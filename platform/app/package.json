@@ -100,6 +100,8 @@
     "@langwatch/agent-server": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-server": "workspace:*",
+    "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/dashboard-server": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/actor": "workspace:*",

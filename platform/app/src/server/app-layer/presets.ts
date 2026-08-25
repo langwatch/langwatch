@@ -87,6 +87,9 @@ import {
   AnalyticsAdapter,
   LoggingAnalyticsTripwire,
 } from "@langwatch/analytics-server";
+import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { featureFlagService } from "~/server/featureFlag";
 import {
@@ -803,6 +806,22 @@ export function initializeDefaultApp(options?: {
         ),
     }),
   });
+  const dashboardService = PostgresDashboardAdapter.create({
+    database: prisma,
+    ids: { generate: () => nanoid() },
+    // The compatibility transports validate with caller protections before
+    // this service is reached. The process policy is the same Analytics
+    // validator for internal callers, using the API-key/full-project view.
+    savedWorkbenchChartPolicy: {
+      validate: async ({ projectId, definition }) => {
+        validateSavedWorkbenchChartDefinition({
+          projectId,
+          protections: await getProtectionsForProject(prisma, { projectId }),
+          definition,
+        });
+      },
+    },
+  }).build();
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
   const planResolver = (organizationId: string) =>
@@ -2099,6 +2118,7 @@ export function initializeDefaultApp(options?: {
     triggerTemplates,
     dspySteps: { steps: dspySteps },
     analytics: analyticsService,
+    dashboard: dashboardService,
     simulations,
     simulationExports,
     suiteRuns: { runs: suiteRunService },
@@ -2557,6 +2577,19 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         throw new Error("ClickHouse not available in test app");
       },
     }),
+    dashboard: PostgresDashboardAdapter.create({
+      database: testPrisma,
+      ids: { generate: () => nanoid() },
+      savedWorkbenchChartPolicy: {
+        validate: async ({ projectId, definition }) => {
+          validateSavedWorkbenchChartDefinition({
+            projectId,
+            protections: await getProtectionsForProject(testPrisma, { projectId }),
+            definition,
+          });
+        },
+      },
+    }).build(),
     experiments: AppExperimentRuntime.create({
       database: testPrisma,
       resolveClickHouseClient: async () => null,

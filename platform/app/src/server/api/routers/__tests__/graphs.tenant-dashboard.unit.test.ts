@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { createInnerTRPCContext } from "../../trpc";
 import { graphsRouter } from "../graphs";
 
@@ -31,24 +31,23 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-const dashboardFindFirst = vi.fn();
-const graphCreate = vi.fn();
+const createGraph = vi.fn();
 
 const createCaller = () => {
   const ctx = createInnerTRPCContext({
     session: { user: { id: "user_1" }, expires: "1" },
     permissionChecked: true,
   });
-  ctx.prisma = {
-    dashboard: { findFirst: dashboardFindFirst },
-    customGraph: { create: graphCreate },
-  } as unknown as PrismaClient;
+  Object.defineProperty(ctx.app, "dashboard", {
+    configurable: true,
+    value: { createGraph },
+  });
   return graphsRouter.createCaller(ctx);
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dashboardFindFirst.mockResolvedValue(null);
+  createGraph.mockRejectedValue(new DashboardNotFoundError());
 });
 
 describe("graph dashboard references", () => {
@@ -62,10 +61,17 @@ describe("graph dashboard references", () => {
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
-    expect(dashboardFindFirst).toHaveBeenCalledWith({
-      where: { id: "dashboard_2", projectId: "project_1" },
-      select: { id: true },
+    expect(createGraph).toHaveBeenCalledWith({
+      projectId: "project_1",
+      name: "Graph",
+      graph: {},
+      filters: {},
+      dashboardId: "dashboard_2",
+      layout: {
+        gridColumn: 0,
+        colSpan: 1,
+        rowSpan: 1,
+      },
     });
-    expect(graphCreate).not.toHaveBeenCalled();
   });
 });

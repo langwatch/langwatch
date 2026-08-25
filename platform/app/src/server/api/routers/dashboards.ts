@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { DashboardService } from "../../dashboards/dashboard.service";
 import { dashboardErrorHandler } from "../../dashboards/middleware";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -20,8 +19,13 @@ export const dashboardsRouter = createTRPCRouter({
     .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
-      const service = DashboardService.create(ctx.prisma);
-      return await service.getAll(input.projectId);
+      const dashboards = await ctx.app.dashboard.getAll({
+        projectId: input.projectId,
+      });
+      return dashboards.map(({ graphCount, ...dashboard }) => ({
+        ...dashboard,
+        _count: { graphs: graphCount },
+      }));
     }),
 
   /**
@@ -32,8 +36,7 @@ export const dashboardsRouter = createTRPCRouter({
     .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
-      const service = DashboardService.create(ctx.prisma);
-      return await service.getById(input.projectId, input.dashboardId);
+      return await ctx.app.dashboard.getById(input);
     }),
 
   /**
@@ -49,8 +52,7 @@ export const dashboardsRouter = createTRPCRouter({
     .permission("analytics:create")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      const service = DashboardService.create(ctx.prisma);
-      return await service.create(input.projectId, input.name);
+      return await ctx.app.dashboard.create(input);
     }),
 
   /**
@@ -67,12 +69,7 @@ export const dashboardsRouter = createTRPCRouter({
     .permission("analytics:update")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      const service = DashboardService.create(ctx.prisma);
-      return await service.rename(
-        input.projectId,
-        input.dashboardId,
-        input.name,
-      );
+      return await ctx.app.dashboard.rename(input);
     }),
 
   /**
@@ -88,8 +85,7 @@ export const dashboardsRouter = createTRPCRouter({
     .permission("analytics:delete")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      const service = DashboardService.create(ctx.prisma);
-      return await service.delete(input.projectId, input.dashboardId);
+      return await ctx.app.dashboard.delete(input);
     }),
 
   /**
@@ -105,8 +101,7 @@ export const dashboardsRouter = createTRPCRouter({
     .permission("analytics:update")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      const service = DashboardService.create(ctx.prisma);
-      return await service.reorder(input.projectId, input.dashboardIds);
+      return await ctx.app.dashboard.reorder(input);
     }),
 
   /**
@@ -118,7 +113,6 @@ export const dashboardsRouter = createTRPCRouter({
     .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
-      const service = DashboardService.create(ctx.prisma);
-      return await service.getOrCreateFirst(input.projectId);
+      return await ctx.app.dashboard.getOrCreateFirst(input);
     }),
 });

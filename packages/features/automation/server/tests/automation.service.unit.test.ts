@@ -194,6 +194,9 @@ class Triggers extends TriggerRepository {
 	tryFindByCustomGraphId() {
 		return Promise.resolve(null);
 	}
+	findByCustomGraphIds() {
+		return Promise.resolve([]);
+	}
 	create() {
 		return Promise.reject(new Error("unused"));
 	}

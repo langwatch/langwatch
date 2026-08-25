@@ -40,6 +40,10 @@ export abstract class AutomationService {
 		projectId: string;
 		customGraphId: string;
 	}): Promise<Trigger | null>;
+	abstract getByCustomGraphIds(input: {
+		projectId: string;
+		customGraphIds: string[];
+	}): Promise<Trigger[]>;
 	abstract getActiveTraceTriggersForProject(
 		projectId: string,
 	): Promise<TriggerSummary[]>;

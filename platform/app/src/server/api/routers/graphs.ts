@@ -1,11 +1,15 @@
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
-import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
-import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
+import type { Graph } from "@langwatch/dashboard-contract";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+/** Compatibility shape: the old Prisma transport exposed the discriminator. */
+const legacyGraph = <T extends Graph>(graph: T) => ({
+  ...graph,
+  kind: "builder" as const,
+});
 
 /**
  * Read-side hydration shape for the `Add / Edit alert` bell icon on the
@@ -38,56 +42,34 @@ export const graphsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
 
-      if (
-        input.dashboardId &&
-        !(await dashboardBelongsToProject(
-          ctx.prisma,
-          input.dashboardId,
-          input.projectId,
-        ))
-      ) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Dashboard not found",
-        });
-      }
-
-      // If no gridRow provided, find the next available row.
-      //
-      // Deliberately not filtered by `kind`: the grid is one shared space, so
-      // the next free row has to account for every chart occupying it. Scoping
-      // this to builder rows would place a new chart on top of a saved
-      // workbench chart the moment those gain dashboard placement.
-      let gridRow = input.gridRow;
-      if (gridRow === undefined && input.dashboardId) {
-        const lastGraph = await ctx.prisma.customGraph.findFirst({
-          where: { dashboardId: input.dashboardId, projectId: input.projectId },
-          orderBy: { gridRow: "desc" },
-        });
-        gridRow = (lastGraph?.gridRow ?? -1) + 1;
-      }
-
-      const customGraph = await ctx.prisma.customGraph.create({
-        data: {
-          id: nanoid(),
-          name: input.name,
-          graph: graph,
+      let customGraph;
+      try {
+        customGraph = await ctx.app.dashboard.createGraph({
           projectId: input.projectId,
+          name: input.name,
+          graph,
           filters: input.filterParams?.filters ?? {},
-          dashboardId: input.dashboardId,
-          gridColumn: input.gridColumn ?? 0,
-          gridRow: gridRow ?? 0,
-          colSpan: input.colSpan ?? 1,
-          rowSpan: input.rowSpan ?? 1,
-        },
-      });
+          ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+          layout: {
+            gridColumn: input.gridColumn ?? 0,
+            ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
+            colSpan: input.colSpan ?? 1,
+            rowSpan: input.rowSpan ?? 1,
+          },
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "DashboardNotFoundError") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Dashboard not found" });
+        }
+        throw error;
+      }
 
       // Alert-writing lives on `automation.upsert` with `customGraphId`
       // as of ADR-034 Phase 5.2. The dashboard chart's `Add alert` bell
       // opens the automations drawer; this router no longer accepts an
       // `alert` field.
 
-      return customGraph;
+      return legacyGraph(customGraph);
     }),
   getAll: protectedProcedure
     .input(
@@ -99,75 +81,77 @@ export const graphsRouter = createTRPCRouter({
     .permission("analytics:view")
     .query(async ({ input, ctx }) => {
       const { projectId, dashboardId } = input;
-      const prisma = ctx.prisma;
-
-      const graphs = await prisma.customGraph.findMany({
-        where: {
-          projectId,
-          kind: BUILDER_CHART_KIND,
-          ...(dashboardId ? { dashboardId } : {}),
-        },
-        orderBy: dashboardId
-          ? [{ gridRow: "asc" }, { gridColumn: "asc" }]
-          : { createdAt: "desc" },
-        include: {
-          trigger: true,
-        },
+      const graphs = await ctx.app.dashboard.listGraphs({
+        projectId,
+        ...(dashboardId === undefined ? {} : { dashboardId }),
       });
+
+      const triggers = await ctx.app.automation.getByCustomGraphIds({
+        projectId,
+        customGraphIds: graphs.map((graph) => graph.id),
+      });
+      const triggerByGraphId = new Map(
+        triggers.flatMap((trigger) =>
+          trigger.customGraphId === null
+            ? []
+            : [[trigger.customGraphId, trigger] as const],
+        ),
+      );
 
       // The included trigger row carries provider secrets in actionParams
       // (the encrypted Slack bot token per ADR-041, webhook header values
       // per ADR-040 §3) — strip them per the trigger's own action before the
       // rows leave the server, the same registry-driven redaction the
       // automations router applies on its read paths.
-      return graphs.map((graph) =>
-        graph.trigger
-          ? {
-              ...graph,
-              trigger: {
-                ...graph.trigger,
-                actionParams: redactActionParamsFor(
-                  graph.trigger.action,
-                  graph.trigger.actionParams ?? {},
-                ),
-              },
-            }
-          : graph,
-      );
+      return graphs.map((graph: Graph) => {
+          const trigger = triggerByGraphId.get(graph.id) ?? null;
+          return {
+            ...legacyGraph(graph),
+            trigger: trigger
+              ? {
+                  ...trigger,
+                  actionParams: redactActionParamsFor(
+                    trigger.action,
+                    trigger.actionParams ?? {},
+                  ),
+                }
+              : null,
+          };
+        });
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("analytics:delete")
     .mutation(async ({ ctx, input }) => {
       const { id } = input;
-      const prisma = ctx.prisma;
-
-      const graph = await prisma.customGraph.findUnique({
-        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
-      });
-      if (!graph) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+      try {
+        return legacyGraph(await ctx.app.dashboard.deleteGraph({
+          projectId: input.projectId,
+          graphId: id,
+        }));
+      } catch (error) {
+        if (error instanceof Error && error.name === "GraphNotFoundError") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+        }
+        throw error;
       }
-
-      await prisma.customGraph.delete({
-        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
-      });
-
-      return graph;
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("analytics:view")
     .query(async ({ ctx, input }) => {
       const { id } = input;
-      const prisma = ctx.prisma;
-
-      const graph = await prisma.customGraph.findUnique({
-        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
-      });
-
-      if (!graph) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+      let graph;
+      try {
+        graph = await ctx.app.dashboard.getGraph({
+          projectId: input.projectId,
+          graphId: id,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "GraphNotFoundError") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+        }
+        throw error;
       }
 
       // Basic validation to ensure filters have the expected structure
@@ -199,11 +183,9 @@ export const graphsRouter = createTRPCRouter({
       }
 
       // Find associated trigger for custom graph alert using direct relation
-      const trigger = await prisma.trigger.findUnique({
-        where: {
-          customGraphId: id,
-          projectId: input.projectId,
-        },
+      const trigger = await ctx.app.automation.tryGetByCustomGraphId({
+        customGraphId: id,
+        projectId: input.projectId,
       });
 
       let alertData = undefined;
@@ -232,7 +214,7 @@ export const graphsRouter = createTRPCRouter({
       }
 
       return {
-        ...graph,
+        ...legacyGraph(graph),
         filters: validatedFilters,
         alert: alertData,
       };
@@ -249,27 +231,28 @@ export const graphsRouter = createTRPCRouter({
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
-      const prisma = ctx.prisma;
-
-      const customGraph = await prisma.customGraph.update({
-        where: {
-          id: input.graphId,
+      let customGraph;
+      try {
+        customGraph = await ctx.app.dashboard.updateGraph({
           projectId: input.projectId,
-          kind: BUILDER_CHART_KIND,
-        },
-        data: {
+          graphId: input.graphId,
           name: input.name,
           graph: JSON.parse(input.graph),
           filters: input.filterParams?.filters ?? {},
-        },
-      });
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "GraphNotFoundError") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+        }
+        throw error;
+      }
 
       // Alert-writing lives on `automation.upsert` with `customGraphId`
       // as of ADR-034 Phase 5.2. The bell icon in the chart-card header
       // opens the automations drawer for edit; this router no longer
       // accepts an `alert` field.
 
-      return customGraph;
+      return legacyGraph(customGraph);
     }),
 
   updateLayout: protectedProcedure
@@ -285,19 +268,23 @@ export const graphsRouter = createTRPCRouter({
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.customGraph.update({
-        where: {
-          id: input.graphId,
+      try {
+        return legacyGraph(await ctx.app.dashboard.updateGraphLayout({
           projectId: input.projectId,
-          kind: BUILDER_CHART_KIND,
-        },
-        data: {
-          gridColumn: input.gridColumn,
-          gridRow: input.gridRow,
-          colSpan: input.colSpan,
-          rowSpan: input.rowSpan,
-        },
-      });
+          graphId: input.graphId,
+          layout: {
+            gridColumn: input.gridColumn,
+            gridRow: input.gridRow,
+            colSpan: input.colSpan,
+            rowSpan: input.rowSpan,
+          },
+        }));
+      } catch (error) {
+        if (error instanceof Error && error.name === "GraphNotFoundError") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+        }
+        throw error;
+      }
     }),
 
   batchUpdateLayouts: protectedProcedure
@@ -317,24 +304,24 @@ export const graphsRouter = createTRPCRouter({
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
-      const updates = input.layouts.map((layout) =>
-        ctx.prisma.customGraph.update({
-          where: {
-            id: layout.graphId,
-            projectId: input.projectId,
-            kind: BUILDER_CHART_KIND,
-          },
-          data: {
-            gridColumn: layout.gridColumn,
-            gridRow: layout.gridRow,
-            colSpan: layout.colSpan,
-            rowSpan: layout.rowSpan,
-          },
-        }),
-      );
-
-      await ctx.prisma.$transaction(updates);
-
-      return { success: true };
+      try {
+        return await ctx.app.dashboard.batchUpdateGraphLayouts({
+          projectId: input.projectId,
+          layouts: input.layouts.map((layout) => ({
+            graphId: layout.graphId,
+            layout: {
+              gridColumn: layout.gridColumn,
+              gridRow: layout.gridRow,
+              colSpan: layout.colSpan,
+              rowSpan: layout.rowSpan,
+            },
+          })),
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "GraphNotFoundError") {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+        }
+        throw error;
+      }
     }),
 });

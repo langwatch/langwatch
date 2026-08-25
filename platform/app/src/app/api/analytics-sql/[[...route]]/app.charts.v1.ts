@@ -34,14 +34,14 @@ import { z } from "zod";
 import { LWQL_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaLitePolicy";
 import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
 import type { Project } from "~/generated/prisma/client";
-
-import {
-  type SavedWorkbenchChart,
-  SavedWorkbenchChartService,
-} from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
+import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
+import {
+  mapDashboardSavedWorkbenchChartError,
+  validateSavedWorkbenchChartDefinition,
+} from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import { prisma } from "~/server/db";
 
 import { canonicalBaseResponses } from "../../shared/base-responses";
@@ -191,10 +191,6 @@ function chartResource({
   };
 }
 
-function chartService(): SavedWorkbenchChartService {
-  return SavedWorkbenchChartService.create(prisma);
-}
-
 /**
  * The chart id the path matched.
  *
@@ -208,6 +204,14 @@ function chartIdOf(chartId: string | undefined): string {
     throw new Error("chart route matched without a chartId path parameter");
   }
   return chartId;
+}
+
+async function dashboardSavedChartCall<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    mapDashboardSavedWorkbenchChartError(error);
+  }
 }
 
 function registerList(secured: ReturnType<typeof createProjectApp>): void {
@@ -233,7 +237,9 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      const charts = await chartService().getAll({ projectId: project.id });
+      const charts = await dashboardSavedChartCall(() =>
+        c.app.dashboard.listSavedWorkbenchCharts({ projectId: project.id }),
+      );
       return c.json({
         data: charts.map((chart) => chartResource({ chart, project })),
       });
@@ -264,13 +270,18 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
-      const chart = await chartService().createChart({
+      const validatedDefinition = validateSavedWorkbenchChartDefinition({
         projectId: project.id,
-        protections: await getProtectionsForProject(prisma, {
-          projectId: project.id,
-        }),
-        input: { name, definition },
+        protections: await getProtectionsForProject(prisma, { projectId: project.id }),
+        definition,
       });
+      const chart = await dashboardSavedChartCall(() =>
+        c.app.dashboard.createSavedWorkbenchChart({
+          projectId: project.id,
+          name,
+          definition: validatedDefinition,
+        }),
+      );
       return c.json(chartResource({ chart, project }), 201);
     },
   );
@@ -298,10 +309,12 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      const chart = await chartService().getById({
-        id: chartIdOf(c.req.param("chartId")),
-        projectId: project.id,
-      });
+      const chart = await dashboardSavedChartCall(() =>
+        c.app.dashboard.getSavedWorkbenchChart({
+          chartId: chartIdOf(c.req.param("chartId")),
+          projectId: project.id,
+        }),
+      );
       return c.json(chartResource({ chart, project }));
     },
   );
@@ -331,17 +344,21 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
-      const chart = await chartService().updateChart({
-        id: chartIdOf(c.req.param("chartId")),
-        projectId: project.id,
-        protections: await getProtectionsForProject(prisma, {
+      const validatedDefinition = definition === undefined
+        ? undefined
+        : validateSavedWorkbenchChartDefinition({
+            projectId: project.id,
+            protections: await getProtectionsForProject(prisma, { projectId: project.id }),
+            definition,
+          });
+      const chart = await dashboardSavedChartCall(() =>
+        c.app.dashboard.updateSavedWorkbenchChart({
+          chartId: chartIdOf(c.req.param("chartId")),
           projectId: project.id,
-        }),
-        input: {
           ...(name === undefined ? {} : { name }),
-          ...(definition === undefined ? {} : { definition }),
-        },
-      });
+          ...(validatedDefinition === undefined ? {} : { definition: validatedDefinition }),
+        }),
+      );
       return c.json(chartResource({ chart, project }));
     },
   );
@@ -366,10 +383,12 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
-      await chartService().deleteChart({
-        id: chartIdOf(c.req.param("chartId")),
-        projectId: project.id,
-      });
+      await dashboardSavedChartCall(() =>
+        c.app.dashboard.deleteSavedWorkbenchChart({
+          chartId: chartIdOf(c.req.param("chartId")),
+          projectId: project.id,
+        }),
+      );
       return c.body(null, 204);
     },
   );

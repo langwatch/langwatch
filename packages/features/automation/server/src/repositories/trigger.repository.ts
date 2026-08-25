@@ -44,6 +44,10 @@ export abstract class TriggerRepository {
 		projectId: string;
 		customGraphId: string;
 	}): Promise<Trigger | null>;
+	abstract findByCustomGraphIds(input: {
+		projectId: string;
+		customGraphIds: string[];
+	}): Promise<Trigger[]>;
 	abstract create(input: CreateTriggerCommand): Promise<Trigger>;
 	abstract update(input: UpdateTriggerCommand): Promise<Trigger>;
 }

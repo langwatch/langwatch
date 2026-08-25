@@ -236,7 +236,7 @@ export class DashboardService extends DashboardServiceContract {
     const projectId = zProjectId(input.projectId);
     const name = savedWorkbenchChartNameSchema.parse(input.name);
     const definition = savedWorkbenchChartDefinitionSchema.parse(input.definition);
-    this.savedWorkbenchChartPolicy.validate({ projectId, definition });
+    await this.savedWorkbenchChartPolicy.validate({ projectId, definition });
     const chart = await this.repository.createSavedWorkbenchChart({
       id: input.id === undefined ? this.ids.generate() : savedWorkbenchChartIdSchema.parse(input.id),
       projectId,
@@ -256,7 +256,7 @@ export class DashboardService extends DashboardServiceContract {
     await this.getSavedWorkbenchChart(parsed);
     const name = input.name === undefined ? undefined : savedWorkbenchChartNameSchema.parse(input.name);
     const definition = input.definition === undefined ? undefined : savedWorkbenchChartDefinitionSchema.parse(input.definition);
-    if (definition !== undefined) this.savedWorkbenchChartPolicy.validate({ projectId: parsed.projectId, definition });
+    if (definition !== undefined) await this.savedWorkbenchChartPolicy.validate({ projectId: parsed.projectId, definition });
     const chart = await this.repository.tryUpdateSavedWorkbenchChart({ ...parsed, name, definition });
     if (!chart) throw new SavedWorkbenchChartNotFoundError();
     return this.presentSavedWorkbenchChart(chart);

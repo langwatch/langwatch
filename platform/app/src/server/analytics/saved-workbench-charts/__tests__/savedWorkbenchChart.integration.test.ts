@@ -15,7 +15,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
-import { PrismaAutomationCustomGraphRepository } from "~/server/app-layer/automations/repositories/custom-graph.prisma.repository";
+import { AppAutomationRuntime } from "~/runtime/app/features/automation";
 import { prisma } from "~/server/db";
 
 import type { Protections } from "../../../traces/protections";
@@ -233,22 +233,25 @@ describe("saved workbench charts (integration)", () => {
         // repository, which reads a chart to evaluate its series. Asserting the
         // converse through one of these is what makes the isolation mutual
         // rather than a property only the workbench's own reads have.
-        const builderReader = new PrismaAutomationCustomGraphRepository(prisma);
+        const builderReader = AppAutomationRuntime.create({
+          database: prisma,
+          redis: null,
+        }).build();
 
         expect(
-          await builderReader.findById({
+          await builderReader.tryGetCustomGraph({
             customGraphId: saved.id,
             projectId: project.id,
           }),
         ).toBeNull();
         expect(
-          await builderReader.existsInProject({
+          await builderReader.customGraphExistsInProject({
             customGraphId: saved.id,
             projectId: project.id,
           }),
         ).toBe(false);
         expect(
-          await builderReader.findAllNamesByIds({
+          await builderReader.getCustomGraphNamesByIds({
             customGraphIds: [saved.id, builder.id],
             projectId: project.id,
           }),

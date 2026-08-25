@@ -55,7 +55,7 @@ export abstract class DashboardRepository {
 
 /** Application-owned validation for LWQL and Vega-Lite definitions. */
 export abstract class SavedWorkbenchChartPolicy {
-  abstract validate(input: { projectId: string; definition: SavedWorkbenchChartDefinition }): void;
+  abstract validate(input: { projectId: string; definition: SavedWorkbenchChartDefinition }): void | Promise<void>;
 }
 
 export abstract class DashboardIdGenerator {

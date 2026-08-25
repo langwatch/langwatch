@@ -138,6 +138,12 @@ export class AutomationService extends AutomationCapability {
 	}): Promise<Trigger | null> {
 		return this.triggers.tryFindByCustomGraphId(input);
 	}
+	getByCustomGraphIds(input: {
+		projectId: string;
+		customGraphIds: string[];
+	}): Promise<Trigger[]> {
+		return this.triggers.findByCustomGraphIds(input);
+	}
 	async getActiveTraceTriggersForProject(
 		projectId: string,
 	): Promise<TriggerSummary[]> {

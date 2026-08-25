@@ -123,6 +123,19 @@ export class PrismaTriggerRepository extends TriggerRepository {
 		});
 		return row === null ? null : mapTriggerRow(row);
 	}
+	async findByCustomGraphIds(input: {
+		projectId: string;
+		customGraphIds: string[];
+	}): Promise<Trigger[]> {
+		if (input.customGraphIds.length === 0) return [];
+		const rows = await this.database.trigger.findMany({
+			where: {
+				projectId: input.projectId,
+				customGraphId: { in: input.customGraphIds },
+			},
+		});
+		return rows.map((row) => mapTriggerRow(row));
+	}
 	async create(input: CreateTriggerCommand): Promise<Trigger> {
 		const row = await this.database.trigger.create({
 			data: {

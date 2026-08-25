@@ -52,8 +52,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -264,7 +263,7 @@ describe("given the saved workbench chart REST endpoints", () => {
     // A real scoped key rather than a stubbed permission check: the claim is
     // "a key that may read cannot write", and a mocked check can only ever
     // agree with whatever it was told to return.
-    const created = await ApiKeyService.create(prisma).create({
+    const created = await getApp().apiKeys.create({
       name: `saved-charts-view-only-${ns}`,
       organizationId: organization.id,
       permissionMode: "restricted",

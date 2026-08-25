@@ -300,37 +300,12 @@ export class SavedWorkbenchChartService {
     protections: Protections;
     definition: unknown;
   }): WorkbenchChartDefinition {
-    const parsed = workbenchChartDefinitionSchema.safeParse(definition);
-    if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
-
-    this.deps.lwql.validate({
+    return validateSavedWorkbenchChartDefinition({
       projectId,
       protections,
-      sql: parsed.data.sql,
-      parameters: parsed.data.parameters,
+      definition,
+      lwql: this.deps.lwql,
     });
-
-    if (parsed.data.vegaLiteSpec !== undefined) {
-      const verdict = validateVegaLiteSpecStructure({
-        spec: parsed.data.vegaLiteSpec,
-        // The one dataset the workbench registers. Naming it here is what makes
-        // a specification reading anything else refused at save rather than
-        // discovered at render.
-        registeredDatasets: [LWQL_QUERY_RESULT_DATASET],
-      });
-      if (!verdict.ok) {
-        logger.info(
-          {
-            projectId,
-            rules: verdict.errors.map((error) => error.rule),
-          },
-          "workbench chart specification refused by policy",
-        );
-        throw new SavedWorkbenchChartSpecificationRefusedError(verdict.errors);
-      }
-    }
-
-    return parsed.data;
   }
 
   /**
@@ -362,4 +337,64 @@ export class SavedWorkbenchChartService {
       updatedAt: row.updatedAt,
     };
   }
+}
+
+/**
+ * Reuses Analytics' existing save-time governance without owning persistence.
+ * Dashboard transports call this immediately before handing a parsed
+ * definition to DashboardService, preserving caller-specific protections while
+ * the lifecycle itself remains process-owned by Dashboard.
+ */
+export function validateSavedWorkbenchChartDefinition({
+  projectId,
+  protections,
+  definition,
+  lwql = getLangWatchQLService(),
+}: {
+  projectId: string;
+  protections: Protections;
+  definition: unknown;
+  lwql?: LangWatchQLService;
+}): WorkbenchChartDefinition {
+  const parsed = workbenchChartDefinitionSchema.safeParse(definition);
+  if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
+
+  lwql.validate({
+    projectId,
+    protections,
+    sql: parsed.data.sql,
+    parameters: parsed.data.parameters,
+  });
+
+  if (parsed.data.vegaLiteSpec !== undefined) {
+    const verdict = validateVegaLiteSpecStructure({
+      spec: parsed.data.vegaLiteSpec,
+      registeredDatasets: [LWQL_QUERY_RESULT_DATASET],
+    });
+    if (!verdict.ok) {
+      logger.info(
+        {
+          projectId,
+          rules: verdict.errors.map((error) => error.rule),
+        },
+        "workbench chart specification refused by policy",
+      );
+      throw new SavedWorkbenchChartSpecificationRefusedError(verdict.errors);
+    }
+  }
+
+  return parsed.data;
+}
+
+/** Keeps compatibility transports on the established handled-error wire shape. */
+export function mapDashboardSavedWorkbenchChartError(error: unknown): never {
+  if (error instanceof Error && error.name === "SavedWorkbenchChartNotFoundError") {
+    throw new SavedWorkbenchChartNotFoundError();
+  }
+  if (error instanceof Error && error.name === "SavedWorkbenchChartDefinitionInvalidError") {
+    throw new SavedWorkbenchChartDefinitionInvalidError(
+      (error as Error & { chartId?: string }).chartId ?? "unknown",
+    );
+  }
+  throw error;
 }

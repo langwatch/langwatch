@@ -143,7 +143,6 @@ export class PrismaDashboardRepository extends DashboardRepository {
       where: {
         projectId: input.projectId,
         dashboardId: input.dashboardId,
-        kind: BUILDER_CHART_KIND,
       },
       orderBy: { gridRow: "desc" },
       select: { gridRow: true },
