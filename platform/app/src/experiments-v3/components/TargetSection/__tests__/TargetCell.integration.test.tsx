@@ -294,6 +294,43 @@ describe("TargetCellContent", () => {
       expect(screen.getByText("Something went wrong")).toBeInTheDocument();
     });
 
+    /** @scenario "The cell says which evaluator had nothing to read" */
+    it("names the evaluator and the fix when no input resolved", () => {
+      const target = createTarget();
+
+      render(
+        <TargetCellContent
+          target={target}
+          output={null}
+          evaluatorResults={{}}
+          row={0}
+          domainError={{
+            code: "evaluator_no_inputs_resolved",
+            kind: "evaluator_no_inputs_resolved",
+            meta: { evaluatorName: "Answer Correctness" },
+            traceId: undefined,
+            spanId: undefined,
+            fault: "customer",
+            httpStatus: 400,
+            reasons: [],
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText(/This evaluator had nothing to read/),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Map the fields of Answer Correctness in the evaluator settings/,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Check its configuration, then run again/),
+      ).not.toBeInTheDocument();
+    });
+
     it("renders object output as JSON", () => {
       const target = createTarget();
       const objectOutput = { key: "value", nested: { foo: "bar" } };

@@ -81,6 +81,19 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     When a newer version lands for this experiment
     Then the stale banner appears and nothing reloads until the user asks
 
+  # One turn that duplicates a target, writes its prompt and runs it is three
+  # saves in a row. While the page reloads for the first, the later versions
+  # arrive with a reload already running. Ignoring them left the page holding
+  # whatever that one fetch happened to bring back, so a target created after
+  # the fetch left the server was never learned and its cells read "No output
+  # yet" until the reader reloaded by hand.
+  @integration
+  Scenario: A burst of backend saves leaves the page on the newest one
+    Given the workbench is open with no unsaved edits
+    And a reload is already running for a version that landed
+    When a newer version lands for this experiment
+    Then the page reloads again once the running reload finishes
+
   # A tab with unsaved edits already has its own save coming, and that save's
   # answer is the truth: a new version, or a refusal. Bannering on the version
   # signal instead told the reader their work clashed with "somewhere else"

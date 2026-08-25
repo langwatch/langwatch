@@ -476,6 +476,21 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And the operator is told to set one up on their own account first
     But an operator who has set one up may impersonate "sam"
 
+  # Asking which of somebody's organizations require a factor is a question
+  # about one person across many organizations. Asked the wrong way it is a
+  # question the tenancy rules refuse to answer at all, and a refusal to
+  # answer is not the same as an answer of "no": it took every impersonation
+  # down as an unexplained failure, including the ones no organization had
+  # any requirement for.
+  @unit
+  Scenario: Looking up the requirement decides the request rather than failing it
+    Given "sam" belongs to organizations that the operator must be checked against
+    When the operator tries to impersonate "sam"
+    Then the request is decided on the operator's own second factor
+    And it never fails as an unexplained error
+
+  # No longer @unimplemented: this branch binds it in
+  # `impersonationRevokeMigration.integration.test.ts`.
   @integration
   Scenario: The one revoke at deploy is the impersonating sessions
     Given sessions exist carrying the legacy impersonation payload

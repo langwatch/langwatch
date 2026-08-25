@@ -23,6 +23,7 @@ import {
 } from "~/components/variables";
 import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappings";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
+import { getFieldsUsedByPromptTemplate } from "~/experiments-v3/utils/mappingValidation";
 import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
@@ -1089,7 +1090,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const watchedMessages = methods.watch("version.configData.messages");
 
   // Calculate missing mapping IDs for highlighting in the variables section
-  // A variable is missing if it's BOTH used in the prompt AND in the inputs list, but has no mapping
+  // A variable is missing if the template consumes it AND it is in the inputs
+  // list, but it has no mapping. The same rule drives the column header in the
+  // workbench, so both surfaces name the same variables.
   // Uses `inputMappings` which is the single source of truth inside this drawer.
   const missingMappingIds = useMemo(() => {
     // Only show missing mappings if we're in evaluations context (have availableSources)
@@ -1097,28 +1100,25 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       return new Set<string>();
     }
 
-    // Extract variables used in messages
-    const usedVariables = new Set<string>();
     const messages = Array.isArray(watchedMessages) ? watchedMessages : [];
-    for (const msg of messages) {
-      const content = msg?.content ?? "";
-      const pattern = /\{\{(\w+)\}\}/g;
-      let match;
-      while ((match = pattern.exec(content)) !== null) {
-        usedVariables.add(match[1]!);
-      }
-    }
-
-    // Get input identifiers
     const inputs = Array.isArray(watchedInputs) ? watchedInputs : [];
-    const inputIds = new Set(
-      inputs.map((i: { identifier: string }) => i.identifier),
+    const declaredFieldIds = inputs.map(
+      (input: { identifier: string }) => input.identifier,
     );
 
+    const usedVariables = getFieldsUsedByPromptTemplate({
+      messages: messages.map((message) => ({
+        role: message?.role ?? "user",
+        content: message?.content ?? "",
+      })),
+      declaredFieldIds,
+    });
+
     // Find variables that are both used and defined but missing a mapping
+    const declared = new Set(declaredFieldIds);
     const missing = new Set<string>();
     for (const varId of usedVariables) {
-      if (inputIds.has(varId) && !inputMappings?.[varId]) {
+      if (declared.has(varId) && !inputMappings?.[varId]) {
         missing.add(varId);
       }
     }

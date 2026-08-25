@@ -274,6 +274,33 @@ export const COMPARISON_EVALUATOR_TYPE = "langevals/select_best_compare";
 /** @deprecated Legacy two-slot judge. Read for back-compat; never written. */
 export const LEGACY_PAIRWISE_EVALUATOR_TYPE = "langevals/pairwise_compare";
 
+/**
+ * Whether this evaluator type is allowed to own a standalone comparison column.
+ *
+ * A `comparison` config is what turns an evaluator from a chip attached to
+ * every target column into a column of its own that judges the other columns
+ * against each other. Only the comparison judge can do that. Any other type
+ * given a `comparison` becomes a column that renders as a comparison and runs
+ * as something that never receives the candidates it is asked to compare.
+ *
+ * The legacy two-slot judge counts: its saved rows open in the same form and
+ * dispatch to the current judge.
+ */
+export const isComparisonEvaluatorType = (
+  evaluatorType: string | undefined,
+): boolean =>
+  evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+  evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+
+/**
+ * What every refusal of that invariant tells the caller. One wording, shared by
+ * the payload schema, the transform, the store and the save seam, so an agent
+ * reads the same instruction whichever of them stopped it.
+ */
+export const COMPARISON_COLUMN_REFUSAL =
+  `Only the Comparison judge (${COMPARISON_EVALUATOR_TYPE}) can be a standalone comparison column. ` +
+  `Omit "comparison" and this evaluator attaches to every target column as a score.`;
+
 export const comparisonEvaluatorConfigSchema = z.object({
   variants: z.array(z.string()).default([]),
   variantOutputPaths: z.record(z.string(), z.array(z.string())).optional(),

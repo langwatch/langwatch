@@ -266,10 +266,53 @@ Feature: Langy drives the open page through typed UI actions
       Then the edit is saved before the run starts
 
     @integration
+    Scenario: A run answers with the id of the run it started
+      Given the page holds an edit the agent has just made
+      When the agent dispatches workbench.run
+      Then the answer carries the id of the run and says it is running
+      And the answer does not wait for the run to finish
+
+    @integration
     Scenario: Two saves never overlap
       Given a save is already in flight
       When another save is asked for
       Then it waits for the first, so neither is refused for the other's version
+
+  Rule: The browser leg is proven end to end against a live stack
+
+    Every scenario above pins one part of the channel with a mock on the other
+    side of it. None of them proves the parts fit together on a real stack, and
+    the parts are spread across a CLI, an HTTP route, Redis, an SSE stream, a
+    browser store and an execution pipeline.
+
+    A headless stand-in for the page closes that gap
+    (platform/app/e2e/langy/fake-workbench-tab.ts). It listens to the same turn
+    stream the panel listens to, claims through the same mutation, applies the
+    same transforms to the same store, saves the same document, and starts runs
+    through the same route. What it stands in for is the rendering, not the
+    behavior, so a suite with one attached exercises the leg the no-page suites
+    can never reach.
+
+    @e2e
+    Scenario: A live conversation's actions are claimed and carried out by the open page
+      Given a workbench page is attached to a running conversation
+      When Langy dispatches workbench actions during the turn
+      Then the page claims them and applies them to its own state
+      And the result the agent reads says the browser carried them out
+
+    @e2e
+    Scenario: A run the open page starts covers the columns its comparisons depend on
+      Given a comparison column judging two prompt columns that already have outputs
+      When the page starts a run scoped to the comparison column alone
+      Then every row of the comparison carries a verdict
+      And no row says it is waiting on a column the run did not cover
+
+    @e2e
+    Scenario: One column re-run on its own still gets its comparison judged
+      Given a comparison judging two prompt columns that already have outputs
+      When the page starts a run scoped to one of those columns alone
+      Then every row of the comparison carries a verdict
+      And no row says it is waiting on the column that was not re-run
 
   Rule: The customer can read what the agent asked the page to do
 

@@ -289,8 +289,11 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 		}
 		if clipped {
 			// An in-band, shape-preserving marker: cards render the head as the
-			// sample it already is; totals ride the document's own count fields.
-			out = append(out, fmt.Sprintf("… %d more items truncated", len(value)-maxItems))
+			// sample it already is. The marker states the array's true size,
+			// because a bare array has no count field of its own for a reader to
+			// ride: the agent otherwise counts the marker as a row and reports
+			// one more item than exists.
+			out = append(out, fmt.Sprintf("… %d more items truncated, %d total", len(value)-maxItems, len(value)))
 		}
 		return out
 	case map[string]any:

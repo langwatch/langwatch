@@ -1,6 +1,10 @@
 import { nanoid } from "nanoid";
 import type { Field } from "~/optimization_studio/types/dsl";
-import type { EvaluatorConfig } from "../../types";
+import {
+  COMPARISON_COLUMN_REFUSAL,
+  type EvaluatorConfig,
+  isComparisonEvaluatorType,
+} from "../../types";
 import { inferAllEvaluatorMappings } from "../../utils/mappingInference";
 import {
   type AddEvaluatorPayload,
@@ -9,6 +13,32 @@ import {
 import { type Transform, TransformError, type WorkbenchState } from "./types";
 
 export const newEvaluatorId = () => `evaluator_${nanoid(8)}`;
+
+/**
+ * Refuses an evaluator that carries a `comparison` config it cannot own.
+ *
+ * The payload schema states the same rule, so an action goes no further than
+ * its own validation. This is the belt for every caller that reaches a state
+ * edit without that schema: the store's own `addEvaluator` and
+ * `updateEvaluator` take a typed `EvaluatorConfig` straight from the UI.
+ */
+export const assertComparisonColumnAllowed = (evaluator: {
+  id?: string;
+  evaluatorType?: string;
+  comparison?: unknown;
+}): void => {
+  if (!evaluator.comparison) return;
+  if (isComparisonEvaluatorType(evaluator.evaluatorType)) return;
+
+  throw new TransformError({
+    code: "evaluator_comparison_type_invalid",
+    message: COMPARISON_COLUMN_REFUSAL,
+    meta: {
+      ...(evaluator.id ? { evaluatorId: evaluator.id } : {}),
+      evaluatorType: evaluator.evaluatorType,
+    },
+  });
+};
 
 /**
  * Append an evaluator and wire it up.
@@ -23,19 +53,27 @@ export const attachEvaluator = ({
 }: {
   state: WorkbenchState;
   evaluator: EvaluatorConfig;
-}): WorkbenchState => ({
-  ...state,
-  evaluators: [
-    ...state.evaluators,
-    {
-      ...evaluator,
-      mappings: {
-        ...evaluator.mappings,
-        ...inferAllEvaluatorMappings(evaluator, state.datasets, state.targets),
+}): WorkbenchState => {
+  assertComparisonColumnAllowed(evaluator);
+
+  return {
+    ...state,
+    evaluators: [
+      ...state.evaluators,
+      {
+        ...evaluator,
+        mappings: {
+          ...evaluator.mappings,
+          ...inferAllEvaluatorMappings(
+            evaluator,
+            state.datasets,
+            state.targets,
+          ),
+        },
       },
-    },
-  ],
-});
+    ],
+  };
+};
 
 /**
  * A caller-supplied id has to be free. Two evaluators under one id make the

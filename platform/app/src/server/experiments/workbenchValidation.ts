@@ -1,13 +1,41 @@
 import type { Prisma } from "~/generated/prisma/client";
 import {
+  COMPARISON_COLUMN_REFUSAL,
+  isComparisonEvaluatorType,
+} from "../../experiments-v3/types";
+import {
   type PersistedEvaluationsV3State,
   persistedEvaluationsV3StateSchema,
 } from "../../experiments-v3/types/persistence";
+import { normalizeEvaluators } from "../../experiments-v3/utils/normalizeComparison";
 import { InvalidWorkbenchStateError } from "./errors";
 import type { WorkbenchReferenceType } from "./workbenchReference.repository";
 
 /** How many zod issues travel to the caller. Enough to fix, not a dump. */
 const MAX_REPORTED_ISSUES = 10;
+
+/**
+ * Every evaluator carrying a `comparison` config it cannot own.
+ *
+ * The field types cannot state this rule, because `comparison` is optional on
+ * every evaluator and only the type decides who may set it. A state that gets
+ * past it holds a column that renders as a standalone comparison and runs as a
+ * judge that never receives the candidates it is asked to compare, which is
+ * what the customer sees as a column that fails every row.
+ */
+const comparisonColumnIssues = (
+  state: PersistedEvaluationsV3State,
+): { path: string; message: string }[] =>
+  state.evaluators.flatMap((evaluator, index) =>
+    evaluator.comparison && !isComparisonEvaluatorType(evaluator.evaluatorType)
+      ? [
+          {
+            path: `evaluators.${index}.comparison`,
+            message: `Evaluator ${evaluator.id} is a ${evaluator.evaluatorType}. ${COMPARISON_COLUMN_REFUSAL}`,
+          },
+        ]
+      : [],
+  );
 
 /**
  * Parses an incoming workbench state, or refuses the write.
@@ -20,14 +48,46 @@ export const parseWorkbenchState = (
   state: unknown,
 ): PersistedEvaluationsV3State => {
   const result = persistedEvaluationsV3StateSchema.safeParse(state);
-  if (result.success) return result.data;
+  if (!result.success) {
+    throw new InvalidWorkbenchStateError({
+      issues: result.error.issues
+        .slice(0, MAX_REPORTED_ISSUES)
+        .map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+    });
+  }
 
-  throw new InvalidWorkbenchStateError({
-    issues: result.error.issues.slice(0, MAX_REPORTED_ISSUES).map((issue) => ({
-      path: issue.path.join("."),
-      message: issue.message,
-    })),
-  });
+  const issues = comparisonColumnIssues(result.data);
+  if (issues.length > 0) {
+    throw new InvalidWorkbenchStateError({
+      issues: issues.slice(0, MAX_REPORTED_ISSUES),
+    });
+  }
+
+  return result.data;
+};
+
+/**
+ * The stored blob, with any evaluator repaired that an earlier write left in a
+ * shape the workbench cannot render.
+ *
+ * Rows saved before the comparison-column rule was enforced can hold a plain
+ * evaluator with a `comparison` config. Repairing on read is what keeps those
+ * rows editable: the next write of the row carries the attached evaluator it
+ * always should have been, so the save seam accepts it instead of refusing
+ * every later edit of a row nobody typed by hand.
+ *
+ * Same function the browser store runs at its own load boundary, so a row reads
+ * the same on both sides.
+ */
+export const repairWorkbenchState = (
+  stored: unknown,
+): PersistedEvaluationsV3State | null => {
+  const state = (stored as PersistedEvaluationsV3State | null) ?? null;
+  if (!state || !Array.isArray(state.evaluators)) return state;
+  return { ...state, evaluators: normalizeEvaluators(state.evaluators) };
 };
 
 /**

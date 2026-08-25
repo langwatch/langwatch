@@ -25,6 +25,16 @@ const authorOf = (version: ExperimentVersionSummary): string => {
   return "User";
 };
 
+/**
+ * What the version cell holds.
+ *
+ * Numbered versions run 1, 2, 3 with no gaps. Typing rewrites one autosave
+ * row, whose number changes with every save, so the table names it for what it
+ * is. The number is still in the JSON output for a script that restores it.
+ */
+const versionOf = (version: ExperimentVersionSummary): string =>
+  version.autoSaved ? "autosave" : `v${version.version}`;
+
 export const experimentVersionsCommand = async (
   slug: string,
   options: ExperimentVersionsOptions = {},
@@ -83,10 +93,10 @@ export const experimentVersionsCommand = async (
 
         formatTable({
           data: result.versions.map((version) => ({
-            Version: `v${version.version}`,
+            Version: versionOf(version),
             Author: authorOf(version),
             Message: version.commitMessage ?? chalk.gray("—"),
-            Saved: formatRelativeTime(version.createdAt),
+            Saved: formatRelativeTime(version.updatedAt),
           })),
           headers: ["Version", "Author", "Message", "Saved"],
           colorMap: {
@@ -99,7 +109,7 @@ export const experimentVersionsCommand = async (
           console.log();
           console.log(
             chalk.gray(
-              `More versions below v${result.nextCursor}. Next page: ${chalk.cyan(
+              `More versions below this page. Next page: ${chalk.cyan(
                 `langwatch experiment versions ${slug} --cursor ${result.nextCursor}`,
               )}`,
             ),
@@ -112,6 +122,19 @@ export const experimentVersionsCommand = async (
             `Use ${chalk.cyan(`langwatch experiment restore ${slug} <version>`)} to bring one back.`,
           ),
         );
+
+        // The autosave row is named rather than numbered, because its number
+        // moves with every save and the numbered rows do not follow it. Restore
+        // still takes that number, so the handle is stated here rather than
+        // being unreachable from the table.
+        const autosave = result.versions.find((version) => version.autoSaved);
+        if (autosave) {
+          console.log(
+            chalk.gray(
+              `The autosave restores as version ${chalk.cyan(autosave.version)}.`,
+            ),
+          );
+        }
       },
     };
   } catch (error) {
