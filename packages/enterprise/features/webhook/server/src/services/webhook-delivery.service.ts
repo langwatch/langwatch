@@ -630,9 +630,8 @@ async function endpointsSubscribedTo({
   status: DeliverPayload["status"];
 }): Promise<WebhookEndpointView[]> {
   const eventType = deliveryEventType(status);
-  return (await deps.endpoints.getActiveByOrganization({ organizationId })).filter((e) =>
-    eventMatches(e.enabledEvents, eventType),
-  );
+  const endpoints = await deps.endpoints.getActiveByOrganization({ organizationId });
+  return endpoints.filter((e) => eventMatches(e.enabledEvents, eventType));
 }
 
 /**

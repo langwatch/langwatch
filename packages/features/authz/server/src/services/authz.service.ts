@@ -491,13 +491,12 @@ export class AuthzService extends AuthzServiceContract {
   ): Promise<boolean> {
     const scope = this.tryScopeOf(check);
     if (!scope) return false;
-    return (
-      await this.getDecision({
-        userId: check.userId,
-        permission: check.permission,
-        scope,
-      })
-    ).permitted;
+    const decision = await this.getDecision({
+      userId: check.userId,
+      permission: check.permission,
+      scope,
+    });
+    return decision.permitted;
   }
 
   async authorizePermission<

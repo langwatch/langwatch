@@ -217,13 +217,15 @@ export class AutomationService extends AutomationCapability {
   }
 
   async getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
-    return (await this.active(projectId)).filter(
+    const triggers = await this.active(projectId);
+    return triggers.filter(
       (trigger) => !trigger.customGraphId && trigger.triggerKind !== "REPORT",
     );
   }
 
   async getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
-    return (await this.active(projectId)).filter(
+    const triggers = await this.active(projectId);
+    return triggers.filter(
       (trigger) => trigger.customGraphId !== null && trigger.triggerKind !== "REPORT",
     );
   }

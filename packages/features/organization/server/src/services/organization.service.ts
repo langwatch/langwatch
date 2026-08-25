@@ -1353,12 +1353,11 @@ export class OrganizationService extends OrganizationServiceContract {
     organizationId: string;
     groupId: string;
   }): Promise<OrganizationGroupBinding[]> {
-    return (
-      await this.authz.listGroupBindings({
-        organizationId: input.organizationId,
-        groupId: input.groupId,
-      })
-    ).map((binding) => this.toGroupBinding(binding));
+    const bindings = await this.authz.listGroupBindings({
+      organizationId: input.organizationId,
+      groupId: input.groupId,
+    });
+    return bindings.map((binding) => this.toGroupBinding(binding));
   }
 
   private toGroupBinding(binding: {

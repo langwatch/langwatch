@@ -27,7 +27,7 @@
     },
     {
       "file": "packages/enterprise/features/webhook/server/src/services/webhook-delivery.service.ts",
-      "moduleLines": 1336,
+      "moduleLines": 1335,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -43,7 +43,7 @@
     },
     {
       "file": "packages/features/authz/server/src/services/authz.service.ts",
-      "moduleLines": 803,
+      "moduleLines": 802,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,
@@ -115,7 +115,7 @@
     },
     {
       "file": "packages/features/organization/server/src/services/organization.service.ts",
-      "moduleLines": 1433,
+      "moduleLines": 1432,
       "methodLines": 152,
       "statements": 24,
       "complexity": 24,

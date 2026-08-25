@@ -148,7 +148,8 @@ export class ProjectService extends ProjectServiceContract {
   }
 
   async getOrganizationId(projectId: string): Promise<string> {
-    return (await this.getWithTeam(projectId)).team.organizationId;
+    const project = await this.getWithTeam(projectId);
+    return project.team.organizationId;
   }
 
   tryGetById(projectId: string): Promise<Project | null> {
