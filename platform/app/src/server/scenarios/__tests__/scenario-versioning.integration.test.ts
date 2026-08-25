@@ -12,9 +12,7 @@ import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
-import {
-  ScenarioStaleVersionError,
-} from "../errors";
+import { ScenarioStaleVersionError } from "../errors";
 import { ScenarioService } from "../scenario.service";
 
 const projectId = `test-scenario-versioning-${nanoid(8)}`;

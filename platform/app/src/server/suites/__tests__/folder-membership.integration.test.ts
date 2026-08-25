@@ -11,12 +11,12 @@
  */
 import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ScenarioService } from "../../scenarios/scenario.service";
-import { SuiteService } from "../suite.service";
-import type { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { reconcileFolderMembership } from "../folder-membership";
+import { SuiteService } from "../suite.service";
 
 const projectId = `test-folder-membership-${nanoid(8)}`;
 const otherProjectId = `${projectId}-other`;
@@ -127,7 +127,10 @@ describe("folder membership", () => {
     /** @scenario "A case created from inside a suite is filed into that suite" */
     it("names the folder on the case and holds the case on the folder", async () => {
       const folder = await createFolder("Refunds");
-      const scenario = await createCase({ name: "Refund", folderId: folder.id });
+      const scenario = await createCase({
+        name: "Refund",
+        folderId: folder.id,
+      });
 
       expect(scenario.folderId).toBe(folder.id);
       expect(await folderScenarioIds(folder.id)).toEqual([scenario.id]);

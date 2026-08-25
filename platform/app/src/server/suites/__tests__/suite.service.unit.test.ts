@@ -1305,12 +1305,10 @@ describe("SuiteService", () => {
       it("schedules cases x targets x repeat count runs", async () => {
         const { service, scenarioRepo, suiteRunService } = createService({
           scenarioRepository: {
-            findManyByFolder: vi
-              .fn()
-              .mockResolvedValue([
-                { id: "scen_1", archivedAt: null },
-                { id: "scen_2", archivedAt: null },
-              ]),
+            findManyByFolder: vi.fn().mockResolvedValue([
+              { id: "scen_1", archivedAt: null },
+              { id: "scen_2", archivedAt: null },
+            ]),
           },
         });
         const folder = makeSuite({

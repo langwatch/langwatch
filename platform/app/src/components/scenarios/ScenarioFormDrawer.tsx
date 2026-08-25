@@ -651,9 +651,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             {isAgentTesting ? (
               <HStack gap={2}>
                 <Heading size="md">
-                  {scenarioId || scenario
-                    ? "Edit test case"
-                    : "New test case"}
+                  {scenarioId || scenario ? "Edit test case" : "New test case"}
                 </Heading>
                 <CaseVersionChip version={scenario?.version} />
               </HStack>

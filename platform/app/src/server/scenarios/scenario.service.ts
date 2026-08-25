@@ -18,6 +18,12 @@ import {
   ScenarioVersionNotFoundError,
 } from "./errors";
 import {
+  type CreateScenarioInput,
+  ScenarioRepository,
+  type ScenarioRunConfig,
+  type UpdateScenarioInput,
+} from "./scenario.repository";
+import {
   buildSnapshotEnvelope,
   diffSnapshotFields,
   parseSnapshotEnvelope,
@@ -28,12 +34,6 @@ import {
   snapshotFieldsOf,
   touchesVersionedFields,
 } from "./scenario-versioning";
-import {
-  type CreateScenarioInput,
-  ScenarioRepository,
-  type ScenarioRunConfig,
-  type UpdateScenarioInput,
-} from "./scenario.repository";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.service");
 const logger = createLogger("langwatch:scenarios:service");

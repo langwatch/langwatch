@@ -173,9 +173,7 @@ export function ScenarioCreateModal({
         name: "AI",
         description:
           "Describe the behavior you care about. AI will turn it into an editable situation and success criteria.",
-        promptLabel: isAgentTesting
-          ? AGENT_TESTING_PROMPT_LABEL
-          : PROMPT_LABEL,
+        promptLabel: isAgentTesting ? AGENT_TESTING_PROMPT_LABEL : PROMPT_LABEL,
         generateLabel: "Draft with AI",
         reviewHint:
           "AI is shaping the situation and criteria. You will review everything before it is saved.",

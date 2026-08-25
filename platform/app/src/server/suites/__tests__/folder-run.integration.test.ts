@@ -16,8 +16,8 @@ import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { ScenarioService } from "../../scenarios/scenario.service";
-import { getSuiteSetId } from "../suite-set-id";
 import { SuiteService } from "../suite.service";
+import { getSuiteSetId } from "../suite-set-id";
 
 const projectId = `test-folder-run-${nanoid(8)}`;
 const organizationId = "test-folder-run-org";

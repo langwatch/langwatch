@@ -417,9 +417,7 @@ describe("<RunPlanDetail/>", () => {
     setRuns([makeRun({ scenarioRunId: "run_a", scenarioId: "scen_7" })]);
     renderDetail();
 
-    await user.click(
-      screen.getByRole("button", { name: /^Actions for / }),
-    );
+    await user.click(screen.getByRole("button", { name: /^Actions for / }));
     await user.click(
       await screen.findByRole("menuitem", { name: "Edit test case" }),
     );

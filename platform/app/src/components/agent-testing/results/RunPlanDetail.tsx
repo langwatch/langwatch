@@ -417,7 +417,9 @@ export function RunPlanDetail({
                 onScenarioRunClick={handleScenarioRunClick}
                 onCancelRun={canStop ? handleCancelRun : undefined}
                 cancellingJobId={cancellingJobId}
-                onEditCase={can("scenarios:manage") ? handleEditCase : undefined}
+                onEditCase={
+                  can("scenarios:manage") ? handleEditCase : undefined
+                }
               />
             )}
           </>

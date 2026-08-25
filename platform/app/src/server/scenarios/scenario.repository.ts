@@ -208,7 +208,9 @@ export class ScenarioRepository {
   async findManyIncludingArchived(input: {
     ids: string[];
     projectId: string;
-  }): Promise<{ id: string; archivedAt: Date | null; folderId: string | null }[]> {
+  }): Promise<
+    { id: string; archivedAt: Date | null; folderId: string | null }[]
+  > {
     return tracer.withActiveSpan(
       "ScenarioRepository.findManyIncludingArchived",
       {

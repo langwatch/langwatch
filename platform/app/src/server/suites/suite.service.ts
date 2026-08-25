@@ -247,7 +247,7 @@ export class SuiteService {
           id: params.folderId,
           projectId: params.projectId,
         });
-        if (!folder || folder.kind !== "folder") {
+        if (folder?.kind !== "folder") {
           throw new SuiteNotFoundError();
         }
         return await this.repository.update({

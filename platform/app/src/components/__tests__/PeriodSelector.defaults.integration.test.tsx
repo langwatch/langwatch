@@ -10,6 +10,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { startOfDay, subDays } from "date-fns";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PeriodSelector } from "../PeriodSelector";
@@ -18,9 +19,14 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
+/**
+ * Anchored to the day the test runs. The trigger names a preset only while
+ * the range still ends today, so a fixed pair of dates would name the preset
+ * on the day it was written and print raw dates on every day after.
+ */
 const period = {
-  startDate: new Date("2026-07-26T00:00:00.000Z"),
-  endDate: new Date("2026-08-24T12:00:00.000Z"),
+  startDate: startOfDay(subDays(new Date(), 29)),
+  endDate: new Date(),
 };
 
 const renderSelector = (

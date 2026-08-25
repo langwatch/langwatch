@@ -10,10 +10,8 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  OrganizationUserRole,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../../db";
 import { appRouter } from "../../../root";
@@ -108,31 +106,25 @@ describe("suites.folders integration", () => {
     );
   });
 
-  beforeEach(async () => {
-    await prisma.scenario.deleteMany({
-      where: { projectId: { in: [projectId, otherProjectId] } },
-    });
-    await prisma.simulationSuite.deleteMany({
-      where: { projectId: { in: [projectId, otherProjectId] } },
-    });
-  });
+  beforeEach(() =>
+    cleanupTestRows(prisma, [
+      ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
+      ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
+    ]),
+  );
 
-  afterAll(async () => {
-    await prisma.scenario.deleteMany({
-      where: { projectId: { in: [projectId, otherProjectId] } },
-    });
-    await prisma.simulationSuite.deleteMany({
-      where: { projectId: { in: [projectId, otherProjectId] } },
-    });
-    await prisma.project.deleteMany({
-      where: { id: { in: [projectId, otherProjectId] } },
-    });
-    await prisma.teamUser.deleteMany({ where: { teamId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
-  });
+  afterAll(() =>
+    cleanupTestRows(prisma, [
+      ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
+      ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
+      ["project", { id: { in: [projectId, otherProjectId] } }],
+      ["teamUser", { teamId }],
+      ["organizationUser", { organizationId }],
+      ["team", { id: teamId }],
+      ["user", { id: { in: userIds } }],
+      ["organization", { id: organizationId }],
+    ]),
+  );
 
   async function createCustomPlan(name: string, project = projectId) {
     const scenario = await prisma.scenario.create({

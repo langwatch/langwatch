@@ -9,13 +9,13 @@
  */
 import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
-import { ScenarioVersionNotFoundError } from "../errors";
-import type { ScenarioActor } from "../scenario-versioning";
-import { ScenarioService } from "../scenario.service";
 import { SuiteService } from "../../suites/suite.service";
-import type { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
+import { ScenarioVersionNotFoundError } from "../errors";
+import { ScenarioService } from "../scenario.service";
+import type { ScenarioActor } from "../scenario-versioning";
 
 const projectId = `test-scenario-restore-${nanoid(8)}`;
 const otherProjectId = `${projectId}-other`;

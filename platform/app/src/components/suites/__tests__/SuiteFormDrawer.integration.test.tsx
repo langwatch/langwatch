@@ -106,6 +106,11 @@ vi.mock("~/utils/api", () => ({
       resolveArchivedNames: {
         useQuery: vi.fn(() => ({ data: undefined })),
       },
+      folders: {
+        getAll: {
+          useQuery: vi.fn(() => ({ data: [] })),
+        },
+      },
     },
     licenseEnforcement: {
       checkLimit: {

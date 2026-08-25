@@ -51,11 +51,15 @@ export class ScenarioStaleVersionError extends HandledError {
   declare readonly code: "scenario_stale_version";
 
   constructor({ currentVersion }: { currentVersion: number }) {
-    super("scenario_stale_version", "This test case changed since it was loaded", {
-      httpStatus: 409,
-      fault: "customer",
-      meta: { currentVersion },
-    });
+    super(
+      "scenario_stale_version",
+      "This test case changed since it was loaded",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: { currentVersion },
+      },
+    );
     this.name = "ScenarioStaleVersionError";
   }
 }

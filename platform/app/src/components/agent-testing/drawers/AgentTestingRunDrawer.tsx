@@ -47,10 +47,6 @@ import {
   isCancellableStatus,
   useCancelScenarioRun,
 } from "~/components/suites/useCancelScenarioRun";
-import {
-  isTerminalStatus,
-  type ScenarioRunStatus,
-} from "~/server/scenarios/scenario-event.enums";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
 import { HandledErrorAlert } from "~/features/errors";
@@ -60,6 +56,10 @@ import { useCan } from "~/hooks/useCan";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import {
+  isTerminalStatus,
+  type ScenarioRunStatus,
+} from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
 import { CaseVersionChip } from "../shared/CaseVersionChip";
 
@@ -97,7 +97,8 @@ function hasCriteria(scenarioState: {
   const results = scenarioState.results;
   if (!results) return false;
   return (
-    (results.metCriteria?.length ?? 0) + (results.unmetCriteria?.length ?? 0) > 0
+    (results.metCriteria?.length ?? 0) + (results.unmetCriteria?.length ?? 0) >
+    0
   );
 }
 

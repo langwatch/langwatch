@@ -1321,7 +1321,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       lastRunAt: Number(row.LastRunAt),
       batchRunId: row.LastBatchRunId,
       scenarioSetId: row.LastScenarioSetId,
-      durationInMs: row.LastDurationMs === "" ? null : Number(row.LastDurationMs),
+      durationInMs:
+        row.LastDurationMs === "" ? null : Number(row.LastDurationMs),
       totalCost: row.LastTotalCost === "" ? null : Number(row.LastTotalCost),
     }));
   }
