@@ -8,6 +8,7 @@
 import type { ContentPartVisitor } from "~/shared/content-parts/visit-content-part";
 import { visitContentPart } from "~/shared/content-parts/visit-content-part";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
+import { mediaPartToMediaData } from "~/shared/traces/mediaParts";
 import type { DisplayPart } from "./types";
 
 /** Identity a decoded part inherits from the message it came from. */
@@ -117,15 +118,22 @@ function partVisitor(
       text
         ? { kind: "text", id: `${id}-c${index}`, role, content: text, traceId }
         : undefined,
-    media: (media) => ({
-      kind: "media",
-      id: `${id}-media${index}`,
-      // Cast: MediaPartData's union splits on source.type, which the upstream
-      // source guard has already validated.
-      part: { type: media.type, source: media.source } as MediaPartData,
-      role,
-      traceId,
-    }),
+    media: (media) => {
+      // Reuse the one mapping instead of casting. The visitor accepts
+      // `document`, `MediaPartData` does not have it, and the cast let a
+      // document through wearing a type no renderer handles.
+      // `mediaPartToMediaData` already folds a document into the binary
+      // member, which is what draws it as an attachment chip.
+      const part = mediaPartToMediaData(media);
+      if (!part) return undefined;
+      return {
+        kind: "media" as const,
+        id: `${id}-media${index}`,
+        part,
+        role,
+        traceId,
+      };
+    },
     binary: (binary) => ({
       kind: "media",
       id: `${id}-media${index}`,
