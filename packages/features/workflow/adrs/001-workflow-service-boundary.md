@@ -55,9 +55,11 @@ Existing tRPC names and REST paths remain compatibility transports. The
 version selection and Evaluation execution.
 
 The browser surface is `@langwatch/workflow-web`. It owns graph, field-edge,
-and Studio dataset transforms; templates; the node palette registry;
-agent-node transforms; the workflow Zustand store; and small browser hooks.
-App page shells, query/event transport composition, Monaco editor chrome, and
+and Studio dataset transforms; templates; the node palette and default-edge
+registries; agent-node transforms; prompt, evaluator, and agent selection
+state transitions; the workflow Zustand store; and small browser hooks. The
+selection transitions receive named application drawer ports, while app page
+shells, query/event transport composition, Monaco editor chrome, and
 Lambda/worker infrastructure remain application responsibilities. The browser
 package owns the code-node Python provider behaviour used by that chrome.
 

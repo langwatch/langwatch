@@ -20,8 +20,8 @@ import {
 } from "@langwatch/workflow-web";
 import type { ComponentType, Custom, Field } from "@langwatch/workflow-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
-import { NodeComponents } from "../nodes";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
+import { workflowNodeComponents } from "@langwatch/workflow-web";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -228,7 +228,7 @@ export function CustomDragLayer() {
     return null;
   }
 
-  const ComponentNode = NodeComponents[item.node.type as ComponentType];
+  const ComponentNode = workflowNodeComponents[item.node.type as ComponentType];
 
   return (
     <div

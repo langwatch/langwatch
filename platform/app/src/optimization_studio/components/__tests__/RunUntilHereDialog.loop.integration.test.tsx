@@ -26,9 +26,6 @@ const entryNode = {
 vi.mock("@langwatch/workflow-web", () => ({
   useRunUntilHereDialogStore: (selector: (s: unknown) => unknown) =>
     selector({ untilNodeId: "agent-1", close: vi.fn() }),
-}));
-
-vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
     selector({
       nodes: [entryNode],
@@ -36,6 +33,8 @@ vi.mock("@langwatch/workflow-web", () => ({
       deselectAllNodes: vi.fn(),
       setPropertiesExpanded: vi.fn(),
     }),
+  getNodeDisplayName: (node: { data?: { name?: string }; id?: string }) =>
+    node.data?.name ?? node.id ?? "node",
 }));
 
 vi.mock("~/optimization_studio/hooks/useWorkflowExecution", () => ({
@@ -55,10 +54,6 @@ vi.mock("~/optimization_studio/hooks/useGetDatasetData", () => ({
 
 vi.mock("~/components/datasets/editor/DatasetPreviewTable", () => ({
   DatasetPreviewTable: () => null,
-}));
-
-vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
-  getNodeDisplayName: (node: { data?: { name?: string } }) => node?.data?.name ?? "node",
 }));
 
 const { RunUntilHereDialog } = await import("../RunUntilHereDialog");

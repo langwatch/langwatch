@@ -25,15 +25,21 @@ const { mockNodes, mockSetNode, mockStartWorkflowExecution, mockDatasetData } =
     },
   }));
 
-vi.mock("@langwatch/workflow-web", () => ({
-  useWorkflowStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      nodes: mockNodes.current,
-      setNode: mockSetNode,
-      deselectAllNodes: vi.fn(),
-      setPropertiesExpanded: vi.fn(),
-    }),
-}));
+vi.mock("@langwatch/workflow-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
+  return {
+    ...actual,
+    useWorkflowStore: (selector: (s: unknown) => unknown) =>
+      selector({
+        nodes: mockNodes.current,
+        setNode: mockSetNode,
+        deselectAllNodes: vi.fn(),
+        setPropertiesExpanded: vi.fn(),
+      }),
+    getNodeDisplayName: (node: { id: string; data: { name?: string } }) =>
+      node.data.name ?? node.id,
+  };
+});
 
 vi.mock("../../hooks/useWorkflowExecution", () => ({
   useWorkflowExecution: () => ({
@@ -48,11 +54,6 @@ vi.mock("../../hooks/useGetDatasetData", () => ({
     query: {},
     total: mockDatasetData.current.rows.length,
   }),
-}));
-
-vi.mock("../nodes/Nodes", () => ({
-  getNodeDisplayName: (node: { id: string; data: { name?: string } }) =>
-    node.data.name ?? node.id,
 }));
 
 const { RunUntilHereDialog } = await import("../RunUntilHereDialog");

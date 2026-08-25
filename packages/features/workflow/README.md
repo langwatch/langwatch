@@ -10,8 +10,9 @@ and its migration history.
   explicit DatasetService-backed Studio dataset materialization.
 - `web/` owns browser graph and Studio dataset transforms, field/edge mapping,
   templates, canvas-node renderers and palette dragging, code-node Python
-  language providers, the node palette registry, agent-node transforms, the
-  Zustand workflow store, and small browser hooks.
+  language providers, the node palette and default-edge registries,
+  agent-node transforms, prompt/evaluator/agent selection state transitions,
+  the Zustand workflow store, and small browser hooks.
   It imports the contract; it does not define persisted values.
 
 The application remains responsible for page shells, tRPC/REST query and event

@@ -9,10 +9,16 @@ import type {
 const camelCaseToSnakeCase = (value: string) =>
   value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 
-export type NodeWithOptionalPosition<T extends Component = Component> = Omit<
-  StudioNode<T>,
-  "position"
-> & { position?: StudioPosition };
+export type NodeWithOptionalPosition<T extends Component = Component> = {
+  id: string;
+  type?: string;
+  position?: StudioPosition;
+  data: T;
+  selected?: boolean;
+  dragging?: boolean;
+  measured?: { width?: number; height?: number };
+  [key: string]: unknown;
+};
 
 /**
  * Validates a node name for rename operations.

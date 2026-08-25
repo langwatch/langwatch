@@ -47,7 +47,11 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { assertCrispChatHidden } from "../../utils/crispBubblePolicy";
 import { titleCase } from "../../utils/stringCasing";
-import { useAskBeforeLeaving } from "@langwatch/workflow-web";
+import {
+  useAskBeforeLeaving,
+  WorkflowEdge,
+  workflowNodeComponents,
+} from "@langwatch/workflow-web";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import { isConnectionAllowed } from "@langwatch/workflow-web";
@@ -57,7 +61,6 @@ import { LLMModelDisplay } from "../../components/llmPromptConfigs/LLMModelDispl
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { AutoSave } from "./AutoSave";
 import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
-import DefaultEdge from "./Edge";
 import { Evaluate } from "./Evaluate";
 import { RunningStatus } from "./ExecutionState";
 import { History } from "./History";
@@ -66,7 +69,6 @@ import {
   NodeSelectionPanel,
   NodeSelectionPanelButton,
 } from "./node-selection-panel/NodeSelectionPanel";
-import { NodeComponents } from "./nodes";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { useComponentExecution } from "../hooks/useComponentExecution";
 import { useComponentVersion } from "../hooks/useComponentVersion";
@@ -493,8 +495,8 @@ export function OptimizationStudioCanvas({
   defaultZoom?: number;
   yAdjust?: number;
 } & ReactFlowProps) {
-  const nodeTypes = useMemo(() => NodeComponents, []);
-  const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
+  const nodeTypes = useMemo(() => workflowNodeComponents, []);
+  const edgeTypes = useMemo(() => ({ default: WorkflowEdge }), []);
   const { colorMode } = useColorMode();
   const useEntryDatasetTotal = (dataset: Entry["dataset"]) =>
     useGetDatasetData({ dataset, preview: true }).total;

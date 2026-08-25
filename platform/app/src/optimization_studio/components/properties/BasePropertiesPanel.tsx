@@ -38,7 +38,7 @@ import {
   ComponentExecutionButton,
   getNodeDisplayName,
   isExecutableComponent,
-} from "../nodes/Nodes";
+} from "@langwatch/workflow-web";
 
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 

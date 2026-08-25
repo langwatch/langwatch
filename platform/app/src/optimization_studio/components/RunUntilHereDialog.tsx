@@ -9,7 +9,7 @@ import { useRunUntilHereDialogStore } from "@langwatch/workflow-web";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Entry } from "@langwatch/workflow-contract";
-import { getNodeDisplayName } from "./nodes/Nodes";
+import { getNodeDisplayName } from "@langwatch/workflow-web";
 
 const stringifyValue = (value: unknown): string => {
   if (value === null || value === undefined) return "";

@@ -58,6 +58,18 @@ Feature: Workflow service boundary
     When a node needs application-only execution or dataset data
     Then Workflow uses its injected browser host port
 
+  Scenario: Canvas renderer and edge registries use the Workflow browser surface
+    Given the application mounts a Workflow React Flow canvas
+    When it resolves node or default-edge renderers
+    Then it consumes the Workflow browser registries
+    And the application retains only page and host composition
+
+  Scenario: Node selection transitions use named application drawer ports
+    Given a prompt, evaluator, or agent node is dropped on the canvas
+    When the user selects, creates, or cancels the resource
+    Then Workflow updates the placeholder and selection through its store
+    And the application port performs only drawer navigation and callback wiring
+
   Scenario: Execution materializes a saved entry dataset through DatasetService
     Given a Studio execution event references a saved entry dataset
     When Workflow materializes the event with an injected DatasetService

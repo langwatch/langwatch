@@ -3,11 +3,11 @@ import { merge } from "lodash-es";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { MODULES } from "@langwatch/workflow-web";
 import type { Component } from "@langwatch/workflow-contract";
-import type { NodeWithOptionalPosition } from "~/types";
+import type { NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
 
-import { NodeDraggable } from "./NodeDraggable";
+import { NodeDraggable } from "@langwatch/workflow-web";
 
 type LlmSignatureNodeDraggableProps = {
   onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;

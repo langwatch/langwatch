@@ -27,7 +27,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 const nodeDraggableProps = vi.fn();
-vi.mock("../NodeDraggable", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
+  MODULES: { signature: { name: "Prompt" } },
   NodeDraggable: (props: unknown) => {
     nodeDraggableProps(props);
     return null;

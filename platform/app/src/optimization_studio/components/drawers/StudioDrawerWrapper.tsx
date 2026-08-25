@@ -16,7 +16,7 @@ import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
-import { ComponentExecutionButton, getNodeDisplayName } from "../nodes/Nodes";
+import { ComponentExecutionButton, getNodeDisplayName } from "@langwatch/workflow-web";
 import { DrawerFooterContext } from "./useInsideDrawer";
 
 /**

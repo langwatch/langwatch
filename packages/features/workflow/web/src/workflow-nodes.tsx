@@ -26,9 +26,11 @@ import { hasUnsavedChanges } from "./utils/unsaved-changes";
 import { useWorkflowNodeHost } from "./workflow-node.host";
 import { ComponentExecutionButton } from "./workflow-node-execution";
 
-function getNodeDisplayName(node: { id: string; data: Component }) {
-  const localConfig = "localConfig" in node.data ? node.data.localConfig : void 0;
-  return localConfig?.name ?? node.data.name ?? node.data.cls ?? node.id;
+export function getNodeDisplayName(node: {
+  id: string;
+  data: { localConfig?: { name?: string }; name?: string; cls?: string };
+}) {
+  return node.data.localConfig?.name ?? node.data.name ?? node.data.cls ?? node.id;
 }
 
 function NodeInputs({
