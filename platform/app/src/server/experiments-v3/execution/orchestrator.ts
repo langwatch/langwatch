@@ -41,12 +41,12 @@ import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDom
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { tryMintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type {
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
 } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
-import { prisma } from "~/server/db";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import {

@@ -27,7 +27,10 @@ const prisma = {} as PrismaClient;
 describe("the agent sandbox key", () => {
   beforeEach(() => {
     create.mockReset();
-    create.mockResolvedValue({ token: "sk-lw-minted", apiKey: { id: "key_1" } });
+    create.mockResolvedValue({
+      token: "sk-lw-minted",
+      apiKey: { id: "key_1" },
+    });
   });
 
   describe("given a project that can mint a key", () => {
