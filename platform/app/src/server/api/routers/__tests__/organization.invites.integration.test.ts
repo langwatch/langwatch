@@ -816,4 +816,91 @@ describe("Organization Invites Integration", () => {
       });
     });
   });
+
+  // ============================================================================
+  // Member denial — invite management is organization:manage, not member-readable
+  // ============================================================================
+
+  describe("when a plain member tries to manage invitations", () => {
+    describe("when a member tries to create invitations", () => {
+      /** @scenario "Inviting, resending, revoking, and listing invitations is refused for organization members" */
+      it("refuses with FORBIDDEN", async () => {
+        await expect(
+          memberCaller.organization.createInvites({
+            organizationId,
+            invites: [
+              {
+                email: `invitee-${testNamespace}-member-denied@example.com`,
+                role: OrganizationUserRole.MEMBER,
+                teamIds: teamId,
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+    });
+
+    describe("when a member tries to revoke a real pending invitation", () => {
+      it("refuses with FORBIDDEN and leaves the invite untouched", async () => {
+        const [minted] = await adminCaller.organization.createInvites({
+          organizationId,
+          invites: [
+            {
+              email: `invitee-${testNamespace}-member-delete@example.com`,
+              role: OrganizationUserRole.MEMBER,
+              teamIds: teamId,
+            },
+          ],
+        });
+
+        await expect(
+          memberCaller.organization.deleteInvite({
+            inviteId: minted!.invite.id,
+            organizationId,
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        const invites =
+          await adminCaller.organization.getOrganizationPendingInvites({
+            organizationId,
+          });
+        const untouched = invites.find(
+          (invite) => invite.id === minted!.invite.id,
+        );
+        expect(untouched?.displayStatus).toBe("PENDING");
+      });
+    });
+
+    describe("when a member tries to resend a real pending invitation", () => {
+      it("refuses with FORBIDDEN", async () => {
+        const [minted] = await adminCaller.organization.createInvites({
+          organizationId,
+          invites: [
+            {
+              email: `invitee-${testNamespace}-member-resend@example.com`,
+              role: OrganizationUserRole.MEMBER,
+              teamIds: teamId,
+            },
+          ],
+        });
+
+        await expect(
+          memberCaller.organization.resendInvite({
+            inviteId: minted!.invite.id,
+            organizationId,
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+    });
+
+    describe("when a member tries to list pending invitations", () => {
+      it("refuses with FORBIDDEN", async () => {
+        await expect(
+          memberCaller.organization.getOrganizationPendingInvites({
+            organizationId,
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+    });
+  });
 });

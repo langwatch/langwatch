@@ -101,6 +101,15 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     When "sam" opens the invite link
     Then the invite is refused without naming the organization or the inviter
 
+  # ── Authorization ──────────────────────────────────────────────────────
+
+  @integration
+  Scenario: Inviting, resending, revoking, and listing invitations is refused for organization members
+    Given "sam" is a plain member of "acme", not an admin
+    When "sam" tries to invite, resend, revoke, or list "acme"'s invitations
+    Then every attempt is refused
+    And no invitation record changes as a result
+
   # License seat counting for expired invitations stays owned by
   # specs/licensing/enforcement-members.feature, which D11 aligns to the
   # new state model (delivery-plan amendment table).
