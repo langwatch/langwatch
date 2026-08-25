@@ -15,7 +15,6 @@ import crypto from "crypto";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getUserProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -93,7 +92,7 @@ secured
     );
 
     const exportId = crypto.randomUUID();
-    const broadcast = getApp().broadcast;
+    const broadcast = c.app.broadcast;
 
     // Build file name: {project_id} - Traces - {YYYY-MM-DD} - {mode}.{ext}
     const today = new Date().toISOString().slice(0, 10);
