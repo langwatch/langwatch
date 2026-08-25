@@ -38,8 +38,21 @@ export const userProfileSchema = z
   .strict();
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
+export const userFullProfileSchema = userProfileSchema
+  .extend({
+    lastHomePath: z.string().nullable(),
+    tracesExplorerTourDismissedAt: z.date().nullable(),
+  })
+  .strict();
+export type UserFullProfile = z.infer<typeof userFullProfileSchema>;
+
 export const userIdInputSchema = z.object({ id: z.string().min(1) }).strict();
 export type UserIdInput = z.infer<typeof userIdInputSchema>;
+
+export const userProfilesInputSchema = z
+  .object({ userIds: z.array(z.string().min(1)) })
+  .strict();
+export type UserProfilesInput = z.infer<typeof userProfilesInputSchema>;
 
 export const userEmailSchema = z.string().trim().pipe(z.email());
 export const userEmailInputSchema = z.object({ email: userEmailSchema }).strict();

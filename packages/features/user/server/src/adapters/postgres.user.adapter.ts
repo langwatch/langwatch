@@ -1,4 +1,5 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserService as UserServiceContract } from "@langwatch/user-contract";
 import type {
   UserAvatarStoragePort,
@@ -9,7 +10,7 @@ import { PrismaUserRepository } from "../repositories/prisma/prisma.user.reposit
 import { UserService } from "../services/user.service";
 
 export interface PostgresUserAdapterOptions {
-  database: object;
+  database: PrismaClient;
   sessions: UserSessionRevocationPort;
   cliTokens: UserCliTokenRevocationPort;
   organizations: OrganizationService;

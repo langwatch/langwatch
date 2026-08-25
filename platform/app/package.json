@@ -95,6 +95,8 @@
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-server": "workspace:*",
+    "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/annotation-server": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/api-key-server": "workspace:*",

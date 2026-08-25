@@ -1,11 +1,11 @@
 import { z } from "zod";
-import type { Annotation, AnnotationScore } from "~/generated/prisma/client";
-import { getSpanNameOrModel } from "../../utils/trace";
 import {
+  annotationSuggestedOutput,
   type AnnotationAnchorRef,
   describeAnnotationAnchor,
-} from "../annotations/annotationAnchorLabel";
-import { annotationSuggestedOutput } from "../annotations/annotationSuggestedOutput";
+} from "@langwatch/annotation-contract";
+import type { Annotation, AnnotationScore } from "~/generated/prisma/client";
+import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "@langwatch/dataset-contract";
 import {
   type Trace as BaseTrace,

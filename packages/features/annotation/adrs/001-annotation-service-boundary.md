@@ -6,83 +6,67 @@
 
 ## Context
 
-Annotation writes and projection reads were implemented by application-owned
-Prisma access and a request-created service. Annotation anchors were also
-defined beside the transport, which made the trace and annotation surfaces
-reimplement their vocabulary.
+Annotation writes and projection reads originated in application-owned Prisma
+access and request-created services. Anchor vocabulary was defined beside the
+transports, so trace and annotation surfaces could drift.
 
 ## Decision
 
 The singular `annotation` feature owns the portable annotation vocabulary,
-anchor schemas, errors and one abstract `AnnotationService`. Its server
-package owns one private repository and a PostgreSQL adapter. The service
-supports annotation writes, tenant-scoped reads and the projection read used
-by Trace. It validates inputs at the contract boundary and validates database
-rows before returning them.
+anchor schemas, errors and one abstract `AnnotationService`. Its server package
+owns one private repository and a PostgreSQL adapter. The service owns writes,
+tenant-scoped reads, projection reads, score definitions, queue-item creation
+and queue-reference validation. Inputs and returned database rows are parsed by
+the contract schemas.
 
-Existing tRPC and REST routes remain compatibility transports. They will be
-migrated to the process-composed service in the application integration pass;
-this package does not register routes or duplicate queue orchestration.
+Existing tRPC and REST routes remain compatibility transports; this package
+does not register routes. Browser routing, transport hooks, draft stores and
+trace navigation stay in the application and are passed to annotation web
+components through narrow props and callbacks. The web package owns controlled
+cards, chips, avatars, form bodies, diffs and score fields. The generic delete
+confirmation remains shared application UI because dataset and prompt surfaces
+also use it.
 
-Annotation queues and score-definition management remain an explicit
-application seam for now because their current router also owns trace
-enrichment, membership authorization and queue-item workflows. They must be
-drained into this same feature service rather than become separate features.
+The queue router still owns trace enrichment, membership authorization and
+queue configuration and read workflows. Transport-specific user enrichment
+also remains there. These are deliberate residuals until that orchestration has
+its own complete migration slice.
 
 ## Boundaries
 
-The contract contains only transport-safe values and Zod 4 schemas. The server
+The contract contains transport-safe values and Zod 4 schemas. The server
 repository is private and is the only owner of Annotation persistence. A
-required lookup throws `AnnotationNotFoundError`; a repository absence check is
-named `tryFindById` and is converted to the throwing service method.
+required lookup throws a concrete domain error from both the service and its
+repository. Neither boundary returns a nullable value for a required record.
 
-The service accepts only its own repository. Trace, authorization and queue
-composition are collaborators for later transport migration, not repository
-ports recreated inside Annotation.
+The concrete service receives its private repository, the complete
+`ProjectService` and the complete `OrganizationService`. Project ownership and
+organization membership stay behind their owning services; Annotation maps only
+the project absence and invalid-member outcomes required by its existing 404
+and 400 transports.
 
-## Public surfaces and transports
-
-The contract is the supported feature capability. Existing tRPC and REST
-transports keep their URLs and response shapes while they are migrated to the
-process-owned service. The feature package itself registers no routes.
-
-## Dependencies
-
-The contract has no application, transport, database or runtime dependencies.
-The server depends on the contract and Prisma infrastructure only; its service
-receives its own private repository.
+The tRPC transport hydrates users in one `UserService` batch per result set.
+The repository does not query User. Full legacy user fields remain on project
+and queue results, trace results keep id, name and image, and ordinary
+annotation values remain user-free.
 
 ## Persistence
 
-`PrismaAnnotationRepository` is private to the server package and owns
-Annotation rows. It parses every returned row with the contract schema before
-returning it.
+`PrismaAnnotationRepository` is private to the server package and owns only
+Annotation, score, queue and queue-item rows. It parses every returned row.
+Queue-item upserts share one transaction while retaining their existing unique
+keys and reset-on-requeue behaviour.
 
-## Runtime and registration
-
-The API or worker composition root constructs one `PostgresAnnotationAdapter`
-and injects its resulting `AnnotationService` into handlers. Requests do not
-construct services, repositories or database clients.
-
-## Environment and configuration
-
-The feature reads no environment values. Database construction and runtime
-configuration are supplied by the application boot composition.
-
-## Errors
-
-Required reads throw `AnnotationNotFoundError`. Nullable persistence discovery
-is named `tryFindById` and is private to the server implementation.
-
-## Contracts and validation
-
-All feature inputs and returned values use Zod 4 schemas from the contract
-package. Generated Prisma records do not cross the server boundary.
+The process composition root builds one annotation service for each process
+preset and injects it into handlers. Requests do not construct it. The feature
+reads no environment values, and generated Prisma records do not cross the
+server boundary.
 
 ## Consequences
 
-Annotation has one discoverable capability and one persistence lifecycle while
-the existing URLs and tRPC procedure names remain stable. Trace projections
-can consume a portable annotation projection without importing Prisma or
-application aliases. Queue and score migration remain visible as the next
-annotation seam rather than being hidden in a partial duplicate implementation.
+Annotation has one discoverable capability, one reusable browser surface and
+one persistence lifecycle while existing URLs and tRPC procedure names remain
+stable. Trace projections can consume a portable annotation projection without
+importing Prisma or application aliases. The remaining application query and
+mutation composition, queue configuration/read seam, stores and startup hook
+are explicit process responsibilities, not a second Annotation implementation.

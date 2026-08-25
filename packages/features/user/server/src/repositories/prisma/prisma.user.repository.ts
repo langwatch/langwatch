@@ -1,37 +1,76 @@
 import {
   userAccountInfoSchema,
+  userFullProfileSchema,
   userProfileSchema,
   userSsoStatusSchema,
   userTourPreferenceSchema,
   type CreateUserInput,
   type UpdateUserProfileInput,
   type UserAccountInfo,
+  type UserFullProfile,
   type UserProfile,
   type UserSsoStatus,
   type UserTourPreference,
 } from "@langwatch/user-contract";
-import type { PrismaClient, User } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { UserRepository } from "../user.repository";
+
+const userProfileSelect = {
+  id: true,
+  name: true,
+  email: true,
+  emailVerified: true,
+  image: true,
+  pendingSsoSetup: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+  deactivatedAt: true,
+} satisfies Prisma.UserSelect;
+
+const userFullProfileSelect = {
+  ...userProfileSelect,
+  lastHomePath: true,
+  tracesExplorerTourDismissedAt: true,
+} satisfies Prisma.UserSelect;
 
 export class PrismaUserRepository extends UserRepository {
   private constructor(private readonly database: PrismaClient) {
     super();
   }
 
-  static create(database: object): PrismaUserRepository {
-    return new PrismaUserRepository(database as PrismaClient);
+  static create(database: PrismaClient): PrismaUserRepository {
+    return new PrismaUserRepository(database);
+  }
+
+  async getProfiles(userIds: string[]): Promise<UserFullProfile[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.database.user.findMany({
+      where: { id: { in: userIds } },
+      select: userFullProfileSelect,
+    });
+    return rows.map((row) => userFullProfileSchema.parse(row));
   }
 
   async tryFindById(id: string): Promise<UserProfile | null> {
-    return this.map(await this.database.user.findUnique({ where: { id } }));
+    return this.map(
+      await this.database.user.findUnique({ where: { id }, select: userProfileSelect }),
+    );
   }
 
   async tryFindByEmail(email: string): Promise<UserProfile | null> {
-    return this.map(await this.database.user.findUnique({ where: { email } }));
+    return this.map(
+      await this.database.user.findUnique({
+        where: { email },
+        select: userProfileSelect,
+      }),
+    );
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
-    return this.mapRequired(await this.database.user.create({ data: input }));
+    return this.mapRequired(
+      await this.database.user.create({ data: input, select: userProfileSelect }),
+    );
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
@@ -42,6 +81,7 @@ export class PrismaUserRepository extends UserRepository {
       await this.database.user.update({
         where: { id: input.id },
         data,
+        select: userProfileSelect,
       }),
     );
   }
@@ -117,6 +157,7 @@ export class PrismaUserRepository extends UserRepository {
       await this.database.user.update({
         where: { id },
         data: { deactivatedAt },
+        select: userProfileSelect,
       }),
     );
   }
@@ -128,11 +169,11 @@ export class PrismaUserRepository extends UserRepository {
     });
   }
 
-  private map(row: User | null): UserProfile | null {
+  private map(row: UserProfile | null): UserProfile | null {
     return row ? userProfileSchema.parse(row) : null;
   }
 
-  private mapRequired(row: User): UserProfile {
+  private mapRequired(row: UserProfile): UserProfile {
     return userProfileSchema.parse(row);
   }
 }

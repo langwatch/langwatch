@@ -33,46 +33,38 @@ export const annotationScoreRouter = createTRPCRouter({
         name: input.name,
         dataType: input.dataType,
         description: input.description ?? "",
-        options: options ?? {},
+        options,
         defaultValue: {
           value: input.defaultRadioOption ?? null,
           options: input.defaultCheckboxOption ?? null,
         },
-        deletedAt: null,
       };
 
       const scoreId = input.annotationScoreId || nanoid();
 
-      return ctx.prisma.annotationScore.upsert({
-        where: {
-          id: scoreId,
-          projectId: input.projectId,
-        },
-        update: data,
-        create: {
-          id: scoreId,
-          ...data,
-        },
+      return ctx.app.annotations.upsertScore({
+        id: scoreId,
+        projectId: input.projectId,
+        name: data.name,
+        dataType: data.dataType,
+        description: data.description,
+        options: data.options,
+        defaultValue: data.defaultValue,
       });
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationScore.findMany({
-        where: {
-          projectId: input.projectId,
-          deletedAt: null,
-        },
-        orderBy: { createdAt: "desc" },
-      });
+      return ctx.app.annotations.listScores({ projectId: input.projectId });
     }),
   getAllActive: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationScore.findMany({
-        where: { projectId: input.projectId, active: true, deletedAt: null },
+      return ctx.app.annotations.listScores({
+        projectId: input.projectId,
+        activeOnly: true,
       });
     }),
   getById: protectedProcedure
@@ -84,12 +76,9 @@ export const annotationScoreRouter = createTRPCRouter({
     )
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationScore.findFirstOrThrow({
-        where: {
-          id: input.scoreId,
-          projectId: input.projectId,
-          deletedAt: null,
-        },
+      return ctx.app.annotations.getScore({
+        id: input.scoreId,
+        projectId: input.projectId,
       });
     }),
   toggle: protectedProcedure
@@ -102,9 +91,10 @@ export const annotationScoreRouter = createTRPCRouter({
     )
     .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.annotationScore.update({
-        where: { id: input.scoreId, projectId: input.projectId },
-        data: { active: input.active },
+      return ctx.app.annotations.toggleScore({
+        id: input.scoreId,
+        projectId: input.projectId,
+        active: input.active,
       });
     }),
   delete: protectedProcedure
@@ -116,9 +106,9 @@ export const annotationScoreRouter = createTRPCRouter({
     )
     .permission("annotations:delete")
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.annotationScore.update({
-        where: { id: input.scoreId, projectId: input.projectId },
-        data: { deletedAt: new Date() },
+      return ctx.app.annotations.deleteScore({
+        id: input.scoreId,
+        projectId: input.projectId,
       });
     }),
 });

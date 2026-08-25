@@ -2,6 +2,16 @@ import { z } from "zod";
 
 export const organizationIdSchema = z.string().min(1);
 
+export const getOrganizationMembersInputSchema = z
+  .object({
+    organizationId: organizationIdSchema,
+    userIds: z.array(z.string().min(1)),
+  })
+  .strict();
+export type GetOrganizationMembersInput = z.infer<
+  typeof getOrganizationMembersInputSchema
+>;
+
 export const getOldestTeamInputSchema = z.object({
   organizationId: organizationIdSchema,
 });

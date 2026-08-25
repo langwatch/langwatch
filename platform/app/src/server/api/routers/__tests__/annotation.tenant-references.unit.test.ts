@@ -1,5 +1,12 @@
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import {
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+  createAnnotationTestUsers,
+} from "~/test-utils/annotation-test-services";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter, createOrUpdateQueueItems } from "../annotation";
 
@@ -23,24 +30,92 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-const projectFindUnique = vi.fn();
-const organizationUserCount = vi.fn();
 const annotationScoreCount = vi.fn();
 const annotationQueueCount = vi.fn();
 const annotationQueueFindFirst = vi.fn();
 const annotationQueueCreate = vi.fn();
-const queueItemUpsert = vi.fn();
+const annotationFindFirst = vi.fn();
+const annotationUpdate = vi.fn();
+type QueueItem = {
+  annotationQueueId?: string;
+  createdByUserId: string;
+  doneAt: Date | null;
+  projectId: string;
+  traceId: string;
+  userId?: string;
+};
+
+const queueItemState = new Map<string, QueueItem>();
+const queueItemKey = (item: QueueItem) =>
+  `${item.projectId}:${item.traceId}:${item.annotationQueueId ?? item.userId ?? ""}`;
+const queueItemCreateMany = vi.fn(async ({ data }: { data: QueueItem[] }) => {
+  for (const item of data) {
+    const key = queueItemKey(item);
+    if (!queueItemState.has(key)) queueItemState.set(key, { ...item, doneAt: null });
+  }
+  return { count: data.length };
+});
+const queueItemUpdateMany = vi.fn(
+  async ({
+    where,
+    data,
+  }: {
+    where: {
+      annotationQueueId?: { in: string[] };
+      projectId: string;
+      traceId: { in: string[] };
+      userId?: { in: string[] };
+    };
+    data: { doneAt: null };
+  }) => {
+    let count = 0;
+    for (const item of queueItemState.values()) {
+      const queueMatches =
+        where.annotationQueueId === void 0 ||
+        where.annotationQueueId.in.includes(item.annotationQueueId ?? "");
+      const userMatches =
+        where.userId === void 0 || where.userId.in.includes(item.userId ?? "");
+      if (
+        item.projectId === where.projectId &&
+        where.traceId.in.includes(item.traceId) &&
+        queueMatches &&
+        userMatches
+      ) {
+        item.doneAt = data.doneAt;
+        count += 1;
+      }
+    }
+    return { count };
+  },
+);
+const queueItemTransaction = vi.fn(async (callback: (transaction: unknown) => unknown) =>
+  callback({
+    annotationQueueItem: {
+      createMany: queueItemCreateMany,
+      updateMany: queueItemUpdateMany,
+    },
+  }),
+);
+const projects = createAnnotationTestProjects("org_1");
+const organizations = createAnnotationTestOrganizations();
+const users = createAnnotationTestUsers();
 
 const prisma = {
-  project: { findUnique: projectFindUnique },
-  organizationUser: { count: organizationUserCount },
+  $transaction: queueItemTransaction,
   annotationScore: { count: annotationScoreCount },
+  annotation: {
+    findFirst: annotationFindFirst,
+    update: annotationUpdate,
+  },
   annotationQueue: {
     count: annotationQueueCount,
     findFirst: annotationQueueFindFirst,
     create: annotationQueueCreate,
   },
-  annotationQueueItem: { upsert: queueItemUpsert },
+  annotationQueueItem: {
+    createMany: queueItemCreateMany,
+    updateMany: queueItemUpdateMany,
+  },
 } as unknown as PrismaClient;
 
 const queueInput = {
@@ -53,15 +128,12 @@ const queueInput = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  projectFindUnique.mockResolvedValue({
-    team: { organizationId: "org_1" },
-  });
-  organizationUserCount.mockResolvedValue(1);
   annotationScoreCount.mockResolvedValue(1);
   annotationQueueCount.mockResolvedValue(1);
   annotationQueueFindFirst.mockResolvedValue(null);
   annotationQueueCreate.mockResolvedValue({ id: "queue_1" });
-  queueItemUpsert.mockResolvedValue({ id: "item_1" });
+  annotationFindFirst.mockResolvedValue(null);
+  queueItemState.clear();
 });
 
 const createCaller = () => {
@@ -70,19 +142,54 @@ const createCaller = () => {
     permissionChecked: true,
   });
   ctx.prisma = prisma;
+  Object.assign(ctx.app, {
+    annotations: PostgresAnnotationAdapter.create({
+      database: prisma,
+      projects,
+      organizations,
+    }).build(),
+    users,
+  });
   return annotationRouter.createCaller(ctx);
 };
 
+const annotationService = () =>
+  PostgresAnnotationAdapter.create({ database: prisma, projects, organizations }).build();
+
 describe("annotation queue references", () => {
+  it("keeps the legacy internal error when an update target is absent", async () => {
+    annotationUpdate.mockRejectedValueOnce(new Error("Record to update not found."));
+
+    await expect(
+      createCaller().updateByTraceId({
+        id: "missing-annotation",
+        projectId: "project_1",
+        traceId: "trace_1",
+        comment: "updated",
+        scoreOptions: {},
+      }),
+    ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+
+    expect(annotationFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "missing-annotation", projectId: "project_1" },
+      }),
+    );
+    expect(annotationUpdate).toHaveBeenCalledOnce();
+  });
+
   it("rejects queue members from another organization", async () => {
-    organizationUserCount.mockResolvedValue(0);
+    organizations.getOrganizationMembers.mockRejectedValueOnce(
+      new UserNotInOrganizationError("user_1"),
+    );
 
     await expect(createCaller().createOrUpdateQueue(queueInput)).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
 
-    expect(organizationUserCount).toHaveBeenCalledWith({
-      where: { organizationId: "org_1", userId: { in: ["user_1"] } },
+    expect(organizations.getOrganizationMembers).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      userIds: ["user_1"],
     });
     expect(annotationQueueCreate).not.toHaveBeenCalled();
   });
@@ -110,17 +217,20 @@ describe("annotation queue references", () => {
         annotators: ["queue-foreign-queue"],
         userId: "creator_1",
         prisma,
+        annotations: annotationService(),
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
     expect(annotationQueueCount).toHaveBeenCalledWith({
       where: { id: { in: ["foreign-queue"] }, projectId: "project_1" },
     });
-    expect(queueItemUpsert).not.toHaveBeenCalled();
+    expect(queueItemCreateMany).not.toHaveBeenCalled();
   });
 
   it("rejects user assignments from another organization", async () => {
-    organizationUserCount.mockResolvedValue(0);
+    organizations.getOrganizationMembers.mockRejectedValueOnce(
+      new UserNotInOrganizationError("foreign-user"),
+    );
 
     await expect(
       createOrUpdateQueueItems({
@@ -129,13 +239,15 @@ describe("annotation queue references", () => {
         annotators: ["user-foreign-user"],
         userId: "creator_1",
         prisma,
+        annotations: annotationService(),
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
-    expect(organizationUserCount).toHaveBeenCalledWith({
-      where: { organizationId: "org_1", userId: { in: ["foreign-user"] } },
+    expect(organizations.getOrganizationMembers).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      userIds: ["foreign-user"],
     });
-    expect(queueItemUpsert).not.toHaveBeenCalled();
+    expect(queueItemCreateMany).not.toHaveBeenCalled();
   });
 
   it("keeps hyphens in validated annotator IDs", async () => {
@@ -145,22 +257,46 @@ describe("annotation queue references", () => {
       annotators: ["queue-queue-with-hyphens", "user-user-with-hyphens"],
       userId: "creator_1",
       prisma,
+      annotations: annotationService(),
       // Which ids resolve to a trace is ClickHouse's answer; this file is about
       // which annotators the references are allowed to name.
       findExistingTraceIds: async ({ traceIds }) => traceIds,
     });
 
-    expect(queueItemUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          annotationQueueId: "queue-with-hyphens",
-        }),
-      }),
+    expect([...queueItemState.values()]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ annotationQueueId: "queue-with-hyphens" }),
+        expect.objectContaining({ userId: "user-with-hyphens" }),
+      ]),
     );
-    expect(queueItemUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({ userId: "user-with-hyphens" }),
-      }),
-    );
+    expect(queueItemTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("requeues an existing item without changing its creator", async () => {
+    queueItemState.set("project_1:trace_1:user-user_1", {
+      projectId: "project_1",
+      traceId: "trace_1",
+      userId: "user_1",
+      createdByUserId: "first-creator",
+      doneAt: new Date(1),
+    });
+
+    await createOrUpdateQueueItems({
+      traceIds: ["trace_1"],
+      projectId: "project_1",
+      annotators: ["user-user_1"],
+      userId: "next-creator",
+      prisma,
+      annotations: annotationService(),
+      findExistingTraceIds: async ({ traceIds }) => traceIds,
+    });
+
+    expect(queueItemState.get("project_1:trace_1:user-user_1")).toEqual({
+      projectId: "project_1",
+      traceId: "trace_1",
+      userId: "user_1",
+      createdByUserId: "first-creator",
+      doneAt: null,
+    });
   });
 });

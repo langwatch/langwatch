@@ -1,17 +1,23 @@
-import { createLogger } from "@langwatch/observability";
-import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
-import { z } from "zod";
-import type { AnnotationQueueItem, PrismaClient } from "~/generated/prisma/client";
-import { AnnotationService } from "~/server/annotations/annotation.service";
+import type {
+  Annotation,
+  AnnotationService,
+  AnnotationUser,
+} from "@langwatch/annotation-contract";
 import {
+  AnnotationNotFoundError,
   annotationAnchorColumnsSchema,
   annotationAnchorScopeSchema,
-  annotationAnchorScopeWhere,
   refineAnnotationAnchorColumns,
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
-} from "~/server/annotations/annotationAnchor";
+} from "@langwatch/annotation-contract";
+import { createLogger } from "@langwatch/observability";
+import { TRPCError } from "@trpc/server";
+import type { UserFullProfile, UserService } from "@langwatch/user-contract";
+import { nanoid } from "nanoid";
+import { z } from "zod";
+import type { AnnotationQueueItem, PrismaClient } from "~/generated/prisma/client";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
@@ -35,9 +41,47 @@ const scoreOptionSchema = z.object({
 
 const scoreOptions = z.record(z.string(), scoreOptionSchema);
 
+type AnnotationWithFullUser = Annotation & { user: UserFullProfile | null };
+type AnnotationWithUserSummary = Annotation & { user: AnnotationUser | null };
+
+function enrichAnnotationsWithUsers(
+  annotations: Annotation[],
+  users: UserService,
+  projection: "full",
+): Promise<AnnotationWithFullUser[]>;
+function enrichAnnotationsWithUsers(
+  annotations: Annotation[],
+  users: UserService,
+  projection: "summary",
+): Promise<AnnotationWithUserSummary[]>;
+async function enrichAnnotationsWithUsers(
+  annotations: Annotation[],
+  users: UserService,
+  projection: "full" | "summary",
+): Promise<Array<AnnotationWithFullUser | AnnotationWithUserSummary>> {
+  const userIds = [
+    ...new Set(
+      annotations.flatMap((annotation) =>
+        annotation.userId === null ? [] : [annotation.userId],
+      ),
+    ),
+  ];
+  const profiles = await users.getProfiles({ userIds });
+  const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+  return annotations.map((annotation) => {
+    const user = annotation.userId ? (profilesById.get(annotation.userId) ?? null) : null;
+    if (projection === "full") return { ...annotation, user };
+    return {
+      ...annotation,
+      user: user ? { id: user.id, name: user.name, image: user.image } : null,
+    };
+  });
+}
+
 // Helper function to fetch and enrich queue items with traces and annotations
 const enrichQueueItemsWithTracesAndAnnotations = async (
-  ctx: { prisma: PrismaClient; session: Session | null },
+  ctx: { prisma: PrismaClient; session: Session | null; app: RequestAppServices },
   projectId: string,
   queueItems: AnnotationQueueItem[],
   protections: Protections,
@@ -48,21 +92,17 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
   // Get all annotations for these traces in a single query. A queue item is a
   // whole trace to review, so it carries every comment left on that trace,
   // each one naming the part of it that was commented on.
-  const annotations = await ctx.prisma.annotation.findMany({
-    where: {
-      projectId: projectId,
-      traceId: {
-        in: traceIds,
-      },
-      ...annotationAnchorScopeWhere("all"),
-    },
-    include: {
-      user: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
+  const annotations = await ctx.app.annotations.list({
+    projectId,
+    traceIds,
+    anchor: "all",
+    order: "desc",
   });
+  const annotationsWithUsers = await enrichAnnotationsWithUsers(
+    annotations,
+    ctx.app.users,
+    "full",
+  );
 
   // Annotators label trace content — resolve full IO (#4991) so they see the
   // whole value, not the 64 KB preview.
@@ -71,15 +111,15 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
     projectId,
     traceIds,
     protections,
-    undefined,
+    void 0,
     { full: true },
   );
 
   // Create lookup maps for O(1) access
   const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
-  const annotationMap = new Map<string, Array<(typeof annotations)[number]>>();
+  const annotationMap = new Map<string, Array<(typeof annotationsWithUsers)[number]>>();
 
-  annotations.forEach((annotation) => {
+  annotationsWithUsers.forEach((annotation) => {
     if (!annotationMap.has(annotation.traceId)) {
       annotationMap.set(annotation.traceId, []);
     }
@@ -107,7 +147,7 @@ const getEnrichedItems = <T extends { id: string }>(
 ) => {
   return queueItems
     .map((item) => enrichedItemMap.get(item.id))
-    .filter((item): item is NonNullable<typeof item> => item !== undefined);
+    .filter((item): item is NonNullable<typeof item> => item !== void 0);
 };
 
 const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
@@ -156,37 +196,12 @@ const writeSuggestionToOverlay = async ({
 };
 
 /**
- * Carries a suggestion over to the trace's correction. The annotation row stays
- * the record of who suggested what; the correction is the trace's current
- * corrected truth and is what the dataset flow reads.
+ * Carries a changed suggestion into the trace correction before saving the
+ * annotation. This ordering prevents a saved annotation from pointing at an
+ * unapplied correction; retrying the same correction is a no-op.
  *
- * Where the suggestion lands is the comment's anchor: a comment on a field
- * corrects that field of what it names, the trace's own input or output or a
- * span's; a comment about the whole trace corrects the trace output. An anchor
- * with nothing for a suggestion to correct (a whole span, an attribute row, a
- * message) carries none, which is also what the composer offers there.
- *
- * Only a suggestion that actually CHANGED is carried over, which is what makes
- * the two sides safe to keep in step:
- *   - no suggestion field at all (undefined) leaves the correction alone;
- *   - the same text the annotation already held is not re-asserted, so saving a
- *     comment on an old annotation cannot overwrite a newer correction with the
- *     text the form loaded when it opened;
- *   - clearing the text withdraws the corrected field, leaving every other
- *     edit on the trace in place. A save that never held a suggestion has
- *     nothing to withdraw, so an ordinary comment never removes a correction
- *     made elsewhere.
- *
- * Writing a correction is `annotations:update` work on every other surface, so
- * a reviewer who may only create annotations still gets their annotation and
- * simply does not move the correction.
- *
- * Runs BEFORE the annotation is written and is deliberately not best-effort: a
- * suggestion the reviewer believes was saved but which never reached the
- * correction would silently ship the uncorrected trace into a dataset. Merging
- * the same text twice is a no-op, so a retry after a failed annotation write
- * costs nothing, while the reverse order would leave a duplicate annotation
- * behind on every retry.
+ * The annotation anchor selects the target. Unsupported anchors carry no
+ * suggestion, and callers without update permission retain only the annotation.
  */
 const carrySuggestionToOverlay = async ({
   ctx,
@@ -209,7 +224,7 @@ const carrySuggestionToOverlay = async ({
   anchorId?: string | null;
   anchorPath?: string | null;
 }) => {
-  if (expectedOutput === undefined) return;
+  if (expectedOutput === void 0) return;
   const next = expectedOutput ?? "";
   const previous = previousExpectedOutput ?? "";
   if (next === previous) return;
@@ -330,7 +345,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:create")
     .mutation(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
 
       await carrySuggestionToOverlay({
         ctx,
@@ -394,21 +409,16 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
 
       // The suggestion the annotation held before this save is what tells a
       // real edit apart from a form re-sending what it loaded, so it is read
       // before the row moves. The anchor comes from the same read rather than
       // from the input: editing a comment changes what it says, never what it
       // is about, so re-anchoring is a delete and a create.
-      const existing = await ctx.prisma.annotation.findFirst({
-        where: { id: input.id, projectId: input.projectId },
-        select: {
-          expectedOutput: true,
-          anchorKind: true,
-          anchorId: true,
-          anchorPath: true,
-        },
+      const existing = await service.getById({
+        id: input.id,
+        projectId: input.projectId,
       });
 
       await carrySuggestionToOverlay({
@@ -416,14 +426,14 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
         traceId: input.traceId,
         expectedOutput: input.expectedOutput,
-        previousExpectedOutput: existing?.expectedOutput,
+        previousExpectedOutput: existing.expectedOutput,
         userId: ctx.session.user.id,
-        anchorKind: existing?.anchorKind,
-        anchorId: existing?.anchorId,
-        anchorPath: existing?.anchorPath,
+        anchorKind: existing.anchorKind,
+        anchorId: existing.anchorId,
+        anchorPath: existing.anchorPath,
       });
 
-      return service.update({
+      const updatedAnnotation = await service.update({
         id: input.id,
         projectId: input.projectId,
         traceId: input.traceId,
@@ -435,6 +445,7 @@ export const annotationRouter = createTRPCRouter({
         // explicit null or empty text withdraws it.
         expectedOutput: input.expectedOutput,
       });
+      return updatedAnnotation;
     }),
   /**
    * The comments on one trace. Defaults to every comment, anchored ones
@@ -452,27 +463,19 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      const annotations = await ctx.prisma.annotation.findMany({
-        where: {
-          traceId: input.traceId,
-          projectId: input.projectId,
-          ...annotationAnchorScopeWhere(input.anchor),
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
+      const annotations = await ctx.app.annotations.list({
+        projectId: input.projectId,
+        traceIds: [input.traceId],
+        anchor: input.anchor,
+        order: "asc",
       });
 
-      return annotations.map(withReadableAnnotationAnchor);
+      const annotationsWithUsers = await enrichAnnotationsWithUsers(
+        annotations,
+        ctx.app.users,
+        "summary",
+      );
+      return annotationsWithUsers.map(withReadableAnnotationAnchor);
     }),
   /** Same contract as `getByTraceId`, for a page of traces. */
   getByTraceIds: protectedProcedure
@@ -485,51 +488,39 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      const annotations = await ctx.prisma.annotation.findMany({
-        where: {
-          traceId: {
-            in: input.traceIds,
-          },
-          projectId: input.projectId,
-          ...annotationAnchorScopeWhere(input.anchor),
-        },
-        // Only what the UI renders. `include: { user: true }` returned every
-        // User column — email, emailVerified, lastLoginAt, deactivatedAt — and
-        // there is no output schema on this procedure, so all of it reached
-        // the browser for every annotation on screen. Mirrors the sibling
-        // getByTraceId above, which already selects narrowly.
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
+      const annotations = await ctx.app.annotations.list({
+        projectId: input.projectId,
+        traceIds: input.traceIds,
+        anchor: input.anchor,
+        order: "asc",
       });
 
-      return annotations.map(withReadableAnnotationAnchor);
+      const annotationsWithUsers = await enrichAnnotationsWithUsers(
+        annotations,
+        ctx.app.users,
+        "summary",
+      );
+      return annotationsWithUsers.map(withReadableAnnotationAnchor);
     }),
   getById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotation.findUnique({
-        where: {
+      try {
+        return await ctx.app.annotations.getById({
           id: input.annotationId,
           projectId: input.projectId,
-        },
-      });
+        });
+      } catch (error) {
+        if (error instanceof AnnotationNotFoundError) return null;
+        throw error;
+      }
     }),
   deleteById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .permission("annotations:delete")
     .mutation(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
 
       const deletedAnnotation = await service.delete({
         id: input.annotationId,
@@ -573,22 +564,14 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotation.findMany({
-        where: {
-          projectId: input.projectId,
-          createdAt: {
-            gte: input.startDate,
-            lte: input.endDate,
-          },
-          ...annotationAnchorScopeWhere("all"),
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          user: true,
-        },
+      const annotations = await ctx.app.annotations.list({
+        projectId: input.projectId,
+        anchor: "all",
+        order: "desc",
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
+      return enrichAnnotationsWithUsers(annotations, ctx.app.users, "full");
     }),
 
   createOrUpdateQueue: protectedProcedure
@@ -604,7 +587,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:create")
     .mutation(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
       await service.assertQueueConfigurationReferences({
         projectId: input.projectId,
         userIds: input.userIds,
@@ -704,7 +687,7 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
       const organizationId = await service.getProjectOrganizationId({
         projectId: input.projectId,
       });
@@ -746,7 +729,7 @@ export const annotationRouter = createTRPCRouter({
         input.projectId,
         traceIds,
         protections,
-        undefined,
+        void 0,
         { full: true },
       );
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
@@ -871,6 +854,7 @@ export const annotationRouter = createTRPCRouter({
         annotators: input.annotators,
         userId: ctx.session.user.id,
         prisma: ctx.prisma,
+        annotations: ctx.app.annotations,
       });
     }),
   /**
@@ -892,7 +876,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
       const organizationId = await service.getProjectOrganizationId({
         projectId: input.projectId,
       });
@@ -918,7 +902,7 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ queueItemId: z.string(), projectId: z.string() }))
     .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
       const organizationId = await service.getProjectOrganizationId({
         projectId: input.projectId,
       });
@@ -957,7 +941,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
       const organizationId = await service.getProjectOrganizationId({
         projectId: input.projectId,
       });
@@ -1006,7 +990,7 @@ export const annotationRouter = createTRPCRouter({
     .permission("annotations:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const service = AnnotationService.create({ prisma: ctx.prisma });
+      const service = ctx.app.annotations;
       const organizationId = await service.getProjectOrganizationId({
         projectId: input.projectId,
       });
@@ -1043,7 +1027,7 @@ export const annotationRouter = createTRPCRouter({
             ? null
             : input.selectedAnnotations === "completed"
               ? { not: null }
-              : undefined,
+              : void 0,
         ...queuedAtRangeFilter(input),
       };
 
@@ -1084,8 +1068,8 @@ export const annotationRouter = createTRPCRouter({
       // Get paginated queue items first
       const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: whereCondition,
-        take: input.allQueueItems ? undefined : input.pageSize,
-        skip: input.allQueueItems ? undefined : input.pageOffset,
+        take: input.allQueueItems ? void 0 : input.pageSize,
+        skip: input.allQueueItems ? void 0 : input.pageOffset,
         include: {
           user: true,
           createdByUser: true,
@@ -1256,6 +1240,7 @@ export async function createOrUpdateQueueItems({
   annotators,
   userId,
   prisma,
+  annotations,
   findExistingTraceIds = ({ projectId: forProject, traceIds: candidates }) =>
     ClickHouseTraceService.create({ prisma }).findExistingTraceIds({
       projectId: forProject,
@@ -1267,6 +1252,7 @@ export async function createOrUpdateQueueItems({
   annotators: string[];
   userId: string;
   prisma: PrismaClient;
+  annotations: AnnotationService;
   findExistingTraceIds?: FindExistingTraceIds;
 }): Promise<{ created: number; skipped: number }> {
   const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
@@ -1286,8 +1272,7 @@ export async function createOrUpdateQueueItems({
     .filter((annotator) => annotator.type === "user")
     .map((annotator) => annotator.id);
 
-  const service = AnnotationService.create({ prisma });
-  await service.assertAnnotatorReferences({ projectId, queueIds, userIds });
+  await annotations.assertAnnotatorReferences({ projectId, queueIds, userIds });
 
   const queueableTraceIds = await resolveQueueableTraceIds({
     traceIds,
@@ -1295,53 +1280,13 @@ export async function createOrUpdateQueueItems({
     findExistingTraceIds,
   });
 
-  for (const traceId of queueableTraceIds) {
-    for (const annotator of parsedAnnotators) {
-      if (annotator.type === "queue") {
-        await prisma.annotationQueueItem.upsert({
-          where: {
-            projectId: projectId,
-            traceId_annotationQueueId_projectId: {
-              traceId: traceId,
-              annotationQueueId: annotator.id,
-              projectId: projectId,
-            },
-          },
-          create: {
-            annotationQueueId: annotator.id,
-            traceId: traceId,
-            projectId: projectId,
-            createdByUserId: userId,
-          },
-          update: {
-            annotationQueueId: annotator.id,
-            doneAt: null,
-          },
-        });
-      } else {
-        await prisma.annotationQueueItem.upsert({
-          where: {
-            projectId: projectId,
-            traceId_userId_projectId: {
-              traceId: traceId,
-              userId: annotator.id,
-              projectId: projectId,
-            },
-          },
-          create: {
-            userId: annotator.id,
-            traceId: traceId,
-            projectId: projectId,
-            createdByUserId: userId,
-          },
-          update: {
-            userId: annotator.id,
-            doneAt: null,
-          },
-        });
-      }
-    }
-  }
+  await annotations.createQueueItems({
+    projectId,
+    traceIds: queueableTraceIds,
+    queueIds,
+    userIds,
+    createdByUserId: userId,
+  });
 
   return {
     created: queueableTraceIds.length,

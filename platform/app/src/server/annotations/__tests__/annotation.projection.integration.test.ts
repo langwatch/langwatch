@@ -9,13 +9,21 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { AnnotationService } from "../annotation.service";
+import {
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+} from "~/test-utils/annotation-test-services";
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 
 const projectId = "test-project-id";
 const traceId = `test-trace-annotation-projection-${nanoid()}`;
 
 describe("annotations for a page of traces", () => {
-  const service = AnnotationService.create({ prisma });
+  const service = PostgresAnnotationAdapter.create({
+    database: prisma,
+    projects: createAnnotationTestProjects(),
+    organizations: createAnnotationTestOrganizations(),
+  }).build();
 
   beforeAll(async () => {
     await prisma.annotation.create({
@@ -68,9 +76,10 @@ describe("annotations for a page of traces", () => {
   describe("given a trace with one comment about it and three about its parts", () => {
     /** @scenario "A dataset column of annotations carries every comment, each naming its target" */
     it("carries every comment", async () => {
-      const rows = await service.getAllForProjection({
+      const rows = await service.listForProjection({
         projectId,
         traceIds: [traceId],
+        anchor: "all",
       });
 
       expect(rows.map((row) => row.comment).sort()).toEqual([
@@ -82,9 +91,10 @@ describe("annotations for a page of traces", () => {
     });
 
     it("carries the part of the trace each comment is about", async () => {
-      const rows = await service.getAllForProjection({
+      const rows = await service.listForProjection({
         projectId,
         traceIds: [traceId],
+        anchor: "all",
       });
 
       expect(rows.find((row) => row.comment === "this output is wrong")).toMatchObject({
@@ -103,9 +113,10 @@ describe("annotations for a page of traces", () => {
   describe("given no traces on the page", () => {
     it("reads nothing", async () => {
       expect(
-        await service.getAllForProjection({
+        await service.listForProjection({
           projectId,
           traceIds: [],
+          anchor: "all",
         }),
       ).toEqual([]);
     });

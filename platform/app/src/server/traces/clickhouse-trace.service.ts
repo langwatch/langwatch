@@ -1,11 +1,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  type AnnotationService,
+  annotationSuggestedOutput,
+} from "@langwatch/annotation-contract";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { parsePromptTraceReference } from "@langwatch/prompt-contract";
+import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
-import { AnnotationService } from "~/server/annotations/annotation.service";
-import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
 import { getApp } from "~/server/app-layer/app";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import {
@@ -18,9 +22,6 @@ import {
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { DataRetentionPolicyRepository } from "~/server/data-retention/policy/dataRetentionPolicy.repository";
-import { RetentionPolicyCache } from "~/server/data-retention/retentionPolicyCache";
-import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
   type ClickHouseEvaluationRunRow,
@@ -46,7 +47,6 @@ import {
   mapTraceSummaryToTrace,
 } from "./mappers";
 import { parseLLMSpanMessages } from "./parseLLMSpanMessages";
-import { parsePromptReference } from "./parsePromptReference";
 import { type EventSpanRow, mapEventAttrsToEvent } from "./projection/event-attrs.mapper";
 import type { ProjectableTrace, ProjectedAnnotation } from "./projection/types";
 import type { ResolvedTraceSpans } from "./resolve-offloaded-traces";
@@ -402,12 +402,14 @@ export class ClickHouseTraceService {
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
 
   private readonly prisma: PrismaClient;
+  private readonly annotations: AnnotationService | undefined;
 
   constructor({
     prisma,
     resolveTraceSpans,
     resolveTraceSpansBatch,
     retentionResolver,
+    annotations,
   }: {
     prisma: PrismaClient;
     resolveTraceSpans?: ResolveTraceSpansFn;
@@ -416,9 +418,11 @@ export class ClickHouseTraceService {
      * Widens the span read's retention floor to this tenant's own policy.
      * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
      */
-    retentionResolver?: RetentionPolicyResolver;
+    retentionResolver?: DataRetentionService;
+    annotations?: AnnotationService;
   }) {
     this.prisma = prisma;
+    this.annotations = annotations;
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
     this.retentionFloor = createRetentionFloorService(retentionResolver);
@@ -446,37 +450,30 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Static factory method for creating ClickHouseTraceService with default dependencies.
-   *
-   * The retention resolver defaults to a live cascade over the same Prisma
-   * client, which is what makes the span read's floor actually tenant-aware in
-   * production. Left to the constructor's optional parameter it never was:
-   * every production path reaches the service through here, none of them
-   * passed a resolver, and the floor quietly stayed at the fixed
-   * {@link SPAN_READ_FLOOR_LOOKBACK_MS} for every project — including the ones
-   * on a longer policy that this exists to serve.
-   *
-   * `new ClickHouseTraceService({...})` stays resolver-free, so unit tests keep
-   * the platform default without a database in the graph.
+   * Static factory method for creating ClickHouseTraceService with explicit
+   * retention dependencies. The process preset injects the singular
+   * DataRetentionService; direct construction remains resolver-free so unit
+   * tests keep the platform default without a database in the graph.
    */
   static create({
     prisma = defaultPrisma,
     resolveTraceSpans,
     resolveTraceSpansBatch,
-    retentionResolver = new RetentionPolicyCache(
-      new DataRetentionPolicyRepository(prisma),
-    ),
+    retentionResolver,
+    annotations,
   }: {
     prisma?: PrismaClient;
     resolveTraceSpans?: ResolveTraceSpansFn;
     resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
-    retentionResolver?: RetentionPolicyResolver;
+    retentionResolver?: DataRetentionService;
+    annotations?: AnnotationService;
   } = {}): ClickHouseTraceService {
     return new ClickHouseTraceService({
       prisma,
       resolveTraceSpans,
       resolveTraceSpansBatch,
       retentionResolver,
+      annotations,
     });
   }
 
@@ -1699,7 +1696,7 @@ export class ClickHouseTraceService {
     }
 
     // Extract prompt reference from attributes
-    const promptRef = parsePromptReference(attrs);
+    const promptRef = parsePromptTraceReference(attrs);
 
     return {
       spanId: row.SpanId,
@@ -2467,13 +2464,12 @@ export class ClickHouseTraceService {
     // name-addressable (annotations.scores.<name>), so fetch the score
     // definitions to remap id -> name. Deleted definitions are included so
     // historical scoreOptions still resolve.
-    const annotations = AnnotationService.create({ prisma: this.prisma });
+    if (!this.annotations) {
+      throw new Error("AnnotationService is required for trace annotation projection");
+    }
     const [rows, scoreDefs] = await Promise.all([
-      annotations.getAllForProjection({ projectId, traceIds }),
-      this.prisma.annotationScore.findMany({
-        where: { projectId },
-        select: { id: true, name: true },
-      }),
+      this.annotations.listForProjection({ projectId, traceIds, anchor: "all" }),
+      this.annotations.listScoreNames({ projectId }),
     ]);
     const scoreNameById = new Map(scoreDefs.map((s) => [s.id, s.name]));
 

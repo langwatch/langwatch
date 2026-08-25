@@ -2,6 +2,7 @@ import type {
   CreateUserInput,
   UpdateUserProfileInput,
   UserAccountInfo,
+  UserFullProfile,
   UserProfile,
   UserSsoStatus,
   UserTourPreference,
@@ -9,6 +10,7 @@ import type {
 
 /** Persistence owned by User. It never crosses the feature boundary. */
 export abstract class UserRepository {
+  abstract getProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   abstract tryFindById(id: string): Promise<UserProfile | null>;
   abstract tryFindByEmail(email: string): Promise<UserProfile | null>;
   abstract create(input: CreateUserInput): Promise<UserProfile>;

@@ -7,13 +7,17 @@ import type {
   UserAccountInfo,
   UserAvatarResult,
   UserEmailInput,
+  UserFullProfile,
   UserIdInput,
   UserProfile,
+  UserProfilesInput,
   UserSsoStatus,
   UserTourPreference,
 } from "./user";
 
 export abstract class UserService {
+  /** Returns every existing profile among the requested user IDs. */
+  abstract getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]>;
   abstract tryFindById(input: UserIdInput): Promise<UserProfile | null>;
   abstract tryFindByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   abstract create(input: CreateUserInput): Promise<UserProfile>;

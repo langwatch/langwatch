@@ -1,10 +1,20 @@
 import type {
   Annotation,
+  AnnotationByIdInput,
   CreateAnnotationInput,
   DeleteAnnotationInput,
   ListAnnotationsInput,
+  ListAnnotationScoreNamesInput,
+  ListAnnotationScoresInput,
+  ListProjectionAnnotationsInput,
   ProjectionAnnotation,
+  AnnotationScore,
+  AnnotationScoreByIdInput,
+  AnnotationScoreName,
+  ToggleAnnotationScoreInput,
   UpdateAnnotationInput,
+  UpsertAnnotationScoreInput,
+  CreateAnnotationQueueItemsInput,
 } from "@langwatch/annotation-contract";
 
 /** Private persistence capability for the Annotation service. */
@@ -12,23 +22,20 @@ export abstract class AnnotationRepository {
   abstract create(input: CreateAnnotationInput): Promise<Annotation>;
   abstract update(input: UpdateAnnotationInput): Promise<Annotation>;
   abstract delete(input: DeleteAnnotationInput): Promise<Annotation>;
-  abstract tryFindById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Annotation | null>;
+  abstract getById(input: AnnotationByIdInput): Promise<Annotation>;
   abstract list(input: ListAnnotationsInput): Promise<Annotation[]>;
-  abstract listForProjection(input: {
-    projectId: string;
-    traceIds: string[];
-    anchor: "trace" | "all";
-  }): Promise<ProjectionAnnotation[]>;
-  abstract findProjectOrganizationId(input: {
-    projectId: string;
-  }): Promise<string | null>;
-  abstract countOrganizationUsers(input: {
-    organizationId: string;
-    userIds: string[];
-  }): Promise<number>;
+  abstract listForProjection(
+    input: ListProjectionAnnotationsInput,
+  ): Promise<ProjectionAnnotation[]>;
+  abstract listScoreNames(
+    input: ListAnnotationScoreNamesInput,
+  ): Promise<AnnotationScoreName[]>;
+  abstract upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore>;
+  abstract listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]>;
+  abstract getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore>;
+  abstract toggleScore(input: ToggleAnnotationScoreInput): Promise<AnnotationScore>;
+  abstract deleteScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore>;
+  abstract createQueueItems(input: CreateAnnotationQueueItemsInput): Promise<void>;
   abstract countAnnotationScores(input: {
     projectId: string;
     scoreTypeIds: string[];

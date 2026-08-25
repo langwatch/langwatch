@@ -70,6 +70,7 @@ describe("automation dispatch wiring smoke", () => {
         traces: { spans: {} as never },
         traceSummaryRepository: {} as never,
         analytics: {} as never,
+        annotations: {} as never,
         resolveClickHouseClient: async () => {
           throw new Error("no ClickHouse in this test");
         },

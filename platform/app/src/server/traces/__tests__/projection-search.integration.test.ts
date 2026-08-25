@@ -16,9 +16,13 @@
  * proof — lives in the ClickHouseTraceService tests, not here.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import {
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+} from "~/test-utils/annotation-test-services";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
@@ -260,6 +264,11 @@ beforeAll(async () => {
   annotationScoreFindMany = vi.mocked(prisma.annotationScore.findMany);
   service = new ClickHouseTraceService({
     prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
+    annotations: PostgresAnnotationAdapter.create({
+      database: prisma,
+      projects: createAnnotationTestProjects(),
+      organizations: createAnnotationTestOrganizations(),
+    }).build(),
   });
 
   await insert({
@@ -296,7 +305,10 @@ beforeAll(async () => {
   annotationFindMany.mockResolvedValue([
     {
       id: `annotation-${nanoid()}`,
+      projectId: tenantId,
       traceId,
+      userId: null,
+      email: null,
       isThumbsUp: true,
       comment: "looks right",
       expectedOutput: null,
@@ -304,6 +316,10 @@ beforeAll(async () => {
         [QUALITY_SCORE_ID]: { value: "5", reason: "accurate" },
       },
       createdAt: new Date(now),
+      updatedAt: new Date(now),
+      anchorKind: null,
+      anchorId: null,
+      anchorPath: null,
     },
   ]);
   annotationScoreFindMany.mockResolvedValue([{ id: QUALITY_SCORE_ID, name: "quality" }]);

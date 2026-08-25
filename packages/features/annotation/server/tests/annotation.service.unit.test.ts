@@ -2,18 +2,26 @@ import {
   AnnotationAnnotatorInvalidError,
   type Annotation,
   AnnotationNotFoundError,
+  AnnotationProjectNotFoundError,
   AnnotationQueueMemberInvalidError,
   AnnotationScoreInvalidError,
 } from "@langwatch/annotation-contract";
+import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import { AnnotationRepository } from "../src/ports/annotation.port";
 import { AnnotationService } from "../src/services/annotation.service";
+import {
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+} from "./annotation.test-services";
 
 const annotation = {
   id: "annotation-1",
   projectId: "project-1",
   traceId: "trace-1",
   userId: "user-1",
+  email: null,
   comment: "comment",
   isThumbsUp: null,
   scoreOptions: {},
@@ -26,16 +34,27 @@ const annotation = {
 } satisfies Annotation;
 
 class FakeRepository extends AnnotationRepository {
-  readonly tryFindById = vi.fn(async () => annotation as Annotation | null);
+  readonly getById = vi.fn(async (): Promise<Annotation> => annotation);
   create = vi.fn(async () => annotation);
   update = vi.fn(async () => annotation);
   delete = vi.fn(async () => annotation);
   list = vi.fn(async () => [annotation]);
   listForProjection = vi.fn(async () => []);
-  findProjectOrganizationId = vi.fn(async () => "organization-1" as string | null);
-  countOrganizationUsers = vi.fn(
-    async ({ userIds }: { userIds: string[] }) => userIds.length,
-  );
+  listScoreNames = vi.fn(async () => []);
+  upsertScore = vi.fn(async () => {
+    throw new Error("not implemented in this fake");
+  });
+  listScores = vi.fn(async () => []);
+  getScore = vi.fn(async () => {
+    throw new Error("not implemented in this fake");
+  });
+  toggleScore = vi.fn(async () => {
+    throw new Error("not implemented in this fake");
+  });
+  deleteScore = vi.fn(async () => {
+    throw new Error("not implemented in this fake");
+  });
+  createQueueItems = vi.fn(async () => void 0);
   countAnnotationScores = vi.fn(
     async ({ scoreTypeIds }: { scoreTypeIds: string[] }) => scoreTypeIds.length,
   );
@@ -44,11 +63,21 @@ class FakeRepository extends AnnotationRepository {
   );
 }
 
+function createService(repository: FakeRepository) {
+  const projects = createAnnotationTestProjects();
+  const organizations = createAnnotationTestOrganizations();
+  return {
+    service: AnnotationService.create({ repository, projects, organizations }),
+    projects,
+    organizations,
+  };
+}
+
 describe("AnnotationService", () => {
   it("throws at the service boundary when an annotation is absent", async () => {
     const repository = new FakeRepository();
-    repository.tryFindById.mockResolvedValue(null);
-    const service = AnnotationService.create({ repository });
+    repository.getById.mockRejectedValue(new AnnotationNotFoundError("missing"));
+    const { service } = createService(repository);
 
     await expect(
       service.getById({ id: "missing", projectId: "project-1" }),
@@ -57,11 +86,12 @@ describe("AnnotationService", () => {
 
   it("delegates projection reads through the private repository", async () => {
     const repository = new FakeRepository();
-    const service = AnnotationService.create({ repository });
+    const { service } = createService(repository);
 
     await service.listForProjection({
       projectId: "project-1",
       traceIds: ["trace-1"],
+      anchor: "all",
     });
 
     expect(repository.listForProjection).toHaveBeenCalledWith({
@@ -73,8 +103,10 @@ describe("AnnotationService", () => {
 
   it("rejects queue members and scores outside the project boundary", async () => {
     const repository = new FakeRepository();
-    const service = AnnotationService.create({ repository });
-    repository.countOrganizationUsers.mockResolvedValueOnce(0);
+    const { service, organizations } = createService(repository);
+    organizations.getOrganizationMembers.mockRejectedValueOnce(
+      new UserNotInOrganizationError("user-1"),
+    );
     await expect(
       service.assertQueueConfigurationReferences({
         projectId: "project-1",
@@ -96,7 +128,7 @@ describe("AnnotationService", () => {
   it("rejects annotator references outside the project boundary", async () => {
     const repository = new FakeRepository();
     repository.countAnnotationQueues.mockResolvedValue(0);
-    const service = AnnotationService.create({ repository });
+    const { service } = createService(repository);
 
     await expect(
       service.assertAnnotatorReferences({
@@ -105,5 +137,15 @@ describe("AnnotationService", () => {
         userIds: ["user-1"],
       }),
     ).rejects.toBeInstanceOf(AnnotationAnnotatorInvalidError);
+  });
+
+  it("maps project absence to the established annotation 404 error", async () => {
+    const repository = new FakeRepository();
+    const { service, projects } = createService(repository);
+    projects.getOrganizationId.mockRejectedValueOnce(new ProjectNotFoundError("missing"));
+
+    await expect(
+      service.getProjectOrganizationId({ projectId: "missing" }),
+    ).rejects.toBeInstanceOf(AnnotationProjectNotFoundError);
   });
 });

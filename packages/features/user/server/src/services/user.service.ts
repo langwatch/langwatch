@@ -9,6 +9,7 @@ import {
   updateUserProfileInputSchema,
   userEmailInputSchema,
   userIdInputSchema,
+  userProfilesInputSchema,
   type CreateUserInput,
   type RemoveUserAvatarInput,
   type SetUserAvatarInput,
@@ -17,8 +18,10 @@ import {
   type UserAccountInfo,
   type UserAvatarResult,
   type UserEmailInput,
+  type UserFullProfile,
   type UserIdInput,
   type UserProfile,
+  type UserProfilesInput,
   type UserSsoStatus,
   type UserTourPreference,
 } from "@langwatch/user-contract";
@@ -60,6 +63,11 @@ export class UserService extends UserServiceContract {
       options.avatarStorage,
       options.now ?? (() => new Date()),
     );
+  }
+
+  getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
+    const parsed = userProfilesInputSchema.parse(input);
+    return this.repository.getProfiles([...new Set(parsed.userIds)]);
   }
 
   tryFindById(input: UserIdInput): Promise<UserProfile | null> {

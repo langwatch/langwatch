@@ -39,6 +39,7 @@ import type {
 } from "~/runtime/app/features/billing";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnnotationService } from "@langwatch/annotation-contract";
 import type { DashboardService } from "@langwatch/dashboard-contract";
 import type { LangWatchQLService } from "~/server/analytics/lwql";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
@@ -139,6 +140,8 @@ export interface AppDependencies {
   agents: AgentService;
   /** One process-owned Dataset capability shared by REST, tRPC, and workers. */
   dataset: DatasetService;
+  /** One process-owned Annotation capability shared by REST, tRPC, and Trace. */
+  annotations: AnnotationService;
   /** One process-owned API-key capability; transports must reuse this instance. */
   apiKeys: ApiKeyService;
 

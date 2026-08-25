@@ -22,7 +22,9 @@
   },
   "dependencies": {
     "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

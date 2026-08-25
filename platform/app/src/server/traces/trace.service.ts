@@ -1,5 +1,7 @@
-import { createLogger } from "@langwatch/observability";
+import type { AnnotationService } from "@langwatch/annotation-contract";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
+import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
@@ -190,6 +192,8 @@ export class TraceService {
     blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: LogRecordStorageService,
     private evaluationService?: EvaluationService,
+    private readonly retentionResolver?: DataRetentionService,
+    private readonly annotationService?: AnnotationService,
   ) {
     // Build the resolver callbacks when deps are present. They are passed to
     // ClickHouseTraceService so resolution happens at the NormalizedSpan level
@@ -207,6 +211,8 @@ export class TraceService {
       prisma,
       resolveTraceSpans: resolveTraceSpansFn,
       resolveTraceSpansBatch: resolveTraceSpansBatchFn,
+      retentionResolver: this.retentionResolver,
+      annotations: this.annotationService,
     });
     // Injected store for the read-time Claude Code content enrichment; the
     // default comes LAZILY from the App on first use (see
@@ -316,12 +322,16 @@ export class TraceService {
     blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: LogRecordStorageService,
     evaluationService?: EvaluationService,
+    retentionResolver?: DataRetentionService,
+    annotationService?: AnnotationService,
   ): TraceService {
     return new TraceService(
       prisma,
       blobResolutionDeps,
       logRecordStorage,
       evaluationService,
+      retentionResolver,
+      annotationService,
     );
   }
 

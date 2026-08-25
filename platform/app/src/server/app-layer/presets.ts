@@ -92,6 +92,7 @@ import {
 } from "@langwatch/langy-server";
 import { AuthzFeature } from "~/runtime/app/features/authz";
 import { AnalyticsAdapter, LoggingAnalyticsTripwire } from "@langwatch/analytics-server";
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
@@ -689,6 +690,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     },
   });
   const dataset = traced(datasetRuntime.build(), "DatasetService");
+  const annotations = traced(
+    PostgresAnnotationAdapter.create({
+      database: prisma,
+      projects,
+      organizations: canonicalOrganizations,
+    }).build(),
+    "AnnotationService",
+  );
   const workflowNlpExecutor = WorkflowNlpExecutor.create({
     migrateDsl: migrateWorkflowDslForExecution,
     getProjectModelProviders: (projectId) => modelProviders.getForProject({ projectId }),
@@ -736,6 +745,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     void 0,
     void 0,
     dataRetentionService,
+    annotations,
   );
 
   const evaluationExecution = traced(
@@ -1328,6 +1338,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     traceSummaryRepository: repositories.traceSummaryFold,
     analytics: analyticsService,
     resolveClickHouseClient,
+    annotations,
   });
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
@@ -1990,6 +2001,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     config,
     agents,
     dataset,
+    annotations,
     workflows,
     evaluators,
     monitors,
@@ -2395,6 +2407,11 @@ export function createTestApp(
     config,
     agents,
     dataset: testDataset,
+    annotations: PostgresAnnotationAdapter.create({
+      database: testPrisma,
+      projects: testProjects,
+      organizations: testCanonicalOrganizations,
+    }).build(),
     workflows: testWorkflows,
     evaluators: testEvaluators,
     monitors: testMonitors,

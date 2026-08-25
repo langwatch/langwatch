@@ -23,17 +23,16 @@ vi.mock("langwatch", () => ({
     withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
       return (fn as (span: unknown) => unknown)({
-        setAttribute: () => undefined,
-        setAttributes: () => undefined,
-        addEvent: () => undefined,
+        setAttribute: () => void 0,
+        setAttributes: () => void 0,
+        addEvent: () => void 0,
       });
     },
   }),
 }));
 
 const { ClickHouseTraceService } = await import("../clickhouse-trace.service");
-const { RetentionPolicyCache } =
-  await import("~/server/data-retention/retentionPolicyCache");
+const retentionResolver = { resolve: async () => null };
 
 /** The service keeps its floor service private; this is the wiring under test. */
 function retentionProviderOf(service: unknown) {
@@ -41,26 +40,37 @@ function retentionProviderOf(service: unknown) {
   return (floor as { provider?: unknown }).provider;
 }
 
+function annotationServiceOf(service: unknown) {
+  return (service as { annotations?: unknown }).annotations;
+}
+
 describe("the production trace-service factory", () => {
   describe("given no resolver is passed explicitly", () => {
     describe("when the service is created", () => {
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("still wires a live retention cascade, so the floor is tenant-aware", () => {
-        const service = ClickHouseTraceService.create();
+        const service = ClickHouseTraceService.create({ retentionResolver });
 
         expect(retentionProviderOf(service)).toBeDefined();
       });
 
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("wires the policy cascade itself, not some other provider", () => {
-        const service = ClickHouseTraceService.create();
+        const service = ClickHouseTraceService.create({ retentionResolver });
 
         // `provider` is the PlatformRetentionDaysProvider adapter the floor
         // service wraps around the resolver; the resolver is the thing that
         // has to be the real cascade.
         const provider = retentionProviderOf(service) as { resolver?: unknown };
 
-        expect(provider?.resolver).toBeInstanceOf(RetentionPolicyCache);
+        expect(provider?.resolver).toBe(retentionResolver);
+      });
+
+      it("keeps the annotation service supplied to the factory", () => {
+        const annotations = {} as never;
+        const service = ClickHouseTraceService.create({ annotations });
+
+        expect(annotationServiceOf(service)).toBe(annotations);
       });
     });
   });

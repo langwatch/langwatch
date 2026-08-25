@@ -19,6 +19,7 @@ import type {
   ClaimOrganizationBillingCustomerInput,
   GetOldestTeamInput,
   GetOrganizationBillingProfileInput,
+  GetOrganizationMembersInput,
   OrganizationBillingProfile,
 } from "./organization";
 import type {
@@ -50,6 +51,8 @@ import type {
 } from "./team";
 
 export abstract class OrganizationService {
+  /** Returns the requested members or throws UserNotInOrganizationError. */
+  abstract getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   /** Returns whether a user belongs to an organization. */
   abstract isMember(input: {
     organizationId: string;

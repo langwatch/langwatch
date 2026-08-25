@@ -99,6 +99,7 @@ export class App {
   readonly config: AppConfig;
   readonly agents: AppDependencies["agents"];
   readonly dataset: AppDependencies["dataset"];
+  readonly annotations: AppDependencies["annotations"];
   readonly apiKeys: AppDependencies["apiKeys"];
   readonly managedProviders: AppDependencies["managedProviders"];
   readonly modelProviders: AppDependencies["modelProviders"];
@@ -186,6 +187,7 @@ export class App {
     this.config = deps.config;
     this.agents = deps.agents;
     this.dataset = deps.dataset;
+    this.annotations = deps.annotations;
     this.apiKeys = deps.apiKeys;
     this.managedProviders = deps.managedProviders;
     this.modelProviders = deps.modelProviders;

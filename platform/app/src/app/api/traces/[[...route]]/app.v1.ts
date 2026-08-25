@@ -188,7 +188,14 @@ export function registerTracesRoutes(
         }
       }
 
-      const traceService = TraceService.create(prisma);
+      const traceService = TraceService.create(
+        prisma,
+        void 0,
+        void 0,
+        void 0,
+        void 0,
+        c.app.annotations,
+      );
       const results = await traceService.getAllTracesForProject(
         {
           ...searchFields,

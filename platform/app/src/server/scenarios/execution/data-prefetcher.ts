@@ -1182,7 +1182,7 @@ export function createDataPrefetcherDependencies({
   app,
   prisma,
 }: {
-  app: App;
+  app: Pick<App, "agents" | "prompts" | "scenarios">;
   prisma: import("~/generated/prisma/client").PrismaClient;
 }): DataPrefetcherDependencies {
   return {

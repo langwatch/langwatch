@@ -46,6 +46,13 @@ export class AnnotationScoreInvalidError extends HandledError {
   }
 }
 
+export class AnnotationScoreNotFoundError extends Error {
+  constructor(scoreId: string) {
+    super(`Annotation score ${scoreId} was not found.`);
+    this.name = "AnnotationScoreNotFoundError";
+  }
+}
+
 export class AnnotationAnnotatorInvalidError extends HandledError {
   declare readonly code: "annotation_annotator_invalid";
 

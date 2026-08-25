@@ -40,9 +40,11 @@ export const tracesRouter = createTRPCRouter({
 
       const traceService = TraceService.create(
         ctx.prisma,
-        undefined,
-        undefined,
+        void 0,
+        void 0,
         ctx.app.evaluations,
+        void 0,
+        ctx.app.annotations,
       );
       return traceService.getAllTracesForProject(input, protections, {
         scrollId: input.scrollId,
@@ -66,6 +68,10 @@ export const tracesRouter = createTRPCRouter({
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
       );
       const trace = await traceService.getById(
         input.projectId,
@@ -158,7 +164,14 @@ export const tracesRouter = createTRPCRouter({
     .input(tracesFilterInput)
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        void 0,
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
+      );
       const result = await traceService.getTopicCounts(input);
 
       const topicsMap = Object.fromEntries(
@@ -232,6 +245,10 @@ export const tracesRouter = createTRPCRouter({
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
       );
 
       return traceService.getTracesByThreadId(projectId, threadId, protections, {
@@ -257,6 +274,10 @@ export const tracesRouter = createTRPCRouter({
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
       );
       return traceService.getTracesWithSpans(
         projectId,
@@ -325,6 +346,10 @@ export const tracesRouter = createTRPCRouter({
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
       );
       return traceService.getTracesWithSpansByThreadIds(
         projectId,
@@ -354,6 +379,10 @@ export const tracesRouter = createTRPCRouter({
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
       );
       const { groups } = await traceService.getAllTracesForProject(
         {
@@ -418,6 +447,10 @@ export const tracesRouter = createTRPCRouter({
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
       );
       const { groups } = await traceService.getAllTracesForProject(
         {
@@ -502,6 +535,10 @@ export const tracesRouter = createTRPCRouter({
       const traceService = TraceService.create(
         ctx.prisma,
         buildTraceBlobResolutionDeps(),
+        void 0,
+        void 0,
+        void 0,
+        ctx.app.annotations,
       );
       return traceService.getAllTracesForProject(
         {

@@ -5,6 +5,7 @@ import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import type { DatasetService } from "@langwatch/dataset-contract";
+import type { AnnotationService } from "@langwatch/annotation-contract";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import {
@@ -76,6 +77,7 @@ export function buildAutomationDispatchPorts({
   resolveClickHouseClient: ClickHouseClientResolver;
   /** Dataset writes go through the process-owned Dataset service. */
   dataset?: DatasetService;
+  annotations: AnnotationService;
 }): AutomationDispatchPorts {
   // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
   // into deep links; an empty baseHost silently ships broken links.
@@ -102,7 +104,14 @@ export function buildAutomationDispatchPorts({
   // path. Concurrent lookups within one dispatch share a single in-flight
   // protections query per project; the entry drops once settled so
   // protections aren't cached stale across dispatches.
-  const traceService = TraceService.create(prisma);
+  const traceService = TraceService.create(
+    prisma,
+    void 0,
+    void 0,
+    void 0,
+    void 0,
+    annotations,
+  );
   const protectionsInFlight = new Map<
     string,
     ReturnType<typeof getProtectionsForProject>
@@ -165,7 +174,7 @@ export function buildAutomationDispatchPorts({
       return traceService.getById(projectId, traceId, protections);
     },
     addToAnnotationQueue: async (params) => {
-      await createOrUpdateQueueItems({ ...params, prisma });
+      await createOrUpdateQueueItems({ ...params, prisma, annotations });
     },
     addToDataset: async (params) => {
       if (!dataset) {

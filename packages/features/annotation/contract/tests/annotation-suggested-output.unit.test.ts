@@ -1,17 +1,11 @@
-/**
- * @vitest-environment node
- *
- * Which comments suggest what the trace should have answered, and which ones
- * are asking for something else entirely.
- */
+/** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { annotationSuggestedOutput } from "../annotationSuggestedOutput";
+import { annotationSuggestedOutput, type AnnotationSuggestionSource } from "../src";
 
 const traceId = "trace-1";
 
-const suggestionOf = (
-  annotation: Parameters<typeof annotationSuggestedOutput>[0]["annotation"] = {},
-) => annotationSuggestedOutput({ annotation, traceId });
+const suggestionOf = (annotation: AnnotationSuggestionSource = {}) =>
+  annotationSuggestedOutput({ annotation, traceId });
 
 describe("the expected output an annotation suggests", () => {
   describe("given a comment about the whole trace", () => {

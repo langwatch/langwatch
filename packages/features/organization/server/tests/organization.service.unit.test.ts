@@ -268,6 +268,7 @@ const sharedTeam: OrganizationTeam = {
 class MemoryTeams extends TeamRepository {
   team: OrganizationTeam = sharedTeam;
   member = true;
+  organizationMemberReads = 0;
 
   get(): Promise<OrganizationTeam> {
     return Promise.resolve(this.team);
@@ -305,6 +306,7 @@ class MemoryTeams extends TeamRepository {
     return Promise.resolve(this.team);
   }
   getOrganizationMembers(input: { userIds: string[] }): Promise<string[]> {
+    this.organizationMemberReads += 1;
     if (!this.member && input.userIds[0]) {
       return Promise.reject(new UserNotInOrganizationError(input.userIds[0]));
     }
@@ -326,6 +328,18 @@ class MemoryTeams extends TeamRepository {
 }
 
 describe("OrganizationService", () => {
+  it("reads requested organization members with one repository call", async () => {
+    const teams = new MemoryTeams();
+    const members = await createService(
+      new StubRepository("team"),
+      new RecordingGrants(),
+      teams,
+    ).getOrganizationMembers({ organizationId: "org", userIds: ["user-1", "user-2"] });
+
+    expect(members).toEqual(["user-1", "user-2"]);
+    expect(teams.organizationMemberReads).toBe(1);
+  });
+
   it("returns the required oldest team", async () => {
     await expect(
       createService(new StubRepository("oldest-team")).getOldestTeamId({

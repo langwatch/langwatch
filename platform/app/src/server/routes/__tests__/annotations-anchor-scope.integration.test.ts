@@ -7,10 +7,15 @@
  */
 
 import { nanoid } from "nanoid";
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import {
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+} from "~/test-utils/annotation-test-services";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { app } from "../annotations";
 
@@ -19,12 +24,45 @@ describe("Annotations REST API", () => {
   let organization: Organization;
   let team: Team;
   let project: Project;
+  const annotations = PostgresAnnotationAdapter.create({
+    database: prisma,
+    projects: createAnnotationTestProjects(),
+    organizations: createAnnotationTestOrganizations(),
+  }).build();
+  const bindings = {
+    langwatchApp: {
+      annotations,
+      apiKeys: {
+        tryResolveToken: async ({ token }: { token: string }) =>
+          token === project.apiKey ? { type: "legacy", project } : null,
+        markUsed: () => void 0,
+      },
+    },
+  };
 
   const get = (path: string) =>
-    app.request(path, {
-      method: "GET",
-      headers: { "X-Auth-Token": project.apiKey },
-    });
+    app.request(
+      path,
+      {
+        method: "GET",
+        headers: { "X-Auth-Token": project.apiKey },
+      },
+      bindings,
+    );
+
+  const patch = (path: string, body: Record<string, unknown>) =>
+    app.request(
+      path,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Auth-Token": project.apiKey,
+        },
+        body: JSON.stringify(body),
+      },
+      bindings,
+    );
 
   beforeAll(async () => {
     organization = await prisma.organization.create({
@@ -114,6 +152,57 @@ describe("Annotations REST API", () => {
       expect(await response.json()).toMatchObject({
         error: "validation_error",
       });
+    });
+  });
+
+  describe("when updating an annotation over REST", () => {
+    it("returns the legacy user-free row without replacing score options", async () => {
+      const annotation = await prisma.annotation.create({
+        data: {
+          id: nanoid(),
+          projectId: project.id,
+          traceId,
+          comment: "before patch",
+          isThumbsUp: false,
+          email: "before@example.com",
+          scoreOptions: { quality: { value: "good" } },
+        },
+      });
+
+      const response = await patch(`/api/annotations/${annotation.id}`, {
+        comment: "after patch",
+        isThumbsUp: true,
+        email: "after@example.com",
+      });
+
+      expect(response.status).toBe(200);
+      const { data } = (await response.json()) as {
+        data: {
+          comment: string;
+          email: string | null;
+          scoreOptions: unknown;
+          user?: unknown;
+        };
+      };
+      expect(data).toMatchObject({
+        comment: "after patch",
+        email: "after@example.com",
+        scoreOptions: { quality: { value: "good" } },
+      });
+      expect(data).not.toHaveProperty("user");
+    });
+
+    it("keeps a missing update on its existing 500 error path", async () => {
+      const response = await patch(`/api/annotations/${nanoid()}`, {
+        comment: "missing",
+        isThumbsUp: false,
+        email: "missing@example.com",
+      });
+
+      expect(response.status).toBe(500);
+      const body = (await response.json()) as { message: string; status: string };
+      expect(body).toMatchObject({ status: "error" });
+      expect(body.message).toMatch(/not found/i);
     });
   });
 });

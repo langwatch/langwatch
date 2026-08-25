@@ -48,6 +48,7 @@ import {
   getOrganizationTeamWithMembersInputSchema,
   getOldestTeamInputSchema,
   getOrganizationBillingProfileInputSchema,
+  getOrganizationMembersInputSchema,
   listMemberOrganizationGroupsInputSchema,
   listOrganizationGroupsInputSchema,
   listOrganizationTeamsInputSchema,
@@ -79,6 +80,7 @@ import {
   type GetOrganizationTeamWithMembersInput,
   type GetOldestTeamInput,
   type GetOrganizationBillingProfileInput,
+  type GetOrganizationMembersInput,
   type ListMemberOrganizationGroupsInput,
   type ListOrganizationGroupsInput,
   type ListOrganizationTeamsInput,
@@ -282,6 +284,11 @@ export class OrganizationService extends OrganizationServiceContract {
       if (error instanceof UserNotInOrganizationError) return false;
       throw error;
     }
+  }
+
+  getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
+    const parsed = getOrganizationMembersInputSchema.parse(input);
+    return this.teams.getOrganizationMembers(parsed);
   }
 
   static create(options: {

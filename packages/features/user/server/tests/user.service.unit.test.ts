@@ -1,5 +1,5 @@
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { UserProfile } from "@langwatch/user-contract";
+import type { UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   UserAvatarStoragePort,
@@ -9,7 +9,7 @@ import {
 import { UserRepository } from "../src/repositories/user.repository";
 import { UserService } from "../src/services/user.service";
 
-const user: UserProfile = {
+const user: UserFullProfile = {
   id: "user-1",
   name: "Ada",
   email: "ada@example.com",
@@ -20,9 +20,12 @@ const user: UserProfile = {
   updatedAt: new Date(0),
   lastLoginAt: null,
   deactivatedAt: null,
+  lastHomePath: null,
+  tracesExplorerTourDismissedAt: null,
 };
 
 class StubRepository extends UserRepository {
+  getProfiles = vi.fn(async () => [user]);
   tryFindById = vi.fn(async () => user);
   tryFindByEmail = vi.fn(async () => user);
   create = vi.fn(async () => user);
@@ -86,6 +89,15 @@ function createService() {
 }
 
 describe("UserService", () => {
+  it("loads requested profiles through one batched repository read", async () => {
+    const { service, repository } = createService();
+
+    await expect(
+      service.getProfiles({ userIds: ["user-1", "user-1", "user-2"] }),
+    ).resolves.toEqual([user]);
+    expect(repository.getProfiles).toHaveBeenCalledWith(["user-1", "user-2"]);
+  });
+
   it("creates a profile through its private repository", async () => {
     const { service, repository } = createService();
 

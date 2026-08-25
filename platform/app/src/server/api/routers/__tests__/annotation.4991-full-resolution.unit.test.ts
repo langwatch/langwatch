@@ -10,7 +10,13 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import {
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+  createAnnotationTestUsers,
+} from "~/test-utils/annotation-test-services";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter } from "../annotation";
 
@@ -29,7 +35,39 @@ const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } = vi.hois
   },
 );
 
-const mockAnnotationFindMany = vi.fn().mockResolvedValue([]);
+const annotation = {
+  id: "annotation-1",
+  projectId: "project_123",
+  traceId: "t1",
+  userId: "annotation-user-1",
+  email: "annotation@example.com",
+  comment: "A comment",
+  isThumbsUp: null,
+  scoreOptions: {},
+  expectedOutput: null,
+  anchorKind: null,
+  anchorId: null,
+  anchorPath: null,
+  createdAt: new Date(1),
+  updatedAt: new Date(2),
+};
+
+const legacyFullUser = {
+  id: "annotation-user-1",
+  name: "Ada Lovelace",
+  email: "annotation@example.com",
+  emailVerified: true,
+  image: "https://example.test/ada.png",
+  pendingSsoSetup: false,
+  createdAt: new Date(3),
+  updatedAt: new Date(4),
+  lastLoginAt: new Date(5),
+  deactivatedAt: null,
+  lastHomePath: "/traces",
+  tracesExplorerTourDismissedAt: new Date(6),
+};
+
+const mockAnnotationFindMany = vi.fn().mockResolvedValue([annotation]);
 const mockQueueItemFindMany = vi.fn();
 const mockQueueItemCount = vi.fn().mockResolvedValue(1);
 
@@ -100,12 +138,16 @@ function makePrismaStub(): PrismaClient {
 }
 
 let caller: ReturnType<typeof annotationRouter.createCaller>;
+let users = createAnnotationTestUsers();
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockCreate.mockReturnValue({ getTracesWithSpans: mockGetTracesWithSpans });
   mockBuildDeps.mockReturnValue(BLOB_DEPS);
   mockGetTracesWithSpans.mockResolvedValue([]);
+  mockAnnotationFindMany.mockResolvedValue([annotation]);
+  users = createAnnotationTestUsers();
+  users.getProfiles.mockResolvedValue([legacyFullUser]);
 
   const ctx = createInnerTRPCContext({
     session: { user: { id: "test-user-id" }, expires: "1" },
@@ -115,6 +157,14 @@ beforeEach(() => {
     publiclyShared: false,
   });
   ctx.prisma = makePrismaStub();
+  Object.assign(ctx.app, {
+    annotations: PostgresAnnotationAdapter.create({
+      database: ctx.prisma,
+      projects: createAnnotationTestProjects(),
+      organizations: createAnnotationTestOrganizations(),
+    }).build(),
+    users,
+  });
   caller = annotationRouter.createCaller(ctx);
 });
 
@@ -172,6 +222,7 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
         pageSize: 10,
         pageOffset: 0,
       });
+      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
       expectFullResolution();
     });
 
@@ -200,25 +251,35 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
   });
 });
 
-describe("annotation router public reads", () => {
-  it("only selects public profile fields for annotation users", async () => {
-    await caller.getByTraceId({
+describe("annotation router user response projections", () => {
+  it("keeps the trace read's narrow user projection", async () => {
+    const result = await caller.getByTraceId({
       projectId: "project_123",
       traceId: "t1",
     });
 
-    expect(mockAnnotationFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
-          },
-        },
-      }),
-    );
+    expect(users.getProfiles).toHaveBeenCalledWith({ userIds: ["annotation-user-1"] });
+    expect(result[0]?.user).toEqual({
+      id: "annotation-user-1",
+      name: "Ada Lovelace",
+      image: "https://example.test/ada.png",
+    });
+  });
+
+  it("keeps every legacy User scalar on the project annotation list", async () => {
+    const result = await caller.getAll({ projectId: "project_123" });
+
+    expect(result[0]?.user).toEqual(legacyFullUser);
+  });
+
+  it("keeps every legacy User scalar when enriching queue annotations", async () => {
+    const result = await caller.getOptimizedAnnotationQueues({
+      projectId: "project_123",
+      selectedAnnotations: "pending",
+      pageSize: 10,
+      pageOffset: 0,
+    });
+
+    expect(result.assignedQueueItems[0]?.annotations[0]?.user).toEqual(legacyFullUser);
   });
 });

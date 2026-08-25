@@ -7,16 +7,17 @@
  * - src/pages/api/annotations/trace/[trace].ts
  */
 
+import {
+  ANNOTATION_ANCHOR_SCOPES,
+  type AnnotationAnchorScope,
+  AnnotationNotFoundError,
+  annotationAnchorScopeSchema,
+} from "@langwatch/annotation-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
-import {
-  ANNOTATION_ANCHOR_SCOPES,
-  type AnnotationAnchorScope,
-  annotationAnchorScopeSchema,
-  annotationAnchorScopeWhere,
-} from "~/server/annotations/annotationAnchor";
+import { z } from "zod";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
@@ -24,12 +25,16 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { appFromContext } from "~/app/api/middleware/app-context";
-import { prisma } from "~/server/db";
 
 const logger = createLogger("langwatch:annotations");
 const AUTH_REASON =
   "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling";
+
+const annotationRestWriteSchema = z.object({
+  comment: z.string().min(1),
+  isThumbsUp: z.boolean(),
+  email: z.string().nullable().optional(),
+});
 
 // One policy per GRAIN, not one per file. A single shared policy would report
 // the same requirement for a read and a delete, which is worse than reporting
@@ -68,7 +73,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
     return { error: message, status: 401 as const, body: { message } };
   }
 
-  const apiKeys = appFromContext(c).apiKeys;
+  const apiKeys = c.app.apiKeys;
   const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
@@ -107,7 +112,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
  */
 function anchorScopeFromQuery(c: Context): AnnotationAnchorScope {
   const requested = c.req.query("anchor");
-  if (requested === undefined) return "all";
+  if (requested === void 0) return "all";
 
   const parsed = annotationAnchorScopeSchema.safeParse(requested);
   if (!parsed.success) {
@@ -126,17 +131,16 @@ secured.access(annotationsViewAuth).get("/annotations", async (c) => {
   }
   const { project, markUsed } = auth;
   const anchorScope = anchorScopeFromQuery(c);
+  const annotations = c.app.annotations;
 
   try {
-    const annotations = await prisma.annotation.findMany({
-      where: {
-        projectId: project.id,
-        ...annotationAnchorScopeWhere(anchorScope),
-      },
+    const rows = await annotations.list({
+      projectId: project.id,
+      anchor: anchorScope,
     });
 
     markUsed();
-    return c.json({ data: annotations ?? [] });
+    return c.json({ data: rows });
   } catch (e) {
     logger.error({ error: e, projectId: project.id }, "error fetching annotations");
     return c.json(
@@ -156,14 +160,18 @@ secured.access(annotationsViewAuth).get("/annotations/:id", async (c) => {
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const annotations = c.app.annotations;
 
   try {
     const annotationId = c.req.param("id");
-    const annotation = await prisma.annotation.findUnique({
-      where: { id: annotationId, projectId: project.id },
-    });
-    if (!annotation) {
-      return c.json({ status: "error", message: "Annotation not found." }, 404);
+    let annotation;
+    try {
+      annotation = await annotations.getById({ id: annotationId, projectId: project.id });
+    } catch (error) {
+      if (error instanceof AnnotationNotFoundError) {
+        return c.json({ status: "error", message: "Annotation not found." }, 404);
+      }
+      throw error;
     }
     markUsed();
     return c.json({ data: annotation });
@@ -185,12 +193,11 @@ secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const annotations = c.app.annotations;
 
   try {
     const annotationId = c.req.param("id");
-    await prisma.annotation.delete({
-      where: { id: annotationId, projectId: project.id },
-    });
+    await annotations.delete({ id: annotationId, projectId: project.id });
     markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
   } catch (e) {
@@ -211,15 +218,16 @@ secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const annotations = c.app.annotations;
 
   try {
     const body = await c.req.json();
-    const comment = body.comment as string;
-    const isThumbsUp = body.isThumbsUp;
+    const parsed = annotationRestWriteSchema.safeParse(body);
     const annotationId = c.req.param("id");
-    const email = body.email as string;
+    const issues = parsed.success ? [] : parsed.error.issues;
 
-    if (!comment || typeof comment !== "string") {
+    const commentIssue = issues.some((issue) => issue.path[0] === "comment");
+    if (commentIssue) {
       return c.json(
         {
           status: "error",
@@ -228,7 +236,8 @@ secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
         400,
       );
     }
-    if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
+    const thumbsIssue = issues.some((issue) => issue.path[0] === "isThumbsUp");
+    if (thumbsIssue) {
       return c.json(
         {
           status: "error",
@@ -238,13 +247,16 @@ secured.access(annotationsManageAuth).patch("/annotations/:id", async (c) => {
       );
     }
 
-    const patchAnnotation = await prisma.annotation.update({
-      where: { id: annotationId, projectId: project.id },
-      data: {
-        comment,
-        isThumbsUp,
-        email,
-      },
+    if (!parsed.success) {
+      return c.json({ status: "error", message: "Invalid request body." }, 400);
+    }
+
+    const patchAnnotation = await annotations.update({
+      id: annotationId,
+      projectId: project.id,
+      comment: parsed.data.comment,
+      isThumbsUp: parsed.data.isThumbsUp,
+      ...(parsed.data.email === void 0 ? {} : { email: parsed.data.email }),
     });
 
     markUsed();
@@ -269,19 +281,18 @@ secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
   }
   const { project, markUsed } = auth;
   const anchorScope = anchorScopeFromQuery(c);
+  const annotations = c.app.annotations;
 
   try {
     const trace = c.req.param("id");
-    const annotationsByTrace = await prisma.annotation.findMany({
-      where: {
-        traceId: trace,
-        projectId: project.id,
-        ...annotationAnchorScopeWhere(anchorScope),
-      },
+    const annotationsByTrace = await annotations.list({
+      projectId: project.id,
+      traceIds: [trace],
+      anchor: anchorScope,
     });
 
     markUsed();
-    return c.json({ data: annotationsByTrace ?? [] });
+    return c.json({ data: annotationsByTrace });
   } catch (e) {
     logger.error(
       { error: e, trace: c.req.param("id"), projectId: project.id },
@@ -307,15 +318,16 @@ secured.access(annotationsCreateAuth).post("/annotations/trace/:id", async (c) =
     return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
+  const annotations = c.app.annotations;
 
   try {
     const body = await c.req.json();
-    const comment = body.comment as string;
-    const isThumbsUp = body.isThumbsUp;
+    const parsed = annotationRestWriteSchema.safeParse(body);
     const trace = c.req.param("id");
-    const email = body.email as string;
+    const issues = parsed.success ? [] : parsed.error.issues;
 
-    if (!comment || typeof comment !== "string") {
+    const commentIssue = issues.some((issue) => issue.path[0] === "comment");
+    if (commentIssue) {
       return c.json(
         {
           status: "error",
@@ -324,7 +336,8 @@ secured.access(annotationsCreateAuth).post("/annotations/trace/:id", async (c) =
         400,
       );
     }
-    if (isThumbsUp === undefined || typeof isThumbsUp !== "boolean") {
+    const thumbsIssue = issues.some((issue) => issue.path[0] === "isThumbsUp");
+    if (thumbsIssue) {
       return c.json(
         {
           status: "error",
@@ -333,7 +346,7 @@ secured.access(annotationsCreateAuth).post("/annotations/trace/:id", async (c) =
         400,
       );
     }
-    if (!trace || typeof trace !== "string") {
+    if (!trace) {
       return c.json(
         {
           status: "error",
@@ -343,15 +356,19 @@ secured.access(annotationsCreateAuth).post("/annotations/trace/:id", async (c) =
       );
     }
 
-    const addAnnotation = await prisma.annotation.create({
-      data: {
-        id: nanoid(),
-        comment,
-        projectId: project.id,
-        isThumbsUp,
-        traceId: trace,
-        email,
-      },
+    if (!parsed.success) {
+      return c.json({ status: "error", message: "Invalid request body." }, 400);
+    }
+
+    const addAnnotation = await annotations.create({
+      id: nanoid(),
+      comment: parsed.data.comment,
+      projectId: project.id,
+      isThumbsUp: parsed.data.isThumbsUp,
+      traceId: trace,
+      ...(parsed.data.email === void 0 ? {} : { email: parsed.data.email }),
+      scoreOptions: {},
+      expectedOutput: null,
     });
 
     markUsed();

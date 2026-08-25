@@ -268,7 +268,14 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });
-  const traceService = TraceService.create(prisma);
+  const traceService = TraceService.create(
+    prisma,
+    void 0,
+    void 0,
+    void 0,
+    void 0,
+    c.app.annotations,
+  );
   const results = await traceService.getAllTracesForProject(
     {
       ...params,

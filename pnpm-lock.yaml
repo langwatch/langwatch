@@ -1165,9 +1165,15 @@ importers:
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -3333,6 +3339,12 @@ importers:
       '@langwatch/analytics-server':
         specifier: workspace:*
         version: link:../../packages/features/analytics/server
+      '@langwatch/annotation-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/annotation/contract
+      '@langwatch/annotation-server':
+        specifier: workspace:*
+        version: link:../../packages/features/annotation/server
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../packages/api

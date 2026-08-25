@@ -9,12 +9,17 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import {
+  createAnnotationTestOrganizations,
+  createAnnotationTestProjects,
+  createAnnotationTestUsers,
+} from "~/test-utils/annotation-test-services";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
@@ -70,6 +75,12 @@ vi.mock("~/server/app-layer/app", async () => {
           getByTraceId: async () => ({ redactedByVisibilityWindow: false }),
         },
       },
+      annotations: PostgresAnnotationAdapter.create({
+        database: prisma,
+        projects: createAnnotationTestProjects(),
+        organizations: createAnnotationTestOrganizations(),
+      }).build(),
+      users: createAnnotationTestUsers(),
       organizations: {
         // The shared test user belongs to the org through the legacy TeamUser
         // row rather than a RoleBinding, so this is the lookup the protections
@@ -744,9 +755,8 @@ describe("Annotation CRUD", () => {
         anchorId: "span-tool",
       });
 
-      // The has-annotation filter in search reads the ClickHouse sync, and the
-      // trigger filters read getAnnotatedTraceIds. Both answer "has a human
-      // touched this trace", so both count a comment on one of its spans.
+      // The has-annotation filter in search reads the ClickHouse sync. A comment
+      // on one span still means a human has touched the trace.
       expect(mockAddAnnotation).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: projectId,
@@ -754,12 +764,6 @@ describe("Annotation CRUD", () => {
           annotationId: created.id,
         }),
       );
-      const annotated = await getAnnotatedTraceIds({
-        projectId,
-        startDate: new Date(Date.now() - 60_000),
-        endDate: new Date(Date.now() + 60_000),
-      });
-      expect(annotated).toContain(spanOnlyTraceId);
     });
 
     /** @scenario "A comment on one part of a trace never becomes a queue item" */

@@ -1,22 +1,13 @@
-/**
- * @vitest-environment node
- *
- * The anchor contract: what a comment may say it is about, what it may not, and
- * how an anchor this build does not recognise reads.
- */
+/** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 import {
   annotationAnchorColumnsSchema,
-  annotationAnchorScopeWhere,
   readableAnnotationAnchor,
-  refineAnnotationAnchorColumns,
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
-} from "../annotationAnchor";
+} from "../src";
 
-const anchorInput = annotationAnchorColumnsSchema.superRefine(
-  refineAnnotationAnchorColumns,
-);
+const anchorInput = annotationAnchorColumnsSchema;
 
 const storedRow = (
   overrides: Partial<{
@@ -150,16 +141,6 @@ describe("reading a stored anchor", () => {
         readableAnnotationAnchor(storedRow({ anchorKind: "span" })).anchorKind,
       ).toBeNull();
     });
-  });
-});
-
-describe("the comments a read asks for", () => {
-  it("narrows to the ones about whole traces", () => {
-    expect(annotationAnchorScopeWhere("trace")).toEqual({ anchorKind: null });
-  });
-
-  it("narrows to nothing when every comment is wanted", () => {
-    expect(annotationAnchorScopeWhere("all")).toEqual({});
   });
 });
 
