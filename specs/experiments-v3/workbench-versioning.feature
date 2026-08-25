@@ -377,6 +377,23 @@ Feature: Versioned workbench saves
 
   Rule: The workbench shows its own history
 
+    # The history is a short list a reader checks and leaves, so it opens on
+    # the button that asks for it and the workbench stays visible behind it. It
+    # was a drawer, which covered the setup the versions describe.
+
+    @integration
+    Scenario: The history opens on the button that asks for it
+      Given an experiment with saved versions
+      When the reader clicks the history button
+      Then the history opens anchored to that button
+      And clicking the button again closes it
+
+    @integration
+    Scenario: The history closes once a restore lands
+      Given the version history is open
+      When the reader confirms a restore
+      Then the history closes
+
     @integration
     Scenario: The version history names each version and who saved it
       Given an experiment with saved versions
