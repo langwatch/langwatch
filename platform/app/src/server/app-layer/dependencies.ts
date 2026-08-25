@@ -42,6 +42,7 @@ import type {
 import type Stripe from "stripe";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { DashboardService } from "@langwatch/dashboard-contract";
+import type { LangWatchQLService } from "~/server/analytics/lwql";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import type { BillableEventsRepository } from "~/server/event-sourcing/registration/global/repositories/billable-events.clickhouse.repository";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
@@ -199,6 +200,8 @@ export interface AppDependencies {
    * ClickHouse client — its own.
    */
   analytics: AnalyticsService;
+  /** One process-owned restricted SQL service and its ClickHouse connection pool. */
+  langWatchQL: LangWatchQLService;
   /** One process-owned Dashboard capability for dashboard, graph and saved-chart lifecycle. */
   dashboard: DashboardService;
   /** One process-owned Simulation capability for reads and execution. */

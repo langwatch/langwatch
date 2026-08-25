@@ -274,6 +274,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
         projectId: project.id,
         protections: await getProtectionsForProject(prisma, { projectId: project.id }),
         definition,
+        lwql: c.app.langWatchQL,
       });
       const chart = await dashboardSavedChartCall(() =>
         c.app.dashboard.createSavedWorkbenchChart({
@@ -350,6 +351,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
             projectId: project.id,
             protections: await getProtectionsForProject(prisma, { projectId: project.id }),
             definition,
+            lwql: c.app.langWatchQL,
           });
       const chart = await dashboardSavedChartCall(() =>
         c.app.dashboard.updateSavedWorkbenchChart({

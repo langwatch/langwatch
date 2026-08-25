@@ -74,7 +74,10 @@ import { AppSimulationRuntime } from "~/runtime/app/features/simulation";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { RedisConnectionService } from "@langwatch/redis-client";
+import {
+  RedisConnectionService,
+  RedisShutdownService,
+} from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import { env } from "~/env.mjs";
@@ -90,6 +93,11 @@ import {
 import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
+import {
+  createLangWatchQLService,
+  DEFAULT_LWQL_DATABASE,
+  LangWatchQLService,
+} from "~/server/analytics/lwql";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { featureFlagService } from "~/server/featureFlag";
 import {
@@ -474,6 +482,7 @@ export function initializeDefaultApp(options?: {
     dbIndex: config.redisDbIndex,
     skip: config.skipRedis,
   });
+  const redisShutdown = RedisShutdownService.create();
 
   const authzFeature = AuthzFeature.create({
     database: prisma,
@@ -806,6 +815,7 @@ export function initializeDefaultApp(options?: {
         ),
     }),
   });
+  const langWatchQL = createLangWatchQLService();
   const dashboardService = PostgresDashboardAdapter.create({
     database: prisma,
     ids: { generate: () => nanoid() },
@@ -818,6 +828,7 @@ export function initializeDefaultApp(options?: {
           projectId,
           protections: await getProtectionsForProject(prisma, { projectId }),
           definition,
+          lwql: langWatchQL,
         });
       },
     },
@@ -1939,6 +1950,10 @@ export function initializeDefaultApp(options?: {
     name: string;
     close: () => Promise<void>;
   }> = [];
+  gracefulCloseables.push({
+    name: "langwatchql",
+    close: () => langWatchQL.close(),
+  });
   if (clickhouseEnabled) {
     gracefulCloseables.push({
       name: "clickhouse",
@@ -1963,9 +1978,7 @@ export function initializeDefaultApp(options?: {
   if (redis) {
     gracefulCloseables.push({
       name: "redis",
-      close: async () => {
-        redis.disconnect();
-      },
+      close: () => redisShutdown.shutdown(redis),
     });
   }
   gracefulCloseables.push({
@@ -2118,6 +2131,7 @@ export function initializeDefaultApp(options?: {
     triggerTemplates,
     dspySteps: { steps: dspySteps },
     analytics: analyticsService,
+    langWatchQL,
     dashboard: dashboardService,
     simulations,
     simulationExports,
@@ -2495,6 +2509,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     commands: testSimulationCommands,
   }).build();
+  const testLangWatchQL = new LangWatchQLService({
+    executor: null,
+    database: DEFAULT_LWQL_DATABASE,
+  });
 
   return new App({
     config,
@@ -2577,6 +2595,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         throw new Error("ClickHouse not available in test app");
       },
     }),
+    langWatchQL: testLangWatchQL,
     dashboard: PostgresDashboardAdapter.create({
       database: testPrisma,
       ids: { generate: () => nanoid() },
@@ -2586,6 +2605,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
             projectId,
             protections: await getProtectionsForProject(testPrisma, { projectId }),
             definition,
+            lwql: testLangWatchQL,
           });
         },
       },

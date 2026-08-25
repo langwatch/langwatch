@@ -23,10 +23,7 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
-import {
-  getLangWatchQLService,
-  MAX_LWQL_LENGTH,
-} from "~/server/analytics/lwql";
+import { MAX_LWQL_LENGTH } from "~/server/analytics/lwql";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
 import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
 
@@ -92,7 +89,7 @@ const availability = protectedProcedure
     });
     if (!enabled) return { available: false, reason: "disabled" };
 
-    if (!getLangWatchQLService().available) {
+    if (!ctx.app.langWatchQL.available) {
       return { available: false, reason: "unprovisioned" };
     }
     return { available: true };
@@ -104,7 +101,7 @@ const schema = protectedProcedure
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
-    return getLangWatchQLService().describeSchema({
+    return ctx.app.langWatchQL.describeSchema({
       protections: await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       }),
@@ -144,7 +141,7 @@ const query = protectedProcedure
       throw new NotFoundError("project_not_found", "Project", input.projectId);
     }
 
-    return getLangWatchQLService().execute({
+    return ctx.app.langWatchQL.execute({
       project,
       protections: await getUserProtectionsForProject(ctx, {
         projectId: project.id,

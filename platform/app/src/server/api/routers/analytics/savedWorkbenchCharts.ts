@@ -25,12 +25,21 @@
 
 import { z } from "zod";
 
-import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
-
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
-
+import {
+  mapDashboardSavedWorkbenchChartError,
+  validateSavedWorkbenchChartDefinition,
+} from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
+
+async function dashboardSavedChartCall<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    mapDashboardSavedWorkbenchChartError(error);
+  }
+}
 
 const projectScopeSchema = z.object({ projectId: z.string() });
 const chartScopeSchema = projectScopeSchema.extend({ id: z.string() });
@@ -44,9 +53,9 @@ const getAll = protectedProcedure
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
-    return await SavedWorkbenchChartService.create(ctx.prisma).getAll({
-      projectId: input.projectId,
-    });
+    return await dashboardSavedChartCall(() =>
+      ctx.app.dashboard.listSavedWorkbenchCharts({ projectId: input.projectId }),
+    );
   });
 
 /** One saved chart, with its query, parameters and specification. */
@@ -55,10 +64,12 @@ const getById = protectedProcedure
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .query(async ({ ctx, input }) => {
-    return await SavedWorkbenchChartService.create(ctx.prisma).getById({
-      id: input.id,
-      projectId: input.projectId,
-    });
+    return await dashboardSavedChartCall(() =>
+      ctx.app.dashboard.getSavedWorkbenchChart({
+        chartId: input.id,
+        projectId: input.projectId,
+      }),
+    );
   });
 
 /**
@@ -80,13 +91,19 @@ const create = protectedProcedure
   .permission("analytics:create")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    return await SavedWorkbenchChartService.create(ctx.prisma).createChart({
+    const definition = validateSavedWorkbenchChartDefinition({
       projectId: input.projectId,
-      protections: await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      }),
-      input: { name: input.name, definition: input.definition },
+      protections: await getUserProtectionsForProject(ctx, { projectId: input.projectId }),
+      definition: input.definition,
+      lwql: ctx.app.langWatchQL,
     });
+    return await dashboardSavedChartCall(() =>
+      ctx.app.dashboard.createSavedWorkbenchChart({
+        projectId: input.projectId,
+        name: input.name,
+        definition,
+      }),
+    );
   });
 
 /**
@@ -106,19 +123,22 @@ const update = protectedProcedure
   .permission("analytics:update")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    return await SavedWorkbenchChartService.create(ctx.prisma).updateChart({
-      id: input.id,
-      projectId: input.projectId,
-      protections: await getUserProtectionsForProject(ctx, {
+    const definition = input.definition === undefined
+      ? undefined
+      : validateSavedWorkbenchChartDefinition({
+          projectId: input.projectId,
+          protections: await getUserProtectionsForProject(ctx, { projectId: input.projectId }),
+          definition: input.definition,
+          lwql: ctx.app.langWatchQL,
+        });
+    return await dashboardSavedChartCall(() =>
+      ctx.app.dashboard.updateSavedWorkbenchChart({
+        chartId: input.id,
         projectId: input.projectId,
-      }),
-      input: {
         ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.definition === undefined
-          ? {}
-          : { definition: input.definition }),
-      },
-    });
+        ...(definition === undefined ? {} : { definition }),
+      }),
+    );
   });
 
 const deleteChart = protectedProcedure
@@ -126,10 +146,12 @@ const deleteChart = protectedProcedure
   .permission("analytics:delete")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    await SavedWorkbenchChartService.create(ctx.prisma).deleteChart({
-      id: input.id,
-      projectId: input.projectId,
-    });
+    await dashboardSavedChartCall(() =>
+      ctx.app.dashboard.deleteSavedWorkbenchChart({
+        chartId: input.id,
+        projectId: input.projectId,
+      }),
+    );
     return { success: true };
   });
 

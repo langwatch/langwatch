@@ -30,7 +30,6 @@ import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import {
-  getLangWatchQLService,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_COLUMN_UNITS,
   LWQL_DIAGNOSTIC_CODES,
@@ -179,7 +178,7 @@ export function registerLangWatchQLRoutes(
         "Running LangWatchQL analytics SQL",
       );
 
-      const result = await getLangWatchQLService().execute({
+      const result = await c.app.langWatchQL.execute({
         project,
         protections: await getProtectionsForProject(prisma, {
           projectId: project.id,
@@ -217,7 +216,7 @@ export function registerLangWatchQLRoutes(
       });
 
       return c.json(
-        getLangWatchQLService().describeSchema({
+        c.app.langWatchQL.describeSchema({
           protections: await getProtectionsForProject(prisma, {
             projectId: project.id,
           }),

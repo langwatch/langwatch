@@ -68,6 +68,8 @@ export class App {
   readonly dspySteps: AppDependencies["dspySteps"];
   /** The ADR-034 analytics read API. */
   readonly analytics: AppDependencies["analytics"];
+  /** The process-owned restricted analytics SQL service. */
+  readonly langWatchQL: AppDependencies["langWatchQL"];
   /** The process-owned dashboard, graph, and saved-chart lifecycle service. */
   readonly dashboard: AppDependencies["dashboard"];
   readonly simulations: AppDependencies["simulations"];
@@ -182,6 +184,7 @@ export class App {
     );
     this.dspySteps = deps.dspySteps;
     this.analytics = deps.analytics;
+    this.langWatchQL = deps.langWatchQL;
     this.dashboard = deps.dashboard;
     this.simulations = deps.simulations;
     this.simulationExports = deps.simulationExports;

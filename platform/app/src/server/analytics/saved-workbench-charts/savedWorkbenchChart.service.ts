@@ -42,10 +42,7 @@ import type {
 
 import type { Protections } from "../../traces/protections";
 import { isUniqueConstraintError } from "../../utils/prismaErrors";
-import {
-  getLangWatchQLService,
-  type LangWatchQLService,
-} from "../lwql/lwql.service";
+import type { LangWatchQLService } from "../lwql/lwql.service";
 import {
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartDefinitionInvalidError,
@@ -100,11 +97,14 @@ export interface SavedWorkbenchChartServiceDependencies {
 export class SavedWorkbenchChartService {
   constructor(private readonly deps: SavedWorkbenchChartServiceDependencies) {}
 
-  /** Builds the service with its production dependencies. */
-  static create(prisma: PrismaClient): SavedWorkbenchChartService {
+  /** Builds the compatibility service with explicit process-owned dependencies. */
+  static create(
+    prisma: PrismaClient,
+    lwql: LangWatchQLService,
+  ): SavedWorkbenchChartService {
     return new SavedWorkbenchChartService({
       repository: new SavedWorkbenchChartRepository(prisma),
-      lwql: getLangWatchQLService(),
+      lwql,
     });
   }
 
@@ -349,12 +349,12 @@ export function validateSavedWorkbenchChartDefinition({
   projectId,
   protections,
   definition,
-  lwql = getLangWatchQLService(),
+  lwql,
 }: {
   projectId: string;
   protections: Protections;
   definition: unknown;
-  lwql?: LangWatchQLService;
+  lwql: LangWatchQLService;
 }): WorkbenchChartDefinition {
   const parsed = workbenchChartDefinitionSchema.safeParse(definition);
   if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
