@@ -137,6 +137,7 @@ _LAZY_FACADES = {
     "spend_events": (".spend_events", "SpendEventsFacade"),
     "webhooks": (".webhooks", "WebhooksFacade"),
     "secrets": (".secrets", "SecretsFacade"),
+    "cache": (".cache", "CacheFacade"),
     "teams": (".teams", "TeamsFacade"),
     "projects": (".projects", "ProjectsFacade"),
 }
@@ -270,6 +271,7 @@ __all__ = [
     "spend_events",
     "webhooks",
     "secrets",
+    "cache",
     "monitors",
     "teams",
     "projects",

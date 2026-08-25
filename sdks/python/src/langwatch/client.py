@@ -30,6 +30,17 @@ from opentelemetry.util._once import Once
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+def _skip_open_telemetry_setup_from_env() -> bool:
+    """Read LANGWATCH_SKIP_OTEL_SETUP.
+
+    A host that already reports the work the SDK would report sets this, so a
+    caller does not have to pass the argument. The code agent sandbox is one:
+    the run reports the row, and a second exporter inside the row would only
+    spend the runner's time budget.
+    """
+    return os.getenv("LANGWATCH_SKIP_OTEL_SETUP", "").strip().lower() == "true"
+
+
 class Client(LangWatchClientProtocol):
     """
     Client for the LangWatch tracing SDK.
@@ -126,7 +137,7 @@ class Client(LangWatchClientProtocol):
                 flush_on_exit: Optional. If True, the tracer provider will flush all spans when the program exits.
                 span_exclude_rules: Optional. The rules to exclude from the span exporter.
                 ignore_global_tracer_provider_override_warning: Optional. If True, the warning about the global tracer provider being overridden will be ignored.
-                skip_open_telemetry_setup: Optional. If True, OpenTelemetry setup will be skipped entirely. This is useful when you want to handle OpenTelemetry setup yourself.
+                skip_open_telemetry_setup: Optional. If True, OpenTelemetry setup will be skipped entirely. This is useful when you want to handle OpenTelemetry setup yourself. Reads LANGWATCH_SKIP_OTEL_SETUP when not given.
         """
 
         # Check if this instance has already been initialized
@@ -182,6 +193,10 @@ class Client(LangWatchClientProtocol):
                 )
             if skip_open_telemetry_setup is not None:
                 Client._skip_open_telemetry_setup = skip_open_telemetry_setup
+            elif not Client._skip_open_telemetry_setup:
+                Client._skip_open_telemetry_setup = (
+                    _skip_open_telemetry_setup_from_env()
+                )
             if prompts_path is not None:
                 Client._prompts_path = prompts_path
             if base_attributes is not None:
@@ -280,6 +295,8 @@ class Client(LangWatchClientProtocol):
 
         if skip_open_telemetry_setup is not None:
             Client._skip_open_telemetry_setup = skip_open_telemetry_setup
+        elif not Client._skip_open_telemetry_setup:
+            Client._skip_open_telemetry_setup = _skip_open_telemetry_setup_from_env()
 
         if prompts_path is not None:
             Client._prompts_path = prompts_path
