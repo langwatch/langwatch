@@ -3,8 +3,19 @@ package idpsim
 import (
 	"html/template"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
 )
+
+// verificationLabel is the label LangWatch publishes its proof under, so the
+// registry answers the name the verifier actually asks for rather than one
+// that merely looks right.
+const verificationLabel = "_langwatch-verification"
+
+func verificationRecordName(domain string) string {
+	return verificationLabel + "." + normalizeDomain(domain)
+}
 
 // pageCSS is the whole stylesheet. idpsim serves its own pages from the
 // binary, so there is nothing to fetch and nothing to build; it follows the
@@ -260,6 +271,46 @@ save, so the address has to be reachable from wherever the app is running.</p>
 </section>
 
 <section class="panel">
+<h2>DNS registry</h2>
+<p class="hint">This machine's DNS, for domains that have none. A real verification asks
+the domain's registrar for a TXT record; nothing on the internet answers for a reserved
+name like <code>acme.test</code>, so this stands in for the registrar and answers
+{{if .DNSAddr}}on <code>{{.DNSAddr}}</code>{{else}}over UDP{{end}}. Publishing here is
+the same act as adding the record in Cloudflare or Route 53.</p>
+<p class="hint">LangWatch mints the value and shows it once. Paste it below and it is
+published on both channels at once — the TXT record <em>and</em> the well-known file —
+so whichever one the check asks for, it finds it.</p>
+<form method="post" action="{{.Tenant.BaseURL}}/dns">
+  <label>Domain
+    <input name="domain" placeholder="acme1.test" value="{{.Tenant.Domain}}" required>
+  </label>
+  <label>Verification value
+    <input name="value" placeholder="the value LangWatch showed you" required autocomplete="off">
+  </label>
+  <p style="margin-top:1.1rem"><button class="primary" type="submit">Publish the record</button></p>
+</form>
+{{if .Records}}
+<table>
+<tr><th>TXT record</th><th>Value</th><th></th></tr>
+{{range .Records}}
+<tr>
+  <td class="mono">{{.Name}}</td>
+  <td><span class="copy"><span class="val" title="{{.Value}}">{{.Value}}</span><button data-copy="{{.Value}}">copy</button></span></td>
+  <td><form method="post" action="{{$.Tenant.BaseURL}}/dns/delete" style="margin:0">
+    <input type="hidden" name="name" value="{{.Name}}">
+    <button type="submit">remove</button>
+  </form></td>
+</tr>
+{{end}}
+</table>
+<p class="hint">Removing a record is how you watch a proof lapse: the checker stops
+finding it, exactly as it would if somebody deleted it at the registrar.</p>
+{{else}}
+<p class="hint">Nothing is published yet.</p>
+{{end}}
+</section>
+
+<section class="panel">
 <h2>Users</h2>
 <table>
 <tr><th>Email</th><th>Name</th><th>Groups</th><th>Status</th></tr>
@@ -341,6 +392,119 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+/**
+ * The DNS registry: this machine standing in for a domain's registrar.
+ *
+ * WHY IT IS A PAGE AND NOT ONLY AN API. A domain proof is the one step of
+ * single sign-on setup that happens somewhere else — you leave the product,
+ * sign in to whoever administers the domain, add a record, and come back.
+ * Locally there is no "somewhere else": `acme.test` is reserved, no resolver
+ * on earth answers for it, and the only thing that can is this simulator. A
+ * control endpoint made that possible and left it a curl command; a form
+ * makes the local walk the same shape as the real one, which is the whole
+ * point of a simulator.
+ *
+ * The value comes from LangWatch, which mints it and shows it once, so this
+ * takes it rather than generating one — generating our own would prove a
+ * domain against a token the product never issued, which is a green tick
+ * that means nothing.
+ */
+
+// publishedRecord is one TXT answer this machine is serving.
+type publishedRecord struct {
+	Name  string
+	Value string
+}
+
+// publishedRecords lists what the registry is answering, name-ordered so the
+// table does not reshuffle itself between two loads of the same page.
+func (s *Server) publishedRecords() []publishedRecord {
+	txt, _ := s.verification.Snapshot()
+	records := make([]publishedRecord, 0, len(txt))
+	for name, values := range txt {
+		records = append(records, publishedRecord{
+			Name:  name,
+			Value: strings.Join(values, " "),
+		})
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].Name < records[j].Name })
+	return records
+}
+
+/**
+ * Publish a verification value, on both channels at once.
+ *
+ * TWO CHANNELS, ONE PRESS, because the product offers both and a person
+ * pasting a value has no idea which one the check will use — and finding out
+ * by failing the check is a bad way to learn it. The TXT record goes at the
+ * name the verifier actually asks for; the same value is served as the
+ * well-known file for the bare domain.
+ */
+func (s *Server) handlePublishVerification(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "unparseable form", http.StatusBadRequest)
+		return
+	}
+	domain := normalizeDomain(r.PostForm.Get("domain"))
+	value := strings.TrimSpace(r.PostForm.Get("value"))
+	if domain == "" || value == "" {
+		s.refusalPage(w, t, refusalNotice{
+			Status: http.StatusBadRequest,
+			Title:  "A record needs a domain and a value",
+			Detail: "Publishing puts one value where a verifier will look for it, so it needs to know both.",
+			Hint:   "The value is the one LangWatch showed you when you asked to prove the domain — it is shown once.",
+		})
+		return
+	}
+
+	name := verificationRecordName(domain)
+	s.verification.SetTXT(name, []string{value})
+	s.verification.SetToken(domain, value)
+	s.record(t, Event{
+		Kind:    "verification.publish",
+		Outcome: OutcomeOK,
+		Detail:  "published the verification value at " + name + " and under /.well-known/",
+	})
+	http.Redirect(w, r, t.BaseURL+"/?published="+url.QueryEscape(name), http.StatusSeeOther)
+}
+
+// handleUnpublishVerification takes a record back out, which is how a lapsed
+// proof is watched: the checker simply stops finding it.
+func (s *Server) handleUnpublishVerification(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "unparseable form", http.StatusBadRequest)
+		return
+	}
+	name := normalizeDomain(r.PostForm.Get("name"))
+	if name == "" {
+		http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+		return
+	}
+	s.verification.RemoveTXT(name)
+	// The well-known token is keyed by the bare domain, so removing the record
+	// removes its other half too — leaving one behind would let a proof the
+	// page reports as gone keep succeeding down the other channel.
+	s.verification.RemoveToken(strings.TrimPrefix(name, verificationLabel+"."))
+	s.record(t, Event{
+		Kind:    "verification.unpublish",
+		Outcome: OutcomeOK,
+		Detail:  "took the verification value at " + name + " back out",
+	})
+	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+}
+
 // handleTenantPage is one tenant's own page: how to wire an application up,
 // what is registered, who its users are, and what it has been doing.
 func (s *Server) handleTenantPage(w http.ResponseWriter, r *http.Request) {
@@ -352,6 +516,7 @@ func (s *Server) handleTenantPage(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Tenant": viewOf(t),
 		"Root":   s.cfg.BaseURL, "DNSAddr": s.DNSAddr(),
+		"Records": s.publishedRecords(),
 	}
 	// ?registered=<client id> is where the registration POST lands, so the
 	// credentials are shown once, at the top, right after they are minted.

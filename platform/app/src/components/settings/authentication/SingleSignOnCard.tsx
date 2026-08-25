@@ -72,7 +72,9 @@ export function SingleSignOnCard({
               loading={sending}
               onClick={() => void start()}
             >
-              <RefreshCw size={14} />
+              {/* It hands the browser to the identity provider and back, so
+                  it is marked as leaving rather than as acting here. */}
+              {failure ? <RefreshCw size={14} /> : <ExternalLink size={14} />}
               {failure ? "Try the sign-in again" : "Test sign-in"}
             </Button>
           )}

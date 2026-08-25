@@ -1,6 +1,6 @@
 import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeGoLiveView } from "@langwatch/identity-server";
-import { RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { TestSignInFailureNotice } from "~/features/sso/components/TestSignInFailureNotice";
 import { useTestSignIn } from "~/features/sso/hooks/useTestSignIn";
 
@@ -56,7 +56,15 @@ export function TestSignInSection({
           loading={sending}
           onClick={() => void start()}
         >
-          {(failure ?? testSignIn.done) && <RefreshCw size={14} />}
+          {/* IT LEAVES. Pressing this hands the browser to somebody else's
+              sign-in screen and brings it back, which is not what a plain
+              button promises — so it is marked the way every other control
+              that navigates away is, and a repeat is marked as a repeat. */}
+          {failure ?? testSignIn.done ? (
+            <RefreshCw size={14} />
+          ) : (
+            <ExternalLink size={14} />
+          )}
           {failure
             ? "Try the sign-in again"
             : testSignIn.done

@@ -50,6 +50,23 @@ export function DomainsSection({
   provesWithLicense: boolean;
 }) {
   const [domain, setDomain] = useState("");
+  /**
+   * THE VALUE, HELD WHERE IT CAN BE READ.
+   *
+   * It is minted by the command that issues the record and returned ONCE —
+   * the fact keeps only a hash, so no later read can answer it. The screen
+   * used to throw that answer away and then render the record from the
+   * refetched setup, where `value` is forever null, so the one string the
+   * whole ceremony depends on appeared nowhere at all and the page calmly
+   * explained it had been "shown once" without ever having shown it.
+   *
+   * Kept in state rather than pushed anywhere: it is a secret whose whole
+   * lifetime is this screen, and a reload is meant to lose it.
+   */
+  const [minted, setMinted] = useState<{
+    domain: string;
+    value: string;
+  } | null>(null);
   const claim = api.ssoSetup.claimDomain.useMutation();
   const utils = api.useUtils();
 
@@ -100,6 +117,7 @@ export function DomainsSection({
                 connectionId={connectionId}
                 provesWithLicense={provesWithLicense}
                 recordIssued={record?.domain === entry}
+                onMinted={setMinted}
               />
             ))}
           </Table.Body>
@@ -143,6 +161,8 @@ export function DomainsSection({
           canManage={canManage}
           organizationId={organizationId}
           connectionId={connectionId}
+          minted={minted?.domain === record.domain ? minted.value : null}
+          onMinted={setMinted}
         />
       )}
     </VStack>
@@ -173,7 +193,15 @@ function DomainRow({
   /** Whether a value is already out for this domain, waiting to be
    *  published. Asking to prove again would replace it. */
   recordIssued: boolean;
+  /** Where a freshly minted value goes. Returned once and never again, so
+   *  a caller that ignores it has thrown the ceremony's answer away. */
+  onMinted: (minted: { domain: string; value: string }) => void;
 }) {
+  const keepMintedValue = (
+    result: { proved: true } | { proved: false; record: { value: string } },
+  ) => {
+    if (!result.proved) onMinted({ domain, value: result.record.value });
+  };
   const claim = api.ssoSetup.claimDomain.useMutation();
   const prove = api.ssoSetup.proveDomain.useMutation();
   const remove = api.ssoSetup.removeDomain.useMutation();
@@ -200,7 +228,16 @@ function DomainRow({
   const takeNextStep = () =>
     next.kind === "claim-again"
       ? claim.mutate(target, settle)
-      : prove.mutate(target, settle);
+      : prove.mutate(target, {
+          ...settle,
+          // The value is in THIS response and in no later read, so keeping
+          // it is the difference between showing it and telling somebody it
+          // was already shown.
+          onSuccess: (result) => {
+            keepMintedValue(result);
+            settle.onSuccess();
+          },
+        });
 
   return (
     <Table.Row>
@@ -359,7 +396,13 @@ function PublishedRecord({
   canManage,
   organizationId,
   connectionId,
+  minted,
+  onMinted,
 }: {
+  /** The value as this screen last saw it minted, which is the ONLY place it
+   *  exists — a refetched record carries a hash and a null value. */
+  minted: string | null;
+  onMinted: (minted: { domain: string; value: string }) => void;
   record: NonNullable<SelfServeSetupView["record"]>;
   canManage: boolean;
   organizationId: string;
@@ -370,6 +413,9 @@ function PublishedRecord({
   const prove = api.ssoSetup.proveDomain.useMutation();
   const utils = api.useUtils();
   const [replacing, setReplacing] = useState(false);
+  // The freshly minted value wins: after a replace, the read's null (or a
+  // previous value) must never be what the reader publishes.
+  const shownValue = minted ?? record.value;
 
   const target = { organizationId, connectionId, domain: record.domain };
   const settle = {
@@ -396,13 +442,17 @@ function PublishedRecord({
             hint: "The whole name",
             value: record.name,
           },
-          ...(record.value === null
+          // `record.value` comes back null on every read after the mint, so
+          // the value shown is the one this screen caught when it was
+          // issued. Rendering the row from the read alone is what made the
+          // secret invisible on the very screen that issued it.
+          ...(shownValue === null
             ? []
             : [
                 {
                   label: "Value",
                   hint: "Shown once — this is the secret",
-                  value: record.value,
+                  value: shownValue,
                 },
               ]),
         ]}
@@ -429,12 +479,14 @@ function PublishedRecord({
           If the first check does not find it, that is usually all it is.
         </Text>
       </Disclosure>
-      {/* The value is shown once, when it is issued. What is kept is its
-          hash, so a reload shows the record rather than the secret. */}
-      {record.value === null && (
+      {/* Only once the screen has genuinely lost it — a reload, or a value
+          minted in another tab. Saying this while the value is on screen
+          above was the old bug read back as copy. */}
+      {shownValue === null && (
         <Text color="fg.muted" fontSize="sm">
-          The value was shown once, when the record was issued. If you no longer
-          have it, ask for a fresh record below.
+          The value was shown once, when the record was issued, and we keep
+          only a hash of it. If you no longer have it, ask for a fresh one
+          below and publish that instead.
         </Text>
       )}
       {record.expired && (
@@ -479,7 +531,18 @@ function PublishedRecord({
                   loading={prove.isPending}
                   onClick={() => {
                     setReplacing(false);
-                    prove.mutate(target, settle);
+                    prove.mutate(target, {
+                      ...settle,
+                      onSuccess: (result) => {
+                        if (!result.proved) {
+                          onMinted({
+                            domain: record.domain,
+                            value: result.record.value,
+                          });
+                        }
+                        settle.onSuccess();
+                      },
+                    });
                   }}
                 >
                   Yes, replace it

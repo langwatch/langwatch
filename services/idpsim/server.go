@@ -69,6 +69,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /t/{tenant}", s.handleTenantPage)
 	mux.HandleFunc("GET /t/{tenant}/{$}", s.handleTenantPage)
 	mux.HandleFunc("POST /t/{tenant}/apps", s.handleRegisterApplication)
+	// The DNS registry: this machine standing in for the registrar a reserved
+	// name has none of, so a domain proof can be walked the way a customer
+	// walks it rather than through a curl command.
+	mux.HandleFunc("POST /t/{tenant}/dns", s.handlePublishVerification)
+	mux.HandleFunc("POST /t/{tenant}/dns/delete", s.handleUnpublishVerification)
 	mux.HandleFunc("POST /t/{tenant}/apps/{client}/delete", s.handleRemoveApplication)
 
 	// OIDC, per tenant.

@@ -169,6 +169,30 @@ Feature: Local IdP simulator (idpsim)
     When a client fetches the well-known verification path for that domain
     Then the response body is exactly the configured token
 
+  # Proving a domain is the one step of single sign-on setup that happens
+  # somewhere else: you leave the product, sign in to whoever administers the
+  # domain, add a record, and come back. Locally there is no somewhere else --
+  # a reserved name like acme.test has no registrar and no resolver answers
+  # for it -- so the simulator is that registrar, and adding a record has to
+  # be something a person does rather than a curl command a person is told
+  # about. The value is LangWatch's, minted once and shown once; publishing
+  # takes it rather than inventing one, because a proof against a token the
+  # product never issued is a green tick that means nothing.
+  @unit
+  Scenario: A domain proof can be published from the simulator's own page
+    Given LangWatch has minted a verification value for a domain
+    When an administrator publishes that value in the simulator's DNS registry
+    Then the TXT record answers at the name the verifier asks for
+    And the same value is served as the well-known token
+    But publishing without a value is refused rather than silently recorded
+
+  @unit
+  Scenario: A published record can be taken back out again
+    Given a verification value published in the simulator's DNS registry
+    When the administrator removes that record
+    Then the TXT lookup stops finding it
+    And the well-known token stops being served, so neither channel still proves it
+
   # --- Tenant range ------------------------------------------------------
 
   @unit
