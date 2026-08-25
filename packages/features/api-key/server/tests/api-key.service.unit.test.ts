@@ -12,6 +12,21 @@ import {
   type StoredApiKey,
 } from "../src/repositories/api-key.repository";
 import { ApiKeyTokenAdapter } from "../src/adapters/api-key-token.api-key-token.adapter";
+import { ApiKeyBindingIdPort } from "../src/ports/api-key-binding-id.port";
+
+class TestApiKeyBindingIdPort extends ApiKeyBindingIdPort {
+  static create(): TestApiKeyBindingIdPort {
+    return new TestApiKeyBindingIdPort();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  generateBindingId(): string {
+    return "binding-id";
+  }
+}
 
 class MemoryApiKeys extends ApiKeyRepository {
   private rows: StoredApiKey[] = [];
@@ -202,7 +217,7 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
       listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
       listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
     } as unknown as ProjectService,
-    newBindingId: () => "binding-id",
+    bindingIds: TestApiKeyBindingIdPort.create(),
     legacyGrants: {
       mint: vi.fn(),
     } as unknown as ApiKeyDependencies["legacyGrants"],
@@ -211,9 +226,16 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
   };
 }
 
+function createService(
+  repository: ApiKeyRepository = new MemoryApiKeys(),
+  options: ApiKeyDependencies = dependencies(),
+): ApiKeyService {
+  return ApiKeyService.create({ repository, ...options });
+}
+
 describe("API-key service", () => {
   it("mints a split token and verifies it without exposing the hash", async () => {
-    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const service = createService();
     const created = await service.create({
       name: "test",
       organizationId: "org-1",
@@ -227,7 +249,7 @@ describe("API-key service", () => {
   });
 
   it("rejects a revoked token", async () => {
-    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const service = createService();
     const created = await service.create({
       name: "test",
       organizationId: "org-1",
@@ -244,7 +266,7 @@ describe("API-key service", () => {
   });
 
   it("resolves a current key through its single project binding", async () => {
-    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const service = createService();
     const created = await service.create({
       name: "project key",
       organizationId: "org-1",
@@ -268,7 +290,7 @@ describe("API-key service", () => {
     const projects = {
       tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     } as unknown as ProjectService;
-    const service = new ApiKeyService(repository, dependencies({ projects }));
+    const service = createService(repository, dependencies({ projects }));
     const token = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
 
     await expect(service.tryResolveToken({ token })).resolves.toMatchObject({
@@ -280,7 +302,7 @@ describe("API-key service", () => {
 
   it("upgrades a legacy SHA-256 hash after successful verification", async () => {
     const repository = new MemoryApiKeys();
-    const service = new ApiKeyService(repository, dependencies());
+    const service = createService(repository);
     const created = await service.create({
       name: "legacy",
       organizationId: "org-1",
@@ -303,7 +325,7 @@ describe("API-key service", () => {
 
   it("rotates the deprecated project credential through its repository", async () => {
     const repository = new MemoryApiKeys();
-    const service = new ApiKeyService(repository, dependencies());
+    const service = createService(repository);
 
     const token = await service.regenerateLegacyProjectKey({
       projectId: "project-1",
@@ -318,7 +340,7 @@ describe("API-key service", () => {
   it("throws when the project credential cannot be rotated", async () => {
     const repository = new MemoryApiKeys();
     repository.legacyProjectRotationSucceeds = false;
-    const service = new ApiKeyService(repository, dependencies());
+    const service = createService(repository);
 
     await expect(
       service.regenerateLegacyProjectKey({ projectId: "missing" }),
@@ -326,7 +348,7 @@ describe("API-key service", () => {
   });
 
   it("defaults an unowned service key to organization ADMIN", async () => {
-    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const service = createService();
     const created = await service.create({
       name: "service",
       organizationId: "org-1",
@@ -339,7 +361,7 @@ describe("API-key service", () => {
   });
 
   it("refuses the hidden system name to customer callers", async () => {
-    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const service = createService();
     await expect(
       service.create({
         name: "Langy session",
@@ -351,7 +373,7 @@ describe("API-key service", () => {
   });
 
   it("allows the product mint to claim the hidden system name", async () => {
-    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const service = createService();
     await expect(
       service.create({
         name: "Langy session",
@@ -364,7 +386,7 @@ describe("API-key service", () => {
   });
 
   it("keeps system-managed keys hidden from customer mutation paths", async () => {
-    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const service = createService();
     const created = await service.create({
       name: "Langy session",
       isSystemManaged: true,
@@ -407,7 +429,7 @@ describe("API-key service", () => {
         team: { id: "team-1", organizationId: "org-1" },
       }),
     } as unknown as ProjectService;
-    const service = new ApiKeyService(
+    const service = createService(
       new MemoryApiKeys(),
       dependencies({ authz, organizations, projects }),
     );
@@ -437,7 +459,7 @@ describe("API-key service", () => {
     ).tryFindPersonalWorkspaceOwner = vi
       .fn()
       .mockResolvedValue({ ownerUserId: "owner-1" });
-    const service = new ApiKeyService(repository, dependencies());
+    const service = createService(repository);
     await expect(
       service.create({
         name: "service",
@@ -472,7 +494,7 @@ describe("API-key service", () => {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes,
     } as unknown as ProjectService;
-    const service = new ApiKeyService(repository, dependencies({ authz, projects }));
+    const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({
       name: "scoped",
       organizationId: "org-1",
@@ -501,7 +523,7 @@ describe("API-key service", () => {
     const projects = {
       listActiveByScopes: vi.fn(),
     } as unknown as ProjectService;
-    const service = new ApiKeyService(repository, dependencies({ projects }));
+    const service = createService(repository, dependencies({ projects }));
     const created = await service.create({
       name: "organization",
       organizationId: "org-1",
@@ -529,7 +551,7 @@ describe("API-key service", () => {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: true }),
     } as unknown as ProjectService;
-    const service = new ApiKeyService(repository, dependencies({ authz, projects }));
+    const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({
       name: "too-wide",
       organizationId: "org-1",

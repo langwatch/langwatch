@@ -18,42 +18,6 @@ export type AuthzBindingIdDeriver = (input: {
   occurredAtMs: number;
 }) => string;
 
-export function keyPredatesAuthzEngine(input: {
-  apiKey: Pick<ApiKey, "createdAt">;
-  cutoverAt: Date | null;
-}): boolean {
-  return (
-    input.cutoverAt !== null &&
-    input.apiKey.createdAt.getTime() < input.cutoverAt.getTime()
-  );
-}
-
-export function legacyGrantForApiKey(
-  apiKey: ApiKey,
-  deriveBindingId: AuthzBindingIdDeriver,
-): AuthzLedgerBindingAttach | null {
-  if (
-    apiKey.roleBindings.length > 0 ||
-    apiKey.ingestSourceType !== null ||
-    apiKey.userId !== null
-  ) {
-    return null;
-  }
-  return {
-    bindingId: deriveBindingId({
-      organizationId: apiKey.organizationId,
-      principal: { type: "apiKey", id: apiKey.id },
-      scope: { type: "ORGANIZATION", id: apiKey.organizationId },
-      occurredAtMs: apiKey.createdAt.getTime(),
-    }),
-    principal: { apiKeyId: apiKey.id },
-    role: "ADMIN",
-    customRoleId: null,
-    scopeType: "ORGANIZATION",
-    scopeId: apiKey.organizationId,
-  };
-}
-
 /**
  * Records the implicit organization grant held by credentials created before
  * the AuthZ engine cutover. Authentication never waits for or fails on this
@@ -61,6 +25,42 @@ export function legacyGrantForApiKey(
  */
 export class LegacyApiKeyGrantService {
   private readonly emitted = new Map<string, number>();
+
+  static keyPredatesAuthzEngine(input: {
+    apiKey: Pick<ApiKey, "createdAt">;
+    cutoverAt: Date | null;
+  }): boolean {
+    return (
+      input.cutoverAt !== null &&
+      input.apiKey.createdAt.getTime() < input.cutoverAt.getTime()
+    );
+  }
+
+  static tryLegacyGrantForApiKey(
+    apiKey: ApiKey,
+    deriveBindingId: AuthzBindingIdDeriver,
+  ): AuthzLedgerBindingAttach | null {
+    if (
+      apiKey.roleBindings.length > 0 ||
+      apiKey.ingestSourceType !== null ||
+      apiKey.userId !== null
+    ) {
+      return null;
+    }
+    return {
+      bindingId: deriveBindingId({
+        organizationId: apiKey.organizationId,
+        principal: { type: "apiKey", id: apiKey.id },
+        scope: { type: "ORGANIZATION", id: apiKey.organizationId },
+        occurredAtMs: apiKey.createdAt.getTime(),
+      }),
+      principal: { apiKeyId: apiKey.id },
+      role: "ADMIN",
+      customRoleId: null,
+      scopeType: "ORGANIZATION",
+      scopeId: apiKey.organizationId,
+    };
+  }
 
   static create(options: {
     authz: AuthzService;
@@ -84,8 +84,13 @@ export class LegacyApiKeyGrantService {
 
   mint(apiKey: ApiKey): void {
     try {
-      const binding = legacyGrantForApiKey(apiKey, this.options.deriveBindingId);
-      if (!binding || this.guardHeld(apiKey.id)) return;
+      const binding = LegacyApiKeyGrantService.tryLegacyGrantForApiKey(
+        apiKey,
+        this.options.deriveBindingId,
+      );
+      if (!binding || this.guardHeld(apiKey.id)) {
+        return;
+      }
       this.holdGuard(apiKey.id);
       void this.persist(apiKey, binding).catch((error: unknown) =>
         this.failed(apiKey, error),
@@ -106,7 +111,9 @@ export class LegacyApiKeyGrantService {
       this.emitted.delete(apiKey.id);
       return;
     }
-    if (!keyPredatesAuthzEngine({ apiKey, cutoverAt })) return;
+    if (!LegacyApiKeyGrantService.keyPredatesAuthzEngine({ apiKey, cutoverAt })) {
+      return;
+    }
 
     await this.options.grants.attachBindings({
       organizationId: apiKey.organizationId,
@@ -126,23 +133,33 @@ export class LegacyApiKeyGrantService {
 
   private guardHeld(apiKeyId: string): boolean {
     const expiresAt = this.emitted.get(apiKeyId);
-    if (expiresAt === undefined) return false;
-    if (this.now() < expiresAt) return true;
+    if (expiresAt === undefined) {
+      return false;
+    }
+    if (this.now() < expiresAt) {
+      return true;
+    }
     this.emitted.delete(apiKeyId);
     return false;
   }
 
   private holdGuard(apiKeyId: string): void {
-    if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) this.sweepGuard();
+    if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) {
+      this.sweepGuard();
+    }
     this.emitted.set(apiKeyId, this.now() + MINT_GUARD_TTL_MS);
   }
 
   private sweepGuard(): void {
     const now = this.now();
     for (const [apiKeyId, expiresAt] of this.emitted) {
-      if (expiresAt <= now) this.emitted.delete(apiKeyId);
+      if (expiresAt <= now) {
+        this.emitted.delete(apiKeyId);
+      }
     }
-    if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) this.emitted.clear();
+    if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) {
+      this.emitted.clear();
+    }
   }
 
   private failed(apiKey: ApiKey, error: unknown): void {

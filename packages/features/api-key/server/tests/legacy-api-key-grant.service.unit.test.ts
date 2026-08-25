@@ -2,11 +2,7 @@ import type { ApiKey } from "@langwatch/api-key-contract";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ApiKeyDiagnosticsPort } from "../src/ports/api-key-diagnostics.port";
-import {
-  LegacyApiKeyGrantService,
-  keyPredatesAuthzEngine,
-  legacyGrantForApiKey,
-} from "../src/services/legacy-api-key-grant.service";
+import { LegacyApiKeyGrantService } from "../src/services/legacy-api-key-grant.service";
 
 const CREATED_AT = new Date("2024-03-01T10:00:00.000Z");
 const CUTOVER_AT = new Date("2024-06-01T00:00:00.000Z");
@@ -162,11 +158,14 @@ describe("LegacyApiKeyGrantService", () => {
 
 describe("legacy API-key grant facts", () => {
   it("uses a strict before-cutover boundary", () => {
-    expect(keyPredatesAuthzEngine({ apiKey: apiKey(), cutoverAt: CUTOVER_AT })).toBe(
-      true,
-    );
     expect(
-      keyPredatesAuthzEngine({
+      LegacyApiKeyGrantService.keyPredatesAuthzEngine({
+        apiKey: apiKey(),
+        cutoverAt: CUTOVER_AT,
+      }),
+    ).toBe(true);
+    expect(
+      LegacyApiKeyGrantService.keyPredatesAuthzEngine({
         apiKey: apiKey({ createdAt: CUTOVER_AT }),
         cutoverAt: CUTOVER_AT,
       }),
@@ -175,7 +174,9 @@ describe("legacy API-key grant facts", () => {
 
   it("derives a stable identity from the fact", () => {
     const derive = vi.fn(() => "grant-derived");
-    expect(legacyGrantForApiKey(apiKey(), derive)?.bindingId).toBe("grant-derived");
+    expect(
+      LegacyApiKeyGrantService.tryLegacyGrantForApiKey(apiKey(), derive)?.bindingId,
+    ).toBe("grant-derived");
     expect(derive).toHaveBeenCalledWith({
       organizationId: "org-1",
       principal: { type: "apiKey", id: "key-1" },
