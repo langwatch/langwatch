@@ -50,7 +50,7 @@ jobs:
             relevant:
               - 'platform/app/**'
               - 'sdks/python/**'
-              - 'tests/agentic-e2e/**'
+              - 'dev/tests/agentic-e2e/**'
               # The single lockfile, workspace definition, root manifest and
               # hoist config live at the repo root since ADR-076; a dependency
               # or override change touches only these.
@@ -76,7 +76,7 @@ jobs:
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
       # Trust the in-repo TEST license keypair so the members suite
-      # (tests/agentic-e2e/tests/members/steps.ts withEnterpriseLicense()) can
+      # (dev/tests/agentic-e2e/tests/members/steps.ts withEnterpriseLicense()) can
       # activate a test ENTERPRISE license and exercise member-invitation flows
       # above the free-tier maxMembers=1 cap. Public key only (safe to commit) — matches
       # TEST_PUBLIC_KEY in platform/app/ee/licensing/__tests__/fixtures/testKeys.ts.
@@ -239,7 +239,7 @@ jobs:
       # One install for the app, the MCP server (a workspace dependency of the
       # app, so `...` pulls it in) and the Playwright suite. This used to be
       # three separate installs against three lockfiles, one of which needed
-      # `--ignore-workspace` to escape a workspace agentic-e2e-tests was never
+      # `--ignore-workspace` to escape a workspace dev/tests/agentic-e2e was never
       # a member of. See ADR-076.
       - name: Install dependencies
         run: >
@@ -286,7 +286,7 @@ jobs:
           sleep 5
 
           # Run tests from the self-contained e2e package
-          cd tests/agentic-e2e && pnpm test
+          cd dev/tests/agentic-e2e && pnpm test
           TEST_EXIT=$?
 
           # Cleanup
@@ -298,7 +298,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
-          path: tests/agentic-e2e/playwright-report/
+          path: dev/tests/agentic-e2e/playwright-report/
           retention-days: 7
 
       - name: Upload test artifacts
@@ -306,7 +306,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
-          path: tests/agentic-e2e/test-results/
+          path: dev/tests/agentic-e2e/test-results/
           retention-days: 7
 
       - name: Notify Slack on failure

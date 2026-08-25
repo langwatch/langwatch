@@ -57,7 +57,7 @@ jobs:
                                    || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p)
                                    || /_test\.go$/.test(p)
                                    || /(^|\/)test_[^/]+\.py$/.test(p)
-                                   || p.startsWith("tests/agentic-e2e/")],
+                                   || p.startsWith("dev/tests/agentic-e2e/")],
               ["CI/CD",          p => p.startsWith(".github/")],
               ["Deploy",         p => p.startsWith("charts/")
                                    || /^infra\/docker\/Dockerfile/.test(p)

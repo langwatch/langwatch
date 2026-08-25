@@ -137,7 +137,7 @@ COPY packages/handled-error/package.json ./packages/handled-error/
 COPY apps/server/package.json ./apps/server/
 COPY mcp/typescript/package.json ./mcp/typescript/
 COPY skills/package.json ./skills/
-COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
+COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
 
 WORKDIR /src
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..." --filter "@langwatch/langyworker..."

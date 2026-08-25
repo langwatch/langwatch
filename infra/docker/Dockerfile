@@ -43,7 +43,7 @@ COPY platform/app/package.json ./platform/app/
 # Every workspace member's manifest must be present or `--frozen-lockfile`
 # has nothing to check the lockfile against. This one carries no source into
 # the image — only the manifest the workspace needs to stay coherent.
-COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
+COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
 # The SDK, in full, because the app declares `langwatch: workspace:*` and so
 # imports THIS copy rather than a published release. Manifest-only was enough
 # while the app resolved the registry tarball; now the app's bundle cannot be

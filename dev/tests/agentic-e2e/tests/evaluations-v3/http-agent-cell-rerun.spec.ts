@@ -24,7 +24,7 @@ import {
 /**
  * Feature: HTTP Agent Support in Evaluations V3
  * Source: specs/evaluations-v3/http-agent-support.feature
- * Test Plan: tests/agentic-e2e/plans/http-agent-evaluations.plan.md
+ * Test Plan: dev/tests/agentic-e2e/plans/http-agent-evaluations.plan.md
  *
  * As a user evaluating AI agents
  * I want to re-execute individual cells

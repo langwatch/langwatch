@@ -242,7 +242,7 @@ route calls it.
 
 | Current path                                          | Destination                                                                                                                                     |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/agentic-e2e/**`                                | `dev/tests/agentic-e2e/**`, moved atomically with workspace, workflow, Docker and documentation references                                      |
+| `dev/tests/agentic-e2e/**`                            | `dev/tests/agentic-e2e/**`, moved atomically with workspace, workflow, Docker and documentation references                                      |
 | Clearly feature-owned `specs/<feature>/**`            | `<owning-feature>/specs/**`; mixed Trace, Studio, Evaluation, RBAC, Gateway, Governance and Settings roots are classified file by file          |
 | SDK-owned specs                                       | The matching SDK-local `specs` directory                                                                                                        |
 | Process, security, CI, setup and infrastructure specs | Remain central until a real technical package owns them                                                                                         |

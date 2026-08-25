@@ -148,7 +148,7 @@ services:
       # /app and be its own workspace root; now it is a member, so it mounts at
       # /platform/app and the root manifest, lockfile, .npmrc and every member the
       # workspace names must be visible at the paths the root packages: list
-      # uses. skills/ and tests/agentic-e2e/ contribute manifests only — a
+      # uses. skills/ and dev/tests/agentic-e2e/ contribute manifests only — a
       # frozen install checks the lockfile against every member it can see.
       - ./platform/app:/platform/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
@@ -159,7 +159,7 @@ services:
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
       - ./sdks/typescript:/sdks/typescript:ro
       - ./sdks/python:/sdks/python:ro
@@ -213,7 +213,7 @@ services:
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
       - ./sdks/typescript:/sdks/typescript:ro
       - ./sdks/python:/sdks/python:ro
@@ -289,7 +289,7 @@ services:
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
       - ./sdks/typescript:/sdks/typescript:ro
       - ./sdks/python:/sdks/python:ro
@@ -391,7 +391,7 @@ services:
       - ./mcp/typescript:/mcp/typescript
       - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./dev/tests/agentic-e2e/package.json:/dev/tests/agentic-e2e/package.json:ro
       - ./services/langevals:/services/langevals
       - ./sdks/typescript:/sdks/typescript:ro
       - ./sdks/python:/sdks/python:ro

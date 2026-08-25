@@ -4,7 +4,7 @@ import path from "path";
 /**
  * Playwright Config for E2E Tests
  *
- * Self-contained in tests/agentic-e2e/ with its own dependencies.
+ * Self-contained in dev/tests/agentic-e2e/ with its own dependencies.
  *
  * Usage:
  *   pnpm test

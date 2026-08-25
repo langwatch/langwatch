@@ -18,21 +18,21 @@ this ADR originally introduced, not the post-ADR-111 target layout.
 The repo accumulated six independent pnpm install roots, each with its own
 lockfile:
 
-| Root                 | Members                                                                              | Lockfile |
-| -------------------- | ------------------------------------------------------------------------------------ | -------- |
-| `/`                  | `packages/*` (server-cli, handled-error, langy)                                      | 1,949 l  |
-| `/langwatch`         | `.`, `packages/*`, `../mcp-server`, `../packages/handled-error`, `../packages/langy` | 21,796 l |
-| `/typescript-sdk`    | —                                                                                    | 5,091 l  |
-| `/mcp-server`        | —                                                                                    | 5,965 l  |
-| `/skills`            | —                                                                                    | 4,862 l  |
-| `/agentic-e2e-tests` | —                                                                                    | 52 l     |
+| Root                     | Members                                                                              | Lockfile |
+| ------------------------ | ------------------------------------------------------------------------------------ | -------- |
+| `/`                      | `packages/*` (server-cli, handled-error, langy)                                      | 1,949 l  |
+| `/langwatch`             | `.`, `packages/*`, `../mcp-server`, `../packages/handled-error`, `../packages/langy` | 21,796 l |
+| `/typescript-sdk`        | —                                                                                    | 5,091 l  |
+| `/mcp-server`            | —                                                                                    | 5,965 l  |
+| `/skills`                | —                                                                                    | 4,862 l  |
+| `/dev/tests/agentic-e2e` | —                                                                                    | 52 l     |
 
 Two of those overlapped. `mcp-server` was both its own root and a member of the
 application's workspace, so CI installed it twice on every application build
 (`langwatch-app-ci.yml`, `e2e-ci.yml`). `packages/handled-error` and
 `packages/langy` were members of two workspaces at once.
 
-Two more — `skills` and `agentic-e2e-tests` — were not members of any workspace
+Two more — `skills` and `dev/tests/agentic-e2e` — were not members of any workspace
 but sat inside a directory tree whose root declared one, so every install of
 them needed `--ignore-workspace` to escape a workspace they were never in.
 
@@ -214,7 +214,7 @@ one command and a security pin that reaches every project.
 - The application's package name changes. Anything filtering it by name needs
   `@langwatch/web`; path-based invocation (`pnpm -C platform/app`) is unaffected.
 - The tarball grows by every member `package.json` it did not previously carry
-  (`packages/server`, `sdks/typescript`, `tests/agentic-e2e`) — a few kilobytes —
+  (`packages/server`, `sdks/typescript`, `dev/tests/agentic-e2e`) — a few kilobytes —
   and by the root lockfile. In exchange it stops carrying a second lockfile that
   could drift from the one the repo develops against.
 - `npx @langwatch/server` installs from `app/` inside the tarball — the staged

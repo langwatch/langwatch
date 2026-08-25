@@ -11,7 +11,7 @@
  * `platform/app/ee/licensing/__tests__/fixtures/testLicenses.ts`, signed with the
  * in-repo TEST keypair (`.../fixtures/testKeys.ts` `TEST_PRIVATE_KEY`), plan
  * ENTERPRISE, maxMembers=100, expires 2030-12-31. It stays a copied literal
- * even though agentic-e2e-tests is a workspace member since ADR-076 and COULD
+ * even though dev/tests/agentic-e2e is a workspace member since ADR-076 and COULD
  * now import the app's fixture: this suite deliberately depends on nothing but
  * @playwright/test, so its install stays a few packages rather than the app's
  * whole tree. One string against that is a fair trade — but it must stay in

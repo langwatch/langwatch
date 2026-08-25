@@ -32,7 +32,7 @@ COPY packages/langy/package.json ./packages/langy/
 COPY apps/server/package.json ./apps/server/
 COPY sdks/typescript/package.json ./sdks/typescript/
 COPY skills/package.json ./skills/
-COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
+COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
 RUN pnpm install --frozen-lockfile --filter "@langwatch/mcp-server..."
 
 # The redaction and ssrf sources the MCP server imports, copied after the

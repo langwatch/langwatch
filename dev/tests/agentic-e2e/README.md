@@ -6,18 +6,18 @@ End-to-end tests for LangWatch using Playwright, designed to be authored and mai
 
 ```bash
 # 1. Start infrastructure services (from this directory)
-cd tests/agentic-e2e
+cd dev/tests/agentic-e2e
 docker compose up -d
 
 # 2. Run database migrations (first time only)
-cd ../../platform/app
+cd ../../../platform/app
 pnpm prisma:migrate
 
 # 3. Start the app (in langwatch/ directory)
 PORT=5570 pnpm dev
 
-# 4. Run tests (from agentic-e2e-tests/ directory)
-cd ../../tests/agentic-e2e
+# 4. Run tests (from dev/tests/agentic-e2e/ directory)
+cd ../../dev/tests/agentic-e2e
 pnpm install   # First time only
 pnpm test
 ```
@@ -46,7 +46,7 @@ Tests run against a **locally-running Next.js dev server** with Docker providing
 ### Directory Structure
 
 ```text
-agentic-e2e-tests/
+dev/tests/agentic-e2e/
 ├── tests/
 │   └── scenarios/
 │       ├── steps.ts              # Gherkin-style step definitions
@@ -175,7 +175,7 @@ To reset authentication, delete `.auth/user.json` and re-run tests.
 ## Running Tests
 
 ```bash
-# Run all tests (from agentic-e2e-tests/ directory)
+# Run all tests (from dev/tests/agentic-e2e/ directory)
 pnpm test
 
 # Run specific test file
@@ -202,7 +202,7 @@ E2E tests are configured to run in CI with:
 
 See `.github/workflows/e2e-ci.yml` for the full configuration.
 
-The CI workflow installs dependencies for both `langwatch/` and `agentic-e2e-tests/` and runs tests using `pnpm test` from the e2e directory.
+The CI workflow installs dependencies for both `langwatch/` and `dev/tests/agentic-e2e/` and runs tests using `pnpm test` from the e2e directory.
 
 **Global Setup (`global-setup.ts`):**
 
@@ -237,7 +237,7 @@ Reset the test database:
 ```bash
 docker compose down -v
 docker compose up -d
-cd ../../platform/app && pnpm prisma:migrate
+cd ../../../platform/app && pnpm prisma:migrate
 ```
 
 ## For AI Agents

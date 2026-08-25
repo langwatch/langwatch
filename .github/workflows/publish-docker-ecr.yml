@@ -186,7 +186,7 @@ jobs:
               - 'sdks/typescript/**'
               - 'skills/**'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
-              - 'tests/agentic-e2e/package.json'
+              - 'dev/tests/agentic-e2e/package.json'
               - 'feature-map.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
