@@ -45,6 +45,7 @@ import {
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
 import { PROJECT_KIND } from "../governanceProject.service";
+import { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 import type {
   PulledEventChRow,
   PushedEventChRow,
@@ -53,7 +54,6 @@ import type {
   SpendSortField,
   WindowCountChRow,
 } from "./activityMonitor.clickhouse.schemas";
-import { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 
 // ---------------------------------------------------------------------------
 // Public interfaces — the service's API contract
