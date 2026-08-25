@@ -1048,16 +1048,6 @@ export class ScimService {
     await this.directoryIdentity.assertWritable({ connectionId, userId: id });
 
     if (scimGrantsWritePathEnabled()) {
-      // The closing usage-attribution rows go FIRST, while the membership
-      // they are enumerated from still exists: `removeAccess` deletes the
-      // membership rows itself, and a crash past that point would lose the
-      // rows forever (ADR-094 Decision 4). It DISABLES rather than removes,
-      // so a rollback inside `removeAccess` leaves the person denied rather
-      // than restored — fail-safe, not fail-open.
-      await this.membershipLifecycle.onMembershipDeactivated({
-        organizationId,
-        userId: id,
-      });
       // Through the SERVICE, whose transaction re-collects the person's
       // effective permissions inside itself and rolls the whole thing back if
       // anything still resolves. The previous code called the ledger writer
@@ -1091,16 +1081,30 @@ export class ScimService {
         revokedGrantIds: visibleGrants.map((row) => row.id),
         actor: ScimService.ACTOR,
       });
-      // One transaction for the removal and the closing link rows. The old
-      // code committed the removal first and deactivated afterwards; a
-      // crash in that gap lost the rows forever, because the IdP's retry
-      // finds no membership and answers 404 before reaching step two.
-      await this.membershipLifecycle.onMembershipDeactivated({
-        organizationId,
-        userId: id,
-        membershipChange: "remove",
-      });
     }
+
+    // Both paths end the membership HERE, after the access is gone: the row
+    // is removed, the person's open usage-attribution links are closed in the
+    // same transaction, and their last active membership takes the account
+    // with it (ADR-094 Decision 4).
+    //
+    // Never before `removeAccess`. That proof re-collects the person's
+    // effective permissions and fails loudly if anything still resolves, and
+    // `isOrgMember` is false for a membership that is merely DISABLED
+    // (packages/authz-server/src/authz-collector.service.ts:333) — so ending
+    // the membership first would satisfy the proof's `stillOrgMember` leg
+    // because of us rather than because the row went, and catching a
+    // membership that survived the offboard is that leg's whole job.
+    //
+    // Safe on the path where `removeAccess` already deleted the row:
+    // `deleteMany` tolerates a row that is gone, and closing the links reads
+    // only `ProviderIdentityLink`, never the membership, so it closes the
+    // same rows either way.
+    await this.membershipLifecycle.onMembershipDeactivated({
+      organizationId,
+      userId: id,
+      membershipChange: "remove",
+    });
 
     await this.forgetDirectoryIdentity({ connectionId, userId: id });
     await this.recordPush({

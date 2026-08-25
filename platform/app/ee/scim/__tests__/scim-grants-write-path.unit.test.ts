@@ -269,8 +269,29 @@ describe("ScimService, on the grants write path", () => {
           }),
         ).rejects.toMatchObject({ code: "offboard_incomplete" });
 
-        // `deactivatedAt` is only ever written AFTER a proved-empty removal.
-        expect(prisma.user.update).not.toHaveBeenCalled();
+        // The membership is only ever ended AFTER a proved-empty removal.
+        expect(prisma.organizationUser.updateMany).not.toHaveBeenCalled();
+        expect(prisma.user.updateMany).not.toHaveBeenCalled();
+      });
+
+      /** @scenario A deletion that cannot prove itself empty leaves the membership standing */
+      it("refuses a deletion, and leaves the membership for the proof to judge", async () => {
+        await expect(
+          service.deleteUser({
+            id: USER,
+            organizationId: ORGANIZATION,
+            connectionId: CONNECTION,
+          }),
+        ).rejects.toMatchObject({ code: "offboard_incomplete" });
+
+        // Ending the membership BEFORE the proof would satisfy its
+        // `stillOrgMember` leg by disabling the row rather than by removing
+        // it — `isOrgMember` is false for a merely disabled membership
+        // (packages/authz-server/src/authz-collector.service.ts:333) — and
+        // catching a membership that survived the offboard is the only thing
+        // that leg exists to do.
+        expect(prisma.organizationUser.updateMany).not.toHaveBeenCalled();
+        expect(prisma.organizationUser.deleteMany).not.toHaveBeenCalled();
       });
     });
   });
