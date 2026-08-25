@@ -7,7 +7,7 @@
  * resolves, so they stay true when the copy is reworded and fail if a surface
  * starts writing its own.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

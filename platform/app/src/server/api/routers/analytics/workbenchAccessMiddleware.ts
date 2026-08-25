@@ -13,7 +13,7 @@
  * switched on for it.
  *
  * @see ~/server/analytics/lwql/access — the decision this adapts
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

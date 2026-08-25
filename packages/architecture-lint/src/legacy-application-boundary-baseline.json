@@ -2,10 +2,6 @@
   "version": 1,
   "edges": {
     "backend-to-browser": {
-      "platform/app/src/app/api/analytics-sql/[[...route]]/app.charts.v1.ts": [
-        "~/features/analytics-query/visualization/vegaLitePolicy",
-        "~/features/analytics-query/visualization/vegaLiteStructure"
-      ],
       "platform/app/src/app/api/copilotkit/[[...route]]/service-adapter.ts": [
         "~/optimization_studio/server/addEnvs",
         "~/prompts/schemas/version-metadata-schema",
@@ -26,13 +22,6 @@
         "../../../../optimization_studio/server/lambda"
       ],
       "platform/app/src/server.mts": ["./env-load", "./instrumentation.node", "./start"],
-      "platform/app/src/server/analytics/saved-workbench-charts/errors.ts": [
-        "~/features/analytics-query/visualization/visualization.types"
-      ],
-      "platform/app/src/server/analytics/saved-workbench-charts/savedWorkbenchChart.service.ts": [
-        "~/features/analytics-query/visualization/lwqlDatasetNames",
-        "~/features/analytics-query/visualization/validateVegaLiteSpec"
-      ],
       "platform/app/src/server/analytics/utils.ts": ["../../hooks/useFilterParams"],
       "platform/app/src/server/api-key/api-key-token.utils.ts": ["~/env.mjs"],
       "platform/app/src/server/api/rbac.ts": ["~/env.mjs"],
@@ -988,39 +977,6 @@
       ],
       "platform/app/src/experiments-v3/utils/mappingValidation.ts": [
         "~/server/evaluations/evaluators"
-      ],
-      "platform/app/src/features/analytics-query/components/LangWatchQLDiagnostics.tsx": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/components/LangWatchQLResultMeta.tsx": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/components/LangWatchQLResultPane.tsx": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/components/LangWatchQLResultTable.tsx": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/components/LangWatchQLSchemaBrowser.tsx": [
-        "~/server/analytics/lwql/timeWindow"
-      ],
-      "platform/app/src/features/analytics-query/components/LangWatchQLTimeWindowEditor.tsx": [
-        "~/server/analytics/lwql/timeWindow"
-      ],
-      "platform/app/src/features/analytics-query/logic/lwqlExecute.ts": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/logic/lwqlRequestController.ts": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/logic/lwqlRequestState.ts": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/logic/lwqlSchemaModel.ts": [
-        "~/server/analytics/lwql"
-      ],
-      "platform/app/src/features/analytics-query/logic/lwqlValueFormat.ts": [
-        "~/server/analytics/lwql"
       ],
       "platform/app/src/features/automations/AutomationDrawer.tsx": [
         "~/server/filters/types"

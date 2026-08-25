@@ -8,7 +8,7 @@
  * window observable once the member presses Run, by which point the half-typed
  * states this suite is about are long gone.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

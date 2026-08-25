@@ -22,7 +22,7 @@
  * `LangWatchQLVegaChartWithoutEval.browser.test.tsx` and
  * `LangWatchQLVegaSpecNetworkSilence.browser.test.tsx`.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

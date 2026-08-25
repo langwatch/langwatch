@@ -1,49 +1,16 @@
 /**
- * LangWatchQL analytics SQL — the service the endpoints call.
- *
- * Composes four layers that are each proven on their own: the schema catalog
- * (`./catalog/`), the default-deny AST validator (`./validation/`), the
- * database-side access model (`./provisioning.ts`), and the execution seam
- * (`./executor.ts`). Nothing here re-decides what any of them decided — the
- * value of this file is the *order*, and the order is load-bearing:
- *
- *  1. Resolve the caller's tenant and content permissions from the
- *     authenticated server context. Never from the request, never from the SQL.
- *  2. Derive the validator's policy from the catalog *for those permissions*,
- *     so `allowedTables` and `gatedColumns` are a function of who is asking.
- *  3. Validate, then resolve the surface's time window into the reserved
- *     parameters the statement declares (`./resolveTimeWindow.ts`) — in that order,
- *     because an injected window is what satisfies the missing-parameter check.
- *     A refusal is thrown as the validator's own handled error and the query
- *     never reaches the database.
- *  4. Execute as the restricted identity, carrying the caller's tenant
- *     capability as the one setting the profile lets a query change.
- *  5. Shape the result, and run the advisory diagnostics (`./diagnostics.ts`)
- *     over the facts step 3 recorded and the rows step 4 returned.
- *
- * ## Where the isolation actually lives
- *
- * Not here. Step 4 is the whole of it: the row policies resolve the tenant from
- * the capability, so a bug anywhere in steps 1-3 costs a caller a wrong refusal
- * or a wrong acceptance, never another tenant's rows. That is deliberate — a
- * gateway is a bad place to keep a security boundary, and this one is defense
- * in depth over a boundary that was proven against the database directly.
- *
- * ## Two ceilings, two behaviours
- *
- * The settings profile pins `readonly`, `max_execution_time` and
- * `max_memory_usage` `CONST`, so a query that outgrows the *database's* budget
- * is killed by the server and surfaces as a coded error. The ceilings this
- * layer adds are about the response — how many rows, how many bytes — and they
- * truncate rather than throw, always marked. Neither can be relaxed by a
- * caller: the first because `readonly = 1` refuses the setting change, the
- * second because it is not in the request shape.
- *
- * @see specs/analytics/lwql-api.feature
- * @see ./provisioning.ts — the isolation this composes over
+ * Orders catalog-derived policy, validation, reserved-window resolution,
+ * restricted execution, then advisory diagnostics. It does not recreate their
+ * decisions. Database row policy is the isolation boundary; this service is
+ * defence in depth. Server ceilings throw coded errors, result ceilings truncate
+ * and mark the response, and neither is caller-controlled.
  */
 
 import { createLogger } from "@langwatch/observability";
+import type {
+  LangWatchQLQueryResult,
+  LangWatchQLSchema,
+} from "@langwatch/analytics-contract";
 import type { Protections } from "../../traces/protections";
 import { lwqlTenantCapability } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
@@ -53,56 +20,24 @@ import {
   lwqlGatedColumns,
   lwqlVisibleViews,
 } from "./catalog/types";
-import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
+import { lwqlDiagnostics } from "./diagnostics";
 import { LangWatchQLParameterMissingError, LangWatchQLUnavailableError } from "./errors";
 import {
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
-  type LangWatchQLColumn,
   type LangWatchQLExecutor,
   type LangWatchQLResultLimits,
-  type LangWatchQLStatistics,
   lwqlConnectionFromEnv,
 } from "./executor";
 import { resolveLangWatchQLTimeWindow } from "./resolveTimeWindow";
-import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
+import { describeLangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
 import { lwqlValidationError } from "./validation/errors";
 import { type AcceptedLangWatchQL, validateLangWatchQL } from "./validation/validate";
 
 const logger = createLogger("langwatch:analytics:lwql");
 
-/** What a caller gets back from the query endpoint. */
-export interface LangWatchQLQueryResult {
-  readonly columns: readonly LangWatchQLColumn[];
-  readonly rows: readonly Record<string, unknown>[];
-  readonly statistics: LangWatchQLStatistics;
-  /** Whether a result ceiling cut the answer short. */
-  readonly truncated: boolean;
-  /**
-   * Notes about the result. An empty list means no known issue was detected,
-   * which is not a claim that the answer is the one the caller meant — see
-   * `LWQL_CLEAN_DIAGNOSTICS_MEANING` in `./diagnostics.ts`.
-   */
-  readonly diagnostics: readonly LangWatchQLDiagnostic[];
-  /**
-   * Whether the statement declared the reserved time-window parameters and was
-   * therefore given the period the surface is showing.
-   *
-   * Declaring is all this reports. The author writes the comparison, so a
-   * statement that names the parameters without comparing against them reads
-   * all of time and still answers `true` — the surface can know what it handed
-   * over, not what the `WHERE` clause did with it.
-   *
-   * `false` is not a failure — an all-time total is a legitimate chart — but it
-   * is the fact a card has to say out loud, because a chart that quietly ignores
-   * the period beside one that follows it is the bug this contract exists to
-   * prevent.
-   *
-   * @see ./timeWindow.ts
-   */
-  readonly followsTimeWindow: boolean;
-}
+export type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
 /** The tenant a query runs for. Only these two fields are ever needed. */
 export interface LangWatchQLCaller {

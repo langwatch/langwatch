@@ -1,23 +1,67 @@
-# ADR-001: Analytics owns the timeseries read capability
+# ADR-001: Analytics owns timeseries reads and the LangWatchQL web surface
 
 **Status:** Accepted
 
-**Behavioural contract:** [Analytics timeseries](../specs/analytics-timeseries.feature)
+**Behavioural contracts:** [Analytics timeseries](../specs/analytics-timeseries.feature)
+and [LangWatchQL workbench](../specs/analytics-lwql-workbench.feature)
 
-Analytics owns the portable timeseries, feedback, and top-document read
-vocabulary, conservative rollup/slim/legacy table routing, tenant-scoped
-query envelopes, ClickHouse query builders, and result validation. Its single
-server service has one private repository capability. The application
-composition root supplies only concrete ClickHouse client resolution and
-transport wiring.
+## Context
 
-Dashboard owns graphs and saved charts. Topic owns clustering. Trace and
-Evaluation own their durable lifecycles. They consume the Analytics service;
-they do not add Analytics repositories or query implementations.
+Analytics provides tenant-scoped timeseries reads and the reusable browser
+surface for LangWatchQL. Dashboard owns graphs and saved charts; Topic, Trace,
+and Evaluation own their distinct lifecycles.
 
-The route table is deliberately conservative: mixed sources, keyed or pipeline
-series, negated or trace-scoped filters, blocklisted attributes, and unsupported
-dimensions use the source's legacy table. Every query carries the project id as
-its tenant id. Timeseries bucket counts are capped at 1,000 by normalising to a
-daily scale, and the service validates the repository result with the shared
-Zod 4 contract.
+## Decision
+
+Analytics owns portable timeseries contracts, conservative table routing,
+ClickHouse reads, LangWatchQL browser behaviour, and Vega-Lite policy. The
+application owns routes, tRPC transport, saved-chart persistence, and browser
+theme/lazy-render ports.
+
+Server-side LangWatchQL execution remains a recorded migration residual under
+`platform/app/src/server/analytics/lwql`; it does not define another owner.
+
+## Public surfaces and transports
+
+`@langwatch/analytics-contract` publishes Zod contracts. The server service is
+called from composed application transports. `@langwatch/analytics-web` accepts
+controlled query, schema, toolbar, error, and chart render ports; it imports no
+application hooks or router clients.
+
+## Dependencies
+
+Analytics consumes ClickHouse through its private server repository. Other
+features consume its contract, never its repositories or query builders.
+
+## Persistence
+
+Analytics reads ClickHouse. Saved workbench chart records belong to Dashboard;
+the browser workbench itself persists nothing.
+
+## Runtime and registration
+
+The application composes one Analytics server service per process and installs
+its transports. The web package is mounted by page composition and has no
+import-time registration.
+
+## Environment and configuration
+
+The contract and web package read no environment. Deployment configuration is
+resolved by application composition and injected into server adapters.
+
+## Errors
+
+Services throw named domain errors. The workbench receives transport failures
+through its error render port and preserves their structured metadata.
+
+## Contracts and validation
+
+Timeseries and LangWatchQL response shapes are shared Zod 4 contracts. The
+LangWatchQL query output is validated at the tRPC boundary; browser chart policy
+validates member-authored Vega-Lite specifications before rendering.
+
+## Consequences
+
+`trace_analytics`, `trace_summaries`, and timeseries rollups remain distinct
+server table boundaries. Moving the LangWatchQL workbench does not alter query
+routes, response fields, authorization, or those table choices.

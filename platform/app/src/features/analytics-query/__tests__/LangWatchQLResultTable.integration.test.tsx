@@ -13,7 +13,7 @@
  * real viewport, which is what makes "only a bounded window is materialized"
  * a claim this suite can actually fail.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

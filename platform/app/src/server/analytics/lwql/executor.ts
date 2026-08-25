@@ -1,37 +1,16 @@
 /**
- * LangWatchQL analytics SQL — the execution seam.
- *
- * The service decides *whether* a query may run; this decides *how* it runs,
- * and it is the only place in the module that opens a database connection.
- * Keeping it behind an interface is what lets the endpoint suite drive the
- * shipped service against a Testcontainers-provisioned server while the
- * deployment story — where the restricted identity's credentials come from,
- * how the key map is populated — lands in a later slice without touching the
- * service at all.
- *
- * ## Two rules that are not negotiable
- *
- * **Never the application's own client.** `~/server/clickhouse/client` is the
- * administrative connection: it is not `readonly`, it carries no tenant
- * capability, and no row policy applies to it. Running a customer's SQL through
- * it would return every tenant's rows. This module therefore builds its own
- * client from credentials that name the restricted identity, and an
- * unconfigured deployment gets no executor at all rather than a fallback.
- *
- * **Only the tenant capability travels as a setting.** The settings profile
- * pins `readonly = 1` and the resource ceilings `CONST`, so any other setting
- * sent per query is refused by the server. That is the design, not a limitation
- * to work around: the ceilings this layer adds are about the *result* — how
- * much of it is handed back — and never about relaxing what the database will
- * do.
- *
- * @see ./provisioning.ts — the identity, the profile, and the key map
- * @see ./capability.ts — the value sent as the tenant setting
- * @see specs/analytics/lwql-api.feature
+ * The only LangWatchQL database seam. It opens the restricted identity, never
+ * the application's administrative client: that client has no tenant row
+ * policy. The tenant capability is the sole query setting; the database profile
+ * pins read-only and resource limits, while this layer only bounds the result.
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
+import type {
+  LangWatchQLColumn,
+  LangWatchQLStatistics,
+} from "@langwatch/analytics-contract";
 
 import {
   isClickHouseObjectUnavailableError,
@@ -44,23 +23,10 @@ import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
-/** One column of a result, as the server typed it. */
-export interface LangWatchQLColumn {
-  /** Output name, which is the caller's alias when they wrote one. */
-  readonly name: string;
-  /** ClickHouse type, verbatim — `Nullable(Float64)`, `Map(String, String)`. */
-  readonly type: string;
-}
-
-/** What the query cost, from the server's own accounting. */
-export interface LangWatchQLStatistics {
-  readonly elapsedMs: number;
-  /** Physical rows read off the parts — the number partition pruning moves. */
-  readonly rowsRead: number;
-  readonly bytesRead: number;
-  /** Rows handed back, after the result ceilings. */
-  readonly rowsReturned: number;
-}
+export type {
+  LangWatchQLColumn,
+  LangWatchQLStatistics,
+} from "@langwatch/analytics-contract";
 
 /** A submitted, already-validated query and the ceilings on what it returns. */
 export interface LangWatchQLExecutionRequest {

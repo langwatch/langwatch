@@ -14,7 +14,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 
-import type { VegaValidationError } from "~/features/analytics-query/visualization/visualization.types";
+import type { VegaValidationError } from "@langwatch/analytics-web/validation";
 import { remediation } from "~/server/app-layer/error-remediation";
 
 /**

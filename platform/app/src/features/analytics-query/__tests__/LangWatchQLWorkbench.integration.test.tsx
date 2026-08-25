@@ -5,7 +5,7 @@
  * goes on the wire when the member presses Run, what does not go on the wire
  * when they do nothing, and where a refusal about parameters is shown.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -49,22 +49,20 @@ const harness = vi.hoisted(() => ({
       vegaLiteSpec?: Record<string, unknown>;
     };
   },
+  createChart: vi.fn(),
+  updateChart: vi.fn(),
 }));
-
-vi.mock("@trpc/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@trpc/client")>();
-  return {
-    ...actual,
-    // The workbench unwraps `utils.client` before binding `mutation`; the stub
-    // stands in for the unwrapped client.
-    getUntypedClient: () => ({ mutation: harness.mutation }),
-  };
-});
 
 vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
-      client: {},
+      client: {
+        analytics: {
+          lwql: {
+            query: { mutate: harness.mutation },
+          },
+        },
+      },
       analytics: {
         savedWorkbenchCharts: {
           getById: {
@@ -97,13 +95,13 @@ vi.mock("~/utils/api", () => ({
         },
         create: {
           useMutation: () => ({
-            mutateAsync: async () => ({}),
+            mutateAsync: harness.createChart,
             isPending: false,
           }),
         },
         update: {
           useMutation: () => ({
-            mutateAsync: async () => ({}),
+            mutateAsync: harness.updateChart,
             isPending: false,
           }),
         },
@@ -118,15 +116,14 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-// Monaco reaches the editor through the code-splitting shim, whose lazy
-// boundary never resolves under jsdom. Standing a textarea in for the shim's
-// result mounts it synchronously; the workbench, the editor component and the
-// wiring between them stay real, which is what this suite is about.
+// The extracted editor code-splits Monaco directly. Standing a textarea in for
+// that browser-only dependency leaves the workbench, editor component and
+// saved-chart wiring real, which is what this suite is about.
 //
 // The stub deliberately never announces a mount: the workbench then falls back
 // to appending inserted text to the draft, which is the path this suite can
 // observe.
-vi.mock("~/utils/compat/next-dynamic", () => {
+vi.mock("@monaco-editor/react", () => {
   function StubMonacoEditor(props: {
     value?: string;
     onChange?: (value: string | undefined) => void;
@@ -134,14 +131,14 @@ vi.mock("~/utils/compat/next-dynamic", () => {
     return (
       <textarea
         data-testid="stub-monaco"
-        aria-label="LangWatchQL ClickHouse SQL"
+        aria-label="LangWatchQL SQL"
         value={props.value ?? ""}
         onChange={(event) => props.onChange?.(event.target.value)}
       />
     );
   }
 
-  return { __esModule: true, default: () => StubMonacoEditor };
+  return { __esModule: true, default: StubMonacoEditor };
 });
 
 // Chart mode's own behavior is covered by its own suites; what belongs to THIS
@@ -234,8 +231,13 @@ function addParameter({ name, value }: { name: string; value: string }) {
 beforeEach(() => {
   harness.mutation.mockReset();
   harness.mutation.mockResolvedValue(lwqlResult());
+  harness.createChart.mockReset();
+  harness.createChart.mockImplementation(async ({ name }) => ({ id: "chart-new", name }));
+  harness.updateChart.mockReset();
+  harness.updateChart.mockResolvedValue(undefined);
   harness.charts = [];
   harness.openableChart = null;
+  harness.editedSpec = '{"mark":"point"}';
 });
 
 describe("the LangWatchQL workbench", () => {
@@ -270,7 +272,6 @@ describe("the LangWatchQL workbench", () => {
 
         await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
         expect(harness.mutation).toHaveBeenCalledWith(
-          "analytics.lwql.query",
           {
             projectId: "project-1",
             sql: SQL,
@@ -320,6 +321,72 @@ describe("the LangWatchQL workbench", () => {
         // The outcome's own statement describes the chart, collapsed to a line.
         expect(chart).toHaveAttribute("data-submitted-label", SQL);
         expect(harness.mutation).toHaveBeenCalledTimes(1);
+      });
+
+      it("saves an edited specification when creating a new chart", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+        await screen.findByTestId("lwql-result-summary");
+
+        await userEvent.click(screen.getByRole("tab", { name: "Chart" }));
+        await userEvent.click(
+          await screen.findByRole("button", { name: "Edit the specification" }),
+        );
+        await userEvent.click(screen.getByTestId("save-chart"));
+        await userEvent.type(screen.getByLabelText("Chart name"), "New chart");
+        await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        await waitFor(() =>
+          expect(harness.createChart).toHaveBeenCalledWith({
+            projectId: "project-1",
+            name: "New chart",
+            definition: {
+              version: 1,
+              sql: SQL,
+              parameters: {},
+              vegaLiteSpec: { mark: "point" },
+            },
+          }),
+        );
+      });
+
+      it("saves an edited specification back to the opened chart", async () => {
+        harness.charts = [{ id: "chart-1", name: "Traces per day" }];
+        harness.openableChart = {
+          id: "chart-1",
+          name: "Traces per day",
+          definition: {
+            sql: SQL,
+            parameters: {},
+            vegaLiteSpec: { mark: "bar" },
+          },
+        };
+
+        await renderWorkbench();
+        await userEvent.click(screen.getByTestId("open-saved-chart"));
+        await userEvent.click(await screen.findByText("Traces per day"));
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+        await screen.findByTestId("lwql-result-summary");
+
+        await userEvent.click(screen.getByRole("tab", { name: "Chart" }));
+        await userEvent.click(
+          await screen.findByRole("button", { name: "Edit the specification" }),
+        );
+        await userEvent.click(screen.getByTestId("save-chart"));
+
+        await waitFor(() =>
+          expect(harness.updateChart).toHaveBeenCalledWith({
+            projectId: "project-1",
+            id: "chart-1",
+            definition: {
+              version: 1,
+              sql: SQL,
+              parameters: {},
+              vegaLiteSpec: { mark: "point" },
+            },
+          }),
+        );
       });
     });
 
@@ -493,8 +560,8 @@ describe("the LangWatchQL workbench", () => {
           end: PAGE_WINDOW.end,
         };
         for (const call of harness.mutation.mock.calls) {
-          expect(call[1].timeWindow).toEqual(overridden);
-          expect(call[1].parameters ?? {}).not.toHaveProperty("period_start");
+          expect(call[0].timeWindow).toEqual(overridden);
+          expect(call[0].parameters ?? {}).not.toHaveProperty("period_start");
         }
       });
 
@@ -510,7 +577,7 @@ describe("the LangWatchQL workbench", () => {
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
 
         await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
-        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(PAGE_WINDOW);
+        expect(harness.mutation.mock.calls[0]![0].timeWindow).toEqual(PAGE_WINDOW);
       });
 
       // The gap this closes: the fields keep showing what was typed while it
@@ -556,7 +623,7 @@ describe("the LangWatchQL workbench", () => {
         );
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
         await waitFor(() => expect(harness.mutation).toHaveBeenCalledTimes(1));
-        expect(harness.mutation.mock.calls[0]![1].timeWindow).toEqual(PAGE_WINDOW);
+        expect(harness.mutation.mock.calls[0]![0].timeWindow).toEqual(PAGE_WINDOW);
       });
     });
 

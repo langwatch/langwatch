@@ -32,8 +32,10 @@ import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { LWQL_QUERY_RESULT_DATASET } from "~/features/analytics-query/visualization/lwqlDatasetNames";
-import { validateVegaLiteSpecStructure } from "~/features/analytics-query/visualization/validateVegaLiteSpec";
+import {
+  LWQL_QUERY_RESULT_DATASET,
+  validateVegaLiteSpecStructure,
+} from "@langwatch/analytics-web/validation";
 import type { CustomGraph, Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import type { Protections } from "../../traces/protections";

@@ -11,7 +11,7 @@
  * behind it at all. These tests pin the identity itself, not merely that some
  * value reached the flag store.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

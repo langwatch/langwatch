@@ -12,7 +12,7 @@
  * No database, no containers: this reads the routers as they are built.
  *
  * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { describe, expect, it } from "vitest";

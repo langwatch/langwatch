@@ -6,7 +6,7 @@
  * every surface inherits — a refusal proven here is a refusal REST, tRPC and
  * the saved-chart write path all get for free, and none of them can restate it.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { describe, expect, it } from "vitest";

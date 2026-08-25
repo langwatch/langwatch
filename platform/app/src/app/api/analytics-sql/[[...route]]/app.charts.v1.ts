@@ -31,8 +31,10 @@
 
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { LWQL_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaLitePolicy";
-import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
+import {
+  LWQL_VEGA_LIMITS,
+  measureSpecBytes,
+} from "@langwatch/analytics-web/visualization";
 import type { Project } from "~/generated/prisma/client";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
 import { type createProjectApp, requires } from "~/server/api/security";

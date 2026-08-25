@@ -5,7 +5,7 @@
  * permission guard, and the deployment's provisioning. Neither can be turned on
  * from the browser, which is the point of the first scenario below.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

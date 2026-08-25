@@ -25,7 +25,7 @@
  * that nor `followsTimeWindow`.
  *
  * @see ./errors.ts — the two refusals
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import {

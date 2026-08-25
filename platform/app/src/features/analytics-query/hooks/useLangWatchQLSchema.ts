@@ -6,7 +6,7 @@
  * a schema that reloaded itself would break it just as surely as a rerunning
  * query would.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { useMemo } from "react";

@@ -1,41 +1,12 @@
 /**
- * LangWatchQL analytics SQL — the advisory diagnostics a result carries.
- *
- * A diagnostic is never a refusal. The validator owns rejection; by the time
- * this module runs the query has already executed and the answer is real. What
- * these say is that the answer is easy to *misread* — a measure counted once
- * per joined row, a chart with a hole in it, a bucket that has not finished
- * filling — and each one names the fact that made it fire so the caller can
- * decide rather than guess.
- *
- * ## One vocabulary, three sources
- *
- * Some rules read the *query's shape*, some read the *result*, and one reads
- * what the executor did to it — and all of them emit into the same list with
- * the same code space. That is deliberate: a consumer branches on `code` and
- * should never have to know which layer noticed.
- *
- *  - Query-shape rules (`POSSIBLE_FANOUT`, `UNBOUNDED_TIME_RANGE`) read
- *    {@link AcceptedLangWatchQL.blocks}, the structure the validator's single
- *    walk recorded. Nothing here re-parses the SQL — a second parse is a second
- *    answer waiting to disagree with the first.
- *  - Result rules (`MISSING_TIME_BUCKETS`, `INCOMPLETE_COMPARISON_PERIOD`) read
- *    the typed columns and rows that came back.
- *  - `RESULT_TRUNCATED` reads the executor's own report that a response ceiling
- *    cut the answer short.
- *
- * ## Under-report rather than over-report
- *
- * Every rule below fires only on a fact it can point at. A join written in
- * `WHERE` instead of `ON` is invisible to the walk, so it gets no fanout
- * diagnostic; a filter written against a projection alias is not recognised as
- * a filter on the column behind it. Both are misses, and misses are the right
- * failure direction for an advisory: a warning that fires on healthy queries
- * gets ignored, and then it is not a warning at all.
- *
- * @see ./validation/validate.ts — the walk whose record the shape rules read
- * @see specs/analytics/lwql-api.feature
+ * Advisory result diagnostics. The validator alone refuses SQL; these describe
+ * facts that can make an accepted result easy to misread. Query-shape rules use
+ * its one recorded walk, never a second parse; other rules use returned rows or
+ * the executor's truncation report. Under-report rather than warn on a fact
+ * this module cannot point at.
  */
+
+import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 
 import { type LangWatchQLViewDefinition, lwqlGrainColumns } from "./catalog/types";
 import type { LangWatchQLColumn, LangWatchQLResultLimits } from "./executor";
@@ -64,25 +35,10 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "INCOMPLETE_COMPARISON_PERIOD",
 ] as const;
 
-export type LangWatchQLDiagnosticCode = (typeof LWQL_DIAGNOSTIC_CODES)[number];
-
-/**
- * A structured note about a result that is correct but worth reading twice.
- *
- * Distinct from an error: the query ran and the answer is real.
- */
-export interface LangWatchQLDiagnostic {
-  readonly code: LangWatchQLDiagnosticCode;
-  /** Customer-safe sentence naming what to check. Never an internal name. */
-  readonly message: string;
-  /**
-   * The facts behind the note, for a consumer that renders or reasons over it.
-   *
-   * A client contract rather than a scratchpad: every key here is one a caller
-   * can act on — which dataset, which columns, how many buckets are missing.
-   */
-  readonly meta?: Readonly<Record<string, unknown>>;
-}
+export type {
+  LangWatchQLDiagnostic,
+  LangWatchQLDiagnosticCode,
+} from "@langwatch/analytics-contract";
 
 /**
  * What an empty diagnostics list means, in the words the API publishes.

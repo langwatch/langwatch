@@ -10,7 +10,7 @@
  * itself sendable, which is the only thing standing between a silent collapse
  * and a query run against a value the member never chose.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

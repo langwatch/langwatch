@@ -4,7 +4,7 @@
  * The schema browser shows what the response carried, documents it, refuses to
  * offer a withheld column, and narrows on a search.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

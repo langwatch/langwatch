@@ -16,6 +16,7 @@ import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { AppAutomationRuntime } from "~/runtime/app/features/automation";
+import { createAutomationTestRuntime } from "@langwatch/automation-server/testing";
 import { prisma } from "~/server/db";
 
 import type { Protections } from "../../../traces/protections";
@@ -234,6 +235,7 @@ describe("saved workbench charts (integration)", () => {
         const builderReader = AppAutomationRuntime.create({
           database: prisma,
           redis: null,
+          graph: createAutomationTestRuntime(),
         }).build();
 
         expect(

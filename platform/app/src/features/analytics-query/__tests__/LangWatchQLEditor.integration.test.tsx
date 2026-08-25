@@ -9,7 +9,7 @@
  * what the workbench registers and hands to it, which is ours, not about what
  * Monaco does with it, which is not.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

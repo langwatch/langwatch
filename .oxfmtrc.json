@@ -13,6 +13,8 @@
     "**/coverage/**",
     "**/.next/**",
     "**/generated/**",
+    "packages/features/analytics/web/src/visualization/vega-lite-schema-validator.generated.js",
+    "packages/features/analytics/web/src/visualization/vega-lite-schema-validator.generated.d.ts",
     "**/*.min.*",
     "**/testdata/**",
     "**/fixtures/**",

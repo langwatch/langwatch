@@ -25,14 +25,21 @@ const FEATURE_DIR = fileURLToPath(new URL("../", import.meta.url));
 /** `…/analytics-query` → `…/src`, which the `~/` alias resolves from. */
 const SRC_DIR = resolve(FEATURE_DIR, "../..");
 
+/** The package owns the chart runtime; app keeps only its lazy Next adapter. */
+const PACKAGE_SRC_DIR = resolve(
+  FEATURE_DIR,
+  "../../../../../packages/features/analytics/web/src",
+);
+
 const LAZY_BOUNDARY = join(FEATURE_DIR, "components/LazyLangWatchQLChartMode.tsx");
-const CHART_MODE = join(FEATURE_DIR, "components/LangWatchQLChartMode.tsx");
+const CHART_MODE = join(PACKAGE_SRC_DIR, "components/langwatch-ql-chart-mode.tsx");
+const CHART_ENTRY = join(PACKAGE_SRC_DIR, "chart.ts");
 
 /** Packages whose presence in a chunk means the Vega runtime is in it. */
 const VEGA_PACKAGE = /^(vega|vega-lite|vega-embed|react-vega)(\/|$)/;
 
 /** The generated schema validator, which is megabytes of its own. */
-const GENERATED_VALIDATOR = "vegaLiteSchemaValidator.generated";
+const GENERATED_VALIDATOR = "vega-lite-schema-validator.generated";
 
 const EXTENSIONS = [".ts", ".tsx", ".js"];
 
@@ -136,6 +143,7 @@ const featureSourceFiles = (directory: string): string[] =>
     }
     // A declaration file is erased too, so it is never in a chunk.
     if (entry.name.endsWith(".d.ts")) return [];
+    if (path === join(PACKAGE_SRC_DIR, "visualization", "validation.ts")) return [];
     return EXTENSIONS.some((extension) => entry.name.endsWith(extension)) ? [path] : [];
   });
 
@@ -149,12 +157,13 @@ describe("where the Vega runtime can be reached from", () => {
         // graph walk that finds nothing anywhere proves nothing.
         expect(reachesVega(chartMode)).toBe(true);
 
-        const behindTheBoundary = new Set(chartMode.files);
-        const leaks = featureSourceFiles(FEATURE_DIR)
+        const chartEntry = walkStaticGraph(CHART_ENTRY);
+        const behindTheBoundary = new Set([...chartMode.files, ...chartEntry.files]);
+        const leaks = featureSourceFiles(PACKAGE_SRC_DIR)
           .filter((file) => !behindTheBoundary.has(file))
           .filter((file) => reachesVega(walkStaticGraph(file)));
 
-        expect(leaks.map((file) => file.replace(FEATURE_DIR, ""))).toEqual([]);
+        expect(leaks.map((file) => file.replace(PACKAGE_SRC_DIR, ""))).toEqual([]);
       });
 
       /** @scenario "Vega loads lazily from Chart mode only" */

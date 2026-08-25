@@ -5,7 +5,7 @@
  * everything this adds is lifecycle — one controller per mount, a subscription,
  * and a disposal that aborts whatever is in flight.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -64,7 +64,10 @@ export function useLangWatchQLQuery({
     createLangWatchQLRequestController({
       execute: (request, options) =>
         createLangWatchQLExecute({
-          utils: utilsRef.current,
+          transport: {
+            mutate: (input, options) =>
+              utilsRef.current.client.analytics.lwql.query.mutate(input, options),
+          },
           projectId: projectIdRef.current,
         })(request, options),
     }),

@@ -5,7 +5,7 @@
  * The gate is a server answer, never a client flag: nothing a browser can be
  * told puts this link on a deployment that could not run the query behind it.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { MenuLink } from "~/components/MenuLink";

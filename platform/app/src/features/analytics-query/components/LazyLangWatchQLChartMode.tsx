@@ -9,7 +9,7 @@
  * Mount this, not `LangWatchQLChartMode` — importing that directly is what
  * would put Vega back in the entry chunk, and nothing would look wrong.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";

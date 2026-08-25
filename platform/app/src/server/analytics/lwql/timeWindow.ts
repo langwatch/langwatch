@@ -24,7 +24,7 @@
  * `./resolveTimeWindow.ts`, which the browser never loads.
  *
  * @see ./resolveTimeWindow.ts — what a surface may and may not do with these
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 /** The window a surface hands a statement, as instants. Half-open: `[start, end)`. */

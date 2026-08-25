@@ -15,7 +15,7 @@
  * to name.
  *
  * @see ../timeWindow.ts — the module under guard
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { readFileSync } from "node:fs";

@@ -15,7 +15,7 @@
  * one deliberate same-origin call through each channel has to show up in its
  * recorder, because an absence assertion that cannot fail is worth nothing.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -40,10 +40,12 @@ import type {
   LangWatchQLDatasetColumn,
 } from "../visualization/visualization.types";
 
-import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial";
-import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid";
-import { LWQL_FIXTURE_COLUMNS } from "./fixtures/lwqlDatasetRegistry";
-import { VALID_VEGA_FIXTURES } from "./fixtures/valid";
+import {
+  ADVERSARIAL_VEGA_FIXTURES,
+  INVALID_VEGA_FIXTURES,
+  LWQL_FIXTURE_COLUMNS,
+  VALID_VEGA_FIXTURES,
+} from "@langwatch/analytics-web/testing";
 
 /**
  * Small datasets on purpose: the row ceilings are maxima, and what is under

@@ -18,9 +18,9 @@
  * decides schema validity" stays literally true.
  *
  * Run:  pnpm generate:vega-validator
- * Pinned by: src/features/analytics-query/visualization/__tests__/
- *            vegaLiteSchemaValidator.unit.test.ts, which regenerates from the
- *            installed schema and fails if the committed module has drifted,
+ * Pinned by: packages/features/analytics/web/tests/visualization/
+ *            vega-lite-schema-validator.unit.test.ts, which regenerates from
+ *            the installed schema and fails if the committed module has drifted,
  *            and separately compares its verdicts against a fresh runtime
  *            compile across the whole fixture corpus.
  */
@@ -45,10 +45,10 @@ const require_ = createRequire(import.meta.url);
 export const VEGA_LITE_SCHEMA_SPECIFIER = "vega-lite/vega-lite-schema.json";
 
 export const GENERATED_VALIDATOR_PATH =
-  "src/features/analytics-query/visualization/vegaLiteSchemaValidator.generated.js";
+  "../../packages/features/analytics/web/src/visualization/vega-lite-schema-validator.generated.js";
 
 export const GENERATED_VALIDATOR_TYPES_PATH =
-  "src/features/analytics-query/visualization/vegaLiteSchemaValidator.generated.d.ts";
+  "../../packages/features/analytics/web/src/visualization/vega-lite-schema-validator.generated.d.ts";
 
 /**
  * The Ajv options the validator is compiled with. Exported so the drift guard
@@ -178,9 +178,9 @@ function main(): void {
   const schema = readBundledVegaLiteSchema();
   const source = generateVegaLiteValidatorSource(schema);
 
-  writeFileSync(`${APP_ROOT}${GENERATED_VALIDATOR_PATH}`, source, "utf8");
+  writeFileSync(resolve(APP_ROOT, GENERATED_VALIDATOR_PATH), source, "utf8");
   writeFileSync(
-    `${APP_ROOT}${GENERATED_VALIDATOR_TYPES_PATH}`,
+    resolve(APP_ROOT, GENERATED_VALIDATOR_TYPES_PATH),
     generateVegaLiteValidatorTypes(),
     "utf8",
   );

@@ -17,10 +17,14 @@
  * it would refuse and teaching a caller the wrong rule.
  *
  * @see ~/server/analytics/lwql — the service and everything under it
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { NotFoundError } from "@langwatch/handled-error";
+import {
+  langWatchQLQueryResultSchema,
+  langWatchQLSchema,
+} from "@langwatch/analytics-contract";
 import { z } from "zod";
 
 import { MAX_LWQL_LENGTH } from "~/server/analytics/lwql";
@@ -95,6 +99,7 @@ const schema = protectedProcedure
   .input(projectScopeSchema)
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
+  .output(langWatchQLSchema)
   .query(async ({ ctx, input }) => {
     return ctx.app.langWatchQL.describeSchema({
       protections: await getUserProtectionsForProject(ctx, {
@@ -124,6 +129,7 @@ const query = protectedProcedure
   )
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
+  .output(langWatchQLQueryResultSchema)
   .mutation(async ({ ctx, input }) => {
     // The project's LangWatchQL secret is hashed into the tenant capability
     // the query runs under. It is read server-side and never leaves this
