@@ -4,12 +4,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
-import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import { prisma } from "~/server/db";
-import { USAGE_UNKNOWN } from "~/server/traces/usage-count";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,
   type SeedRunReport,
@@ -74,118 +70,6 @@ secured
 secured
   .access(cronPolicy())
   .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
-
-// ---------- GET /api/cron/trace_analytics ----------
-secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
-  if (!validateCronKey(c)) {
-    return c.body(null, 401);
-  }
-
-  // Check usage limits for all organizations (SaaS only)
-  if (env.IS_SAAS) {
-    try {
-      const organizations = await prisma.organization.findMany({
-        select: { id: true },
-      });
-
-      const usageService = c.app.usage;
-
-      for (const org of organizations) {
-        try {
-          const projectIds = await c.app.organizations.getProjectIds(org.id);
-          if (projectIds.length === 0) {
-            logger.debug(
-              { organizationId: org.id },
-              "organization has no projects, skipping",
-            );
-            continue;
-          }
-          const currentMonthCount = await usageService.getCurrentMonthCount({
-            organizationId: org.id,
-          });
-
-          if (currentMonthCount === "unlimited") {
-            logger.debug(
-              { organizationId: org.id },
-              "organization has unlimited plan, skipping usage check",
-            );
-            continue;
-          }
-
-          if (currentMonthCount === USAGE_UNKNOWN) {
-            // Skipped, not treated as 0. This job decides whether an
-            // organization has crossed a usage threshold; against a fabricated
-            // zero it concludes "comfortably under" for every organization at
-            // once and sends nothing, which is indistinguishable from a quiet
-            // day. Skipping says the same thing honestly and re-checks on the
-            // next tick.
-            logger.warn(
-              { organizationId: org.id },
-              "usage is unknown, skipping usage check for this organization",
-            );
-            continue;
-          }
-
-          const activePlan = await c.app.planProvider.getActivePlan({
-            organizationId: org.id,
-          });
-
-          if (
-            !activePlan ||
-            typeof activePlan.maxMessagesPerMonth !== "number" ||
-            activePlan.maxMessagesPerMonth <= 0
-          ) {
-            logger.debug(
-              { organizationId: org.id },
-              "organization has invalid or missing plan configuration, skipping",
-            );
-            continue;
-          }
-
-          const maxMessagesPerMonth = activePlan.maxMessagesPerMonth;
-          const usagePercentage =
-            maxMessagesPerMonth > 0
-              ? (currentMonthCount / maxMessagesPerMonth) * 100
-              : 0;
-
-          if (currentMonthCount > 1) {
-            logger.info(
-              {
-                organizationId: org.id,
-                currentMonthMessagesCount: currentMonthCount,
-                maxMessagesPerMonth,
-                usagePercentage: Number(usagePercentage.toFixed(1)),
-                projectCount: projectIds.length,
-              },
-              "organization usage stats",
-            );
-          }
-
-          await c.app.usageLimits.checkAndSendWarning({
-            organizationId: org.id,
-            currentMonthMessagesCount: currentMonthCount,
-            maxMonthlyUsageLimit: maxMessagesPerMonth,
-          });
-        } catch (error) {
-          logger.error(
-            { organizationId: org.id, error },
-            "error checking usage limits for organization",
-          );
-          captureException(toError(error), {
-            extra: { organizationId: org.id },
-          });
-        }
-      }
-    } catch (error) {
-      logger.error({ error }, "error checking usage limits");
-      captureException(toError(error));
-    }
-  } else {
-    logger.debug("skipping usage limit notifications (not SaaS)");
-  }
-
-  return c.json({ success: true });
-});
 
 // NOTE: the `/api/cron/triggers` graph-alert sweep was removed (ADR-034):
 // custom-graph threshold alerts now fire exclusively from the event-sourced
