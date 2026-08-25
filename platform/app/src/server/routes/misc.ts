@@ -52,7 +52,7 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
-import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
   predefinedEventsSchemas,
@@ -917,7 +917,7 @@ secured
     // TeamUser row, so the old `team.members.some` check rejected them with a
     // false 403. `project:view` is the baseline grant every team role (incl.
     // VIEWER) has, and probeProjectPermission also honors org-level access.
-    const project = await getApp().projects.tryGetById(projectId);
+    const project = await c.app.projects.tryGetById(projectId);
 
     if (
       !project ||
@@ -931,7 +931,7 @@ secured
 
     const code = randomUUID();
 
-    const redis = tryGetApp()?.redis ?? null;
+    const redis = c.app.redis;
     if (!redis) {
       const description = "Authorization is temporarily unavailable";
       return c.json(
@@ -1554,7 +1554,7 @@ async function handleWorkflowRun(
 secured
   .access(internalSecret("Stripe webhook signature verified in-handler"))
   .post("/webhooks/stripe", async (c) => {
-    const { webhookService, stripeClient } = getApp();
+    const { webhookService, stripeClient } = c.app;
     if (!env.IS_SAAS || !webhookService || !stripeClient) {
       return c.json({ error: "Not Found" }, 404);
     }
