@@ -134,17 +134,26 @@ export interface GrantFact {
  * One person's membership of one group, as a fact with a beginning and an
  * end (ADR-125's named prerequisite).
  *
- * A membership is its OWN aggregate, keyed on `membershipId` — the same rule
- * ADR-110 applies to a grant and to a role: the aggregate is the entity the
- * events are about, and the organization is the tenant of all of them. The
- * membership is org-scoped because the group is: a `Group` row carries an
- * `organizationId`, so `tenantId === organizationId` holds for these commands
- * exactly as it does for the grant ones.
+ * Two ids, doing two different jobs, and confusing them costs ordering:
  *
- * The pair is NOT the identity. Somebody removed from a group can be added
- * back, and that is a new membership with its own beginning and its own end,
- * not an edit of the old one — so `membershipId` is minted per fact and the
- * pair's uniqueness lives in a partial unique index over the LIVE rows.
+ * - `membershipId` is the membership's IDENTITY, minted per fact. The pair
+ *   repeats — somebody removed from a group can be added back, and that is a
+ *   new membership with its own beginning and its own end, not an edit of the
+ *   old one. A second `group_member_added` on the same id would read as a
+ *   redelivery and fold to nothing. Its uniqueness over live rows is a partial
+ *   unique index.
+ * - The PAIR is the AGGREGATE, via `groupMembershipAggregateId` below. Joined,
+ *   left, joined again is one relationship with a history, so every change to
+ *   it has to ride one FIFO lane in order. Keying the aggregate on
+ *   `membershipId` instead would put the remove and the re-add in DIFFERENT
+ *   lanes, and nothing would then serialize them.
+ *
+ * Same rule ADR-110 applies to a grant and to a role — the aggregate is the
+ * entity the events are about — read correctly: the entity here is the
+ * relationship, not the row recording one instance of it. The membership is
+ * org-scoped because the group is: a `Group` row carries an `organizationId`,
+ * so `tenantId === organizationId` holds for these commands exactly as it does
+ * for the grant ones.
  *
  * No role, no scope, no permissions: a membership grants nothing by itself.
  * What it does is make every grant held by the group reach the user, which is

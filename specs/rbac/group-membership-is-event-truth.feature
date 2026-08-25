@@ -59,6 +59,12 @@ Feature: Group membership is event truth
     Then "acme" has a new change counter
     And no answer held from before the removal is used again
 
+  @unit
+  Scenario: Adding somebody moves the organization's change counter too
+    When an administrator adds "dave" to "sec-eng"
+    Then "acme" has a new change counter
+    And no answer held from before the addition is used again
+
   # ═══ The record survives ══════════════════════════════════════════════
 
   @integration

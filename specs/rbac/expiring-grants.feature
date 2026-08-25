@@ -90,6 +90,18 @@ Feature: Expiring grants
     And the audit trail records the revocation
     And "dana" is denied that access immediately
 
+  # Narrowing a grant must not widen it in the one dimension nobody is
+  # looking at. The end date is stated on the replacement rather than
+  # inferred from the grant being replaced, so an administrator who means to
+  # keep it says so - and one who says nothing gets a grant that has to be
+  # noticed, not one that quietly outlives its source.
+  @unit
+  Scenario: Reducing an expiring grant keeps its end date
+    Given "dana" holds a grant over the whole organization that ends next Friday
+    When an administrator narrows it to one team, still ending next Friday
+    Then "dana" holds the narrower grant
+    And that grant still ends next Friday
+
   # ═══ What the absence of a write costs ════════════════════════════════
   # ACCEPTED, not a defect. Nothing happens at the moment a grant ends, so
   # there is nothing to invalidate caches with — unlike a revocation, which
