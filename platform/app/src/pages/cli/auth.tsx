@@ -544,6 +544,10 @@ export default function CliAuthPage() {
     if (!selectedOrgId || !userCode) return;
     if (requiresProject && !selectedProjectId) return;
     if (isDeviceSessionSelectionIncomplete) return;
+    // Same binding as the render gates, restated on the action itself: the
+    // approval may only go out for the code the user confirmed.
+    if (lookup.kind !== "ready" || lookup.userCode !== userCode) return;
+    if (confirmedUserCode !== userCode) return;
     setAction({ kind: "submitting" });
     try {
       const r = await fetch("/api/auth/cli/approve", {
@@ -630,12 +634,17 @@ export default function CliAuthPage() {
       : `Expires in ${seconds}s`;
   }, [lookup]);
 
+  // Every gate binds to userCode, not just to the lookup: the reset effect
+  // runs after paint, so a route change first renders with the previous
+  // code's lookup and confirmation. Comparing against userCode here keeps
+  // that render from showing either step.
   const isApprovalReady =
     lookup.kind === "ready" &&
+    lookup.userCode === userCode &&
     action.kind !== "success" &&
     action.kind !== "denied";
   const isCodeConfirmed =
-    lookup.kind === "ready" && confirmedUserCode === lookup.userCode;
+    lookup.kind === "ready" && confirmedUserCode === userCode;
 
   if (sessionStatus === "loading" || (!session && userCode)) {
     return <FullPageSpinner />;
