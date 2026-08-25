@@ -117,6 +117,6 @@ Everything above this section looks the same on either path.
 
 **Sessions land in the wrong workspace.** The wrapper binds to whatever workspace you were in when you signed in. Switch workspace in the sidebar, then run `npx langwatch login --device` again.
 
-**Self-hosted, and the device login is refused.** Your server runs a version with governance off by default. Update it with `npx @langwatch/server@latest`, or set `RELEASE_UI_AI_GOVERNANCE_ENABLED=1` and restart.
+**Self-hosted, and the device login is refused.** Device login is on by default, so a refusal means one of two things. Either the server predates that default, which `npx @langwatch/server@latest` fixes, or someone switched it off: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0` turns it off for the whole deployment, and an operator-store row turns it off for one organization. Clearing the deployment-wide variable does not lift an organization row, so check both.
 
 **Also check:** [Claude Code](/coding-agents/claude-code) for the full wiring and every environment variable, and [Privacy](/coding-agents/privacy) for what is stored and who can read it.
