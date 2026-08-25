@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   EvaluatorNotFoundError,
+  EvaluatorWorkflowAlreadyAssignedError,
   standardEvaluatorOutputFields,
   type Evaluator,
 } from "@langwatch/evaluator-contract";
@@ -45,10 +46,8 @@ function repository(
 }
 
 function workflows(
-  overrides: Partial<
-    Pick<WorkflowService, "assertInProject" | "getFields">
-  > = {},
-): Pick<WorkflowService, "assertInProject" | "getFields"> {
+  overrides: Partial<WorkflowService> = {},
+): WorkflowService {
   return {
     assertInProject: vi.fn().mockResolvedValue(undefined),
     getFields: vi.fn().mockResolvedValue({
@@ -58,12 +57,12 @@ function workflows(
       outputFields: [],
     }),
     ...overrides,
-  };
+  } as WorkflowService;
 }
 
 function service(options: {
   repository?: EvaluatorRepository;
-  workflows?: Pick<WorkflowService, "assertInProject" | "getFields">;
+  workflows?: WorkflowService;
 } = {}): EvaluatorService {
   return EvaluatorService.create({
     repository: options.repository ?? repository(),
@@ -84,6 +83,43 @@ describe("EvaluatorService", () => {
     await expect(
       evaluators.getById({ id: "missing", projectId: "p1" }),
     ).rejects.toBeInstanceOf(EvaluatorNotFoundError);
+  });
+
+  it("keeps one workflow owned by one evaluator", async () => {
+    const evaluators = service({
+      repository: repository({
+        tryFindByWorkflow: vi.fn().mockResolvedValue(
+          evaluator({ id: "existing", workflowId: "w1", type: "workflow" }),
+        ),
+      }),
+    });
+
+    await expect(
+      evaluators.create({
+        id: "e2",
+        projectId: "p1",
+        name: "Second",
+        type: "workflow",
+        config: {},
+        workflowId: "w1",
+      }),
+    ).rejects.toBeInstanceOf(EvaluatorWorkflowAlreadyAssignedError);
+  });
+
+  it("validates a code evaluator config even when its type is unchanged", async () => {
+    const evaluators = service({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(evaluator({ type: "code" })),
+      }),
+    });
+
+    await expect(
+      evaluators.update({
+        id: "e1",
+        projectId: "p1",
+        data: { config: { code: "", inputs: [], outputs: [] } },
+      }),
+    ).rejects.toThrow();
   });
 
   it("never adds the legacy sticky details output", () => {

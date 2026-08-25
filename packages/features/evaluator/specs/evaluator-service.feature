@@ -19,6 +19,12 @@ Feature: Evaluator service boundary
     Then the returned value conforms to the contract schema
     And no generated Prisma type crosses the package boundary
 
+  Scenario: Evaluator vocabulary has one portable source
+    Given a host renders or validates a built-in or code evaluator
+    When it needs the catalogue, code defaults, or a display name
+    Then it imports that vocabulary from the evaluator contract
+    And it does not duplicate that vocabulary in an application module
+
   Scenario: Reusable evaluator UI remains browser-safe
     Given a browser host supplies evaluator availability and navigation callbacks
     When it renders an evaluator category, type picker, or card

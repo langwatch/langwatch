@@ -7,7 +7,7 @@ import { EvaluatorService } from "../services/evaluator.service";
 
 export type PostgresEvaluatorAdapterOptions = {
   database: EvaluatorDatabase;
-  workflows: Pick<WorkflowService, "assertInProject" | "getFields">;
+  workflows: WorkflowService;
   auditLog?: EvaluatorAuditLogPort;
   fallbackModels?: { defaultModel: string; embeddingsModel: string };
 };

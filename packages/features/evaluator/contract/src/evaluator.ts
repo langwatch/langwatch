@@ -65,6 +65,19 @@ export type EvaluatorDefinition = {
   };
 };
 
+/** The catalogue's short presentation names are product vocabulary, not UI state. */
+export const evaluatorDisplayNames: Readonly<Record<string, string>> = {
+  "Azure Content Safety": "Content Safety",
+  "OpenAI Moderation": "Moderation",
+  "Azure Jailbreak Detection": "Jailbreak Detection",
+  "Presidio PII Detection": "PII Detection",
+  "Lingua Language Detection": "Language Detection",
+  "Azure Prompt Shield": "Prompt Injection Detection",
+};
+
+export const evaluatorDisplayName = (name: string): string =>
+  evaluatorDisplayNames[name] ?? name;
+
 export const fieldType = (fieldName: string): string => ({
   contexts: "list",
   expected_contexts: "list",

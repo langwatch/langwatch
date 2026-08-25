@@ -20,6 +20,22 @@ export class EvaluatorInvalidTypeError extends HandledError {
   }
 }
 
+export class EvaluatorWorkflowAlreadyAssignedError extends HandledError {
+  declare readonly code: "evaluator_workflow_already_assigned";
+  constructor(workflowId: string) {
+    super(
+      "evaluator_workflow_already_assigned",
+      "An evaluator is already assigned to this workflow.",
+      {
+        httpStatus: 409,
+        meta: { workflowId },
+        fault: "customer",
+      },
+    );
+    this.name = "EvaluatorWorkflowAlreadyAssignedError";
+  }
+}
+
 export class EvaluatorIsNotCopyError extends HandledError {
   declare readonly code: "evaluator_is_not_copy";
   constructor(evaluatorId: string) {

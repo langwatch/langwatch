@@ -27,6 +27,12 @@ pure authoring guidance. The application composes one
 `PostgresEvaluatorAdapter` instance and supplies its contract through App;
 request handlers delegate to that instance.
 
+The contract also owns the built-in evaluator catalogue, code-evaluator
+configuration and editor defaults, and evaluator display names. Evaluation
+execution remains owned by the Evaluation feature; its separate migration must
+consume an evaluator through the canonical service rather than query evaluator
+persistence.
+
 Existing REST and tRPC URLs remain compatibility adapters. They may preserve
 their response envelopes and authorization, but they do not construct an
 Evaluator service or access its repository. Workflow field lookup uses the

@@ -18,6 +18,7 @@ import {
   EvaluatorInvalidTypeError,
   EvaluatorIsNotCopyError,
   EvaluatorSourceNotFoundError,
+  EvaluatorWorkflowAlreadyAssignedError,
   type EvaluatorCopy,
 } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -26,7 +27,7 @@ import type { EvaluatorRepository } from "../repositories/evaluator.repository";
 
 export type EvaluatorServiceOptions = {
   repository: EvaluatorRepository;
-  workflows: Pick<WorkflowService, "assertInProject" | "getFields">;
+  workflows: WorkflowService;
   auditLog?: EvaluatorAuditLogPort;
   fallbackModels?: { defaultModel: string; embeddingsModel: string };
 };
@@ -82,6 +83,13 @@ export class EvaluatorService extends EvaluatorServiceContract {
         workflowId: input.workflowId,
         projectId: input.projectId,
       });
+      const existing = await this.tryGetByWorkflow({
+        workflowId: input.workflowId,
+        projectId: input.projectId,
+      });
+      if (existing) {
+        throw new EvaluatorWorkflowAlreadyAssignedError(input.workflowId);
+      }
     }
     return this.options.repository.create({ ...input, type: parsed.data, config });
   }
@@ -105,10 +113,16 @@ export class EvaluatorService extends EvaluatorServiceContract {
   }
 
   async update(input: EvaluatorUpdateInput): Promise<Evaluator> {
+    const existing = await this.getById({
+      id: input.id,
+      projectId: input.projectId,
+    });
     if (input.data.type !== undefined) evaluatorTypeSchema.parse(input.data.type);
     if (input.data.config !== undefined) {
       const config = evaluatorConfigSchema.parse(input.data.config);
-      if (input.data.type === "code") codeEvaluatorConfigSchema.parse(config);
+      if ((input.data.type ?? existing.type) === "code") {
+        codeEvaluatorConfigSchema.parse(config);
+      }
     }
     if (input.data.workflowId) {
       await this.options.workflows.assertInProject({
@@ -118,11 +132,14 @@ export class EvaluatorService extends EvaluatorServiceContract {
     }
     return this.options.repository.update(input);
   }
-  archive(input: { id: string; projectId: string }): Promise<Evaluator> {
+  async archive(input: { id: string; projectId: string }): Promise<Evaluator> {
+    await this.getById(input);
     return this.options.repository.archive(input);
   }
 
-  async enrichWithFields(evaluator: Evaluator): Promise<EvaluatorWithFields> {
+  private async enrichWithFields(
+    evaluator: Evaluator,
+  ): Promise<EvaluatorWithFields> {
     if (evaluator.type === "workflow" && evaluator.workflowId) {
       const workflow = await this.options.workflows.getFields({ workflowId: evaluator.workflowId, projectId: evaluator.projectId });
       return {

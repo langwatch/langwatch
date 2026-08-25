@@ -18,3 +18,9 @@ export const AVAILABLE_EVALUATORS = {
   ...GENERATED_AVAILABLE_EVALUATORS,
   ...NATIVE_EVALUATOR_DEFINITIONS,
 } as unknown as { [K in EvaluatorTypes]: EvaluatorDefinition };
+
+/** Returns the installed catalogue definition when the check type is known. */
+export const getEvaluatorDefinitions = (
+  evaluatorType: string,
+): EvaluatorDefinition | undefined =>
+  AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];

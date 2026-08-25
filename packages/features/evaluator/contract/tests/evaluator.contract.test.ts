@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { evaluatorSchema, evaluatorTypeSchema, getEvaluatorDefaultSettings } from "../src";
+import {
+  codeEvaluatorConfigSchema,
+  defaultCodeEvaluatorConfig,
+  evaluatorDisplayName,
+  evaluatorSchema,
+  evaluatorTypeSchema,
+  getEvaluatorDefaultSettings,
+} from "../src";
 
 describe("evaluator contract", () => {
   it("keeps the public evaluator type vocabulary explicit", () => {
@@ -27,5 +34,12 @@ describe("evaluator contract", () => {
     }, { defaultModel: "provider/chat", embeddingsModel: "provider/embed" })).toEqual({
       model: "provider/chat", embeddings_model: "provider/embed",
     });
+  });
+
+  it("keeps code evaluator defaults and display names in the portable vocabulary", () => {
+    expect(codeEvaluatorConfigSchema.parse(defaultCodeEvaluatorConfig)).toEqual(
+      defaultCodeEvaluatorConfig,
+    );
+    expect(evaluatorDisplayName("OpenAI Moderation")).toBe("Moderation");
   });
 });
