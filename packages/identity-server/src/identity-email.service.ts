@@ -1,4 +1,8 @@
-import { primaryEmailOf } from "@langwatch/identity";
+import {
+  type MatchableEmail,
+  matchableEmailsOf,
+  primaryEmailOf,
+} from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { IdentityHeadsRepository } from "./identity-heads.repository";
 import type { IdentityUserGate } from "./identity-user-gate";
@@ -45,6 +49,35 @@ export class IdentityEmailService {
       logger.warn(
         { userId, error },
         "could not resolve the identifier email; falling back to the legacy User.email column",
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Every address the user has PROVEN, through any method — invitation
+   * acceptance's question (D11): an invite targets an address, and any
+   * VERIFIED identifier holding it vouches for the person.
+   *
+   * `null` means "answer from the legacy columns instead" — the user is not
+   * on identifiers, or the projection could not be read. The same
+   * never-fail-a-request rule as `resolveEmail`, for the same reason: this
+   * runs on the invite-acceptance path a brand-new member's first session
+   * walks through.
+   */
+  async verifiedEmailsOf({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<MatchableEmail[] | null> {
+    try {
+      if (!(await this.isOnIdentity({ userId }))) return null;
+      const heads = await this.heads.findHeads({ userId });
+      return matchableEmailsOf({ heads });
+    } catch (error) {
+      logger.warn(
+        { userId, error },
+        "could not resolve the verified identifier emails; falling back to the legacy User.email column",
       );
       return null;
     }

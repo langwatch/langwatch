@@ -28,6 +28,7 @@ const attached = (identifierId: string): IdentityFactInput => ({
     accountId: null,
     provider: "email",
     providerId: null,
+    issuer: null,
     providerAccountId: null,
     value: "sam@acme.com",
     identifierHash: null,

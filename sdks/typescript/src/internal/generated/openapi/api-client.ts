@@ -1521,7 +1521,7 @@ export interface paths {
         };
         /**
          * List an experiment's versions
-         * @description Every saved version of the experiment's setup, newest first. Page through them with `limit` and `cursor`.
+         * @description Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.
          */
         get: operations["getApiExperimentsBySlugVersions"];
         put?: never;
@@ -9745,10 +9745,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description Newest first */
+                        /** @description Newest first, by `counterVersion` */
                         versions: {
+                            /** @description Restore this version by this number. Named versions run 1, 2, 3 with no gaps. The autosave row also has a number, but it changes with every save, so read it as a handle and not as a place in the history. */
                             version: number;
-                            /** @description True for a version written by an ordinary save */
+                            /** @description The setup version this row was written at. It says how recent the row is, and it equals the experiment's current version on the row holding the live setup. */
+                            counterVersion: number;
+                            /** @description True for the single autosave row, which every ordinary save rewrites in place */
                             autoSaved: boolean;
                             commitMessage: string | null;
                             /**
@@ -9758,8 +9761,10 @@ export interface operations {
                             authorLabel: string;
                             /** @description User id, when a person wrote it */
                             authorId: string | null;
-                            /** @description ISO 8601 timestamp */
+                            /** @description ISO 8601 timestamp of the first write */
                             createdAt: string;
+                            /** @description ISO 8601 timestamp of the last write. The autosave row is rewritten in place, so this is what says how old its content is. */
+                            updatedAt: string;
                         }[];
                         /** @description Pass as `cursor` to read the next page, null on the last one */
                         nextCursor: number | null;

@@ -10,6 +10,10 @@ export interface CeremonyAccountRow {
   id?: unknown;
   userId?: unknown;
   providerId?: unknown;
+  /** better-auth 1.7's account key half. Absent on a row written by an
+   *  older library version, which is why the ceremony falls back to
+   *  deriving it rather than declining to state the attach. */
+  issuer?: unknown;
   accountId?: unknown;
   createdAt?: unknown;
 }

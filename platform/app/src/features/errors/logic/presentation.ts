@@ -497,6 +497,18 @@ const presentations = {
     title: "This evaluator isn't configured correctly",
     describe: () => "Check its settings and try again.",
   },
+  evaluator_no_inputs_resolved: {
+    title: "This evaluator had nothing to read",
+    // `meta.evaluatorName` is the name the customer gave the evaluator, so it
+    // is theirs to read back. Named consumer: the results cell, which is the
+    // only place this failure is drawn, and which sits beside several other
+    // evaluators the reader has to tell apart.
+    describe: (error) => {
+      const name = str(error, "evaluatorName", "");
+      const whose = name ? `the fields of ${name}` : "its fields";
+      return `Map ${whose} in the evaluator settings, then run again.`;
+    },
+  },
   evaluator_execution_error: {
     title: "The evaluator failed to run",
     // `meta.reason` is a machine sub-classifier ("auth_failed") for branching,

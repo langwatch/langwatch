@@ -55,6 +55,26 @@ const GLOBAL_MODELS = [
   // and claimed BEFORE any user is known to hold it, which is the whole
   // point - it is what decides who gets to.
   "IdentifierReservation",
+  // Credential tables, per-user in exactly the sense `Account` is. A passkey
+  // and a TOTP enrollment belong to a person, not to a project — and the
+  // ceremonies that read them are keyed by credential id BEFORE any user is
+  // known (a discoverable passkey names its own account, which is what makes
+  // it a way IN), so there is no tenancy column a query could carry.
+  //
+  // Listing them here is what makes passkeys work at all: without it the
+  // guard rejected every `findMany` the plugin issues, and the whole feature
+  // answered 500.
+  "Passkey",
+  "TwoFactor",
+  // The MFA aggregate's projection is keyed `tenantId = userId` (D06), so it
+  // is per-user by construction like the identity projections above.
+  "MfaEnrollment",
+  // The directory's `(connectionId, externalId) -> userId` map (D08). Not
+  // project-scoped and carries no organizationId; a SCIM push resolves a
+  // person through it before anything org-shaped is in hand. Cross-org safety
+  // comes from the token's connection scope, which is checked at the endpoint
+  // rather than here.
+  "ScimExternalId",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",

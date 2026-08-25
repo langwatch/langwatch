@@ -134,6 +134,9 @@ function fakeRedis() {
     get: vi.fn().mockResolvedValue("stored"),
     set: vi.fn().mockResolvedValue("OK"),
     del: vi.fn().mockResolvedValue(1),
+    getdel: vi.fn().mockResolvedValue("stored"),
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(1),
   };
 }
 
@@ -164,6 +167,70 @@ describe("better-auth secondary storage", () => {
       expect(redis.set).toHaveBeenCalledWith("better-auth:no-ttl", "value");
       expect(redis.del).toHaveBeenCalledWith("better-auth:session-key");
       expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * `getAndDelete` and `increment` arrived with better-auth 1.7. The limiter
+   * used to read-modify-write a serialized record, which two pods could
+   * interleave; `increment` is the atomic replacement, so how it handles the
+   * window is now load-bearing for whether a rate limit works at all.
+   */
+  describe("given the counter behind distributed rate limiting", () => {
+    it("counts in one round trip rather than reading and writing back", async () => {
+      const redis = fakeRedis();
+      redis.incr.mockResolvedValue(4);
+
+      await withApp(createTestApp({ redis: redis as never }), async () => {
+        expect(await store.increment("rate-limit:ip", 60)).toBe(4);
+      });
+
+      expect(redis.incr).toHaveBeenCalledWith("better-auth:rate-limit:ip");
+      expect(redis.get).not.toHaveBeenCalled();
+      expect(redis.set).not.toHaveBeenCalled();
+    });
+
+    it("dates the window from the first hit in it", async () => {
+      const redis = fakeRedis();
+      redis.incr.mockResolvedValue(1);
+
+      await withApp(createTestApp({ redis: redis as never }), async () => {
+        await store.increment("rate-limit:ip", 60);
+      });
+
+      expect(redis.expire).toHaveBeenCalledWith(
+        "better-auth:rate-limit:ip",
+        60,
+      );
+    });
+
+    /**
+     * The one worth pinning. Re-applying the TTL on every hit means a key
+     * under sustained traffic never expires, and the limit somebody tripped
+     * once becomes permanent.
+     */
+    it("never extends the window on a later hit in the same one", async () => {
+      const redis = fakeRedis();
+      redis.incr.mockResolvedValue(2);
+
+      await withApp(createTestApp({ redis: redis as never }), async () => {
+        await store.increment("rate-limit:ip", 60);
+      });
+
+      expect(redis.expire).not.toHaveBeenCalled();
+    });
+
+    it("reads and clears a single-use value in one round trip", async () => {
+      const redis = fakeRedis();
+
+      await withApp(createTestApp({ redis: redis as never }), async () => {
+        expect(await store.getAndDelete("one-time")).toBe("stored");
+      });
+
+      expect(redis.getdel).toHaveBeenCalledWith("better-auth:one-time");
+      // Two calls would let a second caller read the value between them.
+      expect(redis.get).not.toHaveBeenCalled();
+      expect(redis.del).not.toHaveBeenCalled();
     });
   });
 
@@ -216,6 +283,18 @@ describe("better-auth secondary storage", () => {
         await expect(store.set("k", "v")).resolves.toBeUndefined();
         await expect(store.delete("k")).resolves.toBeUndefined();
       });
+    });
+
+    it("answers the counter as a first hit, leaving the limiter open", async () => {
+      await withApp(undefined, async () => {
+        // Not zero: a post-increment is never zero, and the limiter compares
+        // this against a maximum. One is the honest "as if this were the first
+        // request in the window" — open, and reported as dropped.
+        expect(await store.increment("rate-limit:ip", 60)).toBe(1);
+      });
+
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]?.[0].operation).toBe("increment");
     });
   });
 

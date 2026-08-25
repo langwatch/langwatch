@@ -49,6 +49,7 @@ import {
 } from "~/server/experiments-v3/execution/orchestrator";
 import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
+import { createRunStateMirror } from "~/server/experiments-v3/execution/runStateMirror";
 import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
 import {
   type ExecutionScope,
@@ -362,6 +363,12 @@ secured.access(sessionAuth).post(
       ui: createInitialUIState(),
     };
 
+    const mirror = createRunStateMirror({
+      projectId,
+      experimentId: request.experimentId,
+      experimentSlug: request.experimentSlug ?? "",
+    });
+
     return streamSSE(c, async (stream) => {
       try {
         const isFullRun = request.scope.type === "full";
@@ -382,6 +389,14 @@ secured.access(sessionAuth).post(
         });
 
         for await (const event of orchestrator) {
+          // The store first, the customer second. The `execution_started`
+          // frame names the run, and the page hands that id to a poller as
+          // soon as it reads it, so a frame released before the store knows
+          // the run makes the first poll read 404 on a healthy run. Ordering
+          // it this way keeps the store a superset of what the page has seen.
+          // The mirror swallows its own failures, so a store outage still
+          // cannot stop the run.
+          await mirror.record(event);
           await stream.writeSSE({
             data: JSON.stringify(event),
           });
@@ -417,8 +432,20 @@ secured.access(sessionAuth).post(
         //
         // No `rowIndex`: the orchestrator itself threw, so the whole run is
         // gone and the mapper says so, rather than blaming one row.
+        const failure = mapThrownErrorEvent({ error });
+        if (failure.type === "error") {
+          // The code, never the thrown message: a poller reads this straight
+          // out of the run API. Written before the frame, for the same reason
+          // the loop above records first: a poller must never read the run as
+          // still going after the page has been told it died.
+          await mirror.fail({
+            code: failure.message,
+            domainError: failure.domainError,
+            traceId: failure.traceId,
+          });
+        }
         await stream.writeSSE({
-          data: JSON.stringify(mapThrownErrorEvent({ error })),
+          data: JSON.stringify(failure),
         });
       }
     });
@@ -472,11 +499,9 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   // project before signaling an abort. Without this, a user could abort another
   // tenant's experiment run by guessing its runId.
   //
-  // In-flight runs register their owner via abortManager.setRunning, which
-  // covers the interactive workbench SSE path — that path streams results
-  // directly and never creates a polling run-state record, so consulting only
-  // runStateManager would 404 every workbench abort. runStateManager remains
-  // the fallback for the CI/CD polling path.
+  // In-flight runs register their owner via abortManager.setRunning, which is
+  // set before the first frame of either path. runStateManager is the fallback:
+  // it also holds the owner, for as long as the run state lives.
   const ownerProjectId =
     (await abortManager.getRunningProjectId(runId)) ??
     (await runStateManager.getRunState(runId))?.projectId;
@@ -1231,7 +1256,7 @@ secured.access(apiKeyAuthExperimentsView).get(
   describeRoute({
     summary: "List an experiment's versions",
     description:
-      "Every saved version of the experiment's setup, newest first. Page through them with `limit` and `cursor`.",
+      "Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.",
     tags: ["Experiments"],
     parameters: [
       {
@@ -1300,11 +1325,13 @@ secured.access(apiKeyAuthExperimentsView).get(
     return c.json({
       versions: versions.map((version) => ({
         version: version.version,
+        counterVersion: version.counterVersion,
         autoSaved: version.autoSaved,
         commitMessage: version.commitMessage,
         authorLabel: version.authorLabel,
         authorId: version.authorId,
         createdAt: version.createdAt.toISOString(),
+        updatedAt: version.updatedAt.toISOString(),
       })),
       nextCursor,
     });

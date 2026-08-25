@@ -51,6 +51,11 @@ export class PrismaIdentityBackfillRepository
       select: {
         id: true,
         provider: true,
+        // better-auth 1.7's account key half. Adopted onto the fact rather
+        // than re-derived: a real OIDC issuer is not something the backfill
+        // could work out from the provider id, and deriving one would
+        // re-key the very account the adoption exists to preserve.
+        issuer: true,
         providerAccountId: true,
         createdAt: true,
       },
@@ -59,6 +64,7 @@ export class PrismaIdentityBackfillRepository
     return rows.map((row) => ({
       id: row.id,
       provider: row.provider,
+      issuer: row.issuer,
       providerAccountId: row.providerAccountId,
       createdAtMs: row.createdAt.getTime(),
     }));

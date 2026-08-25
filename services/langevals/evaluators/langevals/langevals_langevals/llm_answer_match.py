@@ -17,9 +17,12 @@ from litellm.cost_calculator import cost_per_token
 
 
 class LLMAnswerMatchEntry(EvaluatorEntry):
+    # The question is context the judge can work without. The two answers are
+    # the comparison itself: with either one missing the judge is asked whether
+    # nothing matches nothing, and answers yes.
     input: Optional[str] = Field(default="")
-    output: str = Field(default="")
-    expected_output: str = Field(default="")
+    output: str
+    expected_output: str
 
 
 class LLMAnswerMatchSettings(LLMEvaluatorSettings):

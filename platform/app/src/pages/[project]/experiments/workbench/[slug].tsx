@@ -2,23 +2,25 @@ import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { readLiveWorkbench } from "~/experiments-v3/actions/liveWorkbenchRead";
 import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
 } from "~/experiments-v3/actions/manifest";
 import { narrateWorkbenchAction } from "~/experiments-v3/actions/narration";
-import { projectWorkbenchState } from "~/experiments-v3/actions/projection";
 import { scopeFromRunPayload } from "~/experiments-v3/actions/runScope";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
 import { HistoryButton } from "~/experiments-v3/components/HistoryButton";
+import { PromptTemplateFieldsProvider } from "~/experiments-v3/components/PromptTemplateFieldsProvider";
 import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationButton";
 import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
 import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
 import { UndoRedo } from "~/experiments-v3/components/UndoRedo";
 import { VersionHistoryButton } from "~/experiments-v3/components/VersionHistoryButton";
 import { WorkbenchStaleBanner } from "~/experiments-v3/components/WorkbenchStaleBanner";
+import { startAndIdentifyRun } from "~/experiments-v3/execution/runIdentification";
 import { useAutosaveEvaluationsV3 } from "~/experiments-v3/hooks/useAutosaveEvaluationsV3";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "~/experiments-v3/hooks/useExecuteEvaluation";
@@ -26,6 +28,7 @@ import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useOptimizeWithLangy } from "~/experiments-v3/hooks/useOptimizeWithLangy";
 import { useReportPageActivityToLangy } from "~/experiments-v3/hooks/useReportPageActivityToLangy";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
+import { useTargetNames } from "~/experiments-v3/hooks/useTargetName";
 import { useWorkbenchUpdateListener } from "~/experiments-v3/hooks/useWorkbenchUpdateListener";
 import {
   revealTargetColumn,
@@ -49,42 +52,6 @@ import { useRouter } from "~/utils/compat/next-router";
 import { assertCrispChatHidden } from "~/utils/crispBubblePolicy";
 
 /**
- * The workbench as the agent should read it: the LIVE store, so unsaved prompt
- * drafts, pending cells and in-memory results are included, which the saved
- * copy cannot show. `source` mirrors the backend fallback's marker, so the
- * agent always knows whether it read the live page or the saved document.
- */
-function readLiveWorkbench({ includeResults }: { includeResults?: boolean }) {
-  const state = useEvaluationsV3Store.getState();
-
-  const identity: { experimentId?: string; experimentSlug?: string } = {};
-  if (state.experimentId) identity.experimentId = state.experimentId;
-  if (state.experimentSlug) identity.experimentSlug = state.experimentSlug;
-
-  const withResults: { results?: typeof state.results } = {};
-  if (includeResults !== false) withResults.results = state.results;
-
-  const projection = projectWorkbenchState({
-    state: {
-      name: state.name,
-      datasets: state.datasets,
-      activeDatasetId: state.activeDatasetId,
-      evaluators: state.evaluators,
-      targets: state.targets,
-      ...identity,
-    },
-    ...withResults,
-  });
-
-  const version: { version?: number } = {};
-  if (state.workbenchVersion !== undefined) {
-    version.version = state.workbenchVersion;
-  }
-
-  return { source: "live", ...version, ...projection };
-}
-
-/**
  * Experiments Workbench Page
  *
  * Main page for the spreadsheet-like experiment experience.
@@ -98,6 +65,7 @@ export default function ExperimentsWorkbenchPage() {
     name,
     setName,
     datasets,
+    targets,
     reset,
     autosaveStatus,
     addEvaluator,
@@ -106,11 +74,27 @@ export default function ExperimentsWorkbenchPage() {
     name: state.name,
     setName: state.setName,
     datasets: state.datasets,
+    targets: state.targets,
     reset: state.reset,
     autosaveStatus: state.ui.autosaveStatus,
     addEvaluator: state.addEvaluator,
     removeEvaluator: state.removeEvaluator,
   }));
+
+  // The columns as their own headers name them, which is also how a run's
+  // errors name them. Resolved here, once, because the projection an agent
+  // reads is pure and a prompt handle only exists in the database.
+  const resolvedTargetNames = useTargetNames(targets);
+  const targetNames = useMemo(
+    () =>
+      Object.fromEntries(
+        targets.map((target, index) => [
+          target.id,
+          resolvedTargetNames[index] ?? "",
+        ]),
+      ),
+    [targets, resolvedTargetNames],
+  );
 
   const createEvaluator = api.evaluators.create.useMutation();
   const updateEvaluator = api.evaluators.update.useMutation();
@@ -459,7 +443,11 @@ export default function ExperimentsWorkbenchPage() {
     handlers["workbench.getState"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
       run: (payload: { includeResults?: boolean }) =>
-        readLiveWorkbench(payload),
+        readLiveWorkbench({
+          state: useEvaluationsV3Store.getState(),
+          ...payload,
+          targetNames,
+        }),
     };
     handlers["workbench.run"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,
@@ -485,19 +473,27 @@ export default function ExperimentsWorkbenchPage() {
           // wrong document.
           assertPageIsCurrent();
           await saveOrRefuse();
-          // Fire-and-forget like the run proposal: the run streams into the
-          // table the user is watching, and the agent polls the runs API for
-          // completion. The payload-to-scope mapping is shared with the backend
-          // fallback so both dispatch paths cover the same cells.
-          void executeEvaluation(scopeFromRunPayload(payload));
-          return { status: "running" as const };
+          // The run itself streams into the table the user is watching and is
+          // not waited for; only its id is. The id is minted server-side and
+          // arrives on the first frame, and without it the agent has nothing to
+          // poll: it cannot ask how the run is going, read its results, or stop
+          // it, so it reads the page instead and guesses. The backend fallback
+          // answers with the id too, so both dispatch paths answer alike.
+          //
+          // The payload-to-scope mapping is shared with that fallback so both
+          // cover the same cells.
+          const runId = await startAndIdentifyRun({
+            start: (onRunStarted) =>
+              executeEvaluation(scopeFromRunPayload(payload), { onRunStarted }),
+          });
+          return { runId, status: "running" as const };
         } finally {
           setActionActivity(null);
         }
       },
     };
     return handlers;
-  }, [executeEvaluation, saveNow]);
+  }, [executeEvaluation, saveNow, targetNames]);
 
   useRegisterLangyActions(uiActionHandlers);
 
@@ -554,69 +550,71 @@ export default function ExperimentsWorkbenchPage() {
 
   return (
     <DashboardLayout backgroundColor="bg.panel">
-      <VStack
-        width="full"
-        height="calc(100vh - 50px)"
-        gap={0}
-        align="stretch"
-        overflow="hidden"
-      >
-        {/* Header */}
-        <HStack paddingX={6} paddingTop={5} paddingBottom={3} flexShrink={0}>
-          <EditableHeading
-            value={name}
-            onSave={setName}
-            isLoading={isLoadingExperiment}
-          />
-          <Spacer />
-          <HStack gap={2}>
-            <AutosaveStatus
-              evaluationState={autosaveStatus.evaluation}
-              datasetState={autosaveStatus.dataset}
-              evaluationError={autosaveStatus.evaluationError}
-              datasetError={autosaveStatus.datasetError}
-            />
-            <UndoRedo />
-            <TableSettingsMenu disabled={isLoadingExperiment} />
-            <HistoryButton disabled={isLoadingExperiment} />
-            <VersionHistoryButton disabled={isLoadingExperiment} />
-            <RunEvaluationButton
-              disabled={isLoadingExperiment || isLoadingDatasets}
-            />
-          </HStack>
-        </HStack>
-
-        {staleWorkbench && (
-          <WorkbenchStaleBanner
-            actorLabel={staleWorkbench.actorLabel}
-            onReload={reloadStaleWorkbench}
-          />
-        )}
-
-        {/* Main content - table container with config panel */}
-        <Box
-          flex={1}
-          position="relative"
+      <PromptTemplateFieldsProvider>
+        <VStack
+          width="full"
+          height="calc(100vh - 50px)"
+          gap={0}
+          align="stretch"
           overflow="hidden"
-          marginLeft={4}
-          borderTopLeftRadius="xl"
-          borderLeft="1px solid"
-          borderTop="1px solid"
-          borderColor="border.emphasized"
-          bg="bg.panel"
         >
-          <Box position="absolute" inset={0} overflow="auto">
-            <EvaluationsV3Table
-              isLoadingExperiment={isLoadingExperiment}
-              isLoadingDatasets={isLoadingDatasets}
-              onOptimizeTarget={optimizeTarget}
+          {/* Header */}
+          <HStack paddingX={6} paddingTop={5} paddingBottom={3} flexShrink={0}>
+            <EditableHeading
+              value={name}
+              onSave={setName}
+              isLoading={isLoadingExperiment}
             />
-          </Box>
-        </Box>
-      </VStack>
+            <Spacer />
+            <HStack gap={2}>
+              <AutosaveStatus
+                evaluationState={autosaveStatus.evaluation}
+                datasetState={autosaveStatus.dataset}
+                evaluationError={autosaveStatus.evaluationError}
+                datasetError={autosaveStatus.datasetError}
+              />
+              <UndoRedo />
+              <TableSettingsMenu disabled={isLoadingExperiment} />
+              <HistoryButton disabled={isLoadingExperiment} />
+              <VersionHistoryButton disabled={isLoadingExperiment} />
+              <RunEvaluationButton
+                disabled={isLoadingExperiment || isLoadingDatasets}
+              />
+            </HStack>
+          </HStack>
 
-      {/* Load saved dataset records - renders nothing, just triggers fetches */}
-      <SavedDatasetLoaders datasets={datasets} />
+          {staleWorkbench && (
+            <WorkbenchStaleBanner
+              actorLabel={staleWorkbench.actorLabel}
+              onReload={reloadStaleWorkbench}
+            />
+          )}
+
+          {/* Main content - table container with config panel */}
+          <Box
+            flex={1}
+            position="relative"
+            overflow="hidden"
+            marginLeft={4}
+            borderTopLeftRadius="xl"
+            borderLeft="1px solid"
+            borderTop="1px solid"
+            borderColor="border.emphasized"
+            bg="bg.panel"
+          >
+            <Box position="absolute" inset={0} overflow="auto">
+              <EvaluationsV3Table
+                isLoadingExperiment={isLoadingExperiment}
+                isLoadingDatasets={isLoadingDatasets}
+                onOptimizeTarget={optimizeTarget}
+              />
+            </Box>
+          </Box>
+        </VStack>
+
+        {/* Load saved dataset records - renders nothing, just triggers fetches */}
+        <SavedDatasetLoaders datasets={datasets} />
+      </PromptTemplateFieldsProvider>
     </DashboardLayout>
   );
 }

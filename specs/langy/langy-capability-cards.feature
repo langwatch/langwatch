@@ -147,6 +147,19 @@ Feature: Langy renders domain-capability cards for tool calls
     And a readable sample of the results
     And the way into the full result set
 
+  # A search reports its own total, so a reduced search card still counts
+  # correctly. A plain list reports no total: the only record of what the
+  # reduction took out is the marker it leaves behind in the rows. Read that
+  # marker, or the card counts the sample it kept and presents it as the total,
+  # which contradicts the answer Langy writes beside it.
+
+  @unit
+  Scenario: A list too large for the chat counts the rows the reduction removed
+    When Langy lists a resource that returns more rows than a chat message can carry
+    And the result carries no total of its own
+    Then the card counts the rows it kept plus the rows the reduction removed
+    And the reduction marker is never shown as a row
+
   @integration
   Scenario: Results start appearing while Langy is still working
     Given Langy has started a trace search that has not returned yet

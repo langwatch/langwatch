@@ -64,16 +64,52 @@ export function clearAllFeatureFlagOverrides(): void {
 }
 
 /**
- * Subscribe to local feature-flag overrides. Returns an empty object during
- * SSR / first render to avoid hydration mismatches; the real value populates
- * on mount via the effect below.
+ * Applies `?ff_<flag>=on|off|clear` to this browser's overrides.
+ *
+ * A URL is the only handle somebody has on a screen they reach before signing
+ * in: the server-side flag check is a protected procedure, so signed out it
+ * answers 401 rather than false. Setting it from a link, once, and having the
+ * browser remember is what survives the redirect back from an identity
+ * provider. `clear` returns a flag to whatever the deployment says.
+ *
+ * Unknown flags and unrecognized values are ignored rather than stored — a
+ * typo that persisted would be a flag nobody can find again to turn off.
+ */
+export function applyFeatureFlagOverridesFromSearch(search: string): void {
+  const params = new URLSearchParams(search);
+  const next = { ...readOverrides() };
+  let changed = false;
+
+  for (const flag of FRONTEND_FEATURE_FLAGS) {
+    const value = params.get(`ff_${flag}`)?.trim().toLowerCase();
+    if (value === undefined) continue;
+
+    if (value === "on" || value === "off") {
+      next[flag] = value === "on";
+      changed = true;
+    } else if (value === "clear") {
+      delete next[flag];
+      changed = true;
+    }
+  }
+
+  if (changed) writeOverrides(next);
+}
+
+/**
+ * Subscribe to local feature-flag overrides.
+ *
+ * Read on the FIRST render, not from an effect. Some of these flags decide
+ * which screen a route renders rather than what a rendered screen shows, and
+ * an effect runs after the first paint — so those callers would paint the
+ * unflagged screen and then swap. `readOverrides` already answers `{}` when
+ * there is no `window`, which is what the deferred read was guarding.
  */
 export function useFeatureFlagOverrides(): FeatureFlagOverrides {
-  const [overrides, setOverrides] = useState<FeatureFlagOverrides>({});
+  const [overrides, setOverrides] =
+    useState<FeatureFlagOverrides>(readOverrides);
 
   useEffect(() => {
-    setOverrides(readOverrides());
-
     const update = () => setOverrides(readOverrides());
     listeners.add(update);
 

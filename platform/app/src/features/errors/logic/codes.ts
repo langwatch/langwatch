@@ -83,6 +83,7 @@ export const APP_ERROR_CODES = [
   "evaluator_execution_error",
   "evaluator_input_too_large",
   "evaluator_missing_field",
+  "evaluator_no_inputs_resolved",
   "evaluator_not_found",
   "experiment_invalid_workbench_state",
   "experiment_not_found",

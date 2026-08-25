@@ -249,6 +249,9 @@ export class IdentityBirthService implements IdentityBirthPort {
       accountId: null,
       provider: "email",
       providerId: null,
+      // No protocol row backs the address adopted from `User.email`, so
+      // nobody asserted it and there is no issuer to name.
+      issuer: null,
       providerAccountId: null,
       value: email,
       occurredAtMs: createdAtMs,

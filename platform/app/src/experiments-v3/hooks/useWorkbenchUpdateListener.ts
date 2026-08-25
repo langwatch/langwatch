@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
 import {
@@ -40,6 +40,49 @@ function thisTabWillAnswerFirst(isDirty: boolean): boolean {
   return isDirty && !state.staleWorkbench;
 }
 
+/** A version that landed while a reload was already running. */
+type MissedVersion = { serverVersion: number; actorLabel?: string };
+
+/** Keeps the newest missed version, since an older one is already covered. */
+const rememberMissedVersion = ({
+  ref,
+  serverVersion,
+  actorLabel,
+}: {
+  ref: MutableRefObject<MissedVersion | undefined>;
+  serverVersion: number;
+  actorLabel?: string;
+}): void => {
+  const missed = ref.current;
+  if (missed && serverVersion <= missed.serverVersion) return;
+  ref.current = { serverVersion, ...(actorLabel && { actorLabel }) };
+};
+
+/**
+ * Pulls the server state in, swallowing the failure.
+ *
+ * No one asked for this pull, so nothing is lost when it fails and a toast
+ * would interrupt the user for work they did not start. The page keeps the
+ * version it has, and the next update signal or the next time the tab becomes
+ * visible tries again.
+ */
+const pullQuietly = async ({
+  reload,
+  serverVersion,
+}: {
+  reload: () => Promise<void>;
+  serverVersion: number;
+}): Promise<void> => {
+  try {
+    await reload();
+  } catch (error) {
+    console.error("Failed to refresh the workbench from the server:", {
+      error,
+      serverVersion,
+    });
+  }
+};
+
 /**
  * The one rule both signals run: a newer server version reloads a CLEAN
  * workbench silently, and banners a DIRTY one so the user decides, because a
@@ -63,6 +106,17 @@ const useApplyServerVersion = ({
   const reloadRef = useRef(reloadFromServer);
   reloadRef.current = reloadFromServer;
   const reloadingRef = useRef(false);
+  /**
+   * The newest version announced while a reload was already running, and who
+   * wrote it.
+   *
+   * One agent turn that duplicates a target, writes its prompt and runs it is
+   * three saves in a row. Dropping the later signals outright left the page on
+   * whatever the in-flight fetch happened to bring back: if it had left the
+   * server before the new target was written, the page never learned that
+   * target existed and its cells read "No output yet" until a manual reload.
+   */
+  const missedRef = useRef<MissedVersion | undefined>(undefined);
 
   const applyServerVersion = useCallback<ApplyServerVersion>(
     (serverVersion, actorLabel) => {
@@ -73,23 +127,20 @@ const useApplyServerVersion = ({
         setStaleWorkbench({ serverVersion, actorLabel });
         return;
       }
-      if (reloadingRef.current) return;
+      if (reloadingRef.current) {
+        rememberMissedVersion({ ref: missedRef, serverVersion, actorLabel });
+        return;
+      }
       reloadingRef.current = true;
       void (async () => {
-        try {
-          await reloadRef.current();
-        } catch (error) {
-          // Nobody asked for this pull, so nothing is lost when it fails and a
-          // toast would interrupt the user for work they did not start. The
-          // page keeps the version it has, and the next update signal or the
-          // next time the tab becomes visible tries again.
-          console.error("Failed to refresh the workbench from the server:", {
-            error,
-            serverVersion,
-          });
-        } finally {
-          reloadingRef.current = false;
-        }
+        await pullQuietly({ reload: reloadRef.current, serverVersion });
+        reloadingRef.current = false;
+        const missed = missedRef.current;
+        missedRef.current = undefined;
+        // Re-run the same rule rather than reloading outright: the reload that
+        // just finished may already have carried this version, and the
+        // workbench may have gone dirty while it ran.
+        if (missed) applyServerVersion(missed.serverVersion, missed.actorLabel);
       })();
     },
     [setStaleWorkbench],

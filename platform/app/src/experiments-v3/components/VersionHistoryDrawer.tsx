@@ -12,12 +12,19 @@ import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 interface VersionEntry {
   version: number;
+  counterVersion: number;
   autoSaved: boolean;
   commitMessage: string | null;
   authorLabel: string;
   authorId: string | null;
   authorName: string | null;
   createdAt: Date | string;
+  /**
+   * When the row was last written. The autosave row is rewritten in place, so
+   * its `createdAt` is the start of the session and only this says how old
+   * what it holds is.
+   */
+  updatedAt: Date | string;
 }
 
 /**
@@ -33,6 +40,17 @@ const authorOf = (entry: VersionEntry): string => {
   if (entry.authorLabel === "api") return "API";
   return entry.authorName ?? "You";
 };
+
+/**
+ * What the row is called.
+ *
+ * Numbered versions are the ones a person made on purpose, and they run 1, 2,
+ * 3 with no gaps. Typing writes one autosave row that every later save
+ * rewrites, so its number changes under the reader and means nothing to them.
+ * It is named for what it is instead.
+ */
+const titleOf = (entry: VersionEntry): string =>
+  entry.autoSaved ? "Autosave" : `v${entry.version}`;
 
 /**
  * Restore a saved version and leave the open workbench holding it.
@@ -64,8 +82,9 @@ const useVersionRestore = ({
   const restoreVersion = api.experiments.restoreWorkbenchVersion.useMutation();
   const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
 
-  const restore = async (version: number) => {
+  const restore = async (entry: VersionEntry) => {
     if (!project) return;
+    const version = entry.version;
     setRestoringVersion(version);
     try {
       await restoreVersion.mutateAsync({
@@ -94,7 +113,12 @@ const useVersionRestore = ({
         experimentId,
       });
 
-      toaster.create({ title: `Restored version ${version}`, type: "success" });
+      toaster.create({
+        title: entry.autoSaved
+          ? "Restored the autosave"
+          : `Restored version ${version}`,
+        type: "success",
+      });
       onRestored();
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't restore this version" });
@@ -138,7 +162,7 @@ function VersionRow({
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
           <Text fontWeight="medium" fontSize="sm">
-            v{entry.version}
+            {titleOf(entry)}
           </Text>
           <Text color="fg.muted" fontSize="sm">
             · {authorOf(entry)}
@@ -151,7 +175,7 @@ function VersionRow({
         </HStack>
         <Text color="fg.muted" fontSize="xs" lineClamp={2}>
           {entry.commitMessage ? `${entry.commitMessage} · ` : ""}
-          {formatTimeAgo(new Date(entry.createdAt).getTime())}
+          {formatTimeAgo(new Date(entry.updatedAt).getTime())}
         </Text>
       </VStack>
 
@@ -201,6 +225,9 @@ function VersionList({
   const [confirmingVersion, setConfirmingVersion] = useState<number | null>(
     null,
   );
+  const workbenchVersion = useEvaluationsV3Store(
+    (state) => state.workbenchVersion,
+  );
   const { restore, restoringVersion } = useVersionRestore({
     experimentId,
     experimentSlug,
@@ -214,7 +241,14 @@ function VersionList({
   );
 
   const versions = (versionsQuery.data?.versions ?? []) as VersionEntry[];
-  const currentVersion = versions[0]?.version;
+  // The row holding what the workbench shows now is the one written at the
+  // page's own version. The list is ordered by that number, so the newest row
+  // is the answer whenever the page is behind the server and no row matches.
+  const currentCounterVersion =
+    workbenchVersion !== undefined &&
+    versions.some((entry) => entry.counterVersion === workbenchVersion)
+      ? workbenchVersion
+      : versions[0]?.counterVersion;
 
   if (versionsQuery.isLoading) {
     return (
@@ -245,12 +279,12 @@ function VersionList({
           <VersionRow
             key={entry.version}
             entry={entry}
-            isCurrent={entry.version === currentVersion}
+            isCurrent={entry.counterVersion === currentCounterVersion}
             isConfirming={confirmingVersion === entry.version}
             isRestoring={restoringVersion === entry.version}
             canRestore={can("experiments:update")}
             onAskRestore={() => setConfirmingVersion(entry.version)}
-            onConfirmRestore={() => void restore(entry.version)}
+            onConfirmRestore={() => void restore(entry)}
             onCancelRestore={() => setConfirmingVersion(null)}
           />
         ))}
