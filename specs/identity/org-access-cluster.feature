@@ -16,16 +16,19 @@ Feature: The people and access settings, as one cluster
   #     └ Security ───────── how the reader proves who they are: their
   #                          addresses, their passkeys, their second step
   #                          and their password
+  #   Organization
+  #     ├ … API Keys, Audit Log, and beside them:
+  #     └ Authentication ─── how everyone signs in, and how accounts arrive —
+  #                          the organization's own control, so it sits with
+  #                          the organization's keys and its audit trail
   #   People & access
   #     ├ Members ────────── members · invitations (n) · join requests (n)
   #     │    └ one person ── a URL-routed drawer: how they sign in, why they
   #     │                    are here, what they can reach, what to do
   #     ├ Teams & Projects ─ the teams, and the projects each holds
   #     ├ Roles ──────────── roles · role assignments
-  #     ├ Authentication ─── how everyone signs in, and how accounts arrive
   #     ├ Directory ─────── status first, then groups, then tokens
-  #     ├ Access ─────────── who may join, and the second-factor requirement
-  #     └ Audit Log ──────── what was done in the organization, and by whom
+  #     └ Access ─────────── who may join, and the second-factor requirement
   #
   # TWO SECTIONS, AND THE FIRST IS THE READER'S. How you prove who you are is
   # not an organization setting, and it was filed as one: the page sat between

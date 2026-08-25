@@ -161,6 +161,23 @@ function organizationGroup({
             },
           ]
         : []),
+      // How the ORGANIZATION signs in — a control of the organization itself,
+      // beside its keys and its audit trail, not a fact about any one person,
+      // which is why it does not sit among the people. The reader's own
+      // sign-in is Security, under You. Offered only to somebody who may at
+      // least SEE single sign-on (D05) — an administrator without the
+      // permission is not shown the entry, and the page refuses the address
+      // as well, because the menu is a courtesy, never the gate.
+      ...(showEnterpriseNav && !isLiteMember && hasPermission("sso:view")
+        ? [
+            {
+              label: "Authentication",
+              href: "/settings/authentication",
+              icon: Lock,
+              isEnterprise: true,
+            },
+          ]
+        : []),
       ...(!isLiteMember
         ? [{ label: "Usage & Billing", href: "/settings/usage", icon: Gauge }]
         : []),
@@ -203,9 +220,7 @@ function accessGroup({
         href: "/settings/teams",
         icon: FolderKanban,
       },
-      ...(showEnterpriseNav && !isLiteMember
-        ? enterpriseAccessItems({ hasPermission })
-        : []),
+      ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
       // Last, and on every plan: the rules apply to every organization, and
       // the card that is enterprise-only carries its own lock.
       {
@@ -217,13 +232,13 @@ function accessGroup({
   };
 }
 
-function enterpriseAccessItems({
-  hasPermission,
-}: Pick<SettingsMenuGates, "hasPermission">): SettingsMenuItem[] {
+function enterpriseAccessItems(): SettingsMenuItem[] {
   return [
     // Groups has no entry of its own: a group is what a directory sends and
     // what an administrator grants a role to, so it is a tab of Directory and
-    // the old address forwards onto it.
+    // the old address forwards onto it. Authentication is not here either:
+    // how the organization signs in is the organization's own control, so it
+    // sits in the Organization group beside its keys and its audit log.
     {
       // Definitions and the grants of those definitions are two tabs of one
       // page now; the old Role Bindings address forwards onto the second.
@@ -233,21 +248,6 @@ function enterpriseAccessItems({
       alsoActiveAt: ["/settings/role-bindings"],
       isEnterprise: true,
     },
-    // How the ORGANIZATION signs in, which is a different subject from how
-    // the reader does: theirs is Security, under You. Offered only to
-    // somebody who may at least SEE single sign-on (D05) — an administrator
-    // without the permission is not shown the entry, and the page refuses
-    // the address as well, because the menu is a courtesy, never the gate.
-    ...(hasPermission("sso:view")
-      ? [
-          {
-            label: "Authentication",
-            href: "/settings/authentication",
-            icon: Lock,
-            isEnterprise: true,
-          },
-        ]
-      : []),
     {
       // Named for what it holds, not for the protocol that fills it. "SCIM"
       // survives in the page's own copy, for the administrator who searches

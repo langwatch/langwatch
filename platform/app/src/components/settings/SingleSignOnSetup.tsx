@@ -114,7 +114,11 @@ export function SingleSignOnSetup({
       <ConnectionSummary connection={connection} goLive={goLive} />
 
       <SetupStep number={1} title="Your identity provider" done>
-        <ServiceProviderDetails serviceProvider={serviceProvider} connected />
+        <ServiceProviderDetails
+          serviceProvider={serviceProvider}
+          connected
+          protocol={connection.type}
+        />
       </SetupStep>
 
       <SetupStep
