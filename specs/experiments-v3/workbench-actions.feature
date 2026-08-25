@@ -114,6 +114,39 @@ Feature: Workbench actions
     And reading the workbench needs only the permission to view experiments
 
   @unit
+  Scenario: Every action documents what it does
+    When I list the actions the workbench exposes
+    Then each action carries prose saying what it does and when to use it
+    And adding an evaluator says that leaving the comparison config out attaches it to every column as a score
+    And running says it runs on the open page, falls back to a server run, and answers with the run id
+
+  @unit
+  Scenario: The state an assistant reads names every column
+    Given two columns of the workbench share one name
+    When the assistant reads the workbench state
+    Then each column carries the name its own header shows
+    And the two same-name columns are numbered the way a run's errors number them
+    And a column whose name is not resolved reads as its own id
+
+  @unit
+  Scenario: The state an assistant reads shows what a comparison judges
+    Given the workbench holds a comparison over two columns
+    When the assistant reads the workbench state
+    Then the comparison names the columns it judges, by id and by name
+    And it says whether it judges against a golden answer, and which field holds it
+    And an evaluator column names the saved evaluator it runs
+
+  @unit
+  Scenario: The state an assistant reads says how the last run went
+    Given the last run filled some cells and failed others
+    When the assistant reads the workbench state
+    Then each column reports how many cells are filled, of how many rows
+    And each column reports how many rows failed, with up to three distinct failure kinds
+    And each column reports the pass, fail and score totals of every evaluator on it
+    And the state names the run the cells came from
+    And the failure kinds and the evaluator totals are the first results detail dropped when the state has to shrink
+
+  @unit
   Scenario: The state an assistant reads stays small
     Given the workbench holds more data than the assistant's budget
     When the assistant reads the workbench state

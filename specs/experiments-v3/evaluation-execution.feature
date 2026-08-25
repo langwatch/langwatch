@@ -144,6 +144,14 @@ Feature: Evaluation execution - UI
     And the error names the evaluator and says to map its fields
     And the run reports no passes for that evaluator
 
+  @integration
+  Scenario: An evaluator column with no resolved inputs reports an error instead of passing
+    Given an evaluator is run as its own column and none of its fields are mapped
+    When I run the evaluation
+    Then the column is not sent to the evaluation service
+    And every row of the column shows an error
+    And the error names the evaluator and says to map its fields
+
   @unit
   Scenario: An evaluator that compares two fields lists both as required
     Given the workbench reads the fields of "exact_match" from the evaluator catalog
@@ -157,6 +165,34 @@ Feature: Evaluation execution - UI
     Then every row of the comparison column shows an error
     And the error says to pick the columns to compare
     And a comparison whose golden answer is on with no column picked says to pick the golden field
+
+  # ==========================================================================
+  # Comparisons And Partial Runs
+  # ==========================================================================
+
+  @integration
+  Scenario: Running one candidate keeps the comparison's other columns
+    Given a comparison judges the "baseline" and "candidate" columns against each other
+    And "baseline" already has an output for every row
+    When I run only the "candidate" column
+    Then the comparison judges every row
+    And no row says it is waiting on "baseline"
+    And "baseline" is not run again, because its saved output is reused
+    And a "baseline" with no saved output is run as part of the same run
+    And a run started with no page open reads those saved outputs the same way
+
+  # ==========================================================================
+  # Following A Run
+  # ==========================================================================
+
+  @integration
+  Scenario: A run started from the open page is readable by the run API
+    Given the workbench page starts a run
+    When I ask the run API for that run
+    Then it reports the run's progress, and its summary once it ends
+    And a stopped run reads as stopped
+    And a failed run reports the failure's code, never the thrown message
+    And a run id nothing knows about is still not found
 
   # ==========================================================================
   # Multiple Datasets And Pinned Versions

@@ -27,6 +27,7 @@ import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useOptimizeWithLangy } from "~/experiments-v3/hooks/useOptimizeWithLangy";
 import { useReportPageActivityToLangy } from "~/experiments-v3/hooks/useReportPageActivityToLangy";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
+import { useTargetNames } from "~/experiments-v3/hooks/useTargetName";
 import { useWorkbenchUpdateListener } from "~/experiments-v3/hooks/useWorkbenchUpdateListener";
 import {
   revealTargetColumn,
@@ -55,7 +56,14 @@ import { assertCrispChatHidden } from "~/utils/crispBubblePolicy";
  * copy cannot show. `source` mirrors the backend fallback's marker, so the
  * agent always knows whether it read the live page or the saved document.
  */
-function readLiveWorkbench({ includeResults }: { includeResults?: boolean }) {
+function readLiveWorkbench({
+  includeResults,
+  targetNames,
+}: {
+  includeResults?: boolean;
+  /** Column names as the page resolved them, keyed by target id. */
+  targetNames?: Record<string, string>;
+}) {
   const state = useEvaluationsV3Store.getState();
 
   const identity: { experimentId?: string; experimentSlug?: string } = {};
@@ -74,6 +82,7 @@ function readLiveWorkbench({ includeResults }: { includeResults?: boolean }) {
       targets: state.targets,
       ...identity,
     },
+    ...(targetNames ? { targetNames } : {}),
     ...withResults,
   });
 
@@ -83,6 +92,39 @@ function readLiveWorkbench({ includeResults }: { includeResults?: boolean }) {
   }
 
   return { source: "live", ...version, ...projection };
+}
+
+/**
+ * How long the run action waits for the stream to name its run.
+ *
+ * The id is minted server-side and travels on the first frame, so this only
+ * has to cover opening the connection — the same budget `fetchSSE` gives that
+ * connection. The run itself takes minutes and is never waited for.
+ */
+const RUN_ID_WAIT_MS = 30_000;
+
+/**
+ * Start a run and answer with its id.
+ *
+ * Answers with no id rather than holding the action open when the stream ends,
+ * fails, or never opens: a run the caller cannot name is still a run that is
+ * going, and the action's own budget is not the place to discover otherwise.
+ */
+function startAndIdentifyRun(
+  start: (onRunStarted: (runId: string) => void) => Promise<void>,
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const answer = (runId?: string) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(runId);
+    };
+    timer = setTimeout(() => answer(undefined), RUN_ID_WAIT_MS);
+    void Promise.resolve(start(answer)).finally(() => answer(undefined));
+  });
 }
 
 /**
@@ -99,6 +141,7 @@ export default function ExperimentsWorkbenchPage() {
     name,
     setName,
     datasets,
+    targets,
     reset,
     autosaveStatus,
     addEvaluator,
@@ -107,11 +150,27 @@ export default function ExperimentsWorkbenchPage() {
     name: state.name,
     setName: state.setName,
     datasets: state.datasets,
+    targets: state.targets,
     reset: state.reset,
     autosaveStatus: state.ui.autosaveStatus,
     addEvaluator: state.addEvaluator,
     removeEvaluator: state.removeEvaluator,
   }));
+
+  // The columns as their own headers name them, which is also how a run's
+  // errors name them. Resolved here, once, because the projection an agent
+  // reads is pure and a prompt handle only exists in the database.
+  const resolvedTargetNames = useTargetNames(targets);
+  const targetNames = useMemo(
+    () =>
+      Object.fromEntries(
+        targets.map((target, index) => [
+          target.id,
+          resolvedTargetNames[index] ?? "",
+        ]),
+      ),
+    [targets, resolvedTargetNames],
+  );
 
   const createEvaluator = api.evaluators.create.useMutation();
   const updateEvaluator = api.evaluators.update.useMutation();
@@ -460,7 +519,7 @@ export default function ExperimentsWorkbenchPage() {
     handlers["workbench.getState"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
       run: (payload: { includeResults?: boolean }) =>
-        readLiveWorkbench(payload),
+        readLiveWorkbench({ ...payload, targetNames }),
     };
     handlers["workbench.run"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,
@@ -486,19 +545,26 @@ export default function ExperimentsWorkbenchPage() {
           // wrong document.
           assertPageIsCurrent();
           await saveOrRefuse();
-          // Fire-and-forget like the run proposal: the run streams into the
-          // table the user is watching, and the agent polls the runs API for
-          // completion. The payload-to-scope mapping is shared with the backend
-          // fallback so both dispatch paths cover the same cells.
-          void executeEvaluation(scopeFromRunPayload(payload));
-          return { status: "running" as const };
+          // The run itself streams into the table the user is watching and is
+          // not waited for; only its id is. The id is minted server-side and
+          // arrives on the first frame, and without it the agent has nothing to
+          // poll: it cannot ask how the run is going, read its results, or stop
+          // it, so it reads the page instead and guesses. The backend fallback
+          // answers with the id too, so both dispatch paths answer alike.
+          //
+          // The payload-to-scope mapping is shared with that fallback so both
+          // cover the same cells.
+          const runId = await startAndIdentifyRun((onRunStarted) =>
+            executeEvaluation(scopeFromRunPayload(payload), { onRunStarted }),
+          );
+          return { runId, status: "running" as const };
         } finally {
           setActionActivity(null);
         }
       },
     };
     return handlers;
-  }, [executeEvaluation, saveNow]);
+  }, [executeEvaluation, saveNow, targetNames]);
 
   useRegisterLangyActions(uiActionHandlers);
 

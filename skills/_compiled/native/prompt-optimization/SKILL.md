@@ -96,7 +96,7 @@ A run of any size takes minutes. The status command does the waiting:
 langwatch experiment status <slug> --wait --format json
 ```
 
-It answers as soon as the run reaches a terminal state, or after a minute with the progress so far, and `--timeout <seconds>` moves that limit. Call it again while the run is still going, and post a progress line each time the count moves. The run's own answer reports its `status`, and the backend path adds the `runId`; you never need that id, because the status command resolves the experiment's latest run itself.
+It answers as soon as the run reaches a terminal state, or after a minute with the progress so far, and `--timeout <seconds>` moves that limit. Call it again while the run is still going, and post a progress line each time the count moves. The run's own answer carries the `runId` to poll; the status command also resolves the experiment's latest run by itself, so the slug alone is enough.
 
 **Never use `sleep`.** Not on its own and above all not joined, as in `sleep 60; langwatch experiment status`. Joined into one call it is a single command that prints nothing for a minute, so the panel shows the sleep as the work in progress and the user learns nothing until it is over; and a turn that ends while that call is open loses the run it was waiting for. The page the user is watching narrates the run's own progress on its own; what they need from you is a line between polls when something changed.
 

@@ -40,9 +40,14 @@ const saveNow = vi.hoisted(() =>
 );
 
 const executeEvaluation = vi.hoisted(() =>
-  vi.fn(() => {
-    calls.push("run");
-  }),
+  vi.fn(
+    (_scope?: unknown, options?: { onRunStarted?: (id: string) => void }) => {
+      calls.push("run");
+      // The real hook names the run from the stream's first frame. The action
+      // answers with that id, so the mock has to produce one.
+      options?.onRunStarted?.("swift-bold-fox");
+    },
+  ),
 );
 
 vi.mock("~/components/DashboardLayout", () => ({
@@ -72,6 +77,7 @@ vi.mock("~/experiments-v3/hooks/useEvaluationsV3Store", () => ({
         name: "My Experiment",
         setName: vi.fn(),
         datasets: [],
+        targets: [],
         reset: vi.fn(),
         ui: {
           autosaveStatus: {
@@ -109,6 +115,10 @@ vi.mock("~/experiments-v3/hooks/useExecuteEvaluation", () => ({
 
 vi.mock("~/experiments-v3/hooks/useSavedDatasetLoader", () => ({
   useSavedDatasetLoader: () => ({ isLoading: false }),
+}));
+
+vi.mock("~/experiments-v3/hooks/useTargetName", () => ({
+  useTargetNames: () => [],
 }));
 
 vi.mock("~/experiments-v3/hooks/useWorkbenchUpdateListener", () => ({
@@ -176,6 +186,20 @@ describe("given the page holds an edit the agent has just made", () => {
       // Order, not counts: a run that starts first writes its results as a
       // newer version and the pending save is refused behind it.
       expect(calls).toEqual(["save", "run"]);
+    });
+
+    /** @scenario A run answers with the id of the run it started */
+    it("answers with the run id, without waiting for the run", async () => {
+      render(<ExperimentsWorkbenchPage />);
+
+      const answer = await captured.handlers?.["workbench.run"]?.run(
+        {} as never,
+      );
+
+      expect(answer).toEqual({
+        runId: "swift-bold-fox",
+        status: "running",
+      });
     });
   });
 });

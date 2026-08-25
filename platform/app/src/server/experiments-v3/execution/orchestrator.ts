@@ -14,6 +14,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import { comparisonDependencies } from "~/experiments-v3/execution/buildExecutionRequest";
 import type {
   ComparisonEvaluatorConfig,
   EvaluationsV3State,
@@ -295,20 +296,28 @@ export const generateCells = (
 
   // Determine which targets to process.
   //
-  // For target-/cell-scoped runs against a comparison column-target, the
-  // verdict needs every variant's output to exist before Phase 2 can
-  // synthesize the comparison cell. If the user hits Play on the Comparison
-  // column without first running the variants, expand the scope to include
-  // those variants so Phase 1 produces what Phase 2 needs. Without this, only
-  // the comparison target is dispatched, Phase 1 skips it (column-style
-  // comparisons are always Phase-2-only), and the run completes with 0 cells —
-  // visible to the user as a silent no-op with "No verdict yet" everywhere.
+  // A scoped run that touches a comparison needs the OTHER columns that
+  // comparison reads, or Phase 2 has nothing to judge. Two shapes reach this
+  // and both used to leave the same hole:
+  //
+  //   - a comparison column-target: hitting Play on it alone dispatched only
+  //     that column, which Phase 1 always skips, so the run finished with 0
+  //     cells and "No verdict yet" everywhere;
+  //   - a chip comparison whose variants are plain columns: running one
+  //     candidate alone left the judge with no output for the others, and
+  //     Phase 2 wrote "Waiting on …" over verdicts nobody asked to re-run.
+  //
+  // Expanding covers the columns the run has nothing saved for; the caller's
+  // `seedTargetOutputs` covers the rest, and the loop below skips those.
+  const comparisonDeps = (id: string): string[] =>
+    comparisonDependencies({
+      targets: state.targets,
+      evaluators: state.evaluators,
+      targetId: id,
+    });
+
   const expandComparisonDeps = (id: string): string[] => {
-    const t = state.targets.find((tg: TargetConfig) => tg.id === id);
-    if (t?.type !== "evaluator") return [id];
-    const deps = (toComparisonConfig(t)?.variants ?? []).filter(
-      (v): v is string => !!v,
-    );
+    const deps = comparisonDeps(id);
     if (deps.length === 0) return [id];
     return Array.from(new Set([...deps, id]));
   };
@@ -332,15 +341,7 @@ export const generateCells = (
       : scope.type === "target-rows"
         ? scope.targetIds
         : []
-    ).flatMap((scopedId) => {
-      const scopedTarget = state.targets.find(
-        (target) => target.id === scopedId,
-      );
-      if (!scopedTarget) return [];
-      return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
-        (variant): variant is string => !!variant,
-      );
-    }),
+    ).flatMap(comparisonDeps),
   );
 
   // Generate cells, skipping empty rows
@@ -1415,6 +1416,26 @@ export async function* executeCell(
   };
 
   try {
+    // The dispatch decision for an evaluator COLUMN. Nothing mapped means
+    // nothing to score, and scoring empty against empty passes.
+    if (
+      evaluatorTargetHasNoResolvedInputs({
+        cell,
+        loadedEvaluators: loadedData.evaluators,
+      })
+    ) {
+      const name = evaluatorTargetDisplayName({
+        target: cell.targetConfig,
+        loadedEvaluators: loadedData.evaluators,
+      });
+      logger.info(
+        { rowIndex: cell.rowIndex, targetId: cell.targetId, name },
+        "Evaluator column not dispatched: every input resolved empty",
+      );
+      yield evaluatorTargetNoInputsResult({ cell, name });
+      return;
+    }
+
     // Build the workflow
     const { workflow, targetNodeId, evaluatorNodeIds } = buildCellWorkflow(
       {
@@ -1991,27 +2012,113 @@ const isEmptyInputValue = (value: unknown): boolean =>
   (typeof value === "string" && value.trim() === "");
 
 /**
- * The fields an evaluator reads: the ones declared on its own config, and the
- * catalog's required plus optional fields otherwise. Optional counts here — an
- * evaluator whose only field is optional is just as broken when that field is
- * unmapped as one whose field is required.
+ * A type's fields from the catalog, required plus optional. Optional counts —
+ * an evaluator whose only field is optional is just as broken when that field
+ * is unmapped as one whose field is required.
  */
-const declaredEvaluatorFields = (evaluator: EvaluatorConfig): string[] => {
-  const declared = evaluator.inputs?.map((field) => field.identifier) ?? [];
-  if (declared.length > 0) return declared;
-
-  const definition =
-    AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+const catalogFields = (evaluatorType: string | undefined): string[] => {
+  const definition = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
   return [
     ...(definition?.requiredFields ?? []),
     ...(definition?.optionalFields ?? []),
   ];
 };
 
+/**
+ * The fields an evaluator reads: the ones declared on its own config, and the
+ * catalog's otherwise.
+ */
+const declaredEvaluatorFields = (evaluator: EvaluatorConfig): string[] => {
+  const declared = evaluator.inputs?.map((field) => field.identifier) ?? [];
+  if (declared.length > 0) return declared;
+  return catalogFields(evaluator.evaluatorType);
+};
+
 /** What the row calls the evaluator that could not run. */
 const evaluatorDisplayName = (evaluator: EvaluatorConfig): string =>
   AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ??
   evaluator.evaluatorType;
+
+/** DB evaluator rows a run has loaded, keyed by their own id. */
+type LoadedEvaluators = Map<
+  string,
+  { id: string; name: string; config: unknown }
+>;
+
+/**
+ * The fields an evaluator COLUMN reads. Its own declared inputs when it has
+ * them; otherwise the catalog fields of the DB evaluator behind it, whose type
+ * only the loaded row knows (a target carries the evaluator's id, not its type).
+ */
+const evaluatorTargetFields = ({
+  target,
+  loadedEvaluators,
+}: {
+  target: TargetConfig;
+  loadedEvaluators?: LoadedEvaluators;
+}): string[] => {
+  const declared = target.inputs?.map((field) => field.identifier) ?? [];
+  if (declared.length > 0) return declared;
+  const dbConfig = loadedEvaluators?.get(target.targetEvaluatorId ?? "")
+    ?.config as { evaluatorType?: string } | undefined;
+  return catalogFields(dbConfig?.evaluatorType);
+};
+
+/** What the row calls the evaluator column that could not run. */
+export const evaluatorTargetDisplayName = ({
+  target,
+  loadedEvaluators,
+}: {
+  target: TargetConfig;
+  loadedEvaluators?: LoadedEvaluators;
+}): string =>
+  target.localEvaluatorConfig?.name ??
+  loadedEvaluators?.get(target.targetEvaluatorId ?? "")?.name ??
+  target.id;
+
+/**
+ * Whether dispatching this evaluator COLUMN would hand it nothing to read.
+ *
+ * The chip guard above covers evaluators attached to a target; a column whose
+ * target IS an evaluator dispatches through `buildTargetInputs` instead and
+ * needs the same answer, for the same reason: `exact_match` comparing "" to ""
+ * reports a pass, and that pass is counted in the run's pass rate.
+ *
+ * A comparison column is exempt — its payload is the candidate list Phase 2
+ * builds, not the cell's mappings. So is a cell running a precomputed output,
+ * which dispatches no target at all.
+ */
+export const evaluatorTargetHasNoResolvedInputs = ({
+  cell,
+  loadedEvaluators,
+}: {
+  cell: ExecutionCell;
+  loadedEvaluators?: LoadedEvaluators;
+}): boolean => {
+  const target = cell.targetConfig;
+  if (target.type !== "evaluator") return false;
+  if (cell.comparison || cell.skipTarget) return false;
+
+  const fields = evaluatorTargetFields({ target, loadedEvaluators });
+  if (fields.length === 0) return false;
+
+  return Object.values(buildTargetInputs(cell)).every(isEmptyInputValue);
+};
+
+/** The error cell an evaluator column with nothing mapped reports for itself. */
+const evaluatorTargetNoInputsResult = ({
+  cell,
+  name,
+}: {
+  cell: ExecutionCell;
+  name: string;
+}): EvaluationV3Event => ({
+  type: "target_result",
+  rowIndex: cell.rowIndex,
+  targetId: cell.targetId,
+  output: undefined,
+  error: `${name} received no input for this row. Map its fields in the evaluator settings, then run again.`,
+});
 
 /**
  * Whether dispatching would hand the evaluator nothing to read.
@@ -2382,8 +2489,9 @@ export async function* runOrchestrator(
     "Starting orchestrator",
   );
 
-  // Set running flag + record the owner so abort can authorize this run even
-  // on the interactive SSE path, which never creates a polling run-state record.
+  // Set running flag + record the owner, which is what abort authorizes
+  // against. Set here rather than by the caller, so every dispatch path has it
+  // from the first frame.
   await abortManager.setRunning(runId, projectId);
 
   // Get commands for ClickHouse dual-write (unconditional)

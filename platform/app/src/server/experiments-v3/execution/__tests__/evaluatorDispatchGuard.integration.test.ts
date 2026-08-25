@@ -179,6 +179,120 @@ describe("given an evaluator attached to a target column", () => {
   });
 });
 
+/**
+ * An evaluator can also BE a column rather than a chip attached to one. That
+ * column dispatches through the target path, which the chip guard never
+ * reached, so an unmapped evaluator column scored empty against empty and
+ * reported a pass for every row.
+ */
+describe("given an evaluator run as its own column", () => {
+  const loadedEvaluators = new Map([
+    [
+      "db-eval-1",
+      {
+        id: "db-eval-1",
+        name: "Answer Correctness",
+        config: { evaluatorType: "langevals/exact_match" },
+      },
+    ],
+  ]);
+
+  const evaluatorColumn = (mapped: boolean): ExecutionCell => ({
+    rowIndex: 0,
+    targetId: "target-eval",
+    targetConfig: {
+      id: "target-eval",
+      type: "evaluator",
+      targetEvaluatorId: "db-eval-1",
+      inputs: [
+        { identifier: "output", type: "str" },
+        { identifier: "expected_output", type: "str" },
+      ],
+      outputs: [{ identifier: "passed", type: "bool" }],
+      mappings: mapped
+        ? {
+            "dataset-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "question",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-1",
+                sourceField: "expected",
+              },
+            },
+          }
+        : {},
+    } as unknown as ExecutionCell["targetConfig"],
+    evaluatorConfigs: [],
+    datasetEntry: {
+      _datasetId: "dataset-1",
+      question: "is a dog an animal?",
+      expected: "yes",
+    },
+  });
+
+  const runColumn = async (
+    cell: ExecutionCell,
+  ): Promise<EvaluationV3Event[]> => {
+    const events: EvaluationV3Event[] = [];
+    for await (const event of executeCell(cell, "p1", datasetColumns, {
+      evaluators: loadedEvaluators,
+    })) {
+      events.push(event);
+    }
+    return events;
+  };
+
+  describe("when none of its fields are mapped", () => {
+    /** @scenario "An evaluator column with no resolved inputs reports an error instead of passing" */
+    it("reports the row as an error and never calls the evaluator", async () => {
+      const events = await runColumn(evaluatorColumn(false));
+
+      const results = events.filter((e) => e.type === "target_result");
+      expect(results).toHaveLength(1);
+      expect(results[0]?.error).toContain("Answer Correctness");
+      expect(results[0]?.error).toContain(
+        "Map its fields in the evaluator settings",
+      );
+      expect(results[0]?.output).toBeUndefined();
+      expect(evaluatorDispatches()).toHaveLength(0);
+    });
+  });
+
+  describe("when its fields are mapped", () => {
+    /** @scenario "An evaluator column with no resolved inputs reports an error instead of passing" */
+    it("dispatches the column with the resolved inputs", async () => {
+      scripted.component = [
+        {
+          type: "component_state_change",
+          payload: {
+            component_id: "target-eval",
+            execution_state: {
+              status: "success",
+              outputs: { score: 1, passed: true },
+            },
+          },
+        },
+      ] as unknown as StudioServerEvent[];
+
+      const events = await runColumn(evaluatorColumn(true));
+
+      expect(evaluatorDispatches()).toHaveLength(1);
+      expect(evaluatorDispatches()[0]?.payload.inputs).toEqual({
+        output: "is a dog an animal?",
+        expected_output: "yes",
+      });
+      const result = events.find((e) => e.type === "target_result");
+      expect(result?.error).toBeUndefined();
+    });
+  });
+});
+
 describe("given a workbench with two datasets", () => {
   describe("when the active dataset is not the first one", () => {
     /** @scenario "The run reads its mappings from the dataset the rows come from" */

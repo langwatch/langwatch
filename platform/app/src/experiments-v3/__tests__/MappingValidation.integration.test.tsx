@@ -529,7 +529,7 @@ describe("Validation edge cases", () => {
     ).toBe(true);
   });
 
-  /** @scenario A declared prompt variable not referenced by any message is not required */
+  /** @scenario A declared input the template does not use needs no mapping */
   it("does not block the run when an explicit user message omits a declared 'input'", () => {
     // Mirrors the reported bug: explicit user message uses real variables,
     // but the prompt still carries a default declared "input" it never

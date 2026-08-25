@@ -266,6 +266,13 @@ Feature: Langy drives the open page through typed UI actions
       Then the edit is saved before the run starts
 
     @integration
+    Scenario: A run answers with the id of the run it started
+      Given the page holds an edit the agent has just made
+      When the agent dispatches workbench.run
+      Then the answer carries the id of the run and says it is running
+      And the answer does not wait for the run to finish
+
+    @integration
     Scenario: Two saves never overlap
       Given a save is already in flight
       When another save is asked for

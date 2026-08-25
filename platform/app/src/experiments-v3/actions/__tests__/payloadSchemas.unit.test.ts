@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
+import zodToJsonSchema from "zod-to-json-schema";
+import { COMPARISON_EVALUATOR_TYPE } from "../../types";
 import {
   addColumnPayloadSchema,
   addEvaluatorPayloadSchema,
   addRowsPayloadSchema,
   addTargetPayloadSchema,
   duplicateTargetPayloadSchema,
+  getStatePayloadSchema,
   removeTargetPayloadSchema,
+  runPayloadSchema,
   setCellValuePayloadSchema,
   setEvaluatorMappingPayloadSchema,
   setMappingPayloadSchema,
@@ -203,6 +207,54 @@ describe("payload schemas", () => {
           inputs: [],
         }).success,
       ).toBe(false);
+    });
+  });
+
+  /**
+   * `GET /api/langy/ui/actions` renders these schemas as JSON Schema, and that
+   * listing is the only documentation the surface has. A schema with no prose
+   * documents nothing.
+   */
+  describe("given the action listing rendered as JSON Schema", () => {
+    const described = [
+      ["addTarget", addTargetPayloadSchema],
+      ["duplicateTarget", duplicateTargetPayloadSchema],
+      ["setTargetPrompt", setTargetPromptPayloadSchema],
+      ["updateTargetModel", updateTargetModelPayloadSchema],
+      ["setMapping", setMappingPayloadSchema],
+      ["setEvaluatorMapping", setEvaluatorMappingPayloadSchema],
+      ["addEvaluator", addEvaluatorPayloadSchema],
+      ["setCellValue", setCellValuePayloadSchema],
+      ["addColumn", addColumnPayloadSchema],
+      ["addRows", addRowsPayloadSchema],
+      ["removeTarget", removeTargetPayloadSchema],
+      ["getState", getStatePayloadSchema],
+      ["run", runPayloadSchema],
+    ] as const;
+
+    /** @scenario "Every action documents what it does" */
+    it.each(described)("carries prose for %s", (_kind, schema) => {
+      const rendered = zodToJsonSchema(schema) as { description?: string };
+      expect(rendered.description ?? "").not.toBe("");
+    });
+
+    /** @scenario "Every action documents what it does" */
+    it("says what leaving the comparison config out does", () => {
+      const description = addEvaluatorPayloadSchema.description ?? "";
+
+      expect(description).toContain(
+        "attaches to EVERY target column as a score",
+      );
+      expect(description).toContain(COMPARISON_EVALUATOR_TYPE);
+    });
+
+    /** @scenario "Every action documents what it does" */
+    it("says where a run happens and what it answers with", () => {
+      const description = runPayloadSchema.description ?? "";
+
+      expect(description).toContain("open page");
+      expect(description).toContain("id of the run");
+      expect(description).toContain("langwatch experiment status");
     });
   });
 

@@ -11,7 +11,11 @@ import type { EvaluationResults } from "~/experiments-v3/types";
 import { StaleWorkbenchStateError } from "~/server/experiments/errors";
 import type { ExperimentService } from "~/server/experiments/experiment.service";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
-import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
+import {
+  planSavedRunSeeding,
+  prepareSavedStateExecution,
+} from "~/server/experiments-v3/execution/savedStateExecution";
+import { resolveWorkbenchTargetNames } from "~/server/experiments-v3/workbenchTargetNames";
 import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
@@ -96,8 +100,15 @@ async function readSavedState({
   const state = current.state as unknown as WorkbenchState;
   const persistedResults =
     parsed.includeResults === false ? undefined : current.state.results;
+  // The columns named the way the run's own errors name them. Resolved here
+  // because the projection is pure and a prompt handle lives in the database.
+  const targetNames = await resolveWorkbenchTargetNames({
+    projectId: context.projectId,
+    targets: state.targets,
+  });
   const projection = projectWorkbenchState({
     state,
+    targetNames,
     // The saved snapshot has no transient status; "idle" says exactly that.
     ...(persistedResults
       ? {
@@ -204,6 +215,7 @@ async function startSavedStateRun({
   }
 
   const scope = scopeFromRunPayload(parsed);
+  const seedTargetOutputs = planSavedRunSeeding({ prepared, scope });
   const { runId, total } = await startPollingRun({
     projectId: context.projectId,
     projectSlug: context.projectSlug,
@@ -217,6 +229,9 @@ async function startSavedStateRun({
     loadedAgents: prepared.loadedAgents,
     loadedEvaluators: prepared.loadedEvaluators,
     loadedWorkflows: prepared.loadedWorkflows,
+    // The saved cells the run reuses rather than recomputes. A comparison
+    // judging this column against another one reads the other one from here.
+    ...(seedTargetOutputs ? { seedTargetOutputs } : {}),
     // The run evaluates the saved dataset, so its cells belong in the saved
     // state: without this the page the assistant is working for still reads
     // "No output yet" after the run finishes.

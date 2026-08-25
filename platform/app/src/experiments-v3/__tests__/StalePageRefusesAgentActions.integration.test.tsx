@@ -65,6 +65,7 @@ vi.mock("~/experiments-v3/hooks/useEvaluationsV3Store", () => ({
         name: "My Experiment",
         setName: vi.fn(),
         datasets: [],
+        targets: [],
         reset: vi.fn(),
         ui: {
           autosaveStatus: {
@@ -103,6 +104,10 @@ vi.mock("~/experiments-v3/hooks/useExecuteEvaluation", () => ({
     status: "idle",
     progress: { completed: 0, total: 0 },
   }),
+}));
+
+vi.mock("~/experiments-v3/hooks/useTargetName", () => ({
+  useTargetNames: () => [],
 }));
 
 vi.mock("~/experiments-v3/hooks/useSavedDatasetLoader", () => ({

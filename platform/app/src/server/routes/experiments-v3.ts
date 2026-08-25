@@ -9,7 +9,10 @@
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
  */
-import { HandledError } from "@langwatch/handled-error";
+import {
+  HandledError,
+  type SerializedHandledError,
+} from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -51,6 +54,7 @@ import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMap
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
 import {
+  type EvaluationV3Event,
   type ExecutionScope,
   executionRequestSchema,
   runInputsBodySchema,
@@ -275,6 +279,74 @@ const parseOptionalPositiveInt = (value: string | undefined) => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
+/**
+ * Mirrors a streaming run into the run-state store the polling runner writes.
+ *
+ * A run started by an open tab used to exist only inside that tab, so
+ * `GET /runs/:runId` answered 404 for it and `langwatch experiment status`
+ * could not follow a run it had just started. The store is Redis, so a poll
+ * served by a different process finds the run too.
+ *
+ * The run's id is minted by the orchestrator and arrives on the first frame,
+ * which is why this is fed the stream rather than told the id up front.
+ */
+const createRunStateMirror = ({
+  projectId,
+  experimentId,
+  experimentSlug,
+}: {
+  projectId: string;
+  experimentId?: string;
+  experimentSlug: string;
+}) => {
+  let runId: string | undefined;
+  let ended = false;
+
+  const recordEnd = async (event: EvaluationV3Event): Promise<void> => {
+    if (!runId) return;
+    if (event.type === "done") {
+      ended = true;
+      await runStateManager.completeRun(runId, event.summary);
+      return;
+    }
+    if (event.type === "stopped") {
+      ended = true;
+      await runStateManager.stopRun(runId);
+    }
+  };
+
+  return {
+    async record(event: EvaluationV3Event): Promise<void> {
+      if (event.type === "execution_started") {
+        runId = event.runId;
+        await runStateManager.createRun({
+          runId: event.runId,
+          projectId,
+          experimentId,
+          experimentSlug,
+          total: event.total,
+        });
+        return;
+      }
+      if (!runId) return;
+      await runStateManager.addEvent(runId, event);
+      await recordEnd(event);
+    },
+    /**
+     * Not called once the run has reported how it ended: a write that fails
+     * after the last frame would rewrite a finished run as a failed one.
+     */
+    async fail(failure: {
+      code: string;
+      domainError?: SerializedHandledError;
+      traceId?: string;
+    }): Promise<void> {
+      if (!runId || ended) return;
+      await runStateManager.failRun(runId, failure);
+    },
+  };
+};
+
 // ── POST /execute ────────────────────────────────────────────────────
 
 secured.access(sessionAuth).post(
@@ -362,6 +434,12 @@ secured.access(sessionAuth).post(
       ui: createInitialUIState(),
     };
 
+    const mirror = createRunStateMirror({
+      projectId,
+      experimentId: request.experimentId,
+      experimentSlug: request.experimentSlug ?? "",
+    });
+
     return streamSSE(c, async (stream) => {
       try {
         const isFullRun = request.scope.type === "full";
@@ -385,6 +463,7 @@ secured.access(sessionAuth).post(
           await stream.writeSSE({
             data: JSON.stringify(event),
           });
+          await mirror.record(event);
 
           if (event.type === "done" || event.type === "stopped") {
             if (session?.user?.id) {
@@ -417,9 +496,19 @@ secured.access(sessionAuth).post(
         //
         // No `rowIndex`: the orchestrator itself threw, so the whole run is
         // gone and the mapper says so, rather than blaming one row.
+        const failure = mapThrownErrorEvent({ error });
         await stream.writeSSE({
-          data: JSON.stringify(mapThrownErrorEvent({ error })),
+          data: JSON.stringify(failure),
         });
+        if (failure.type === "error") {
+          // The code, never the thrown message: a poller reads this straight
+          // out of the run API.
+          await mirror.fail({
+            code: failure.message,
+            domainError: failure.domainError,
+            traceId: failure.traceId,
+          });
+        }
       }
     });
   },
@@ -472,11 +561,9 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   // project before signaling an abort. Without this, a user could abort another
   // tenant's experiment run by guessing its runId.
   //
-  // In-flight runs register their owner via abortManager.setRunning, which
-  // covers the interactive workbench SSE path — that path streams results
-  // directly and never creates a polling run-state record, so consulting only
-  // runStateManager would 404 every workbench abort. runStateManager remains
-  // the fallback for the CI/CD polling path.
+  // In-flight runs register their owner via abortManager.setRunning, which is
+  // set before the first frame of either path. runStateManager is the fallback:
+  // it also holds the owner, for as long as the run state lives.
   const ownerProjectId =
     (await abortManager.getRunningProjectId(runId)) ??
     (await runStateManager.getRunState(runId))?.projectId;
