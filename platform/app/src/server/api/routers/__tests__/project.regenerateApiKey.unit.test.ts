@@ -1,16 +1,17 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { projectRouter } from "../project";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 
 /**
  * Unit tests for project.regenerateApiKey mutation
  *
  * Tests the business logic of regenerating API keys:
  * - Successful key regeneration
- * - Error handling when project doesn't exist (P2025)
- * - Error handling for other Prisma errors
+ * - Error handling when the project credential doesn't exist
+ * - Error handling for other API-key service errors
  */
 
 // Mock nanoid to control API key generation
@@ -59,19 +60,15 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
 }));
 
 describe("project.regenerateApiKey mutation logic", () => {
-  let mockPrisma: {
-    project: {
-      update: ReturnType<typeof vi.fn>;
-    };
+  let mockApiKeys: {
+    regenerateLegacyProjectKey: ReturnType<typeof vi.fn>;
   };
   let caller: ReturnType<typeof projectRouter.createCaller>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma = {
-      project: {
-        update: vi.fn(),
-      },
+    mockApiKeys = {
+      regenerateLegacyProjectKey: vi.fn(),
     };
 
     // Create a caller with mocked context
@@ -84,10 +81,8 @@ describe("project.regenerateApiKey mutation logic", () => {
       res: undefined,
       permissionChecked: true,
       publiclyShared: false,
+      app: { apiKeys: mockApiKeys } as unknown as RequestAppServices,
     });
-
-    // Override prisma with our mock
-    ctx.prisma = mockPrisma as unknown as PrismaClient;
 
     caller = projectRouter.createCaller(ctx);
   });
@@ -98,11 +93,9 @@ describe("project.regenerateApiKey mutation logic", () => {
       const projectId = "project_123";
       const expectedApiKey =
         "sk-lw-mock48characterrandomstringforapikeygeneration";
-      mockPrisma.project.update.mockResolvedValueOnce({
-        id: projectId,
-        apiKey: expectedApiKey,
-        slug: "test-project",
-      });
+      mockApiKeys.regenerateLegacyProjectKey.mockResolvedValueOnce(
+        expectedApiKey,
+      );
 
       // Act
       const result = await caller.regenerateApiKey({ projectId });
@@ -112,29 +105,17 @@ describe("project.regenerateApiKey mutation logic", () => {
         apiKey: expectedApiKey,
       });
       expect(result.apiKey).toMatch(/^sk-lw-/);
-      expect(mockPrisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: projectId },
-          data: {
-            apiKey: expect.stringMatching(/^sk-lw-/),
-          },
-          select: {
-            apiKey: true,
-            id: true,
-            slug: true,
-          },
-        }),
-      );
+      expect(mockApiKeys.regenerateLegacyProjectKey).toHaveBeenCalledWith({
+        projectId,
+      });
     });
 
     it("logs the security-critical action to audit log", async () => {
       // Arrange
       const projectId = "project_123";
-      mockPrisma.project.update.mockResolvedValueOnce({
-        id: projectId,
-        apiKey: "sk-lw-mock48characterrandomstringforapikeygeneration",
-        slug: "test-project",
-      });
+      mockApiKeys.regenerateLegacyProjectKey.mockResolvedValueOnce(
+        "sk-lw-mock48characterrandomstringforapikeygeneration",
+      );
 
       // Act
       await caller.regenerateApiKey({ projectId });
@@ -149,18 +130,12 @@ describe("project.regenerateApiKey mutation logic", () => {
   });
 
   describe("when project does not exist", () => {
-    it("throws TRPCError with NOT_FOUND when Prisma returns P2025", async () => {
+    it("throws TRPCError with NOT_FOUND when the API key service reports a missing key", async () => {
       // Arrange
       const projectId = "nonexistent_project";
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        "Record to update not found.",
-        {
-          code: "P2025",
-          clientVersion: "5.0.0",
-        },
+      mockApiKeys.regenerateLegacyProjectKey.mockRejectedValueOnce(
+        new ApiKeyNotFoundError(projectId),
       );
-
-      mockPrisma.project.update.mockRejectedValueOnce(prismaError);
 
       // Act & Assert - Call actual mutation and verify it throws correct error
       await expect(
@@ -172,21 +147,14 @@ describe("project.regenerateApiKey mutation logic", () => {
     });
   });
 
-  describe("when Prisma throws other errors", () => {
-    it("re-throws the original error for non-P2025 Prisma errors", async () => {
+  describe("when the API key service throws other errors", () => {
+    it("re-throws the original service error", async () => {
       // Arrange
       const projectId = "project_123";
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        "Connection error",
-        {
-          code: "P1001",
-          clientVersion: "5.0.0",
-        },
-      );
+      const serviceError = new Error("Connection error");
+      mockApiKeys.regenerateLegacyProjectKey.mockRejectedValueOnce(serviceError);
 
-      mockPrisma.project.update.mockRejectedValueOnce(prismaError);
-
-      // Act & Assert - tRPC wraps non-P2025 errors as INTERNAL_SERVER_ERROR
+      // Act & Assert - tRPC wraps service errors as INTERNAL_SERVER_ERROR
       await expect(
         caller.regenerateApiKey({ projectId }),
       ).rejects.toMatchObject({
@@ -200,7 +168,7 @@ describe("project.regenerateApiKey mutation logic", () => {
       const projectId = "project_123";
       const genericError = new Error("Database connection failed");
 
-      mockPrisma.project.update.mockRejectedValueOnce(genericError);
+      mockApiKeys.regenerateLegacyProjectKey.mockRejectedValueOnce(genericError);
 
       // Act & Assert - tRPC wraps generic errors as INTERNAL_SERVER_ERROR
       await expect(
@@ -212,16 +180,14 @@ describe("project.regenerateApiKey mutation logic", () => {
     });
 
     it("does not record the rotation as audited when the update fails", async () => {
-      // The mutation does a SINGLE atomic prisma.project.update before the
-      // success audit log. When that write rejects, the row — and thus the old
-      // key's validity — is left intact, so the rotation must NOT be recorded
-      // as a completed action. The generic tRPC error-audit middleware still
+      // When the canonical API-key service rejects, the rotation must NOT be
+      // recorded as a completed action. The generic tRPC error-audit middleware still
       // fires (action: "regenerateApiKey", error: ...) — that is orthogonal
       // platform telemetry for the failed call, not a half-rotation — so we
       // assert specifically that the success-path "project.apiKey.regenerated"
       // audit was never written.
       const projectId = "project_123";
-      mockPrisma.project.update.mockRejectedValueOnce(
+      mockApiKeys.regenerateLegacyProjectKey.mockRejectedValueOnce(
         new Error("Database connection failed"),
       );
 
@@ -243,11 +209,9 @@ describe("project.regenerateApiKey mutation logic", () => {
       const projectId = "project_123";
       const expectedApiKey =
         "sk-lw-mock48characterrandomstringforapikeygeneration";
-      mockPrisma.project.update.mockResolvedValueOnce({
-        id: projectId,
-        apiKey: expectedApiKey,
-        slug: "test-project",
-      });
+      mockApiKeys.regenerateLegacyProjectKey.mockResolvedValueOnce(
+        expectedApiKey,
+      );
       vi.mocked(auditLog).mockRejectedValueOnce(
         new Error("audit service unavailable"),
       );

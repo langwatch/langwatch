@@ -1,6 +1,7 @@
 import { describeRoute } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import type { Organization } from "~/generated/prisma/client";
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import {
   anyAuthenticated,
   createOrgApp,
@@ -376,7 +377,17 @@ secured
         throw new NotFoundError("Project not found");
       }
 
-      const newApiKey = await service.regenerateApiKey(id);
+      let newApiKey: string;
+      try {
+        newApiKey = await c.app.apiKeys.regenerateLegacyProjectKey({
+          projectId: id,
+        });
+      } catch (error) {
+        if (error instanceof ApiKeyNotFoundError) {
+          throw new NotFoundError("Project not found");
+        }
+        throw error;
+      }
 
       return c.json({ apiKey: newApiKey });
     },

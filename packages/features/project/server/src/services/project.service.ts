@@ -36,9 +36,9 @@ import {
   type ProjectCredentialsPort,
   type ProjectDiagnosticsPort,
   type ProjectKeyMapPort,
-  type ProjectRepository,
   type ProjectStoredObjectsPort,
 } from "../ports/project.port";
+import type { ProjectRepository } from "../repositories/project.repository";
 
 export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
 
@@ -170,12 +170,6 @@ export class ProjectService extends ProjectServiceContract {
 
   tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
     return this.repository.tryGetWithTeam(id);
-  }
-
-  tryGetWithTeamByLegacyApiKey(
-    apiKey: string,
-  ): Promise<ProjectWithTeam | null> {
-    return this.repository.tryGetWithTeamByLegacyApiKey(apiKey);
   }
 
   private async assertTeamCanHoldANewProject(input: {
@@ -429,13 +423,4 @@ export class ProjectService extends ProjectServiceContract {
     }
   }
 
-  async regenerateApiKey(projectId: string): Promise<string> {
-    if (!(await this.repository.tryGetById(projectId))) {
-      throw new ProjectNotFoundError("Project not found");
-    }
-    return this.repository.regenerateApiKey(
-      projectId,
-      this.credentials.generateApiKey(),
-    );
-  }
 }

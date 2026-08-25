@@ -35,10 +35,6 @@ export abstract class ProjectService {
   ): Promise<{ name: string; slug: string } | null>;
   abstract getWithTeam(id: string): Promise<ProjectWithTeam>;
   abstract tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
-  /** Resolves the deprecated project credential during transport authentication. */
-  abstract tryGetWithTeamByLegacyApiKey(
-    apiKey: string,
-  ): Promise<ProjectWithTeam | null>;
   abstract create(input: {
     organizationId: string;
     userId?: string | null;
@@ -95,5 +91,4 @@ export abstract class ProjectService {
     projectId: string,
   ): Promise<TraceSharingConfig | null>;
   abstract resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
-  abstract regenerateApiKey(projectId: string): Promise<string>;
 }

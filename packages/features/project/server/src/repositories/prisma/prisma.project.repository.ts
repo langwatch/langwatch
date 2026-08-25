@@ -21,12 +21,12 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
+import type { ProjectDatabase } from "../../ports/project.port";
 import {
   ProjectRepository,
-  type ProjectDatabase,
   type ProjectWithOrgAdmin,
   type TouchCodingAgentActivityInput,
-} from "../../ports/project.port";
+} from "../project.repository";
 
 export class PrismaProjectRepository extends ProjectRepository {
   private constructor(private readonly prisma: PrismaClient) {
@@ -111,21 +111,6 @@ export class PrismaProjectRepository extends ProjectRepository {
   async tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
     const row = await this.prisma.project.findUnique({
       where: { id, archivedAt: null },
-      include: { team: true },
-    });
-    if (!row) return null;
-    const { team, ...projectRow } = row;
-    return {
-      ...this.mapProjectRequired(projectRow),
-      team: this.mapTeamRequired(team),
-    };
-  }
-
-  async tryGetWithTeamByLegacyApiKey(
-    apiKey: string,
-  ): Promise<ProjectWithTeam | null> {
-    const row = await this.prisma.project.findUnique({
-      where: { apiKey, archivedAt: null },
       include: { team: true },
     });
     if (!row) return null;
@@ -364,17 +349,6 @@ export class PrismaProjectRepository extends ProjectRepository {
       select: { id: true, isPersonal: true },
     });
   }
-
-
-  async regenerateApiKey(projectId: string, apiKey: string): Promise<string> {
-    const result = await this.prisma.project.update({
-      where: { id: projectId },
-      data: { apiKey },
-      select: { apiKey: true },
-    });
-    return result.apiKey;
-  }
-
   private mapProject(row: PrismaProject | null): Project | null {
     return row ? projectSchema.parse(row) : null;
   }

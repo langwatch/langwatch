@@ -1,4 +1,7 @@
 import {
+  DestinationTeamNotFoundError,
+  PersonalProjectProtectedError,
+  PersonalWorkspaceBoundaryError,
   PROJECT_KIND,
   projectSchema,
   type InternalProject,
@@ -14,10 +17,8 @@ import {
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ProjectCredentialsPort,
-  ProjectRepository,
-} from "../src/ports/project.port";
+import { ProjectCredentialsPort } from "../src/ports/project.port";
+import { ProjectRepository } from "../src/repositories/project.repository";
 import { ProjectService } from "../src/services/project.service";
 
 const project: InternalProject = {
@@ -61,16 +62,34 @@ const applicationProject: Project = projectSchema.parse({
   lastCodingAgentPullRequestAt: null,
 });
 
+const projectWithTeam = (
+  overrides: Partial<ProjectWithTeam> = {},
+): ProjectWithTeam => ({
+  ...applicationProject,
+  team: {
+    id: "team_1",
+    name: "Team",
+    slug: "team",
+    organizationId: "org",
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    departmentId: null,
+  },
+  ...overrides,
+});
+
 class StubRepository extends ProjectRepository {
   existing: InternalProject | null = null;
   tryFindInternalByOrganization = vi.fn(async () => this.existing);
   tryFindInternalBySlug = vi.fn(async () => null);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
-  tryFindActiveTeamInOrganization = vi.fn(async () => ({
-    id: "team_1",
-    isPersonal: false,
-  }));
+  tryFindActiveTeamInOrganization = vi.fn<
+    () => Promise<{ id: string; isPersonal: boolean } | null>
+  >(async () => ({ id: "team_1", isPersonal: false }));
   tryFindBySlugInTeam = vi.fn(async () => null);
   findAllByTeam = vi.fn(async () => [applicationProject]);
   create = vi.fn(async () => applicationProject);
@@ -78,7 +97,6 @@ class StubRepository extends ProjectRepository {
   tryGetWithTeam = vi.fn<
     (id: string) => Promise<ProjectWithTeam | null>
   >(async () => null);
-  tryGetWithTeamByLegacyApiKey = vi.fn(async () => null);
   updateMetadata = vi.fn(async () => undefined);
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
@@ -92,7 +110,6 @@ class StubRepository extends ProjectRepository {
     pagination: { page: 1, limit: 50, total: 1 },
   }));
   findActiveByScopes = vi.fn(async () => [applicationProject]);
-  regenerateApiKey = vi.fn(async (_projectId: string, apiKey: string) => apiKey);
 }
 
 class StubOrganizationService extends OrganizationServiceContract {
@@ -474,5 +491,140 @@ describe("ProjectService", () => {
       }),
     ).rejects.toThrow("Projects cannot be created in a personal workspace");
     expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it("updates without looking up a destination team when teamId is absent", async () => {
+    const repository = new StubRepository();
+
+    await createService(repository).update({
+      id: applicationProject.id,
+      organizationId: "org",
+      data: { name: "Renamed" },
+    });
+
+    expect(repository.tryFindActiveTeamInOrganization).not.toHaveBeenCalled();
+    expect(repository.update).toHaveBeenCalledWith({
+      id: applicationProject.id,
+      organizationId: "org",
+      data: { name: "Renamed" },
+    });
+  });
+
+  it("rejects an unavailable destination team", async () => {
+    const repository = new StubRepository();
+    repository.tryFindActiveTeamInOrganization.mockResolvedValue(null);
+
+    await expect(
+      createService(repository).update({
+        id: applicationProject.id,
+        organizationId: "org",
+        data: { teamId: "missing" },
+      }),
+    ).rejects.toBeInstanceOf(DestinationTeamNotFoundError);
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      current: projectWithTeam({ isPersonal: true, teamId: "personal" }),
+      destination: { id: "shared", isPersonal: false },
+    },
+    {
+      current: projectWithTeam({ isPersonal: false, teamId: "shared" }),
+      destination: { id: "personal", isPersonal: true },
+    },
+  ])("rejects moves across the personal-workspace boundary", async ({
+    current,
+    destination,
+  }) => {
+    const repository = new StubRepository();
+    repository.tryGetWithTeam.mockResolvedValue(current);
+    repository.tryFindActiveTeamInOrganization.mockResolvedValue(destination);
+
+    await expect(
+      createService(repository).update({
+        id: current.id,
+        organizationId: "org",
+        data: { teamId: destination.id },
+      }),
+    ).rejects.toBeInstanceOf(PersonalWorkspaceBoundaryError);
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it("allows an update that names the current personal team", async () => {
+    const repository = new StubRepository();
+    repository.tryGetWithTeam.mockResolvedValue(
+      projectWithTeam({ isPersonal: true, teamId: "personal" }),
+    );
+    repository.tryFindActiveTeamInOrganization.mockResolvedValue({
+      id: "personal",
+      isPersonal: true,
+    });
+
+    await expect(
+      createService(repository).update({
+        id: applicationProject.id,
+        organizationId: "org",
+        data: { name: "My Workspace", teamId: "personal" },
+      }),
+    ).resolves.toBe(applicationProject);
+  });
+
+  it("refuses to archive a personal project", async () => {
+    const repository = new StubRepository();
+    repository.tryGetWithTeam.mockResolvedValue(
+      projectWithTeam({ isPersonal: true }),
+    );
+
+    await expect(
+      createService(repository).archive({
+        id: applicationProject.id,
+        organizationId: "org",
+      }),
+    ).rejects.toBeInstanceOf(PersonalProjectProtectedError);
+    expect(repository.archive).not.toHaveBeenCalled();
+  });
+
+  it("mints a slug from the name and generated project id", async () => {
+    const repository = new StubRepository();
+
+    await createService(repository).create({
+      organizationId: "org",
+      teamId: "team_1",
+      name: "Governance & Insights",
+      language: "typescript",
+      framework: "langchain",
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: "governance-insights-govern" }),
+    );
+  });
+
+  it("keeps coding-agent activity columns on independent clocks", async () => {
+    const repository = new StubRepository();
+    const at = new Date("2026-08-25T12:00:00.000Z");
+    const service = createService(repository);
+
+    await service.touchCodingAgentSessionSeen({
+      projectId: applicationProject.id,
+      at,
+    });
+    await service.touchCodingAgentPullRequestSeen({
+      projectId: applicationProject.id,
+      at,
+    });
+
+    const expected = {
+      projectId: applicationProject.id,
+      at,
+      staleBefore: new Date("2026-08-25T11:00:00.000Z"),
+    };
+    expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(
+      expected,
+    );
+    expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(
+      expected,
+    );
   });
 });

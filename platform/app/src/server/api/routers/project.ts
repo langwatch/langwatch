@@ -1,24 +1,23 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
-  personalWorkspaceArchiveViolation,
-  personalWorkspaceCreateViolation,
-  personalWorkspaceMoveViolation,
-} from "~/server/app-layer/projects/project.service";
-import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
+  DestinationTeamNotFoundError,
+  PersonalProjectProtectedError,
+  PersonalWorkspaceBoundaryError,
+  ProjectNotFoundError,
+  ProjectSlugConflictError,
+  TeamNotInOrganizationError,
+} from "@langwatch/project-contract";
 import type { Session } from "~/server/auth";
-import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { generateApiKey } from "../../utils/apiKeyGenerator";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -26,48 +25,6 @@ import { getUserProtectionsForProject } from "../utils";
  * The owner is ADMIN of their own personal team, so `project:create` passes
  * there. A personal workspace holds only the project provisioned with it.
  */
-async function assertTeamCanHoldANewProject(
-  prisma: PrismaClient,
-  { teamId, organizationId }: { teamId?: string; organizationId: string },
-): Promise<void> {
-  if (!teamId) return;
-
-  const destinationTeam = await prisma.team.findFirst({
-    where: { id: teamId, organizationId },
-    select: { isPersonal: true },
-  });
-  const violation = personalWorkspaceCreateViolation(
-    destinationTeam?.isPersonal ?? false,
-  );
-  if (violation) {
-    throw new TRPCError({ code: "FORBIDDEN", message: violation });
-  }
-}
-
-/**
- * The boundary itself is defined once in the projects app layer, which this
- * router does not go through. See the helper there for why it holds.
- */
-function assertMoveStaysOutOfPersonalWorkspaces({
-  isMovingTeams,
-  isProjectPersonal,
-  isDestinationTeamPersonal,
-}: {
-  isMovingTeams: boolean;
-  isProjectPersonal: boolean;
-  isDestinationTeamPersonal: boolean;
-}): void {
-  if (!isMovingTeams) return;
-
-  const violation = personalWorkspaceMoveViolation({
-    isProjectPersonal,
-    isDestinationTeamPersonal,
-  });
-  if (violation) {
-    throw new TRPCError({ code: "FORBIDDEN", message: violation });
-  }
-}
-
 export const projectRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -113,56 +70,29 @@ export const projectRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
-
-      await assertTeamCanHoldANewProject(prisma, {
-        teamId: input.teamId,
-        organizationId: input.organizationId,
-      });
-
-      const projectNanoId = nanoid();
-      const projectId = `project_${projectNanoId}`;
-      const slug = mintProjectSlug({ name: input.name, projectNanoId });
-
-      const existingProject = await prisma.project.findFirst({
-        where: {
-          teamId: input.teamId,
-          slug,
-        },
-      });
-
-      if (existingProject) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message:
-            "A project with this name already exists in the selected team.",
-        });
-      }
-
-      let teamId = input.teamId;
-      if (!teamId) {
-        // The team and the ADMIN binding that comes with it belong to the team
-        // service: the binding is a grants-ledger fact, and a route is not
-        // where the ledger is driven from.
-        const team = await new TeamService({ prisma }).createWithFoundingAdmin({
+      let project;
+      try {
+        project = await ctx.app.projects.create({
           organizationId: input.organizationId,
-          name: input.newTeamName ?? input.name,
-          adminUserId: userId,
-        });
-
-        teamId = team.id;
-      }
-
-      const project = await prisma.project.create({
-        data: {
-          id: projectId,
+          userId,
+          teamId: input.teamId,
+          newTeamName: input.newTeamName,
           name: input.name,
-          slug,
           language: input.language,
           framework: input.framework,
-          teamId: teamId,
-          apiKey: generateApiKey(),
-        },
-      });
+        });
+      } catch (error) {
+        if (error instanceof TeamNotInOrganizationError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
+        if (error instanceof PersonalWorkspaceBoundaryError) {
+          throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+        }
+        if (error instanceof ProjectSlugConflictError) {
+          throw new TRPCError({ code: "CONFLICT", message: error.message });
+        }
+        throw error;
+      }
 
       // (The eager per-project Langy service key that used to be minted here is
       // gone — Langy now mints a per-turn, per-user session key scoped to exactly
@@ -200,12 +130,7 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:update")
     .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { apiKey: true },
-      });
+      const project = await ctx.app.projects.tryGetById(input.projectId);
 
       if (!project) {
         throw new TRPCError({
@@ -219,8 +144,8 @@ export const projectRouter = createTRPCRouter({
   getHasFirstMessage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
-    .query(async ({ input }) => {
-      const project = await getApp().projects.getById(input.projectId);
+    .query(async ({ input, ctx }) => {
+      const project = await ctx.app.projects.tryGetById(input.projectId);
 
       return { firstMessage: project?.firstMessage ?? false };
     }),
@@ -228,24 +153,9 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:manage")
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      // Generate new API key
-      const newApiKey = generateApiKey();
-
       try {
-        // Update the project with new API key
-        // Note: updatedAt is handled automatically by Prisma @updatedAt
-        const project = await prisma.project.update({
-          where: { id: input.projectId },
-          data: {
-            apiKey: newApiKey,
-          },
-          select: {
-            apiKey: true,
-            id: true,
-            slug: true,
-          },
+        const apiKey = await ctx.app.apiKeys.regenerateLegacyProjectKey({
+          projectId: input.projectId,
         });
 
         // Audit log the security-critical action; non-fatal so an audit
@@ -256,12 +166,11 @@ export const projectRouter = createTRPCRouter({
           projectId: input.projectId,
         }).catch(captureException);
 
-        return { apiKey: project.apiKey };
+        return { apiKey };
       } catch (error) {
-        // Prisma throws P2025 when no record is found
         if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2025"
+          error instanceof ProjectNotFoundError ||
+          error instanceof ApiKeyNotFoundError
         ) {
           throw new TRPCError({
             code: "NOT_FOUND",
@@ -302,12 +211,7 @@ export const projectRouter = createTRPCRouter({
     .permission("project:update")
     .use(checkCapturedDataVisibilityPermission)
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        include: { team: { include: { organization: true } } },
-      });
+      const project = await ctx.app.projects.tryGetWithTeam(input.projectId);
 
       if (!project) {
         throw new TRPCError({
@@ -316,60 +220,50 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      if (input.teamId) {
-        const destinationTeam = await prisma.team.findFirst({
-          where: {
-            id: input.teamId,
-            organizationId: project.team.organizationId,
-            archivedAt: null,
+      let updatedProject;
+      try {
+        updatedProject = await ctx.app.projects.update({
+          id: input.projectId,
+          organizationId: project.team.organizationId,
+          data: {
+            ...(input.name !== undefined && { name: input.name }),
+            ...(input.language !== undefined && { language: input.language }),
+            ...(input.framework !== undefined && { framework: input.framework }),
+            ...(input.userLinkTemplate !== undefined && {
+              userLinkTemplate: input.userLinkTemplate,
+            }),
+            ...(input.teamId && { teamId: input.teamId }),
+            traceSharingEnabled: input.traceSharingEnabled,
+            presenceEnabled: input.presenceEnabled,
+            s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
+            s3AccessKeyId: input.s3AccessKeyId
+              ? encrypt(input.s3AccessKeyId)
+              : null,
+            s3SecretAccessKey: input.s3SecretAccessKey
+              ? encrypt(input.s3SecretAccessKey)
+              : null,
+            s3Bucket: input.s3Bucket,
           },
-          select: { id: true, isPersonal: true },
         });
-        if (!destinationTeam) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "Destination team not found, is archived, or belongs to a different organization",
-          });
+      } catch (error) {
+        if (error instanceof DestinationTeamNotFoundError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
         }
-
-        assertMoveStaysOutOfPersonalWorkspaces({
-          isMovingTeams: input.teamId !== project.teamId,
-          isProjectPersonal: project.isPersonal,
-          isDestinationTeamPersonal: destinationTeam.isPersonal,
-        });
+        if (error instanceof PersonalWorkspaceBoundaryError) {
+          throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+        }
+        if (error instanceof ProjectNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
       }
-
-      const updatedProject = await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          ...(input.name !== undefined && { name: input.name }),
-          ...(input.language !== undefined && { language: input.language }),
-          ...(input.framework !== undefined && { framework: input.framework }),
-          ...(input.userLinkTemplate !== undefined && {
-            userLinkTemplate: input.userLinkTemplate,
-          }),
-          ...(input.teamId && { teamId: input.teamId }),
-          traceSharingEnabled:
-            input.traceSharingEnabled ?? project.traceSharingEnabled,
-          presenceEnabled: input.presenceEnabled ?? project.presenceEnabled,
-          s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
-          s3AccessKeyId: input.s3AccessKeyId
-            ? encrypt(input.s3AccessKeyId)
-            : null,
-          s3SecretAccessKey: input.s3SecretAccessKey
-            ? encrypt(input.s3SecretAccessKey)
-            : null,
-          s3Bucket: input.s3Bucket,
-        },
-      });
 
       // If trace sharing was disabled, revoke all existing trace shares
       if (
         input.traceSharingEnabled === false &&
         project.traceSharingEnabled === true
       ) {
-        await getApp().share.revokeAllTraceShares(input.projectId);
+        await ctx.app.share.revokeAllTraceShares(input.projectId);
       }
 
       return { success: true, projectSlug: updatedProject.slug };
@@ -408,7 +302,6 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
     .permission("project:delete")
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
       if (input.projectToArchiveId === input.projectId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -424,22 +317,26 @@ export const projectRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
 
-      const target = await prisma.project.findUnique({
-        where: { id: input.projectToArchiveId },
-        select: { isPersonal: true },
-      });
-      const archiveViolation = personalWorkspaceArchiveViolation(
-        target?.isPersonal ?? false,
+      const target = await ctx.app.projects.tryGetWithTeam(
+        input.projectToArchiveId,
       );
-      if (archiveViolation) {
-        throw new TRPCError({ code: "FORBIDDEN", message: archiveViolation });
-      }
+      if (!target) return { success: true, alreadyArchived: true };
 
-      const result = await prisma.project.updateMany({
-        where: { id: input.projectToArchiveId, archivedAt: null },
-        data: { archivedAt: new Date() },
-      });
-      return { success: true, alreadyArchived: result.count === 0 };
+      try {
+        await ctx.app.projects.archive({
+          id: input.projectToArchiveId,
+          organizationId: target.team.organizationId,
+        });
+        return { success: true, alreadyArchived: false };
+      } catch (error) {
+        if (error instanceof PersonalProjectProtectedError) {
+          throw new TRPCError({ code: "FORBIDDEN", message: error.message });
+        }
+        if (error instanceof ProjectNotFoundError) {
+          return { success: true, alreadyArchived: true };
+        }
+        throw error;
+      }
     }),
 
   triggerTopicClustering: protectedProcedure
@@ -447,7 +344,6 @@ export const projectRouter = createTRPCRouter({
     .permission("project:update")
     .mutation(async ({ ctx, input }) => {
       try {
-        const app = getApp();
         // A request made while a run is already underway is declined by the
         // scheduler, not queued behind it, so an unconditional success would
         // tell the user a run started when nothing did. The read model is the
@@ -455,13 +351,13 @@ export const projectRouter = createTRPCRouter({
         // ask it first and report which of the two the click actually did.
         // Best effort by nature: the scheduler, not this check, is what keeps
         // two runs off one project.
-        if (await app.topicClustering.status.isRunInFlight(input)) {
+        if (await ctx.app.topicClustering.status.isRunInFlight(input)) {
           return {
             started: false as const,
             reason: "already_running" as const,
           };
         }
-        await app.topicClustering.requestClustering({
+        await ctx.app.topicClustering.requestClustering({
           tenantId: input.projectId,
           occurredAt: Date.now(),
           trigger: "manual",
