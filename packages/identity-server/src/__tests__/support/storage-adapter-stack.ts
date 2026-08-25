@@ -124,10 +124,106 @@ export interface IdentityStack {
  * WRITE throw, so a closed gate that nevertheless put a row into identity
  * storage fails the suite rather than passing quietly.
  */
+/**
+ * The memory engine, holding the legacy Prisma schema's line on the account
+ * model: there is no `issuer` column, and a query or a write naming one is
+ * refused exactly the way `PrismaClientValidationError` refuses it.
+ *
+ * The stock memory engine is schemaless and quietly absorbs any field, which
+ * is precisely how the issuer regression stayed invisible to this suite
+ * while production's Prisma engine threw on `/two-factor/enable`. A stack
+ * built over this wrapper fails the same way production did, so the
+ * adapter's translation of 1.7's issuer-keyed traffic is pinned against the
+ * schema that actually exists.
+ */
+function schemaBoundLegacyEngine(db: MemoryDB) {
+  const inner = memoryAdapter(db);
+  return (options: BetterAuthOptions) => {
+    const engine = inner(options);
+    const refuseIssuer = ({
+      model,
+      where,
+      data,
+    }: {
+      model: string;
+      where?: readonly { field: string }[];
+      data?: Record<string, unknown>;
+    }) => {
+      if (model !== "account") return;
+      if (where?.some((clause) => clause.field === "issuer")) {
+        throw new Error(
+          "Unknown argument `issuer`. Did you mean `user`? Available options are marked with ?.",
+        );
+      }
+      if (data && Object.keys(data).includes("issuer")) {
+        throw new Error(
+          "Unknown argument `issuer`. Available options are marked with ?.",
+        );
+      }
+    };
+    return {
+      ...engine,
+      create: (args: never) => {
+        const { model, data } = args as {
+          model: string;
+          data: Record<string, unknown>;
+        };
+        refuseIssuer({ model, data });
+        return engine.create(args);
+      },
+      findOne: (args: never) => {
+        refuseIssuer(args);
+        return engine.findOne(args);
+      },
+      findMany: (args: never) => {
+        refuseIssuer(args);
+        return engine.findMany(args);
+      },
+      count: (args: never) => {
+        refuseIssuer(args);
+        return engine.count(args);
+      },
+      update: (args: never) => {
+        const { model, where, update } = args as {
+          model: string;
+          where?: readonly { field: string }[];
+          update: Record<string, unknown>;
+        };
+        refuseIssuer({ model, where, data: update });
+        return engine.update(args);
+      },
+      updateMany: (args: never) => {
+        const { model, where, update } = args as {
+          model: string;
+          where?: readonly { field: string }[];
+          update: Record<string, unknown>;
+        };
+        refuseIssuer({ model, where, data: update });
+        return engine.updateMany(args);
+      },
+      delete: (args: never) => {
+        refuseIssuer(args);
+        return engine.delete(args);
+      },
+      deleteMany: (args: never) => {
+        refuseIssuer(args);
+        return engine.deleteMany(args);
+      },
+    } as ReturnType<typeof inner>;
+  };
+}
+
 export function identityStack({
   inert = false,
   withDatabaseHooks = false,
-}: { inert?: boolean; withDatabaseHooks?: boolean } = {}): IdentityStack {
+  schemaBoundLegacy = false,
+}: {
+  inert?: boolean;
+  withDatabaseHooks?: boolean;
+  /** The legacy engine refuses account columns the Prisma schema does not
+   *  hold, instead of absorbing them the way bare memory storage does. */
+  schemaBoundLegacy?: boolean;
+} = {}): IdentityStack {
   const db = emptyDb();
   const heads = new InMemoryHeads();
   const commands: IdentityCommand[] = [];
@@ -262,7 +358,9 @@ export function identityStack({
   });
   const auth = authOver(
     createIdentityStorageAdapter({
-      legacyEngine: memoryAdapter(db),
+      legacyEngine: schemaBoundLegacy
+        ? schemaBoundLegacyEngine(db)
+        : memoryAdapter(db),
       accounts,
       resolution,
       ceremonies,

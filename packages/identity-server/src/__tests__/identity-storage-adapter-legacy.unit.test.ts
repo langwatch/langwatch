@@ -194,4 +194,98 @@ describe("better-auth over the identity storage adapter", () => {
       expect(sorted).toHaveLength(1);
     });
   });
+
+  /**
+   * The legacy engine here holds the Prisma schema's line: no `issuer`
+   * column on `account`, and naming one is refused the way
+   * `PrismaClientValidationError` refuses it. The stock memory engine
+   * absorbs any field, which is how this regression stayed green here
+   * while `/two-factor/enable` threw in production.
+   */
+  describe("given the legacy engine is bound to the Prisma account schema", () => {
+    let identity: IdentityStack;
+
+    beforeEach(() => {
+      identity = identityStack({ inert: true, schemaBoundLegacy: true });
+    });
+
+    /** @scenario "A legacy account write never carries the issuer column" */
+    it("signs up and links a provider without handing the engine an issuer", async () => {
+      const cookie = await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "google",
+        issuer: "local:oauth:google",
+        accountId: "sub-google-1",
+      });
+
+      const listed = await identity.auth.api.listUserAccounts({
+        headers: new Headers({ cookie }),
+      });
+      expect(listed.map((row) => row.providerId).sort()).toEqual([
+        "credential",
+        "google",
+      ]);
+    });
+
+    /** @scenario "An issuer-keyed account read on the legacy branch drops the synthetic issuer" */
+    it("serves the issuer-keyed credential read /two-factor/enable sends", async () => {
+      await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      // The exact shape 1.7's enableTwoFactor issues: the user, the
+      // provider, the synthetic issuer and the subject, all at once.
+      const row = await context.adapter.findOne({
+        model: "account",
+        where: [
+          { field: "userId", value: userId },
+          { field: "providerId", value: "credential" },
+          { field: "issuer", value: "local:credential" },
+          { field: "accountId", value: userId },
+        ],
+      });
+
+      expect(row).not.toBeNull();
+    });
+
+    /** @scenario "An issuer the legacy table cannot answer returns no rows instead of throwing" */
+    it("answers no rows for an issuer that contradicts the provider beside it", async () => {
+      await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      const contradicted = await context.adapter.findOne({
+        model: "account",
+        where: [
+          { field: "userId", value: userId },
+          { field: "providerId", value: "credential" },
+          { field: "issuer", value: "https://accounts.google.com" },
+        ],
+      });
+      expect(contradicted).toBeNull();
+
+      // An issuer standing alone in a real-URL form is equally unanswerable:
+      // the table keys nothing by issuer, and widening to "any provider"
+      // would resolve one IdP's subject onto another's.
+      const unanswerable = await context.adapter.findMany({
+        model: "account",
+        where: [{ field: "issuer", value: "https://accounts.google.com" }],
+      });
+      expect(unanswerable).toEqual([]);
+
+      // While the synthetic form alone is decodable, and answers.
+      const decoded = await context.adapter.findMany({
+        model: "account",
+        where: [
+          { field: "userId", value: userId },
+          { field: "issuer", value: "local:credential" },
+        ],
+      });
+      expect(decoded).toHaveLength(1);
+    });
+  });
 });
