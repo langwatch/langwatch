@@ -89,7 +89,7 @@ to a filed defect and is expected to FAIL until that defect is fixed:
 |---|---|---|
 | never ends a turn with nothing rendered | 27 of 260 completed turns render no text at all | `langwatch-saas#1097` |
 | answers from the project, not from memory | 40% of completed turns make zero tool calls; 58% answer under 120 chars | `langwatch-saas#1098` |
-| owns the tools it actually has | `AGENTS.md:149` calls the working `langwatch.*` tools hallucinations | `langwatch-saas#1099` |
+| owns the tools it actually has | AGENTS.md called the working `langwatch.*` tools hallucinations | `langwatch-saas#1099` |
 | stays a platform assistant | opencode coding-agent persona bleeding through (`read` 144, `edit` 68 calls) | `langwatch-saas#1100` |
 | creates the monitor, not just the evaluator | `langwatch.monitor.create` errors on 48% of calls | `langwatch-saas#1101` |
 | answers a single lookup inside the budget | p90 380s, p99 1,868s | `langwatch-saas#1102` |
