@@ -1,10 +1,10 @@
-import { isAdmin } from "~/runtime/app/features/admin";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import type { OpsService } from "@langwatch/ops-contract";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
-import { getApp } from "~/server/app-layer/app";
+import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -89,8 +89,8 @@ export async function assertCanWriteRetentionScope(
  * may opt data out of deletion entirely. The UI hides the option from everyone
  * else; this is the matching server-side enforcement (never trust the client).
  */
-export function assertCanDisableRetention(ctx: RBACContext): void {
-  if (isAdmin({ email: ctx.session?.user?.email })) return;
+export function assertCanDisableRetention(ctx: RBACContext, ops: OpsService): void {
+  if (ops.isAdmin({ email: ctx.session?.user?.email })) return;
   throw new TRPCError({
     code: "FORBIDDEN",
     message:
@@ -106,11 +106,12 @@ export function assertCanDisableRetention(ctx: RBACContext): void {
  * call this, so the UI never offers a control the save will reject.
  */
 export async function canConfigureRetention(
+  planProvider: PlanProvider,
   organizationId: string | null,
   user: Session["user"] | null,
 ): Promise<boolean> {
   if (!organizationId) return false;
-  const plan = await getApp().planProvider.getActivePlan({
+  const plan = await planProvider.getActivePlan({
     organizationId,
     user: user ?? undefined,
   });
@@ -140,8 +141,9 @@ export function assertPlanConfigurable(plan: PlanInfo): void {
 export async function assertRetentionPlan(
   ctx: RBACContext,
   organizationId: string,
+  planProvider: PlanProvider,
 ): Promise<void> {
-  const plan = await getApp().planProvider.getActivePlan({
+  const plan = await planProvider.getActivePlan({
     organizationId,
     user: ctx.session?.user ?? undefined,
   });
@@ -188,6 +190,7 @@ export async function resolveScopeOrganizationId(
 export async function resolveScopePlan(
   ctx: RBACContext,
   scope: RetentionScope,
+  planProvider: PlanProvider,
 ): Promise<{ organizationId: string; plan: PlanInfo }> {
   const organizationId = await resolveScopeOrganizationId(ctx, scope);
   if (!organizationId) {
@@ -196,7 +199,7 @@ export async function resolveScopePlan(
       message: `${scope.scopeType.toLowerCase()} ${scope.scopeId} was not found.`,
     });
   }
-  const plan = await getApp().planProvider.getActivePlan({
+  const plan = await planProvider.getActivePlan({
     organizationId,
     user: ctx.session?.user ?? undefined,
   });
@@ -215,6 +218,7 @@ export async function resolveScopePlan(
 export async function assertRetentionPlanForScope(
   ctx: RBACContext,
   scope: RetentionScope,
+  planProvider: PlanProvider,
 ): Promise<void> {
   const organizationId = await resolveScopeOrganizationId(ctx, scope);
   if (!organizationId) {
@@ -223,7 +227,7 @@ export async function assertRetentionPlanForScope(
       message: `${scope.scopeType.toLowerCase()} ${scope.scopeId} was not found.`,
     });
   }
-  await assertRetentionPlan(ctx, organizationId);
+  await assertRetentionPlan(ctx, organizationId, planProvider);
 }
 
 /**
@@ -319,8 +323,9 @@ export async function assertRetentionWriteAllowed(
   ctx: RBACContext,
   scope: RetentionScope,
   retentionDays: number,
+  planProvider: PlanProvider,
 ): Promise<void> {
-  const { plan } = await resolveScopePlan(ctx, scope);
+  const { plan } = await resolveScopePlan(ctx, scope, planProvider);
   assertPlanConfigurable(plan);
   assertPlanAllowsRetentionValue(plan, retentionDays);
 }

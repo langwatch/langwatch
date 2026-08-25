@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import type { OpsService } from "@langwatch/ops-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rbacMocks = vi.hoisted(() => ({
@@ -13,14 +14,6 @@ const planMocks = vi.hoisted(() => ({
   getActivePlan: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    planProvider: { getActivePlan: planMocks.getActivePlan },
-  }),
-}));
-
 import {
   assertCanDisableRetention,
   assertCanWriteRetentionScope,
@@ -31,6 +24,18 @@ import {
 const session = { user: { id: "user_member" } } as any;
 const prisma = {} as any;
 const ctx = { prisma, session };
+const planProvider = {
+  getActivePlan: planMocks.getActivePlan,
+} as any;
+const ops = {
+  isAdmin: ({ email }: { email: string | null | undefined }) =>
+    email !== null &&
+    email !== undefined &&
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .includes(email),
+} as OpsService;
 
 describe("requiredRetentionWritePermission", () => {
   it("maps each tier to the permission the read snapshot advertises", () => {
@@ -157,7 +162,7 @@ describe("assertCanDisableRetention", () => {
       const adminCtx = {
         session: { user: { id: "u1", email: "admin@langwatch.ai" } },
       } as any;
-      expect(() => assertCanDisableRetention(adminCtx)).not.toThrow();
+      expect(() => assertCanDisableRetention(adminCtx, ops)).not.toThrow();
     });
   });
 
@@ -168,7 +173,7 @@ describe("assertCanDisableRetention", () => {
         session: { user: { id: "u2", email: "owner@acme.com" } },
       } as any;
       try {
-        assertCanDisableRetention(orgAdminCtx);
+        assertCanDisableRetention(orgAdminCtx, ops);
         expect.unreachable("should have thrown");
       } catch (e) {
         expect(e).toBeInstanceOf(TRPCError);
@@ -182,9 +187,9 @@ describe("assertCanDisableRetention", () => {
   describe("given no session", () => {
     it("throws FORBIDDEN", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai";
-      expect(() => assertCanDisableRetention({ prisma, session: null } as any)).toThrow(
-        TRPCError,
-      );
+      expect(() =>
+        assertCanDisableRetention({ prisma, session: null } as any, ops),
+      ).toThrow(TRPCError);
     });
   });
 });
@@ -221,10 +226,14 @@ describe("assertRetentionPlanForScope", () => {
       planMocks.getActivePlan.mockResolvedValue({ free: true });
 
       await expect(
-        assertRetentionPlanForScope(ctxScope, {
-          scopeType: "ORGANIZATION",
-          scopeId: "org_free",
-        }),
+        assertRetentionPlanForScope(
+          ctxScope,
+          {
+            scopeType: "ORGANIZATION",
+            scopeId: "org_free",
+          },
+          planProvider,
+        ),
       ).rejects.toMatchObject({
         name: "TRPCError",
         code: "FORBIDDEN",
@@ -244,10 +253,14 @@ describe("assertRetentionPlanForScope", () => {
       planMocks.getActivePlan.mockResolvedValue({ free: false });
 
       await expect(
-        assertRetentionPlanForScope(ctxScope, {
-          scopeType: "TEAM",
-          scopeId: "team_a",
-        }),
+        assertRetentionPlanForScope(
+          ctxScope,
+          {
+            scopeType: "TEAM",
+            scopeId: "team_a",
+          },
+          planProvider,
+        ),
       ).resolves.toBeUndefined();
 
       expect(planMocks.getActivePlan).toHaveBeenCalledWith(
@@ -264,10 +277,14 @@ describe("assertRetentionPlanForScope", () => {
       planMocks.getActivePlan.mockResolvedValue({ free: false });
 
       await expect(
-        assertRetentionPlanForScope(ctxScope, {
-          scopeType: "PROJECT",
-          scopeId: "project_a",
-        }),
+        assertRetentionPlanForScope(
+          ctxScope,
+          {
+            scopeType: "PROJECT",
+            scopeId: "project_a",
+          },
+          planProvider,
+        ),
       ).resolves.toBeUndefined();
     });
   });
@@ -277,10 +294,14 @@ describe("assertRetentionPlanForScope", () => {
       prismaScopeMock.organization.findUnique.mockResolvedValue(null);
 
       await expect(
-        assertRetentionPlanForScope(ctxScope, {
-          scopeType: "ORGANIZATION",
-          scopeId: "org_missing",
-        }),
+        assertRetentionPlanForScope(
+          ctxScope,
+          {
+            scopeType: "ORGANIZATION",
+            scopeId: "org_missing",
+          },
+          planProvider,
+        ),
       ).rejects.toMatchObject({
         name: "TRPCError",
         code: "NOT_FOUND",

@@ -154,19 +154,7 @@ export default function SharePage() {
   );
 
   if (shared.isError) {
-    // The one surface whose reader has no account, no navigation and no other
-    // support channel — so it gets the full state, not a flattened sentence:
-    // the registry's remediation, the docs link and the error id they can quote
-    // back. Every code reachable here (`share_link_not_found` / `_forbidden` /
-    // `_expired` / `_exhausted`, `share_read_rate_limited`) is written for a
-    // recipient who did nothing wrong, and none of them discloses whether a
-    // trace exists or who owns it — the server collapses those cases into one
-    // code on purpose (see app-layer/share/errors.ts).
-    //
-    // And it is the only screen in the product whose visitor is, by
-    // definition, not a customer yet. A dead link is a bad first impression on
-    // its own; a dead link with nothing beyond it wastes the only visit we get.
-    // So the way forward from here is an invitation, not just an apology.
+    // Share errors are safe for anonymous visitors and include remediation.
     return (
       <HandledErrorState
         error={shared.error}

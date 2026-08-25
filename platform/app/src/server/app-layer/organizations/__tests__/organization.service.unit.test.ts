@@ -6,6 +6,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import type { PromptService } from "@langwatch/prompt-contract";
+import type { ShareService } from "@langwatch/share-contract";
 import { OrganizationService } from "../organization.service";
 import type { OrganizationRepository } from "../repositories/organization.repository";
 
@@ -23,14 +24,6 @@ const { mockRevokeAllTraceShares, mockCheckLimit } = vi.hoisted(() => ({
 // repository's client, which the double answers as a bare object.
 vi.mock("~/server/license-enforcement", () => ({
   createLicenseEnforcementService: () => ({ checkLimit: mockCheckLimit }),
-}));
-
-// The service reaches the app singleton only for cross-aggregate effects
-// (trace-share revocation, plan resolution); pin the one this suite drives.
-vi.mock("../../app", () => ({
-  getApp: () => ({
-    share: { revokeAllTraceShares: mockRevokeAllTraceShares },
-  }),
 }));
 
 describe("OrganizationService", () => {
@@ -75,6 +68,9 @@ describe("OrganizationService", () => {
   const mockPrompts = {
     seedTagsForOrganization: vi.fn(),
   } as Pick<PromptService, "seedTagsForOrganization">;
+  const mockShares = {
+    revokeAllTraceShares: mockRevokeAllTraceShares,
+  } as unknown as ShareService;
 
   let service: OrganizationService;
 
@@ -83,7 +79,7 @@ describe("OrganizationService", () => {
     // The flows that compose raw-client helpers ask the repository for its
     // client; the double is Prisma-backed as far as they are concerned.
     vi.mocked(mockRepo.getClient!).mockReturnValue({} as unknown as PrismaClient);
-    service = new OrganizationService(mockRepo, mockPrompts);
+    service = new OrganizationService(mockRepo, mockPrompts, void 0, void 0, mockShares);
   });
 
   describe("getOrganizationIdByTeamId", () => {

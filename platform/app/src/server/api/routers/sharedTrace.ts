@@ -3,15 +3,10 @@ import { z } from "zod";
 import { Prisma } from "~/generated/prisma/client";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import {
-  probeOrganizationPermission,
-  probeProjectPermission,
-} from "~/server/app-layer/permissions/imperative";
-import {
   ShareLinkNotFoundError,
   ShareReadRateLimitedError,
-} from "~/server/app-layer/share/errors";
-import type { ShareViewer } from "~/server/app-layer/share/share.service";
-import { buildSharedTraceCacheKey } from "~/server/app-layer/share/shared-trace-cache.service";
+  type ShareViewer,
+} from "@langwatch/share-contract";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { rateLimit } from "~/server/rateLimit";
 import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redaction";
@@ -112,13 +107,9 @@ export const sharedTraceRouter = createTRPCRouter({
     })
     .output(sharedTraceDtoSchema)
     .query(async ({ input, ctx }) => {
-      const viewer: ShareViewer = {
-        isOrgMember: async (organizationId) =>
-          !!ctx.session?.user &&
-          probeOrganizationPermission(ctx, organizationId, "organization:view"),
-        isProjectMember: async (projectId) =>
-          probeProjectPermission(ctx, projectId, "traces:view"),
-      };
+      const viewer: ShareViewer = ctx.session?.user
+        ? { type: "user", id: ctx.session.user.id }
+        : { type: "anonymous" };
 
       // This is the one trace read the open internet can drive, and each call
       // costs five ClickHouse reads plus a view write. Limit per token AND per
@@ -190,11 +181,10 @@ export const sharedTraceRouter = createTRPCRouter({
       // a revoked, expired or exhausted link stops serving immediately no
       // matter what is cached, and the key carries a protections fingerprint
       // so two viewers with different redactions can never share an entry.
-      const cacheKey = buildSharedTraceCacheKey({
+      const cached = await app.share.tryGetCachedPayload({
         token: input.token,
         protections,
       });
-      const cached = await app.sharedTraceCache.get(cacheKey);
       if (cached) {
         // Re-parsed through the same output schema rather than trusted: a
         // stale entry written by an older deploy is stripped to today's share
@@ -332,7 +322,11 @@ export const sharedTraceRouter = createTRPCRouter({
         evaluations,
       };
       // Best-effort: a cache write failure is logged, never fatal to the read.
-      await app.sharedTraceCache.set(cacheKey, dto);
+      await app.share.cachePayload({
+        token: input.token,
+        protections,
+        payload: dto,
+      });
       return dto;
     }),
 });

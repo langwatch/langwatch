@@ -23,23 +23,15 @@ const appMocks = vi.hoisted(() => ({
   getActivePlan: vi.fn(),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    dataRetention: {
-      policy: {
-        getResolvedForProject: appMocks.getResolvedForProject,
-        listOrganizationRules: appMocks.listOrganizationRules,
-      },
-    },
-    planProvider: {
-      getActivePlan: appMocks.getActivePlan,
-    },
-  }),
-}));
-
 import { getRetentionPolicySnapshot } from "../dataRetentionPolicy.read";
+
+const dataRetention = {
+  getResolvedForProject: appMocks.getResolvedForProject,
+  listOrganizationRules: appMocks.listOrganizationRules,
+} as any;
+const planProvider = {
+  getActivePlan: appMocks.getActivePlan,
+} as any;
 
 /**
  * Regression: a caller with project:view on a single project must NOT see
@@ -149,6 +141,8 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
       const snapshot = await getRetentionPolicySnapshot(
         { prisma, session },
         { projectId: "project_a" },
+        dataRetention,
+        planProvider,
       );
 
       const scopeKeys = snapshot.rules.map((r) => `${r.scopeType}:${r.scopeId}`);
@@ -171,6 +165,8 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
       const snapshot = await getRetentionPolicySnapshot(
         { prisma, session },
         { projectId: "project_a" },
+        dataRetention,
+        planProvider,
       );
 
       const scopeKeys = snapshot.rules.map((r) => `${r.scopeType}:${r.scopeId}`);
@@ -186,6 +182,8 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
       const snapshot = await getRetentionPolicySnapshot(
         { prisma, session },
         { projectId: "project_a" },
+        dataRetention,
+        planProvider,
       );
 
       expect(snapshot.available.organization).toBeNull();
@@ -216,6 +214,8 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
       const snapshot = await getRetentionPolicySnapshot(
         { prisma, session },
         { projectId: "project_a" },
+        dataRetention,
+        planProvider,
       );
 
       expect(snapshot.available.projects.map((p) => p.id)).toEqual(["project_a"]);

@@ -62,9 +62,7 @@ import type { GovernanceOcsfEventsClickHouseRepository } from "~/runtime/app/fea
 import type { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/features/governance/governance-trace-activity.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
-import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
-import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
@@ -97,8 +95,7 @@ import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { ShareService } from "./share/share.service";
-import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
+import type { ShareService } from "@langwatch/share-contract";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
@@ -118,12 +115,11 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 
-export interface DataRetentionDependencies {
-  policy: DataRetentionPolicyService;
-  pinning: PinnedTraceService;
+export type DataRetentionDependencies = DataRetentionService & {
+  /** Singular feature service: policy and trace-pin methods share one instance. */
   retroactive: RetroactiveUpdateService;
   metering: StorageMeterService;
-}
+};
 
 export interface OpsDependencies {
   queues: QueueService;
@@ -384,10 +380,8 @@ export interface AppDependencies {
   notifications: NotificationService;
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
-  retentionPolicyCache: RetentionPolicyCache;
   dataRetention: DataRetentionDependencies;
   share: ShareService;
-  sharedTraceCache: SharedTracePayloadCache;
   commands: AppCommands;
   ops?: OpsDependencies;
 

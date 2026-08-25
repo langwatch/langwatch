@@ -1,6 +1,7 @@
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { batchScopePermissions } from "~/server/api/rbac";
-import { getApp } from "~/server/app-layer/app";
+import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -59,11 +60,12 @@ export type RetentionPolicySnapshot = {
 export async function getRetentionPolicySnapshot(
   ctx: ReadCtx,
   params: { projectId: string },
+  dataRetention: DataRetentionService,
+  planProvider: PlanProvider,
 ): Promise<RetentionPolicySnapshot> {
   const { projectId } = params;
-  const app = getApp();
 
-  const effective = await app.dataRetention.policy.getResolvedForProject(projectId);
+  const effective = await dataRetention.getResolvedForProject({ projectId });
 
   const project = await ctx.prisma.project.findUnique({
     where: { id: projectId },
@@ -126,13 +128,13 @@ export async function getRetentionPolicySnapshot(
         select: { id: true, name: true, teamId: true, archivedAt: true },
         orderBy: { name: "asc" },
       }),
-      app.dataRetention.policy.listOrganizationRules(organizationId),
+      dataRetention.listOrganizationRules({ organizationId }),
       probeOrganizationPermission(
         ctx as AuthedCtx,
         organizationId,
         "organization:manage",
       ),
-      canConfigureRetention(organizationId, ctx.session?.user ?? null),
+      canConfigureRetention(planProvider, organizationId, ctx.session?.user ?? null),
     ]);
 
   const projectTeamId: Record<string, string> = {};

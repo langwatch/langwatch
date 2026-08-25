@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { PinnedToActiveShareError } from "~/server/data-retention/pinning/pinnedTrace.service";
+import { PinnedToActiveShareError } from "@langwatch/share-contract";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const pinnedTraceRouter = createTRPCRouter({
@@ -14,7 +14,7 @@ export const pinnedTraceRouter = createTRPCRouter({
     )
     .permission("project:update")
     .mutation(async ({ input, ctx }) => {
-      return ctx.app.dataRetention.pinning.pin({
+      return ctx.app.dataRetention.pin({
         projectId: input.projectId,
         traceId: input.traceId,
         userId: ctx.session.user.id,
@@ -32,7 +32,7 @@ export const pinnedTraceRouter = createTRPCRouter({
     .permission("project:update")
     .mutation(async ({ input, ctx }) => {
       try {
-        await ctx.app.dataRetention.pinning.unpin({
+        await ctx.app.share.unpinTrace({
           projectId: input.projectId,
           traceId: input.traceId,
         });
@@ -56,7 +56,7 @@ export const pinnedTraceRouter = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      return ctx.app.dataRetention.pinning.getPin({
+      return ctx.app.dataRetention.tryGetPin({
         projectId: input.projectId,
         traceId: input.traceId,
       });
@@ -70,7 +70,7 @@ export const pinnedTraceRouter = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      return ctx.app.dataRetention.pinning.listByProject({
+      return ctx.app.dataRetention.listByProject({
         projectId: input.projectId,
       });
     }),

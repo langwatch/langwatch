@@ -164,10 +164,8 @@ export class App {
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
   readonly ops?: OpsDependencies;
-  readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
-  readonly sharedTraceCache: AppDependencies["sharedTraceCache"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -247,10 +245,8 @@ export class App {
     this.github = deps.github;
     this.langy = deps.langy;
     this.ops = deps.ops;
-    this.retentionPolicyCache = deps.retentionPolicyCache;
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
-    this.sharedTraceCache = deps.sharedTraceCache;
     this._eventSourcing = deps._eventSourcing;
     this._authzMigration = deps._authzMigration;
     this._shutdownResources = deps._shutdownResources ?? new AppShutdownResources();

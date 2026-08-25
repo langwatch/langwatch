@@ -52,12 +52,12 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
-    share: { resolveForViewer: mockResolveForViewer },
-    // No cache in unit tests: every call assembles, so the assertions below
-    // observe the real assembly rather than a replayed payload.
-    sharedTraceCache: {
-      get: async () => null,
-      set: async () => undefined,
+    share: {
+      resolveForViewer: mockResolveForViewer,
+      // No cache in unit tests: every call assembles, so the assertions below
+      // observe the real assembly rather than a replayed payload.
+      tryGetCachedPayload: async () => null,
+      cachePayload: async () => void 0,
     },
     projects: { tryGetById: mockProjectsGetById },
     traces: {
@@ -220,7 +220,10 @@ describe("sharedTrace.get", () => {
 
       expect(mockResolveForViewer).toHaveBeenCalledTimes(1);
       expect(mockResolveForViewer).toHaveBeenCalledWith(
-        expect.objectContaining({ token: TOKEN }),
+        expect.objectContaining({
+          token: TOKEN,
+          viewer: { type: "anonymous" },
+        }),
       );
     });
 

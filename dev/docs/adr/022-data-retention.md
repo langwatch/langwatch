@@ -215,12 +215,11 @@ row exists. Two interaction surfaces: `pin` (`source=manual`) and
 user can share, then explicitly pin — the row's source becomes `manual`
 while the share is still active.
 
-The unpin guard is `hasActiveShareForTrace`, **not** `pin.source === share`
-— an earlier version checked source and missed the share→manual promotion
-path. The router translates `PinnedToActiveShareError` to tRPC `CONFLICT`;
-the UI greys the unpin action and points at the share toggle.
-`PinnedTraceService` and `ShareService` would form a cycle; broken by
-injecting `hasActiveShareForTrace` as a predicate from `presets.ts`.
+Share owns the unpin guard because it owns active-link discovery. It throws
+`PinnedToActiveShareError` before delegating pin persistence to Data Retention;
+the router translates it to tRPC `CONFLICT`. The guard checks active links,
+not `pin.source`, so it still catches a share pin promoted to a manual pin.
+Data Retention does not query Share, keeping the service graph acyclic.
 
 ### Authorization
 

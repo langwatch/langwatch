@@ -196,12 +196,9 @@ import {
   type WebhookService,
 } from "./billing/enterprise/webhook.service";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import { PrismaDataRetentionAdapter } from "@langwatch/data-retention-server";
+import { PostgresShareAdapter } from "@langwatch/share-server";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
-import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
-import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRetentionPolicy.repository";
-import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
-import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { PostgresAutomationGraphDeliveryAdapter } from "@langwatch/automation-server";
@@ -338,11 +335,6 @@ import {
 } from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
-import { LedgerShareRepository } from "./share/repositories/share.ledger.repository";
-import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
-import { ShareService } from "./share/share.service";
-import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
-import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
@@ -501,22 +493,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     grants: authzFeature.grants,
   }).build();
   const licenseEnforcement = createLicenseEnforcementService(prisma);
-  const organizations = traced(
-    new OrganizationService(
-      new PrismaOrganizationRepository(prisma, authzFeature.grants),
-      prompts,
-      canonicalOrganizations,
-      licenseEnforcement,
-    ),
-    "OrganizationService",
-  );
   const broadcast = new BroadcastService(redis);
   const projects = traced(
     AppProjectRuntime.create({
       database: prisma,
       generateProjectId: nanoid,
       generateApiKey,
-      organizations,
+      organizations: canonicalOrganizations,
       keyMap: LwqlKeyMapService.create(
         new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
       ),
@@ -543,7 +526,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       pepper: apiKeyPepper,
       authz: authzFeature.permissions,
       grants: authzFeature.grants,
-      organizations,
+      organizations: canonicalOrganizations,
       projects,
       newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       deriveBindingId: AuthzFeature.deriveGrantId,
@@ -580,8 +563,35 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // evaluation-run repository below needs it and is built first — without it
   // that read floor silently falls back to the platform default, which is the
   // whole point of making it tenant-aware.
-  const dataRetentionPolicyRepo = new DataRetentionPolicyRepository(prisma);
-  const retentionPolicyCache = new RetentionPolicyCache(dataRetentionPolicyRepo);
+  const dataRetentionService = PrismaDataRetentionAdapter.create({
+    database: prisma,
+    projects,
+    organizations: canonicalOrganizations,
+    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    redis,
+    cacheTtlMs: 60_000,
+  });
+  const share = traced(
+    PostgresShareAdapter.create({
+      database: prisma,
+      dataRetention: dataRetentionService,
+      projects,
+      permissions: authzFeature.permissions,
+      grants: authzFeature.grants,
+      redis,
+    }),
+    "ShareService",
+  );
+  const organizations = traced(
+    new OrganizationService(
+      new PrismaOrganizationRepository(prisma, authzFeature.grants),
+      prompts,
+      canonicalOrganizations,
+      licenseEnforcement,
+      share,
+    ),
+    "OrganizationService",
+  );
 
   const traceSummary = traced(
     new TraceSummaryService(
@@ -641,7 +651,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         : async () => null,
       tupleParam: (values) => new TupleParam(values),
       runHistoryTelemetry: AppExperimentRunHistoryTelemetry.create(),
-      dspyRetention: AppExperimentDspyRetentionPort.create(retentionPolicyCache),
+      dspyRetention: AppExperimentDspyRetentionPort.create(dataRetentionService),
       execution: AppExperimentEventingAdapter.create(
         () => commands.experimentRuns,
       ).build(),
@@ -711,10 +721,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     EvaluatorFeature.create({ prisma, workflows }),
     "EvaluatorService",
   );
-  const traceService = TraceService.create(prisma, {
-    blobStore,
-    ioExtractionService,
-  });
+  const traceService = TraceService.create(
+    prisma,
+    {
+      blobStore,
+      ioExtractionService,
+    },
+    void 0,
+    void 0,
+    dataRetentionService,
+  );
 
   const evaluationExecution = traced(
     new EvaluationExecutionService({
@@ -742,7 +758,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
           },
         };
       },
-      retentionFloor: createRetentionFloorService(retentionPolicyCache),
+      retentionFloor: createRetentionFloorService(dataRetentionService),
       execution: AppEvaluationExecutionPort.create((input) =>
         evaluationExecution.executeForTrace({
           ...input,
@@ -987,62 +1003,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       })
     : undefined;
 
-  const dataRetentionPolicyService = new DataRetentionPolicyService(
-    dataRetentionPolicyRepo,
-    retentionPolicyCache,
-  );
-  const pinnedTraceRepo = new PinnedTraceRepository(prisma);
-  // Construct the share repo here (not inside ShareService) so the pinning
-  // service can ask "is this trace still shared?" without depending on
-  // ShareService — that would close the cycle: ShareService already depends
-  // on PinnedTraceService for auto(un)pin.
-  // A cut-over organization's links are written through the grants ledger and
-  // read off the same compat row as ever (ADR-092 PR 3); everyone else gets
-  // the Prisma repository byte for byte.
-  const shareRepo = new LedgerShareRepository({
-    legacy: new PrismaShareRepository(prisma),
-    prisma,
-    writer: () => authzFeature.grants,
-    authz: authzFeature.permissions,
-  });
-  const pinnedTraceService = new PinnedTraceService(
-    pinnedTraceRepo,
-    async ({ projectId, traceId }) => {
-      return shareRepo.hasActiveShareForResource({
-        projectId,
-        resourceType: "TRACE",
-        resourceId: traceId,
-      });
-    },
-  );
   const retroactiveUpdateService = new RetroactiveUpdateService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
   const storageMeterService = new StorageMeterService({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
   });
-  const dataRetention: DataRetentionDependencies = {
-    policy: dataRetentionPolicyService,
-    pinning: pinnedTraceService,
+  const dataRetention: DataRetentionDependencies = Object.assign(dataRetentionService, {
     retroactive: retroactiveUpdateService,
     metering: storageMeterService,
-  };
-
-  const share = traced(
-    new ShareService(shareRepo, pinnedTraceService, {
-      // Effective sharing = org AND project. Off at either level blocks new
-      // links; existing links stop resolving via resolveForViewer. ADR-057.
-      isTraceSharingEnabled: async (projectId) => {
-        const config = await projects.tryGetTraceSharingConfig(projectId);
-        return !!config && config.orgEnabled && config.projectEnabled;
-      },
-      // Makes `maxViews` count viewings rather than requests, so a recipient
-      // refreshing a single-view link doesn't lock themselves out. ADR-057.
-      viewDedupe: createShareViewDedupeService(redis),
-    }),
-    "ShareService",
-  );
-  const sharedTraceCache = createSharedTracePayloadCache(redis);
+  });
 
   const langyAdapter = PostgresLangyAdapter.create({ database: prisma });
   const langyPersistence = langyAdapter.eventing();
@@ -1283,7 +1253,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const eventStore = clickhouseEnabled
     ? new EventStoreClickHouse(
         new EventRepositoryClickHouse(resolveClickHouseClient),
-        retentionPolicyCache,
+        dataRetentionService,
       )
     : undefined;
   const configuredGlobalConcurrency = Number(process.env.GLOBAL_QUEUE_CONCURRENCY);
@@ -1318,7 +1288,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     consumersEnabled: roleRunsWorkers(config.processRole),
     executionTarget: config.processRole === "all" ? undefined : config.processRole,
     replayMarkerChecker: redis ? new RedisReplayMarkerChecker(redis) : undefined,
-    retentionPolicyResolver: retentionPolicyCache,
+    retentionPolicyResolver: dataRetentionService,
     configureGlobalProjections: config.isSaas
       ? (registry) => {
           registry.registerMapProjection(orgBillableEventsMeterProjection);
@@ -2126,10 +2096,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     prompts,
     nurturing,
     usageLimits,
-    retentionPolicyCache,
     dataRetention,
     share,
-    sharedTraceCache,
     commands,
     ops,
     _eventSourcing: es,
@@ -2151,15 +2119,6 @@ export function createTestApp(
 ): App {
   const testPrisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma: testPrisma });
-  const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
-  const testRetentionPolicyCache = new RetentionPolicyCache(testRetentionPolicyRepo);
-  // Single PinnedTraceService instance shared between dataRetention.pinning
-  // and share, mirroring the production wiring (presets.ts above). Without
-  // this, tests that auto-pin via share would see a different repo state
-  // than tests that pin directly through dataRetention.pinning.
-  const testPinnedTraceService = new PinnedTraceService(
-    new PinnedTraceRepository(testPrisma),
-  );
   const noop = async () => {
     /* noop */
   };
@@ -2229,15 +2188,6 @@ export function createTestApp(
     authz: testAuthz.permissions,
     grants: testAuthz.grants,
   }).build();
-  const nullOrganizations = traced(
-    new OrganizationService(
-      new NullOrganizationRepository(),
-      prompts,
-      testCanonicalOrganizations,
-      createLicenseEnforcementService(testPrisma),
-    ),
-    "OrganizationService",
-  );
   const testProjects = traced(
     AppProjectRuntime.create({
       database: testPrisma,
@@ -2247,6 +2197,31 @@ export function createTestApp(
       keyMap: LwqlKeyMapService.create(new NullLwqlKeyMapRepository()),
     }).build(),
     "ProjectService",
+  );
+  const testDataRetentionService = PrismaDataRetentionAdapter.create({
+    database: testPrisma,
+    projects: testProjects,
+    organizations: testCanonicalOrganizations,
+    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    cacheTtlMs: 60_000,
+  });
+  const testShare = PostgresShareAdapter.create({
+    database: testPrisma,
+    dataRetention: testDataRetentionService,
+    projects: testProjects,
+    permissions: testAuthz.permissions,
+    grants: testAuthz.grants,
+    redis: null,
+  });
+  const nullOrganizations = traced(
+    new OrganizationService(
+      new NullOrganizationRepository(),
+      prompts,
+      testCanonicalOrganizations,
+      createLicenseEnforcementService(testPrisma),
+      testShare,
+    ),
+    "OrganizationService",
   );
   const apiKeys = AppApiKeyRuntime.create({
     database: testPrisma,
@@ -2340,7 +2315,7 @@ export function createTestApp(
       insert: async () => undefined,
       query: async () => ({ json: async () => [] }),
     }),
-    retentionFloor: createRetentionFloorService(testRetentionPolicyCache),
+    retentionFloor: createRetentionFloorService(testDataRetentionService),
     execution: AppEvaluationExecutionPort.create(async () => ({
       status: "skipped",
     })),
@@ -2383,6 +2358,13 @@ export function createTestApp(
     database: testPrisma,
     processStore: new PrismaProcessStore(testPrisma),
   }).build();
+  const testDataRetention: DataRetentionDependencies = Object.assign(
+    testDataRetentionService,
+    {
+      retroactive: new RetroactiveUpdateService(null),
+      metering: new StorageMeterService({ resolveClickHouseClient: null }),
+    },
+  );
 
   return new App({
     config,
@@ -2484,7 +2466,7 @@ export function createTestApp(
       resolveClickHouseClient: async () => null,
       tupleParam: (values) => new TupleParam(values),
       runHistoryTelemetry: AppExperimentRunHistoryTelemetry.create(),
-      dspyRetention: AppExperimentDspyRetentionPort.create(testRetentionPolicyCache),
+      dspyRetention: AppExperimentDspyRetentionPort.create(testDataRetentionService),
       slugify,
       newId: () => nanoid(8),
     }).build(),
@@ -2766,53 +2748,8 @@ export function createTestApp(
         },
       },
     },
-    retentionPolicyCache: testRetentionPolicyCache,
-    dataRetention: {
-      policy: new DataRetentionPolicyService(
-        testRetentionPolicyRepo,
-        testRetentionPolicyCache,
-      ),
-      pinning: testPinnedTraceService,
-      retroactive: new RetroactiveUpdateService(null),
-      metering: new StorageMeterService({ resolveClickHouseClient: null }),
-    },
-    share: new ShareService(
-      // The same repository the real preset wires, so a test organization
-      // that has been cut over exercises the ledger path rather than a shape
-      // only tests see. The writer is built over `testPrisma` explicitly
-      // through the same contract capability as production.
-      new LedgerShareRepository({
-        legacy: new PrismaShareRepository(testPrisma),
-        prisma: testPrisma,
-        writer: () => testAuthz.grants,
-        authz: testAuthz.permissions,
-      }),
-      testPinnedTraceService,
-      {
-        isTraceSharingEnabled: async (projectId) => {
-          // Effective sharing = org AND project (ADR-057).
-          const project = await testPrisma.project.findUnique({
-            where: { id: projectId },
-            select: {
-              traceSharingEnabled: true,
-              team: {
-                select: {
-                  organization: { select: { traceSharingEnabled: true } },
-                },
-              },
-            },
-          });
-          return (
-            !!project &&
-            project.team.organization.traceSharingEnabled &&
-            project.traceSharingEnabled
-          );
-        },
-      },
-    ),
-    // No Redis in the test preset: every open counts as a viewing and nothing
-    // is cached, which is the stricter behaviour of both.
-    sharedTraceCache: createSharedTracePayloadCache(null),
+    dataRetention: testDataRetention,
+    share: testShare,
     _authzMigration: testAuthz.migration,
     ...overrides,
   });

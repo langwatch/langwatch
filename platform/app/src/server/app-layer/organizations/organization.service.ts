@@ -47,6 +47,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient, User } from "~/generated/prisma/client";
 import type { PromptService } from "@langwatch/prompt-contract";
+import type { ShareService } from "@langwatch/share-contract";
 import {
   type OrganizationIntent,
   type OrganizationUserRole,
@@ -71,7 +72,6 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../../api/enterprise";
-import { getApp } from "../app";
 import type { PlanProviderUser } from "../subscription/plan-provider";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import {
@@ -288,6 +288,7 @@ export class OrganizationService extends OrganizationServiceContract {
     private readonly prompts: Pick<PromptService, "seedTagsForOrganization">,
     private readonly canonical?: OrganizationServiceContract,
     private readonly licenseEnforcement?: LicenseEnforcementService,
+    private readonly shares?: ShareService,
   ) {
     super();
   }
@@ -759,13 +760,18 @@ export class OrganizationService extends OrganizationServiceContract {
     await this.repo.updateSettings(input);
 
     if (input.traceSharingEnabled === false && wasSharingEnabled) {
+      if (!this.shares) {
+        throw new Error("Share service is required to disable trace sharing");
+      }
+
+      const shares = this.shares;
       const projectIds = await this.repo.getProjectIds(input.organizationId);
       // Settled, not `all`: the setting already reads "sharing off", so a
       // first rejection that skipped the remaining projects would leave live
       // share links behind an organization that says it has none. Every
       // project is attempted, and the caller is told which ones survived.
       const outcomes = await Promise.allSettled(
-        projectIds.map((projectId) => getApp().share.revokeAllTraceShares(projectId)),
+        projectIds.map((projectId) => shares.revokeAllTraceShares(projectId)),
       );
       const unrevoked = projectIds.filter(
         (_, index) => outcomes[index]?.status === "rejected",

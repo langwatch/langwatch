@@ -12,14 +12,6 @@ vi.mock("~/env.mjs", () => ({ env: envMock }));
 const planMocks = vi.hoisted(() => ({
   getActivePlan: vi.fn(),
 }));
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    planProvider: { getActivePlan: planMocks.getActivePlan },
-  }),
-}));
-
 import {
   assertPlanAllowsRetentionValue,
   assertRetentionWriteAllowed,
@@ -28,6 +20,9 @@ import {
 const paidPlan = { free: false, type: "GROWTH_SEAT_EUR_MONTHLY" } as PlanInfo;
 const enterprisePlan = { free: false, type: "ENTERPRISE" } as PlanInfo;
 const freePlan = { free: true, type: "FREE" } as PlanInfo;
+const planProvider = {
+  getActivePlan: planMocks.getActivePlan,
+} as any;
 
 const expectForbidden = (fn: () => void) => {
   expect(fn).toThrow(TRPCError);
@@ -118,7 +113,7 @@ describe("assertRetentionWriteAllowed", () => {
   it("resolves the org and plan exactly once for the whole gate", async () => {
     planMocks.getActivePlan.mockResolvedValue(paidPlan);
     const ctx = makeCtx();
-    await assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35);
+    await assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35, planProvider);
     expect(ctx.prisma.organization.findUnique).toHaveBeenCalledTimes(1);
     expect(planMocks.getActivePlan).toHaveBeenCalledTimes(1);
   });
@@ -126,14 +121,14 @@ describe("assertRetentionWriteAllowed", () => {
   it("rejects a paid org's off-menu value end-to-end", async () => {
     planMocks.getActivePlan.mockResolvedValue(paidPlan);
     await expect(
-      assertRetentionWriteAllowed(makeCtx(), ORG_SCOPE, 371),
+      assertRetentionWriteAllowed(makeCtx(), ORG_SCOPE, 371, planProvider),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("blocks a free org via the free gate before the value rule", async () => {
     planMocks.getActivePlan.mockResolvedValue(freePlan);
     await expect(
-      assertRetentionWriteAllowed(makeCtx(), ORG_SCOPE, 35),
+      assertRetentionWriteAllowed(makeCtx(), ORG_SCOPE, 35, planProvider),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
@@ -144,9 +139,9 @@ describe("assertRetentionWriteAllowed", () => {
         organization: { findUnique: vi.fn().mockResolvedValue(null) },
       },
     } as any;
-    await expect(assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35)).rejects.toMatchObject({
-      code: "NOT_FOUND",
-    });
+    await expect(
+      assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35, planProvider),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(planMocks.getActivePlan).not.toHaveBeenCalled();
   });
 });
