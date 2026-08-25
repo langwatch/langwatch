@@ -56,3 +56,7 @@ export type {
   IdentityResolution,
   IdentityResolutionPort,
 } from "./better-auth/storage-ports";
+export {
+  MfaCeremonies,
+  type MfaCeremoniesDeps,
+} from "./better-auth/mfa-ceremonies";

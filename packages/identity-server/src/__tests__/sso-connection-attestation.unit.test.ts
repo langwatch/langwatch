@@ -11,6 +11,7 @@ import { SsoConnectionGuards } from "../sso-connection-guards";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -100,6 +101,7 @@ beforeEach(() => {
     breakGlass,
     stranding: new StubStranding([]),
     platformOperators: new StubPlatformOperators([OLIVE.id]),
+    licenseAuthority: new StubLicenseAuthority(true),
   });
 });
 
@@ -130,12 +132,13 @@ describe("operator attestation", () => {
       // No ceremony was ever opened, so none is in flight.
       expect(state.pendingVerification).toBeNull();
       expect(state.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
     });
 
@@ -243,12 +246,13 @@ describe("operator attestation", () => {
       expect(aYearOn?.tearDownAfterMs).toBeNull();
       expect(aYearOn?.pendingVerification).toBeNull();
       expect(aYearOn?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
 
       // And it is still commandable as an ACTIVE connection at that later
@@ -305,12 +309,13 @@ describe("operator attestation", () => {
         actor: OLIVE,
       });
       expect(suspended.state.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
     });
   });
@@ -362,6 +367,10 @@ describe("operator attestation", () => {
             method: "dns-txt",
             actorId: "user_first",
             verifiedAtMs: T0,
+            proofState: "VERIFIED",
+            firstAbsentAtMs: null,
+            graceEndsAtMs: null,
+            tokenHash: null,
           },
         ],
       });
@@ -497,28 +506,31 @@ describe("operator attestation", () => {
       // Each domain names the method that proved it, and who — so a dispute
       // is answerable from the connection alone.
       expect(attested?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
       expect(published?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "beta.example",
           method: "dns-txt",
           actorId: ANA.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
       expect(byLicence?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "gamma.example",
           method: "license-token",
           actorId: ANA.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
 
       // And nothing anywhere can present the attested one as customer-proved:

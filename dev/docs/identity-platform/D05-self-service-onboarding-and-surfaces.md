@@ -18,7 +18,7 @@ Enterprise SSO onboarding stops being a support ticket. Org admins register and 
 
 **Registry permissions (authz API, no seam):**
 
-- `sso:view`, `sso:manage`, `scim:view`, `scim:manage` registered in `packages/authz/src/registry.ts` (org-scope only, org-exclusive like governance). The registry is a shared package, not app code: `server/authz/registry.ts` does not exist and never did — app-side authorization (the tRPC middleware, the engine gate, the grants runtime) lives at `server/app-layer/authz`, and it consumes the registry rather than holding it.
+- `sso:view`, `sso:manage` registered in `packages/authz/src/registry.ts` (org-scope only, org-exclusive like governance). They gate directory sync too: the directory provisions against a connection, so a second pair would have been a second name for one job. The registry is a shared package, not app code: `server/authz/registry.ts` does not exist and never did — app-side authorization (the tRPC middleware, the engine gate, the grants runtime) lives at `server/app-layer/authz`, and it consumes the registry rather than holding it.
 - IT-admin custom role = `CustomRole` row holding only those permissions, bound at org scope.
 - All tRPC gating via `.permission()`/`authz.require`; all UI gating via `useCan`/`RequireCan`.
 

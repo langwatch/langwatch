@@ -70,7 +70,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # Needs Postgres: a stored token row read back through verifyEntitled,
   # and a push authenticated with it landing a sync fact that names the
   # connection. Attribution cannot be observed without a real push.
-  @integration @unimplemented
+  @integration
   Scenario: A token is issued against exactly one connection
     When a directory token is minted for "okta-primary"
     Then the token names "okta-primary" as the connection it was issued for
@@ -100,7 +100,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # Needs Postgres: the connection's ScimToken rows gone, its ScimSyncState
   # folded to REVOKED, and the other connection's token still verifying.
-  @integration @unimplemented
+  @integration
   Scenario: Tearing a connection down ends its tokens
     Given "okta-primary" has a working directory token
     When "okta-primary" is torn down
@@ -165,7 +165,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the role they hold is the one the directory's mapping asserts
     And no membership is created with a role nothing asserted
 
-  @unit @unimplemented
+  @unit
   Scenario: Every membership a directory push causes is explained by an event
     Given "acme" has been synced through a full push, group and removal cycle
     When "acme"'s memberships are read back against the events that caused them
@@ -179,7 +179,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And the membership fact's actor is the one directory principal, the same on every connection
     And no per-customer value is used as an actor
 
-  @unit @unimplemented
+  @unit
   Scenario: Directory-sourced membership changes stay on the customer's audit page
     When "okta-primary" pushes people in and out of "acme"
     Then each change appears on "acme"'s audit page

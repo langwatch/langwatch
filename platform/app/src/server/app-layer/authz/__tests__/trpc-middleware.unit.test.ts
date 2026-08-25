@@ -85,6 +85,11 @@ const paramsFor = (
     session: (authed ? session : null) as any,
     permissionChecked: false,
     organizationRole: undefined as any,
+    // The seam's own suite, not the second-factor gate's: the gate runs after
+    // the permission and reads the organization it guards, which no fixture
+    // here creates. Handed in through the ctx slot that exists for exactly
+    // this — `mfa-gate`'s behaviour is asserted by its own tests.
+    mfaGate: { offered: () => false } as any,
   },
   input,
   next: vi.fn().mockReturnValue("next-called"),
@@ -428,6 +433,20 @@ describe("declaredNoPermission", () => {
         allow: { organizationId: "creating inside this organization" },
       })(paramsFor({ organizationId: "org-1" }) as any),
     ).resolves.toBe("next-called");
+  });
+
+  /** @scenario "An opted-out procedure cannot silently read scoped input" */
+  it("passes a procedure that declares no input at all, rather than throwing on it", async () => {
+    // `in` throws on `undefined`, so a procedure with no `.input()` used to
+    // fail here — every call became a 500 at the boundary before the handler
+    // ran, which is how `identity.myIdentifiers` took the authentication
+    // settings page down. Nothing is skipped by allowing it: an input that
+    // does not exist carries no scope id to smuggle past the check.
+    const middleware = declaredNoPermission({ reason: "no input at all" });
+    const params = { ...paramsFor({}), input: undefined };
+
+    await expect(middleware(params as any)).resolves.toBe("next-called");
+    expect(params.ctx.permissionChecked).toBe(true);
   });
 });
 

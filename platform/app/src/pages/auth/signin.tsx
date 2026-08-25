@@ -15,10 +15,10 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  FrontDoorShell,
+  AuthShell,
   IdentifierFirstSignIn,
-  useIdentityFrontDoor,
-} from "~/features/auth-front-door";
+  useIdentityAuthScreens,
+} from "~/features/auth";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
@@ -39,21 +39,21 @@ import { isStableAuthError, normalizeErrorCode, SignInError } from "./error";
  * which one it is, because guessing would flash the wrong door on every load.
  */
 export default function SignIn() {
-  const frontDoor = useIdentityFrontDoor();
+  const auth = useIdentityAuthScreens();
 
-  if (!frontDoor.isResolved) return null;
-  if (frontDoor.enabled) {
+  if (!auth.isResolved) return null;
+  if (auth.enabled) {
     return (
       // The same room as sign-up, same seats: words on the left, card on the
       // right. The panel greets rather than pitches, because somebody logging
       // in already made the decision the sign-up headline argues for.
-      <FrontDoorShell
+      <AuthShell
         headline={"Let's see what your agents\nhave been up to."}
         headlineAccent="up to"
         tagline="Log in and pick up where you left off."
       >
         <IdentifierFirstSignIn />
-      </FrontDoorShell>
+      </AuthShell>
     );
   }
 

@@ -7,12 +7,14 @@ import {
 /**
  * Sign-up's address confirmation (D13, ADR-117 §6).
  *
- * The front door verifies the address BEFORE any sign-in method is chosen, so
- * this is the first thing sign-up does and the only thing it does until the
- * emailed link comes back. Nothing is created for the address in between: the
- * only state a request leaves behind is a single-use token with an hour on it,
- * which is what makes an abandoned sign-up cost nothing and an expired one
- * recoverable by asking again.
+ * The address is confirmed BEFORE anybody gets in. The account is created by
+ * the credential step — it has to be, because a passkey cannot be enrolled
+ * against an account that does not exist yet — but no session is opened for
+ * it, and the link is what opens the first one. So an account whose address
+ * was never confirmed is an account nobody ever signed into.
+ *
+ * The state a request leaves behind is a single-use token with an hour on it,
+ * which is what makes an expired sign-up recoverable by asking again.
  *
  * A token may carry a PENDING CREDENTIAL: the password somebody typed into the
  * log-in form for an address nobody holds. That is the same journey arriving
@@ -51,9 +53,23 @@ export interface SignUpVerificationMailer {
   }): Promise<void>;
 }
 
-/** Whether an address already has an account (epic Q12: sign-up may say so). */
+/**
+ * What an address already is to us. Three states rather than a boolean,
+ * because sign-up now treats the middle one differently from both ends: an
+ * account whose address is still unconfirmed is somebody mid-sign-up, and the
+ * one thing they may need is the link again.
+ */
+export type SignUpAddressState =
+  /** No account. A sign-up may proceed. */
+  | "unknown"
+  /** An account exists and its address has not been confirmed yet. */
+  | "awaiting_confirmation"
+  /** An account exists and its address is confirmed. The wrong door. */
+  | "confirmed";
+
+/** What an address already is (epic Q12: sign-up may say so out loud). */
 export interface SignUpAccountDirectory {
-  hasAccountFor(input: { email: string }): Promise<boolean>;
+  stateFor(input: { email: string }): Promise<SignUpAddressState>;
 }
 
 /** Creates the account a confirmed pending credential earned. */
@@ -95,6 +111,28 @@ const SIGN_UP_TOKEN_NAMESPACE = "identity-signup-verification:";
 export const SIGN_UP_VERIFICATION_TTL_MS = 60 * 60 * 1000;
 
 /**
+ * The namespace for a PROOF that an address was confirmed while it had no
+ * account yet.
+ *
+ * A link minted from the log-in door (an address nobody holds, typed into a
+ * password field) confirms an address that has nothing behind it. The account
+ * is created a screen later, by `user.register`, and without this that account
+ * would be born unconfirmed and immediately mailed a second link — asking
+ * somebody to prove, twice, an address they just proved.
+ *
+ * The proof is a server-minted single-use token rather than a flag the browser
+ * sets, because "this address is already confirmed" is exactly the claim a
+ * caller must not be able to make about an address they do not hold.
+ */
+const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
+
+/**
+ * Half an hour: long enough to choose a password on the very next screen,
+ * short enough that a proof left lying in a closed tab is worthless.
+ */
+export const CONFIRMED_ADDRESS_TTL_MS = 30 * 60 * 1000;
+
+/**
  * What a sign-up token stands for: an address, and — only on links minted
  * before both doors converged — a credential.
  *
@@ -120,14 +158,27 @@ export class SignUpVerificationService {
   }
 
   /**
-   * Whether the address already holds an account — the one question sign-up
-   * is allowed to answer out loud (epic Q12), because refusing to say it is
-   * what strands somebody on an account they half-created.
+   * What the address already is — the one question sign-up is allowed to
+   * answer out loud (epic Q12), because refusing to say it is what strands
+   * somebody on an account they half-created.
    */
-  async addressIsRegistered({ email }: { email: string }): Promise<boolean> {
-    return this.deps.directory.hasAccountFor({
+  async addressState({
+    email,
+  }: {
+    email: string;
+  }): Promise<SignUpAddressState> {
+    return this.deps.directory.stateFor({
       email: normalizeIdentifierValue(email),
     });
+  }
+
+  /**
+   * Whether the address already holds an account, confirmed or not. The
+   * question `completeVerification` asks, where the difference does not
+   * matter: a link confirms an account that exists either way.
+   */
+  async addressIsRegistered({ email }: { email: string }): Promise<boolean> {
+    return (await this.addressState({ email })) !== "unknown";
   }
 
   /**
@@ -157,6 +208,14 @@ export class SignUpVerificationService {
     email: string;
     accountCreated: boolean;
     accountExists: boolean;
+    /**
+     * Only where the confirmed address has NO account yet: the single-use
+     * proof `user.register` spends to mark the account it is about to create
+     * as already confirmed, so nobody is asked to prove the same address
+     * twice. Null in every other case, where there is an account to mark and
+     * it has just been marked.
+     */
+    addressProof: string | null;
   }> {
     const claimed = await this.deps.tokens.claim({ token, now: this.now() });
     const pending = claimed ? readPendingSignUp(claimed.identifier) : null;
@@ -177,17 +236,21 @@ export class SignUpVerificationService {
         email: pending.email,
         accountCreated: false,
         accountExists: true,
+        addressProof: null,
       };
     }
 
     // No account, and no credential to make one from: the link came from the
     // log-in door, where a password is asked for once and never kept. The
-    // screen takes it from here.
+    // screen takes it from here — and carries the proof, so the account it
+    // creates is born confirmed instead of being mailed a second link for the
+    // address this one just proved.
     if (!pending.passwordHash) {
       return {
         email: pending.email,
         accountCreated: false,
         accountExists: false,
+        addressProof: await this.issueAddressProof({ email: pending.email }),
       };
     }
 
@@ -196,7 +259,64 @@ export class SignUpVerificationService {
       passwordHash: pending.passwordHash,
     });
     await this.deps.accounts.markAddressConfirmed({ email: pending.email });
-    return { email: pending.email, accountCreated: true, accountExists: true };
+    return {
+      email: pending.email,
+      accountCreated: true,
+      accountExists: true,
+      addressProof: null,
+    };
+  }
+
+  /**
+   * Spends a proof minted by `completeVerification`, and answers whether it
+   * was genuinely one for this address.
+   *
+   * Both halves matter. Claiming makes it single-use, so a proof cannot mint
+   * a second confirmed account; comparing the address makes it non-
+   * transferable, so a proof for one address cannot confirm another. A proof
+   * that is missing, expired, spent or for somebody else all answer false, and
+   * the caller's job is then simply to send a link the ordinary way.
+   */
+  async claimAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    const claimed = await this.deps.tokens.claim({ token, now: this.now() });
+    if (!claimed?.identifier.startsWith(CONFIRMED_ADDRESS_NAMESPACE)) {
+      return false;
+    }
+    return (
+      claimed.identifier.slice(CONFIRMED_ADDRESS_NAMESPACE.length) ===
+      normalizeIdentifierValue(email)
+    );
+  }
+
+  /**
+   * Records that an address is proved. Called where the proof and the account
+   * arrive in the other order — `user.register` creating an account for an
+   * address a link confirmed a screen earlier.
+   */
+  async markAddressConfirmed({ email }: { email: string }): Promise<void> {
+    await this.deps.accounts.markAddressConfirmed({
+      email: normalizeIdentifierValue(email),
+    });
+  }
+
+  private async issueAddressProof({
+    email,
+  }: {
+    email: string;
+  }): Promise<string> {
+    const token = this.mintToken();
+    await this.deps.tokens.issue({
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${email}`,
+      token,
+      expires: new Date(this.now().getTime() + CONFIRMED_ADDRESS_TTL_MS),
+    });
+    return token;
   }
 
   private async issueLink({

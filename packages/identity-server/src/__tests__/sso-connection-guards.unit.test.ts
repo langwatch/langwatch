@@ -15,6 +15,7 @@ import { SsoConnectionGuards } from "../sso-connection-guards";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -97,6 +98,7 @@ beforeEach(() => {
     breakGlass,
     stranding,
     platformOperators: new StubPlatformOperators([OPS.id]),
+    licenseAuthority: new StubLicenseAuthority(),
   });
 });
 
@@ -263,6 +265,7 @@ describe("sso connection guards", () => {
       expect(requested.state.state).toBe("VERIFICATION_PENDING");
       expect(requested.state.pendingVerification).toEqual({
         domain: "acme.com",
+        expiresAtMs: null,
         method: "dns-txt",
         tokenHash: "sha256:9f86d0",
       });
@@ -526,6 +529,125 @@ describe("sso connection guards", () => {
       });
       expect(held?.state).toBe("ACTIVE");
       expect(held?.verifiedDomains).toEqual(["acme.com"]);
+    });
+  });
+
+  describe("when a published record is what decides the claim", () => {
+    /** @scenario "A published record decides the claim, with nobody at LangWatch in the loop" */
+    it("states the approval on the record's authority and the proof together, in that order", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          allowsJit: true,
+        }),
+      );
+      await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+      // The record may be asked for against an undecided claim, which is
+      // what makes a decision-free journey possible at all.
+      await run(() =>
+        guards.requestVerification({
+          ...identity,
+          domain: "acme.com",
+          method: "dns-txt",
+          tokenHash: "sha256:proof",
+        }),
+      );
+
+      const { facts, state } = await run(() =>
+        guards.verifyDomain({ ...identity, domain: "acme.com" }),
+      );
+
+      expect(facts.map((fact) => fact.type)).toEqual([
+        DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        DOMAIN_VERIFIED_EVENT_TYPE,
+      ]);
+      expect(facts[0]!.data).toMatchObject({
+        authority: "dns-proof",
+        actor: ANA,
+      });
+      expect(state.state).toBe("VERIFIED");
+      expect(state.verifiedDomains).toEqual(["acme.com"]);
+      expect(state.domainClaims).toEqual([
+        expect.objectContaining({ state: "APPROVED", authority: "dns-proof" }),
+      ]);
+    });
+
+    /** @scenario "Claiming the record's authority without the record proves nothing" */
+    it("refuses a caller that names the record's authority itself", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          allowsJit: true,
+        }),
+      );
+      await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+
+      await expect(
+        guards.approveDomainClaim({
+          ...identity,
+          domain: "acme.com",
+          authority: "dns-proof",
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
+
+      const held = await connections.findConnection({
+        connectionId: CONNECTION,
+      });
+      expect(held?.approvedDomains).toEqual([]);
+      expect(held?.domainClaims[0]?.state).toBe("WAITING");
+    });
+
+    /** @scenario "A licence-bound ceremony cannot stand in for a decision" */
+    it("refuses a licence ceremony against a claim nobody decided", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          allowsJit: true,
+        }),
+      );
+      await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+
+      await expect(
+        guards.requestVerification({
+          ...identity,
+          domain: "acme.com",
+          method: "license-token",
+          tokenHash: "sha256:licence",
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
+    });
+  });
+
+  describe("when a domain nobody could own alone is claimed", () => {
+    /** @scenario "A consumer mail domain cannot be claimed on any tier" */
+    /** @scenario "A public suffix with no company behind it cannot be claimed either" */
+    it("refuses a shared mail provider, a domain ending and a bare label, stating nothing", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          allowsJit: true,
+        }),
+      );
+
+      for (const domain of ["gmail.com", "OUTLOOK.com", "co.uk", "com"]) {
+        await expect(
+          guards.claimDomain({ ...identity, domain }),
+        ).rejects.toMatchObject({ code: "sso_domain_not_eligible" });
+      }
+
+      const held = await connections.findConnection({
+        connectionId: CONNECTION,
+      });
+      expect(held?.state).toBe("DRAFT");
+      expect(held?.domainClaims).toEqual([]);
     });
   });
 });

@@ -169,7 +169,7 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused with code join_request_throttled and status 429
     And asking after the cool-down opens a fresh PENDING request
 
-  @unit @unimplemented
+  @unit
   Scenario: Every refusal reaches the person as words
     When any of these refusals is shown to a person
     Then the screen shows the customer copy registered for that code

@@ -16,7 +16,7 @@ Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
   starts with the address, and the answer to where it signs in is the
   router's - specs/identity/signin-signup-screens.feature owns and binds that,
   and specs/identity/signin-router.feature owns the decisions themselves. What
-  stays here is the transport underneath, unchanged by the front door: the
+  stays here is the transport underneath, unchanged by the auth screens: the
   same endpoints, the same session cookie, the same legacy callback path that
   customer identity-provider applications are configured against. The Auth0
   flow retires at D10, when the legacy callback shim goes.

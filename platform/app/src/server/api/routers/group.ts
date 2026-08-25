@@ -113,7 +113,8 @@ export const groupRouter = createTRPCRouter({
     // Tightened from organization:view to manage — exposes every
     // group's role-binding map (which scopes they grant on, what
     // role, which custom role). Authz config, admin-surface.
-    // Sole TS caller is settings/groups.tsx, an admin-only page.
+    // Sole TS caller is the groups tab of settings/directory.tsx, an
+    // admin-only page.
     .permission("organization:manage")
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({

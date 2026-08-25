@@ -14,6 +14,8 @@ import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
+import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
+import { useOrganizationMfaGate } from "../features/mfa/hooks/useOrganizationMfaGate";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import {
   useOrganizationTeamProject,
@@ -28,6 +30,7 @@ import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
+import { JoinYourTeamNotice } from "./JoinYourTeamNotice";
 import { SavedViewsBar } from "./SavedViewsBar";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -133,6 +136,15 @@ export const DashboardPageBody = ({
   // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
   // `project?.slug` would otherwise read as a match on any route that hasn't
   // resolved a project yet.
+  // The organization's membership condition (D06), asked on the way into ITS
+  // data and nowhere else. A personal-scope route is never held: the
+  // requirement belongs to the organization that set it, and nobody's own
+  // workspace is stranded by their employer's decision.
+  const mfaGate = useOrganizationMfaGate({
+    organizationId: organization?.id,
+    isPersonalScope: isPersonalScopeRoute,
+  });
+
   const isDemoProject =
     !!publicEnv.data?.DEMO_PROJECT_SLUG &&
     publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
@@ -266,6 +278,27 @@ export const DashboardPageBody = ({
 
       <AnnouncementBanner />
 
+      {/* That their colleagues are already here (D12). Renders nothing for
+          nearly everybody.
+
+          The "your address is not confirmed yet" nudge that stood beside this
+          is gone with the sign-up gate (ADR-117 §6): the address is confirmed
+          before anybody gets in, so a signed-in person's own address is
+          confirmed by construction and the banner had nobody left to warn.
+
+          It could still have fired for accounts created before the gate,
+          and that is the second reason it went rather than a reason to keep
+          it: `createCredentialUser` has never set `emailVerified`, so every
+          password account made before this reads as unconfirmed. What the
+          nudge would have done on those is paint a warning above every page
+          of the app for most of the existing user base, about an address they
+          have been receiving our mail at for years.
+
+          An ADDITIONAL address still gets asked about — in account settings,
+          on the row it belongs to, which is where somebody who added one goes
+          looking. */}
+      <JoinYourTeamNotice />
+
       {adminViewingAs && (
         <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
       )}
@@ -300,7 +333,7 @@ export const DashboardPageBody = ({
                 color="white"
                 asChild
               >
-                <Link href="/settings/authentication">
+                <Link href="/settings/security">
                   <KeyRound size={14} />
                   Link SSO Account
                 </Link>
@@ -331,7 +364,19 @@ export const DashboardPageBody = ({
         /[project]/traces where TracesPage already mounts it. */}
       <GlobalTraceV2DrawerMount />
 
-      {userIsPartOfTeam ? (
+      {mfaGate.outcome.held ? (
+        // The enrollment gate (D06). Here rather than in each shell because
+        // this is the one interior every shell renders, so the gate cannot be
+        // reachable through a nav mode somebody forgot to wire. It swaps the
+        // BODY and leaves the chrome: the organization switcher above it is
+        // how somebody reaches everything they are not held out of, and
+        // nothing about their session has changed.
+        <OrganizationMfaGate
+          organizationName={mfaGate.outcome.organizationName}
+          offerPasskey={mfaGate.outcome.offerPasskey}
+          onEnrolled={mfaGate.refresh}
+        />
+      ) : userIsPartOfTeam ? (
         // Page body absorbs leftover vertical space inside the
         // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
         // pages that use `height="full"` interpret it as "100%

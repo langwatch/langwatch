@@ -21,11 +21,22 @@ import {
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
+  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+  DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
+  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
+  domainClaimFor,
+  domainClaimRetryAfterSeconds,
+  domainProofFor,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   type GrandfatherConnectionCommandData,
   type IdentityActor,
+  isClaimableSsoDomain,
   normalizeDomain,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  type RecordDomainProofPresentCommandData,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
@@ -41,11 +52,18 @@ import {
   type SsoConnectionFactInput,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
+  type SsoDomainClaimAuthority,
+  type SsoDomainVerification,
   SsoConnectionActivationBlockedError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
   SsoConnectionOperatorActRequiredError,
   SsoConnectionTeardownStrandsUsersError,
+  SsoDomainClaimThrottledError,
+  SsoDomainNotEligibleError,
+  SsoDomainProofExpiredError,
+  SsoLicenseRequiredError,
+  verificationHasExpired,
   type SuspendConnectionCommandData,
   TEARDOWN_REQUESTED_EVENT_TYPE,
   VERIFICATION_REQUESTED_EVENT_TYPE,
@@ -56,6 +74,7 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoLicenseAuthorityRepository,
   SsoPlatformOperatorRepository,
 } from "./sso-connection.repository";
 
@@ -88,12 +107,29 @@ const ALLOWED_FROM: Record<
   [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [DISCARD_CONNECTION_COMMAND_TYPE]: ["DRAFT"],
-  [REQUEST_VERIFICATION_COMMAND_TYPE]: ["APPROVED"],
+  // From CLAIMED, because the published record is what DECIDES a claim: a
+  // customer is given the record the moment they claim, and the proof
+  // landing states the approval and the verification together. From
+  // APPROVED for the tiers a licence or an operator already decided, and
+  // from VERIFICATION_PENDING so a customer whose record expired can ask for
+  // a fresh one. A re-request costs no progress either way.
+  [REQUEST_VERIFICATION_COMMAND_TYPE]: [
+    "CLAIMED",
+    "APPROVED",
+    "VERIFICATION_PENDING",
+  ],
   // Attestation replaces the PROOF, never the approval: it is commandable
   // from APPROVED and from nowhere else, which is what makes an attestation
   // against an unapproved claim a refusal rather than a shortcut.
   [ATTEST_DOMAIN_COMMAND_TYPE]: ["APPROVED"],
   [VERIFY_DOMAIN_COMMAND_TYPE]: ["VERIFICATION_PENDING"],
+  // Re-checking is for a connection whose domains are actually doing
+  // something: one that reached VERIFIED and one serving traffic. A
+  // SUSPENDED connection routes nothing, so doubting its evidence would
+  // produce alerts about a door nobody can open, and a TEARDOWN_PENDING one
+  // is on its way out.
+  [RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE]: ["VERIFIED", "ACTIVE"],
+  [RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE]: ["VERIFIED", "ACTIVE"],
   [ACTIVATE_CONNECTION_COMMAND_TYPE]: ["VERIFIED"],
   [SUSPEND_CONNECTION_COMMAND_TYPE]: ["ACTIVE"],
   [RESUME_CONNECTION_COMMAND_TYPE]: ["SUSPENDED"],
@@ -106,6 +142,8 @@ export interface SsoConnectionGuardsDeps {
   breakGlass: SsoBreakGlassBindingRepository;
   stranding: SsoConnectionStrandingRepository;
   platformOperators: SsoPlatformOperatorRepository;
+  /** What the installation's licence may authorize (D05 tier 2). */
+  licenseAuthority: SsoLicenseAuthorityRepository;
 }
 
 export class SsoConnectionGuards {
@@ -113,12 +151,14 @@ export class SsoConnectionGuards {
   private readonly breakGlass: SsoBreakGlassBindingRepository;
   private readonly stranding: SsoConnectionStrandingRepository;
   private readonly platformOperators: SsoPlatformOperatorRepository;
+  private readonly licenseAuthority: SsoLicenseAuthorityRepository;
 
   constructor(deps: SsoConnectionGuardsDeps) {
     this.connections = deps.connections;
     this.breakGlass = deps.breakGlass;
     this.stranding = deps.stranding;
     this.platformOperators = deps.platformOperators;
+    this.licenseAuthority = deps.licenseAuthority;
   }
 
   async registerConnection(
@@ -189,7 +229,15 @@ export class SsoConnectionGuards {
         },
         {
           type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
-          data: { connectionId, domain, actor, source },
+          // The migration states history rather than deciding anything, and
+          // the history it states is one an operator configured by hand.
+          data: {
+            connectionId,
+            domain,
+            actor,
+            authority: "platform-operator",
+            source,
+          },
         },
         {
           type: DOMAIN_VERIFIED_EVENT_TYPE,
@@ -216,6 +264,21 @@ export class SsoConnectionGuards {
     ];
   }
 
+  /**
+   * Claim a domain — and the two rails that replaced a reviewer's eye.
+   *
+   * Both run HERE rather than only on the setup surface, because the
+   * published record now decides the claim: there is no longer a person
+   * between a claim and a domain routing sign-ins, so the things that person
+   * would have noticed have to be rules. A domain nobody may own alone is
+   * refused by name; more domains in the window than the connection is
+   * allowed is refused by name with the wait attached.
+   *
+   * They are checked AFTER the already-claimed short-circuit above them, so
+   * a retry of a claim that already exists still states nothing and still
+   * costs nothing — a repeated command must not be able to spend the budget
+   * its own first attempt already paid for.
+   */
   async claimDomain(
     data: ClaimDomainCommandData,
   ): Promise<SsoConnectionFactInput[]> {
@@ -227,6 +290,18 @@ export class SsoConnectionGuards {
       state.verifiedDomains.includes(domain)
     ) {
       return [];
+    }
+    if (!isClaimableSsoDomain(domain)) {
+      throw new SsoDomainNotEligibleError(
+        `connection ${data.connectionId}: ${domain} is not a domain an organization can hold alone`,
+      );
+    }
+    const retryAfterSeconds = domainClaimRetryAfterSeconds({
+      claims: state.domainClaims,
+      nowMs: data.occurredAtMs,
+    });
+    if (retryAfterSeconds > 0) {
+      throw new SsoDomainClaimThrottledError(retryAfterSeconds);
     }
     return [
       {
@@ -255,7 +330,13 @@ export class SsoConnectionGuards {
     const state = await this.require(data, APPROVE_DOMAIN_CLAIM_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
     if (state.approvedDomains.includes(domain)) return [];
-    await this.requirePlatformOperator({
+    // An operator's hand is what a command that says nothing means: the
+    // licence path is the newer one, so it is the one that has to name
+    // itself, and a caller written before tier 2 cannot accidentally claim
+    // an authority it never had.
+    const authority = data.authority ?? "platform-operator";
+    await this.requireClaimAuthority({
+      authority,
       actor: data.actor,
       act: `approve the claim on ${domain}`,
     });
@@ -267,6 +348,7 @@ export class SsoConnectionGuards {
           connectionId: data.connectionId,
           domain,
           actor: data.actor,
+          authority,
           source: data.source,
         },
       },
@@ -326,10 +408,32 @@ export class SsoConnectionGuards {
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, REQUEST_VERIFICATION_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    if (!state.approvedDomains.includes(domain)) {
+    // A record may be asked for against an approved claim, or against one
+    // still waiting — the record is what will decide the waiting one. Only
+    // the PUBLISHED-record ceremony may stand in for a decision: a licence
+    // speaks for an installation and has already decided at the claim, so
+    // asking for it here against an undecided claim would be a second,
+    // unwitnessed way to approve one.
+    const decided = state.approvedDomains.includes(domain);
+    const waiting = domainClaimFor({ state, domain })?.state === "WAITING";
+    if (!decided && !(waiting && data.method === "dns-txt")) {
       throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: domain ${domain} has no approved claim to verify`,
+        `connection ${data.connectionId}: domain ${domain} has no claim a ${data.method} ceremony may prove`,
       );
+    }
+    // The licence-bound ceremony exists because a self-hosted customer has
+    // nobody to publish a record for. Asked of the port rather than of the
+    // command, so a hosted organization naming the method gets the same
+    // refusal an unlicensed installation does, and neither of them can talk
+    // its way past a DNS record it simply has to publish.
+    if (data.method === "license-token") {
+      const licensed =
+        await this.licenseAuthority.licenseAuthorizesDomainClaims();
+      if (!licensed) {
+        throw new SsoLicenseRequiredError(
+          `connection ${data.connectionId}: the licence-bound ceremony is not available on this deployment`,
+        );
+      }
     }
     await this.refuseIfDomainOwnedElsewhere({
       domain,
@@ -343,6 +447,7 @@ export class SsoConnectionGuards {
           domain,
           method: data.method,
           tokenHash: data.tokenHash,
+          expiresAtMs: data.expiresAtMs ?? null,
           actor: data.actor,
           source: data.source,
         },
@@ -403,9 +508,25 @@ export class SsoConnectionGuards {
   }
 
   /**
-   * The proof landed. Ownership is re-checked: the ceremony is not
-   * instantaneous, and another organization's connection may have gone
-   * ACTIVE on the same domain while this one was waiting for DNS.
+   * The proof landed — and, where the claim was still waiting, the proof IS
+   * the decision.
+   *
+   * Two facts from one command in that case, approval first: a published
+   * record is the strongest evidence anybody can hand us, so it authorizes
+   * the claim under `dns-proof` and proves the domain in the same commit.
+   * The ORDER is the honesty — a history can never say a domain was approved
+   * before anything proved it — and one commit is what makes the pair
+   * atomic, so no reachable state has an approval standing on a proof that
+   * did not land.
+   *
+   * `dns-proof` is stated HERE and nowhere else. `approveDomainClaim` refuses
+   * a caller that names it, so the only way that authority reaches a fact is
+   * through this method, on a ceremony this method has just checked.
+   *
+   * Ownership is re-checked either way: the ceremony is not instantaneous,
+   * and another organization's connection may have gone ACTIVE on the same
+   * domain while this one was waiting for DNS. That refusal is what keeps a
+   * dispute out of the self-deciding path.
    */
   async verifyDomain(
     data: VerifyDomainCommandData,
@@ -419,11 +540,39 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: no verification is in flight for ${domain}`,
       );
     }
+    // A record found after its expiry proves nothing. Refused here rather
+    // than swept away, so the record the customer was given is still on
+    // screen and asking again is one click that costs no progress.
+    if (verificationHasExpired({ pending, nowMs: data.occurredAtMs })) {
+      throw new SsoDomainProofExpiredError(
+        `connection ${data.connectionId}: the ceremony for ${domain} passed its expiry`,
+      );
+    }
     await this.refuseIfDomainOwnedElsewhere({
       domain,
       connectionId: data.connectionId,
     });
+    const undecided = state.claimedDomains.includes(domain);
+    if (undecided && pending.method !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: a ${pending.method} ceremony cannot decide the claim on ${domain}`,
+      );
+    }
     return [
+      ...(undecided
+        ? [
+            {
+              type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+              data: {
+                connectionId: data.connectionId,
+                domain,
+                actor: data.actor,
+                authority: "dns-proof" as const,
+                source: data.source,
+              },
+            } satisfies SsoConnectionFactInput,
+          ]
+        : []),
       {
         type: DOMAIN_VERIFIED_EVENT_TYPE,
         data: {
@@ -435,6 +584,131 @@ export class SsoConnectionGuards {
         },
       },
     ];
+  }
+
+  /**
+   * A re-check found no matching record on the domain (ADR-123).
+   *
+   * Three answers, and which one is a function of where the proof already
+   * stood: evidence that was fine starts wavering, evidence that has been
+   * missing past its deadline lapses, and evidence that is missing but still
+   * inside its window states NOTHING. That last one is why re-checking every
+   * few hours does not fill a customer's history with noise — a fact is
+   * written when the world CHANGED, not when we looked.
+   *
+   * What this refuses outright is doubting a proof a published record never
+   * made. An attested domain, a licence-bound one and a grandfathered one
+   * have no TXT record to be missing, so a DNS answer says nothing about
+   * them; without this, the sweep would find `absent` for every one of them
+   * and lapse domains whose evidence was never in DNS at all.
+   */
+  async recordDomainProofAbsent(
+    data: RecordDomainProofAbsentCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(
+      data,
+      RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+    );
+    const domain = normalizeDomain(data.domain);
+    const proof = this.requirePublishedRecordProof({ state, domain });
+    // Already lapsed: the record is still missing and that is already what
+    // the connection says. Nothing changed, so nothing is stated.
+    if (proof.proofState === "LAPSED") return [];
+    if (proof.proofState === "VERIFIED") {
+      return [
+        {
+          type: DOMAIN_PROOF_WAVERED_EVENT_TYPE,
+          data: {
+            connectionId: data.connectionId,
+            domain,
+            firstAbsentAtMs: data.occurredAtMs,
+            graceEndsAtMs: data.occurredAtMs + data.graceMs,
+            actor: data.actor,
+            source: data.source,
+          },
+        },
+      ];
+    }
+    // Wavering. The deadline is the one written on the wavering fact, not one
+    // recomputed now: a customer keeps the deadline they were told, even if
+    // the composed grace changed underneath them since.
+    const firstAbsentAtMs = proof.firstAbsentAtMs ?? data.occurredAtMs;
+    const deadline = proof.graceEndsAtMs ?? firstAbsentAtMs + data.graceMs;
+    if (data.occurredAtMs < deadline) return [];
+    return [
+      {
+        type: DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          domain,
+          firstAbsentAtMs,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * A re-check found the record published (ADR-123).
+   *
+   * Recovery is unconditional and costs the customer nothing beyond
+   * publishing: no re-claim, no fresh token, no queue. A domain that was
+   * never doubted states nothing, which is the steady state of every healthy
+   * domain on every sweep.
+   */
+  async recordDomainProofPresent(
+    data: RecordDomainProofPresentCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(
+      data,
+      RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+    );
+    const domain = normalizeDomain(data.domain);
+    const proof = this.requirePublishedRecordProof({ state, domain });
+    if (proof.proofState === "VERIFIED") return [];
+    return [
+      {
+        type: DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          domain,
+          absentForMs: Math.max(
+            0,
+            data.occurredAtMs - (proof.firstAbsentAtMs ?? data.occurredAtMs),
+          ),
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * The proof a DNS answer is entitled to speak about: one a published record
+   * made. Everything else is refused rather than ignored, so a caller that
+   * sweeps the wrong set of domains is told, rather than quietly lapsing
+   * evidence that was never in DNS.
+   */
+  private requirePublishedRecordProof({
+    state,
+    domain,
+  }: {
+    state: SsoConnectionState;
+    domain: string;
+  }): SsoDomainVerification {
+    const proof = domainProofFor({ state, domain });
+    if (!proof) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${state.connectionId}: ${domain} has no proof to re-check`,
+      );
+    }
+    if (proof.method !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${state.connectionId}: ${domain} was proved by ${proof.method}, which no published record can speak for`,
+      );
+    }
+    return proof;
   }
 
   /**
@@ -629,6 +903,46 @@ export class SsoConnectionGuards {
     if (isOperator) return;
     throw new SsoConnectionOperatorActRequiredError(
       `actor ${actor.id} is not a platform operator and may not ${act}`,
+    );
+  }
+
+  /**
+   * Who may decide a domain claim, on the authority the command names.
+   *
+   * Two answers a caller may ask for, and both are asked of a port: an
+   * operator's hand, or the installation's licence. What makes the second
+   * safe is that the licence speaks for an INSTALLATION rather than for
+   * whoever is asking, so an organization administrator on the hosted service
+   * naming it is refused by a port that answers no to every organization
+   * there.
+   *
+   * `dns-proof` is the third authority and is NOT one of them. A caller
+   * naming it would be asserting a published record nobody read; the only
+   * thing that may state it is `verifyDomain`, in the same commit as the
+   * proof it rests on, which is why naming it here is refused outright.
+   */
+  private async requireClaimAuthority({
+    authority,
+    actor,
+    act,
+  }: {
+    authority: SsoDomainClaimAuthority;
+    actor: IdentityActor;
+    act: string;
+  }): Promise<void> {
+    if (authority === "dns-proof") {
+      throw new SsoConnectionInvalidTransitionError(
+        `nothing may ${act} on a published record's authority except the check that read the record`,
+      );
+    }
+    if (authority === "platform-operator") {
+      await this.requirePlatformOperator({ actor, act });
+      return;
+    }
+    const licensed = await this.licenseAuthority.licenseAuthorizesDomainClaims();
+    if (licensed) return;
+    throw new SsoLicenseRequiredError(
+      `no licence on this deployment authorizes ${act}`,
     );
   }
 

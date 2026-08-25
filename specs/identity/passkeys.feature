@@ -70,13 +70,47 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # The nudge (ADR-120) offers a way IN, and only the identifier-first
   # screens accept one — so a deployment still signing everybody in the old
-  # way must not mint credentials its own front door cannot take.
+  # way must not mint credentials its own auth screens cannot take.
   @unit
   Scenario: The nudge stays silent while the old sign-in screens are the way in
     Given the deployment mints passkeys behind their flag
     But the identifier-first sign-in screens are not enforced
     When the signed-in shell asks whether to offer "sam" a passkey
     Then no passkey is offered
+
+  # ONE offer, two halves (D06 follow-up). A person is asked once about their
+  # ACCOUNT rather than once about a passkey and again about two-step
+  # verification: two dialogs on the way in is a nag whatever each one says,
+  # and somebody who declines the first has answered the question the second
+  # would ask. Each half keeps its own gate, and one dismissal covers both.
+  @unit
+  Scenario: The offer covers whichever of the two the person lacks
+    Given "sam" holds no passkey and has not set up two-step verification
+    And both are offered on this deployment
+    When the signed-in shell asks what to offer "sam"
+    Then both a passkey and two-step verification are offered
+    And they are offered together, as one question about the account
+
+  @unit
+  Scenario: Each half disappears once the person has it
+    Given "sam" has set up two-step verification but holds no passkey
+    And both are offered on this deployment
+    When the signed-in shell asks what to offer "sam"
+    Then a passkey is offered and two-step verification is not
+
+  @unit
+  Scenario: Only what the deployment offers is offered
+    Given two-step verification is offered here and passkeys are not
+    And "sam" has neither
+    When the signed-in shell asks what to offer "sam"
+    Then two-step verification is offered and a passkey is not
+
+  @unit
+  Scenario: One dismissal answers the whole offer
+    Given "sam" holds neither and has just said not now
+    When the signed-in shell asks again the same day
+    Then nothing is offered, about either of them
+    But once the interval has passed the offer comes back
 
   @unit @unimplemented
   Scenario: A registered passkey becomes an identifier like every other method
@@ -168,7 +202,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the session records that a phishing-resistant method was proven
     And the session records which of "sam"'s sign-in methods minted it
 
-  @unit @unimplemented
+  @unit
   Scenario: A passkey nobody holds is refused without telling anyone anything
     When a sign-in is attempted with a credential no user holds
     Then the refusal carries the code "identity_passkey_not_recognized"
@@ -182,7 +216,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then it is refused
     And the tombstone still resolves for anyone reading "sam"'s history
 
-  @integration @unimplemented
+  @integration
   Scenario: Cancelling the device prompt is not a dead end
     Given "sam" chose the passkey method
     When "sam" dismisses the device prompt
@@ -303,14 +337,14 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # ── Failures read as words ─────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Every named failure has copy a first-time reader understands
     When registering, signing in with, or removing a passkey is refused with a named code
     Then the screen shows the copy registered for that code
     And the screen never shows the code itself or an internal error
     And no message names a credential identifier, a table or a service
 
-  @unit @unimplemented
+  @unit
   Scenario: A failure we cannot name stays unnamed
     When a passkey ceremony fails for a reason nothing anticipated
     Then no invented code is attached to it

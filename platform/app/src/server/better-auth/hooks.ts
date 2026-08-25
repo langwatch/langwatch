@@ -613,9 +613,12 @@ export const beforeSessionCreate = async ({
  * invariant holds immediately for subsequent requests on the same session.
  * Ported from the NextAuth session callback.
  *
- * Skipped entirely when the session is an admin-impersonation session
- * (detected via the `impersonating` JSON field on the new Session row) — we
+ * Skipped entirely when the session is an admin-impersonation session — we
  * don't want an admin's activity to ghost-write the target user's lastLoginAt.
+ * In practice no impersonation reaches here at all: starting one writes the
+ * `{actor, subject}` claims onto the operator's EXISTING session rather than
+ * minting a new one (D06), so this hook only ever sees real sign-ins. The
+ * parameter survives for callers that mint a session on somebody's behalf.
  */
 export const afterSessionCreate = async ({
   prisma,

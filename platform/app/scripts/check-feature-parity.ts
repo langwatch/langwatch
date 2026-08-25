@@ -301,7 +301,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
-  "specs/ai-gateway/governance/sessions-and-devices.feature",
   "specs/ai-gateway/governance/siem-export.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
   "specs/ai-gateway/governance/template-ottl-authoring.feature",
@@ -454,8 +453,6 @@ const LEGACY_INERT: string[] = [
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
   "specs/identity/org-admin-identity-surface.feature",
-  "specs/identity/platform-ops-identity-lookup.feature",
-  "specs/identity/scim-reconciliation-surfaces.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",

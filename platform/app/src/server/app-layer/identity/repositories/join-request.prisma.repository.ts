@@ -87,6 +87,34 @@ export class PrismaJoinRequestReadRepository
     return rows.map(rowToJoinRequest);
   }
 
+  /**
+   * The joins nobody approved, newest first.
+   *
+   * Read off the SAME projection the pending list comes from, which is the
+   * point rather than an implementation detail: an automatic join is the same
+   * request with the same events, so finding one is the same query with a
+   * different resolver. A separate table for "people who walked in" would be
+   * a class of membership the panel could disagree with.
+   */
+  async findAutomaticJoinsForOrganization({
+    organizationId,
+    resolvedAfterMs,
+  }: {
+    organizationId: string;
+    resolvedAfterMs: number;
+  }): Promise<JoinRequestAggregateState[]> {
+    const rows = await this.prisma.joinRequest.findMany({
+      where: {
+        organizationId,
+        state: "APPROVED",
+        resolvedByType: "policy",
+        resolvedAt: { gte: new Date(resolvedAfterMs) },
+      },
+      orderBy: { resolvedAt: "desc" },
+    });
+    return rows.map(rowToJoinRequest);
+  }
+
   /** Everything one person is waiting on. */
   async findPendingForUser({
     userId,
@@ -137,19 +165,34 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     const userIds = verifiedOnDomain.map((row) => row.userId);
     if (userIds.length === 0) return [];
 
-    const memberships = await this.prisma.organizationUser.findMany({
-      where: { userId: { in: userIds }, disabledAt: null },
-      select: { organizationId: true, userId: true },
+    // Asked of ORGANIZATION rather than of the membership rows. A `findMany`
+    // over `OrganizationUser` bounded only by `userId` spans every
+    // organization at once, so the org-tenancy guard refuses it — and that
+    // refusal is a plain Error, which would have reached the sign-up screen as
+    // an unknown failure and silently taken domain matching with it. This is
+    // the shape the rest of the repo uses for "the organizations these people
+    // belong to" (`two-step-verification-adapters.ts`,
+    // `authz-read.prisma.repository.ts`).
+    const organizations = await this.prisma.organization.findMany({
+      where: {
+        members: { some: { userId: { in: userIds }, disabledAt: null } },
+      },
+      select: {
+        id: true,
+        members: {
+          where: { userId: { in: userIds }, disabledAt: null },
+          select: { userId: true },
+        },
+      },
     });
-    if (memberships.length === 0) return [];
+    if (organizations.length === 0) return [];
 
     const verifiedByOrganization = new Map<string, Set<string>>();
-    for (const membership of memberships) {
-      const held =
-        verifiedByOrganization.get(membership.organizationId) ??
-        new Set<string>();
-      held.add(membership.userId);
-      verifiedByOrganization.set(membership.organizationId, held);
+    for (const organization of organizations) {
+      verifiedByOrganization.set(
+        organization.id,
+        new Set(organization.members.map((member) => member.userId)),
+      );
     }
 
     return this.describe({
@@ -210,15 +253,26 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
           state: "ACTIVE",
           verifiedDomains: { has: domain },
         },
-        select: { organizationId: true },
+        select: { organizationId: true, lapsedDomains: true },
       }),
     ]);
 
     const memberCountByOrganization = new Map(
       memberCounts.map((row) => [row.organizationId, row._count.userId]),
     );
+    // A connection whose proof on this domain LAPSED no longer admits
+    // anybody new through it (ADR-123), so it no longer stands in the way of
+    // asking either: the join door reopens for exactly the organizations
+    // whose provider stopped being an answer.
     const admittedByConnection = new Set(
-      connections.map((row) => row.organizationId),
+      connections
+        .filter((row) => !row.lapsedDomains.includes(domain))
+        .map((row) => row.organizationId),
+    );
+    const lapsedByConnection = new Set(
+      connections
+        .filter((row) => row.lapsedDomains.includes(domain))
+        .map((row) => row.organizationId),
     );
 
     return organizations.map((organization) => ({
@@ -236,6 +290,10 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
         verifiedByOrganization.get(organization.id)?.size ?? 0,
       memberCount: memberCountByOrganization.get(organization.id) ?? 0,
       autoJoinDomains: organization.joinDomains,
+      // Stops people walking straight in, and nothing else. Asking still
+      // reaches a human at the company, who is the one able to tell a
+      // colleague from somebody who bought a domain this company let go.
+      domainProofLapsed: lapsedByConnection.has(organization.id),
     }));
   }
 }

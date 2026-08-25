@@ -1,4 +1,7 @@
-import type { SsoConnectionState } from "@langwatch/identity";
+import type {
+  SsoConnectionState,
+  SsoDomainClaimQueueEntry,
+} from "@langwatch/identity";
 
 /**
  * How the connection guards see current state (D04, ADR-117 §5): reads over
@@ -26,6 +29,46 @@ export interface SsoConnectionReadRepository {
   findDomainOwner(args: {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null>;
+
+  /**
+   * The connection an organization is setting up or running, or null when it
+   * has none (D05 tiers 2 and 3).
+   *
+   * Singular because the self-serve surface is: an organization sets ONE
+   * connection up itself, and offering to register a second before the first
+   * routes anything would be offering a way to lock yourself out twice. The
+   * back office, which does hold organizations with more than one, lists
+   * them from its own read rather than through this port. A torn-down or
+   * discarded connection is not one — it is a tombstone, and a customer
+   * whose connection was removed is setting up from nothing again.
+   */
+  findConnectionForOrganization(args: {
+    organizationId: string;
+  }): Promise<SsoConnectionState | null>;
+}
+
+/**
+ * The claims that still need a LangWatch operator, across every organization
+ * — which is now the DISPUTED ones and nothing else.
+ *
+ * A published record decides an uncontested claim, so listing one would be
+ * listing work nobody has to do; what a record cannot settle is two
+ * organizations claiming the same domain, and that is what this answers.
+ * Cross-organization by nature, twice over — the queue spans customers, and
+ * deciding whether a claim is disputed means looking at another customer's
+ * verified domains.
+ *
+ * Read-only: deciding a claim is one of the aggregate's guarded verbs, and
+ * this port never writes. Longest-waiting first is the ordering, and the
+ * wait itself is recorded on the claim rather than computed at read time,
+ * because the epic's Open Q2 wants queue latency measured from the day the
+ * queue exists and a number that only exists while a row is unread is not a
+ * measurement.
+ */
+export interface SsoDomainClaimQueueRepository {
+  findAllDisputed(args: {
+    limit: number;
+  }): Promise<SsoDomainClaimQueueEntry[]>;
 }
 
 /**
@@ -55,6 +98,26 @@ export interface SsoBreakGlassBindingRepository {
  */
 export interface SsoPlatformOperatorRepository {
   isPlatformOperator(args: { actorId: string }): Promise<boolean>;
+}
+
+/**
+ * Whether THIS INSTALLATION's enterprise licence can authorize a domain
+ * claim (D05 tier 2).
+ *
+ * A port, and asked about the installation rather than about the actor,
+ * because that is what a licence actually speaks for: a self-hosted customer
+ * has nobody at LangWatch to reach, so their licence is the authorization
+ * and it authorizes every organization on the instance they run. A hosted
+ * deployment answers false to all of them — there is no instance licence to
+ * speak with, and the claim queue is right there.
+ *
+ * The answer is the frozen startup one, exactly like ADR-027's gate: a
+ * licence activated while the process is running is genuine and still does
+ * not change what this process federates until it restarts.
+ */
+export interface SsoLicenseAuthorityRepository {
+  /** True when the licence may stand in for a LangWatch operator's approval. */
+  licenseAuthorizesDomainClaims(): Promise<boolean>;
 }
 
 /**

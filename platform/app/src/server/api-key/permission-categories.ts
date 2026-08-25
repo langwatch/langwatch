@@ -68,6 +68,10 @@ const GOVERNANCE_RESOURCES: AuthzResource[] = [
   "aiTools",
 ];
 
+/** Setting up how people sign in, and how a directory provisions them —
+ *  one resource, because the directory provisions against the connection. */
+const IDENTITY_PROVIDER_RESOURCES = ["sso"] as const;
+
 export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
   {
     key: "traces",
@@ -217,6 +221,17 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     accessLevels: ["read", "write"],
     readPermissions: viewsOf(...GOVERNANCE_RESOURCES),
     writePermissions: allActionsOf(...GOVERNANCE_RESOURCES),
+  },
+  {
+    // Single sign-on and the directory that provisions people (D05). Its own
+    // category rather than a corner of Organization, because this is the one
+    // an IT administrator is given and the rest of the organization's
+    // settings are not — which is the whole point of the split.
+    key: "identityProvider",
+    label: "Single sign-on and directory",
+    accessLevels: ["read", "write"],
+    readPermissions: viewsOf(...IDENTITY_PROVIDER_RESOURCES),
+    writePermissions: allActionsOf(...IDENTITY_PROVIDER_RESOURCES),
   },
 ] as const;
 

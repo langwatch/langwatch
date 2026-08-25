@@ -1,0 +1,47 @@
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { scimReconciliation } from "~/server/app-layer/identity/scim-reconciliation-runtime";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
+
+/**
+ * The organization's read of its own directory sync (ADR-122).
+ *
+ * Gated on `sso:view` — SEEING sync status is a different job from managing
+ * it, and a security reviewer checking whether the directory removed a leaver
+ * has no business being handed a control that mints credentials. Minting,
+ * revoking and group mapping stay on `sso:manage` (see `scimToken.ts`).
+ *
+ * Read-only, deliberately and permanently: the organization view offers no
+ * retry, because the remediation for a failed apply is the directory's next
+ * push, which re-asserts everything the directory still believes. A control
+ * here would be a second thing pushing the same state.
+ *
+ * The organization is the thing the query is BUILT from, not a filter: the
+ * service takes it and never accepts a connection id on its own, so naming
+ * another organization's connection answers as if it did not exist.
+ */
+const scimViewProcedure = protectedProcedure
+  .input(z.object({ organizationId: z.string().min(1) }))
+  .permission("sso:view")
+  .use(async ({ ctx, input, next }) => {
+    await assertEnterprisePlan({
+      organizationId: input.organizationId,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
+    });
+    return next({ ctx });
+  });
+
+export const scimReconciliationRouter = createTRPCRouter({
+  getAll: scimViewProcedure.query(async ({ input }) =>
+    scimReconciliation().getAll({ organizationId: input.organizationId }),
+  ),
+
+  getById: scimViewProcedure
+    .input(z.object({ connectionId: z.string().min(1) }))
+    .query(async ({ input }) =>
+      scimReconciliation().getById({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+      }),
+    ),
+});

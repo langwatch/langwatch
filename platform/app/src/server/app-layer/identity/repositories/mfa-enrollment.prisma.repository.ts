@@ -38,10 +38,14 @@ export class PrismaMfaEnrollmentRepository implements MfaEnrollmentRepository {
   }: {
     userId: string;
   }): Promise<readonly string[]> {
-    const memberships = await this.prisma.organizationUser.findMany({
-      where: { userId, organization: { mfaRequired: true } },
-      select: { organization: { select: { slug: true } } },
+    // Asked of ORGANIZATION rather than of the membership rows: a `findMany`
+    // over `OrganizationUser` bounded only by `userId` spans every
+    // organization at once and the org-tenancy guard refuses it. Same shape as
+    // `two-step-verification-adapters.ts`.
+    const organizations = await this.prisma.organization.findMany({
+      where: { mfaRequired: true, members: { some: { userId } } },
+      select: { slug: true },
     });
-    return memberships.map((membership) => membership.organization.slug);
+    return organizations.map((organization) => organization.slug);
   }
 }

@@ -3,10 +3,16 @@
  * `@langwatch/identity-server`'s ScimSyncLedger, in the shape the identity,
  * grants and connection ledgers already have (ADR-110, ADR-101):
  *
- *   1. the durable ClickHouse append, WAITED — the fact lands before the
- *      caller returns;
- *   2. the command staged onto the per-sync GroupQueue, awaited — the fold is
- *      the queue's, and nothing here applies a projection itself.
+ *   the command staged onto the per-sync GroupQueue — the queued run is what
+ *   APPENDS, re-running the same guard the calling path ran, and the fold is
+ *   the queue's too. Nothing here appends, and nothing here applies a
+ *   projection.
+ *
+ * The staged command is the SOLE appender, which is the correction ADR-110
+ * made for grants and identity. Appending here as well and staging the
+ * command afterwards writes every fact twice: the queued run re-executes the
+ * handler against heads the fold has not advanced yet, so it restates and
+ * appends a second row.
  *
  * NO read-your-writes wait, unlike the connection ledger. Nothing on the SCIM
  * request path reads this projection back: the endpoints answer from Postgres
@@ -30,6 +36,7 @@ import {
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
+  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
   type ScimSyncCommand,
   type ScimSyncCommandType,
@@ -38,15 +45,7 @@ import {
 import type { ScimSyncLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
-import { createTenantId } from "~/server/event-sourcing";
-import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
-import { scimSyncEventsFor } from "~/server/event-sourcing/pipelines/scim-sync/envelope";
-import {
-  SCIM_SYNC_AGGREGATE_TYPE,
-  SCIM_SYNC_PIPELINE_NAME,
-} from "~/server/event-sourcing/pipelines/scim-sync/schemas/constants";
-import type { ScimSyncEvent } from "~/server/event-sourcing/pipelines/scim-sync/schemas/events";
-import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
+import { SCIM_SYNC_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/scim-sync/schemas/constants";
 
 const logger = createLogger("langwatch:identity:scim-sync-ledger");
 
@@ -59,15 +58,9 @@ const SENDER_NAME_BY_COMMAND: Record<ScimSyncCommandType, string> = {
   [RECORD_SCIM_USER_PUSH_COMMAND_TYPE]: "recordScimUserPush",
   [RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE]: "recordScimGroupMapping",
   [RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE]: "recordScimApplyFailure",
+  [REDRIVE_SCIM_APPLY_COMMAND_TYPE]: "redriveScimApply",
   [REVOKE_SCIM_SYNC_COMMAND_TYPE]: "revokeScimSync",
 };
-
-function resolveEventStore(): EventStore<ScimSyncEvent> | null {
-  const app = tryGetApp();
-  return app?.eventSourcing?.isEnabled
-    ? (app.eventSourcing.getEventStore<ScimSyncEvent>() ?? null)
-    : null;
-}
 
 function resolveStagedSender(name: string): ScimSyncStagedSender | null {
   const app = tryGetApp();
@@ -83,17 +76,14 @@ function resolveStagedSender(name: string): ScimSyncStagedSender | null {
 }
 
 export interface ScimSyncLedgerWriterDeps {
-  /** Production resolves the App's event store lazily; tests hand one in. */
-  eventStore?: () => EventStore<ScimSyncEvent> | null;
+  /** Production resolves the App's pipeline lazily; tests hand one in. */
   stagedSender?: (name: string) => ScimSyncStagedSender | null;
 }
 
 export class ScimSyncLedgerWriter implements ScimSyncLedger {
-  private readonly eventStore: () => EventStore<ScimSyncEvent> | null;
   private readonly stagedSender: (name: string) => ScimSyncStagedSender | null;
 
   constructor(deps: ScimSyncLedgerWriterDeps = {}) {
-    this.eventStore = deps.eventStore ?? resolveEventStore;
     this.stagedSender = deps.stagedSender ?? resolveStagedSender;
   }
 
@@ -104,24 +94,10 @@ export class ScimSyncLedgerWriter implements ScimSyncLedger {
     command: ScimSyncCommand;
     facts: ScimSyncFactInput[];
   }): Promise<void> {
-    const events = scimSyncEventsFor({ command, facts });
-    if (events.length === 0) return;
-    const { scimSyncId, connectionId, tenantId } = command.data;
+    if (facts.length === 0) return;
+    const { scimSyncId, connectionId } = command.data;
 
     try {
-      const eventStore = this.eventStore();
-      if (!eventStore) {
-        logger.warn(
-          { scimSyncId, connectionId, commandType: command.type },
-          "directory sync history not recorded: the event-sourcing stack is unavailable",
-        );
-        return;
-      }
-      await eventStore.storeEvents(
-        events,
-        { tenantId: createTenantId(tenantId) },
-        SCIM_SYNC_AGGREGATE_TYPE as AggregateType,
-      );
       await this.stage({ command });
     } catch (error) {
       // Swallowed on purpose, and loudly. The membership consequence this is

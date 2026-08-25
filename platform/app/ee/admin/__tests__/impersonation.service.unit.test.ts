@@ -164,7 +164,8 @@ describe("ImpersonationService", () => {
     });
 
     describe("given a healthy, non-admin, non-deactivated target", () => {
-      it("writes an audit log and stamps the session with the impersonating user", async () => {
+      /** @scenario "An impersonated session records both people" */
+      it("records the operator as the actor and the target as the subject", async () => {
         const prisma = makePrisma();
         prisma.user.findUnique.mockResolvedValue({
           id: "user_target",
@@ -202,13 +203,79 @@ describe("ImpersonationService", () => {
         const call = prisma.session.update.mock.calls[0]!;
         const [{ where, data }] = call;
         expect(where).toEqual({ id: "sess_1" });
-        expect(data.impersonating.id).toBe("user_target");
-        expect(data.impersonating.email).toBe("target@example.com");
+        expect(data.actorUserId).toBe("user_admin");
+        expect(data.subjectUserId).toBe("user_target");
+        // The reason rides beside both people, not only in the audit log.
+        expect(data.impersonationReason).toBe("Debugging trace #42");
         // Expiry is ~1h in the future; accept anything within a 5s window
         // of "now + 1h" to avoid flaky timing assertions.
-        const expires = new Date(data.impersonating.expires).getTime();
+        const expires = new Date(data.impersonationExpiresAt).getTime();
         const expected = Date.now() + 60 * 60 * 1000;
         expect(Math.abs(expires - expected)).toBeLessThan(5_000);
+      });
+
+      /** @scenario "Starting an impersonation still takes a reason" */
+      it("records the reason beside both people, not only in the audit log", async () => {
+        const prisma = makePrisma();
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user_target",
+          name: "Target",
+          email: "target@example.com",
+          image: null,
+          deactivatedAt: null,
+        });
+        const auditLog = makeAuditLog();
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          auditLog,
+        );
+
+        await service.start({
+          sessionId: "sess_1",
+          impersonatorUserId: "user_admin",
+          userIdToImpersonate: "user_target",
+          reason: "customer asked us to look",
+          req: {},
+        });
+
+        const [{ data }] = prisma.session.update.mock.calls[0]!;
+        expect(data.impersonationReason).toBe("customer asked us to look");
+        expect(data.actorUserId).toBe("user_admin");
+        expect(data.subjectUserId).toBe("user_target");
+        expect(auditLog.calls[0]?.args).toMatchObject({
+          reason: "customer asked us to look",
+        });
+      });
+
+      /** @scenario "An impersonated session records both people" */
+      it("writes nothing to the legacy impersonation payload", async () => {
+        const prisma = makePrisma();
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user_target",
+          name: "Target",
+          email: "target@example.com",
+          image: null,
+          deactivatedAt: null,
+        });
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          makeAuditLog(),
+        );
+
+        await service.start({
+          sessionId: "sess_1",
+          impersonatorUserId: "user_admin",
+          userIdToImpersonate: "user_target",
+          reason: "Debugging trace #42",
+          req: {},
+        });
+
+        const [{ data }] = prisma.session.update.mock.calls[0]!;
+        expect("impersonating" in data).toBe(false);
+        // Nor a copy of the subject's own details, which is what went stale
+        // the moment either person changed theirs.
+        expect("name" in data).toBe(false);
+        expect("email" in data).toBe(false);
       });
     });
 
@@ -304,7 +371,8 @@ describe("ImpersonationService", () => {
   });
 
   describe("stop", () => {
-    it("clears the impersonating column on the given session", async () => {
+    /** @scenario "The banner and the way out keep working on the new claims" */
+    it("clears both halves of the claim and ends no session", async () => {
       const prisma = makePrisma();
       const service = ImpersonationService.create(
         prisma as unknown as PrismaClient,
@@ -317,9 +385,12 @@ describe("ImpersonationService", () => {
       const call = prisma.session.update.mock.calls[0]!;
       const [{ where, data }] = call;
       expect(where).toEqual({ id: "sess_1" });
-      // Prisma.DbNull — vitest's deep equal compares by reference for
-      // unknown symbols, so just assert the property exists.
-      expect("impersonating" in data).toBe(true);
+      expect(data).toEqual({
+        actorUserId: null,
+        subjectUserId: null,
+        impersonationReason: null,
+        impersonationExpiresAt: null,
+      });
     });
   });
 });

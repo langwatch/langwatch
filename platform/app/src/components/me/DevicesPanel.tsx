@@ -9,6 +9,7 @@ import { api } from "~/utils/api";
 import { InstallCliCard } from "./InstallCliCard";
 import { formatRelativeTime } from "./relativeTime";
 import { usePersonalContext } from "./usePersonalContext";
+import { WebSessionsPanel } from "./WebSessionsPanel";
 
 /**
  * Where the CLI is signed in, and the way to take a device's access away.
@@ -46,6 +47,10 @@ export function DevicesPanel() {
 
   return (
     <VStack align="stretch" gap={4}>
+      {/* Browser sign-ins first: it is the credential class most people came
+          here about, and the one that says how it got in (D06). */}
+      <WebSessionsPanel />
+
       {sessions.length > 1 && !isPendingRevokeAll && (
         <HStack justify="end">
           <Button

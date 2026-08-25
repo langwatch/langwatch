@@ -1,24 +1,23 @@
 import {
-  Badge,
-  Box,
-  Button,
   Card,
   HStack,
   Spacer,
+  Spinner,
   Table,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
+import { Key, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { SectionErrorNotice } from "~/components/settings/SectionErrorNotice";
+import { FilterChips } from "~/components/ui/FilterChips";
 import { showErrorToast } from "~/features/errors";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { useSession } from "~/utils/auth-client";
 import { filterProvidersByScope } from "~/utils/filterProvidersByScope";
-import { ProviderScopeChips } from "../../../components/settings/ProviderScopeChips";
 import { RegenerateApiKeyDialog } from "../../../components/settings/RegenerateApiKeyDialog";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { toaster } from "../../../components/ui/toaster";
@@ -26,7 +25,14 @@ import { Tooltip } from "../../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { api, type RouterOutputs } from "../../../utils/api";
-import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+import {
+  ApiKeyAccessBadge,
+  ApiKeyLastUsedCell,
+  ApiKeyNameCell,
+  ApiKeyOwnerCell,
+  ApiKeyRowActions,
+  ApiKeyScopeCell,
+} from "./ApiKeyTableCells";
 import { apiKeyRowAnchorId } from "./apiKeyAnchor";
 import {
   CreateApiKeyDrawer,
@@ -34,71 +40,52 @@ import {
 } from "./CreateApiKeyDrawer";
 import { EditApiKeyDrawer } from "./EditApiKeyDrawer";
 import { IngestionKeysSection } from "./IngestionKeysSection";
+import { ProjectKeyRow } from "./ProjectKeyRow";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
+import {
+  ALL_SCOPE_KINDS,
+  buildScopeKindChips,
+  filterKeysByScopeKind,
+  keyMatchesScopeKind,
+  SCOPE_KIND_OVERLAP_NOTE,
+  type ScopeKindFilter,
+} from "./scopeKindFilter";
 import { TokenCreatedDialog } from "./TokenCreatedDialog";
 
 type ApiKeyRow = RouterOutputs["apiKey"]["list"][number];
 
-/**
- * Actions for the legacy "Project API Key" row. The row intentionally has no
- * edit/revoke affordance — the only mutating action is rotation, and only when
- * the viewer can manage the project (`project:manage`). Rotation is the
- * supported, audited replacement for the base key that the unified-keys rework
- * removed.
- */
-function ProjectKeyActions({
-  apiKey,
-  canManage,
-  onRotate,
-}: {
-  apiKey: string;
-  canManage: boolean;
-  onRotate: () => void;
-}) {
-  return (
-    <HStack gap={1}>
-      <Button
-        size="xs"
-        variant="ghost"
-        aria-label="Copy secret key"
-        onClick={() => {
-          void navigator.clipboard.writeText(apiKey);
-          toaster.create({
-            title: "API key copied to clipboard",
-            type: "success",
-            duration: 2000,
-          });
-        }}
-      >
-        <Clipboard size={14} />
-      </Button>
-      {canManage && (
-        <Tooltip content="Rotate this key">
-          <Button
-            size="xs"
-            variant="ghost"
-            aria-label="Rotate Project API Key"
-            onClick={onRotate}
-          >
-            <RotateCw size={14} aria-hidden="true" />
-          </Button>
-        </Tooltip>
-      )}
-    </HStack>
-  );
+/** Number of table columns, so an empty or loading row can span all of them. */
+const COLUMN_COUNT = 7;
+
+/** The legacy project key sits on exactly one project, whatever else it is. */
+const PROJECT_KEY_BINDINGS = [{ scopeType: "PROJECT" }];
+
+function isExpired(apiKey: Pick<ApiKeyRow, "expiresAt">): boolean {
+  return Boolean(apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date());
+}
+
+function formatCreatedAt(createdAt: Date | string): string {
+  return new Date(createdAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 /**
- * Unified API Keys table. Shows all user-scoped API keys plus the legacy
- * project key in one flat list. Admins see all keys in the org.
+ * The credentials table: every personal and service API key the viewer can see,
+ * one row each, saying what the key is called, how far it reaches, what it may
+ * do, who holds it, and when it was last used.
  *
- * The scope filter in the header narrows the visible rows using the same
- * inclusive cascade as the model-providers page. Selecting a scope shows
- * all keys whose ANY binding sits on the same branch of the org tree as
- * the active filter — parents up, children down.
+ * Two filters share one toolbar and compose. The chips pick a LEVEL of the
+ * organization tree and carry the count of rows behind each; the scope picker
+ * beside them narrows to ONE organization, team, or project using the inclusive
+ * cascade shared with the model-providers page and persisted as `?scope=TYPE:id`.
+ * The chips count what the picker left, so a chip's number is always the number
+ * of rows clicking it produces.
  *
- * Filter selection is persisted in the URL via `?scope=TYPE:id` so it
- * survives reloads and can be deep-linked.
+ * Specs: specs/api-keys/api-keys-credentials-table.feature,
+ * specs/api-keys/scope-filter.feature, specs/api-keys/unified-api-keys.feature.
  */
 export function ApiKeysSection({
   organizationId,
@@ -143,6 +130,7 @@ export function ApiKeysSection({
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
   const [isRotateConfirmOpen, setIsRotateConfirmOpen] = useState(false);
+  const [scopeKind, setScopeKind] = useState<ScopeKindFilter>(ALL_SCOPE_KINDS);
 
   // Derive available scopes (and org-tree hierarchy) for the filter dropdown
   // from the organization graph.
@@ -162,7 +150,7 @@ export function ApiKeysSection({
   // service API keys. They render in two separate labeled sections. `!= null`
   // catches both null and undefined so keys without the field stay in the
   // regular list.
-  const allApiKeys = apiKeys.data ?? [];
+  const allApiKeys = useMemo(() => apiKeys.data ?? [], [apiKeys.data]);
   const ingestionKeys = useMemo(
     () => allApiKeys.filter((k) => k.ingestSourceType != null),
     [allApiKeys],
@@ -175,7 +163,7 @@ export function ApiKeysSection({
   // Client-side filter: map each regular key's roleBindings → scopes so
   // filterProvidersByScope can apply its inclusive cascade directly. The scope
   // filter only governs the regular API keys section.
-  const filteredKeys = useMemo(
+  const scopedKeys = useMemo(
     () =>
       filterProvidersByScope(
         serviceApiKeys.map((k) => ({
@@ -349,14 +337,13 @@ export function ApiKeysSection({
     );
   };
 
-  // Build unified rows: API keys + project service key
   const projectApiKey = project?.apiKey;
 
   // Decide whether the legacy project service key survives the active scope
   // filter by running it through the same inclusive cascade as user-scoped keys.
   // A fake row with a single PROJECT-scoped binding is synthesised so the same
   // filterProvidersByScope logic can decide.
-  const showProjectKey: boolean = useMemo(() => {
+  const projectKeyPassesScope: boolean = useMemo(() => {
     if (!projectApiKey || !project?.id) return false;
     // Synthesize a single-binding row so the project-service-key row reuses the
     // same inclusive cascade predicate (`filterProvidersByScope`) as the table.
@@ -373,51 +360,63 @@ export function ApiKeysSection({
     );
   }, [projectApiKey, project?.id, scopeFilter, hierarchy, team?.id]);
 
-  const getStatus = (key: ApiKeyRow) => {
-    if (key.expiresAt && new Date(key.expiresAt) < new Date()) return "Expired";
-    return "Active";
-  };
+  // Everything the scope picker left, legacy project key included, so a chip's
+  // count is exactly the number of rows clicking that chip renders.
+  const countableRows = useMemo(
+    () =>
+      projectKeyPassesScope
+        ? [...scopedKeys, { roleBindings: PROJECT_KEY_BINDINGS }]
+        : scopedKeys,
+    [scopedKeys, projectKeyPassesScope],
+  );
+  const scopeKindChips = useMemo(
+    () => buildScopeKindChips(countableRows),
+    [countableRows],
+  );
+  const visibleKeys = useMemo(
+    () => filterKeysByScopeKind(scopedKeys, scopeKind),
+    [scopedKeys, scopeKind],
+  );
+  const showProjectKeyRow =
+    projectKeyPassesScope &&
+    keyMatchesScopeKind({ roleBindings: PROJECT_KEY_BINDINGS }, scopeKind);
 
-  const getPermissionBadge = (apiKeyRow: ApiKeyRow) => {
-    if (apiKeyRow.permissionMode === "all") {
-      return (
-        <Badge size="sm" colorPalette="green">
-          All
-        </Badge>
-      );
-    }
-    return (
-      <Badge size="sm" colorPalette="orange">
-        Restricted
-      </Badge>
-    );
-  };
+  const shownCount = visibleKeys.length + (showProjectKeyRow ? 1 : 0);
+  const totalCount = countableRows.length;
+  // What the table would hold with no filter at all, which is the only number
+  // that can tell "you have no keys" apart from "your filters hid them".
+  const unfilteredCount = serviceApiKeys.length + (projectApiKey ? 1 : 0);
+  const hasRows = shownCount > 0;
+  const loadError = apiKeys.error;
 
-  const getScopeBadge = (apiKeyRow: ApiKeyRow) => {
-    return (
-      <ProviderScopeChips
-        size="xs"
-        scopes={apiKeyRow.roleBindings.map((rb) => ({
-          scopeType: rb.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-          scopeId: rb.scopeId,
-          name: rb.scopeName ?? undefined,
-        }))}
-      />
+  // Clicking the chip you are already on lets go of the filter, so getting back
+  // to everything never means hunting for the "All keys" chip.
+  const handleScopeKindChange = (next: string) =>
+    setScopeKind((current) =>
+      current === next ? ALL_SCOPE_KINDS : (next as ScopeKindFilter),
     );
-  };
 
   return (
     <>
       <VStack gap={8} width="full" align="stretch">
         {/* Personal + service keys (ingestSourceType == null). The page
             heading titles this table, so the section carries no heading of
-            its own. The "Create API key" flow and scope filter belong here. */}
+            its own. The "Create API key" flow and the filters belong here. */}
         <VStack gap={4} width="full" align="start">
-          <HStack width="full" flexWrap="wrap" gap={2}>
-            <Text fontSize="sm" color="fg.muted">
-              Do not share your API keys or expose them in the browser or other
-              client-side code.
-            </Text>
+          <Text fontSize="sm" color="fg.muted">
+            Do not share your API keys or expose them in the browser or other
+            client-side code.
+          </Text>
+
+          <HStack width="full" flexWrap="wrap" gap={3} align="center">
+            <FilterChips
+              value={scopeKind}
+              onChange={handleScopeKindChange}
+              items={scopeKindChips}
+              groupLabel="Filter keys by scope"
+              countNoun={{ singular: "key", plural: "keys" }}
+              testId="scope-kind-chips"
+            />
             <Spacer />
             {/* Scope filter — right side of header row, before the Create button.
               Mirrors the layout of the model-providers page. */}
@@ -434,233 +433,138 @@ export function ApiKeysSection({
             </PageLayout.HeaderButton>
           </HStack>
 
+          <Tooltip content={SCOPE_KIND_OVERLAP_NOTE}>
+            <Text
+              fontSize="xs"
+              color="fg.muted"
+              cursor="help"
+              tabIndex={0}
+              data-testid="api-keys-shown-count"
+            >
+              {`Showing ${shownCount} of ${totalCount} keys`}
+            </Text>
+          </Tooltip>
+
+          <SectionErrorNotice
+            error={loadError}
+            fallbackTitle="Couldn't load API keys"
+          />
+
           <Card.Root width="full" overflow="hidden">
             <Card.Body paddingY={0} paddingX={0} overflowX="auto">
               <Table.Root variant="line" size="md" width="full">
                 <Table.Header>
                   <Table.Row>
-                    <Table.ColumnHeader>Name</Table.ColumnHeader>
-                    <Table.ColumnHeader>Status</Table.ColumnHeader>
-                    <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
-                    <Table.ColumnHeader>Created</Table.ColumnHeader>
-                    <Table.ColumnHeader>Last Used</Table.ColumnHeader>
-                    <Table.ColumnHeader>Type</Table.ColumnHeader>
+                    <Table.ColumnHeader>Key</Table.ColumnHeader>
                     <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                    <Table.ColumnHeader>Permissions</Table.ColumnHeader>
-                    <Table.ColumnHeader width="100px"></Table.ColumnHeader>
+                    <Table.ColumnHeader>Access</Table.ColumnHeader>
+                    <Table.ColumnHeader>Owner</Table.ColumnHeader>
+                    <Table.ColumnHeader>Last used</Table.ColumnHeader>
+                    <Table.ColumnHeader>Created</Table.ColumnHeader>
+                    <Table.ColumnHeader width="60px" />
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {/* Project service key row — only shown when it survives the active scope filter */}
-                  {showProjectKey && projectApiKey && (
+                  {showProjectKeyRow && projectApiKey && (
+                    <ProjectKeyRow
+                      apiKey={projectApiKey}
+                      projectId={project?.id ?? ""}
+                      projectName={project?.name}
+                      canManage={canManageProject}
+                      onRotate={() => setIsRotateConfirmOpen(true)}
+                    />
+                  )}
+
+                  {visibleKeys.map((apiKey) => {
+                    const canAct = isAdmin || apiKey.userId === currentUserId;
+                    return (
+                      <Table.Row
+                        key={apiKey.id}
+                        id={apiKeyRowAnchorId(apiKey.id)}
+                      >
+                        <Table.Cell>
+                          <ApiKeyNameCell
+                            name={apiKey.name}
+                            description={apiKey.description}
+                            secret={{
+                              display: `sk-lw-${apiKey.lookupIdPrefix}…`,
+                              copyValue: `sk-lw-${apiKey.lookupIdPrefix}`,
+                              copyLabel: `Copy the key identifier for ${apiKey.name}`,
+                              copiedTitle: "Key identifier copied",
+                            }}
+                            isExpired={isExpired(apiKey)}
+                            icon={<Key size={14} aria-hidden />}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ApiKeyScopeCell
+                            scopes={apiKey.roleBindings.map((rb) => ({
+                              scopeType: rb.scopeType as
+                                | "ORGANIZATION"
+                                | "TEAM"
+                                | "PROJECT",
+                              scopeId: rb.scopeId,
+                              name: rb.scopeName ?? undefined,
+                            }))}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ApiKeyAccessBadge
+                            permissionMode={apiKey.permissionMode}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ApiKeyOwnerCell
+                            ownerName={apiKey.userName}
+                            ownerEmail={apiKey.userEmail}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ApiKeyLastUsedCell lastUsedAt={apiKey.lastUsedAt} />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text fontSize="sm">
+                            {formatCreatedAt(apiKey.createdAt)}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {/* Owner or admin can edit/revoke; service keys (no
+                              userId) require admin. A viewer who can do neither
+                              gets no trigger rather than an empty menu. */}
+                          {canAct && (
+                            <ApiKeyRowActions
+                              keyName={apiKey.name}
+                              onEdit={() => setApiKeyToEdit(apiKey)}
+                              onRevoke={() => setApiKeyToRevoke(apiKey.id)}
+                            />
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+
+                  {isLoadingKeys && (
                     <Table.Row>
-                      <Table.Cell>
-                        <HStack align="center">
-                          <Key size={14} />
-                          <Text>Project API Key</Text>
+                      <Table.Cell colSpan={COLUMN_COUNT}>
+                        <HStack justify="center" paddingY={4} gap={2}>
+                          <Spinner size="sm" />
+                          <Text color="fg.muted">Loading API keys</Text>
                         </HStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge size="sm" colorPalette="green">
-                          Active
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text
-                          fontSize="xs"
-                          fontFamily="monospace"
-                          color="fg.muted"
-                        >
-                          sk-…{projectApiKey.slice(-4)}
-                        </Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="fg.muted">
-                          —
-                        </Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="fg.muted">
-                          —
-                        </Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge size="sm" colorPalette="purple">
-                          Service
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {/* Name the project this legacy key is fixed to, using
-                          the same named scope chip as the user-scoped rows. */}
-                        <ProviderScopeChips
-                          size="xs"
-                          scopes={[
-                            {
-                              scopeType: "PROJECT",
-                              scopeId: project?.id ?? "",
-                              name: project?.name,
-                            },
-                          ]}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge size="sm" colorPalette="green">
-                          All
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <ProjectKeyActions
-                          apiKey={projectApiKey}
-                          canManage={canManageProject}
-                          onRotate={() => setIsRotateConfirmOpen(true)}
-                        />
                       </Table.Cell>
                     </Table.Row>
                   )}
 
-                  {/* User-scoped API key rows */}
-                  {filteredKeys.map((apiKey) => (
-                    <Table.Row
-                      key={apiKey.id}
-                      id={apiKeyRowAnchorId(apiKey.id)}
-                    >
-                      <Table.Cell>
-                        <HStack align="start">
-                          <Box paddingTop={1}>
-                            <Key size={14} />
-                          </Box>
-                          <VStack align="start" gap={0}>
-                            <Text>{apiKey.name}</Text>
-                            {apiKey.description && (
-                              <Text fontSize="xs" color="fg.muted">
-                                {apiKey.description}
-                              </Text>
-                            )}
-                          </VStack>
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {getStatus(apiKey) === "Expired" ? (
-                          <Badge size="sm" colorPalette="red">
-                            Expired
-                          </Badge>
-                        ) : (
-                          <Badge size="sm" colorPalette="green">
-                            Active
-                          </Badge>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text
-                          fontSize="xs"
-                          fontFamily="monospace"
-                          color="fg.muted"
-                        >
-                          sk-lw-{apiKey.lookupIdPrefix}…
+                  {!isLoadingKeys && !loadError && !hasRows && (
+                    <Table.Row>
+                      <Table.Cell colSpan={COLUMN_COUNT}>
+                        <Text color="fg.muted" textAlign="center" paddingY={4}>
+                          {unfilteredCount === 0
+                            ? "No API keys. Create one to get started."
+                            : "No keys match the current filter. Pick another scope to see the rest."}
                         </Text>
                       </Table.Cell>
-                      <Table.Cell>
-                        {new Date(apiKey.createdAt).toLocaleDateString(
-                          "en-US",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {apiKey.lastUsedAt ? (
-                          <Tooltip
-                            content={new Date(apiKey.lastUsedAt).toISOString()}
-                          >
-                            <Text
-                              cursor="help"
-                              tabIndex={0}
-                              aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
-                            >
-                              {formatTimeAgo(
-                                new Date(apiKey.lastUsedAt).getTime(),
-                              )}
-                            </Text>
-                          </Tooltip>
-                        ) : (
-                          <Text fontSize="sm" color="fg.muted">
-                            Never
-                          </Text>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {apiKey.userId ? (
-                          <Badge size="sm" variant="outline">
-                            {apiKey.userEmail ?? apiKey.userName ?? "—"}
-                          </Badge>
-                        ) : (
-                          <Badge size="sm" colorPalette="purple">
-                            Service
-                          </Badge>
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>{getScopeBadge(apiKey)}</Table.Cell>
-                      <Table.Cell>{getPermissionBadge(apiKey)}</Table.Cell>
-                      <Table.Cell>
-                        {/* Owner or admin can edit/revoke; service keys (no userId) require admin */}
-                        {(isAdmin || apiKey.userId === currentUserId) && (
-                          <HStack gap={1}>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              aria-label={`Edit API key ${apiKey.name}`}
-                              onClick={() => setApiKeyToEdit(apiKey)}
-                            >
-                              <Pencil size={14} />
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              colorPalette="red"
-                              aria-label={`Revoke API key ${apiKey.name}`}
-                              onClick={() => setApiKeyToRevoke(apiKey.id)}
-                            >
-                              <Trash2 size={14} aria-hidden="true" />
-                            </Button>
-                          </HStack>
-                        )}
-                      </Table.Cell>
                     </Table.Row>
-                  ))}
-
-                  {filteredKeys.length === 0 &&
-                    !showProjectKey &&
-                    scopeFilter.kind === "all" && (
-                      <Table.Row>
-                        <Table.Cell colSpan={9}>
-                          <Text
-                            color="fg.muted"
-                            textAlign="center"
-                            paddingY={4}
-                          >
-                            No API keys. Create one to get started.
-                          </Text>
-                        </Table.Cell>
-                      </Table.Row>
-                    )}
-                  {filteredKeys.length === 0 &&
-                    !showProjectKey &&
-                    scopeFilter.kind !== "all" && (
-                      <Table.Row>
-                        <Table.Cell colSpan={9}>
-                          <Text
-                            color="fg.muted"
-                            textAlign="center"
-                            paddingY={4}
-                          >
-                            No keys match the current scope. Change the filter
-                            above to see other keys.
-                          </Text>
-                        </Table.Cell>
-                      </Table.Row>
-                    )}
+                  )}
                 </Table.Body>
               </Table.Root>
             </Card.Body>

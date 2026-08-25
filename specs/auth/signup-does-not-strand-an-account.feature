@@ -15,7 +15,7 @@ Feature: Signing up never strands an account
   #
   # The account is not the problem. Dead-ending on it is.
   #
-  # Amended at D13 (ADR-117 §6): under the identifier-first front door the
+  # Amended at D13 (ADR-117 §6): under the identifier-first auth screens the
   # mechanism changes and the guarantee does not. Signing up with an address
   # that already has an account no longer refuses at all - the page quietly
   # becomes the log-in step for that address, with the reset link on the same

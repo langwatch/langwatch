@@ -1,4 +1,5 @@
 import { passkey } from "@better-auth/passkey";
+import { sso } from "@better-auth/sso";
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
@@ -17,12 +18,13 @@ import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import {
+  BACKUP_CODE_COUNT,
   deploymentIsFederationCapable,
   identityBridgeCeremonies,
   identityCeremonies,
@@ -44,7 +46,9 @@ import {
 } from "./hooks";
 import { passkeySignUpRegistration } from "./passkey-signup";
 import { revokeAllSessionsForUser } from "./revokeSessions";
+import { sessionClaimsData } from "./session-claims-hook";
 import { runSignInRouterShadow } from "./signInRouterShadow";
+import { runTwoStepCeremony } from "./two-step-ceremonies";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -75,8 +79,9 @@ const genericOAuthConfigs = buildGenericOAuthConfigs(env);
 // NOTE: BetterAuth's admin plugin is intentionally NOT used. It expects
 // `User.role` and `User.banned` columns which our schema doesn't have, and
 // it would override admin impersonation with its own mechanism. We use our
-// own `isAdmin` check (ee/admin/isAdmin.ts) and the legacy
-// Session.impersonating JSON column handled in src/server/auth.ts.
+// own `isAdmin` check (ee/admin/isAdmin.ts) and the session's own
+// `{actor, subject}` impersonation claims, read in src/server/auth.ts (D06 —
+// they replaced the legacy `Session.impersonating` JSON column).
 /**
  * D06 / D07. Both flags are read at module load, because that is when
  * `betterAuth()` below is constructed and a plugin decides which ROUTES
@@ -104,13 +109,36 @@ const plugins = [
     ? [
         twoFactor({
           issuer: "LangWatch",
+          // An account with NO password can still turn two-step verification
+          // on, off, and draw fresh backup codes.
+          //
+          // The plugin's default demands a password on all three, which made
+          // the feature unreachable for exactly the accounts we most want
+          // enrolled: somebody who signed up with a passkey has no password
+          // to type, and the setup dialog asked for one anyway. This is the
+          // plugin's own sanctioned switch, not a fork of it —
+          // `shouldRequirePassword` still demands the password from every
+          // account that HAS one, and only waives it where the credential row
+          // holds none. The session is still required; what changes is the
+          // second proof, which for a passwordless account was impossible
+          // rather than optional.
+          allowPasswordless: true,
           // Encrypted, not hashed. A backup code has to be COMPARED against
           // what the person types, and the plugin's own verification path
           // decrypts and compares; hashing them would make the plugin
           // unable to verify its own codes. `NEXTAUTH_SECRET` is the key,
           // which is why turning the flag on without one set is refused at
           // boot by the env schema rather than at first use.
-          backupCodeOptions: { storeBackupCodes: "encrypted" },
+          backupCodeOptions: {
+            storeBackupCodes: "encrypted",
+            // Stated rather than left to the plugin's default, because two
+            // things need the same number and one of them is not the plugin:
+            // the `MfaEnrollment` aggregate records HOW MANY codes a set
+            // holds, so "how many are left" is answerable from the log
+            // without the log ever knowing a code. A default that drifted
+            // would make that count a lie.
+            amount: BACKUP_CODE_COUNT,
+          },
         }),
       ]
     : []),
@@ -131,6 +159,54 @@ const plugins = [
         }),
       ]
     : []),
+  /**
+   * Per-organization single sign-on (D09 — see
+   * specs/identity/sso-idp-termination.feature).
+   *
+   * Mounted BESIDE `genericOAuth`, never instead of it. The deployment's own
+   * provider — `NEXTAUTH_PROVIDER`, which is what every existing enterprise
+   * customer signs in through, Auth0-brokered SAML included — keeps its
+   * routes, its accounts and its behavior exactly as they were. This plugin
+   * adds a second way for a sign-in to arrive, keyed per connection, and the
+   * two coexist for as long as anybody is using either.
+   *
+   * Unconditional rather than flag-gated, and the two are different things.
+   * What the plugin being registered does is mount routes that answer for
+   * providers in a table; with no rows, `/sso/*` answers "no such provider"
+   * and nothing about anybody's sign-in changes. What decides whether a
+   * sign-in ROUTES to a connection is the per-organization
+   * `sso_connection_routing` flag, off by default, and that decision is the
+   * router's rather than the engine's.
+   *
+   * The provider rows themselves are never written through this plugin's own
+   * registration endpoint. They are folded from the connection log
+   * (`sso-connection-projection.prisma.repository.ts`), which is what keeps
+   * the aggregate the only source of truth and makes the engine's table
+   * rebuildable by replay.
+   */
+  sso({
+    // The identity provider's word on whether it verified the address.
+    //
+    // This is what lets an organization move from the brokered provider to
+    // its own without minting a second account for everybody: the subject an
+    // identity provider asserts natively is not the subject Auth0 brokered
+    // (`samlp|...`), so the new account can only find the existing person by
+    // ADDRESS. better-auth links on a verified address and refuses on an
+    // unverified one, and without this the plugin reports every address as
+    // unverified — so every cutover would be a fresh set of duplicates.
+    //
+    // Trusting it is warranted here in a way it would not be for a public
+    // provider: the domain is DNS-proved before the connection may route, and
+    // the assertion comes from the identity provider that domain named. The
+    // local half of the check is untouched — better-auth still refuses to
+    // link into a LangWatch account whose own address was never verified.
+    trustEmailVerified: true,
+    // Somebody with no LangWatch account who signs in through their
+    // employer's provider gets one, which is what an enterprise rollout
+    // means. Whether they then land in the organization is the connection's
+    // `allowsJit` and the join policy's business, not this plugin's.
+    disableImplicitSignUp: false,
+  }),
 ];
 
 /**
@@ -377,8 +453,20 @@ export const auth = betterAuth({
       token: "sessionToken",
       expiresAt: "expires",
     },
+    /**
+     * D06. Both columns are written by `databaseHooks.session.create.before`
+     * and never by a client, which is what `input: false` states.
+     *
+     * The field this replaces was `impersonating`, declared here as
+     * `{ type: "string" }` while Prisma declared the same column `Json?`.
+     * They disagreed for as long as both existed and the disagreement is
+     * gone with the column: impersonation rides the `{actor, subject}` claims
+     * now, which our own code reads and writes through Prisma rather than
+     * through better-auth's session shape.
+     */
     additionalFields: {
-      impersonating: { type: "string", required: false, input: false },
+      identifierId: { type: "string", required: false, input: false },
+      amr: { type: "string[]", required: false, input: false },
     },
     // Preserve NextAuth's 30-day session TTL. BetterAuth defaults to 7 days,
     // which would force users to re-auth more often than before. Match the
@@ -390,23 +478,25 @@ export const auth = betterAuth({
     /**
      * REQUIRED when `secondaryStorage` is set. Without this, BetterAuth's
      * `createSession` skips the main adapter (Prisma) and only writes to
-     * Redis. That breaks our admin impersonation flow, which lives in the
-     * legacy `Session.impersonating` JSON column — `getServerAuthSession`
-     * does `prisma.session.findUnique({where: {id: ...}})` to read it, and
-     * `/api/admin/impersonate` does `prisma.session.update` to write it.
-     * Both crash with "Record not found" when the row only exists in Redis.
-     * Forcing dual-write keeps Redis useful (rate limiting, secondary
-     * storage for plugins) while preserving DB-backed impersonation.
+     * Redis, and a session that exists only in Redis is a session with no
+     * columns of our own on it.
      *
-     * D06 gives this a second, independent reason that outlives the first.
-     * A session now records WHICH sign-in method minted it and WHAT that
-     * sign-in proved (`Session.identifierId`, `Session.amr`), and an
-     * organization's two-step requirement reads that when a member reaches
-     * its data. A session row that existed only in Redis could not carry
-     * either column, so the requirement would read null for everybody and
-     * hold every federated member at a gate they cannot pass. Even when
-     * impersonation eventually stops using `Session.impersonating`, this
-     * option stays required.
+     * RE-JUSTIFIED at D06, because its original reason is gone. It used to
+     * be here for the legacy `Session.impersonating` JSON column, which has
+     * been dropped; two reasons that outlive it stand in its place, and
+     * either alone would be enough:
+     *
+     *   - a session records WHICH sign-in method minted it and WHAT that
+     *     sign-in proved (`Session.identifierId`, `Session.amr`), and an
+     *     organization's two-step requirement reads the second when a member
+     *     reaches its data. A Redis-only row carries neither, so the
+     *     requirement would read nothing for everybody and hold every
+     *     federated member at a gate they cannot pass;
+     *   - impersonation's `{actor, subject}` claims are columns on the same
+     *     row, written by `/api/admin/impersonate` and read on every request.
+     *
+     * Both are reads and writes we perform through Prisma against a row we
+     * need to exist. So this stays true, now for reasons that are ours.
      */
     storeSessionInDatabase: true,
   },
@@ -645,11 +735,27 @@ export const auth = betterAuth({
     },
     session: {
       create: {
-        before: async (session) =>
-          beforeSessionCreate({
+        /**
+         * Two jobs in one hook, in this order and no other: the refusal
+         * first, then the claims (D06). A deactivated user's session must
+         * not be described before it is refused, and a refusal returns
+         * `false` before any read about what was proved happens.
+         *
+         * `context.path` is the endpoint minting the session, which is what
+         * says what the sign-in proved — a password, a two-step challenge
+         * answered, a passkey, a federated callback.
+         */
+        before: async (session, context) => {
+          const refusal = await beforeSessionCreate({
             prisma,
             session: { userId: session.userId },
-          }),
+          });
+          if (refusal === false) return false;
+          return sessionClaimsData({
+            userId: session.userId,
+            path: (context as { path?: string } | undefined)?.path,
+          });
+        },
         after: async (session) => {
           await afterSessionCreate({
             prisma,
@@ -773,6 +879,29 @@ export const auth = betterAuth({
         });
       }
     },
+    /**
+     * D06 follow-up 1: the two-factor endpoints, as identity facts.
+     *
+     * An ENDPOINT hook and not a database hook, because better-auth's
+     * `databaseHooks` do not fire for a plugin's own tables — a `TwoFactor`
+     * row appearing is invisible to the identity ceremonies that handle
+     * `Account` and `User`, which is why the `MfaEnrollment` aggregate had a
+     * pipeline, guards, commands and a projection and no writer at all.
+     *
+     * It runs for every path and returns immediately for all but five, and it
+     * can never fail a request: the endpoint has already answered by the time
+     * this runs, and every ceremony swallows its own failure.
+     *
+     * `createAuthMiddleware` is load-bearing, not ceremony: the after-hook
+     * runner reads `.headers` off whatever the hook returns without a guard
+     * (unlike the before runner), so a bare async that resolves undefined
+     * fails EVERY auth request after its endpoint has already answered. The
+     * wrapper is what turns "no return" into the `{ headers, response }`
+     * shape the runner requires.
+     */
+    after: createAuthMiddleware(async (ctx) => {
+      await runTwoStepCeremony(ctx as never);
+    }),
   },
 });
 

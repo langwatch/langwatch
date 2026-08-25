@@ -4,7 +4,7 @@ Feature: Python langwatch_nlp removed — nlpgo is the sole NLP engine
   So that the deployable artifact is light, boots fast, and there is one engine to reason about
 
   # _shared/contract.md §1-3, §7, §11 (Go-only end state). The Python
-  # langwatch_nlp service, the uvicorn child, the front-door reverse proxy,
+  # langwatch_nlp service, the uvicorn child, the auth-screen reverse proxy,
   # and the release_nlp_go_engine_enabled dual-path are all removed. nlpgo
   # serves /go/* + health in-process and returns a typed 502 for anything
   # else. The only Python that runs is a transient code-block sandbox

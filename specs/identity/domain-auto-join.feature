@@ -59,7 +59,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then "sam" is a member of "acme" with the organization's default role
     And "sam" was never shown a waiting screen
 
-  @unit @unimplemented
+  @unit
   Scenario: The automatic path is the same lifecycle, approved by policy
     Given "ana" turned on automatic joining for "acme.com"
     When "sam" joins automatically
@@ -67,21 +67,21 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     And it records the policy, not a person, as what resolved it
     And it sits in the same panel and the same history as an admin approval
 
-  @integration @unimplemented
+  @integration
   Scenario: The admins are told after the fact, straight away
     Given "ana" turned on automatic joining for "acme.com"
     When "sam" joins automatically
     Then every admin of "acme" is told it happened, by email and in the product
     And the message names who joined and that the domain setting admitted them
 
-  @integration @unimplemented
+  @integration
   Scenario: Every automatic join is on the customer's audit page
     Given "ana" turned on automatic joining for "acme.com"
     When "sam" joins automatically
     Then "acme"'s audit page shows the membership with the policy as what authorized it
     And it is no harder to find than a membership an admin approved by hand
 
-  @unit @unimplemented
+  @unit
   Scenario: Walking in still grants only the default role
     Given "ana" turned on automatic joining for "acme.com"
     When "sam" joins automatically
@@ -89,7 +89,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
 
   # ── Turning it on is deliberate ────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Asking is the default and automatic is never inferred
     Given a newly created self-serve organization
     When its joining setting is read
@@ -125,13 +125,13 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
 
   # ── Only an administrator, only a person ───────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Changing the setting needs the authority that gates managing the organization
     Given a member of "acme" who cannot manage the organization
     When they try to change the joining setting
     Then the attempt is refused for lack of permission
 
-  @unit @unimplemented
+  @unit
   Scenario: The setting change is itself audited
     When "ana" changes "acme"'s joining setting
     Then the change is on "acme"'s audit page with "ana" as the actor and both values
@@ -145,7 +145,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then the attempt is refused with code join_auto_not_licensed and status 403
     And "acme" stays on asking
 
-  @unit @unimplemented
+  @unit
   Scenario: An unlicensed deployment still lets colleagues ask
     Given a self-hosted deployment that has never held a genuine license
     And "acme" accepts requests to join from "acme.com"
@@ -163,7 +163,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
 
   # ── Refusing to guess ──────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An ambiguous domain refuses to admit and falls back to asking
     Given two organizations both hold verified members on "acme.com"
     And both have automatic joining on
@@ -171,7 +171,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then "sam" joins neither automatically
     And both are offered as somewhere to ask, and "sam" chooses
 
-  @unit @unimplemented
+  @unit
   Scenario: An unverified address never walks in
     Given "acme" has automatic joining on for "acme.com"
     And "sam" has typed the address but not verified it
@@ -179,7 +179,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then "sam" is not a member of anything
     And verifying the address is what admits them
 
-  @unit @unimplemented
+  @unit
   Scenario: With the flag off nobody joins automatically
     Given the join-requests flag is off
     And "acme" carries an automatic joining setting from a previous bake

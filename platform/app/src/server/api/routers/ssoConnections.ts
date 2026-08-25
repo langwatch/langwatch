@@ -130,10 +130,11 @@ export const ssoConnectionsRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().min(1),
-        // The union the aggregate speaks, so a SAML request reaches the
-        // service and is refused BY NAME. Narrowing it to `"oidc"` here would
-        // answer a validation error instead, which tells the operator the
-        // field is wrong rather than that the protocol is not self-serve yet.
+        // Both protocols, and neither is refused any more (D09): the engine
+        // that terminates them exists. What an operator registers here is
+        // still the SHAPE of a connection — credentials come from the
+        // organization's own administrator through Settings, so a connection
+        // registered here is not dialable until they do.
         type: z.enum(["oidc", "saml"]),
         providerId: z.string().min(1).max(100),
         issuer: z.string().max(2048).nullable().default(null),

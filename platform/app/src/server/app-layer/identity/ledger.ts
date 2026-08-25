@@ -43,6 +43,7 @@
  */
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
+  CONFIRM_LINK_COMMAND_TYPE,
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
   type IdentityCommand,
@@ -51,6 +52,7 @@ import {
   type IdentityFactInput,
   MARK_PRIMARY_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
+  REJECT_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity";
 import type { IdentityLedger } from "@langwatch/identity-server";
@@ -87,7 +89,40 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [DETACH_IDENTIFIER_COMMAND_TYPE]: "detachIdentifier",
   [ERASE_USER_COMMAND_TYPE]: "eraseUser",
   [PROPOSE_LINK_COMMAND_TYPE]: "proposeLink",
+  [CONFIRM_LINK_COMMAND_TYPE]: "confirmLink",
+  [REJECT_LINK_COMMAND_TYPE]: "rejectLink",
 };
+
+/**
+ * The App's event store, waited for.
+ *
+ * Exported because the identity log has a second reader now (D05's operator
+ * lookup, which folds proposals and renders history out of the same events),
+ * and two copies of "wait for the App handle, then ask for the store" is two
+ * places for the deadline to drift.
+ */
+export async function resolveIdentityEventStore(): Promise<
+  EventStore<IdentityEvent>
+> {
+  const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
+  let app = tryGetApp();
+  while (!app && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    app = tryGetApp();
+  }
+  const eventStore = app?.eventSourcing?.isEnabled
+    ? app.eventSourcing.getEventStore<IdentityEvent>()
+    : undefined;
+  if (!eventStore) {
+    // A plain Error on purpose (error doctrine): the caller cannot act on an
+    // unavailable event stack, and the ceremony degrades to a retryable
+    // failure with a trace id.
+    throw new Error(
+      "identity ledger cannot append: the event-sourcing stack is unavailable",
+    );
+  }
+  return eventStore;
+}
 
 /**
  * The pipeline's sender for one command, once the App exists.

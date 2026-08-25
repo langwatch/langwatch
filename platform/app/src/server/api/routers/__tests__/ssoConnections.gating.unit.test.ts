@@ -6,7 +6,6 @@
  *
  * Corresponds to specs/identity/sso-onboarding-tiers.feature.
  */
-import { memoryAdapter } from "better-auth/adapters/memory";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { ssoConnectionsRouter } from "../ssoConnections";
@@ -60,14 +59,31 @@ vi.mock(
   },
 );
 
+/** Enough of better-auth's adapter shape for `betterAuth()` to finish
+ *  constructing. Nothing in this suite reaches storage; what it needs is for
+ *  the auth module on its import graph to finish evaluating. */
+const stubBetterAuthAdapter = {
+  id: "stub",
+  create: async () => ({}),
+  update: async () => ({}),
+  updateMany: async () => 0,
+  findOne: async () => null,
+  findMany: async () => [],
+  delete: async () => undefined,
+  deleteMany: async () => 0,
+  count: async () => 0,
+};
+
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoConnections: mockSsoConnections,
-  // `betterAuth()` builds its adapter EAGERLY at module load, and this
-  // suite's import graph reaches it through the router. It has to be real
-  // enough to initialise; better-auth's own memory engine over an empty
-  // store is exactly that, and holds nothing this suite could assert
-  // against by accident.
-  identityStorageAdapter: () => memoryAdapter({}),
+  // The composition root is mocked whole, so anything else that reads it at
+  // module load has to be answered here too — `better-auth/index.ts` is on
+  // this router's import graph through `auth.ts` and evaluates both at the
+  // moment it builds its plugin list.
+  BACKUP_CODE_COUNT: 10,
+  identityBridgeCeremonies: () => ({}),
+  identityCeremonies: () => ({}),
+  identityStorageAdapter: () => () => stubBetterAuthAdapter,
 }));
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
@@ -128,17 +144,9 @@ describe("the back-office single sign-on surface", () => {
       // message that names nothing — no resource, no id, no surface. A
       // message naming the back office would tell a prober it exists and they
       // merely lack the session.
-      // `then` with both arms rather than `catch`: the success arm throws, so
-      // a call that stopped being denied fails here instead of handing the
-      // assertions below an `undefined` to read properties off.
       const denial = await caller
         .attestDomain({ ...TARGET, domain: "acme.com" })
-        .then(
-          () => {
-            throw new Error(
-              "attestDomain resolved: the back office gate let the call through",
-            );
-          },
+        .catch(
           (error: unknown) =>
             error as {
               code: string;
@@ -219,35 +227,24 @@ describe("the back-office single sign-on surface", () => {
       ]);
     });
 
-    /** @scenario "Setting up a SAML connection is not something anybody does themselves yet" */
-    it("refuses a SAML registration by name, saying to talk to LangWatch", async () => {
+    /** @scenario "SAML is no longer refused for being SAML" */
+    it("passes a SAML registration through to the service", async () => {
       const caller = buildCaller("olive@langwatch.ai");
-      // The real service decides this, so the mock steps aside for one call.
-      const { SsoSamlNotSelfServeError } = await import("@langwatch/identity");
-      mockService.registerConnection.mockRejectedValueOnce(
-        new SsoSamlNotSelfServeError("connection type saml"),
+      mockService.registerConnection.mockResolvedValueOnce({
+        connectionId: "ssoconn_1",
+      });
+
+      await caller.register({
+        organizationId: "org_acme",
+        type: "saml",
+        providerId: "okta",
+        issuer: null,
+        allowsJit: false,
+      });
+
+      expect(mockService.registerConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "saml" }),
       );
-
-      const refusal = await caller
-        .register({
-          organizationId: "org_acme",
-          type: "saml",
-          providerId: "okta",
-          issuer: null,
-          allowsJit: false,
-        })
-        .then(
-          () => {
-            throw new Error(
-              "register resolved: SAML was accepted as self-serve",
-            );
-          },
-          (error: unknown) => error as { message: string },
-        );
-
-      // The wire message for a handled error IS the code; the words the
-      // reader sees come from the registry keyed by it.
-      expect(refusal.message).toBe("sso_saml_not_self_serve");
     });
 
     it("records every attempt in the audit log before the command runs", async () => {

@@ -63,7 +63,7 @@ export function deploymentOffersPasskeys(): boolean {
 /**
  * Whether a passkey minted today is a way IN today. The plugin can be mounted
  * (`deploymentOffersPasskeys`) while the legacy sign-in screens are still the
- * front door — and those screens accept no passkey, only the identifier-first
+ * auth screens — and those screens accept no passkey, only the identifier-first
  * ones do (D13, `IDENTITY_ROUTER_V2=enforce`). Anything that OFFERS to mint a
  * credential — the nudge above all — gates on this, so nobody is walked into
  * creating one the sign-in screen then has no button for.

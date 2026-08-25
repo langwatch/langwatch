@@ -573,7 +573,7 @@ function ProjectSection({
                     </Badge>
                     {m.viaGroupName ? (
                       <Link
-                        href="/settings/groups"
+                        href="/settings/directory?tab=groups"
                         fontSize="xs"
                         color="purple.400"
                       >
@@ -883,7 +883,7 @@ function TeamCard({
                           {m.customRoleName ?? m.role}
                         </Badge>
                         <Link
-                          href="/settings/groups"
+                          href="/settings/directory?tab=groups"
                           fontSize="xs"
                           color="purple.400"
                         >

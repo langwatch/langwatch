@@ -18,6 +18,7 @@ import { tryGetApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 import { auth } from "~/server/better-auth";
 import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
+import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 
@@ -200,7 +201,12 @@ const betterAuthCatchAll = async (c: Context) => {
   }
 
   // BetterAuth's auth.handler is fetch-compatible (Request => Response)
-  return auth.handler(c.req.raw);
+  const response = await auth.handler(c.req.raw);
+  // ...and its refusals speak its own vocabulary, which is neither a
+  // registered code nor copy anybody wrote for a customer. This is where the
+  // families we have translated join the handled-error contract; everything
+  // else passes through byte for byte. See `better-auth/handled-errors.ts`.
+  return translateBetterAuthError({ response, path: c.req.path });
 };
 
 // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach

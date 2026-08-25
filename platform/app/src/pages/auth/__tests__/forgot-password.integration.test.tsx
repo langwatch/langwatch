@@ -105,6 +105,46 @@ describe("ForgotPassword page", () => {
     });
   });
 
+  describe("when the reset screens are looked at beside the log-in screen", () => {
+    /** @scenario The reset screens are the same card as every other auth screens screen */
+    it("renders the one auth-screen card, with its fields and its primary action", () => {
+      const { container } = renderPage();
+
+      // The same card component every unauthenticated screen is, marked so
+      // the entrance can address it — not a settings panel that happens to
+      // hold a form.
+      expect(container.querySelector("[data-auth-card]")).toBeTruthy();
+      expect(container.querySelector("[data-auth-card-logo]")).toBeTruthy();
+      expect(container.querySelector(".lw-auth-card")).toBeTruthy();
+      expect(
+        container.querySelector("button.lw-auth-primary"),
+      ).toBeTruthy();
+      // The board's field, not the app's: a small mono label, no helper line
+      // restating it in different words.
+      const label = screen.getByText("Email");
+      expect(label.tagName.toLowerCase()).toBe("label");
+      expect(screen.getByRole("textbox").getAttribute("id")).toBe(
+        label.getAttribute("for"),
+      );
+    });
+
+    /** @scenario The reset screens morph rather than replacing themselves */
+    it("becomes the same check-your-email the other doors show, in the same card", async () => {
+      const { container } = renderPage();
+      submitEmail("forgot@acme.test");
+
+      await screen.findByText(/if an account exists for/i);
+      // Still the one card: the content changed, the surface did not.
+      expect(container.querySelector("[data-auth-card]")).toBeTruthy();
+      expect(
+        screen.getByRole("heading", { name: /check your email/i }),
+      ).toBeTruthy();
+      // And it is not a dead end — the commonest reason to be staring at this
+      // card puzzled is that the address on it is wrong.
+      expect(screen.getByTestId("check-email-back")).toBeTruthy();
+    });
+  });
+
   describe("when the deployment has no outbound email configured", () => {
     beforeEach(() => {
       publicEnvRef.current = {

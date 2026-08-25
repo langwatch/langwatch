@@ -13,7 +13,6 @@ import { ssoConnectionEventsFor } from "~/server/event-sourcing/pipelines/sso-co
 import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { SsoConnectionStateFoldProjection } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { LocalDoorBreakGlassBinding } from "../../break-glass-binding";
-import { AdminEmailPlatformOperators } from "../../platform-operators";
 import { LegacySsoDomainRoutingRepository } from "../legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "../legacy-sso-organization.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "../sso-connection-projection.prisma.repository";
@@ -66,7 +65,7 @@ const legacyRouting = new LegacySsoDomainRoutingRepository(
 );
 const connectionRouting = new SsoConnectionDomainRoutingRepository(
   prisma,
-  async (methodId) => methodId === PROVIDER,
+  async ({ methodId }) => methodId === PROVIDER,
 );
 
 let appended = 0;
@@ -130,10 +129,11 @@ function grandfather() {
         connections: new PrismaSsoConnectionReadRepository(prisma),
         breakGlass: new LocalDoorBreakGlassBinding(),
         stranding: new PrismaSsoConnectionStrandingRepository(prisma),
-        // The real binding, over the same prisma the rest of this suite uses:
-        // an integration test that stubbed the operator check would stop
-        // proving the guard it is here to exercise.
-        platformOperators: new AdminEmailPlatformOperators(prisma),
+        // The migration states history and commands nothing an operator or a
+        // licence has to authorize, so both gates answer no here — and the
+        // pass still lands, which is the point of the assertion below.
+        platformOperators: { isPlatformOperator: async () => false },
+        licenseAuthority: { licenseAuthorizesDomainClaims: async () => false },
       }),
       ledger,
     ),
@@ -258,10 +258,10 @@ describe("the sso connection grandfather migration against Postgres", () => {
             connections: new PrismaSsoConnectionReadRepository(prisma),
             breakGlass: new LocalDoorBreakGlassBinding(),
             stranding: new PrismaSsoConnectionStrandingRepository(prisma),
-            // The real binding, over the same prisma the rest of this suite uses:
-            // an integration test that stubbed the operator check would stop
-            // proving the guard it is here to exercise.
-            platformOperators: new AdminEmailPlatformOperators(prisma),
+            platformOperators: { isPlatformOperator: async () => false },
+            licenseAuthority: {
+              licenseAuthorizesDomainClaims: async () => false,
+            },
           }),
           ledger,
         ),

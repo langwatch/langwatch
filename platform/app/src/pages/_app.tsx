@@ -12,7 +12,7 @@ import {
   mergeConfigs,
 } from "@chakra-ui/react";
 import { colorSystem } from "../components/ui/color-mode";
-import { frontDoorThemeConfig } from "../features/auth-front-door/frontDoorTheme";
+import { authThemeConfig } from "../features/auth/authTheme";
 import { langyThemeConfig } from "../features/langy/langyTheme";
 
 // Inter font loaded via CSS @import in globals.scss (no more next/font/google)
@@ -46,6 +46,29 @@ const toastPanel = {
 
 const appConfig = defineConfig({
   globalCss: {
+    /**
+     * What the BROWSER paints, as opposed to what we do.
+     *
+     * `color-scheme` was never declared, so every surface the browser draws
+     * itself stayed in light mode over a dark app: scrollbars above all — a
+     * pale grey trough and a chunky thumb, the single loudest thing on a dark
+     * page — but also the spinners, the autofill wash, the date and select
+     * popups, and the overscroll gutter.
+     *
+     * Declaring it is the whole fix, and it is a better one than styling
+     * `::-webkit-scrollbar` by hand: the browser draws its own dark scrollbar,
+     * which is the one the person already recognises from every other dark
+     * application, at the width their platform says and with the
+     * overlay/inset behaviour their platform says. A hand-drawn one is a
+     * scrollbar that looks like ours instead of like theirs, and it has to be
+     * re-tuned per platform forever.
+     *
+     * Keyed off the resolved theme rather than `prefers-color-scheme`, so it
+     * follows the toggle in the app and not the operating system — those
+     * disagree exactly when somebody has chosen.
+     */
+    ":root": { colorScheme: "light" },
+    ".dark, [data-theme='dark']": { colorScheme: "dark" },
     body: {
       background: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
       fontSize: "14px",
@@ -1328,7 +1351,7 @@ const appConfig = defineConfig({
  */
 export const system = createSystem(
   defaultConfig,
-  mergeConfigs(appConfig, langyThemeConfig, frontDoorThemeConfig),
+  mergeConfigs(appConfig, langyThemeConfig, authThemeConfig),
 );
 
 // The LangWatch app shell (providers, routing, NProgress) has moved to:

@@ -1,0 +1,645 @@
+/*
+ * The auth screens's surface: the website's own vocabulary, value for value.
+ *
+ * Each colour mode is one of the site's own grounds, whole. Light is the
+ * homepage hero: a white field with the mesh cloud drifting across all of it
+ * and a soft white radial keeping the reading side clean. Dark is the site's
+ * enterprise band: the ink-950 field with the blue-into-amber warp glowing up
+ * the right edge. The card is glass over whichever ground is up, the way the
+ * site's dark sections set their panels: a translucent surface, a hairline
+ * border, the ground blurring through.
+ *
+ * Both modes are declared here, keyed off the `.dark` class the app's
+ * colour-mode provider puts on the document, so the toggle moves these
+ * screens with everything else and no component holds a light-only value.
+ *
+ * Every animation lives inside a no-preference query rather than being
+ * switched off by one, so somebody who has asked for less motion gets a
+ * completely static page rather than one that stops moving after it starts.
+ */
+
+/*
+ * The site's display face. The same files Langy's theme points at, declared
+ * again here because an auth screen must not depend on another feature's
+ * stylesheet having loaded. Same family name, same URL: the browser loads the
+ * file once.
+ */
+@font-face {
+	font-family: "Sentient";
+	src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+/*
+ * COLOUR LIVES IN THE THEME, NOT HERE.
+ *
+ * The sixteen `--lw-auth-*` properties that used to be declared twice in
+ * this file (once for paper, once for ink) are semantic tokens now, in
+ * `authTheme.ts`. Chakra emits them as `--chakra-colors-auth-*` and
+ * resolves the ground the same way it does for every other surface in the app,
+ * so a component writes `bg="auth.action"` instead of importing a `var()`
+ * string, and there is one vocabulary rather than two.
+ *
+ * What is left in this file is what a token cannot hold: gradients, the
+ * wide-gamut upgrade, keyframes, and the glass effects that need real CSS.
+ */
+
+:root {
+	/* The one gradient word: blue into warm orange, the site's
+	   `.text-gradient`. Not a colour token - Chakra's `colors` namespace holds
+	   colours, and this is a paint. */
+	--lw-auth-accent-gradient: linear-gradient(
+		100deg,
+		#2563eb 0%,
+		#d9531e 100%
+	);
+	/* The card's shadow: three stacked layers, which `shadows` could hold but
+	   only by splitting one effect across two token systems. It stays here,
+	   beside the glass it belongs to. */
+	--lw-auth-card-shadow:
+		inset 0 1px 1px rgba(255, 255, 255, 0.9),
+		inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
+		0 24px 48px -20px rgba(20, 20, 23, 0.28);
+}
+
+.dark {
+	/* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
+	--lw-auth-accent-gradient: linear-gradient(
+		100deg,
+		#5fa3ff 0%,
+		#ffa24d 100%
+	);
+	/* Dark glass is smoked, not clear, so the type always has a dark floor
+	   under it - a clear film over a bright warp left the words fighting the
+	   light behind them. */
+	--lw-auth-card-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.06),
+		0 24px 60px -24px rgba(0, 0, 0, 0.65);
+}
+
+/*
+ * WIDE GAMUT.
+ *
+ * sRGB cannot show the brand orange. #f56b1a is already at the edge of the
+ * space and the deepened #c2510a is a compromise made twice over - once for
+ * contrast, once for the gamut - so on a display that can do better, it
+ * should.
+ *
+ * These re-declare the THEME's own emitted variables rather than introducing a
+ * second set, which is what keeps one source of truth: the token holds the
+ * sRGB value every display can render, and this block upgrades it in place
+ * where `color(display-p3 ...)` is available. A browser without `color-gamut`
+ * support, or a display without the gamut, never enters the block and never
+ * sees a colour it would have to clip.
+ *
+ * Only the ORANGES are lifted. White, ink and the neutral alphas are identical
+ * in both spaces, so restating them would be noise; the red is left alone
+ * because a refusal gains nothing from being more saturated.
+ */
+@media (color-gamut: p3) {
+	:root {
+		--chakra-colors-auth-action: color(display-p3 0.706 0.325 0.055);
+		--chakra-colors-auth-action-hover: color(display-p3 0.62 0.247 0.02);
+		--chakra-colors-auth-ink: color(display-p3 0.62 0.247 0.02);
+		--chakra-colors-auth-detail: color(display-p3 0.91 0.427 0.114);
+		--chakra-colors-auth-tint: color(display-p3 0.98 0.925 0.882);
+		--chakra-colors-auth-focus-ring: color(
+			display-p3 0.91 0.427 0.114 / 0.22
+		);
+		--chakra-colors-auth-glow: color(display-p3 0.91 0.427 0.114 / 0.28);
+		--lw-auth-accent-gradient: linear-gradient(
+			100deg,
+			color(display-p3 0.161 0.373 0.898) 0%,
+			color(display-p3 0.831 0.337 0.133) 100%
+		);
+	}
+
+	.dark {
+		--chakra-colors-auth-action: color(
+			display-p3 0.91 0.427 0.114 / 0.92
+		);
+		--chakra-colors-auth-action-hover: color(display-p3 0.98 0.549 0.259);
+		--chakra-colors-auth-ink: color(display-p3 0.98 0.549 0.259);
+		--chakra-colors-auth-detail: color(
+			display-p3 0.98 0.549 0.259 / 0.75
+		);
+		--chakra-colors-auth-tint: color(display-p3 0.91 0.427 0.114 / 0.18);
+		--chakra-colors-auth-focus-ring: color(
+			display-p3 0.98 0.549 0.259 / 0.22
+		);
+		--chakra-colors-auth-glow: color(display-p3 0.98 0.549 0.259 / 0.22);
+		--lw-auth-accent-gradient: linear-gradient(
+			100deg,
+			color(display-p3 0.408 0.639 1) 0%,
+			color(display-p3 1 0.639 0.318) 100%
+		);
+	}
+}
+
+/*
+ * The ground's static form: what the server, a reduced-motion visitor and a
+ * machine with no WebGL all see. The live shader in `AuthGround`
+ * replaces it, never adds to it. Light is the site hero's own static
+ * gradient; dark is the site's WarpAccent fallback — two soft glows, blue
+ * high and warm low, anchored to the card's side of the page.
+ */
+.lw-auth-ambient {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: hidden;
+	z-index: 0;
+	contain: layout paint;
+}
+
+.lw-auth-ambient-static {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		135deg,
+		#ffffff 0%,
+		#ffaf6e 35%,
+		#cddcf9 72%,
+		#ffffff 100%
+	);
+	opacity: 0.72;
+}
+
+.dark .lw-auth-ambient-static {
+	background:
+		radial-gradient(circle at 70% 22%, rgba(91, 141, 239, 0.4), transparent 38%),
+		radial-gradient(
+			circle at 86% 66%,
+			rgba(201, 123, 58, 0.26),
+			transparent 46%
+		);
+	opacity: 1;
+}
+
+/* The live shader arrives, it never pops: the static gradient in the same
+   palette is always painted underneath, and the shader fades in over it once
+   its first frame exists. What a visitor sees is colour that sharpens, not a
+   blank page that suddenly acquires a background. */
+/* Declared INSIDE a no-preference query rather than switched off by a reduce
+   one, which is the rule this file states at the top and this animation was
+   the one exception to. The difference is not cosmetic: opting out means a
+   visitor who asked for less motion loads a page that starts animating and
+   then stops, and the pattern also silently fails wherever the override loses
+   a specificity fight. Opting IN means the animation never exists for them. */
+@media (prefers-reduced-motion: no-preference) {
+	.lw-auth-shader-arrive {
+		animation: lw-auth-arrive 700ms ease 120ms both;
+	}
+}
+
+/* Only a `from`: each layer fades up to its own resting opacity — the warp
+   to its 0.55, the mesh to its 0.95 — not to a hardcoded 1. */
+@keyframes lw-auth-arrive {
+	from {
+		opacity: 0;
+	}
+}
+
+/* The live dark shader sits in the site's own frame: anchored to the card's
+   side, full height, bled past every edge so no seam of bare ground shows,
+   dissolving toward the reading side. */
+/*
+ * The dissolve is the STAGE's, not this rule's. `--lw-ground-hold` is where
+ * the colour is still solid and `--lw-ground-reach` is how much of the page it
+ * crosses; `AuthGround` writes both from the tweened stage, so the field
+ * opens out or draws back as somebody moves through a door, and the two doors
+ * do not get the same amount of the page.
+ *
+ * The fade also runs much further than it used to. It held solid to 30% and
+ * was gone by 84%, which is a band of about half the width — short enough to
+ * read as the edge of a shape. Now it holds to whatever the stage says (35%
+ * at the tightest, 5% at the loosest) and does not reach nothing until 100%,
+ * so what is left is light falling off rather than a cloud with a border.
+ *
+ * The fallbacks are the resting values, for the frame before React has set
+ * anything and for a machine that never runs the component at all.
+ */
+.lw-auth-warp {
+	position: absolute;
+	top: -12%;
+	right: -12%;
+	width: calc(84% * var(--lw-ground-reach, 1));
+	height: 124%;
+	opacity: 0.55;
+	-webkit-mask-image: linear-gradient(
+		to left,
+		black 0%,
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.45) 62%,
+		rgba(0, 0, 0, 0.12) 86%,
+		transparent 100%
+	);
+	mask-image: linear-gradient(
+		to left,
+		black 0%,
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.45) 62%,
+		rgba(0, 0, 0, 0.12) 86%,
+		transparent 100%
+	);
+	transition:
+		width 900ms ease,
+		mask-image 900ms ease;
+}
+
+/* Where the card stands alone, the glow stands behind it instead of off to
+   one side: same shader, held in a centred pool. */
+/* The centred pool takes the same two knobs: `reach` widens the ellipse and
+   `hold` is how much of it stays solid before the fall-off starts. It runs to
+   nothing at 100% for the same reason the side one does — an edge at 85% is
+   an edge. */
+.lw-auth-warp--center {
+	top: -12%;
+	right: auto;
+	left: 50%;
+	transform: translateX(-50%);
+	width: calc(130% * var(--lw-ground-reach, 1));
+	-webkit-mask-image: radial-gradient(
+		ellipse 62% 70% at 50% 42%,
+		black 0%,
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.55) 62%,
+		rgba(0, 0, 0, 0.16) 84%,
+		transparent 100%
+	);
+	mask-image: radial-gradient(
+		ellipse 62% 70% at 50% 42%,
+		black 0%,
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.55) 62%,
+		rgba(0, 0, 0, 0.16) 84%,
+		transparent 100%
+	);
+}
+
+.dark .lw-auth-ambient--center .lw-auth-ambient-static {
+	background:
+		radial-gradient(
+			circle at 50% 30%,
+			rgba(91, 141, 239, 0.35),
+			transparent 42%
+		),
+		radial-gradient(
+			circle at 58% 72%,
+			rgba(201, 123, 58, 0.22),
+			transparent 48%
+		);
+}
+
+/* The white radial that keeps one region clean for reading. On its own layer
+   so it sits over the live shader and the static band alike. */
+.lw-auth-ambient-protect {
+	position: absolute;
+	inset: 0;
+}
+
+.dark .lw-auth-ambient-protect {
+	/* A white veil is a light-mode instrument. The dark ground keeps its
+	   reading side clean by fading the glow out instead. */
+	display: none;
+}
+
+/*
+ * Where the value panel is on screen it carries the wordmark, above the
+ * headline, and the card drops its own. The mark belongs to the PAGE: said
+ * twice on one screen it stops being an identity and becomes a repeated
+ * graphic, and the card's copy was the one labelling a form rather than
+ * introducing anything.
+ *
+ * Done here rather than by a prop because the card is the same component on
+ * every installation and must not learn what is beside it. A self-hosted
+ * centred door has no panel, never gets the modifier, and keeps its wordmark.
+ */
+.lw-auth--split [data-auth-card-logo] {
+	display: none;
+}
+
+/*
+ * The site's dark-section texture, verbatim: a faint grid dissolving toward
+ * the glow, so the headline's side of a dark ground is a surface rather than
+ * a void. Light mode has the mesh for a ground and shows nothing here.
+ */
+.lw-auth-signal-grid {
+	display: none;
+}
+
+.dark .lw-auth-signal-grid {
+	display: block;
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background-image:
+		linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+	background-size: 72px 72px;
+	-webkit-mask-image: linear-gradient(to right, black, transparent 82%);
+	mask-image: linear-gradient(to right, black, transparent 82%);
+}
+
+/*
+ * The lens: the one place the ground is in focus. The field is soft by
+ * design — glow, not shapes — but under the pointer the same signal grid
+ * sharpens into view, as if the cursor were a glass held over the surface.
+ * Pointer-driven, not an animation: it moves exactly when the person does,
+ * so it runs under reduced motion like any other cursor response. The
+ * position rides two custom properties `AuthGround` writes straight to
+ * the node on pointermove — no React render per mouse event. Dark ground
+ * only, like the grid it focuses.
+ */
+.lw-auth-lens {
+	display: none;
+}
+
+.dark .lw-auth-lens {
+	display: block;
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 480ms ease;
+	background-image:
+		linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+	background-size: 72px 72px;
+	-webkit-mask-image: radial-gradient(
+		circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
+		black 0%,
+		rgba(0, 0, 0, 0.5) 55%,
+		transparent 100%
+	);
+	mask-image: radial-gradient(
+		circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
+		black 0%,
+		rgba(0, 0, 0, 0.5) 55%,
+		transparent 100%
+	);
+}
+/* The primary action: flat brand orange, and nothing else.
+
+   This is the third cut. The first was a 22% white sheen over a backdrop
+   blur; the second traded it for a "whisper of top light" — a 14% white
+   gradient down the top half, a 20% inset highlight along the top edge, and a
+   soft throw of the brand's glow underneath. That is still a gel button. A
+   top-lit gradient with an inner highlight is the one shape language that
+   says "click me, I am made of plastic", and it belongs to a decade the
+   website does not draw from.
+
+   What the site actually does is a flat fill of the brand colour, and the
+   colour is enough: #c2510a on paper is loud on its own, and stacking light
+   on top of it only makes the surface look wet. So the fill carries the
+   whole message, and every state is a change of COLOUR rather than a change
+   of material — no gradient, no inner highlight, no glow, no lift.
+
+   The one shadow left is a hairline of contact, so the button sits ON the
+   glass rather than being printed into it. It does not grow on hover. */
+.lw-auth-primary {
+	box-shadow: 0 1px 2px rgba(12, 8, 5, 0.09);
+	transition:
+		background-color 140ms ease,
+		box-shadow 140ms ease;
+}
+
+/* The press. A half pixel, which is felt rather than seen: enough to
+   acknowledge the click, small enough that nothing around it reflows. The
+   colour has already darkened by then (the hover token), so this is the
+   second half of a signal rather than the whole of one. */
+.lw-auth-primary:active:not(:disabled) {
+	transform: translateY(0.5px);
+	box-shadow: 0 0 0 1px rgba(12, 8, 5, 0.06);
+}
+
+/* The alert is glass too, for the same reason the pill is: it sits ON the
+   card, and an opaque panel in the middle of a translucent one reads as a
+   patch rather than part of the surface. It keeps its red hairline and its
+   red mark — the warning must not soften — and only the pane behind the
+   words becomes glass, tinted just enough to carry the alarm. The blur is
+   smaller than the card's: it is a nearer layer, and the ground should move
+   through it less. */
+.lw-auth-alert {
+	/* A literal red rather than a mix of the theme's: every other colour in
+	   this file is a literal too, because these screens must not depend on
+	   another stylesheet's tokens having loaded. The `!important` is what
+	   takes the pane back from the component's own opaque background — the
+	   only thing being overridden. */
+	background-color: rgba(220, 62, 62, 0.1) !important;
+	background-image: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.14),
+		rgba(255, 255, 255, 0.03) 60%,
+		rgba(255, 255, 255, 0) 100%
+	);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	-webkit-backdrop-filter: blur(10px) saturate(1.25);
+	backdrop-filter: blur(10px) saturate(1.25);
+}
+
+/* Hover is a colour change and only a colour change, and the colour comes
+   from the theme (`auth.actionHover`) rather than from here — one step
+   darker on paper, one step brighter on ink, because "recedes" and "lifts"
+   are opposite directions on opposite grounds. There is no rule for it in
+   this file on purpose: a hover that also changed the SHADOW is what made
+   the old button grow when you pointed at it. */
+
+@media (prefers-reduced-motion: reduce) {
+	.lw-auth-primary {
+		transition: none;
+	}
+	.lw-auth-primary:active:not(:disabled) {
+		transform: none;
+	}
+}
+
+/* The card: glass over the ground. The blur is what makes it glass — the
+   ground's colour moves through it rather than stopping at it. And the card
+   answers being used: while anything on it holds focus, the glass warms with
+   a slow breath of the brand's light, so clicking into a field feels like
+   the surface noticed. */
+.lw-auth-card {
+	background: var(--chakra-colors-auth-card-bg) !important;
+	border-color: var(--chakra-colors-auth-card-border) !important;
+	box-shadow: var(--lw-auth-card-shadow);
+	/* Recalibrated from 18px / 1.9 / brightness(1.04). That mix let the
+	   ground's blue bloom come through so hot that the card's top half read
+	   as a different surface than its bottom — a band, not glass. More blur
+	   softens the ground's internal edges as they cross the card, the tamer
+	   saturation stops amplifying them, and the deeper card floor (see
+	   `cardBg` in authTheme.ts) evens the whole pane so the ground
+	   reads as light behind the glass rather than shapes stuck to it. */
+	-webkit-backdrop-filter: blur(26px) saturate(1.35);
+	backdrop-filter: blur(26px) saturate(1.35);
+	transition:
+		box-shadow 420ms ease,
+		border-color 420ms ease;
+}
+
+.lw-auth-card:focus-within {
+	box-shadow:
+		var(--lw-auth-card-shadow),
+		0 0 56px -14px var(--chakra-colors-auth-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lw-auth-card {
+		transition: none;
+	}
+}
+
+/*
+ * Crossing between the two doors: the card and the value panel carry
+ * view-transition names, so a log-in link on the sign-up page (and back)
+ * slides each across the page to its mirrored place — the real card, glass
+ * and all, not a facsimile. Browsers without the API, and anybody asking for
+ * less motion, get the ordinary instant swap.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	[data-auth-card] {
+		view-transition-name: lw-auth-card;
+	}
+	.lw-auth-panel {
+		view-transition-name: lw-auth-panel;
+	}
+}
+
+::view-transition-group(lw-auth-card),
+::view-transition-group(lw-auth-panel) {
+	animation-duration: 460ms;
+	animation-timing-function: cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+
+/* The hairline either side of the word "or". */
+.lw-auth-hairline {
+	flex: 1;
+	height: 1px;
+	background: var(--chakra-colors-auth-hairline);
+}
+
+/* "Last used" floats on the shoulder of the method it belongs to. */
+.lw-auth-badge-float {
+	position: absolute;
+	top: -9px;
+	right: 12px;
+	z-index: 1;
+}
+
+/* One ring, once, where something just worked. */
+.lw-auth-pulse {
+	position: relative;
+	display: inline-flex;
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	background: var(--chakra-colors-auth-detail);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lw-auth-pulse::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: 9999px;
+		animation: lw-auth-boom 0.7s ease-out 1;
+	}
+}
+
+@keyframes lw-auth-boom {
+	from {
+		box-shadow: 0 0 0 0 rgba(245, 107, 26, 0.35);
+	}
+	to {
+		box-shadow: 0 0 0 14px rgba(245, 107, 26, 0);
+	}
+}
+
+/*
+ * The entrance: the card and everything on it rises in once, gently, and the
+ * rows follow each other by a breath. No overlay, no flight — the loading
+ * screen's mark and the card's mark are the same glyphs in nearly the same
+ * place, and a soft dissolve between them reads as one thing settling where
+ * a flight read as three.
+ *
+ * The card is live from the first frame: this animates opacity and a few
+ * pixels of translate, and gates nothing.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.lw-auth-enter [data-auth-card] {
+		animation: lw-auth-settle 360ms ease-out both;
+	}
+
+	.lw-auth-enter [data-auth-card-body] > * {
+		animation: lw-auth-rise 240ms ease-out both;
+	}
+
+	.lw-auth-enter [data-auth-card-body] > *:nth-child(1) {
+		animation-delay: 120ms;
+	}
+	.lw-auth-enter [data-auth-card-body] > *:nth-child(2) {
+		animation-delay: 170ms;
+	}
+	.lw-auth-enter [data-auth-card-body] > *:nth-child(3) {
+		animation-delay: 220ms;
+	}
+	.lw-auth-enter [data-auth-card-body] > *:nth-child(n + 4) {
+		animation-delay: 270ms;
+	}
+}
+
+@keyframes lw-auth-settle {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 6px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes lw-auth-rise {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 8px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+/*
+ * The passkey ceremony's mark, while a device is being asked.
+ *
+ * It breathes rather than spins. A spinner is a claim that something is
+ * being processed, and nothing is: the browser and the operating system hold
+ * the screen, and what this glyph says is that the card is still listening.
+ * Slow, small, and never at the centre of attention — the words are.
+ *
+ * Declared INSIDE a no-preference query, which is this file's rule (see the
+ * shader's arrival, above): opting out would mean somebody who asked for less
+ * motion loads a card that starts breathing and then stops. Here the
+ * animation simply never exists for them, and the mark is on screen, still,
+ * with every word of the panel where it was.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.lw-auth-passkey-glyph {
+		animation: lw-auth-breathe 2.6s ease-in-out infinite;
+	}
+}
+
+@keyframes lw-auth-breathe {
+	0%,
+	100% {
+		transform: scale(1);
+		box-shadow: 0 0 0 0 var(--chakra-colors-auth-glow);
+	}
+	50% {
+		transform: scale(1.045);
+		box-shadow: 0 0 0 10px rgba(245, 107, 26, 0);
+	}
+}

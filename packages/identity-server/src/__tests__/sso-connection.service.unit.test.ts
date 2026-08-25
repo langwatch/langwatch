@@ -9,6 +9,7 @@ import { SsoConnectionService } from "../sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -66,6 +67,7 @@ beforeEach(() => {
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),
       platformOperators: new StubPlatformOperators([OPS.id]),
+      licenseAuthority: new StubLicenseAuthority(),
     }),
     ledger,
   );

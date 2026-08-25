@@ -38,7 +38,7 @@ vi.mock("~/hooks/useRequiredSession", () => ({
 }));
 
 // The page this file covers is the one a deployment gets before the
-// identifier-first front door is enforced (ADR-117 §7): accept on arrival,
+// identifier-first auth screens is enforced (ADR-117 §7): accept on arrival,
 // explain the failure, offer the way out. The landing screen that replaces it
 // at the flip has its own tests.
 vi.mock("~/hooks/usePublicEnv", () => ({

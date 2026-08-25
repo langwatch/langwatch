@@ -6,6 +6,7 @@ import {
   RecordScimApplyFailureCommand,
   RecordScimGroupMappingCommand,
   RecordScimUserPushCommand,
+  RedriveScimApplyCommand,
   RevokeScimSyncCommand,
 } from "./commands/scimSyncCommands";
 import {
@@ -28,6 +29,7 @@ const SCIM_SYNC_COMMANDS = [
   ["recordScimUserPush", RecordScimUserPushCommand],
   ["recordScimGroupMapping", RecordScimGroupMappingCommand],
   ["recordScimApplyFailure", RecordScimApplyFailureCommand],
+  ["redriveScimApply", RedriveScimApplyCommand],
   ["revokeScimSync", RevokeScimSyncCommand],
 ] as const;
 
@@ -52,6 +54,12 @@ export interface ScimSyncPipelineDeps {
  * re-attempted the apply behind the provider's back would mean two things
  * pushing the same state and neither able to say which one the customer is
  * looking at.
+ *
+ * ONE VERB IS NOT THE DIRECTORY'S. `redriveScimApply` is a platform operator
+ * sending a retired apply through again once its cause is fixed (ADR-122) —
+ * the single write either reconciliation surface has. It is still not a
+ * queue re-attempting anything behind the provider's back: a person decided,
+ * and the fact carries which person.
  *
  * Ships DARK: `SCIM_V2_GRANTS` defaults off, so no SCIM request path
  * dispatches these commands and the previous write path is unchanged. A

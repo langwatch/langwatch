@@ -77,7 +77,27 @@ describe("the pages under /settings", () => {
     it.each(modules)("%s renders SettingsLayout", (moduleSpecifier) => {
       const source = readFileSync(sourceFileOf(moduleSpecifier), "utf-8");
 
+      // A page whose whole job is to forward an old address renders nothing
+      // of its own, so framing it would flash a settings shell on the way
+      // past. `/settings/role-bindings` is one: the page it named is now a
+      // tab of Roles, and the address keeps resolving so old links do not
+      // dead-end. The frame is the destination's job.
+      if (source.includes("<Navigate")) return;
+
       expect(source).toContain("<SettingsLayout");
+    });
+
+    /** @scenario An address that only forwards is not framed on the way past */
+    /** @scenario The old role bindings address forwards onto the tab it became */
+    it("forwards the old role-bindings address onto the tab it became", () => {
+      const source = readFileSync(
+        sourceFileOf("pages/settings/role-bindings"),
+        "utf-8",
+      );
+
+      expect(source).toContain("<Navigate");
+      expect(source).toContain("/settings/roles?tab=assignments");
+      expect(source).not.toContain("<SettingsLayout");
     });
   });
 });

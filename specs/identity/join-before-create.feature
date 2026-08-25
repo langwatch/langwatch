@@ -68,7 +68,7 @@ Feature: Join before create - the choice happens before an organization is minte
 
   # ── The invariant ──────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: No organization is created for somebody who did not ask for one
     Given an organization "acme" open to requests from "acme.com"
     When "sam" completes verification and asks to join "acme"
@@ -83,7 +83,7 @@ Feature: Join before create - the choice happens before an organization is minte
     And creating an organization anyway is offered as a plain, explicit choice
     And taking it creates exactly one organization and leaves the request open
 
-  @integration @unimplemented
+  @integration
   Scenario: Approval reaches somebody who created a workspace while waiting
     Given "sam" created an organization while a request to "acme" was open
     When "ana" approves the request
@@ -92,7 +92,7 @@ Feature: Join before create - the choice happens before an organization is minte
 
   # ── Existing users ─────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: An existing user is offered their colleagues once, and can dismiss it
     Given "sam" already has an account and a verified "acme.com" address
     And "acme" is open to requests from that domain
@@ -100,7 +100,7 @@ Feature: Join before create - the choice happens before an organization is minte
     Then the offer appears once for that domain
     And dismissing it stops it appearing again for that domain
 
-  @integration @unimplemented
+  @integration
   Scenario: Creating an organization on a matching domain is nudged, never blocked
     Given "sam" is an existing user whose domain matches "acme"
     When "sam" opens the create-organization screen
@@ -109,7 +109,7 @@ Feature: Join before create - the choice happens before an organization is minte
 
   # ── What the operator can see ──────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Organizations nobody meant to create are countable before the flag flips
     Given organizations created by people who joined another organization on
       the same domain within thirty days

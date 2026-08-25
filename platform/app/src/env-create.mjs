@@ -290,7 +290,7 @@ export function createEnvConfig() {
       LANGWATCH_LICENSE_KEY: z.string().optional(),
       // ADR-117 §7: the one flag covering the identifier-first router (D03)
       // and the screens that render its decisions (D13). Three-valued and
-      // shipped `off`, because the front door is the highest-risk flip in the
+      // shipped `off`, because the auth screens is the highest-risk flip in the
       // identity program: `shadow` computes the router's decision on every
       // live login and logs how it compares against the legacy outcome
       // WITHOUT changing anything, `enforce` is the flip, and `off` leaves the
@@ -317,7 +317,7 @@ export function createEnvConfig() {
       PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
-      // front door is the highest-risk flip in the identity program.
+      // auth screens is the highest-risk flip in the identity program.
       // `off` composes today's `Organization.ssoDomain` strings and nothing
       // else. `shadow` still lets the strings decide, and runs the
       // `SsoConnection` projection lookup alongside so disagreements are

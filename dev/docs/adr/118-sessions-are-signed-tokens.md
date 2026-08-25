@@ -9,7 +9,7 @@ plan `../identity-platform/delivery-plan.md`. Touches every deliverable that
 reads a session, and D06 most of all (it is what puts claims on one).
 
 **Builds on:** ADR-093 (Redis is an owned client, resolved per call, and may be
-absent), ADR-101 (the identity pipeline), ADR-117 (the front door that mints
+absent), ADR-101 (the identity pipeline), ADR-117 (the auth screens that mints
 these sessions).
 
 ## Context

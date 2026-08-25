@@ -12,6 +12,8 @@ import type React from "react";
 import { useMemo } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { Link } from "~/components/ui/link";
+import { JoinInsteadNotice } from "~/features/auth";
+import { api } from "~/utils/api";
 import { LEGAL_LINKS } from "~/utils/legalLinks";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
@@ -37,9 +39,19 @@ const OrganizationScreen: React.FC = () => {
   const { organizationName, agreement, setOrganizationName, setAgreement } =
     useOnboardingFormContext();
   const { emit } = useAnalytics();
+  // Answers only for this caller's OWN verified address, and answers nothing
+  // for an unverified one — so no organization name reaches the browser
+  // before the person has proved the domain they are being nudged about.
+  const joinLookup = api.joinRequests.lookup.useQuery();
 
   return (
     <VStack gap={5} align="stretch" w="full" minW="0">
+      {/* Nudged, never blocked (D12, epic Q17): somebody starting a second
+          organization at a company that already has one is doing something
+          ordinary, and the only failure this notice can have is standing in
+          their way. The form below it completes exactly as it did. */}
+      <JoinInsteadNotice lookup={joinLookup.data} />
+
       <Field.Root colorPalette="orange" w="full">
         <Input
           autoFocus

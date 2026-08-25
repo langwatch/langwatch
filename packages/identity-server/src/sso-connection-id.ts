@@ -22,6 +22,13 @@ export function newSsoConnectionCommandId(): string {
   return generate("ssocmd").toString();
 }
 
+/** One way back in, granted to one person until one date (D05). Minted here
+ *  rather than beside the connection ids' consumers for the same reason they
+ *  are: an id prefix is a persisted contract. */
+export function newSsoBreakGlassBindingId(): string {
+  return generate("ssobg").toString();
+}
+
 /**
  * The connection the grandfather migration creates for an organization.
  * Derived from the organization so every pass names the same aggregate —

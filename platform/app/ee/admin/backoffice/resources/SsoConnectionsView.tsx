@@ -633,7 +633,7 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
       </VStack>
       {connection.claimedDomains.length > 0 && (
         <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          Waiting for a decision: {connection.claimedDomains.join(", ")}
+          Claimed, not yet proved: {connection.claimedDomains.join(", ")}
         </Text>
       )}
       {connection.approvedDomains.length > 0 && (

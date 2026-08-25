@@ -1,8 +1,8 @@
 import {
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
+  type SsoConnectionType,
   type SsoDomainVerification,
-  SsoSamlNotSelfServeError,
 } from "@langwatch/identity";
 import type { SsoConnectionService } from "@langwatch/identity-server";
 import {
@@ -124,10 +124,16 @@ export class SsoConnectionBackofficeService {
   /**
    * Register a connection for an organization.
    *
-   * SAML is refused by name here rather than at the aggregate: the aggregate
-   * is protocol-agnostic on purpose, and D09 will terminate SAML through it.
-   * What is not available is registering one through a SELF-SERVE surface,
-   * which is a property of the surface and belongs on it.
+   * Both protocols, since D09: SAML was refused here because nothing in the
+   * product could terminate it, and something can now.
+   *
+   * What this surface still does not do is take credentials. A connection
+   * registered here carries no references, so the fold writes the engine no
+   * provider and the router reads "not configured" — which is exactly true
+   * until an administrator supplies the client secret or the identity
+   * provider's metadata through Settings. An operator registering the SHAPE
+   * of a connection ahead of that conversation is the tier-1 journey, and it
+   * has never been the thing that makes a sign-in arrive.
    */
   async registerConnection({
     organizationId,
@@ -138,21 +144,16 @@ export class SsoConnectionBackofficeService {
     operator,
   }: {
     organizationId: string;
-    type: string;
+    type: SsoConnectionType;
     providerId: string;
     issuer: string | null;
     allowsJit: boolean;
     operator: OperatorActor;
   }): Promise<{ connectionId: string }> {
-    if (type !== "oidc") {
-      throw new SsoSamlNotSelfServeError(
-        `connection type ${type} is not registrable through a self-serve surface`,
-      );
-    }
     const connectionId = newSsoConnectionId();
     await this.deps.connections().registerConnection({
       ...this.command({ organizationId, connectionId, operator }),
-      type: "oidc",
+      type,
       idp: {
         issuer,
         providerId,

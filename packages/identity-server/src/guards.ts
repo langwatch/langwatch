@@ -10,6 +10,7 @@ import {
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   type IdentifierArrivalState,
   IdentityDetachStrandsUserError,
+  type IdentityHeads,
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
   IdentityPrimaryMustDemoteFirstError,
@@ -31,6 +32,53 @@ import {
 import type { IdentityHeadsRepository } from "./identity-heads.repository";
 import type { IdentityReservationRepository } from "./identity-reservations.repository";
 import type { IdentityUsersRepository } from "./identity-users.repository";
+
+/**
+ * Why removing this identifier would strand the person, or null.
+ *
+ * Pure over the heads, and exported, because two callers need the SAME
+ * answer and only one of them is about to write: the detach guard refuses
+ * with it, and the settings surface stands its Remove control down with it
+ * before anybody clicks (`specs/identity/authentication-settings.feature`).
+ * A screen that predicted the refusal with a rule of its own would be a
+ * second implementation of the invariant, and the two would drift — the
+ * screen would either offer a click that always fails or hide one that would
+ * have worked.
+ *
+ * Scoped to identifiers that are actually usable, which is what makes an
+ * unconfirmed address removable: nobody could have signed in with it, so
+ * losing it strands nobody. The subject's own state is deliberately NOT read
+ * here — the question is what is LEFT — so it answers the same for a VERIFIED
+ * identifier and for the PRIMARY one, which is what lets the surface reason
+ * about a removal that demotes first.
+ */
+export function detachStrandsUser({
+  heads,
+  identifierId,
+}: {
+  heads: IdentityHeads;
+  identifierId: string;
+}): IdentityDetachStrandsUserError | null {
+  const remaining = Object.values(heads.identifiers).filter(
+    (candidate) =>
+      candidate.identifierId !== identifierId &&
+      (candidate.state === "VERIFIED" || candidate.state === "PRIMARY"),
+  );
+  if (remaining.length === 0) {
+    return new IdentityDetachStrandsUserError(
+      `detach_identifier: ${identifierId} is the last verified identifier for this user`,
+    );
+  }
+  // A passkey is a way in and not a way back: it has no address, so a person
+  // holding only passkeys has nowhere a recovery message could reach them.
+  // The remedy the screen offers is a verified email.
+  if (remaining.every((candidate) => candidate.provider === "passkey")) {
+    return new IdentityDetachStrandsUserError(
+      `detach_identifier: removing ${identifierId} would leave this user with passkeys only and no recovery address`,
+    );
+  }
+  return null;
+}
 
 /**
  * The identity guards (ADR-101 §2): what runs BEFORE any fact exists — the
@@ -354,24 +402,8 @@ export class IdentityGuards {
     // are actually usable: detaching an unverified address strands nobody,
     // because nobody could have signed in with it.
     if (head.state === "VERIFIED") {
-      const remaining = Object.values(heads.identifiers).filter(
-        (candidate) =>
-          candidate.identifierId !== identifierId &&
-          (candidate.state === "VERIFIED" || candidate.state === "PRIMARY"),
-      );
-      if (remaining.length === 0) {
-        throw new IdentityDetachStrandsUserError(
-          `detach_identifier: ${identifierId} is the last verified identifier for this user`,
-        );
-      }
-      // A passkey is a way in and not a way back: it has no address, so a
-      // person holding only passkeys has nowhere a recovery message could
-      // reach them. The remedy the screen offers is a verified email.
-      if (remaining.every((candidate) => candidate.provider === "passkey")) {
-        throw new IdentityDetachStrandsUserError(
-          `detach_identifier: removing ${identifierId} would leave this user with passkeys only and no recovery address`,
-        );
-      }
+      const strands = detachStrandsUser({ heads, identifierId });
+      if (strands) throw strands;
     }
     return [
       { type: IDENTIFIER_DETACHED_EVENT_TYPE, data: { identifierId, actor } },

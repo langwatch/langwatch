@@ -41,19 +41,19 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
 
   # ── The organization view: status ──────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: A connection's sync state is on the SCIM settings page
     When "ana" opens the SCIM settings page
     Then "acme-okta" is listed with its current sync state
     And the state says what it is waiting for, in words, not a code
 
-  @integration @unimplemented
+  @integration
   Scenario: The last push and the people managed are counted per connection
     When "ana" opens the SCIM settings page
     Then "acme-okta" shows when the directory last pushed
     And how many of "acme"'s people the directory currently manages
 
-  @integration @unimplemented
+  @integration
   Scenario: A connection the directory has never pushed to says so calmly
     Given "acme" holds a second connection whose token has never been used
     When "ana" opens the SCIM settings page
@@ -62,21 +62,21 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
 
   # ── The organization view: what the directory did ──────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: People the directory removed are listed as the directory's act
     Given the directory deactivated "sam" in its last push
     When "ana" opens the reconciliation panel for "acme-okta"
     Then "sam" appears in the recent directory-caused changes
     And the change names the directory as its author, with when it happened
 
-  @integration @unimplemented
+  @integration
   Scenario: A directory-caused change and the audit page tell the same story
     Given the directory deactivated "sam" in its last push
     Then the change the reconciliation panel shows for "sam"
     And the entry on the organization's audit page
     Are explained by the same recorded facts
 
-  @integration @unimplemented
+  @integration
   Scenario: A failed apply reaches the administrator as words to act on
     Given the directory's last push contained an operation that could not be applied
     When "ana" opens the reconciliation panel for "acme-okta"
@@ -84,7 +84,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     And it says what will resolve it
     And no internal error code or intent identifier is shown
 
-  @integration @unimplemented
+  @integration
   Scenario: The organization view offers no retry
     Given the directory's last push contained an operation that could not be applied
     When "ana" opens the reconciliation panel for "acme-okta"
@@ -93,13 +93,13 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
 
   # ── The organization view: scope and permission ─────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Another organization's connection is not there to read
     When "ana" opens the SCIM settings page
     Then nothing from "globex" is listed
     And naming "globex"'s connection in a request answers as if it did not exist
 
-  @integration @unimplemented
+  @integration
   Scenario: Seeing sync status and managing tokens are two different permissions
     Given "rio" of "acme" may see single sign-on but not manage it
     When "rio" opens the SCIM settings page
@@ -108,25 +108,25 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
 
   # ── The operator view ───────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Every customer's connections are one operator list
     Given a platform operator opens the SCIM oversight surface
     Then connections across organizations are listed with their sync states
     And the list searches and pages the way the other operator lists do
 
-  @integration @unimplemented
+  @integration
   Scenario: A dead letter opens to the intent behind it
     Given an apply for "acme-okta" retired as unretryable
     When the operator opens that failure
     Then it links to the retired intent, its error, and its retry history
 
-  @integration @unimplemented
+  @integration
   Scenario: The mapping detail is the operator's, not the customer's
     When the operator opens a person the directory manages in "acme"
     Then the external identifier the directory knows them by is shown per connection
     And the organization view never shows that identifier
 
-  @integration @unimplemented
+  @integration
   Scenario: The surface is refused without platform operator access
     Given a signed-in user who is not a platform operator
     When they request the SCIM oversight surface
@@ -134,7 +134,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
 
   # ── The one write: the guarded re-drive ─────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Re-driving a retired apply is a recorded act
     Given an apply for "acme-okta" retired as unretryable
     And its cause has been fixed
@@ -142,13 +142,13 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     Then the apply runs again
     And the re-drive is recorded with the operator on it
 
-  @integration @unimplemented
+  @integration
   Scenario: An apply that is not retired cannot be re-driven
     Given an apply for "acme-okta" that is still being retried
     When the operator attempts to re-drive it
     Then the re-drive is refused with words saying why
 
-  @integration @unimplemented
+  @integration
   Scenario: Re-driving twice applies once
     Given an apply for "acme-okta" retired as unretryable
     When the operator re-drives it twice
@@ -156,7 +156,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
 
   # ── Rebuildability ──────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Replay rebuilds everything the views show
     Given both views have been read for "acme"
     When the reconciliation projections are rebuilt from the event log

@@ -6,15 +6,26 @@ import { PersonalWorkspaceService } from "@ee/governance/services/personalWorksp
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { ValidationError } from "@langwatch/handled-error";
-import { passwordProblem } from "@langwatch/identity";
+import {
+  IdentityDetachStrandsUserError,
+  passwordProblem,
+} from "@langwatch/identity";
 import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { deploymentSignsInWithPasskeys } from "~/server/app-layer/identity/signin-method-policy";
+import { signUpVerification } from "~/server/app-layer/identity/runtime";
+import {
+  deploymentOffersTwoStepVerification,
+  deploymentSignsInWithPasskeys,
+} from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
+import {
+  AuthRateLimitedError,
+  DirectRegistrationUnavailableError,
+} from "~/server/auth/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
@@ -39,11 +50,34 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 const logger = createLogger("langwatch:user-router");
 
 /**
+ * How long until a rate-limit budget refills, in whole seconds, never
+ * negative. Carried on the refusal so a screen can count down rather than say
+ * "later" and leave somebody guessing.
+ */
+function secondsUntil(resetAt: number): number {
+  return Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
+}
+
+/**
  * How long "not now" lasts (ADR-120). Long enough that the offer reads as an
  * offer rather than a nag, short enough that somebody who declined on the day
  * they signed up is asked again once they have something worth protecting.
  */
-const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
+const SECURE_ACCOUNT_NUDGE_INTERVAL_DAYS = 30;
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+ * A display name, as `user.updateName` will accept it.
+ *
+ * Trimmed BEFORE the length checks, so "   " is a name of length zero and is
+ * refused rather than stored as a blank that renders as an unexplained gap in
+ * every member list. Exported so the shape is testable on its own, without
+ * standing a router up around it.
+ *
+ * Spec: specs/settings/profile.feature
+ */
+export const PROFILE_NAME_SCHEMA = z.string().trim().min(1).max(120);
 
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
@@ -99,7 +133,7 @@ export const userRouter = createTRPCRouter({
   register: publicProcedure
     .input(
       z.object({
-        // Optional: the front door does not ask. Onboarding does, in a place
+        // Optional: the auth screens does not ask. Onboarding does, in a place
         // where the question is worth a field. The legacy sign-up page still
         // sends one, so it is taken when it comes.
         name: z.string().min(1, "Name is required").optional(),
@@ -109,6 +143,13 @@ export const userRouter = createTRPCRouter({
         // looking at. An input-schema rejection arrives as a tRPC parse error
         // with no field to hang on.
         password: z.string().min(1),
+        /**
+         * The single-use proof that an emailed link already confirmed this
+         * address, minted by `completeSignUpVerification` for an address that
+         * had no account behind it. Where it checks out, the account is born
+         * confirmed and no second link is sent.
+         */
+        addressProof: z.string().min(1).optional(),
       }),
     )
     .noPermission({
@@ -140,11 +181,7 @@ export const userRouter = createTRPCRouter({
       // the signup form's actual backend — blocking it would kill the
       // fresh-signup recovery route (Decision 5c).
       if ((await resolveAuthProvider()) !== "email") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "Direct registration is not available for this auth provider",
-        });
+        throw new DirectRegistrationUnavailableError();
       }
 
       // Per-IP rate limit. Mirrors BetterAuth's `/sign-up/email` 20-per-hour
@@ -157,9 +194,8 @@ export const userRouter = createTRPCRouter({
         max: 20,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many signup attempts. Please try again later.",
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 
@@ -182,6 +218,50 @@ export const userRouter = createTRPCRouter({
         email,
         passwordHash: await hash(password, 10),
       });
+
+      // An address an emailed link already proved does not get asked again.
+      // The proof is spent here, so it confirms exactly one account, and it
+      // is checked against THIS address, so a proof for one address cannot
+      // confirm another. Anything that does not check out simply falls
+      // through to the ordinary link below.
+      const verification = signUpVerification();
+      if (
+        input.addressProof &&
+        (await verification.claimAddressProof({
+          token: input.addressProof,
+          email,
+        }))
+      ) {
+        await verification.markAddressConfirmed({ email });
+        return { id: newUser.id };
+      }
+
+      // The confirmation link, sent from HERE (ADR-117 §6). Sign-up creates
+      // the account but opens no session: the address is confirmed before
+      // anybody gets in, so there is no session for the screen to send this
+      // from. The alternative — a public "send a confirmation to this
+      // address" — is a mailer pointed at anything anybody types, and the
+      // guard that keeps `requestSignUpVerification` honest (refusing an
+      // address that already has an account) is exactly the guard such an
+      // endpoint could not have, since by this line the account is the point.
+      //
+      // Sending it from the call that CREATED the account closes that: the
+      // only address reachable is the one just registered, and the mail is a
+      // consequence of the write rather than a favour done for a caller.
+      //
+      // Awaited, unlike the passkey path's, because nothing navigates behind
+      // it and the screen it returns to is the one that says a link is on its
+      // way. A mailer that is down must not lose the account, though, so a
+      // failure is logged and swallowed: the account exists, and the way on
+      // is the "send it again" the next screen offers.
+      try {
+        await verification.requestVerification({ email });
+      } catch (failure) {
+        logger.warn(
+          { error: failure, userId: newUser.id },
+          "sign-up could not send the address confirmation",
+        );
+      }
 
       return { id: newUser.id };
     }),
@@ -224,6 +304,39 @@ export const userRouter = createTRPCRouter({
       return UserService.create(ctx.prisma).getAccountInfo({
         id: ctx.session.user.id,
       });
+    }),
+
+  /**
+   * Sets the caller's own display name — the one a member list, a comment and
+   * an audit entry name them by.
+   *
+   * The name was writable by sign-up, by the identity provider and by a
+   * back-office operator, and by nobody else: somebody whose directory sent
+   * "asmith" was stuck as "asmith" to every colleague who read a member list.
+   *
+   * A name the directory owns is still the caller's to set. The next push may
+   * overwrite it; refusing the edit would not change that and would only take
+   * away the one thing they could do about it in the meantime.
+   *
+   * The schema trims first and requires something left, so a name that is
+   * nothing but whitespace is refused at the boundary rather than persisted
+   * as a blank that renders as an unexplained gap wherever a person is
+   * listed. Sessions are NOT revoked: `updateProfile` reserves that for an
+   * email change, and a cosmetic edit is no reason to sign somebody out.
+   *
+   * Spec: specs/settings/profile.feature
+   */
+  updateName: protectedProcedure
+    .input(z.object({ name: PROFILE_NAME_SCHEMA }))
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
+    .mutation(async ({ ctx, input }) => {
+      await UserService.create(ctx.prisma).updateProfile({
+        id: ctx.session.user.id,
+        name: input.name,
+      });
+      return { name: input.name };
     }),
   getLinkedAccounts: protectedProcedure
     .input(z.object({}))
@@ -268,10 +381,13 @@ export const userRouter = createTRPCRouter({
             where: { userId },
           });
           if (accountCount <= 1) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Cannot remove the last authentication method",
-            });
+            // The same refusal the detach guard raises, so the words the
+            // caller reads come from the code-keyed presentation registry
+            // rather than from a sentence written here. A raw message would
+            // reach the screen as "unknown error" (#5984).
+            throw new IdentityDetachStrandsUserError(
+              `unlink_account: ${input.accountId} is the last account of user ${userId}`,
+            );
           }
           const account = await tx.account.findFirst({
             where: { id: input.accountId, userId },
@@ -293,51 +409,81 @@ export const userRouter = createTRPCRouter({
       return { success: true };
     }),
   /**
-   * Whether to offer this person a passkey right now (ADR-120).
+   * What this person could do to secure their account right now, and whether
+   * to say so (ADR-120, extended at D06).
    *
-   * Three conditions, and the first is the one that keeps it from being noise:
-   * somebody who already HOLDS a passkey is never asked, whatever they signed
-   * in with today — a member on a machine that does not hold theirs has a good
-   * reason, and asking them to make another is a nag with no upside.
+   * ONE offer covering both halves, not two nudges racing each other. A
+   * person is asked once about the account rather than once about a passkey
+   * and again about two-step verification, because two dialogs on the way in
+   * is a nag whatever each one says on its own — and because somebody who
+   * declines the first has answered the question the second would ask.
    *
-   * The interval lives on the account rather than in browser storage, so a new
-   * device does not restart the count and the 30 days actually mean 30 days.
+   * Each half keeps its own gate and its own reason to be absent:
    *
-   * Gated on the sign-in screens actually TAKING a passkey, not just on the
-   * plugin being mounted: a deployment still on the legacy front door would
-   * otherwise nudge people into minting a credential no screen has a button
-   * for.
+   *   - the passkey half is gated on the sign-in screens actually TAKING a
+   *     passkey, not just on the plugin being mounted (a deployment on the
+   *     legacy auth screens would otherwise nudge people into minting a
+   *     credential no screen has a button for), and never appears for
+   *     somebody who already holds one — whatever they signed in with today;
+   *   - the two-step half is gated on `MFA_ENROLLMENT_OPEN`, so with the flag
+   *     off nothing about it is offered, and never appears for somebody who
+   *     has already set one up.
+   *
+   * The interval lives on the account rather than in browser storage, so a
+   * new device does not restart the count and the 30 days actually mean 30
+   * days. One dismissal governs the WHOLE nudge, which is what makes it one
+   * question rather than two.
    */
-  passkeyNudge: protectedProcedure
+  secureAccountNudge: protectedProcedure
     .input(z.object({}))
     .noPermission({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .query(async ({ ctx }) => {
-      if (!deploymentSignsInWithPasskeys()) return { offer: false };
+      const passkeysOffered = deploymentSignsInWithPasskeys();
+      const twoStepOffered = deploymentOffersTwoStepVerification();
+      // Neither half exists on this deployment: nothing is read, because
+      // there is nothing any answer could change.
+      if (!passkeysOffered && !twoStepOffered) {
+        return { offer: false, passkey: false, twoStep: false };
+      }
 
       const [passkeys, user] = await Promise.all([
-        ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } }),
+        passkeysOffered
+          ? ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } })
+          : Promise.resolve(0),
         ctx.prisma.user.findUnique({
           where: { id: ctx.session.user.id },
-          select: { passkeyNudgeDismissedAt: true },
+          select: { passkeyNudgeDismissedAt: true, twoFactorEnabled: true },
         }),
       ]);
-      if (passkeys > 0) return { offer: false };
 
+      const passkey = passkeysOffered && passkeys === 0;
+      const twoStep = twoStepOffered && !(user?.twoFactorEnabled ?? false);
+      if (!passkey && !twoStep) {
+        return { offer: false, passkey: false, twoStep: false };
+      }
+
+      // The column keeps its name. It has always dated one dismissal of one
+      // offer, and it still does — the offer simply says more than it used
+      // to. Renaming it would rewrite every existing dismissal's meaning for
+      // no gain a reader of this code can see.
       const dismissedAt = user?.passkeyNudgeDismissedAt;
-      if (!dismissedAt) return { offer: true };
-
-      const askAgainAfter =
-        dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
-      return { offer: Date.now() >= askAgainAfter };
+      const askAgainAfter = dismissedAt
+        ? dismissedAt.getTime() + SECURE_ACCOUNT_NUDGE_INTERVAL_DAYS * DAY_MS
+        : 0;
+      return { offer: Date.now() >= askAgainAfter, passkey, twoStep };
     }),
   /**
    * "Not now". Dated rather than flagged, because the offer comes back — a
    * flag would make one dismissal permanent, and somebody who declines on the
-   * day they sign up is not somebody who never wants a passkey.
+   * day they sign up is not somebody who never wants to secure their account.
+   *
+   * One dismissal covers both halves. Declining is an answer to "shall we
+   * make this account harder to take over", and asking again about the other
+   * half tomorrow would be answering a question nobody asked.
    */
-  dismissPasskeyNudge: protectedProcedure
+  dismissSecureAccountNudge: protectedProcedure
     .input(z.object({}))
     .noPermission({
       reason: "operates on the session user's own account, no tenant scope",
@@ -405,10 +551,7 @@ export const userRouter = createTRPCRouter({
       // Email mode only. Under Auth0 the password lives in the Auth0 tenant
       // and this row is not where it would go.
       if ((await resolveAuthProvider()) !== "email") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Passwords are not available for this auth provider",
-        });
+        throw new DirectRegistrationUnavailableError();
       }
 
       const limit = await rateLimit({
@@ -417,9 +560,8 @@ export const userRouter = createTRPCRouter({
         max: 5,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many attempts. Please try again later.",
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 
@@ -529,9 +671,8 @@ export const userRouter = createTRPCRouter({
         max: 5,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many password change attempts. Please try again later.",
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 

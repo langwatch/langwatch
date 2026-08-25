@@ -22,16 +22,19 @@ import type {
   IdentityReservationRepository,
   IdentityUsersRepository,
   JoinRequestReadRepository,
+  LinkProposalReadsRepository,
   MfaEnrollmentRepository,
   ScimSyncReadRepository,
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoLicenseAuthorityRepository,
   SsoPlatformOperatorRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
   JoinRequestGuards,
+  LinkProposalGuards,
   MfaGuards,
   ScimSyncGuards,
   SsoConnectionGuards,
@@ -400,6 +403,9 @@ export interface PipelineRepositories {
    * claim is the same claim rather than a second one.
    */
   identityReservations: IdentityReservationRepository;
+  /** The proposal log the link-decision guards read (ADR-117 §3, D05). A
+   *  proposal changes no head, so there is nothing else to read it from. */
+  identityLinkProposals: LinkProposalReadsRepository;
   /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
   mfaProjection: StateProjectionStore<MfaFoldState>;
   /** Postgres reads the two-step verification guards run against (D06). */
@@ -415,6 +421,9 @@ export interface PipelineRepositories {
   /** Whether an actor is a LangWatch platform operator — what makes deciding
    *  a domain claim and attesting a domain operator acts (D05 tier 1). */
   ssoPlatformOperators: SsoPlatformOperatorRepository;
+  /** What the installation's licence may authorize — the tier-2 path where
+   *  a self-hosted customer's licence stands in for our approval (D05). */
+  ssoLicenseAuthority: SsoLicenseAuthorityRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
   /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
@@ -740,6 +749,12 @@ export class PipelineRegistry {
         // plugin is not registered and nothing dispatches these.
         mfaProjectionStore: this.deps.repositories.mfaProjection,
         mfaGuards: new MfaGuards(this.deps.repositories.mfaEnrollments),
+        // D05's operator lookup decides waiting sign-ins through these. The
+        // staged re-run runs the same guard the calling path ran, so a
+        // proposal cannot be decided twice by taking the other leg.
+        linkProposalGuards: new LinkProposalGuards({
+          proposals: this.deps.repositories.identityLinkProposals,
+        }),
       }),
     );
     // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
@@ -757,6 +772,7 @@ export class PipelineRegistry {
           breakGlass: this.deps.repositories.ssoBreakGlassBindings,
           stranding: this.deps.repositories.ssoConnectionStranding,
           platformOperators: this.deps.repositories.ssoPlatformOperators,
+          licenseAuthority: this.deps.repositories.ssoLicenseAuthority,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
       }),
