@@ -17,9 +17,11 @@
  * differs by surface: the home greeting drops the name from its sentence, and
  * a message label falls back to the generic role.
  */
-export const displayFirstName = (
-  name: string | null | undefined,
-): string | null => {
+export const displayFirstName = ({
+  name,
+}: {
+  name: string | null | undefined;
+}): string | null => {
   const trimmed = name?.trim();
   if (!trimmed) return null;
 
@@ -28,5 +30,8 @@ export const displayFirstName = (
   // surface calls them.
   if (trimmed.includes("@")) return null;
 
-  return trimmed.split(" ")[0] ?? null;
+  // Any whitespace, not just a space: a name pasted from a profile can carry a
+  // non-breaking space or a tab between its parts, and splitting on " " alone
+  // returns the whole string as the "first" name.
+  return trimmed.split(/\s+/)[0] ?? null;
 };

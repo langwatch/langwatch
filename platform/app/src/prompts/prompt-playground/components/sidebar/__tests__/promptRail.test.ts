@@ -25,11 +25,21 @@ describe("the prompts rail model", () => {
       tags: [{ name: "production", versionId: "v2" }],
     });
 
-    expect(matchesPromptRailFilter(item, "support")).toBe(true);
-    expect(matchesPromptRailFilter(item, "gpt-5")).toBe(true);
-    expect(matchesPromptRailFilter(item, "ada")).toBe(true);
-    expect(matchesPromptRailFilter(item, "production")).toBe(true);
-    expect(matchesPromptRailFilter(item, "summariser")).toBe(false);
+    expect(matchesPromptRailFilter({ prompt: item, rawQuery: "support" })).toBe(
+      true,
+    );
+    expect(matchesPromptRailFilter({ prompt: item, rawQuery: "gpt-5" })).toBe(
+      true,
+    );
+    expect(matchesPromptRailFilter({ prompt: item, rawQuery: "ada" })).toBe(
+      true,
+    );
+    expect(
+      matchesPromptRailFilter({ prompt: item, rawQuery: "production" }),
+    ).toBe(true);
+    expect(
+      matchesPromptRailFilter({ prompt: item, rawQuery: "summariser" }),
+    ).toBe(false);
   });
 
   it("groups unfiled prompts first and sorts folders by name", () => {

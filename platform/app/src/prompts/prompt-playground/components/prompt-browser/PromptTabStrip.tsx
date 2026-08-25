@@ -95,7 +95,7 @@ export function PromptTabStrip({
                   dimmed={!isActiveWindow}
                   isActive={tab.id === activeTabId}
                   isCrowded={isStripOverflowing}
-                  hideCloseButton={tabs.length === 1}
+                  isCloseButtonHidden={tabs.length === 1}
                 />
               </DraggableTabsBrowser.Trigger>
             </DraggableTabsBrowser.Tab>

@@ -50,14 +50,14 @@ interface ConversationThreadProps {
   /** Rendered after each part, keyed by part id — hover actions, delete. */
   renderPartActions?: (part: DisplayPart) => ReactNode;
   /** Scrolls the newest part into view as content arrives. */
-  autoScroll?: boolean;
+  shouldAutoScroll?: boolean;
   /**
    * Renders an assistant reply that parses as a JSON object as a value tree
    * rather than as markdown. On for surfaces whose prompts declare structured
    * outputs; off elsewhere, where a JSON-shaped reply is still prose the user
    * wrote and should read as they wrote it.
    */
-  structuredOutput?: boolean;
+  shouldRenderStructuredOutput?: boolean;
   /**
    * Frames the thread as a standalone chat panel rather than a section inside
    * a drawer: the scrollbar sits at the panel's own edge while the messages
@@ -74,7 +74,7 @@ interface ConversationThreadProps {
    * gap between sending and the first token is otherwise silent, and a silent
    * gap reads as nothing having happened.
    */
-  pendingReply?: boolean;
+  hasPendingReply?: boolean;
   /**
    * The conversation is being written now rather than read back. A turn is
    * then numbered from the moment it starts, and its trace affordance appears
@@ -94,7 +94,7 @@ function ConversationPart({
   roleMode,
   labels,
   projectId,
-  structuredOutput,
+  shouldRenderStructuredOutput,
   actions,
   audioPlayback,
 }: {
@@ -103,7 +103,7 @@ function ConversationPart({
   roleMode: "chat" | "scenario";
   labels?: { user?: string; assistant?: string };
   projectId: string;
-  structuredOutput: boolean;
+  shouldRenderStructuredOutput: boolean;
   actions?: ReactNode;
   audioPlayback?: AudioPlaybackProps;
 }) {
@@ -115,7 +115,7 @@ function ConversationPart({
           compact={compact}
           roleMode={roleMode}
           labels={labels}
-          structuredOutput={structuredOutput}
+          shouldRenderStructuredOutput={shouldRenderStructuredOutput}
           actions={actions}
         />
       );
@@ -203,10 +203,10 @@ export function ConversationThread({
   labels,
   projectId,
   renderPartActions,
-  autoScroll = true,
-  structuredOutput = false,
+  shouldAutoScroll = true,
+  shouldRenderStructuredOutput = false,
   panel,
-  pendingReply = false,
+  hasPendingReply = false,
   live = false,
 }: ConversationThreadProps) {
   const compact = variant === "compact";
@@ -215,7 +215,7 @@ export function ConversationThread({
   const turns = useMemo(() => groupIntoTurns(parts, { live }), [parts, live]);
 
   useEffect(() => {
-    if (!autoScroll) return;
+    if (!shouldAutoScroll) return;
     const container = scrollRef.current;
     if (!container) return;
     // The thread's own box is scrolled directly rather than asking the last
@@ -224,10 +224,10 @@ export function ConversationThread({
     // switching away from this tab and back — dragged the whole editor beside
     // it to the top and then back down again.
     container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-    // `pendingReply` is a dependency because the waiting state is the newest
+    // `hasPendingReply` is a dependency because the waiting state is the newest
     // thing in the thread the moment it appears, and it appears before any
     // part of the reply does.
-  }, [parts, pendingReply, autoScroll]);
+  }, [parts, hasPendingReply, shouldAutoScroll]);
 
   const audioPropsFor = useConversationAudio(parts);
 
@@ -239,7 +239,7 @@ export function ConversationThread({
       roleMode={roleMode}
       labels={labels}
       projectId={projectId}
-      structuredOutput={structuredOutput}
+      shouldRenderStructuredOutput={shouldRenderStructuredOutput}
       actions={renderPartActions?.(part)}
       audioPlayback={audioPropsFor(part)}
     />
@@ -260,7 +260,9 @@ export function ConversationThread({
               {turn.parts.map(renderPart)}
             </VStack>
           ))}
-      {pendingReply && <PendingReply compact={compact} roleMode={roleMode} />}
+      {hasPendingReply && (
+        <PendingReply compact={compact} roleMode={roleMode} />
+      )}
     </VStack>
   );
 

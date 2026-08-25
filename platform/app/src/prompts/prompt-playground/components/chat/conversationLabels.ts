@@ -28,7 +28,7 @@ export function playgroundConversationLabels({
   model?: string | null;
 }): { user?: string; assistant?: string } {
   return {
-    user: displayFirstName(userName) ?? undefined,
+    user: displayFirstName({ name: userName }) ?? undefined,
     assistant: modelLabel(model),
   };
 }

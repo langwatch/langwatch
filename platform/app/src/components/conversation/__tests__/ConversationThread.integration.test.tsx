@@ -70,13 +70,13 @@ const message = (msg: Record<string, unknown>) => msg as FlattenableMessage;
 /**
  * The playground's own configuration, so these tests answer for the surface
  * the spec is about: `PromptPlaygroundChat` renders `ConversationThread` with
- * `structuredOutput` on, the default `regular` variant (turn separators on)
- * and the default autoScroll, and adds nothing else.
+ * `shouldRenderStructuredOutput` on, the default `regular` variant (turn separators on)
+ * and the default shouldAutoScroll, and adds nothing else.
  */
 function renderConversation(
   messages: Record<string, unknown>[],
   options: {
-    structuredOutput?: boolean;
+    shouldRenderStructuredOutput?: boolean;
     labels?: { user?: string; assistant?: string };
     roleMode?: "chat" | "scenario";
   } = {},
@@ -85,7 +85,9 @@ function renderConversation(
     <ConversationThread
       parts={flattenMessages({ messages: messages.map(message) })}
       projectId="proj-1"
-      structuredOutput={options.structuredOutput ?? true}
+      shouldRenderStructuredOutput={
+        options.shouldRenderStructuredOutput ?? true
+      }
       labels={options.labels}
       roleMode={options.roleMode ?? "chat"}
     />
@@ -390,7 +392,7 @@ describe("<ConversationThread />", () => {
     it("renders the finished reply as a structured value rather than raw text", () => {
       const { container } = renderConversation(
         [{ id: "m1", role: "assistant", content: reply }],
-        { structuredOutput: true },
+        { shouldRenderStructuredOutput: true },
       );
 
       // The value tree itself is a lazily-imported viewer that jsdom never

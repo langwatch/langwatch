@@ -153,7 +153,10 @@ export function PublishedPromptsList() {
     [data],
   );
   const visiblePrompts = useMemo(
-    () => prompts.filter((prompt) => matchesPromptRailFilter(prompt, query)),
+    () =>
+      prompts.filter((prompt) =>
+        matchesPromptRailFilter({ prompt, rawQuery: query }),
+      ),
     [prompts, query],
   );
   const groups = useMemo(
@@ -162,7 +165,13 @@ export function PublishedPromptsList() {
   );
 
   const movePrompt = useCallback(
-    async (prompt: VersionedPrompt, folder?: string) => {
+    async ({
+      prompt,
+      folder,
+    }: {
+      prompt: VersionedPrompt;
+      folder?: string;
+    }) => {
       if (!project?.id || !prompt.handle) return;
       const handle = movePromptHandleToFolder({
         handle: prompt.handle,
@@ -195,14 +204,14 @@ export function PublishedPromptsList() {
   );
 
   const handleDrop = useCallback(
-    (event: DragEvent, folder?: string) => {
+    ({ event, folder }: { event: DragEvent; folder?: string }) => {
       event.preventDefault();
       const promptId =
         event.dataTransfer.getData(DRAGGED_PROMPT_TYPE) || draggedPromptId;
       const prompt = prompts.find((candidate) => candidate.id === promptId);
       setDraggedPromptId(undefined);
       setDropFolder(null);
-      if (prompt) void movePrompt(prompt, folder);
+      if (prompt) void movePrompt({ prompt, folder });
     },
     [draggedPromptId, movePrompt, prompts],
   );
@@ -271,7 +280,7 @@ export function PublishedPromptsList() {
                   setDropFolder(null);
                 }
               }}
-              onDrop={(event) => handleDrop(event, folder)}
+              onDrop={(event) => handleDrop({ event, folder })}
             >
               <Sidebar.List
                 title={folder ?? "Unfiled"}

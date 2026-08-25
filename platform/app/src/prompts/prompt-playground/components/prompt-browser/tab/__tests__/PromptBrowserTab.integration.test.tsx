@@ -40,7 +40,7 @@ function renderTab(
   props: {
     isActive?: boolean;
     isCrowded?: boolean;
-    hideCloseButton?: boolean;
+    isCloseButtonHidden?: boolean;
   } = {},
 ) {
   return render(
@@ -163,7 +163,7 @@ describe("PromptBrowserTab", () => {
   describe("given it is the only tab in its card", () => {
     it("leaves its close action to the far side of the card", () => {
       givenTabTitled("classifier");
-      renderTab({ isActive: true, hideCloseButton: true });
+      renderTab({ isActive: true, isCloseButtonHidden: true });
 
       expect(closeAction()).not.toBeInTheDocument();
     });

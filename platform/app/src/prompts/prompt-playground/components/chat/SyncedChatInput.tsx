@@ -154,7 +154,9 @@ export function SyncedChatInput({
       <Box
         onFocus={() => setIsFocused(true)}
         onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          if (
+            !event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
             setIsFocused(false);
           }
         }}

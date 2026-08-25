@@ -46,18 +46,18 @@ export function TextPart({
   compact,
   roleMode,
   labels,
-  structuredOutput,
+  shouldRenderStructuredOutput,
   actions,
 }: {
   part: Extract<DisplayPart, { kind: "text" }>;
   compact: boolean;
   roleMode: "chat" | "scenario";
   labels?: { user?: string; assistant?: string };
-  structuredOutput: boolean;
+  shouldRenderStructuredOutput: boolean;
   actions?: ReactNode;
 }) {
   const structured =
-    structuredOutput && part.role === "assistant"
+    shouldRenderStructuredOutput && part.role === "assistant"
       ? tryParseJson(part.content)
       : undefined;
 

@@ -557,11 +557,15 @@ export function formValuesToTriggerSaveVersionParams(
  * - "gato" -> "gato" (no change if no prefix)
  * - "folder/gato" -> "folder/gato" (no change if no scope prefix)
  */
-const extractShortHandle = (
-  handle: string | null | undefined,
-  projectId?: string,
-  organizationId?: string,
-): string | null => {
+const extractShortHandle = ({
+  handle,
+  projectId,
+  organizationId,
+}: {
+  handle: string | null | undefined;
+  projectId?: string;
+  organizationId?: string;
+}): string | null => {
   if (!handle) return null;
 
   // API responses can carry the database scope prefix verbatim. Match it to
@@ -601,11 +605,11 @@ export function versionedPromptToPromptConfigFormValues(
    * The API may return full paths in some contexts (like version history)
    * but forms should use the short handle.
    */
-  const shortHandle = extractShortHandle(
-    prompt.handle,
-    prompt.projectId,
-    prompt.organizationId,
-  );
+  const shortHandle = extractShortHandle({
+    handle: prompt.handle,
+    projectId: prompt.projectId,
+    organizationId: prompt.organizationId,
+  });
 
   /**
    * Because we have old handles that are not valid,

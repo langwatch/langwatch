@@ -9,10 +9,13 @@ export type PromptRailGroup = {
   prompts: VersionedPrompt[];
 };
 
-export function matchesPromptRailFilter(
-  prompt: VersionedPrompt,
-  rawQuery: string,
-): boolean {
+export function matchesPromptRailFilter({
+  prompt,
+  rawQuery,
+}: {
+  prompt: VersionedPrompt;
+  rawQuery: string;
+}): boolean {
   const query = rawQuery.trim().toLocaleLowerCase();
   if (!query) return true;
 

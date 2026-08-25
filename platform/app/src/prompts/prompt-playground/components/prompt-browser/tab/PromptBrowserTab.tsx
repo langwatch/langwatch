@@ -14,7 +14,7 @@ interface PromptBrowserTabProps extends StackProps {
   /** The strip has run out of room, so every tab sits at its narrow floor. */
   isCrowded?: boolean;
   /** A single tab puts its close action at the opposite end of the card. */
-  hideCloseButton?: boolean;
+  isCloseButtonHidden?: boolean;
 }
 
 type PromptBrowserTabControllerProps = ReturnType<
@@ -32,7 +32,7 @@ function PromptBrowserTabView({
   dimmed,
   isActive,
   isCrowded,
-  hideCloseButton,
+  isCloseButtonHidden,
   handleClose,
   versionNumber,
   latestVersion,
@@ -54,7 +54,7 @@ function PromptBrowserTabView({
   // arrives. The active tab is the one most likely to be closed, and it is
   // never in doubt about which prompt it is.
   const showsCloseButton =
-    !hideCloseButton && (!isCrowded || isActive || isHovered);
+    !isCloseButtonHidden && (!isCrowded || isActive || isHovered);
 
   return (
     // `minWidth={0}` on every flex ancestor of the title, or the title's

@@ -63,8 +63,14 @@ describe("flattenMessages", () => {
           role: "assistant",
           content: "",
           tool_calls: [
-            { id: "call_1", function: { name: "search", arguments: '{"q":"a"}' } },
-            { id: "call_2", function: { name: "search", arguments: '{"q":"b"}' } },
+            {
+              id: "call_1",
+              function: { name: "search", arguments: '{"q":"a"}' },
+            },
+            {
+              id: "call_2",
+              function: { name: "search", arguments: '{"q":"b"}' },
+            },
           ],
         },
       ]);

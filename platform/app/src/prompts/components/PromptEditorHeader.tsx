@@ -44,7 +44,7 @@ export type PromptEditorHeaderProps = {
   /** When true the version history panel opens automatically on mount. */
   openHistoryOnLoad?: boolean;
   /** Show the playground's compact version, deployment and usage context. */
-  showPromptContext?: boolean;
+  isPromptContextVisible?: boolean;
 };
 
 function PromptContextSummary({ configId }: { configId: string }) {
@@ -142,7 +142,7 @@ export function PromptEditorHeader({
   onVersionRestore,
   variant = "full",
   openHistoryOnLoad,
-  showPromptContext = false,
+  isPromptContextVisible = false,
 }: PromptEditorHeaderProps) {
   const { project } = useOrganizationTeamProject();
   const formMethods = useFormContext<PromptConfigFormValues>();
@@ -160,7 +160,7 @@ export function PromptEditorHeader({
     >
       <HStack flex={1} minWidth={0} gap={2} overflow="hidden">
         <ModelSelectFieldMini />
-        {showPromptContext && configId && (
+        {isPromptContextVisible && configId && (
           <PromptContextSummary configId={configId} />
         )}
       </HStack>

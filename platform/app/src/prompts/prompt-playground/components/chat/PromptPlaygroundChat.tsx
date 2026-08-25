@@ -216,12 +216,12 @@ const PromptPlaygroundChat = forwardRef<
             labels={labels}
             projectId={project?.id ?? ""}
             renderPartActions={renderPartActions}
-            structuredOutput
+            shouldRenderStructuredOutput
             panel={{ contentMaxWidth: "768px" }}
             live
             // The gap between sending and the first token belongs to the thread,
             // where the reply will land — not to the send button going quiet.
-            pendingReply={isRunning && !hasStreamingReply}
+            hasPendingReply={isRunning && !hasStreamingReply}
           />
         </Box>
       </Box>
