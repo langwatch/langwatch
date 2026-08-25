@@ -11,7 +11,7 @@
  * why the assertion below is about position, not merely presence.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { setupRef, hasPermissionMock } = vi.hoisted(() => ({
@@ -99,15 +99,15 @@ describe("given an organization that may set single sign-on up and has no connec
   afterEach(cleanup);
 
   /** @scenario "LangWatch's own details are shown before the identity provider's are asked for" */
-  it("shows LangWatch's addresses, and shows them above the fields to fill in", () => {
+  it("shows the chosen protocol's addresses, and shows them above the fields to fill in", () => {
     const { container } = renderSetup();
 
-    const values = [...container.querySelectorAll("input")].map(
-      (input) => (input as HTMLInputElement).value,
-    );
-    expect(values).toContain(SERVICE_PROVIDER.redirectUrl);
-    expect(values).toContain(SERVICE_PROVIDER.assertionConsumerServiceUrl);
-    expect(values).toContain(SERVICE_PROVIDER.entityId);
+    // OpenID Connect is the default choice, and it needs exactly one of our
+    // addresses. The other protocol's three are not a wall of URLs behind it.
+    expect(screen.getByText(SERVICE_PROVIDER.redirectUrl)).toBeDefined();
+    expect(
+      screen.queryByText(SERVICE_PROVIDER.assertionConsumerServiceUrl),
+    ).toBeNull();
 
     const ours = container.textContent?.indexOf(
       "Set LangWatch up in your identity provider",
@@ -117,35 +117,59 @@ describe("given an organization that may set single sign-on up and has no connec
     expect(theirs).toBeGreaterThan(ours ?? 0);
   });
 
-  /** @scenario "The administrator chooses which kind of provider they have" */
-  it("offers both kinds of provider in the customer's own words", () => {
+  /** @scenario "LangWatch's own details are shown before the identity provider's are asked for" */
+  it("shows the SAML addresses once SAML is chosen, and only those", () => {
     renderSetup();
 
-    // Named by what the administrator HAS, not by the protocol: somebody
-    // handed a metadata file by their security team does not necessarily
-    // know it is called SAML.
+    fireEvent.click(screen.getByRole("radio", { name: /SAML/ }));
+
     expect(
-      screen.getByRole("option", {
-        name: "I have a client id and a client secret",
+      screen.getByText(SERVICE_PROVIDER.assertionConsumerServiceUrl),
+    ).toBeDefined();
+    expect(screen.getByText(SERVICE_PROVIDER.entityId)).toBeDefined();
+    expect(screen.getByText(SERVICE_PROVIDER.metadataUrl)).toBeDefined();
+    expect(screen.queryByText(SERVICE_PROVIDER.redirectUrl)).toBeNull();
+  });
+
+  /** @scenario "The administrator chooses which kind of provider they have" */
+  it("offers both protocols by name, described by what the administrator holds", () => {
+    renderSetup();
+
+    // Named by protocol — the word their identity provider's console uses —
+    // and described by what they HAVE, because somebody handed a metadata
+    // file by their security team does not necessarily know it is called
+    // SAML.
+    expect(
+      screen.getByRole("radio", {
+        name: /OpenID Connect.*client id and a client secret/,
       }),
     ).toBeDefined();
     expect(
-      screen.getByRole("option", {
-        name: "I have my identity provider's metadata",
+      screen.getByRole("radio", {
+        name: /SAML.*metadata file, or a sign-in address and a certificate/,
       }),
     ).toBeDefined();
   });
 
   /** @scenario "The administrator chooses which kind of provider they have" */
   it("asks for an issuer, a client id and a client secret by default", () => {
-    const { container } = renderSetup();
+    renderSetup();
 
-    const placeholders = [...container.querySelectorAll("input, textarea")].map(
-      (field) => field.getAttribute("placeholder"),
-    );
-    expect(placeholders).toContain("Issuer address");
-    expect(placeholders).toContain("Client id");
-    expect(placeholders).toContain("Client secret");
+    expect(screen.getByLabelText("Issuer address")).toBeDefined();
+    expect(screen.getByLabelText("Client id")).toBeDefined();
+    expect(screen.getByLabelText("Client secret")).toBeDefined();
+  });
+
+  /** @scenario "The administrator chooses which kind of provider they have" */
+  it("asks for metadata, or a sign-in address and certificate, once SAML is chosen", () => {
+    renderSetup();
+
+    fireEvent.click(screen.getByRole("radio", { name: /SAML/ }));
+
+    expect(screen.getByLabelText("Sign-in address")).toBeDefined();
+    expect(screen.getByLabelText("Metadata")).toBeDefined();
+    expect(screen.getByLabelText("Entity id")).toBeDefined();
+    expect(screen.getByLabelText("Signing certificate")).toBeDefined();
   });
 });
 

@@ -291,15 +291,17 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   @integration
   Scenario: LangWatch's own details are shown before the identity provider's are asked for
     When an administrator with no connection opens single sign-on setup
-    Then LangWatch's sign-in address is shown and can be copied
-    And LangWatch's assertion address is shown and can be copied
-    And LangWatch's entity id is shown and can be copied
+    Then LangWatch's addresses for the chosen protocol are shown and can be copied
+    And choosing OpenID Connect shows the redirect address alone
+    And choosing SAML shows the assertion address, the entity id and the
+    published metadata address
     And they appear above the fields the administrator has to fill in
 
   @integration
   Scenario: The administrator chooses which kind of provider they have
     When an administrator opens the registration form
-    Then they can choose OpenID Connect or SAML
+    Then they can choose OpenID Connect or SAML, named by protocol and
+    described by what the administrator holds
     And choosing OpenID Connect asks for an issuer address, a client id and a
     client secret
     And choosing SAML asks for the identity provider's metadata or its
