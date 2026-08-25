@@ -18,6 +18,7 @@ import {
   type PaginatedProjects,
   type Project,
   type ProjectFeatureFlag,
+  type ProjectName,
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
@@ -325,6 +326,10 @@ export class ProjectService extends ProjectServiceContract {
 
   listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
     return this.repository.findAllByTeam(input);
+  }
+
+  listNamesByIds(input: { projectIds: string[] }): Promise<ProjectName[]> {
+    return this.repository.findNamesByIds([...new Set(input.projectIds)]);
   }
 
   async listActiveByScopes(

@@ -172,6 +172,11 @@ export interface SearchProjectsResult {
   slug: string;
 }
 
+export interface ProjectName {
+  id: string;
+  name: string;
+}
+
 export interface TraceSharingConfig {
   orgEnabled: boolean;
   projectEnabled: boolean;

@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/ops-contract";
 import type { Cluster, Redis as IORedis } from "ioredis";
 import type { UserService } from "@langwatch/user-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
@@ -27,6 +28,10 @@ import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store
 import { NullBlobStoreRepository } from "../repositories/blob-store.repository";
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.admin-backoffice.repository";
 import { AdminBackofficeService } from "../services/admin-backoffice.service";
+import type { SchedulerAuditSink } from "../ports/scheduler-audit.sink";
+import type { SchedulerOpsRepository } from "../ports/scheduler-ops.repository";
+import type { SchedulerWakeService } from "../ports/scheduler-wake.service";
+import { SchedulerOpsService } from "../services/scheduler-ops.service";
 
 export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   database: AdminDatabase;
@@ -35,6 +40,12 @@ export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   now?: (() => Date) | undefined;
   redis?: IORedis | Cluster | undefined;
   users: UserService;
+  scheduler: {
+    repository: SchedulerOpsRepository;
+    audit: SchedulerAuditSink;
+    wake: SchedulerWakeService;
+    projects: ProjectService;
+  };
 }
 
 export class PostgresOpsAdapter {
@@ -74,6 +85,7 @@ export class PostgresOpsAdapter {
         audit: this.options.audit,
         now: this.options.now,
       }),
+      scheduler: SchedulerOpsService.create(this.options.scheduler),
     });
   }
 }

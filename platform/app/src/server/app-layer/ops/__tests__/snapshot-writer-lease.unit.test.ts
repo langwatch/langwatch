@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { OpsMetricsCollector } from "../../metrics-collector";
-import type { SnapshotRepository } from "../snapshot.repository";
+import { OpsMetricsCollector } from "../metrics-collector";
+import type { OpsSnapshotService } from "@langwatch/ops-contract";
 
 /**
  * The lease gate is the whole cost saving in ADR-090: a pod that does not hold
@@ -69,29 +69,36 @@ const makeQueueRepo = () => ({
   reconcileTotalPending: vi.fn().mockResolvedValue(null),
 });
 
-const makeSnapshotRepo = (isHeld: boolean): SnapshotRepository => ({
+const makeSnapshots = (isHeld: boolean): OpsSnapshotService => ({
+  start: vi.fn().mockResolvedValue(void 0),
+  stop: vi.fn(),
+  tryGetDashboardData: vi.fn().mockReturnValue(null),
+  getBadgeCounts: vi.fn().mockReturnValue({
+    blockedCount: 0,
+    dlqCount: 0,
+    computedAt: new Date(0),
+  }),
+  streamDashboard: vi.fn(),
   acquireOrRenewLease: vi
     .fn()
     .mockResolvedValue({ isHeld, epoch: 1, token: isHeld ? "token-1" : null }),
-  releaseLease: vi.fn().mockResolvedValue(undefined),
+  releaseLease: vi.fn().mockResolvedValue(void 0),
   writeLive: vi.fn().mockResolvedValue(true),
   writeDetail: vi.fn().mockResolvedValue(true),
-  readLive: vi.fn().mockResolvedValue(null),
-  readDetail: vi.fn().mockResolvedValue(null),
 });
 
 const makeWriter = (held: boolean) => {
   const queueRepo = makeQueueRepo();
-  const snapshotRepo = makeSnapshotRepo(held);
+  const snapshots = makeSnapshots(held);
   const collector = new OpsMetricsCollector({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     redis: redisStub as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     queueRepo: queueRepo as any,
-    snapshotRepo,
+    snapshots,
     writerId: held ? "holder" : "loser",
   });
-  return { collector, queueRepo, snapshotRepo };
+  return { collector, queueRepo, snapshots };
 };
 
 describe("snapshot writer lease gate", () => {
@@ -99,13 +106,13 @@ describe("snapshot writer lease gate", () => {
     describe("when its collection cycle runs", () => {
       /** @scenario "Only the lease holder scans" */
       it("performs no scan at all", async () => {
-        const { collector, queueRepo, snapshotRepo } = makeWriter(false);
+        const { collector, queueRepo, snapshots } = makeWriter(false);
 
         await collector.discoverQueues();
         await collector.collect();
 
         expect(queueRepo.scanQueues).not.toHaveBeenCalled();
-        expect(snapshotRepo.writeLive).not.toHaveBeenCalled();
+        expect(snapshots.writeLive).not.toHaveBeenCalled();
         expect(collector.isWriter()).toBe(false);
       });
     });
@@ -114,13 +121,13 @@ describe("snapshot writer lease gate", () => {
   describe("given the pod holding the lease", () => {
     describe("when its collection cycle runs", () => {
       it("scans and publishes the live artifact", async () => {
-        const { collector, queueRepo, snapshotRepo } = makeWriter(true);
+        const { collector, queueRepo, snapshots } = makeWriter(true);
 
         await collector.discoverQueues();
         await collector.collect();
 
         expect(queueRepo.scanQueues).toHaveBeenCalled();
-        expect(snapshotRepo.writeLive).toHaveBeenCalled();
+        expect(snapshots.writeLive).toHaveBeenCalled();
         expect(collector.isWriter()).toBe(true);
       });
     });
@@ -130,13 +137,13 @@ describe("snapshot writer lease gate", () => {
     it("hands the lease back rather than letting it lapse", async () => {
       // Waiting out the TTL on a clean shutdown leaves the whole fleet without
       // a writer for the remainder of the window — the rolling-deploy case.
-      const { collector, snapshotRepo } = makeWriter(true);
+      const { collector, snapshots } = makeWriter(true);
       await collector.discoverQueues();
       await collector.collect();
 
       await collector.stop();
 
-      expect(snapshotRepo.releaseLease).toHaveBeenCalled();
+      expect(snapshots.releaseLease).toHaveBeenCalled();
     });
   });
 
@@ -147,20 +154,20 @@ describe("snapshot writer lease gate", () => {
       // it booted long ago, has lost every election since, and its in-memory
       // peaks and chart buffer are frozen at zero.
       const redis = makeRedisHoldingState(FLEET_STATE);
-      const snapshotRepo = makeSnapshotRepo(true);
+      const snapshots = makeSnapshots(true);
       const collector = new OpsMetricsCollector({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         redis: redis as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         queueRepo: makeQueueRepo() as any,
-        snapshotRepo,
+        snapshots,
         writerId: "taking-over",
       });
 
       await collector.discoverQueues();
       await collector.collect();
 
-      const published = (snapshotRepo.writeLive as ReturnType<typeof vi.fn>).mock
+      const published = (snapshots.writeLive as ReturnType<typeof vi.fn>).mock
         .calls[0]?.[0].snapshot;
       expect(published.peakCompletedPerSec).toBe(999);
       expect(published.peakLatencyP99Ms).toBe(900);
@@ -183,7 +190,7 @@ describe("snapshot writer lease gate", () => {
         redis: redis as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         queueRepo: makeQueueRepo() as any,
-        snapshotRepo: makeSnapshotRepo(true),
+        snapshots: makeSnapshots(true),
         writerId: "taking-over",
       });
 
@@ -205,14 +212,14 @@ describe("snapshot writer lease gate", () => {
       // The lease turned over mid-scan, so this payload was never published.
       // Adopting it would have the collector report a detail artifact that
       // exists nowhere but in its own memory.
-      const snapshotRepo = makeSnapshotRepo(true);
-      (snapshotRepo.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+      const snapshots = makeSnapshots(true);
+      (snapshots.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(false);
       const collector = new OpsMetricsCollector({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         redis: redisStub as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         queueRepo: makeQueueRepo() as any,
-        snapshotRepo,
+        snapshots,
         writerId: "fenced-out",
       });
 
@@ -220,7 +227,7 @@ describe("snapshot writer lease gate", () => {
       await collector.collect();
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(snapshotRepo.writeDetail).toHaveBeenCalled();
+      expect(snapshots.writeDetail).toHaveBeenCalled();
       expect(collector.getLatestDetail()).toBeNull();
     });
   });
@@ -229,13 +236,13 @@ describe("snapshot writer lease gate", () => {
     it("releases nothing on shutdown", async () => {
       // A compare-and-delete would no-op anyway, but not issuing the call at
       // all keeps a departing loser off the holder's key entirely.
-      const { collector, snapshotRepo } = makeWriter(false);
+      const { collector, snapshots } = makeWriter(false);
       await collector.discoverQueues();
       await collector.collect();
 
       await collector.stop();
 
-      expect(snapshotRepo.releaseLease).not.toHaveBeenCalled();
+      expect(snapshots.releaseLease).not.toHaveBeenCalled();
     });
   });
 });

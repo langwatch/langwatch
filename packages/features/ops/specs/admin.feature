@@ -30,3 +30,24 @@ Feature: Platform administration package boundary
     Given a blob still has a live lease
     When an operator requests deletion
     Then the bytes remain and the result reports deleted as false
+
+  @integration
+  Scenario: The Ops dashboard stream starts with the current snapshot
+    Given a readable current Ops snapshot
+    When an authorized subscriber opens the dashboard stream
+    Then the current snapshot is delivered before waiting for the next update
+    And every dashboard response field remains present
+
+  @unit
+  Scenario: A manual scheduler run follows the ordinary due path
+    Given an active schedule with no claimed slot
+    When an operator requests an immediate run
+    Then the schedule is made due rather than invoking its target directly
+    And the scheduler is woken after the audited control
+
+  @unit
+  Scenario: Scheduler controls refuse stale or racing state
+    Given a paused schedule or a live or non-stale claimed slot
+    When an operator requests a conflicting control
+    Then the service refuses with its stable scheduler error
+    And no audit entry is written for the refused control

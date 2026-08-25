@@ -1,4 +1,3 @@
-import { on } from "node:events";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -9,8 +8,6 @@ import {
 } from "@langwatch/ops-contract";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { DASHBOARD_EVENT } from "~/server/app-layer/ops/snapshot/snapshot-reader";
-import type { DashboardData } from "~/server/app-layer/ops/types";
 import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
 import { resolveHotDays, TABLE_TTL_CONFIG } from "~/server/clickhouse/ttlReconciler";
 import {
@@ -105,9 +102,7 @@ export const opsRouter = createTRPCRouter({
   }),
 
   getDashboardSnapshot: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
-    const ops = ctx.app.ops;
-    if (!ops.snapshotReader) return null;
-    return ops.snapshotReader.getDashboardData();
+    return ctx.app.ops.snapshots?.tryGetDashboardData() ?? null;
   }),
 
   /**
@@ -125,34 +120,28 @@ export const opsRouter = createTRPCRouter({
       dlqCount: number;
       computedAt: Date | null;
     } => {
-      const ops = ctx.app.ops;
-      if (!ops.snapshotReader) {
+      const snapshots = ctx.app.ops.snapshots;
+      if (!snapshots) {
         // Same shape as the served path so no caller has to branch on whether
         // the field exists — but `computedAt: null`, because these zeroes are
         // "we cannot say" rather than "nothing is wrong". Stamping the current
         // time would present unavailable data as a fresh all-clear.
         return { blockedCount: 0, dlqCount: 0, computedAt: null };
       }
-      return ops.snapshotReader.getBadgeCounts();
+      return snapshots.getBadgeCounts();
     },
   ),
 
   dashboardStream: protectedProcedure
     .use(opsViewPermission)
     .subscription(async function* ({ signal, ctx }) {
-      const reader = ctx.app.ops.snapshotReader;
-      if (!reader) return;
+      const snapshots = ctx.app.ops.snapshots;
+      if (!snapshots) {
+        return;
+      }
 
-      // Yield the current snapshot immediately so the client doesn't have
-      // to wait for the next broadcast tick before rendering. Null until a
-      // readable snapshot exists, which the page renders as its loading state.
-      const current = reader.getDashboardData();
-      if (current) yield current;
-
-      for await (const [data] of on(reader.getEmitter(), DASHBOARD_EVENT, {
-        signal,
-      })) {
-        yield data as DashboardData;
+      for await (const data of snapshots.streamDashboard({ signal })) {
+        yield data;
       }
     }),
 
@@ -187,8 +176,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }))
     .query(async ({ input, ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.scheduler.listScheduledJobs({ limit: input.limit });
+      return ctx.app.ops.listScheduledJobs({ limit: input.limit });
     }),
 
   /**
@@ -204,8 +192,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.scheduler.listPausedSchedules({ limit: input.limit });
+      return ctx.app.ops.listPausedSchedules({ limit: input.limit });
     }),
 
   /** Recent scheduler operator actions, so the page explains its own history. */
@@ -213,8 +200,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
     .query(async ({ input, ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.scheduler.listRecentActions({ limit: input.limit });
+      return ctx.app.ops.listSchedulerActions({ limit: input.limit });
     }),
 
   /**
@@ -226,8 +212,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsManagePermission)
     .input(z.object({ scheduleId: z.string(), active: z.boolean() }))
     .mutation(async ({ input, ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.scheduler.setActive({
+      return ctx.app.ops.setScheduleActive({
         scheduleId: input.scheduleId,
         active: input.active,
         actorUserId: ctx.session.user.id,
@@ -239,8 +224,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsManagePermission)
     .input(z.object({ scheduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.scheduler.clearStuckSlot({
+      return ctx.app.ops.clearStuckScheduleSlot({
         scheduleId: input.scheduleId,
         actorUserId: ctx.session.user.id,
       });
@@ -255,8 +239,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsManagePermission)
     .input(z.object({ scheduleId: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ops = ctx.app.ops;
-      return ops.scheduler.runNow({
+      return ctx.app.ops.runScheduleNow({
         scheduleId: input.scheduleId,
         actorUserId: ctx.session.user.id,
       });

@@ -1,34 +1,35 @@
 import * as os from "node:os";
 import { createLogger } from "@langwatch/observability";
 import {
+  LATENCY_HOUR_BUCKET_MS,
+  LATENCY_MINUTE_BUCKET_MS,
+  SNAPSHOT_VERSION,
+  latencyAllTimeKey,
+  latencyHourBucketKey,
+  latencyMinuteBucketKey,
+  mergeHistogramCounts,
+  windowPercentiles,
+} from "@langwatch/ops-contract";
+import type {
+  DashboardData,
+  DetailSnapshot,
+  JobNameMetrics,
+  LatencyWindows,
+  OpsSnapshotService,
+  PipelineNode,
+  QueueInfo,
+  QueueSummaryInfo,
+  RedisInfo,
+  ThroughputPoint,
+} from "@langwatch/ops-contract";
+import {
   computeEngineCpuPercent,
   normalizeErrorMessage,
   type RedisCpuSample,
 } from "@langwatch/ops-server";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import {
-  LATENCY_HOUR_BUCKET_MS,
-  LATENCY_MINUTE_BUCKET_MS,
-  type LatencyWindows,
-  latencyAllTimeKey,
-  latencyHourBucketKey,
-  latencyMinuteBucketKey,
-  mergeHistogramCounts,
-  windowPercentiles,
-} from "~/shared/ops/latency";
 import type { QueueRepository } from "./repositories/queue.repository";
-import type { SnapshotRepository } from "./snapshot/snapshot.repository";
-import { type DetailSnapshot, SNAPSHOT_VERSION } from "./snapshot/snapshot.types";
-import type {
-  DashboardData,
-  JobNameMetrics,
-  PipelineNode,
-  QueueInfo,
-  QueueSummaryInfo,
-  RedisInfo,
-  ThroughputPoint,
-} from "./types";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
 
@@ -377,7 +378,7 @@ export class OpsMetricsCollector {
   private prevFailed = new Map<string, number>();
 
   private queueRepo: QueueRepository;
-  private snapshotRepo: SnapshotRepository | null;
+  private snapshots: OpsSnapshotService | null;
   /** Identity of this writer in the lease and in every artifact it stamps. */
   private readonly writerId: string;
   private leaseEpoch = 0;
@@ -392,12 +393,12 @@ export class OpsMetricsCollector {
   constructor(params: {
     redis: IORedis | Cluster;
     queueRepo: QueueRepository;
-    snapshotRepo?: SnapshotRepository | null;
+    snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }) {
     this.redis = params.redis;
     this.queueRepo = params.queueRepo;
-    this.snapshotRepo = params.snapshotRepo ?? null;
+    this.snapshots = params.snapshots ?? null;
     this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
   }
 
@@ -423,7 +424,7 @@ export class OpsMetricsCollector {
     );
     void this.reconcilePending();
     // No broadcast here by design (ADR-090): the writer publishes to Redis and
-    // `OpsSnapshotReader` is what fans out to each pod's subscribers. A writer
+    // `OpsSnapshotService` is what fans out to each pod's subscribers. A writer
     // that also broadcast would serve its own pod a different payload from
     // every other pod — the exact divergence this design removes.
   }
@@ -451,11 +452,11 @@ export class OpsMetricsCollector {
     // Hand the lease back rather than letting it lapse: a clean shutdown that
     // waits out the TTL leaves the whole fleet without a writer for up to the
     // lease window, which is exactly the rolling-deploy case.
-    if (this.snapshotRepo && this.holdsLease) {
+    if (this.snapshots && this.holdsLease) {
       this.holdsLease = false;
       this.leaseToken = null;
       try {
-        await this.snapshotRepo.releaseLease();
+        await this.snapshots.releaseLease();
       } catch (err) {
         logger.warn({ error: err }, "Failed to release ops snapshot lease");
       }
@@ -628,13 +629,13 @@ export class OpsMetricsCollector {
 
   /** Cheap artifact: exact counts, rates, peaks and the rolling history. */
   private async publishLive(): Promise<void> {
-    if (!this.snapshotRepo) return;
+    if (!this.snapshots) return;
     const leaseToken = this.leaseToken;
     if (!leaseToken) return;
     const data = this.getDashboardData();
     const mem = process.memoryUsage();
     try {
-      await this.snapshotRepo.writeLive({
+      await this.snapshots.writeLive({
         leaseToken,
         snapshot: {
           version: SNAPSHOT_VERSION,
@@ -683,7 +684,8 @@ export class OpsMetricsCollector {
    * stale `computedAt`, which readers surface, rather than as a lost lease.
    */
   private maybePublishDetail(queues: QueueInfo[]): void {
-    if (!this.snapshotRepo) return;
+    if (!this.snapshots) return;
+    const snapshots = this.snapshots;
     if (this.detailInFlight) return;
     if (Date.now() - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) return;
 
@@ -738,7 +740,7 @@ export class OpsMetricsCollector {
         // reader can see. Leaving `lastDetailAt` alone is deliberate too — a
         // pod that regains the lease should rescan rather than sit out a
         // cadence it never completed.
-        const published = await this.snapshotRepo!.writeDetail({
+        const published = await snapshots.writeDetail({
           snapshot: detail,
           leaseToken: tokenAtScanStart,
         });
@@ -1187,8 +1189,8 @@ export class OpsMetricsCollector {
       // Election first: a pod that does not hold the lease must not scan at
       // all. This is the whole cost saving — without the early return every
       // pod would still pay for the scan and merely skip the write.
-      if (this.snapshotRepo) {
-        const lease = await this.snapshotRepo.acquireOrRenewLease({
+      if (this.snapshots) {
+        const lease = await this.snapshots.acquireOrRenewLease({
           writerId: this.writerId,
         });
         if (!lease.isHeld) {
@@ -1345,7 +1347,7 @@ export class OpsMetricsCollector {
         logger.warn({ error: err }, "Failed to persist metrics state");
       });
 
-      if (this.snapshotRepo) {
+      if (this.snapshots) {
         await this.publishLive();
         this.maybePublishDetail(queues);
       }
@@ -1362,7 +1364,7 @@ let singleton: OpsMetricsCollector | null = null;
 export function getOpsMetricsCollector(params: {
   redis: IORedis | Cluster;
   queueRepo: QueueRepository;
-  snapshotRepo?: SnapshotRepository | null;
+  snapshots?: OpsSnapshotService | null;
 }): OpsMetricsCollector {
   if (!singleton) {
     singleton = new OpsMetricsCollector(params);

@@ -203,7 +203,7 @@ export interface ScheduledJobStore {
   // lease. `setActiveForOps` is not fenced that way — see its own note.
 
   /** One schedule by id, across projects. Null when it no longer exists. */
-  findByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
+  tryFindByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
 
   /** Pause or resume a schedule. Never touches an in-flight slot. */
   setActiveForOps(params: {

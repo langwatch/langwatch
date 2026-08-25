@@ -6,6 +6,7 @@ import {
   projectSchema,
   type InternalProject,
   type Project,
+  type ProjectName,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import {
@@ -90,6 +91,9 @@ class StubRepository extends ProjectRepository {
   >(async () => ({ id: "team_1", isPersonal: false }));
   tryFindBySlugInTeam = vi.fn(async () => null);
   findAllByTeam = vi.fn(async () => [applicationProject]);
+  findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectName[]>>(
+    async () => [],
+  );
   create = vi.fn(async () => applicationProject);
   tryGetById = vi.fn(async () => applicationProject);
   tryGetWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(
@@ -430,6 +434,24 @@ describe("ProjectService", () => {
       organizationId: "org",
       teamId: "team_1",
     });
+  });
+
+  it("loads project names in one deduplicated repository call", async () => {
+    const repository = new StubRepository();
+    repository.findNamesByIds.mockResolvedValue([
+      { id: "project_1", name: "First" },
+      { id: "project_2", name: "Second" },
+    ]);
+
+    await expect(
+      createService(repository).listNamesByIds({
+        projectIds: ["project_1", "project_2", "project_1"],
+      }),
+    ).resolves.toEqual([
+      { id: "project_1", name: "First" },
+      { id: "project_2", name: "Second" },
+    ]);
+    expect(repository.findNamesByIds).toHaveBeenCalledWith(["project_1", "project_2"]);
   });
 
   it("bounds active project scope queries and reports another page", async () => {

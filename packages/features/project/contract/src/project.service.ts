@@ -7,6 +7,7 @@ import type {
   PaginatedProjects,
   Project,
   ProjectFeatureFlag,
+  ProjectName,
   ProjectWithTeam,
   ProjectPresenceInput,
   SearchProjectsResult,
@@ -58,6 +59,7 @@ export abstract class ProjectService {
     organizationId: string;
     teamId: string;
   }): Promise<Project[]>;
+  abstract listNamesByIds(input: { projectIds: string[] }): Promise<ProjectName[]>;
   /** Lists active projects reached by the supplied organization/team/project scopes. */
   abstract listActiveByScopes(
     input: ActiveProjectsByScopesInput,

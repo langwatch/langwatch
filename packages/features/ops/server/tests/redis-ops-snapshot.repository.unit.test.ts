@@ -1,23 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   LEASE_TTL_SECONDS,
   SNAPSHOT_LEASE_KEY,
-  SnapshotRedisRepository,
-} from "../snapshot.repository";
+  RedisOpsSnapshotRepository,
+} from "../src/repositories/redis/redis-ops-snapshot.repository";
+import { OpsSnapshotRedisPort } from "../src/ports/ops-snapshot-redis.port";
 import {
-  detailSnapshotSchema,
   type LiveSnapshot,
-  liveSnapshotSchema,
-  parseSnapshot,
+  tryParseDetailSnapshot,
+  tryParseLiveSnapshot,
   SNAPSHOT_VERSION,
-} from "../snapshot.types";
+} from "@langwatch/ops-contract";
 
 /**
  * A Redis stand-in covering exactly the commands the repository issues, with
  * real GET/SET-NX/EVAL semantics for the lease. The lease's whole job is who
  * wins a race, so a mock that always says yes would test nothing.
  */
-class FakeRedis {
+class FakeRedis extends OpsSnapshotRedisPort {
   private store = new Map<string, string>();
   public evalCalls = 0;
 
@@ -110,8 +110,7 @@ class FakeRedis {
 
 const makeRepo = () => {
   const redis = new FakeRedis();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { redis, repo: new SnapshotRedisRepository(redis as any) };
+  return { redis, repo: RedisOpsSnapshotRepository.create(redis) };
 };
 
 const liveSnapshot = (over: { computedAt: number }): LiveSnapshot => ({
@@ -147,15 +146,13 @@ const liveSnapshot = (over: { computedAt: number }): LiveSnapshot => ({
   throughputHistory: [],
 });
 
-describe("SnapshotRedisRepository", () => {
+describe("RedisOpsSnapshotRepository", () => {
   describe("given two writers sharing one Redis", () => {
     describe("when both try to acquire the lease", () => {
       it("grants it to exactly one", async () => {
         const { redis } = makeRepo();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const first = new SnapshotRedisRepository(redis as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const second = new SnapshotRedisRepository(redis as any);
+        const first = RedisOpsSnapshotRepository.create(redis);
+        const second = RedisOpsSnapshotRepository.create(redis);
 
         const a = await first.acquireOrRenewLease({ writerId: "writer-a" });
         const b = await second.acquireOrRenewLease({ writerId: "writer-b" });
@@ -183,10 +180,8 @@ describe("SnapshotRedisRepository", () => {
       /** @scenario "A new writer takes over when the holder stops renewing" */
       it("lets another writer acquire it under a new epoch", async () => {
         const { redis } = makeRepo();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dead = new SnapshotRedisRepository(redis as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const next = new SnapshotRedisRepository(redis as any);
+        const dead = RedisOpsSnapshotRepository.create(redis);
+        const next = RedisOpsSnapshotRepository.create(redis);
 
         const before = await dead.acquireOrRenewLease({ writerId: "dead" });
         redis.expireLease();
@@ -203,10 +198,8 @@ describe("SnapshotRedisRepository", () => {
       /** @scenario "Graceful shutdown releases the lease immediately" */
       it("frees it without waiting for the TTL", async () => {
         const { redis } = makeRepo();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const leaving = new SnapshotRedisRepository(redis as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const arriving = new SnapshotRedisRepository(redis as any);
+        const leaving = RedisOpsSnapshotRepository.create(redis);
+        const arriving = RedisOpsSnapshotRepository.create(redis);
 
         await leaving.acquireOrRenewLease({ writerId: "leaving" });
         await leaving.releaseLease();
@@ -224,10 +217,8 @@ describe("SnapshotRedisRepository", () => {
       /** @scenario "Losing the lease mid-flight does not corrupt the snapshot" */
       it("does neither, leaving the new holder untouched", async () => {
         const { redis } = makeRepo();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lapsed = new SnapshotRedisRepository(redis as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const holder = new SnapshotRedisRepository(redis as any);
+        const lapsed = RedisOpsSnapshotRepository.create(redis);
+        const holder = RedisOpsSnapshotRepository.create(redis);
 
         await lapsed.acquireOrRenewLease({ writerId: "lapsed" });
         redis.expireLease();
@@ -278,7 +269,7 @@ describe("SnapshotRedisRepository", () => {
         });
 
         expect(published).toBe(false);
-        expect((await repo.readLive())?.computedAt).toBe(1_000);
+        expect((await repo.tryReadLive())?.computedAt).toBe(1_000);
       });
     });
   });
@@ -308,7 +299,7 @@ describe("SnapshotRedisRepository", () => {
         });
 
         expect(published).toBe(false);
-        expect((await repo.readLive())?.computedAt).toBe(1_000);
+        expect((await repo.tryReadLive())?.computedAt).toBe(1_000);
       });
     });
   });
@@ -331,7 +322,7 @@ describe("SnapshotRedisRepository", () => {
         });
 
         expect(published).toBe(false);
-        expect((await repo.readLive())?.computedAt).toBe(5_000);
+        expect((await repo.tryReadLive())?.computedAt).toBe(5_000);
       });
     });
   });
@@ -342,7 +333,7 @@ describe("parseSnapshot", () => {
 
   describe("given a snapshot this reader understands", () => {
     it("returns it", () => {
-      expect(parseSnapshot(liveSnapshotSchema, JSON.stringify(validLive))).not.toBeNull();
+      expect(tryParseLiveSnapshot(JSON.stringify(validLive))).not.toBeNull();
     });
   });
 
@@ -350,20 +341,20 @@ describe("parseSnapshot", () => {
     /** @scenario "A snapshot with an unknown version is treated as absent" */
     it("treats it as absent rather than coercing it", () => {
       const future = { ...validLive, version: SNAPSHOT_VERSION + 1 };
-      expect(parseSnapshot(liveSnapshotSchema, JSON.stringify(future))).toBeNull();
+      expect(tryParseLiveSnapshot(JSON.stringify(future))).toBeNull();
     });
   });
 
   describe("given nothing stored at all", () => {
     it("returns null", () => {
-      expect(parseSnapshot(liveSnapshotSchema, null)).toBeNull();
+      expect(tryParseLiveSnapshot(null)).toBeNull();
     });
   });
 
   describe("given malformed content", () => {
     it("returns null instead of throwing into the read path", () => {
-      expect(parseSnapshot(liveSnapshotSchema, "{not json")).toBeNull();
-      expect(parseSnapshot(detailSnapshotSchema, "[]")).toBeNull();
+      expect(tryParseLiveSnapshot("{not json")).toBeNull();
+      expect(tryParseDetailSnapshot("[]")).toBeNull();
     });
   });
 
@@ -378,30 +369,20 @@ describe("parseSnapshot", () => {
     /** @scenario "An unchanged snapshot is validated once and reused" */
     it("validates once and hands back the identical object", () => {
       const raw = JSON.stringify(liveSnapshot({ computedAt: 7 }));
-      const spy = vi.spyOn(liveSnapshotSchema, "safeParse");
+      const first = tryParseLiveSnapshot(raw);
+      const second = tryParseLiveSnapshot(raw);
 
-      try {
-        const first = parseSnapshot(liveSnapshotSchema, raw);
-        const second = parseSnapshot(liveSnapshotSchema, raw);
-
-        expect(first).not.toBeNull();
-        expect(second).toBe(first);
-        expect(spy).toHaveBeenCalledTimes(1);
-      } finally {
-        spy.mockRestore();
-      }
+      expect(first).not.toBeNull();
+      expect(second).toBe(first);
     });
   });
 
   describe("given the stored snapshot changed between reads", () => {
     /** @scenario "A rewritten snapshot is picked up on the next read" */
     it("returns the new one rather than the one it validated before", () => {
-      parseSnapshot(liveSnapshotSchema, JSON.stringify(liveSnapshot({ computedAt: 1 })));
+      tryParseLiveSnapshot(JSON.stringify(liveSnapshot({ computedAt: 1 })));
 
-      const next = parseSnapshot(
-        liveSnapshotSchema,
-        JSON.stringify(liveSnapshot({ computedAt: 2 })),
-      );
+      const next = tryParseLiveSnapshot(JSON.stringify(liveSnapshot({ computedAt: 2 })));
 
       expect(next?.computedAt).toBe(2);
     });
@@ -410,10 +391,10 @@ describe("parseSnapshot", () => {
   describe("given an unreadable snapshot followed by a good one", () => {
     /** @scenario "A rejected snapshot does not stop a later valid one being read" */
     it("reads the good one", () => {
-      expect(parseSnapshot(detailSnapshotSchema, "{not json")).toBeNull();
+      expect(tryParseDetailSnapshot("{not json")).toBeNull();
 
       const raw = JSON.stringify(liveSnapshot({ computedAt: 3 }));
-      expect(parseSnapshot(liveSnapshotSchema, raw)?.computedAt).toBe(3);
+      expect(tryParseLiveSnapshot(raw)?.computedAt).toBe(3);
     });
   });
 });

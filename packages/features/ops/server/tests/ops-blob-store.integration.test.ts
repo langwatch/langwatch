@@ -7,10 +7,16 @@ import {
 } from "@langwatch/group-queue/operational";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PostgresOpsAdapter } from "@langwatch/ops-server";
+import {
+  NoopSchedulerAuditSink,
+  NoopSchedulerWakeService,
+  PostgresOpsAdapter,
+  type SchedulerOpsRepository,
+} from "@langwatch/ops-server";
 import type { OpsService } from "@langwatch/ops-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ProjectService } from "@langwatch/project-contract";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;
@@ -18,6 +24,18 @@ const hasRedis = !!redisUrl;
 const QUEUE = "{test/blobrepo}";
 const PROJECT = "project-blobrepo";
 const HASH = "blobrepohash01";
+
+const schedulerRepository: SchedulerOpsRepository = {
+  tryFindByIdForOps: async () => null,
+  setActiveForOps: async () => false,
+  releaseSlotForOps: async () => false,
+  requestImmediateRunForOps: async () => false,
+  listForOps: async () => [],
+  listPausedForOps: async () => ({ rows: [], total: 0 }),
+};
+
+const projects: ProjectService = Object.create(ProjectService.prototype);
+projects.listNamesByIds = async () => [];
 
 /**
  * The operator delete path against a live Redis. The point under test is the
@@ -58,6 +76,12 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       audit: { record: async () => undefined },
       users: {} as UserService,
       redis,
+      scheduler: {
+        repository: schedulerRepository,
+        audit: NoopSchedulerAuditSink.create(),
+        wake: NoopSchedulerWakeService.create(),
+        projects,
+      },
     }).build();
   });
 

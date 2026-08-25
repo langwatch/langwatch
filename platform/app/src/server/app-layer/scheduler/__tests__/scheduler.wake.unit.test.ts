@@ -25,7 +25,7 @@ function makeRepo(): ScheduledJobStore {
     findAllForProject: vi.fn(async () => []),
     listForOps: vi.fn(async () => []),
     listPausedForOps: vi.fn(async () => ({ rows: [], total: 0 })),
-    findByIdForOps: vi.fn(async () => null),
+    tryFindByIdForOps: vi.fn(async () => null),
     setActiveForOps: vi.fn(async () => true),
     releaseSlotForOps: vi.fn(async () => true),
     requestImmediateRunForOps: vi.fn(async () => true),

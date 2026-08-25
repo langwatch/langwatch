@@ -15,6 +15,7 @@ import {
   type InternalProject,
   type PaginatedProjects,
   type Project,
+  type ProjectName,
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
@@ -294,6 +295,17 @@ export class PrismaProjectRepository extends ProjectRepository {
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => this.mapProjectRequired(row));
+  }
+
+  async findNamesByIds(projectIds: string[]): Promise<ProjectName[]> {
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, name: true },
+    });
   }
 
   async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {

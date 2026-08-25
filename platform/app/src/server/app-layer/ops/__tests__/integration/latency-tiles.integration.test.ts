@@ -3,9 +3,10 @@ import {
   GroupQueueConsumer,
   GroupQueueProducer,
 } from "@langwatch/group-queue";
+import { latencyAllTimeKey, latencyMinuteBucketKey } from "@langwatch/ops-contract";
+import { RedisOpsSnapshotAdapter } from "@langwatch/ops-server";
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { latencyAllTimeKey, latencyMinuteBucketKey } from "~/shared/ops/latency";
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -16,7 +17,6 @@ import {
   NullQueueRepository,
   type QueueRepository,
 } from "../../repositories/queue.repository";
-import { SnapshotRedisRepository } from "../../snapshot/snapshot.repository";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -225,11 +225,11 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
         const queueRepoStub: QueueRepository = Object.assign(new NullQueueRepository(), {
           discoverQueueNames: async () => [name],
         });
-        const snapshotRepo = new SnapshotRedisRepository(redis);
+        const snapshots = RedisOpsSnapshotAdapter.create({ redis });
         const collector = new OpsMetricsCollector({
           redis,
           queueRepo: queueRepoStub,
-          snapshotRepo,
+          snapshots,
         });
         try {
           await collector.discoverQueues();
@@ -252,10 +252,12 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
 
           // The reader path: the persisted artifact round-trips through the
           // wire schema with the windows intact — what any pod would serve.
-          const served = await snapshotRepo.readDetail();
+          await snapshots.start();
+          const served = snapshots.tryGetDashboardData();
           expect(served?.latencyWindows?.hour?.p50Ms).toBe(windows?.hour?.p50Ms);
         } finally {
-          collector.stop();
+          snapshots.stop();
+          await collector.stop();
         }
       });
     });

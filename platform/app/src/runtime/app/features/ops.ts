@@ -1,9 +1,16 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
 import type { AdminAuditRequest, AuditLogRequestLike } from "@langwatch/ops-contract";
-import { AdminAuditSink, PostgresOpsAdapter } from "@langwatch/ops-server";
+import {
+  AdminAuditSink,
+  PostgresOpsAdapter,
+  type SchedulerAuditSink,
+  type SchedulerOpsRepository,
+  type SchedulerWakeService,
+} from "@langwatch/ops-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Cluster, Redis } from "ioredis";
 import type { UserService } from "@langwatch/user-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 export { auditLog };
 
 /**
@@ -40,6 +47,12 @@ export interface AppOpsRuntimeOptions {
   adminEmails: string | readonly string[];
   redis?: Redis | Cluster | undefined;
   users: UserService;
+  scheduler: {
+    repository: SchedulerOpsRepository;
+    audit: SchedulerAuditSink;
+    wake: SchedulerWakeService;
+    projects: ProjectService;
+  };
 }
 
 export class AppOpsRuntime {

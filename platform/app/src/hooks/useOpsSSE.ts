@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { DashboardData } from "~/server/app-layer/ops/types";
+import type { DashboardData } from "@langwatch/ops-contract";
 import { api } from "~/utils/api";
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";

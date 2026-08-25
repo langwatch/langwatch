@@ -14,11 +14,19 @@ import {
   type StopImpersonationInput,
   type AdminOperationInput,
   type AdminOperationResult,
+  type ListPausedSchedulesInput,
+  type ListScheduledJobsInput,
+  type ListSchedulerActionsInput,
+  type OpsScheduledJob,
+  type ScheduleControlInput,
+  type SchedulerAuditEntryView,
+  type SetScheduleActiveInput,
 } from "@langwatch/ops-contract";
 import type { AdminAccess } from "./admin-access.service";
 import type { AdminBackofficeService } from "./admin-backoffice.service";
 import type { ImpersonationService } from "./impersonation.service";
 import type { BlobStoreService } from "./blob-store.service";
+import type { SchedulerOpsService } from "./scheduler-ops.service";
 
 export class OpsService extends OpsServiceContract {
   private constructor(
@@ -26,6 +34,7 @@ export class OpsService extends OpsServiceContract {
     private readonly impersonation: ImpersonationService,
     private readonly adminBackoffice: AdminBackofficeService,
     private readonly blobStore: BlobStoreService,
+    private readonly scheduler: SchedulerOpsService,
   ) {
     super();
   }
@@ -35,12 +44,14 @@ export class OpsService extends OpsServiceContract {
     impersonation: ImpersonationService;
     adminBackoffice: AdminBackofficeService;
     blobStore: BlobStoreService;
+    scheduler: SchedulerOpsService;
   }): OpsService {
     return new OpsService(
       options.access,
       options.impersonation,
       options.adminBackoffice,
       options.blobStore,
+      options.scheduler,
     );
   }
 
@@ -85,5 +96,33 @@ export class OpsService extends OpsServiceContract {
 
   deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult> {
     return this.blobStore.deleteBlob(input);
+  }
+
+  listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]> {
+    return this.scheduler.listScheduledJobs(input);
+  }
+
+  listPausedSchedules(
+    input: ListPausedSchedulesInput,
+  ): Promise<{ schedules: OpsScheduledJob[]; total: number }> {
+    return this.scheduler.listPausedSchedules(input);
+  }
+
+  listSchedulerActions(
+    input: ListSchedulerActionsInput,
+  ): Promise<SchedulerAuditEntryView[]> {
+    return this.scheduler.listRecentActions(input);
+  }
+
+  setScheduleActive(input: SetScheduleActiveInput): Promise<OpsScheduledJob> {
+    return this.scheduler.setActive(input);
+  }
+
+  clearStuckScheduleSlot(input: ScheduleControlInput): Promise<OpsScheduledJob> {
+    return this.scheduler.clearStuckSlot(input);
+  }
+
+  runScheduleNow(input: ScheduleControlInput): Promise<OpsScheduledJob> {
+    return this.scheduler.runNow(input);
   }
 }

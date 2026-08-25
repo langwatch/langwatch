@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { GroupInfo, QueueInfo } from "@langwatch/ops-contract";
 import { buildPipelineTree, mapJobTypeToPhase } from "../metrics-collector";
-import type { GroupInfo, QueueInfo } from "../types";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   return {

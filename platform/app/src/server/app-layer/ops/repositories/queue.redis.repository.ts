@@ -18,12 +18,17 @@ import {
 } from "@langwatch/group-queue/operational";
 import { normalizeErrorMessage } from "@langwatch/ops-server";
 import { createLogger } from "@langwatch/observability";
+import type {
+  ErrorCluster,
+  GroupInfo,
+  ParkedGroupInfo,
+  ParkedTenant,
+  QueueInfo,
+} from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
-import type { ParkedTenant } from "../snapshot/snapshot.types";
-import type { ErrorCluster, GroupInfo, ParkedGroupInfo, QueueInfo } from "../types";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -2657,7 +2662,7 @@ export class QueueRedisRepository implements QueueRepository {
       }
       if (params.pipelineFilter) {
         const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== undefined) {
+        if (fetchIdx !== void 0) {
           const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
           if (raw) {
             if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)
@@ -2702,7 +2707,7 @@ export class QueueRedisRepository implements QueueRepository {
       }
       if (params.pipelineFilter) {
         const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== undefined) {
+        if (fetchIdx !== void 0) {
           const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
           if (raw) {
             if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)

@@ -8,7 +8,11 @@ deployment, not Enterprise-only code.
 - `web/`: browser-safe clients, formatters, JSON inspection, and reusable
   operator controls.
 
-The app still owns transport registration, auth/session lookup, and composition.
+The app still owns transport registration, auth/session lookup, and process
+composition. Ops snapshots are read, written, and streamed through the single
+`OpsSnapshotService`; scheduler controls are methods on the canonical
+`OpsService`, backed by app-provided persistence, audit and wake adapters plus
+the canonical Project service.
 The Ops server owns backoffice resource queries behind private repositories;
 generated Prisma does not cross the contract or transport boundary.
 

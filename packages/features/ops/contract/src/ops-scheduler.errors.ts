@@ -1,18 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 
-/**
- * Refusals an operator can act on (ADR-091).
- *
- * Each names a cause the caller can do something about, so each gets a stable
- * code and copy in the client presentation registry. Anything else — a dead
- * Postgres, a bug — stays a plain Error and degrades to "unknown" with a trace
- * id, which is the honest answer for a failure we cannot name.
- *
- * None of them carry the schedule id in `meta`. `meta` is a client contract and
- * no presentation reads it; the operator already knows which row they clicked.
- * The id a support engineer needs is logged at the refusal instead, next to the
- * reason it was refused.
- */
+/** Stable operator-action refusals; infrastructure failures remain unhandled. */
 
 export class ScheduleNotFoundError extends HandledError {
   declare readonly code: "schedule_not_found";

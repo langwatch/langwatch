@@ -26,6 +26,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "ioredis": "5.10.1",
     "ra-data-simple-prisma": "3.1.3"

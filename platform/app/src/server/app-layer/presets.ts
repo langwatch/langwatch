@@ -293,7 +293,6 @@ import { MetricDataPointClickHouseRepository } from "./metrics/repositories/metr
 import { NullMetricDataPointRepository } from "./metrics/repositories/metric-data-point.repository";
 
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
-import { BlobStoreService } from "./ops/blob-store.service";
 import { EventExplorerService } from "./ops/event-explorer.service";
 import {
   ManagerExplorerService,
@@ -308,8 +307,6 @@ import {
 import { QueueService } from "./ops/queue.service";
 import { QueueAuditRepository } from "./ops/queue-audit.repository";
 import { ReplayService } from "./ops/replay.service";
-import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
-import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
 import { ProcessOpsPrismaRepository } from "./ops/repositories/process-ops.prisma.repository";
@@ -318,10 +315,14 @@ import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository"
 import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
 import { NullReplayRepository } from "./ops/repositories/replay.repository";
-import { SchedulerAuditRepository } from "./ops/scheduler-audit.repository";
-import { SchedulerOpsService } from "./ops/scheduler-ops.service";
-import { SnapshotRedisRepository } from "./ops/snapshot/snapshot.repository";
-import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
+import {
+  NoopSchedulerAuditSink,
+  NoopSchedulerWakeService,
+  PrismaSchedulerAuditRepository,
+  RedisOpsSnapshotAdapter,
+  RedisSchedulerWakeAdapter,
+} from "@langwatch/ops-server";
+import { AppOpsRuntime } from "~/runtime/app/features/ops";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
@@ -1871,7 +1872,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // disconnected the release can no longer be issued at all.
   shutdownResources.register("subscriber", "ops-snapshot", async () => {
     await ops.metricsCollector?.stop();
-    ops.snapshotReader?.stop();
+    ops.snapshots?.stop();
   });
   if (redis) {
     shutdownResources.register("redis", "redis", () => redisShutdown.shutdown(redis));
@@ -1915,36 +1916,38 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     baseHost: config.baseHost ?? env.BASE_HOST,
   });
 
+  const opsService = AppOpsRuntime.create({
+    database: prisma,
+    adminEmails: process.env.ADMIN_EMAILS ?? "",
+    redis,
+    users,
+    scheduler: {
+      repository: new PrismaScheduledJobStore(prisma),
+      audit: PrismaSchedulerAuditRepository.create(prisma),
+      wake: redis
+        ? RedisSchedulerWakeAdapter.create(redis)
+        : NoopSchedulerWakeService.create(),
+      projects,
+    },
+  }).build();
+
   const queueRepo = redis ? new QueueRedisRepository(redis) : new NullQueueRepository();
   const replayRepo = redis
     ? new ReplayRedisRepository(redis)
     : new NullReplayRepository();
-  // One snapshot store shared by this pod's writer and its reader: the writer
-  // publishes only while it holds the lease, the reader always reads.
-  const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
+  const snapshots = redis ? RedisOpsSnapshotAdapter.create({ redis }) : null;
+  snapshots?.start().catch((error) => {
+    logger.error({ error }, "Failed to start ops snapshot service");
+  });
   const sharedCh = _getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
     : new NullEventExplorerRepository();
 
-  const ops = {
+  const ops = Object.assign(opsService, {
     queues: new QueueService({
       repo: queueRepo,
       audit: new QueueAuditRepository(prisma),
-    }),
-    scheduler: new SchedulerOpsService({
-      repo: new PrismaScheduledJobStore(prisma),
-      audit: new SchedulerAuditRepository(prisma),
-      // Best-effort poke so a manual run fires now rather than within one poll
-      // backstop. Latency only: the loop picks the row up either way.
-      wake: redis ? () => void SchedulerService.publishWake(redis) : null,
-      resolveProjectNames: async (projectIds) => {
-        const projects = await prisma.project.findMany({
-          where: { id: { in: projectIds } },
-          select: { id: true, name: true },
-        });
-        return new Map(projects.map((p) => [p.id, p.name]));
-      },
     }),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     managerExplorer: (() => {
@@ -1965,14 +1968,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       });
     })(),
     replay: new ReplayService(replayRepo),
-    blobStore: new BlobStoreService(
-      redis ? new BlobStoreRedisRepository(redis) : new NullBlobStoreRepository(),
-    ),
     metricsCollector: redis
-      ? getOpsMetricsCollector({ redis, queueRepo, snapshotRepo })
+      ? getOpsMetricsCollector({ redis, queueRepo, snapshots })
       : null,
-    snapshotReader: redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
-  };
+    snapshots,
+  });
 
   const app = initializeApp({
     config,
@@ -2366,6 +2366,18 @@ export function createTestApp(
     },
   );
 
+  const testOpsService = AppOpsRuntime.create({
+    database: testPrisma,
+    adminEmails: process.env.ADMIN_EMAILS ?? "",
+    users: testUsers,
+    scheduler: {
+      repository: new NullScheduledJobStore(),
+      audit: NoopSchedulerAuditSink.create(),
+      wake: NoopSchedulerWakeService.create(),
+      projects: testProjects,
+    },
+  }).build();
+
   return new App({
     config,
     agents,
@@ -2658,11 +2670,8 @@ export function createTestApp(
     notifications: NotificationService.createNull(),
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
-    ops: {
+    ops: Object.assign(testOpsService, {
       queues: new QueueService({ repo: new NullQueueRepository() }),
-      scheduler: new SchedulerOpsService({
-        repo: new NullScheduledJobStore(),
-      }),
       eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
       managerExplorer: new ManagerExplorerService({
         store: new InMemoryProcessStore(),
@@ -2670,10 +2679,9 @@ export function createTestApp(
         audit: new NullProcessAuditSink(),
       }),
       replay: new ReplayService(new NullReplayRepository()),
-      blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
-      snapshotReader: null,
-    },
+      snapshots: null,
+    }),
     commands: {
       traces: {
         recordSpan: noop,

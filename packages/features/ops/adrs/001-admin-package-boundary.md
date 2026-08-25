@@ -47,7 +47,18 @@ is owned by the private Redis repository.
 ## Runtime and registration
 
 `PostgresOpsAdapter.create(...).build()` constructs the process-owned Ops
-service. The application registers Hono routes; package imports do not.
+service. Snapshot collection and dashboard streaming use one process-owned
+`OpsSnapshotService`; its Redis adapter owns lease/read/write/version handling.
+Scheduler operator controls are part of the canonical `OpsService`. Its private
+scheduler collaborator uses the application's scheduled-job store and package
+audit and Redis wake adapters. Project labels come from the complete Project
+service, not a Project repository owned by Ops. The application registers
+Hono/tRPC routes and owns the calendar scheduler loop; package imports do not
+register transports.
+
+Dashboard subscriptions yield the current readable snapshot before waiting for
+the next update. A missing snapshot remains `null`, preserving the loading
+state and the existing SSE response fields.
 
 ## Environment and configuration
 

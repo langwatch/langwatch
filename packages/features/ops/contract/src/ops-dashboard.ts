@@ -1,5 +1,5 @@
-import type { LatencyWindows } from "~/shared/ops/latency";
-import type { BoundedSection, ParkedTenant } from "./snapshot/snapshot.types";
+import type { LatencyWindows } from "./ops-latency";
+import type { BoundedSection, ParkedTenant } from "./ops-snapshot";
 
 /** One tenant's parked group, as the drill-down lists it. */
 export interface ParkedGroupInfo {

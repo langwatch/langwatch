@@ -85,14 +85,12 @@ import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.
 import type { AppConfig } from "./config";
 import type { GithubService } from "@langwatch/github-contract";
 import type { LangyService } from "@langwatch/langy-contract";
-import type { BlobStoreService } from "./ops/blob-store.service";
+import type { OpsService, OpsSnapshotService } from "@langwatch/ops-contract";
 import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { ManagerExplorerService } from "./ops/manager-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
-import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
-import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
@@ -121,21 +119,19 @@ export type DataRetentionDependencies = DataRetentionService & {
   metering: StorageMeterService;
 };
 
-export interface OpsDependencies {
+export type OpsDependencies = OpsService & {
   queues: QueueService;
-  scheduler: SchedulerOpsService;
   eventExplorer: EventExplorerService;
   managerExplorer: ManagerExplorerService;
   replay: ReplayService;
-  blobStore: BlobStoreService;
   /**
    * The lease-elected snapshot writer. Present on every pod that can reach
    * Redis, but only scans on the pod currently holding the lease (ADR-090).
    */
   metricsCollector: OpsMetricsCollector | null;
-  /** Serves the shared snapshot to this pod's dashboard subscribers. */
-  snapshotReader: OpsSnapshotReader | null;
-}
+  /** Reads, writes, and streams the process-owned shared snapshot. */
+  snapshots: OpsSnapshotService | null;
+};
 
 export interface AppDependencies {
   config: AppConfig;
@@ -383,7 +379,7 @@ export interface AppDependencies {
   dataRetention: DataRetentionDependencies;
   share: ShareService;
   commands: AppCommands;
-  ops?: OpsDependencies;
+  ops: OpsDependencies;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
   _eventSourcing?: EventSourcing;

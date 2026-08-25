@@ -15,6 +15,15 @@ import type {
   RunBlobCleanupInput,
 } from "./blob-store";
 import type { AdminOperationInput, AdminOperationResult } from "./admin-backoffice";
+import type {
+  ListPausedSchedulesInput,
+  ListScheduledJobsInput,
+  ListSchedulerActionsInput,
+  OpsScheduledJob,
+  ScheduleControlInput,
+  SchedulerAuditEntryView,
+  SetScheduleActiveInput,
+} from "./ops-scheduler";
 
 /** The single portable capability for platform operations and backoffice work. */
 export abstract class OpsService {
@@ -28,4 +37,14 @@ export abstract class OpsService {
   abstract tryGetBlob(input: GetBlobInput): Promise<OpsBlobSummary | null>;
   abstract runBlobCleanup(input: RunBlobCleanupInput): Promise<BlobSweepReport>;
   abstract deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult>;
+  abstract listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]>;
+  abstract listPausedSchedules(
+    input: ListPausedSchedulesInput,
+  ): Promise<{ schedules: OpsScheduledJob[]; total: number }>;
+  abstract listSchedulerActions(
+    input: ListSchedulerActionsInput,
+  ): Promise<SchedulerAuditEntryView[]>;
+  abstract setScheduleActive(input: SetScheduleActiveInput): Promise<OpsScheduledJob>;
+  abstract clearStuckScheduleSlot(input: ScheduleControlInput): Promise<OpsScheduledJob>;
+  abstract runScheduleNow(input: ScheduleControlInput): Promise<OpsScheduledJob>;
 }

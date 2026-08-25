@@ -1,19 +1,7 @@
 import { z } from "zod";
-import type { PipelineNode } from "../types";
+import type { PipelineNode } from "./ops-dashboard";
 
-/**
- * Wire version of the ops snapshot (ADR-090).
- *
- * Readers treat an unrecognised version as an ABSENT snapshot rather than
- * trying to coerce it: during a rolling deploy the two releases genuinely
- * disagree about the shape, and rendering a half-understood payload is worse
- * than rendering the loading state for one pod-termination cycle.
- *
- * Bump this only for a breaking shape change. Every field below is required,
- * so any field ADDED without a bump has to be declared `.optional()` to stay
- * readable by the build that does not write it — adding a required one is a
- * breaking change and needs the bump.
- */
+/** Unknown wire versions are absent during rolling deploys. */
 export const SNAPSHOT_VERSION = 1;
 
 const throughputPointSchema = z.object({
@@ -66,9 +54,7 @@ const jobNameMetricsSchema = z.object({
   peakLatencyP99Ms: z.number(),
 });
 
-// Recursive schemas are the one case zod cannot infer: the annotation is
-// required to break the cycle. It reuses the existing `PipelineNode` rather
-// than restating its shape, so the two cannot drift.
+// The annotation breaks the recursive schema cycle.
 const pipelineNodeSchema: z.ZodType<PipelineNode> = z.lazy(() =>
   z.object({
     name: z.string(),
@@ -89,13 +75,7 @@ const errorClusterSchema = z.object({
   sampleGroupIds: z.array(z.string()),
 });
 
-/**
- * One tenant sitting at its in-flight cap, with enough context to act.
- *
- * "Parked" here is ALWAYS tenant soft-cap parking (a group moved out of the
- * ready zset into the tenant's parked set). The poison-group guard's unrelated
- * "park" puts a crash-looping group in the BLOCKED set; it never appears here.
- */
+/** Tenant soft-cap parking, not poison-group blocking. */
 const parkedTenantSchema = z.object({
   tenantId: z.string(),
   queueName: z.string(),
@@ -104,13 +84,7 @@ const parkedTenantSchema = z.object({
   oldestParkedMs: z.number().nullable(),
 });
 
-/**
- * How much of a bounded section the writer actually included.
- *
- * Every bound the snapshot applies reports itself. Silent truncation is the
- * defect ADR-090 exists to remove — reintroducing it inside the snapshot would
- * be the same bug with better plumbing.
- */
+/** Included and total rows make bounded sections explicit. */
 const boundedSchema = z.object({
   /** Rows included in this snapshot. */
   included: z.number(),
@@ -201,52 +175,25 @@ export type DetailSnapshot = z.infer<typeof detailSnapshotSchema>;
 export type ParkedTenant = z.infer<typeof parkedTenantSchema>;
 export type BoundedSection = z.infer<typeof boundedSchema>;
 
-/**
- * Parse a stored snapshot, treating anything unreadable as absent.
- *
- * Version mismatch, malformed JSON and schema drift all collapse to `null` on
- * purpose: the caller's only sensible response to each is the same (wait for a
- * snapshot it understands), and distinguishing them at the call site would
- * invite rendering a partial payload.
- */
-/**
- * The last successful parse, per schema.
- *
- * Both readers poll one fixed Redis key on an interval, so between writes they
- * hand the byte-identical JSON string to the same schema over and over.
- * Re-validating it every poll was 2.7% of the app's wall time in production,
- * 84% of that inside zod. Comparing the raw string answers the same question
- * for a fraction of the cost, and it keeps the validation rather than trading
- * it away: a string that has not changed cannot have a shape different from
- * the one already checked.
- *
- * Only successful parses are stored. An unreadable snapshot re-parses on every
- * poll, which is the behaviour it had before and is not worth caching — it is
- * rare, and caching a rejection would keep rejecting a key that has since been
- * rewritten correctly.
- *
- * Keyed by schema identity, and each schema holds exactly one entry, so this
- * cannot grow. The schemas are module-level constants.
- *
- * The cached value is handed to every caller, so callers must treat it as
- * read-only. `mergeSnapshots` projects it into a fresh object rather than
- * mutating it, which is the arrangement this relies on.
- */
-const lastParse = new WeakMap<object, { raw: string; value: unknown }>();
+/** Cache one successful parse per fixed Redis artifact. */
+function createSnapshotParser<T>(schema: z.ZodType<T>) {
+  let lastParse: { raw: string; value: T } | null = null;
 
-export function parseSnapshot<T>(schema: z.ZodType<T>, raw: string | null): T | null {
-  if (!raw) return null;
+  return (raw: string | null): T | null => {
+    if (!raw) return null;
+    if (lastParse?.raw === raw) return lastParse.value;
 
-  const cached = lastParse.get(schema);
-  if (cached?.raw === raw) return cached.value as T;
+    try {
+      const result = schema.safeParse(JSON.parse(raw));
+      if (!result.success) return null;
 
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    const result = schema.safeParse(parsed);
-    if (!result.success) return null;
-    lastParse.set(schema, { raw, value: result.data });
-    return result.data;
-  } catch {
-    return null;
-  }
+      lastParse = { raw, value: result.data };
+      return result.data;
+    } catch {
+      return null;
+    }
+  };
 }
+
+export const tryParseLiveSnapshot = createSnapshotParser(liveSnapshotSchema);
+export const tryParseDetailSnapshot = createSnapshotParser(detailSnapshotSchema);

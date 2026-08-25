@@ -1,56 +1,111 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SLOT_STALE_AFTER_MS } from "~/shared/ops/schedulerControl";
-import type { ScheduledJobRecord } from "../../scheduler/scheduler.types";
-import { SchedulerOpsService } from "../scheduler-ops.service";
+import { ProjectService } from "@langwatch/project-contract";
+import {
+  NoopSchedulerWakeService,
+  SchedulerAuditSink,
+  SLOT_STALE_AFTER_MS,
+  type ScheduledJobRecord,
+} from "../src";
+import type { SchedulerOpsRepository } from "../src";
+import { SchedulerOpsService } from "../src/services/scheduler-ops.service";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
 
-const record = (over: Partial<ScheduledJobRecord> = {}): ScheduledJobRecord =>
-  ({
-    id: "sched_1",
-    projectId: "project_acme",
-    targetType: "scheduled_report",
-    targetId: "report_1",
-    cron: "0 3 21 * *",
-    timezone: "UTC",
-    nextRunAt: at(600_000),
-    lastSlot: at(-600_000),
-    currentSlot: null,
-    attempts: 0,
-    lastError: null,
-    active: true,
-    createdAt: at(-86_400_000),
-    updatedAt: at(-1_000),
-    ...over,
-  }) as ScheduledJobRecord;
+const projects: ProjectService = Object.create(ProjectService.prototype);
+projects.listNamesByIds = async () => [];
+
+const record = (over: Partial<ScheduledJobRecord> = {}): ScheduledJobRecord => ({
+  id: "sched_1",
+  projectId: "project_acme",
+  targetType: "scheduled_report",
+  targetId: "report_1",
+  cron: "0 3 21 * *",
+  timezone: "UTC",
+  nextRunAt: at(600_000),
+  lastSlot: at(-600_000),
+  currentSlot: null,
+  attempts: 0,
+  lastError: null,
+  active: true,
+  createdAt: at(-86_400_000),
+  updatedAt: at(-1_000),
+  ...over,
+});
+
+class SchedulerRepositoryStub implements SchedulerOpsRepository {
+  readonly tryFindByIdForOps =
+    vi.fn<(params: { id: string }) => Promise<ScheduledJobRecord | null>>();
+  readonly setActiveForOps =
+    vi.fn<
+      (params: { id: string; projectId: string; active: boolean }) => Promise<boolean>
+    >();
+  readonly releaseSlotForOps =
+    vi.fn<
+      (params: {
+        id: string;
+        projectId: string;
+        expectedNextRunAt: Date;
+        now: Date;
+      }) => Promise<boolean>
+    >();
+  readonly requestImmediateRunForOps =
+    vi.fn<
+      (params: {
+        id: string;
+        projectId: string;
+        expectedNextRunAt: Date;
+        now: Date;
+      }) => Promise<boolean>
+    >();
+  readonly listForOps =
+    vi.fn<(params: { limit: number }) => Promise<ScheduledJobRecord[]>>();
+  readonly listPausedForOps =
+    vi.fn<
+      (params: {
+        limit: number;
+      }) => Promise<{ rows: ScheduledJobRecord[]; total: number }>
+    >();
+}
+
+class SchedulerAuditSinkStub extends SchedulerAuditSink {
+  readonly append = vi.fn().mockResolvedValue(void 0);
+  readonly listRecent = vi.fn().mockResolvedValue([]);
+}
 
 const makeService = (row: ScheduledJobRecord | null) => {
-  const repo = {
-    findByIdForOps: vi.fn().mockResolvedValue(row),
-    setActiveForOps: vi.fn().mockResolvedValue(true),
-    releaseSlotForOps: vi.fn().mockResolvedValue(true),
-    requestImmediateRunForOps: vi.fn().mockResolvedValue(true),
-    listForOps: vi.fn().mockResolvedValue([]),
-    listPausedForOps: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
-  };
-  const audit = { append: vi.fn().mockResolvedValue(undefined) };
-  const wake = vi.fn();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const service = new SchedulerOpsService({ repo: repo as any, audit, wake });
-  return { service, repo, audit, wake };
+  const repo = new SchedulerRepositoryStub();
+  repo.tryFindByIdForOps.mockResolvedValue(row);
+  repo.setActiveForOps.mockResolvedValue(true);
+  repo.releaseSlotForOps.mockResolvedValue(true);
+  repo.requestImmediateRunForOps.mockResolvedValue(true);
+  repo.listForOps.mockResolvedValue([]);
+  repo.listPausedForOps.mockResolvedValue({ rows: [], total: 0 });
+  const audit = new SchedulerAuditSinkStub();
+  const wake = NoopSchedulerWakeService.create();
+  const wakeSpy = vi.spyOn(wake, "wake");
+  const service = SchedulerOpsService.create({
+    repository: repo,
+    audit,
+    wake,
+    projects,
+  });
+  return { service, repo, audit, wake: wakeSpy };
 };
 
 const codeOf = async (run: () => Promise<unknown>): Promise<string> => {
   try {
     await run();
   } catch (error) {
-    return (error as { code?: string }).code ?? "no-code";
+    if (error instanceof Error && "code" in error && typeof error.code === "string") {
+      return error.code;
+    }
+    return "no-code";
   }
   return "did-not-throw";
 };
 
-describe("SchedulerOpsService controls", () => {
+describe("scheduler controls", () => {
   beforeEach(() => vi.clearAllMocks());
 
   describe("given a schedule that no longer exists", () => {
@@ -129,7 +184,7 @@ describe("SchedulerOpsService controls", () => {
         // turns that into the right words.
         const { service, repo } = makeService(record());
         repo.requestImmediateRunForOps.mockResolvedValue(false);
-        repo.findByIdForOps
+        repo.tryFindByIdForOps
           .mockResolvedValueOnce(record())
           .mockResolvedValueOnce(record({ currentSlot: at(-1_000) }));
 
@@ -154,6 +209,12 @@ describe("SchedulerOpsService controls", () => {
         });
 
         const call = repo.requestImmediateRunForOps.mock.calls[0]?.[0];
+        expect(call).toBeDefined();
+        if (!call) {
+          throw new Error(
+            "Expected the scheduler repository to receive the control request",
+          );
+        }
         expect(call.expectedNextRunAt).toEqual(at(600_000));
       });
 
@@ -333,7 +394,7 @@ describe("SchedulerOpsService controls", () => {
         const { service, repo } = makeService(record());
         repo.requestImmediateRunForOps.mockResolvedValue(false);
         // The re-read sees what the write saw: somebody paused it.
-        repo.findByIdForOps
+        repo.tryFindByIdForOps
           .mockResolvedValueOnce(record())
           .mockResolvedValueOnce(record({ active: false }));
 

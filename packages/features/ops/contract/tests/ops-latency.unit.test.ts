@@ -6,7 +6,7 @@ import {
   mergeHistogramCounts,
   percentileFromHistogram,
   windowPercentiles,
-} from "../latency";
+} from "../src/ops-latency";
 
 describe("latencyBucketField", () => {
   describe("when a duration is bucketed", () => {

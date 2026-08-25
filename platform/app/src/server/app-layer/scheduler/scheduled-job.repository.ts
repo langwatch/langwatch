@@ -298,7 +298,7 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
 
   // ── Operator control (ADR-091) ────────────────────────────────────────
 
-  async findByIdForOps({ id }: { id: string }): Promise<ScheduledJobRecord | null> {
+  async tryFindByIdForOps({ id }: { id: string }): Promise<ScheduledJobRecord | null> {
     const rows = await this.prisma.$queryRaw<ScheduledJobRecord[]>`
       SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
              "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",
@@ -441,7 +441,7 @@ export class NullScheduledJobStore implements ScheduledJobStore {
   }> {
     return { rows: [], total: 0 };
   }
-  async findByIdForOps(): Promise<ScheduledJobRecord | null> {
+  async tryFindByIdForOps(): Promise<ScheduledJobRecord | null> {
     return null;
   }
   async setActiveForOps(): Promise<boolean> {

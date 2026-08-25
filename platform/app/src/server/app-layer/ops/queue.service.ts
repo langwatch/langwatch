@@ -1,3 +1,8 @@
+import type {
+  GroupInfo,
+  ParkedGroupInfo,
+  QueueSummaryInfo,
+} from "@langwatch/ops-contract";
 import { NullQueueAuditSink, type QueueAuditSink } from "./queue-audit.repository";
 import type {
   BlockedSummary,
@@ -6,7 +11,6 @@ import type {
   JobEntry,
   QueueRepository,
 } from "./repositories/queue.repository";
-import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "./types";
 
 /** What an error with no recognizable class name is recorded as. */
 const UNTYPED_ERROR_SHAPE = "untyped_error";

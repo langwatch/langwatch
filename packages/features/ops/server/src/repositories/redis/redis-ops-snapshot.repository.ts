@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
-import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
 import {
   type DetailSnapshot,
-  detailSnapshotSchema,
   type LiveSnapshot,
-  liveSnapshotSchema,
-  parseSnapshot,
-} from "./snapshot.types";
+  type OpsSnapshotLease,
+  tryParseDetailSnapshot,
+  tryParseLiveSnapshot,
+} from "@langwatch/ops-contract";
+import { OpsSnapshotRedisPort } from "../../ports/ops-snapshot-redis.port";
+import { OpsSnapshotRepository } from "../ops-snapshot.repository";
 
 /**
  * The `{snapshot}` hash tag is load-bearing, not decoration.
@@ -92,49 +92,18 @@ redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[3])
 return 1
 `;
 
-export interface LeaseState {
-  /** True when this writer may scan and publish this cycle. */
-  isHeld: boolean;
-  /**
-   * Increments on every acquisition — including a re-acquisition by the pod
-   * that just lost it — and is stamped into every artifact. It answers "has the
-   * writer restarted since the payload I am looking at", which is what
-   * separates a stuck writer from a churning one. It is NOT a fleet-wide
-   * ordering of writers, and a pod that has never held the lease reports 0.
-   */
-  epoch: number;
-  /**
-   * Opaque, and unique to THIS acquisition rather than to the pod.
-   *
-   * Writes are fenced on it, and that is why it cannot be the writer id: a pod
-   * can lose the lease and take it back while a slow detail scan is still
-   * running, and a scan carrying only the pod's identity would then pass a
-   * fence it should fail. Capture it when a scan STARTS and pass that value to
-   * the write; a lease that turned over in between no longer matches.
-   *
-   * Null when the lease is not held.
-   */
-  token: string | null;
-}
-
-export interface SnapshotRepository {
-  acquireOrRenewLease(params: { writerId: string }): Promise<LeaseState>;
-  /** No-op when this instance does not hold the lease. */
-  releaseLease(): Promise<void>;
-  /** Resolves true when the artifact was published, false when fenced out. */
-  writeLive(params: { snapshot: LiveSnapshot; leaseToken: string }): Promise<boolean>;
-  /** Resolves true when the artifact was published, false when fenced out. */
-  writeDetail(params: { snapshot: DetailSnapshot; leaseToken: string }): Promise<boolean>;
-  readLive(): Promise<LiveSnapshot | null>;
-  readDetail(): Promise<DetailSnapshot | null>;
-}
-
-export class SnapshotRedisRepository implements SnapshotRepository {
+export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
   private currentEpoch = 0;
   /** The value this instance last wrote into the lease key, or null. */
   private currentToken: string | null = null;
 
-  constructor(private readonly redis: IORedis | Cluster) {}
+  static create(redis: OpsSnapshotRedisPort): RedisOpsSnapshotRepository {
+    return new RedisOpsSnapshotRepository(redis);
+  }
+
+  private constructor(private readonly redis: OpsSnapshotRedisPort) {
+    super();
+  }
 
   /**
    * One round trip in the common case (renewal), two on a fresh acquisition.
@@ -144,7 +113,11 @@ export class SnapshotRedisRepository implements SnapshotRepository {
    * not the writer id, is what lands in the lease key — see `LeaseState.token`
    * for why a stable per-pod value cannot fence a write.
    */
-  async acquireOrRenewLease({ writerId }: { writerId: string }): Promise<LeaseState> {
+  async acquireOrRenewLease({
+    writerId,
+  }: {
+    writerId: string;
+  }): Promise<OpsSnapshotLease> {
     if (this.currentToken) {
       const renewed = await this.redis.eval(
         RENEW_LUA,
@@ -242,11 +215,11 @@ export class SnapshotRedisRepository implements SnapshotRepository {
     return Number(written) === 1;
   }
 
-  async readLive(): Promise<LiveSnapshot | null> {
-    return parseSnapshot(liveSnapshotSchema, await this.redis.get(SNAPSHOT_LIVE_KEY));
+  async tryReadLive(): Promise<LiveSnapshot | null> {
+    return tryParseLiveSnapshot(await this.redis.get(SNAPSHOT_LIVE_KEY));
   }
 
-  async readDetail(): Promise<DetailSnapshot | null> {
-    return parseSnapshot(detailSnapshotSchema, await this.redis.get(SNAPSHOT_DETAIL_KEY));
+  async tryReadDetail(): Promise<DetailSnapshot | null> {
+    return tryParseDetailSnapshot(await this.redis.get(SNAPSHOT_DETAIL_KEY));
   }
 }
