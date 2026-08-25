@@ -1,4 +1,15 @@
 import { Skeleton, Table, Text, VStack } from "@chakra-ui/react";
+import {
+  type SessionListRow,
+  type SessionsSortColumn,
+  type SessionsSortState,
+  SessionsTableHeader,
+  isWithinPeriod,
+  matchesSessionSearch,
+  type PeriodSelection,
+  toListRow,
+  useSessionsSort,
+} from "@langwatch/coding-agent-web";
 import { SquareTerminal } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -9,20 +20,8 @@ import { Pagination } from "~/components/ui/Pagination";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { SessionRow } from "./sessions/SessionRow";
-import { SessionsTableHeader } from "./sessions/SessionsTableHeader";
 import { SessionsToolbar } from "./sessions/SessionsToolbar";
-import {
-  isWithinPeriod,
-  matchesSessionSearch,
-  type PeriodSelection,
-} from "./sessions/sessionFilters";
-import { type SessionListRow, toListRow } from "./sessions/sessionListRow";
 import { useTerminalReplay } from "./sessions/useTerminalReplay";
-import {
-  type SessionsSortColumn,
-  type SessionsSortState,
-  useSessionsSort,
-} from "./useSessionsSort";
 
 /**
  * Every coding-agent session of the last quarter, and what it cost in context

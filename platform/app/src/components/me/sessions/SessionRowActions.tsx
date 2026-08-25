@@ -1,10 +1,10 @@
 import { Button } from "@chakra-ui/react";
+import type { SessionListRow } from "@langwatch/coding-agent-web";
 import { MoreVertical } from "lucide-react";
 import type React from "react";
 
 import { Menu } from "~/components/ui/menu";
 
-import type { SessionListRow } from "./sessionListRow";
 
 /**
  * Everything a reader can do with a row other than choose it. Choosing the row

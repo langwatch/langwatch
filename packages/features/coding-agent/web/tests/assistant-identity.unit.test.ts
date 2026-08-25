@@ -7,8 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { assistantKindOfAgent } from "../agentIdentity";
-import { ASSISTANT_PRESETS } from "../tiles/assistantIcons";
+import { assistantKindOfAgent } from "../src/assistant-identity";
 
 describe("assistantKindOfAgent", () => {
   describe("given a slug the tiles already use", () => {
@@ -18,11 +17,6 @@ describe("assistantKindOfAgent", () => {
     });
 
     /** @scenario "An agent slug resolves to its product name" */
-    it("names Claude Code through the preset", () => {
-      const kind = assistantKindOfAgent("claude_code");
-      expect(kind && ASSISTANT_PRESETS[kind].label).toBe("Claude Code");
-    });
-
     /** @scenario "An agent slug resolves to its product name" */
     it("resolves opencode to its own kind", () => {
       expect(assistantKindOfAgent("opencode")).toBe("opencode");

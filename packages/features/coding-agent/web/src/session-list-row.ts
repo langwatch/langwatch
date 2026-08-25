@@ -1,10 +1,9 @@
-import type { RouterOutputs } from "~/utils/api";
+import type { CodingAgentSessionListRow } from "@langwatch/coding-agent-contract";
 
-import { sessionLastUpdateAtMs, sessionTotalTokens } from "../useSessionsSort";
+import { sessionLastUpdateAtMs, sessionTotalTokens } from "./session-sort";
 
 /** One session as the read hands it over. */
-export type SessionPayload =
-  RouterOutputs["codingAgents"]["sessionsList"][number];
+export type SessionPayload = CodingAgentSessionListRow;
 
 /** One pull request a session drove. */
 export type SessionPullRequest = SessionPayload["pullRequests"][number];

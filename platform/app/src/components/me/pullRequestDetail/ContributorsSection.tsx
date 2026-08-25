@@ -1,4 +1,5 @@
 import { Table } from "@chakra-ui/react";
+import { type DetailPayload, MISSING_VALUE } from "@langwatch/coding-agent-web";
 import numeral from "numeral";
 import type React from "react";
 
@@ -10,8 +11,7 @@ import {
 
 import { AgentLabel } from "../AgentLabel";
 import { ContributorName } from "./ContributorName";
-import { type DetailPayload, MISSING_VALUE } from "./detailPayload";
-import { EmptySection, Section } from "./Section";
+import { EmptySection, Section } from "@langwatch/coding-agent-web";
 
 /** Who worked on the pull request, and what each of them consumed. */
 export const ContributorsSection: React.FC<{

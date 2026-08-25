@@ -10,3 +10,10 @@ named composition policy until Entitlement publishes that capability.
 The contract contains portable Zod 4 values only. The server service owns its
 private read repositories and is composed once by the application; it imports
 neither application transports nor environment configuration.
+
+The browser package owns the portable session and pull-request presentation
+primitives: sorting, status derivation, row shaping, date/duration formatting,
+and small table/detail components. Query-facing tables, drawers, replay hooks,
+and app navigation remain composition in `platform/app`; they depend on the
+app's tRPC, drawer, router, and design-system wrappers. The web package has a
+single root export and never imports the server or app.

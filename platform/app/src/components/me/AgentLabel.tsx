@@ -1,6 +1,6 @@
 import { HStack, Image, Text } from "@chakra-ui/react";
+import { assistantKindOfAgent } from "@langwatch/coding-agent-web";
 
-import { assistantKindOfAgent } from "./agentIdentity";
 import { ASSISTANT_PRESETS } from "./tiles/assistantIcons";
 
 /**

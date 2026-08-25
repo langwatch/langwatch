@@ -1,6 +1,6 @@
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 
-import { formatShortDate } from "./shortDate";
+import { formatShortDate } from "@langwatch/coding-agent-web";
 
 /** A day, the point where "how long ago" stops beating "which day". */
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;

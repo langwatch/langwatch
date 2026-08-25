@@ -1,9 +1,9 @@
 import { chakra, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { SessionListRow } from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
 
-import type { SessionListRow } from "../sessionListRow";
 
 /**
  * What the session was called, over where it ran.

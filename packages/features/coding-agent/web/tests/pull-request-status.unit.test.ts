@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { derivePullRequestStatus } from "../pullRequestStatus";
+import { derivePullRequestStatus } from "../src/pull-request-status";
 
 describe("derivePullRequestStatus", () => {
   describe("given a merged pull request", () => {

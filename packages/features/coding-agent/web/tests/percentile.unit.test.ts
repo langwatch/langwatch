@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { percentileStats } from "../percentile";
+import { percentileStats } from "../src/percentile";
 
 describe("percentileStats", () => {
   describe("given fewer than three values carrying something", () => {

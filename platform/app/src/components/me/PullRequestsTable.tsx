@@ -1,4 +1,14 @@
 import {
+  PeerComparisonCell,
+  peerComparisonSentence,
+  percentileStats,
+  PullRequestStatusBadge,
+  SortableColumnHeader,
+  derivePullRequestStatus,
+  type PullRequestStatus,
+  usePullRequestSort,
+} from "@langwatch/coding-agent-web";
+import {
   Button,
   HStack,
   Skeleton,
@@ -35,22 +45,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
 import { formatLastUpdate } from "./lastUpdate";
-import {
-  PeerComparisonCell,
-  peerComparisonSentence,
-} from "./PeerComparisonCell";
-import { PullRequestStatusBadge } from "./PullRequestStatusBadge";
-import { percentileStats } from "./percentile";
-import {
-  derivePullRequestStatus,
-  type PullRequestStatus,
-} from "./pullRequestStatus";
-import { SortableColumnHeader } from "./SortableColumnHeader";
-import {
-  type PullRequestSortColumn,
-  type PullRequestSortState,
-  usePullRequestSort,
-} from "./usePullRequestSort";
+import type {
+  PullRequestSortColumn,
+  PullRequestSortState,
+} from "@langwatch/coding-agent-web";
 
 /**
  * What each pull request cost in assistant usage.

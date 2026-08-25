@@ -29,3 +29,10 @@ Feature: Coding-agent session read service
       Given the session aggregate is available
       When Coding Agent reads the session events
       Then it bounds the first read around the session start time
+
+  Rule: Browser presentation belongs to Coding Agent
+
+    Scenario: the application renders a coding-agent session list
+      When the application supplies session rows to Coding Agent presentation
+      Then Coding Agent shapes, sorts and formats the rows
+      And application routing and query composition remain outside the feature

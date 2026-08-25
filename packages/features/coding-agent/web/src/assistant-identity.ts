@@ -1,4 +1,12 @@
-import type { AssistantKind } from "./tiles/assistantIcons";
+/** The assistant names the coding-agent UI knows how to render. */
+export type KnownAssistantKind =
+  | "claude_code"
+  | "claude_cowork"
+  | "codex"
+  | "gemini"
+  | "opencode"
+  | "cursor"
+  | "github_copilot";
 
 /**
  * The product an agent slug names.
@@ -10,7 +18,7 @@ import type { AssistantKind } from "./tiles/assistantIcons";
  * where the tile says `gemini`, and `copilot` where the tile says
  * `github_copilot`.
  */
-const ASSISTANT_KIND_BY_AGENT = {
+const ASSISTANT_KIND_BY_AGENT: Readonly<Record<string, KnownAssistantKind>> = {
   claude_code: "claude_code",
   claude_cowork: "claude_cowork",
   codex: "codex",
@@ -20,7 +28,7 @@ const ASSISTANT_KIND_BY_AGENT = {
   cursor: "cursor",
   github_copilot: "github_copilot",
   copilot: "github_copilot",
-} as const satisfies Record<string, Exclude<AssistantKind, "custom">>;
+};
 
 /**
  * The assistant kind a slug resolves to, or null when this build does not know
@@ -29,11 +37,8 @@ const ASSISTANT_KIND_BY_AGENT = {
  */
 export function assistantKindOfAgent(
   agent: string,
-): Exclude<AssistantKind, "custom"> | null {
+): KnownAssistantKind | null {
   const slug = agent.trim();
   if (slug.length === 0) return null;
-  return (
-    ASSISTANT_KIND_BY_AGENT[slug as keyof typeof ASSISTANT_KIND_BY_AGENT] ??
-    null
-  );
+  return ASSISTANT_KIND_BY_AGENT[slug] ?? null;
 }

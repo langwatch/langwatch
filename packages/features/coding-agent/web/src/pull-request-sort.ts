@@ -5,11 +5,11 @@ import {
   type SortDirection,
   sortRowsByColumn,
   useColumnSort,
-} from "./columnSort";
+} from "./column-sort";
 import {
   PULL_REQUEST_STATUS_SORT_RANK,
   type PullRequestStatus,
-} from "./pullRequestStatus";
+} from "./pull-request-status";
 
 /**
  * The Pull Requests table's columns, named against the shared column-sort

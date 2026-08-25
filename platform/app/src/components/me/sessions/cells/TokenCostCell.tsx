@@ -1,11 +1,12 @@
 import { Text, VStack } from "@chakra-ui/react";
+import {
+  ComparisonBar,
+  MissingValue,
+  type SessionListRow,
+} from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { formatCost } from "~/features/traces-v2/utils/formatters";
-
-import type { SessionListRow } from "../sessionListRow";
-import { ComparisonBar } from "./ComparisonBar";
-import { MissingValue } from "./MissingValue";
 
 /** What the session's tokens cost, against the dearest one on the page. */
 export const TokenCostCell: React.FC<{

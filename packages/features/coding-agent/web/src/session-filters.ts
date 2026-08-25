@@ -1,6 +1,7 @@
-import type { Period, PeriodMode } from "~/components/PeriodSelector";
+import type { SessionListRow } from "./session-list-row";
 
-import type { SessionListRow } from "./sessionListRow";
+export type Period = { startDate: Date; endDate: Date };
+export type PeriodMode = "relative" | "absolute";
 
 /** A period the reader picked, and which way they picked it. */
 export interface PeriodSelection {

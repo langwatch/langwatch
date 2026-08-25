@@ -1,4 +1,5 @@
 import { HStack } from "@chakra-ui/react";
+import type { PeriodSelection } from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import {
@@ -6,8 +7,6 @@ import {
   PeriodSelector,
 } from "~/components/PeriodSelector";
 import { SearchInput } from "~/components/ui/SearchInput";
-
-import type { PeriodSelection } from "./sessionFilters";
 
 /**
  * The window the period control shows while no period has been picked. It is

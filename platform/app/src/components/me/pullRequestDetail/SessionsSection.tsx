@@ -1,4 +1,9 @@
 import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
+import {
+  type DetailPayload,
+  MISSING_VALUE,
+  formatShortDate,
+} from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { ListTable } from "~/components/ui/ListTable";
@@ -9,10 +14,8 @@ import {
 
 import { AgentLabel } from "../AgentLabel";
 import { useTerminalReplay } from "../sessions/useTerminalReplay";
-import { formatShortDate } from "../shortDate";
 import { ContributorName } from "./ContributorName";
-import { type DetailPayload, MISSING_VALUE } from "./detailPayload";
-import { EmptySection, Section } from "./Section";
+import { EmptySection, Section } from "@langwatch/coding-agent-web";
 
 /** One session as the pull request detail lists it. */
 type DetailSession = DetailPayload["sessions"][number];

@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { formatDurationSeconds } from "~/components/me/duration";
+import { formatDurationSeconds } from "@langwatch/coding-agent-web";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import {
   formatCost,

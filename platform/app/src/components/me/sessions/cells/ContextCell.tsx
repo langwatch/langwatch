@@ -1,12 +1,13 @@
 import { Text, VStack } from "@chakra-ui/react";
+import {
+  ComparisonBar,
+  MissingValue,
+  type SessionListRow,
+} from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatTokens } from "~/features/traces-v2/utils/formatters";
-
-import type { SessionListRow } from "../sessionListRow";
-import { ComparisonBar } from "./ComparisonBar";
-import { MissingValue } from "./MissingValue";
 
 /**
  * The two token figures that answer different questions, and a bar comparing

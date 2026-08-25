@@ -1,11 +1,12 @@
 import { Text, VStack } from "@chakra-ui/react";
+import {
+  MissingValue,
+  type SessionListRow,
+} from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatTokens } from "~/features/traces-v2/utils/formatters";
-
-import type { SessionListRow } from "../sessionListRow";
-import { MissingValue } from "./MissingValue";
 
 /**
  * How often the session had to throw context away, and how often it had to

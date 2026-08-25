@@ -1,7 +1,7 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * A number with a thin bar underneath saying how it compares to the other rows

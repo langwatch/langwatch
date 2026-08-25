@@ -1,7 +1,7 @@
 import { Button, Icon, Table } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
-import type { ColumnSortState } from "./columnSort";
+import type { ColumnSortState } from "./column-sort";
 
 /**
  * The chevron: solid and pointing the way the column is ordered when it is the

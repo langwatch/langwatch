@@ -1,10 +1,9 @@
 import { Box, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { formatDurationSeconds } from "@langwatch/coding-agent-web";
 import numeral from "numeral";
 
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { api } from "~/utils/api";
-
-import { formatDurationSeconds } from "./duration";
 
 /**
  * The personal coding-agent usage figures (ADR-056, personal-usage.feature):

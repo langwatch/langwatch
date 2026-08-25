@@ -1,10 +1,11 @@
 import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  MissingValue,
+  type SessionPullRequest,
+} from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
-
-import type { SessionPullRequest } from "../sessionListRow";
-import { MissingValue } from "./MissingValue";
 
 /** How many pull requests a row names before the rest go behind a hover. */
 const MAX_LISTED_PULL_REQUESTS = 3;

@@ -1,17 +1,20 @@
 import { Table } from "@chakra-ui/react";
+import {
+  ActiveAndWaitingCell,
+  type SessionListRow,
+  type SessionPullRequest,
+  MISSING_VALUE,
+} from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { AgentLabel } from "../AgentLabel";
 import { formatLastUpdate } from "../lastUpdate";
-import { ActiveAndWaitingCell } from "./cells/ActiveAndWaitingCell";
 import { CompactionsCell } from "./cells/CompactionsCell";
 import { ContextCell } from "./cells/ContextCell";
-import { MISSING_VALUE } from "./cells/MissingValue";
 import { PullRequestsCell } from "./cells/PullRequestsCell";
 import { SessionNameCell } from "./cells/SessionNameCell";
 import { TokenCostCell } from "./cells/TokenCostCell";
 import { SessionRowActions } from "./SessionRowActions";
-import type { SessionListRow, SessionPullRequest } from "./sessionListRow";
 
 /**
  * One session, read left to right. The whole row is the target that opens the

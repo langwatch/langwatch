@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { type DetailPayload, MISSING_VALUE } from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import {
@@ -6,8 +7,7 @@ import {
   formatTokens,
 } from "~/features/traces-v2/utils/formatters";
 
-import { type DetailPayload, MISSING_VALUE } from "./detailPayload";
-import { EmptySection, Section } from "./Section";
+import { EmptySection, Section } from "@langwatch/coding-agent-web";
 
 type ModelUsage = DetailPayload["modelBreakdown"][number];
 

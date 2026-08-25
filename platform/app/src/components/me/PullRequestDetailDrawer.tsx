@@ -1,4 +1,11 @@
 import {
+  type DetailPayload,
+  MISSING_VALUE,
+  PullRequestStatusBadge,
+  derivePullRequestStatus,
+  formatShortDate,
+} from "@langwatch/coding-agent-web";
+import {
   Box,
   Button,
   Heading,
@@ -20,16 +27,9 @@ import {
 } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
-import { PullRequestStatusBadge } from "./PullRequestStatusBadge";
 import { ContributorsSection } from "./pullRequestDetail/ContributorsSection";
-import {
-  type DetailPayload,
-  MISSING_VALUE,
-} from "./pullRequestDetail/detailPayload";
 import { ModelsSection } from "./pullRequestDetail/ModelsSection";
 import { SessionsSection } from "./pullRequestDetail/SessionsSection";
-import { derivePullRequestStatus } from "./pullRequestStatus";
-import { formatShortDate } from "./shortDate";
 
 /**
  * One pull request in full: what it cost, who worked on it, what each model
