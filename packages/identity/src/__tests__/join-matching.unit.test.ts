@@ -47,7 +47,7 @@ const acme: JoinCandidateOrganization = {
   verifiedMembersOnDomain: 3,
   memberCount: 117,
   autoJoinDomains: [],
-  domainProofLapsed: false,
+  domainProved: false,
 };
 
 const lookup = (
@@ -227,7 +227,7 @@ describe("given a work organization with a single member", () => {
       });
     });
 
-    it("never lets a one-person organization admit anybody automatically", () => {
+    it("never lets an unproven organization admit anybody automatically", () => {
       const solo: JoinCandidateOrganization = {
         ...acme,
         domainJoin: "auto",
@@ -236,9 +236,9 @@ describe("given a work organization with a single member", () => {
         memberCount: 1,
       };
 
-      // The corroboration threshold is what makes the automatic path safe
-      // without a personal-organization predicate: two verified members is
-      // something one person cannot be.
+      // The proof requirement is what makes the automatic path safe without
+      // a personal-organization predicate: however many accounts receive
+      // mail on a domain, only whoever controls it can prove it.
       expect(lookup([solo]).outcome).toBe("ask");
       expect(
         organizationAdmitsDomainAutomatically({
@@ -267,7 +267,7 @@ describe("given an organization that admits its domain automatically", () => {
           ...acme,
           domainJoin: "auto",
           autoJoinDomains: ["acme.com"],
-          verifiedMembersOnDomain: 2,
+          domainProved: true,
         },
       ]);
 
@@ -281,16 +281,19 @@ describe("given an organization that admits its domain automatically", () => {
       });
     });
 
-    it("falls back to asking when only one member has verified the domain", () => {
-      // Nobody gates the automatic path, so one colleague with a
-      // company-looking address is not evidence a company owns a domain.
+    it("falls back to asking when the domain is not proved", () => {
+      // Nobody gates the automatic path, so members' addresses are not
+      // evidence here, however many there are: any two accounts on an
+      // unlisted consumer mail host can receive mail on a domain. Proof of
+      // control is what opens this door.
       expect(
         lookup([
           {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 1,
+            verifiedMembersOnDomain: 4,
+            domainProved: false,
           },
         ]).outcome,
       ).toBe("ask");
@@ -309,7 +312,7 @@ describe("given an organization that admits its domain automatically", () => {
         ...acme,
         domainJoin: "auto" as const,
         autoJoinDomains: ["acme.com"],
-        verifiedMembersOnDomain: 4,
+        domainProved: true,
       };
       const decision = lookup([
         automatic,
@@ -329,7 +332,7 @@ describe("given an organization that admits its domain automatically", () => {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 4,
+            domainProved: true,
           },
         ],
         { licensed: false },
@@ -365,12 +368,12 @@ describe("given the pure helpers the rules are built from", () => {
   });
 
   describe("when the automatic rule is asked about one organization", () => {
-    it("requires the named domain, the corroboration and an open door", () => {
+    it("requires the named domain, the proof and an open door", () => {
       const automatic: JoinCandidateOrganization = {
         ...acme,
         domainJoin: "auto",
         autoJoinDomains: ["acme.com"],
-        verifiedMembersOnDomain: 2,
+        domainProved: true,
       };
 
       expect(
@@ -395,12 +398,15 @@ describe("given the pure helpers the rules are built from", () => {
 
     /** @scenario "A lapse stops new people and stops nobody who is already here" */
     it("refuses to admit automatically on a domain whose record stopped being published", () => {
+      // A lapsed proof reaches this seam as no proof at all: the repository
+      // reads a LAPSED domain as unproved, and the rule needs no second
+      // field to treat it that way.
       const automatic: JoinCandidateOrganization = {
         ...acme,
         domainJoin: "auto",
         autoJoinDomains: ["acme.com"],
         verifiedMembersOnDomain: 2,
-        domainProofLapsed: true,
+        domainProved: false,
       };
 
       expect(

@@ -31,22 +31,24 @@ Feature: Which organization takes my address - matching rules and what they reve
   # predicate for it is permanently false - a scenario that reads green while
   # proving nothing. The privacy it was reaching for is held by the rules
   # above instead: a consumer domain is structurally excluded, automatic
-  # joining needs an admin-named domain AND two verified members (which one
-  # person cannot be), and the request path ends with an administrator free to
-  # ignore it. What remains is the solo WORK organization, and offering that is
+  # joining needs an admin-named domain AND a proof the organization controls
+  # it (which no count of signed-up addresses can fake), and the request path
+  # ends with an administrator free to ignore it. What remains is the solo WORK organization, and offering that is
   # the orphan-organization fix doing its job rather than a leak - the asker
   # learns only that somebody at a domain they have already proved they hold
   # uses LangWatch, and the person there decides. The scenario below states
   # that outcome instead.
   #
-  # DECISION - the matching threshold (epic Open Q8, settled here). Asking to
-  # join needs ONE member holding a verified address on the domain: the ask
-  # reveals nothing on its own and an admin gates the outcome. Walking in
-  # automatically needs more, because nobody gates it - the administrator must
-  # have named that domain themselves when they turned automatic joining on,
-  # AND two members must hold verified addresses on it. One colleague with a
-  # personal-looking address at a small vendor is not evidence a company owns
-  # a domain; the administrator saying so, plus corroboration, is.
+  # DECISION - the matching threshold (epic Open Q8, settled here; evidence
+  # basis revised 2026-08-25). Asking to join needs ONE member holding a
+  # verified address on the domain: the ask reveals nothing on its own and an
+  # admin gates the outcome. Walking in automatically needs a PROOF the
+  # organization controls the domain - the verification ceremony's published
+  # record or file, an operator's attestation, or a licence - because nobody
+  # gates that path. Members' verified addresses are deliberately not enough
+  # for it, however many there are: any two accounts on a consumer mail host
+  # the deny-list has not heard of can receive mail on a domain, and only
+  # whoever controls the domain can prove it.
   #
   # Ships behind JOIN_REQUESTS.
 

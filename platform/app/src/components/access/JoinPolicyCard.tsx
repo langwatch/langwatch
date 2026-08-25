@@ -52,8 +52,8 @@ const OPTIONS: Array<{
   },
   {
     value: "auto",
-    label: "Anyone on a domain you name, straight away",
-    help: "Colleagues with a verified address on that domain join with your default role, without anybody approving. You are emailed each time.",
+    label: "Anyone on a domain you verified, straight away",
+    help: "Colleagues on a domain you have verified as yours join with your default role, without anybody approving. You are emailed each time. Verify the domain on the Authentication page first.",
   },
 ];
 
@@ -186,14 +186,13 @@ export function JoinPolicyCard({
                 onChange={(event) => setDomains(event.target.value)}
                 data-testid="join-policy-domains"
               />
-              {/* The one sentence that keeps the two mechanisms apart. A
-                  domain admitted here is corroborated by your own members'
-                  verified addresses; the DNS record below proves a domain to
-                  an identity provider, and neither stands in for the other. */}
+              {/* The one sentence that names what opens this door: the same
+                  verification ceremony sign-in routing uses — never a count
+                  of who happens to receive mail on the domain. */}
               <Text color="fg.muted" fontSize="sm">
-                Company domains only, and at least two of your members must have
-                verified an address on one before it can be used. This is not
-                the same as proving a domain for single sign-on.
+                Company domains only, and each one must be verified as yours —
+                the record or file from the Authentication page — before
+                anybody walks in through it.
               </Text>
             </VStack>
           )}

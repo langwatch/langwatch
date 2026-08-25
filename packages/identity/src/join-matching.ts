@@ -25,9 +25,9 @@ import { identifierDomain, normalizeIdentifierValue } from "./identifier";
  * an organization, and every organization the product creates gets a shared
  * team — so a predicate for it could only ever be inert. The privacy it was
  * reaching for is held by the rules above instead: a consumer domain is
- * structurally excluded, automatic joining needs an admin-named domain AND two
- * verified members (which one person cannot be), and the request path ends
- * with an administrator who is free to ignore it.
+ * structurally excluded, automatic joining needs an admin-named domain AND a
+ * proof the organization controls it, and the request path ends with an
+ * administrator who is free to ignore it.
  *
  * What is left is the solo WORK organization — one person at a real company
  * domain — and offering that is the orphan-organization fix doing its job. The
@@ -57,14 +57,6 @@ export const DEFAULT_DOMAIN_JOIN_SETTING: DomainJoinSetting = "request";
  * the ask reveals nothing on its own and an admin gates the outcome.
  */
 export const JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD = 1;
-
-/**
- * Walking in automatically needs more, because nobody gates it. One colleague
- * with a personal-looking address at a small vendor is not evidence a company
- * owns a domain; the administrator naming the domain, plus corroboration from
- * a second verified member, is.
- */
-export const JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD = 2;
 
 /**
  * Consumer mail providers, which are not companies.
@@ -159,15 +151,19 @@ export interface JoinCandidateOrganization {
    *  Empty means automatic joining admits nobody, whatever the setting says. */
   autoJoinDomains: readonly string[];
   /**
-   * True when this organization's SSO connection proved the domain and the
-   * published record has since stayed missing through its grace (ADR-123).
+   * True when this organization holds a LIVE proof of the domain: the
+   * verification ceremony's published record or file still standing, an
+   * operator's attestation, or a licence — and not a proof that has lapsed
+   * (ADR-123).
    *
-   * It stops AUTOMATIC joining and nothing else. Asking still works, because
-   * a request reaches somebody at the company who can tell a colleague from a
-   * stranger — which is exactly the judgement a lapsed proof can no longer
-   * make on their behalf.
+   * This is what authorizes walking in without a human in the loop. Verified
+   * members on a domain are people who RECEIVED mail there, which any two
+   * accounts on an unlisted consumer mail host can be; a proof is the
+   * organization demonstrating it CONTROLS the domain, which they cannot.
+   * Asking still runs on members, because a request ends with an
+   * administrator who decides.
    */
-  domainProofLapsed: boolean;
+  domainProved: boolean;
 }
 
 /** What is safe to say about an organization to somebody who is not in it:
@@ -290,8 +286,16 @@ export function organizationAdmitsDomain({
 
 /**
  * Whether an organization admits a domain WITHOUT an admin clicking: the
- * setting is `auto`, an administrator named this exact domain, and a second
- * verified member corroborates that the company owns it.
+ * setting is `auto`, an administrator named this exact domain, and the
+ * organization has PROVED it controls the domain.
+ *
+ * Members' verified addresses are deliberately not enough here, however many
+ * there are. Receiving mail on a domain is something any two strangers on a
+ * consumer mail host our deny-list has not heard of can do; proving the
+ * domain — the published record or file, an operator's attestation, a
+ * licence — is something only whoever controls it can. The one path with no
+ * human in the loop runs on the one kind of evidence that cannot be
+ * accumulated by signing up.
  */
 export function organizationAdmitsDomainAutomatically({
   organization,
@@ -301,15 +305,9 @@ export function organizationAdmitsDomainAutomatically({
   domain: string;
 }): boolean {
   if (!organizationAdmitsDomain({ organization, domain })) return false;
-  // A domain whose published record went missing and stayed missing stops
-  // vouching for anybody NEW (ADR-123), and walking straight in is the most
-  // vouching there is. Asking is still open, deliberately: a request reaches
-  // a human at the company, who is exactly the person able to say whether
-  // this is a colleague or somebody who bought a lapsed domain.
-  if (organization.domainProofLapsed) return false;
   if (organization.domainJoin !== "auto") return false;
   if (!organization.autoJoinDomains.includes(domain)) return false;
-  return (
-    organization.verifiedMembersOnDomain >= JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD
-  );
+  // A lapsed proof reads as no proof: the domain stopped vouching for new
+  // people when its record stayed missing through the grace (ADR-123).
+  return organization.domainProved;
 }

@@ -597,9 +597,9 @@ Feature: The people and access settings, as one cluster
     @integration
     Scenario: The two ways a domain matters are told apart
       When "ana" reads the who-can-join policy
-      Then it says two members must have verified an address for a domain to
-      admit people
-      And it says that is not the same as proving a domain for single sign-on
+      Then it says a verified domain is what lets colleagues join automatically
+      And it says asking to join needs only one member with a verified address,
+      because "ana" approves each request herself
 
     @integration
     Scenario: Verifying a domain is answerable from here

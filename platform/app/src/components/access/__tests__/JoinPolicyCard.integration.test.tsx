@@ -138,17 +138,13 @@ describe("given the who-can-join policy", () => {
   });
 
   describe("when automatic joining is chosen", () => {
-    /** @scenario Turning it on names the domain and needs corroboration */
-    it("says how a domain qualifies, and that it is not the sign-on ceremony", () => {
+    /** @scenario Turning it on names the domain and needs the domain proved */
+    it("says a named domain must be verified as yours first", () => {
       renderCard({ domainJoin: "auto", joinDomains: ["acme.com"] });
 
       const card = screen.getByTestId("join-policy-card");
-      expect(card.textContent).toContain(
-        "at least two of your members must have verified an address",
-      );
-      expect(card.textContent).toContain(
-        "not the same as proving a domain for single sign-on",
-      );
+      expect(card.textContent).toContain("must be verified as yours");
+      expect(card.textContent).toContain("the Authentication page");
     });
   });
 });

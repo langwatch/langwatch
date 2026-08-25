@@ -22,15 +22,12 @@ import { IdentityChip } from "./IdentityRow";
  * domain. The answer lives on the Authentication page, under a heading about
  * identity providers, and nothing on this screen used to point at it.
  *
- * TWO MECHANISMS, AND THEY ARE NOT THE SAME ONE. This section says so out
- * loud, because collapsing them is the mistake this whole panel exists to
- * prevent:
- *
- *   - joining by domain is corroborated by YOUR MEMBERS — at least two of
- *     them holding a verified address on it. No DNS, no record, nothing for
- *     an administrator to publish;
- *   - single sign-on is proved by a DNS TXT RECORD an administrator publishes
- *     and we look up. That is the ceremony below.
+ * ONE CEREMONY, TWO DOORS. Proving a domain — the published record or file
+ * an administrator sets up on the Authentication page — is what unlocks BOTH
+ * routing sign-in to an identity provider AND letting colleagues join
+ * automatically. Asking to join is the lighter door: it needs only a member
+ * with a verified address on the domain, because an administrator approves
+ * each request by hand.
  *
  * The ceremony itself stays on the Authentication page rather than being
  * built twice. This shows what state each domain is in and takes the reader
@@ -63,14 +60,16 @@ export function DomainVerificationSection({
             </Text>
           </VStack>
 
-          {/* Said once, plainly, because the two are easy to confuse and the
-              consequence of confusing them is an administrator publishing a
-              DNS record to fix a joining setting it has nothing to do with. */}
+          {/* Said once, plainly: one ceremony, two doors. The same proof
+              that routes sign-in is what lets colleagues join without an
+              approval, so the reader publishes one record for both. */}
           <Text color="fg.muted" fontSize="sm">
-            Letting colleagues join by domain needs no DNS record. That works
-            once at least two of your members have verified an address on the
-            domain. Proving a domain for single sign-on is the DNS record below,
-            and the two are independent.
+            Verifying a domain — publishing the record or serving the file we
+            give you — is what lets colleagues on it join automatically, and
+            what can route their sign-in to your identity provider. Asking to
+            join is lighter: it only needs one of your members to hold a
+            verified address on the domain, because you approve each request
+            yourself.
           </Text>
 
           {!canView ? (

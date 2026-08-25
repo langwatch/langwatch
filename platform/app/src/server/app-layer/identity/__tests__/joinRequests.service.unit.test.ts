@@ -46,6 +46,7 @@ const acme: JoinCandidateOrganization = {
   verifiedMembersOnDomain: 3,
   memberCount: 117,
   autoJoinDomains: [],
+  domainProved: false,
 };
 
 const pendingState = (
@@ -396,7 +397,7 @@ describe("given a domain that admits colleagues automatically", () => {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 2,
+            domainProved: true,
           },
         ],
       });
@@ -435,7 +436,7 @@ describe("given a domain that admits colleagues automatically", () => {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 4,
+            domainProved: true,
           },
         ],
       });
@@ -529,6 +530,7 @@ describe("given an organization whose plan does not carry the joining control", 
     it("is not refused, because nothing was opened", async () => {
       const { service, settings } = harness({
         policyEntitled: false,
+        candidates: [{ ...acme, domainProved: true }],
         setting: { domainJoin: "auto", joinDomains: ["acme.com"] },
       });
 
@@ -594,11 +596,15 @@ describe("given an administrator turning automatic joining on", () => {
     });
   });
 
-  describe("when only one member has verified the domain", () => {
-    /** @scenario Turning it on names the domain and needs corroboration */
-    it("refuses until a second verified member corroborates it", async () => {
+  describe("when the domain has not been proved", () => {
+    /** @scenario Turning it on names the domain and needs the domain proved */
+    it("refuses however many members hold addresses on it", async () => {
+      // Four verified members and still no: receiving mail on a domain is
+      // not controlling it, and nobody gates the automatic path.
       const { service } = harness({
-        candidates: [{ ...acme, verifiedMembersOnDomain: 1 }],
+        candidates: [
+          { ...acme, verifiedMembersOnDomain: 4, domainProved: false },
+        ],
       });
 
       await expect(
@@ -630,7 +636,11 @@ describe("given an administrator turning automatic joining on", () => {
 
   describe("when everything checks out", () => {
     it("saves the setting with the named domain", async () => {
-      const { service, settings } = harness();
+      // Proved is what lets the door open: the record or file ceremony, an
+      // attestation, or a licence — never a count of members.
+      const { service, settings } = harness({
+        candidates: [{ ...acme, domainProved: true }],
+      });
 
       const result = await service.setJoining({
         organizationId: "org_acme",
@@ -763,7 +773,7 @@ describe("given an organization that admits its domain automatically", () => {
     ...acme,
     domainJoin: "auto",
     autoJoinDomains: ["acme.com"],
-    verifiedMembersOnDomain: 2,
+    domainProved: true,
   };
 
   describe("when a verified colleague walks in", () => {

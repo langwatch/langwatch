@@ -90,13 +90,13 @@ describe("given an organization's domains", () => {
 
       const section = screen.getByTestId("domain-verification-section");
       expect(section.textContent).toContain(
-        "Letting colleagues join by domain needs no DNS record",
+        "is what lets colleagues on it join automatically",
       );
       expect(section.textContent).toContain(
-        "at least two of your members have verified an address",
+        "only needs one of your members to hold a verified address",
       );
       expect(section.textContent).toContain(
-        "Proving a domain for single sign-on is the DNS record",
+        "you approve each request yourself",
       );
     });
 

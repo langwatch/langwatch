@@ -39,6 +39,14 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  // better-auth reads these at module load; the values are irrelevant to
+  // anything here — they only have to exist for the import graph to settle.
+  BACKUP_CODE_COUNT: 10,
+  deploymentIsFederationCapable: async () => false,
+  identityBridgeCeremonies: () => ({}),
+  identityCeremonies: () => ({}),
+  identityStorageAdapter: () => () => ({}),
+  resolveSignInMethodPolicy: async () => ({}),
   identityEmail: () => ({ verifiedEmailsOf: async () => null }),
   joinRequestsService: () => ({ setJoining: setJoiningMock }),
   // The second-factor gate runs after every permitted decision (D06). Nothing

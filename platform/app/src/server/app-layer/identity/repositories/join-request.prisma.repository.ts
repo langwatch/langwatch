@@ -245,15 +245,16 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
         where: { organizationId: { in: organizationIds }, disabledAt: null },
         _count: { userId: true },
       }),
-      // An identity provider that already admits this domain is the way in,
-      // and joining is not offered beside it.
+      // Every connection that ever proved this domain, whatever state the
+      // connection is in: an admitting ACTIVE one closes the join door, and
+      // a proof on a connection that never went live still proves the
+      // organization controls the domain.
       this.prisma.ssoConnection.findMany({
         where: {
           organizationId: { in: organizationIds },
-          state: "ACTIVE",
           verifiedDomains: { has: domain },
         },
-        select: { organizationId: true, lapsedDomains: true },
+        select: { organizationId: true, lapsedDomains: true, state: true },
       }),
     ]);
 
@@ -266,12 +267,18 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     // whose provider stopped being an answer.
     const admittedByConnection = new Set(
       connections
-        .filter((row) => !row.lapsedDomains.includes(domain))
+        .filter(
+          (row) =>
+            row.state === "ACTIVE" && !row.lapsedDomains.includes(domain),
+        )
         .map((row) => row.organizationId),
     );
-    const lapsedByConnection = new Set(
+    // A live proof on ANY connection: verified and not lapsed. This is what
+    // authorizes walking in automatically — evidence the organization
+    // controls the domain, not a count of who receives mail on it.
+    const provedByConnection = new Set(
       connections
-        .filter((row) => row.lapsedDomains.includes(domain))
+        .filter((row) => !row.lapsedDomains.includes(domain))
         .map((row) => row.organizationId),
     );
 
@@ -290,10 +297,10 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
         verifiedByOrganization.get(organization.id)?.size ?? 0,
       memberCount: memberCountByOrganization.get(organization.id) ?? 0,
       autoJoinDomains: organization.joinDomains,
-      // Stops people walking straight in, and nothing else. Asking still
-      // reaches a human at the company, who is the one able to tell a
-      // colleague from somebody who bought a domain this company let go.
-      domainProofLapsed: lapsedByConnection.has(organization.id),
+      // Authorizes walking straight in, and nothing else. Asking still runs
+      // on members plus a human who approves; this is the evidence the
+      // organization controls the domain, and a lapsed proof is not it.
+      domainProved: provedByConnection.has(organization.id),
     }));
   }
 }

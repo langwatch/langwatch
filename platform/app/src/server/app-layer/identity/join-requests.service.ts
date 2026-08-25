@@ -3,7 +3,6 @@ import {
   DOMAIN_AUTO_JOIN_POLICY_ID,
   type DomainJoinSetting,
   isPublicEmailDomain,
-  JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
@@ -835,9 +834,13 @@ export class JoinRequestsService {
   }
 
   /**
-   * Automatic joining needs the administrator to have named the domain AND a
-   * second verified member on it. One colleague with a company-looking
-   * address at a small vendor is not evidence a company owns a domain.
+   * Automatic joining needs the administrator to have named the domain AND
+   * the organization to have PROVED it controls it — the verification
+   * ceremony's record or file, an operator's attestation, or a licence.
+   * Members' verified addresses are deliberately not evidence here: any two
+   * accounts on a consumer mail host the deny-list has not heard of can
+   * receive mail on a domain, and this is the one path with nobody in the
+   * loop to notice.
    */
   private async assertDomainProven({
     organizationId,
@@ -863,19 +866,12 @@ export class JoinRequestsService {
         `an active connection already admits ${domain} for ${organizationId}`,
       );
     }
-    // A domain whose published record went missing and stayed missing is not
-    // a domain to open a door on (ADR-123). The refusal is the same one an
-    // unproven domain gets, and for the same reason: what would authorize
-    // this is evidence, and right now there is none.
-    if (candidate?.domainProofLapsed) {
+    // A lapsed proof and a proof that never existed refuse identically, and
+    // for the same reason: what would authorize walking in is evidence the
+    // organization controls the domain, and right now there is none.
+    if (!candidate?.domainProved) {
       throw new JoinAutoDomainUnprovenError(
-        `${domain} was proved for ${organizationId} by a record that is no longer published`,
-      );
-    }
-    const verified = candidate?.verifiedMembersOnDomain ?? 0;
-    if (verified < JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD) {
-      throw new JoinAutoDomainUnprovenError(
-        `${domain} is held by ${verified} verified member(s) of ${organizationId}; automatic joining needs ${JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD}`,
+        `${domain} is not proved for ${organizationId}; automatic joining needs a verified domain`,
       );
     }
   }

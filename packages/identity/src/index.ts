@@ -256,7 +256,6 @@ export {
   DOMAIN_JOIN_SETTINGS,
   type DomainJoinSetting,
   isPublicEmailDomain,
-  JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
   JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD,
   type JoinCandidateOrganization,
   type JoinLookupDecision,

@@ -23,8 +23,8 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
   # auto-join already uses. The two look alike and are not: single sign-on
   # auto-join admits somebody because an identity provider the organization
   # configured asserted them, and domain auto-join admits them because their
-  # address ends in the right string and an administrator once said that was
-  # enough. Different evidence, different trust, different thing to argue
+  # address ends in a domain the organization PROVED it controls and an
+  # administrator opted in. Different evidence, different trust, different thing to argue
   # with when a customer reads their audit page and asks how this person got
   # in. Stamping both with one name would make that question unanswerable.
   #
@@ -47,7 +47,8 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
 
   Background:
     Given an organization "acme" with an administrator "ana"
-    And two members of "acme" hold verified addresses on "acme.com"
+    And "acme" has proved it controls "acme.com" through the domain verification ceremony
+    And a member of "acme" holds a verified address on "acme.com"
     And "sam" holds a VERIFIED identifier for "sam@acme.com" and belongs to no organization
 
   # ── Walking in ─────────────────────────────────────────────────────────
@@ -97,11 +98,13 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     And nobody joins automatically until an administrator turns that on
 
   @unit
-  Scenario: Turning it on names the domain and needs corroboration
-    Given only one member of "acme" holds a verified address on "acme.com"
+  Scenario: Turning it on names the domain and needs the domain proved
+    Given "acme" has not proved it controls "acme.com"
     When "ana" turns on automatic joining for "acme.com"
     Then the attempt is refused with code join_auto_domain_unproven and status 422
-    And it succeeds once a second member holds a verified address on that domain
+    And it succeeds once "acme.com" is proved through the domain verification ceremony
+    And however many members hold verified addresses on the domain changes neither answer,
+    because receiving mail on a domain is not controlling it
 
   @unit
   Scenario: A public email domain cannot be turned on at all

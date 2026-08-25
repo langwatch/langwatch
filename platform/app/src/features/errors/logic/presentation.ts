@@ -1324,9 +1324,9 @@ const presentations = {
   // consumer mail provider would turn the refusal into a way to enumerate
   // the deny-list.
   join_auto_domain_unproven: {
-    title: "That domain is not proven yet",
+    title: "That domain is not verified yet",
     describe: () =>
-      "Automatic joining works for company domains that at least two of your members have verified. Personal email domains are never eligible.",
+      "Automatic joining works once you have verified the domain is yours — publish the record or serve the file from the Authentication page, then try again. Personal email domains are never eligible.",
   },
   join_auto_connection_admits: {
     title: "Your identity provider already admits that domain",
