@@ -29,6 +29,16 @@ vi.mock("~/server/app-layer/app", () => {
   const app = {
     share: { createShare: mockCreateShare },
     permissions: { getDecision: mockGetDecision },
+    // The engine gate asks whether any tenant has finished the migration.
+    // It caches, so a suite that leaves this out only passes when some
+    // earlier file in the same worker happened to warm it — and vitest runs
+    // these with `isolate: false`, so that is shard order, not a guarantee.
+    // Answering it here makes this suite independent of who ran before it.
+    prisma: {
+      systemMigrationTenantState: {
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+    },
   };
   return { tryGetApp: () => app, getApp: () => app };
 });
