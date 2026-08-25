@@ -53,8 +53,8 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   evaluatorsSchema,
-} from "~/server/evaluations/evaluators";
-import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+} from "@langwatch/evaluator-contract";
+import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 
 import type { EvaluatorCategoryId } from "@langwatch/evaluator-web";

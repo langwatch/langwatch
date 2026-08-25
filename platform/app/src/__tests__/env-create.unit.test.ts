@@ -17,8 +17,7 @@ import {
 // boot cleanly but caused /api/internal/gateway/* to return 503 minutes
 // later at first VK request. Hard-failing at import time (via this
 // assertion, called from env-create after createEnv) surfaces the misconfig
-// immediately on start + covers workers.ts too (which otherwise only ran
-// verifyRedisReady at boot).
+// immediately during explicit executable boot, including workers.
 describe("assertGatewaySecretsAllOrNone", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -108,7 +107,7 @@ describe("createEnvConfig — client-safe guard", () => {
     const original = process.env.LW_VIRTUAL_KEY_PEPPER;
     process.env.LW_VIRTUAL_KEY_PEPPER = "a".repeat(32);
     try {
-      expect(() => createEnvConfig()).not.toThrow();
+      expect(() => createEnvConfig(process.env)).not.toThrow();
     } finally {
       if (original === undefined) {
         delete process.env.LW_VIRTUAL_KEY_PEPPER;
@@ -239,7 +238,7 @@ describe("storedObjectsBackendSchema", () => {
       );
       // Both keys must be first-class env vars: declared in the zod server
       // schema AND wired through runtimeEnv — otherwise application code
-      // would have to reach into process.env directly, which the repo bans.
+      // would have to reach into the raw source outside executable boot.
       // Assert the two DECLARATIONS, not how many times the name appears —
       // a comment mentioning the variable twice would satisfy a count.
       expect(source).toMatch(
@@ -249,10 +248,10 @@ describe("storedObjectsBackendSchema", () => {
         /AZURE_BLOB_CONTAINER:\s*z\s*\n?\s*\.string\(\)|AZURE_BLOB_CONTAINER:\s*z\.string\(\)/,
       );
       expect(source).toMatch(
-        /STORED_OBJECTS_BACKEND:\s*process\.env\.STORED_OBJECTS_BACKEND/,
+        /STORED_OBJECTS_BACKEND:\s*source\.STORED_OBJECTS_BACKEND/,
       );
       expect(source).toMatch(
-        /AZURE_BLOB_CONTAINER:\s*process\.env\.AZURE_BLOB_CONTAINER/,
+        /AZURE_BLOB_CONTAINER:\s*source\.AZURE_BLOB_CONTAINER/,
       );
     });
   });
@@ -332,7 +331,7 @@ describe("azureBlobAuthModeSchema", () => {
       // is the assertion the sibling test above deliberately avoids.
       expect(source).toMatch(/AZURE_BLOB_AUTH_MODE:\s*azureBlobAuthModeSchema/);
       expect(source).toMatch(
-        /AZURE_BLOB_AUTH_MODE:\s*process\.env\.AZURE_BLOB_AUTH_MODE/,
+        /AZURE_BLOB_AUTH_MODE:\s*source\.AZURE_BLOB_AUTH_MODE/,
       );
     });
   });

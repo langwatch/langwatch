@@ -26,7 +26,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
 import type { LocalPromptConfig } from "~/experiments-v3/types";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";

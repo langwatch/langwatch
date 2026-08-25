@@ -979,7 +979,6 @@
   "src/server/app-layer/automations/__tests__/graph-trigger-heartbeat-default-source-lookup.unit.test.ts": 31,
   "src/server/app-layer/automations/__tests__/prismaEnumParity.unit.test.ts": 46,
   "src/server/app-layer/automations/__tests__/runaway-containment.service.integration.test.ts": 113,
-  "src/server/app-layer/automations/__tests__/trigger-fire-history.prisma.repository.unit.test.ts": 51,
   "src/server/app-layer/automations/__tests__/trigger-template.service.unit.test.ts": 171,
   "src/server/app-layer/automations/delivery/__tests__/deliverWebhook.unit.test.ts": 56,
   "src/server/app-layer/automations/dispatch/__tests__/persistCap.integration.test.ts": 21,

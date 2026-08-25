@@ -24,7 +24,7 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 
 export default function ForgotPassword() {
-  const publicEnv = usePublicEnv();
+  const publicEnv = usePublicEnv({ includeCapabilities: true });
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
 
   if (!publicEnv.data) {

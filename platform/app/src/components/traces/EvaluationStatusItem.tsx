@@ -12,12 +12,12 @@ import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, Pencil } from "lucide-react";
 import numeral from "numeral";
 import { useMemo } from "react";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import {
   evaluationPassed,

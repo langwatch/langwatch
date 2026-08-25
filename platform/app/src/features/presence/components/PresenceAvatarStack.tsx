@@ -1,5 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
-import type { PresenceSession } from "~/server/app-layer/presence/types";
+import type { PresenceSession } from "@langwatch/presence-contract";
 import { PresenceAvatar } from "./PresenceAvatar";
 
 interface PresenceAvatarStackProps {

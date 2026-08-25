@@ -20,7 +20,7 @@ import {
   computePermissionsFromSelections,
   PERMISSION_CATEGORIES,
   selectionsFromPermissions,
-} from "../../../server/api-key/permission-categories";
+} from "@langwatch/api-key-contract";
 import type { RouterOutputs } from "../../../utils/api";
 import {
   PermissionCategoryList,

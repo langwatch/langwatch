@@ -26,8 +26,8 @@ import {
   type Evaluators,
   evaluatorsSchema,
   type SingleEvaluationResult,
-} from "../../server/evaluations/evaluators";
-import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+} from "@langwatch/evaluator-contract";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,

@@ -6,7 +6,7 @@
  * result reports — and links through to the run. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
-import { extractPlatformUrl } from "~/utils/platformHref";
+import { extractPlatformUrl } from "@langwatch/langy-contract";
 import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
   type CapabilityCardInput,

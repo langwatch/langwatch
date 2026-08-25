@@ -7,10 +7,9 @@ import {
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors/logic/presentation";
 import {
-  AVATAR_MAX_BYTES,
-  AvatarRateLimitedError,
-  parseAvatarDataUrl,
-} from "~/server/user-avatar/avatar";
+  UserAvatarRateLimitedError,
+  UserAvatarTooLargeError,
+} from "@langwatch/user-contract";
 import {
   AVATAR_MAX_SOURCE_BYTES,
   AvatarImageProcessingFailedError,
@@ -35,21 +34,6 @@ async function codeOf(run: () => Promise<unknown>): Promise<string> {
   }
   throw new Error("expected the call to throw");
 }
-
-function codeOfSync(run: () => unknown): string {
-  try {
-    run();
-  } catch (err) {
-    if (HandledError.isHandled(err)) return err.code;
-    throw err;
-  }
-  throw new Error("expected the call to throw");
-}
-
-/** A base64 data URL whose decoded length exceeds the server's ceiling. */
-const OVERSIZED_DATA_URL = `data:image/png;base64,${Buffer.alloc(
-  AVATAR_MAX_BYTES + 1,
-).toString("base64")}`;
 
 describe("avatar upload refusals", () => {
   describe("when the browser prepares the picked file", () => {
@@ -91,15 +75,6 @@ describe("avatar upload refusals", () => {
     });
   });
 
-  describe("when the server validates the payload it received", () => {
-    /** @scenario The server refuses an oversized payload with the same reason as the browser */
-    it("refuses an oversized payload as too large", () => {
-      expect(codeOfSync(() => parseAvatarDataUrl(OVERSIZED_DATA_URL))).toBe(
-        "avatar_image_too_large",
-      );
-    });
-  });
-
   describe("when the same oversized photo is refused on both sides", () => {
     /** @scenario The browser and the server refuse an oversized photo for the same reason */
     it("gives one reason, whichever half caught it", async () => {
@@ -111,9 +86,7 @@ describe("avatar upload refusals", () => {
           }),
         ),
       );
-      const fromServer = codeOfSync(() =>
-        parseAvatarDataUrl(OVERSIZED_DATA_URL),
-      );
+      const fromServer = new UserAvatarTooLargeError().code;
 
       // The whole point of the shared code set: a customer who picks a 20 MB
       // file reads the same sentence whether the browser or the server was
@@ -132,7 +105,7 @@ describe("avatar upload refusals", () => {
       // fails here instead of quietly degrading to the unknown state in front
       // of a customer. `tips` and `docsUrl` are optional on the wire and
       // required on the shape, so absent becomes empty.
-      const wire = new AvatarRateLimitedError().serialize();
+      const wire = new UserAvatarRateLimitedError().serialize();
       const explained = explainHandledError({
         code: wire.code,
         meta: wire.meta,

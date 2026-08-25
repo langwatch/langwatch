@@ -48,11 +48,11 @@ import { OnboardingContainer } from "~/features/onboarding/components/containers
 import type { TeamUserRole } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getTeamRolePermissions } from "~/server/api/rbac";
-import { defaultCliKeyPermissions } from "~/server/api-key/cli-key-defaults";
+import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import {
   computePermissionsFromSelections,
   selectionsFromPermissions,
-} from "~/server/api-key/permission-categories";
+} from "@langwatch/api-key-contract";
 import { api } from "~/utils/api";
 import { setAttributionIfAbsent } from "~/utils/attribution";
 import { useSession } from "~/utils/auth-client";

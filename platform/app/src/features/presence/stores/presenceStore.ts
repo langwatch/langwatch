@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type {
   PresenceEvent,
   PresenceSession,
-} from "~/server/app-layer/presence/types";
+} from "@langwatch/presence-contract";
 
 interface PresenceState {
   /** The current user's own sessionId, so callers can filter themselves out. */

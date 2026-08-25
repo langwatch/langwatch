@@ -7,7 +7,7 @@ import {
   seedLangyTurnProjection,
 } from "@langwatch/langy-contract";
 import { create } from "zustand";
-import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyStreamEntry } from "@langwatch/langy-server";
 import { useLangyStore } from "./langyStore";
 
 /**

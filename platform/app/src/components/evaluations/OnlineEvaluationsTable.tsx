@@ -19,7 +19,7 @@ import {
 
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { evaluationContextChip } from "~/features/langy/logic/langyContextChips";
-import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import Link from "~/utils/compat/next-link";
 
 import { ListTable } from "../ui/ListTable";

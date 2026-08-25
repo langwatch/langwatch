@@ -24,7 +24,7 @@ import type { z } from "zod";
 import {
   AVAILABLE_EVALUATORS,
   evaluatorsSchema,
-} from "../../../server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 
 afterEach(() => cleanup());
 

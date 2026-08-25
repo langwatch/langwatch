@@ -8,11 +8,11 @@ import {
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
-import type { Evaluator } from "~/generated/prisma/client";
 import {
   AVAILABLE_EVALUATORS,
+  type Evaluator,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import {
   langwatchEndpoint,
   langwatchEndpointEnv,

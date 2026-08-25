@@ -1,53 +1,28 @@
-import {
-  ZodArray,
-  ZodBoolean,
-  ZodEnum,
-  ZodLazy,
-  ZodNumber,
-  ZodObject,
-  ZodRecord,
-  ZodString,
-  ZodUnion,
-} from "zod";
-import "zod-openapi/extend";
+import { ZodType } from "zod";
+
+interface OpenApiMetadata extends Record<string, unknown> {
+  ref?: string;
+}
+
+declare module "zod" {
+  interface ZodType {
+    openapi(metadata: OpenApiMetadata): this;
+  }
+}
 
 export const patchZodOpenapi = () => {
-  // Fix for zod-openapi/extend because for some reason it actually doesn't patch when executing the route by next.js, but it does work when generating the openapi schemas directly
-  if (!ZodArray.prototype.openapi) {
-    ZodArray.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodObject.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodString.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodNumber.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodBoolean.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodRecord.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodEnum.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodUnion.prototype.openapi = function () {
-      return this;
-    };
-
-    ZodLazy.prototype.openapi = function () {
-      return this;
+  // Zod 4 owns JSON Schema metadata natively. The old zod-openapi prototype
+  // extension targets Zod 3 and replaces Zod 4 object methods with wrappers
+  // that crash on `.omit()`/`.pick()`. Preserve the small legacy `.openapi()`
+  // call surface by translating it to Zod 4 metadata without touching any
+  // other schema method.
+  if (!ZodType.prototype.openapi) {
+    ZodType.prototype.openapi = function (metadata: OpenApiMetadata) {
+      const { ref, ...openApi } = metadata;
+      return this.meta({
+        ...openApi,
+        ...(ref ? { id: ref } : {}),
+      }) as this;
     };
   }
 };

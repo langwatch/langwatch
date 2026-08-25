@@ -4,7 +4,7 @@ import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { NodeWithOptionalPosition } from "~/types";
 import type { Component, Field } from "../types/dsl";

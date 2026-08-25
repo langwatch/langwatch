@@ -17,7 +17,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useProjectEventTypes } from "../../hooks/useProjectEventTypes";
 import { useProjectSpanNames } from "../../hooks/useProjectSpanNames";
 import type { Workflow } from "../../optimization_studio/types/dsl";
-import type { DatasetRecordEntry } from "../../server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   type AllTraceMappingSources,
   type MappingState,

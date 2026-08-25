@@ -13,7 +13,7 @@ import {
   type ListResult,
   type ResourceName,
   type SortOrder,
-} from "@langwatch/enterprise-admin-web";
+} from "@langwatch/ops-web";
 
 /**
  * React-Query hooks around the admin REST endpoints. Kept small and local —

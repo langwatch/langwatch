@@ -26,7 +26,7 @@ import {
 } from "~/generated/prisma/client";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
-import { ImpersonationBanner } from "@langwatch/enterprise-admin-web";
+import { ImpersonationBanner } from "@langwatch/ops-web";
 import { CommandBarTrigger } from "../features/command-bar";
 import { NavigationV2Shell } from "../features/navigation/shell/NavigationV2Shell";
 import { useNavigationMode } from "../features/navigation/useNavigationMode";

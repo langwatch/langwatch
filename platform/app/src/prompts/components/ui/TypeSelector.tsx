@@ -15,7 +15,7 @@ import { fromZodError } from "zod-validation-error";
 import { Dialog } from "~/components/ui/dialog";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
 import { TypeLabel } from "~/optimization_studio/components/nodes/Nodes";
-import { outputsSchema } from "~/prompts/schemas";
+import { outputsSchema } from "@langwatch/prompt-contract";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 /**

@@ -6,7 +6,7 @@ import {
   handleSchema,
   runtimeParametersSchema,
   scopeSchema,
-} from "./field-schemas";
+} from "@langwatch/prompt-contract";
 import { versionMetadataSchema } from "./version-metadata-schema";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();

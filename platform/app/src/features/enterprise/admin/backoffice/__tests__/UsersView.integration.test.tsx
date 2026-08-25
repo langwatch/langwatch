@@ -12,10 +12,10 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toaster } from "~/components/ui/toaster";
-import { impersonateUser } from "@langwatch/enterprise-admin-web";
+import { impersonateUser } from "@langwatch/ops-web";
 import { ImpersonateDialog } from "../resources/UsersView";
 
-vi.mock("@langwatch/enterprise-admin-web", () => ({
+vi.mock("@langwatch/ops-web", () => ({
   impersonateUser: vi.fn().mockResolvedValue(undefined),
 }));
 

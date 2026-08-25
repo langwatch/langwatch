@@ -1,5 +1,5 @@
 import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
-import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators";
+import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 
 import type {
   BaseComponent,

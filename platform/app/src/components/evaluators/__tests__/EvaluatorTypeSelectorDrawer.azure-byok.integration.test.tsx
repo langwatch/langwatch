@@ -20,7 +20,7 @@ import { EvaluatorTypeSelectorDrawer } from "../EvaluatorTypeSelectorDrawer";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("~/server/evaluations/evaluators", () => ({
+vi.mock("@langwatch/evaluator-contract", () => ({
   AVAILABLE_EVALUATORS: {
     "presidio/pii_detection": {
       name: "PII Detection",

@@ -16,12 +16,12 @@ import type { UseFormReturn } from "react-hook-form";
 import NextLink from "~/utils/compat/next-link";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
+import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-} from "../../server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";
 import { titleCase } from "../../utils/stringCasing";

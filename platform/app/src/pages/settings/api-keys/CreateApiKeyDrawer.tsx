@@ -19,7 +19,7 @@ import {
 import { Drawer } from "../../../components/ui/drawer";
 import { Select } from "../../../components/ui/select";
 import { getTeamRolePermissions } from "../../../server/api/rbac";
-import { computePermissionsFromSelections } from "../../../server/api-key/permission-categories";
+import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
 import type { RouterOutputs } from "../../../utils/api";
 import { api } from "../../../utils/api";
 import {

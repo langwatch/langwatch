@@ -24,8 +24,8 @@ import type {
   EvaluatorDefinition,
   Evaluators,
   EvaluatorTypes,
-} from "../../server/evaluations/evaluators";
-import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+} from "@langwatch/evaluator-contract";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { api } from "../../utils/api";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";

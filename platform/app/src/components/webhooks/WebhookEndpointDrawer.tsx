@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { WebhookEventType } from "@langwatch/enterprise-webhooks-contract";
+import type { WebhookEventType } from "@langwatch/enterprise-webhook-contract";
 import { Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";

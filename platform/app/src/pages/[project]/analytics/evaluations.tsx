@@ -21,7 +21,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
-import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

@@ -95,7 +95,7 @@ const CLIENT_MINTED_CODES = new Set(["langy_codex_plan_limit"]);
  * as the one this scanner cannot see, because there is no string literal at the
  * declaration to match.
  *
- * `LangyApiIdentityDeniedError` (`src/server/app-layer/langy/errors.ts`) is one
+ * `LangyApiIdentityDeniedError` (the Langy contract errors) is one
  * class over three codes on purpose: all three are the same 403 with the same
  * body, and only the remediation differs (mint a personal key / ask an admin
  * for Langy access / the owner is gone). Its caller picks the code, so the

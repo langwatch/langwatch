@@ -1,7 +1,7 @@
 import type {
   PresenceSession,
   PresenceUser,
-} from "~/server/app-layer/presence/types";
+} from "@langwatch/presence-contract";
 import { getColorForString } from "~/utils/rotatingColors";
 
 /** Display name used as the seed for avatar colours and tooltip labels. */

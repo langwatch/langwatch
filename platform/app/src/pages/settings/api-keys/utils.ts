@@ -5,7 +5,7 @@ import {
   categorizablePermissions,
   PERMISSION_CATEGORIES,
   type PermissionCategory,
-} from "../../../server/api-key/permission-categories";
+} from "@langwatch/api-key-contract";
 
 /**
  * Whether the user may hand a category's read or write level to an API key.

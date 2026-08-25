@@ -6,7 +6,7 @@ import {
   type AccessLevel,
   PERMISSION_CATEGORIES,
   type PermissionCategory,
-} from "../../../server/api-key/permission-categories";
+} from "@langwatch/api-key-contract";
 import { categoryAccessAvailability } from "./utils";
 
 export type PermissionSelection = "none" | AccessLevel;

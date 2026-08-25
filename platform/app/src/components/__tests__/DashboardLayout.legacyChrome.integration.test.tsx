@@ -199,7 +199,7 @@ vi.mock("../SavedViewsBar", () => ({ SavedViewsBar: () => null }));
 vi.mock("../governance/AdminViewingAsBanner", () => ({
   AdminViewingAsBanner: () => null,
 }));
-vi.mock("@langwatch/enterprise-admin-web", () => ({
+vi.mock("@langwatch/ops-web", () => ({
   ImpersonationBanner: () => null,
 }));
 vi.mock("~/features/enterprise/admin/ImpersonationSwitchBackMenuItem", () => ({

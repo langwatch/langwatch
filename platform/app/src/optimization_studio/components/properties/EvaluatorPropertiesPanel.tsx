@@ -14,8 +14,8 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   evaluatorsSchema,
-} from "../../../server/evaluations/evaluators";
-import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
+} from "@langwatch/evaluator-contract";
+import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "../../../utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Evaluator, Field } from "../../types/dsl";

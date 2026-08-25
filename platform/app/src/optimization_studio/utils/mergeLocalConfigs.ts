@@ -1,6 +1,6 @@
 import type { Node } from "@xyflow/react";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
-import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
+import { buildLLMConfig } from "~/prompts/llmConfigBuilder";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 import type {
   AgentComponent,

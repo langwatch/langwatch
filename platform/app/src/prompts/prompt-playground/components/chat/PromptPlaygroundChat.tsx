@@ -17,7 +17,7 @@ import type { z } from "zod";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
+import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { ChatMessage } from "~/server/tracer/types";
 import { isLLMErrorType } from "~/utils/formatLLMError";

@@ -24,7 +24,7 @@ import {
   TYPE_LABELS,
   VariableTypeIcon,
 } from "@langwatch/prompt-web";
-import { outputsSchema } from "~/prompts/schemas";
+import { outputsSchema } from "@langwatch/prompt-contract";
 import {
   generateUniqueIdentifier,
   normalizeIdentifier,

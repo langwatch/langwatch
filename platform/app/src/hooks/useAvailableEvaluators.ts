@@ -6,7 +6,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
-} from "../server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 

@@ -50,7 +50,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 // Mock AVAILABLE_EVALUATORS for computeFieldsFromEvaluatorType
-vi.mock("~/server/evaluations/evaluators", () => ({
+vi.mock("@langwatch/evaluator-contract", () => ({
   AVAILABLE_EVALUATORS: {
     "langevals/exact_match": {
       name: "Exact Match",

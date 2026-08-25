@@ -4,7 +4,7 @@ import type {
   LangyResourceContext,
   LangySkillContext,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
-import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyStreamEntry } from "@langwatch/langy-server";
 import { trpcClient } from "~/utils/api";
 
 /**

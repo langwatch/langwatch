@@ -30,17 +30,17 @@ import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
-import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
+import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   type Evaluators,
   type EvaluatorTypes,
   evaluatorsSchema,
   evaluatorTypesSchema,
-} from "../../server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
-} from "../../server/evaluations/getEvaluator";
+} from "@langwatch/evaluator-contract";
 import {
   type CheckPreconditions,
   checkPreconditionsSchema,

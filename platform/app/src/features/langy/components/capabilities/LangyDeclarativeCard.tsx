@@ -18,7 +18,7 @@
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy-contract";
-import { extractPlatformUrl } from "~/utils/platformHref";
+import { extractPlatformUrl } from "@langwatch/langy-contract";
 import {
   type CapabilityData,
   useCapabilityData,

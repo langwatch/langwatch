@@ -448,7 +448,7 @@ export const MainMenu = React.memo(function MainMenu({
 const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
-  const publicEnv = usePublicEnv();
+  const publicEnv = usePublicEnv({ includeCapabilities: true });
   // Fleet-wide allowlist (env) OR a per-browser pin from the hidden Feature
   // Flags drawer. The pin is only queried for users who already have ops
   // access — it is a visibility convenience, never a way to widen access.

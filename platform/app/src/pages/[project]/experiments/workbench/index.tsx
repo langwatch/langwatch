@@ -10,7 +10,7 @@ import {
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 

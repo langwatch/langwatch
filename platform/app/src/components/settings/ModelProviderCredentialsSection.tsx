@@ -1,7 +1,7 @@
 import { Box, Field, Input, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect } from "react";
-import { ManagedModelProviderAlert } from "@langwatch/enterprise-managed-providers-web";
+import { ManagedModelProviderAlert } from "@langwatch/enterprise-managed-provider-web";
 import { modelProviderRegistry } from "../../features/onboarding/regions/model-providers/registry";
 import type {
   UseModelProviderFormActions,

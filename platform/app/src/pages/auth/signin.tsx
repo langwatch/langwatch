@@ -33,7 +33,7 @@ export default function SignIn() {
   // e.g. "account_already_linked_to_different_user" → "OAuthAccountNotLinked"
   const error = normalizeErrorCode(rawError);
 
-  const publicEnv = usePublicEnv();
+  const publicEnv = usePublicEnv({ includeCapabilities: true });
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 

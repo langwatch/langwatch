@@ -1,4 +1,4 @@
-import { HIDDEN_SYSTEM_KEY_NAMES } from "~/server/api-key/reserved-names";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 /**

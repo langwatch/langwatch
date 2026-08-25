@@ -45,7 +45,7 @@ const RECOVERY_FALLBACK =
 
 export default function SignUp() {
   const { data: session } = useSession();
-  const publicEnv = usePublicEnv();
+  const publicEnv = usePublicEnv({ includeCapabilities: true });
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 

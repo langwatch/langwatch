@@ -24,7 +24,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultCliKeyPermissions } from "../../../server/api-key/cli-key-defaults";
+import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 
 const { fetchMock, sessionRef, orgsRef, bindingsRef } = vi.hoisted(() => {
   const fetchMock = vi.fn();

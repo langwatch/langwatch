@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SeriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesBucket } from "~/server/analytics/types";
-import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
+import { buildSeriesName } from "@langwatch/analytics-contract";
 import type { BriefingReceipt } from "../types";
 import {
   buildBriefingReceipts,

@@ -1,6 +1,6 @@
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { PresenceSession } from "~/server/app-layer/presence/types";
+import type { PresenceSession } from "@langwatch/presence-contract";
 import {
   presenceDisplayName,
   presenceSessionColor,

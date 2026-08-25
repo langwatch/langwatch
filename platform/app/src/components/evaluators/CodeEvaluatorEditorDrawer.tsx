@@ -31,10 +31,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
 import { rewriteCodeSignature } from "~/optimization_studio/utils/codeSignature";
 import {
-  CODE_EVALUATOR_OUTPUT_FIELDS,
   type CodeEvaluatorConfig,
-  DEFAULT_CODE_EVALUATOR_CONFIG,
-} from "~/server/evaluators/codeEvaluator";
+  codeEvaluatorOutputFields,
+  defaultCodeEvaluatorConfig,
+} from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 
 import { codeEvaluatorDisabledReason } from "@langwatch/evaluator-web";
@@ -90,12 +90,12 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   const [name, setName] = useState("");
-  const [code, setCode] = useState(DEFAULT_CODE_EVALUATOR_CONFIG.code);
+  const [code, setCode] = useState(defaultCodeEvaluatorConfig.code);
   const [inputs, setInputs] = useState<EditableField[]>(
-    DEFAULT_CODE_EVALUATOR_CONFIG.inputs.map((f) => ({ ...f })),
+    defaultCodeEvaluatorConfig.inputs.map((f) => ({ ...f })),
   );
   // Outputs are the fixed evaluator contract, not user-editable.
-  const outputs: EditableField[] = CODE_EVALUATOR_OUTPUT_FIELDS;
+  const outputs: EditableField[] = [...codeEvaluatorOutputFields];
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
     mappingsConfig?.initialMappings ?? {},
   );
@@ -193,7 +193,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     const config: CodeEvaluatorConfig = {
       code,
       inputs: validFields(inputs),
-      outputs: CODE_EVALUATOR_OUTPUT_FIELDS.map((f) => ({ ...f })),
+      outputs: codeEvaluatorOutputFields.map((field) => ({ ...field })),
     };
     if (isEditing) {
       updateMutation.mutate({
@@ -463,7 +463,7 @@ function OutputContractInfo() {
         borderRadius="md"
         padding={3}
       >
-        {CODE_EVALUATOR_OUTPUT_FIELDS.map((field) => (
+        {codeEvaluatorOutputFields.map((field) => (
           <HStack key={field.identifier} gap={2} align="baseline">
             <Text
               fontSize="sm"

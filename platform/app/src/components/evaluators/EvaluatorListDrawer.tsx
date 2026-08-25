@@ -23,11 +23,11 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { evaluatorDisplayName } from "~/server/evaluations/evaluatorDisplayNames";
+import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";

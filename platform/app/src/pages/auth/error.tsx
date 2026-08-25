@@ -93,7 +93,7 @@ export default function Error() {
   const { data: session } = useSession();
   const query = useSearchParams();
   const error = normalizeErrorCode(query?.get("error"));
-  const publicEnv = usePublicEnv();
+  const publicEnv = usePublicEnv({ includeCapabilities: true });
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
   useEffect(() => {

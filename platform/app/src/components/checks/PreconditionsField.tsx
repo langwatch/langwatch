@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { X } from "react-feather";
 import { useFormContext } from "react-hook-form";
-import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type {
   CheckPreconditionFields,
   CheckPreconditionRule,

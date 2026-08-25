@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
-import type { PresenceCursorEvent } from "~/server/app-layer/presence/types";
+import type { PresenceCursorEvent } from "@langwatch/presence-contract";
 import { api } from "~/utils/api";
 import { useTabSessionId } from "./useTabSessionId";
 

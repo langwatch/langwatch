@@ -71,7 +71,7 @@ export function SignInMethodsSection() {
   const { data: accounts, isLoading } = api.user.getLinkedAccounts.useQuery({});
   const unlinkAccount = api.user.unlinkAccount.useMutation();
   const { organization } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
+  const publicEnv = usePublicEnv({ includeCapabilities: true });
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const apiContext = api.useUtils();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);

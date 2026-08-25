@@ -11,7 +11,7 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { DatasetRecordEntry } from "~/server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
 

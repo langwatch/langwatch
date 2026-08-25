@@ -6,7 +6,7 @@ import type { ZodType } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
 import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 

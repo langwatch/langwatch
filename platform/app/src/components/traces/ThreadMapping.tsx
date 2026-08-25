@@ -14,7 +14,7 @@ import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Workflow } from "../../optimization_studio/types/dsl";
-import type { DatasetRecordEntry } from "../../server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,

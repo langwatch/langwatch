@@ -6,7 +6,7 @@
  * summary — and links into Simulations. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
-import { extractPlatformUrl } from "~/utils/platformHref";
+import { extractPlatformUrl } from "@langwatch/langy-contract";
 import {
   type CapabilityCardInput,
   extractPrimaryId,

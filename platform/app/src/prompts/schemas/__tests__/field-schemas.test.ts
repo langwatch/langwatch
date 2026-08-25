@@ -3,7 +3,7 @@ import {
   deriveResponseFormatFromOutputs,
   outputsSchema,
   responseFormatSchema,
-} from "../field-schemas";
+} from "@langwatch/prompt-contract";
 
 describe("responseFormatSchema", () => {
   describe("when json_schema contains a full schema with properties", () => {

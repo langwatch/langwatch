@@ -13,7 +13,7 @@ export default defineConfig({
   test: {
     // The workspace packages export TypeScript SOURCE (`exports` → `src/*.ts`),
     // so they must be transformed by vite rather than handed to node's
-    // resolver — externalised, `import "@langwatch/langy"` resolves to a
+    // resolver — externalised, Langy feature imports resolve to TypeScript
     // .ts file node cannot load, and vitest reports it as unresolvable.
     //
     // This lived under `resolve.server`, which is not a real option — `resolve`
@@ -25,7 +25,7 @@ export default defineConfig({
     server: {
       deps: {
         inline: [
-          /@langwatch\/(api|langy|handled-error|automations|observability|redaction|redis-client)/,
+          /@langwatch\/(api|langy-contract|langy-server|handled-error|automations|observability|redaction|redis-client)/,
         ],
       },
     },
@@ -155,7 +155,7 @@ export default defineConfig({
       "@app/": join(__dirname, "./src/server/app-layer/"),
     },
     // ONE zod instance for the app AND linked workspace packages
-    // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
+    // Langy feature packages: zod 4 instanceof-checks its own classes (e.g.
     // z.record's key/value overload detection), so a second physical copy
     // resolved from a package's own node_modules silently mis-parses.
     dedupe: ["zod"],

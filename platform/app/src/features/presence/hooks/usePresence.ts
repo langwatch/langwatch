@@ -3,7 +3,7 @@ import { useSSESubscription } from "~/hooks/useSSESubscription";
 import type {
   PresenceEvent,
   PresenceLocation,
-} from "~/server/app-layer/presence/types";
+} from "@langwatch/presence-contract";
 import { api } from "~/utils/api";
 import { usePresencePreferencesStore } from "../stores/presencePreferencesStore";
 import { usePresenceStore } from "../stores/presenceStore";

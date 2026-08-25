@@ -3,7 +3,7 @@ import {
   categorizablePermissions,
   categoryPermissions,
   PERMISSION_CATEGORIES,
-} from "../../../server/api-key/permission-categories";
+} from "@langwatch/api-key-contract";
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
