@@ -12,6 +12,10 @@
  * budgets are being labelled.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 
 export type BudgetScopeTargetInfo = {
   kind: string;
@@ -203,13 +207,15 @@ async function addGroupTargets({
   // Same tenant pin as the VIRTUAL_KEY branch: a stray scopeId must not
   // surface another organization's group name.
   if (idSet.size === 0 || !organizationId) return;
-  const groups = await prisma.group.findMany({
+  const groups = await liveGroups(prisma).findMany({
     where: { id: { in: [...idSet] }, organizationId },
     select: {
       id: true,
       name: true,
       slug: true,
-      _count: { select: { members: true } },
+      // LIVE members: the count says how many people a per-member allowance
+      // covers now, which people who left the group are not.
+      _count: { select: { members: { where: LIVE_MEMBERSHIP } } },
     },
   });
   for (const g of groups) {

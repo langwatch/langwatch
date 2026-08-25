@@ -20,7 +20,11 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
-import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  LIVE_GROUP,
+  liveGroupMemberships,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 // The SCIM-managed guard's typed refusal, shared with `group.service.ts` so
 // both paths answer the customer with the same `scim_managed_group` code.
 import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
@@ -298,7 +302,7 @@ export class RoleBindingService {
       return { organizationRole: membership.role };
     }
     if (groupId) {
-      const group = await this.prisma.group.findFirst({
+      const group = await liveGroups(this.prisma).findFirst({
         where: { id: groupId, organizationId },
         select: { id: true },
       });
@@ -491,7 +495,7 @@ export class RoleBindingService {
         ? await liveGroupMemberships(this.prisma).findMany({
             where: {
               groupId: { in: groupIds },
-              group: { organizationId },
+              group: { organizationId, ...LIVE_GROUP },
               user: { orgMemberships: { some: { organizationId } } },
             },
             select: { groupId: true, userId: true },
@@ -548,7 +552,7 @@ export class RoleBindingService {
         select: { role: true },
       }),
       liveGroupMemberships(this.prisma).findMany({
-        where: { userId, group: { organizationId } },
+        where: { userId, group: { organizationId, ...LIVE_GROUP } },
         include: {
           group: {
             select: { id: true, name: true, slug: true, scimSource: true },
@@ -1220,7 +1224,7 @@ export class RoleBindingService {
     memberUserIdsToRemove: string[];
     actor: LedgerActor;
   }): Promise<void> {
-    const group = await this.prisma.group.findFirst({
+    const group = await liveGroups(this.prisma).findFirst({
       where: { id: groupId, organizationId },
       select: { id: true, scimSource: true },
     });

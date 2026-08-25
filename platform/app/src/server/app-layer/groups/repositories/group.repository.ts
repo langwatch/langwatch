@@ -69,7 +69,18 @@ export interface GroupRepository {
     organizationId: string;
   }): Promise<GroupWithMembers | null>;
 
+  /** The LIVE group. A deleted one answers null, everywhere. */
   findGroupOnly(params: {
+    id: string;
+    organizationId: string;
+  }): Promise<Group | null>;
+
+  /**
+   * The group row whether or not it has been deleted. The one read that looks
+   * past the live fence, so a caller can tell "no such group" apart from "this
+   * one is already deleted" and refuse with the right error.
+   */
+  findIncludingDeleted(params: {
     id: string;
     organizationId: string;
   }): Promise<Group | null>;
@@ -90,7 +101,17 @@ export interface GroupRepository {
     slug: string;
   }): Promise<Group | null>;
 
-  delete(params: { id: string; organizationId: string }): Promise<void>;
+  /**
+   * MARKS the group deleted; it is never a row deletion. The row has to
+   * survive so the marked `GroupMembership` rows it holds are not taken with
+   * it — that history is the whole reason a membership removal marks rather
+   * than deletes. Bumps the organization's authz epoch.
+   */
+  delete(params: {
+    id: string;
+    organizationId: string;
+    reason?: string | null;
+  }): Promise<void>;
 
   findMembers(params: { groupId: string }): Promise<
     Array<{

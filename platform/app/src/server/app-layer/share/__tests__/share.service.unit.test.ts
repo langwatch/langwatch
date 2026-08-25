@@ -365,7 +365,7 @@ describe("ShareService", () => {
       it("grants a member of that project", async () => {
         deps.shareAccess = buildDecider({
           allowed: true,
-          via: "project-audience",
+          via: "resource-grant",
         });
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ visibility: "PROJECT" }),

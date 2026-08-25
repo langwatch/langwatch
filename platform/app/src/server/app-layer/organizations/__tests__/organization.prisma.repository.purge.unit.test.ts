@@ -30,6 +30,7 @@ function purgingPrisma() {
     });
   const models = [
     "roleBinding",
+    "groupMembership",
     "grantUsage",
     "grant",
     "role",
@@ -54,6 +55,7 @@ function purgingPrisma() {
 
 describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
   describe("when a provisioned organization is purged", () => {
+    /** @scenario "Deleting a whole organization still works and says what it erases" */
     it("deletes the grants ledger's projections along with the legacy rows", async () => {
       const { prisma, deletions } = purgingPrisma();
       const repository = new PrismaOrganizationRepository(
@@ -66,6 +68,12 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
       expect(deletions.map((deletion) => deletion.model)).toEqual([
         // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
         "roleBinding",
+        // Memberships are NAMED here rather than cascaded, because
+        // `GroupMembership.group` is `onDelete: Restrict` so that deleting a
+        // group can never quietly take its ended memberships with it. A purge
+        // is the one erasure where taking them is the intent, and without this
+        // the organization delete below fails on the restrict.
+        "groupMembership",
         // Usage before the Grant row it accounts for.
         "grantUsage",
         "grant",
@@ -92,14 +100,18 @@ describe("PrismaOrganizationRepository.deleteProvisionedOrganization", () => {
 
       for (const deletion of deletions) {
         // The organization row itself is keyed by id, the migration state row
-        // by the tenant id it tracks; everything else by the organization it
-        // belongs to.
+        // by the tenant id it tracks, and a group membership through the group
+        // it belongs to — it carries no organizationId column of its own, so
+        // the relation IS how it is fenced. Everything else by the
+        // organization it belongs to.
         expect(deletion.where).toEqual(
           deletion.model === "organization"
             ? { id: ORGANIZATION_ID }
             : deletion.model === "systemMigrationTenantState"
               ? { tenantId: ORGANIZATION_ID }
-              : { organizationId: ORGANIZATION_ID },
+              : deletion.model === "groupMembership"
+                ? { group: { organizationId: ORGANIZATION_ID } }
+                : { organizationId: ORGANIZATION_ID },
         );
       }
     });

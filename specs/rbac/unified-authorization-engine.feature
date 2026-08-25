@@ -437,11 +437,12 @@ Feature: Unified authorization engine
     And a member of "chatbot" holds "traces:view" there through their team
     When that member presents the expired link
     Then the request is denied
-    # The walk reaches the resource tier last, so an ordinary binding on the
-    # trace's lineage would otherwise answer a resource check before the token
-    # is ever read - handing a member a link its own expiry had killed, and
-    # spending a view against a token that granted nothing. Reading the trace
-    # in-app is a different question, asked at the project scope.
+    # A dead link is filtered out before the walk sees it, so the tier has
+    # nothing to answer with and the member's own binding on the trace's
+    # lineage answers instead. Honouring that would hand a member a link its
+    # own expiry had killed, and spend a view against a token that granted
+    # nothing. Reading the trace in-app is a different question, asked at the
+    # project scope.
 
   @unit
   Scenario: A share link grants only what it says it grants
@@ -485,6 +486,63 @@ Feature: Unified authorization engine
       | members of team client-a | a member of team "client-b" | denied  |
       | members of org acme      | any member of "acme"        | granted |
       | anyone                   | a visitor presenting the link | granted |
+
+  # A membership audience names a SET OF PEOPLE, not a binding scope. "Members
+  # of project chatbot" is therefore a reachability question, and the engine
+  # answers it off the same scope chain an ordinary permission check walks -
+  # which matters because project access almost never arrives as a binding on
+  # the project. It arrives on the team that owns it.
+
+  @unit
+  Scenario Outline: A project audience reaches everyone who reaches the project
+    Given trace "t1" in project "chatbot" is shared with the members of "chatbot"
+    And "chatbot" belongs to team "client-a" in organization "acme"
+    When a member of "acme" whose access arrives <how> presents the link
+    Then the request is granted through the resource tier
+
+    Examples:
+      | how                                  |
+      | as a binding on "chatbot" itself     |
+      | as a binding on team "client-a"      |
+      | as a binding on organization "acme"  |
+      | as a pre-migration team membership   |
+
+  @unit
+  Scenario Outline: A project audience stops at the project's own lineage
+    Given trace "t1" in project "chatbot" is shared with the members of "chatbot"
+    And "chatbot" belongs to team "client-a" in organization "acme"
+    When <caller> presents the link
+    Then the request is denied
+
+    Examples:
+      | caller                                                     |
+      | a member of "acme" bound only to team "client-b"           |
+      | a member of "acme" holding no binding on chatbot's lineage |
+      | a former member whose team binding outlived their seat     |
+      | a member of a different organization entirely              |
+    # An organization member is not automatically in a project's audience:
+    # the floor legacy applies is an ORGANIZATION-scope rule, and reading it
+    # as project reach would open every link in acme to everyone in acme.
+
+  @unit
+  Scenario: An organization audience is every member and nobody else
+    Given trace "t1" in project "chatbot" is shared with the members of "acme"
+    When any member of "acme" presents the link
+    Then the request is granted through the resource tier
+    And a member holding no binding anywhere is granted just the same
+    But somebody signed in to another organization is denied
+    And an anonymous holder of the leaked link is denied
+
+  @unit
+  Scenario: Presenting a token is answered by the resource tier, not by a binding
+    Given trace "t1" in project "chatbot" has a live share link
+    And the caller is a member who could read "t1" in-app anyway
+    When that member presents the link
+    Then the resource tier is what granted the read
+    # The tier can only answer at all when a token was presented, so it is
+    # asked before the binding steps: a caller who asked with a token gets
+    # the token's answer. Reading "t1" in-app presents nothing, collects no
+    # resource grant, and stays on the binding path.
 
   @unit
   Scenario: Resource grants are anchored to their project

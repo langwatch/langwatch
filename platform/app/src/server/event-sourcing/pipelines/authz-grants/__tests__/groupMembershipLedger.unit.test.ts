@@ -22,6 +22,10 @@ import {
   AuthzGrantsWriteProjection,
   type GrantProjectionWriteStore,
 } from "../projections/authzGrantsWrite.projection";
+import type {
+  AddGroupMemberCommandData,
+  RemoveGroupMemberCommandData,
+} from "../schemas/commands";
 import {
   addGroupMemberCommandDataSchema,
   removeGroupMemberCommandDataSchema,
@@ -77,7 +81,9 @@ function removedEvent(overrides: Record<string, unknown> = {}) {
   } as never;
 }
 
-function addCommandData(overrides: Record<string, unknown> = {}) {
+function addCommandData(
+  overrides: Partial<AddGroupMemberCommandData> = {},
+): AddGroupMemberCommandData {
   return {
     tenantId: ORG,
     organizationId: ORG,
@@ -92,7 +98,9 @@ function addCommandData(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function removeCommandData(overrides: Record<string, unknown> = {}) {
+function removeCommandData(
+  overrides: Partial<RemoveGroupMemberCommandData> = {},
+): RemoveGroupMemberCommandData {
   return {
     tenantId: ORG,
     organizationId: ORG,

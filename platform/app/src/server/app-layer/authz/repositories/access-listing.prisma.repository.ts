@@ -37,7 +37,7 @@ import {
   ACCESS_LISTING_GROUP_SELECT,
   ACCESS_LISTING_USER_SELECT,
 } from "./access-listing.repository";
-import { LIVE_MEMBERSHIP } from "./live-rows";
+import { LIVE_GROUP, LIVE_MEMBERSHIP } from "./live-rows";
 
 /** The relation predicate the whole-table and scope listings carry: a row is
  *  listed only while its principal is still of this organization. */
@@ -49,7 +49,10 @@ const principalInOrganizationWhere = (
       userId: { not: null },
       user: { orgMemberships: { some: { organizationId } } },
     },
-    { groupId: { not: null }, group: { organizationId } },
+    // "of this organization" includes "still exists": a deleted group's
+    // bindings are revoked, but a listing that showed them would report access
+    // nobody holds.
+    { groupId: { not: null }, group: { organizationId, ...LIVE_GROUP } },
     { apiKeyId: { not: null }, apiKey: { organizationId } },
   ],
 });
@@ -242,7 +245,12 @@ export class PrismaAccessListingRepository implements AccessListingRepository {
           // LIVE_MEMBERSHIP, not a bare `{ userId }`: a removal marks the
           // membership row, so without the fence a group somebody LEFT still
           // synthesizes its bindings onto them.
-          { group: { members: { some: { userId, ...LIVE_MEMBERSHIP } } } },
+          {
+            group: {
+              ...LIVE_GROUP,
+              members: { some: { userId, ...LIVE_MEMBERSHIP } },
+            },
+          },
         ],
         scopeType: { in: ["TEAM", "ORGANIZATION", "PROJECT"] },
       },

@@ -4,6 +4,7 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Group, PrismaClient } from "~/generated/prisma/client";
+import { bumpAuthzEpoch } from "~/server/app-layer/authz/epoch";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
@@ -12,6 +13,7 @@ import {
 import {
   LIVE_MEMBERSHIP,
   liveGroupMemberships,
+  liveGroups,
 } from "~/server/app-layer/authz/repositories/live-rows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
@@ -89,7 +91,7 @@ export class ScimGroupService {
     };
 
     const [groups, totalCount] = await Promise.all([
-      this.prisma.group.findMany({
+      liveGroups(this.prisma).findMany({
         where,
         include: {
           // LIVE members. A SCIM list says who is in each group NOW, and a
@@ -105,7 +107,7 @@ export class ScimGroupService {
         take: count,
         orderBy: { createdAt: "asc" },
       }),
-      this.prisma.group.count({ where }),
+      liveGroups(this.prisma).count({ where }),
     ]);
 
     return {
@@ -151,7 +153,12 @@ export class ScimGroupService {
   }): Promise<ScimGroup | ScimError> {
     // The directory's own identifier first, and the display name second: a
     // group renamed in the directory is the same group, and matching on the
-    // name would make it a second one.
+    // name would make it a second one. LIVE groups only, which
+    // `findExistingGroup` fences on: a directory group that was deleted here
+    // and is being pushed again is a NEW group with the same name, which is
+    // the case the partial unique indexes exist to allow — refusing it on the
+    // strength of a deleted row would leave the IdP unable to re-create a
+    // group it owns.
     const existing = await this.findExistingGroup({
       organizationId,
       connectionId,
@@ -245,7 +252,7 @@ export class ScimGroupService {
         userIds: toRemove,
       });
 
-    const updatedGroup = await this.prisma.group.findUniqueOrThrow({
+    const updatedGroup = await liveGroups(this.prisma).findUniqueOrThrow({
       where: { id: group.id },
     });
     const members = await liveGroupMemberships(this.prisma).findMany({
@@ -273,7 +280,7 @@ export class ScimGroupService {
       await this.applyPatch({ group, operation, organizationId });
     }
 
-    const updatedGroup = await this.prisma.group.findUniqueOrThrow({
+    const updatedGroup = await liveGroups(this.prisma).findUniqueOrThrow({
       where: { id: group.id },
     });
     const members = await liveGroupMemberships(this.prisma).findMany({
@@ -307,17 +314,31 @@ export class ScimGroupService {
       actor: { type: "system", id: SYSTEM_ACTORS.scim },
       mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
     });
-    // The memberships END before the group row goes, so the ledger and the
-    // audit trail carry who was in it and when the directory took them out.
-    // The group row's own deletion still cascades the marked rows away — the
-    // limit is stated on the `GroupMembership` model.
+    // The memberships END before the group row is marked, so the ledger and
+    // the audit trail carry who was in it and when the directory took them
+    // out. Those marked rows now SURVIVE the deletion, which is what changed:
+    // the group is marked rather than deleted, so nothing cascades them away.
     await this.writer.removeGroupMembersWhere({
       organizationId,
       where: { groupId: group.id },
       actor: { type: "system", id: SYSTEM_ACTORS.scim },
       reason: "group deleted by the identity provider",
     });
-    await this.prisma.group.delete({ where: { id: group.id } });
+    // MARKED, not deleted — and only while live, so a repeated DELETE cannot
+    // move the moment the directory removed it. The externalId is freed with
+    // it: the live partial unique is what lets the same directory group
+    // disappear and come back without colliding with its own past.
+    await this.prisma.group.updateMany({
+      where: { id: group.id, organizationId, deletedAt: null },
+      data: {
+        deletedAt: new Date(),
+        deletedReason: "group deleted by the identity provider",
+      },
+    });
+    // Every group read fences on that mark, and the L1 decision cache is keyed
+    // on the epoch, so without this the deleted group keeps being listed and
+    // resolved for up to thirty seconds after it stopped granting.
+    await bumpAuthzEpoch({ organizationId });
 
     return null;
   }
@@ -346,12 +367,12 @@ export class ScimGroupService {
     displayName: string;
   }): Promise<Group | null> {
     if (connectionId && externalId) {
-      const byIdentifier = await this.prisma.group.findFirst({
+      const byIdentifier = await liveGroups(this.prisma).findFirst({
         where: { organizationId, scimConnectionId: connectionId, externalId },
       });
       if (byIdentifier) return byIdentifier;
     }
-    return this.prisma.group.findFirst({
+    return liveGroups(this.prisma).findFirst({
       where: {
         organizationId,
         name: displayName,
@@ -378,7 +399,11 @@ export class ScimGroupService {
     scimResourceId: string;
     organizationId: string;
   }): Promise<Group | null> {
-    return this.prisma.group.findFirst({
+    // The LIVE group. A deleted one is gone as far as the directory is
+    // concerned — every SCIM verb that starts here answers 404 for it, which
+    // is what an IdP expects of a resource it removed — while the row and the
+    // memberships it held stay readable in the change history.
+    return liveGroups(this.prisma).findFirst({
       where: { id: scimResourceId, organizationId },
     });
   }
@@ -572,8 +597,13 @@ export class ScimGroupService {
     const base = slugify(name, { lower: true, strict: true }) || "group";
     let slug = base;
     let i = 1;
+    // Live groups only: a deleted group's slug is free again (the uniqueness
+    // index is partial over live rows), so suffixing around one would hand the
+    // directory `engineering-1` for a name nothing is using.
     while (
-      await this.prisma.group.findFirst({ where: { organizationId, slug } })
+      await liveGroups(this.prisma).findFirst({
+        where: { organizationId, slug },
+      })
     ) {
       slug = `${base}-${i++}`;
     }

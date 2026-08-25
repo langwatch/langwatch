@@ -21,7 +21,7 @@ import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
-import { liveGroupMemberships } from "./live-rows";
+import { LIVE_GROUP, liveGroupMemberships } from "./live-rows";
 
 /** Seeds per budget statement. Four binds a row, so this sits well under
  *  Postgres' 65535-parameter ceiling. */
@@ -253,7 +253,7 @@ export class PrismaAuthzMigrationRepository
     organizationId: string;
   }): Promise<Array<{ userId: string; groupId: string }>> {
     return liveGroupMemberships(this.prisma).findMany({
-      where: { group: { organizationId } },
+      where: { group: { organizationId, ...LIVE_GROUP } },
       select: { userId: true, groupId: true },
     });
   }

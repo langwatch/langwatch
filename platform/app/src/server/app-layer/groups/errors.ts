@@ -29,6 +29,28 @@ export class GroupNotFoundError extends NotFoundError {
 }
 
 /**
+ * The group was already deleted, so there is nothing left to take away.
+ *
+ * Not a `GroupNotFoundError`: a deleted group is still a row, kept on purpose
+ * so the memberships it held survive with it, and telling the caller it does
+ * not exist would contradict the record they can read — the same distinction
+ * `MemberNotInGroupError` draws for a membership that already ended. What is
+ * absent is a group that still grants.
+ */
+export class GroupAlreadyDeletedError extends HandledError {
+  declare readonly code: "group_already_deleted";
+
+  constructor(groupId?: string) {
+    super("group_already_deleted", "This group has already been deleted", {
+      httpStatus: 409,
+      ...remediation("group_already_deleted"),
+      ...(groupId ? { meta: { groupId } } : {}),
+    });
+    this.name = "GroupAlreadyDeletedError";
+  }
+}
+
+/**
  * The group is provisioned by an identity provider over SCIM, so its name, its
  * membership and its existence are that directory's to change. Editing it here
  * would be undone on the next sync, silently, and deleting it would take every

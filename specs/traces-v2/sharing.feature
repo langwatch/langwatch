@@ -83,6 +83,11 @@ Feature: Share a trace behind a secret, scoped, expiring link
       Then they can view the trace
       When a member of the organization outside the project opens the link
       Then access is denied
+      # "Member of the project" is whoever can reach the project, which is
+      # nearly always through the team that owns it rather than through
+      # anything naming the project. The engine resolves the audience over
+      # that whole chain - see "A project audience reaches everyone who
+      # reaches the project" in specs/rbac/unified-authorization-engine.feature.
 
   Rule: Links expire by time or by view count
 

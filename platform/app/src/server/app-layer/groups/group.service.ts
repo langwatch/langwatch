@@ -16,6 +16,7 @@ import {
   BindingNotFoundError,
   CustomRoleRequiredError,
   DuplicateMemberError,
+  GroupAlreadyDeletedError,
   GroupNotFoundError,
   GroupRoleNotAssignableError,
   ScimManagedGroupError,
@@ -259,8 +260,14 @@ export class GroupRestService {
      */
     shouldBypassDirectoryManagement?: boolean;
   }): Promise<void> {
-    const group = await this.repo.findGroupOnly({ id, organizationId });
+    // Past the live fence on purpose, so the two refusals stay distinguishable:
+    // a group that never existed here is a 404, and one that was already
+    // deleted is a 409 naming the record the caller can still read. A
+    // `findGroupOnly` here would have collapsed both into "not found" and
+    // contradicted the history this change exists to keep.
+    const group = await this.repo.findIncludingDeleted({ id, organizationId });
     if (!group) throw new GroupNotFoundError();
+    if (group.deletedAt) throw new GroupAlreadyDeletedError(id);
     // Deleting is the most destructive thing that can happen to a group the
     // directory owns: every grant it carries goes with it, and the next sync
     // pushes the group back without them.
@@ -268,20 +275,27 @@ export class GroupRestService {
       throw new ScimManagedGroupError(id);
     }
 
-    // The grants go first, so the deny is enforced before the group row
-    // that carries them disappears.
+    // Access first, the group row last — the fail-safe order. Both of the
+    // writes below enforce their deny synchronously and bump the epoch, so an
+    // interrupted delete under-grants rather than leaving access standing on a
+    // group that is on its way out.
     await this.repo.deleteAllBindings({ groupId: id, organizationId, actor });
-    // The memberships END before the group row goes, so the ledger and the
-    // audit trail both carry who was in it and when they left. The group row's
-    // own deletion still cascades the marked rows away — see the
-    // `GroupMembership` model comment for why that limit stands and what
-    // closing it would cost.
+    // The memberships END before the group row is marked, so each one is its
+    // own fact with its own moment and reason, and the ledger and the audit
+    // trail both carry who was in it and when they left. Those marked rows now
+    // SURVIVE the deletion: the group row is marked rather than deleted, so
+    // nothing cascades them away (see the `Group` model comment).
     await this.repo.deleteAllMemberships({
       groupId: id,
       organizationId,
       actor,
     });
-    await this.repo.delete({ id, organizationId });
+    // And the group itself is MARKED. Not a ledger fact: a group's existence
+    // is not access — the grants and the memberships above are, and both are
+    // already facts — and creating one emits nothing, so a `group_deleted`
+    // event would be a fold able to delete a group it could never create. The
+    // mark still moves the epoch, because every group READ fences on it.
+    await this.repo.delete({ id, organizationId, reason: "group deleted" });
   }
 
   async getMembers({ groupId }: { groupId: string }) {
