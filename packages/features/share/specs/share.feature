@@ -1,23 +1,4 @@
-# Trace sharing (redesign) — Gherkin Spec
-# ADR: dev/docs/adr/057-token-gated-trace-sharing.md
-#
-# Supersedes the legacy PublicShare feature. The legacy model authorized
-# anonymous reads by checking whether *a share row existed* for a given
-# (projectId, resourceType, resourceId). Because trace IDs are caller-supplied
-# and not secret, anyone who learned a shared trace's ID + projectId could read
-# it without ever possessing the share link. The redesign moves authorization
-# onto possession of a high-entropy secret token: the token IS the credential.
-#
-# Data model: PublicShare is renamed to ShareLink and gains: a secret `token`
-# (unprefixed, high-entropy), an optional `threadId` (share a trace with its
-# surrounding conversation), a `visibility` (PUBLIC | ORGANIZATION | PROJECT),
-# an optional `expiresAt` (null = never), an optional `maxViews` (null =
-# unlimited; 1 = single view) and a `viewCount`. Legacy rows are migrated in
-# place: `token` is backfilled from the old `id`, `visibility` = PUBLIC,
-# `expiresAt` = null, so every existing /share/<id> URL keeps working.
-#
-# The share creation + management UI lives only in the new Trace Explorer
-# (traces v2). The legacy trace drawer's Share button is removed.
+# ADR: packages/features/share/adrs/001-share-service-boundary.md
 
 Feature: Share a trace behind a secret, scoped, expiring link
   As an operator who wants to show a trace to someone
@@ -38,20 +19,12 @@ Feature: Share a trace behind a secret, scoped, expiring link
       And the token is at least 128 bits of entropy
       And the link resolves to that trace for anyone who holds it
 
-    # Thread sharing is parked: the read-only viewer renders a trace and
-    # nothing else, so `createShare` accepts TRACE only and no code path binds
-    # a link to a conversation. This keeps the system from minting a capability
-    # nothing can redeem. Reinstate when the aggregate payload carries the
-    # surrounding conversation (ADR-057 follow-up).
     @unit
     Scenario: A share link covers the trace alone
       Given I am viewing a trace that belongs to a thread
       When I create a share link for it
       Then the link records no conversation
 
-    # @unimplemented: multi-link independence is an integration behavior (two
-    # persisted rows resolving separately); the unit suite covers single-link
-    # creation and resolution. Bind when an integration test exists.
     @integration @unimplemented
     Scenario: The same trace can have multiple concurrent links
       Given I have already created one share link for a trace
@@ -106,10 +79,6 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When two viewers open the link at the same moment
       Then at most one of them is granted access
 
-    # A view is a viewing, not an HTTP request: within a short window the same
-    # viewer re-opening the link (a refresh, a restored tab) does not spend
-    # another. Authorization is still re-checked in full every time — only the
-    # counting is deduped — so a revoked link stops working immediately.
     @unit
     Scenario: A viewer refreshing a single-view link keeps access
       Given a share link with a maximum of one view
@@ -138,10 +107,6 @@ Feature: Share a trace behind a secret, scoped, expiring link
 
   Rule: The anonymous surface is bounded in cost
 
-    # The one read the open internet can drive. Each call costs several
-    # analytics reads, so it is rate limited per link and per caller, and the
-    # assembled payload is briefly reused — a shared trace is a snapshot, so
-    # reuse changes nothing a viewer would notice.
     @unit
     Scenario: Opening a shared link too often is refused for a moment
       Given a share link opened far more often than a person would
@@ -219,8 +184,6 @@ Feature: Share a trace behind a secret, scoped, expiring link
 
   Rule: A trace-scoped link does not unlock the surrounding conversation
 
-    # Holds by construction: the share payload has no conversation section at
-    # all, so there is nothing to leak and nothing to gate.
     @unit
     Scenario: A shared link never reveals the surrounding conversation
       Given a share link for a trace that belongs to a thread
@@ -229,8 +192,6 @@ Feature: Share a trace behind a secret, scoped, expiring link
 
   Rule: The shared link renders the new Trace Explorer, read-only
 
-    # @unimplemented: browser-level rendering of the read-only page; needs an
-    # e2e/UI test rather than a unit binding.
     @integration @unimplemented
     Scenario: A shared trace opens in the new Trace Explorer surface
       Given a public share link for a trace
@@ -238,8 +199,6 @@ Feature: Share a trace behind a secret, scoped, expiring link
       Then they see the trace in the new Trace Explorer, filling the page
       And there is no drawer chrome to close, resize or dock
 
-    # @unimplemented: the read-only affordance-suppression is a UI behavior
-    # (no session-dependent actions rendered); needs an e2e/UI test.
     @integration @unimplemented
     Scenario: The shared view offers nothing that needs an account
       Given a public share link for a trace
@@ -256,16 +215,6 @@ Feature: Share a trace behind a secret, scoped, expiring link
       And the trace is shown
 
   Rule: A link's view budget survives its organization moving onto the engine
-
-    # ADR-092 delivery-plan PR 3 (decision 22). A cut-over organization's
-    # share links are authored through the grants ledger, and view
-    # consumption moves to a separate accounting row that the projection
-    # never rewrites. What must not change for the customer holding the link
-    # is the only thing they can perceive: how many views they have left.
-    #
-    # The failure this pins is a refill, not a crash — an already-spent link
-    # coming back to life the moment its organization is served by the
-    # engine, which no error surface would ever report.
 
     @integration
     Scenario: A cut-over organization's share link consumes its remaining budget
@@ -284,26 +233,18 @@ Feature: Share a trace behind a secret, scoped, expiring link
 
   Rule: Legacy links keep working; the legacy UI no longer offers sharing
 
-    # @unimplemented: exercises the migration's token backfill against a real
-    # DB; needs an integration test with the migrated schema.
     @integration @unimplemented
     Scenario: An existing pre-migration share URL still resolves
       Given a share link that existed before the redesign
       When someone opens its original /share/<id> URL
       Then they can view the trace
 
-    # @unimplemented: absence of a UI button in the legacy drawer; needs an
-    # e2e/UI test.
     @integration @unimplemented
     Scenario: The legacy trace drawer has no Share affordance
       Given I am viewing a trace in the legacy trace drawer
       Then there is no Share button
 
   Rule: The kill switch works at both the organization and project level
-
-    # Effective sharing = organization AND project (ADR-057). The org toggle is
-    # the global switch; the project toggle scopes the kill to one project —
-    # mirrors the presence kill switch.
 
     @integration
     Scenario: Disabling trace sharing for a project revokes all its links

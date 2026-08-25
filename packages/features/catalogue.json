@@ -196,6 +196,12 @@
       "subjects": ["secret"]
     },
     {
+      "id": "share",
+      "root": "packages/features/share",
+      "classification": "core",
+      "subjects": ["share"]
+    },
+    {
       "id": "simulation",
       "root": "packages/features/simulation",
       "classification": "core",
