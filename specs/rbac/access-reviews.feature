@@ -199,12 +199,24 @@ Feature: Access reviews
     Then the review says it is the first, so there is nothing to compare with
     And it does not present an empty change history as "nothing changed"
 
+  # A review is measured from the one before it, so "the same period" is not
+  # something a second export can ask for — the window has moved on. What an
+  # auditor is testing is that the record already taken cannot change, so this
+  # reads the review that was exported rather than exporting it again.
   @unimplemented
   Scenario: The change history cannot be rewritten after the fact
     Given a review of "acme" was exported last week
-    When olivia exports the same period again
-    Then the change history is identical
-    And no change that happened has been edited or removed by the second export
+    And access has been granted and taken away since
+    When olivia opens that review again
+    Then its change history is exactly what it was when it was exported
+    And nothing that happened since appears in it
+
+  @unimplemented
+  Scenario: A later review leaves the earlier one alone
+    Given a review of "acme" was exported last week
+    When olivia exports a new review of "acme"
+    Then the earlier review's change history is unchanged
+    And no change it recorded has been edited or removed
 
   @unimplemented
   Scenario: A period older than the account keeps its history says so

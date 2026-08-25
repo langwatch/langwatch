@@ -527,6 +527,33 @@ describe("Feature: Role bindings REST API", () => {
         ).toBe(0);
       });
 
+      /** @scenario "A binding created with an end date reports it back" */
+      it("reports the end date on a binding created with one", async () => {
+        const member = await seedOrgMember({
+          prisma,
+          ns,
+          organizationId: seeded.organization.id,
+          role: OrganizationUserRole.MEMBER,
+          label: "future-end-date",
+          hasOrgBinding: true,
+        });
+
+        const expiresAt = "2099-12-31T23:59:59.000Z";
+        const response = await postBinding({
+          userId: member.userId,
+          role: "MEMBER",
+          scopeType: "TEAM",
+          scopeId: teamAId,
+          expiresAt,
+        });
+
+        expect(response.status).toBe(201);
+        // The round trip is the point: the service forwarding `expiresAtMs` is
+        // proven at the unit level, but nothing showed the boundary parsing an
+        // ISO string, storing it, and serialising it back unchanged.
+        expect((await response.json()).expiresAt).toBe(expiresAt);
+      });
+
       /** @scenario "A binding with no end date reports none" */
       it("reports no end date on a binding created without one", async () => {
         const member = await seedOrgMember({

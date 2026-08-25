@@ -210,6 +210,20 @@ describe("explainHandledError", () => {
     });
 
     /** @scenario "A denied member is told which of their roles fell short" */
+    it("names the role that fell short when no built-in role would grant it", () => {
+      // A real server answer, not a defensive branch: only custom roles carry
+      // some permissions, and `rolesThatWouldGrant` lists built-in roles only,
+      // so a held role with nothing to point at is what the engine returns.
+      const { description } = explainHandledError(
+        denial({ heldRoles: ["Viewer"], wouldGrantRoles: [] }),
+      );
+
+      expect(description).toBe(
+        'Your Viewer role doesn\'t include "traces:share". Ask an organization admin to grant you "traces:share".',
+      );
+    });
+
+    /** @scenario "A denied member is told which of their roles fell short" */
     it("says so plainly when they hold no role on this scope at all", () => {
       const { description } = explainHandledError(
         denial({ heldRoles: [], wouldGrantRoles: ["Admin"] }),

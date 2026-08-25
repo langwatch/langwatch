@@ -200,11 +200,31 @@ describe("given a group somebody belongs to", () => {
       const ended = await allMemberships();
       expect(ended).toHaveLength(1);
 
-      // The fold is severed, so the row the command would have written is
-      // written here — the assertion is about the state a re-add reaches,
-      // and the writer's own liveness pre-check is what has to let it get
-      // this far rather than reading the marked row as a duplicate.
-      const reAddId = newGroupMembershipId();
+      // The command, not a hand-written row: the writer's liveness pre-check
+      // is the thing that has to let this through, and only calling it can
+      // catch a check that reads the MARKED row as a duplicate. It refuses
+      // with `group_member_already_added` if it ever does.
+      const before = appended.length;
+      await expect(
+        repository().addMember({
+          groupId,
+          organizationId: organization.id,
+          userId,
+          actor: ACTOR,
+        }),
+        // The fold is severed, so no projection row ever lands and the
+        // read-back fails. That is this harness, not the re-add: the append
+        // below proves the command went out.
+      ).rejects.toMatchObject({ code: "authz_ledger_unavailable" });
+
+      const sent = appended
+        .slice(before)
+        .filter((entry) => entry.verb === "addGroupMember");
+      expect(sent).toHaveLength(1);
+      const reAddId = (sent[0]!.data as { membershipId: string }).membershipId;
+
+      // The row the severed fold would have written, with the id the command
+      // actually named — so what follows asserts the state a re-add reaches.
       await prisma.groupMembership.create({
         data: { id: reAddId, groupId, userId, occurredAt: new Date() },
       });

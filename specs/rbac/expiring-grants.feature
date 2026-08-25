@@ -183,6 +183,13 @@ Feature: Expiring grants
     Then the end date is recorded alongside the grant
 
   @integration
+  Scenario: A binding created with an end date reports it back
+    Given I am authenticated with an organization-scoped API key
+    When I bind "dana" as a member of a team until next Friday
+    Then the response status is 201
+    And the binding reports that same end date
+
+  @integration
   Scenario: A binding with no end date reports none
     Given I am authenticated with an organization-scoped API key
     When I bind "dana" as a member of a team with no end date

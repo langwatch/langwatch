@@ -449,7 +449,14 @@ Feature: Unified authorization engine
     Given trace "t1" in project "chatbot" has a share link conferring "datasets:view"
     When a visitor presents that link to read the trace
     Then the request is denied
-    But a link conferring "annotations:create" reads the trace, because it carries "traces:view" too
+
+  @unit
+  Scenario: An annotate link reads the trace it may comment on
+    Given trace "t1" in project "chatbot" has a share link conferring "annotations:create"
+    When a visitor presents that link to read the trace
+    Then the request is granted
+    # "annotations:create" carries "traces:view" with it, so no second link is
+    # needed to read what its holder may comment on.
 
   @unit
   Scenario: A share link covers the trace it names and no other

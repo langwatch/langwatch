@@ -53,12 +53,14 @@ Feature: Agent principals
   Scenario: The assistant does for alice what alice can do
     When alice asks the assistant to update a prompt in "chatbot"
     Then the prompt is updated
-    And the assistant needed no access of its own to do it
+    And the assistant holds no role binding of its own that permitted it
 
   @unimplemented
   Scenario: The assistant's authority is composed for the turn and kept nowhere
     When alice asks the assistant to do anything in "chatbot"
-    Then no credential is created for that turn
+    Then no API key is stored for that turn
+    And no role binding is created for that turn
+    And no session record outlives the turn
     And nothing is left behind to expire, revoke or clean up when it ends
     And an administrator listing the organization's credentials sees none for
       the assistant
