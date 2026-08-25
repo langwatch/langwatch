@@ -185,6 +185,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
 
+      - name: "assert ClickHouse pool sizing follows fleet capacity"
+        if: "!cancelled()"
+        run: ./tests/clickhouse-pool-sizing.sh
+
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
       # hook that orders them is a template over several values, so which

@@ -1854,6 +1854,15 @@ clickhouse:
       secretKeyRef: { name: "", key: "" }
     ## @param clickhouse.external.cluster [string] Cluster name for ON CLUSTER DDL (omit for non-replicated).
     cluster: ""
+    ## @param clickhouse.external.serverNodes [default: 1] Nodes serving client queries.
+    serverNodes: 1
+    ## @param clickhouse.external.serverMaxConcurrentQueries [default: 300] Per-node max_concurrent_queries.
+    serverMaxConcurrentQueries: 300
+
+  ## @extra clickhouse.client Client pool sizing shared by app and worker processes.
+  client:
+    ## @param clickhouse.client.maxOpenConnections [string] Explicit per-client override. Empty derives from fleet capacity.
+    maxOpenConnections: ""
 
   # ---------------------------------------------------------------------------
   # Chart-managed subchart configuration (clickhouse-serverless)

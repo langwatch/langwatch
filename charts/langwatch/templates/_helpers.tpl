@@ -832,6 +832,27 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.clickhouse.external.cluster | quote }}
 {{- end }}
 {{- end }}
+{{- $workerReplicas := 0 }}
+{{- if .Values.workers.enabled }}
+  {{- $workerReplicas = int .Values.workers.replicaCount }}
+{{- end }}
+{{- $clientReplicas := add (int .Values.app.replicaCount) $workerReplicas }}
+{{- $serverNodes := int .Values.clickhouse.external.serverNodes }}
+{{- $serverMaxConcurrentQueries := int .Values.clickhouse.external.serverMaxConcurrentQueries }}
+{{- if .Values.clickhouse.chartManaged }}
+  {{- $serverNodes = int .Values.clickhouse.replicas }}
+  {{- $serverMaxConcurrentQueries = int (index (.Values.clickhouse.env | default dict) "MAX_CONCURRENT_QUERIES" | default 300) }}
+{{- end }}
+- name: CLICKHOUSE_CLIENT_REPLICAS
+  value: {{ $clientReplicas | quote }}
+- name: CLICKHOUSE_SERVER_NODES
+  value: {{ $serverNodes | quote }}
+- name: CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES
+  value: {{ $serverMaxConcurrentQueries | quote }}
+{{- if .Values.clickhouse.client.maxOpenConnections }}
+- name: CLICKHOUSE_MAX_OPEN_CONNECTIONS
+  value: {{ .Values.clickhouse.client.maxOpenConnections | quote }}
+{{- end }}
 {{- $chCold := (.Values.clickhouse).cold }}
 {{- if $chCold.enabled }}
 - name: CLICKHOUSE_COLD_STORAGE_ENABLED
