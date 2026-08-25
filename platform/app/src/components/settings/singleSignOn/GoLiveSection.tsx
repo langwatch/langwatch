@@ -86,14 +86,25 @@ export function GoLiveSection({
       />
       {canManage &&
         (goLive.ready ? (
+          // THE DECISION THIS WHOLE PAGE LEADS TO, at the weight of one. It
+          // drew as a small grey button underneath a column of green ticks,
+          // which made the checklist louder than the thing the checklist was
+          // for — the reader's eye landed on what was already done rather
+          // than on what to do. Green because every settled state above it is
+          // green, and this is the step that settles the connection itself.
           <Button
             alignSelf="start"
+            size="lg"
+            colorPalette="green"
+            marginTop={2}
             loading={activate.isPending}
             onClick={() =>
               activate.mutate(
                 { organizationId, connectionId },
                 {
-                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+                  onSuccess: async () => {
+                    await utils.ssoSetup.getSetup.invalidate();
+                  },
                   onError: reportRefusal,
                 },
               )

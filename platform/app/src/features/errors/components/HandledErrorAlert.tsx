@@ -3,9 +3,11 @@ import { AlertCircle } from "lucide-react";
 
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
+import { isServerUnreachable } from "../logic/isServerUnreachable";
 import { resolveErrorCopy } from "../logic/resolveErrorCopy";
 
 import { ErrorActions } from "./ErrorActions";
+import { ServerUnreachableNotice } from "./ServerUnreachableNotice";
 
 /**
  * The same restrained hairline the toast wears — the tone lives in the border
@@ -40,6 +42,12 @@ export interface HandledErrorAlertProps {
    * only the pane it sits on changes.
    */
   className?: string;
+  /**
+   * Runs the failed request again. Used only when nothing answered at all,
+   * where the screen becomes a wait that settles itself rather than an error
+   * somebody has to act on.
+   */
+  onRetry?: () => void;
 }
 
 /**
@@ -57,6 +65,7 @@ export function HandledErrorAlert({
   fallbackTitle,
   showAllTips = true,
   className,
+  onRetry,
 }: HandledErrorAlertProps) {
   if (!error) return null;
 
@@ -66,6 +75,14 @@ export function HandledErrorAlert({
   // wrong / We've been notified" underneath the modal that was busy explaining
   // it properly.
   if (isHandledByGlobalHandler(error)) return null;
+
+  // NOTHING ANSWERED. Said as a wait rather than as a fault, because that is
+  // what it is: the request never left the browser, so "we've been notified"
+  // is a promise nobody kept and the trace id names a trace that does not
+  // exist. Ahead of the registry, since no code arrived to look up.
+  if (isServerUnreachable(error)) {
+    return <ServerUnreachableNotice onRetry={onRetry} className={className} />;
+  }
 
   // One parse, and the same two rules the toast renders — whose headline
   // wins, and which tips add to the description rather than repeating it.

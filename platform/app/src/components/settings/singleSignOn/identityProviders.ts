@@ -26,7 +26,13 @@
 import type { IconType } from "react-icons";
 import { FaMicrosoft } from "react-icons/fa6";
 import { LuFileCode2, LuShieldQuestion } from "react-icons/lu";
-import { SiAuth0, SiGoogle, SiKeycloak, SiOkta, SiOpenid } from "react-icons/si";
+import {
+  SiAuth0,
+  SiGoogle,
+  SiKeycloak,
+  SiOkta,
+  SiOpenid,
+} from "react-icons/si";
 
 export type SsoProtocol = "oidc" | "saml";
 

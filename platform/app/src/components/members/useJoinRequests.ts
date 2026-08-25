@@ -116,6 +116,30 @@ function useAnswerJoinRequest({ organizationId }: { organizationId: string }) {
 }
 
 /** What is waiting, and the two answers. */
+/**
+ * How many people are waiting, and nothing else.
+ *
+ * For the settings menu, which wants the NUMBER without the approve and
+ * reject machinery `useJoinRequests` builds around it — a sidebar rendered on
+ * every settings page must not mount two mutations to draw a badge.
+ *
+ * Undefined until the answer is in, so a caller can tell "nobody is waiting"
+ * from "we have not asked yet" and draw neither a wrong zero nor a flicker.
+ */
+export function usePendingJoinRequestCount({
+  organizationId,
+  canManage,
+}: {
+  organizationId: string | undefined;
+  canManage: boolean;
+}): number | undefined {
+  const pending = api.joinRequests.pending.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId && canManage },
+  );
+  return pending.data?.length;
+}
+
 function usePendingJoinRequests({
   organizationId,
   canManage,

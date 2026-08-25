@@ -123,8 +123,8 @@ export function DirectoryCard({
       <OverviewDetail label="Provisioning token">
         <VStack align="start" gap={1}>
           <Text fontSize="sm" color="fg.muted">
-            The password your identity provider uses to create and remove
-            people here on its own, without anybody signing in. One token per
+            The password your identity provider uses to create and remove people
+            here on its own, without anybody signing in. One token per
             connection, shown once when it is issued.
           </Text>
           <Link href="/settings/directory?tab=tokens">

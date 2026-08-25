@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Collapsible,
   Container,
@@ -10,6 +11,7 @@ import { ChevronDown } from "lucide-react";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { usePendingJoinRequestCount } from "~/components/members/useJoinRequests";
 import { useNavigationV2ShellActive } from "~/features/navigation/useNavigationV2ShellActive";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
@@ -198,7 +200,18 @@ export default function SettingsLayout({
               "/settings/audit-log",
             ]}
           >
-            <MenuLink href="/settings/members" includePath="members">
+            {/* WHO IS WAITING, from wherever in settings the reader is. A
+                join request is the one thing in here that is waiting on a
+                person rather than sitting there, and it was only visible to
+                somebody who had already opened the page it lives on.
+                Unlike the tab's count, this is hidden at zero: a badge in a
+                menu means "something needs you", and one that is always
+                present means nothing at all. */}
+            <MenuLink
+              href="/settings/members"
+              includePath="members"
+              menuEnd={<PendingJoinRequestsBadge />}
+            >
               Members
             </MenuLink>
             <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
@@ -350,5 +363,41 @@ export default function SettingsLayout({
         </Container>
       </HStack>
     </DashboardLayout>
+  );
+}
+
+/**
+ * How many people are waiting to join, beside the menu entry that answers
+ * them.
+ *
+ * Its own component so the query lives with the one thing that reads it: the
+ * layout renders on every settings page and must not take a dependency on a
+ * count most of those pages have nothing to do with.
+ *
+ * Draws nothing at zero, and nothing for somebody who could not answer a
+ * request anyway. A menu badge is a claim on the reader's attention, and one
+ * that is always there stops being read.
+ */
+function PendingJoinRequestsBadge() {
+  const { organization, hasPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const waiting = usePendingJoinRequestCount({
+    organizationId: organization?.id,
+    canManage: hasPermission("organization:manage"),
+  });
+
+  if (!waiting) return null;
+
+  return (
+    <Badge
+      size="sm"
+      variant="solid"
+      colorPalette="orange"
+      fontVariantNumeric="tabular-nums"
+      aria-label={`${waiting} waiting to join`}
+    >
+      {waiting}
+    </Badge>
   );
 }

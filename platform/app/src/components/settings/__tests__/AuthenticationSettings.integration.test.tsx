@@ -334,7 +334,9 @@ describe("the organization's authentication page", () => {
       expect(screen.queryByText(/prove a domain is yours/i)).toBeNull();
 
       await user.click(
-        screen.getByRole("button", { name: /manage or turn off this connection/i }),
+        screen.getByRole("button", {
+          name: /manage or turn off this connection/i,
+        }),
       );
 
       expect(screen.getByText(/prove a domain is yours/i)).toBeTruthy();

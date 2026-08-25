@@ -14,7 +14,7 @@ import type {
   SelfServeIssuedDnsRecord,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
-import { Check, RefreshCw } from "lucide-react";
+import { Check, KeyRound, RefreshCw } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { domainNextStepFor } from "~/features/sso/logic/domainNextStep";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
@@ -207,6 +207,14 @@ function DomainRow({
   connectionId,
   provesWithLicense,
   recordIssued,
+  // DECLARED IN THE TYPE AND NEVER TAKEN OFF THE PROPS, which made every
+  // successful mint throw a ReferenceError on the line that was supposed to
+  // keep its value. The mint had already happened server-side, so the row
+  // moved on after a reload and the value — issued once and never returned
+  // again — was gone, and the only way to see one was to press a second time
+  // and replace the record nobody had seen. This is why "Prove this domain"
+  // looked like it did nothing.
+  onMinted,
 }: {
   domain: string;
   claimed: SelfServeDomainClaimView | undefined;
@@ -250,8 +258,16 @@ function DomainRow({
     recordIssued,
   });
 
+  // AWAITED, not fired and forgotten. An un-awaited invalidate lets the
+  // mutation finish — spinner off, row re-rendered — while the refetch is
+  // still in flight, so the screen settles on the state it already had and
+  // only a manual reload shows what happened. It looked like the button
+  // worked "sometimes", which is the shape of a race rather than a bug in
+  // the step itself. Awaiting keeps the control busy until the answer is in.
   const settle = {
-    onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+    onSuccess: async () => {
+      await utils.ssoSetup.getSetup.invalidate();
+    },
   };
   const target = { organizationId, connectionId, domain };
   // "Claim it again" is a claim; every other move on this row asks to prove.
@@ -304,9 +320,16 @@ function DomainRow({
       </Table.Cell>
       <Table.Cell verticalAlign="top">
         <HStack gap={1} justify="end">
+          {/* THE ONE THING TO DO ON THIS ROW, dressed like it. It was a grey
+              extra-small chip sitting beside "Remove", which read as a pair of
+              equals — and the row exists to move somebody forward, not to
+              offer them a symmetrical choice between proceeding and undoing.
+              "Claim it again" stays quieter: it is a retry after a rejection
+              rather than the step somebody came here to take. */}
           {canManage && next.action && (
             <Button
-              size="xs"
+              size="sm"
+              colorPalette={next.kind === "claim-again" ? "gray" : "orange"}
               variant={next.kind === "claim-again" ? "outline" : "solid"}
               loading={prove.isPending || claim.isPending}
               onClick={takeNextStep}
@@ -454,8 +477,13 @@ function PublishedRecord({
   const shownValue = minted ?? record.value;
 
   const target = { organizationId, connectionId, domain: record.domain };
+  // Awaited for the reason the row's is — see `DomainRow`. This is the one
+  // the checks run through, and a check whose refetch lost the race is a
+  // check that appears to have found nothing.
   const settle = {
-    onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+    onSuccess: async () => {
+      await utils.ssoSetup.getSetup.invalidate();
+    },
   };
 
   return (
@@ -587,8 +615,18 @@ function PublishedRecord({
                 </Button>
               </HStack>
             ) : (
-              <Button variant="ghost" onClick={() => setReplacing(true)}>
-                Give me a fresh value
+              // A CONTROL, drawn as one. As a ghost button it read as a stray
+              // line of prose beside two real buttons, so what it was — and
+              // that it could be pressed at all — was left to be guessed. The
+              // label names the noun it replaces rather than asking for "a
+              // fresh value" of something unstated.
+              <Button
+                variant="outline"
+                color="fg.muted"
+                onClick={() => setReplacing(true)}
+              >
+                <KeyRound size={14} />
+                Replace the secret value
               </Button>
             )}
           </HStack>

@@ -238,7 +238,9 @@ describe("given an organization's members page", () => {
     it("shows three tabs and opens on the members", () => {
       renderMembers();
 
-      expect(screen.getByRole("tab", { name: "Members" })).toHaveAttribute(
+      // Each tab now carries its count in a badge, so the accessible name is
+      // the label and the number together.
+      expect(screen.getByRole("tab", { name: /^Members/ })).toHaveAttribute(
         "aria-selected",
         "true",
       );
@@ -325,11 +327,13 @@ describe("given an organization's members page", () => {
       renderMembers();
 
       // The accepted invitation is history, not a thing anybody is waiting on.
+      // The count rides in a badge beside the label rather than in the label,
+      // so it reads as "Invitations 2" to an assistive reader.
       expect(
-        screen.getByRole("tab", { name: "Invitations (2)" }),
+        screen.getByRole("tab", { name: "Invitations 2" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("tab", { name: "Join requests (1)" }),
+        screen.getByRole("tab", { name: "Join requests 1" }),
       ).toBeInTheDocument();
     });
 

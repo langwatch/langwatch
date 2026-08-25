@@ -60,7 +60,7 @@ export function TestSignInSection({
               sign-in screen and brings it back, which is not what a plain
               button promises — so it is marked the way every other control
               that navigates away is, and a repeat is marked as a repeat. */}
-          {failure ?? testSignIn.done ? (
+          {(failure ?? testSignIn.done) ? (
             <RefreshCw size={14} />
           ) : (
             <ExternalLink size={14} />

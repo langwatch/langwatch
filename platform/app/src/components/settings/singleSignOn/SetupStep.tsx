@@ -1,4 +1,13 @@
-import { Box, Card, Collapsible, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Card,
+  Collapsible,
+  Heading,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { SetupStepState } from "~/features/sso/logic/setupProgress";
@@ -213,13 +222,7 @@ function Rail({ done }: { done: boolean }) {
 }
 
 /** The numbered marker. */
-function Marker({
-  number,
-  state,
-}: {
-  number: number;
-  state: SetupStepState;
-}) {
+function Marker({ number, state }: { number: number; state: SetupStepState }) {
   const done = state === "done";
   return (
     <Box

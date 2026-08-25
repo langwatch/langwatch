@@ -205,7 +205,6 @@ export function IdentifierFirstSignIn() {
       errored: Boolean(error),
       ceremony: passkeyCeremony !== null,
       outcome: decision?.outcome ?? null,
-      hasIdentifier: submittedIdentifier !== null,
       showPicker: Boolean(showPicker),
     }),
     attributes: {
@@ -370,10 +369,21 @@ export function IdentifierFirstSignIn() {
           typing the address again — so taking the field away leaves somebody
           holding an apology and no way to act on it. It sits above the form,
           and the form stays live underneath. */}
+      {/* Where nothing answered at all — a deploy rolling, a server still
+          coming up — this becomes a wait that settles itself rather than an
+          apology. The address already typed is still in the field, so the
+          retry costs the reader nothing and usually finishes before they have
+          read the sentence. */}
       <HandledErrorAlert
         error={routing.error}
         fallbackTitle="Could not start log-in"
         className="lw-auth-alert"
+        onRetry={() =>
+          void decide({
+            identifier: submittedIdentifier ?? null,
+            breakGlass,
+          })
+        }
       />
       <HandledErrorAlert
         error={passkeyError}

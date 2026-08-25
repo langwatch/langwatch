@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { IdentityRow, IdentityRowList } from "~/components/access/IdentityRow";
 import { ProvenanceChip } from "~/components/access/ProvenanceChip";
+import { TabCount } from "~/components/settings/TabCount";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -362,16 +363,28 @@ function MembersList({
           colorPalette="blue"
           width="full"
         >
+          {/* ONE RULE FOR ALL THREE. Invitations carried its count in
+              parentheses whether or not there was anything to count, join
+              requests carried none until something arrived, and members
+              carried none at all — three lists in one row, labelled three
+              ways. A zero is an answer here, and it is the answer somebody
+              checking on a quiet week came to read. */}
           <Tabs.List marginBottom={4}>
-            <Tabs.Trigger value="members">Members</Tabs.Trigger>
-            <Tabs.Trigger value="invitations">
-              Invitations{pendingInvites.data ? ` (${openInviteCount})` : ""}
+            {/* The explicit space is not decoration. A flex container drops
+                whitespace-only children from layout but keeps them in the
+                text the accessible name is computed from — so without it the
+                tab announces as "Invitations2", one run-together token. */}
+            <Tabs.Trigger value="members" gap={2}>
+              Members <TabCount value={sortedMembers.length} />
             </Tabs.Trigger>
-            <Tabs.Trigger value="requests">
-              Join requests
-              {joinRequests.requests.length > 0
-                ? ` (${joinRequests.requests.length})`
-                : ""}
+            <Tabs.Trigger value="invitations" gap={2}>
+              Invitations{" "}
+              <TabCount
+                value={pendingInvites.data ? openInviteCount : undefined}
+              />
+            </Tabs.Trigger>
+            <Tabs.Trigger value="requests" gap={2}>
+              Join requests <TabCount value={joinRequests.requests.length} />
             </Tabs.Trigger>
           </Tabs.List>
 
