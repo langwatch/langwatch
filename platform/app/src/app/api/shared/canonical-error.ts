@@ -169,6 +169,7 @@ function handledErrorEnvelope(
         status,
         code: FALLBACK_ERROR_CODE,
         message: INTERNAL_ERROR_MESSAGE,
+        retryable: error.retryable,
         ...traceIds,
       }),
     };
@@ -181,6 +182,7 @@ function handledErrorEnvelope(
       status,
       code: error.code,
       message: error.message ?? "",
+      retryable: error.retryable,
       meta: {
         ...(error.meta ?? {}),
         ...(reasons.length > 0 ? { reasons } : {}),

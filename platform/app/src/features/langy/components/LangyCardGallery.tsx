@@ -599,6 +599,7 @@ export function LangyCardGallery() {
               code: kind,
               meta: {},
               httpStatus: 500,
+              retryable: false,
             })}
             onAction={() => undefined}
           />
@@ -608,6 +609,7 @@ export function LangyCardGallery() {
             code: "unknown",
             meta: {},
             httpStatus: 500,
+            retryable: false,
             traceId: "abc123",
           })}
           onAction={() => undefined}

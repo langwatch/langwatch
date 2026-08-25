@@ -43,16 +43,17 @@ type ErrorResponse struct {
 // TypeScript side uses everywhere. Emitting both means a consumer can read
 // whichever its transport taught it and always get the same answer.
 type ErrorBody struct {
-	Type    string      `json:"type"`
-	Code    string      `json:"code"`
-	Message string      `json:"message"`
-	Meta    M           `json:"meta,omitempty"`
-	TraceID string      `json:"trace_id,omitempty"`
-	SpanID  string      `json:"span_id,omitempty"`
-	Reasons []ErrorBody `json:"reasons,omitempty"`
-	Tips    []string    `json:"tips,omitempty"`
-	DocsURL string      `json:"docs_url,omitempty"`
-	Fault   string      `json:"fault,omitempty"`
+	Type      string      `json:"type"`
+	Code      string      `json:"code"`
+	Message   string      `json:"message"`
+	Retryable bool        `json:"retryable"`
+	Meta      M           `json:"meta,omitempty"`
+	TraceID   string      `json:"trace_id,omitempty"`
+	SpanID    string      `json:"span_id,omitempty"`
+	Reasons   []ErrorBody `json:"reasons,omitempty"`
+	Tips      []string    `json:"tips,omitempty"`
+	DocsURL   string      `json:"docs_url,omitempty"`
+	Fault     string      `json:"fault,omitempty"`
 }
 
 // HandledErrorHeader marks an HTTP response body as a LangWatch-authored herr
@@ -150,7 +151,7 @@ func FromBody(body ErrorBody) E {
 	if body.Fault != "" {
 		meta["fault"] = body.Fault
 	}
-	e := E{Code: Code(code), Meta: meta}
+	e := E{Code: Code(code), Meta: meta, Retryable: body.Retryable}
 	if tid, err := trace.TraceIDFromHex(body.TraceID); err == nil {
 		e.TraceID = tid
 	}
@@ -196,9 +197,10 @@ func metaStrings(m M, key string) []string {
 
 func toErrorBody(e E) ErrorBody {
 	body := ErrorBody{
-		Type:    string(e.Code),
-		Code:    string(e.Code),
-		Message: string(e.Code),
+		Type:      string(e.Code),
+		Code:      string(e.Code),
+		Message:   string(e.Code),
+		Retryable: e.Retryable,
 	}
 
 	if msg := metaString(e.Meta, "message"); msg != "" {

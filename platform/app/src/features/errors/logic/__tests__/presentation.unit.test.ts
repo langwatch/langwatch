@@ -26,6 +26,7 @@ const shape = (overrides: Partial<HandledErrorShape> = {}): HandledErrorShape =>
   meta: {},
   httpStatus: 404,
   fault: "customer",
+  retryable: false,
   tips: [],
   docsUrl: undefined,
   traceId: undefined,

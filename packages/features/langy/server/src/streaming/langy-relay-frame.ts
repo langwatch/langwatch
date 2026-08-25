@@ -47,6 +47,7 @@ const herrEnvelopeWireSchema: z.ZodType<HerrEnvelope> = z.lazy(() =>
     trace_id: z.string().optional(),
     span_id: z.string().optional(),
     fault: z.enum(["customer", "platform", "provider"]).optional(),
+    retryable: z.boolean().optional(),
     tips: z.array(z.string()).optional(),
     docs_url: z.string().optional(),
     reasons: z.array(herrEnvelopeWireSchema).optional(),

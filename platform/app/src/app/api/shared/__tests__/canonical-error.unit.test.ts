@@ -1,4 +1,4 @@
-import { ValidationError } from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +9,16 @@ import {
 import { canonicalErrorFor } from "../canonical-error";
 import { InternalServerError } from "../errors";
 
+class RetryableUnavailableError extends HandledError {
+  constructor() {
+    super("temporary_unavailable", "Try again later", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+    });
+  }
+}
+
 describe("canonicalErrorFor", () => {
   describe("given a handled error with a 5xx status", () => {
     it("collapses to the opaque body instead of shipping its own code and message", () => {
@@ -17,7 +27,16 @@ describe("canonicalErrorFor", () => {
       expect(status).toBe(503);
       expect(body.error.code).toBe("internal_error");
       expect(body.error.message).toBe("An unknown error occurred");
+      expect(body.error.retryable).toBe(false);
       expect(body.error.message).not.toContain("LangWatchQL");
+    });
+
+    it("keeps an explicit retry signal while collapsing private detail", () => {
+      const { body } = canonicalErrorFor(new RetryableUnavailableError());
+
+      expect(body.error.code).toBe("internal_error");
+      expect(body.error.message).toBe("An unknown error occurred");
+      expect(body.error.retryable).toBe(true);
     });
 
     it("drops meta and the reason chain from the opaque body", () => {
@@ -54,6 +73,7 @@ describe("canonicalErrorFor", () => {
       expect(status).toBe(500);
       expect(body.error.code).toBe("internal_error");
       expect(body.error.message).toBe("An unknown error occurred");
+      expect(body.error.retryable).toBe(false);
       expect(body.error.message).not.toContain("prisma-host");
     });
 
@@ -87,6 +107,14 @@ describe("canonicalErrorFor", () => {
 
       expect(status).toBe(400);
       expect(body.error.code).toBe("validation_error");
+    });
+
+    it("publishes an explicit retry signal", () => {
+      const { body } = canonicalErrorFor(
+        new ValidationError("Try the request again", { retryable: true }),
+      );
+
+      expect(body.error.retryable).toBe(true);
     });
   });
 });

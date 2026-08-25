@@ -21,7 +21,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.1"
+    "@opentelemetry/api": "^1.9.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

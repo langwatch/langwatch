@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, serializedReasonSchema } from "@langwatch/handled-error";
 import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -76,7 +76,12 @@ function liveId(id: string | undefined, zero: string): string | undefined {
 function serializedReasons(error: unknown): unknown[] {
   if (HandledError.isHandled(error)) return error.serialize().reasons;
   const reasons = (error as { reasons?: unknown }).reasons;
-  return Array.isArray(reasons) ? reasons : [];
+  if (!Array.isArray(reasons)) return [];
+
+  return reasons.flatMap((reason) => {
+    const parsed = serializedReasonSchema.safeParse(reason);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 /**
@@ -94,7 +99,7 @@ export function handledErrorResponseBody(error: unknown): {
   body: object;
 } {
   const { code, message, httpStatus, meta } = error as HandledError;
-  const { tips, docsUrl, fault } = error as HandledError;
+  const { tips, docsUrl, fault, retryable } = error as HandledError;
   const reasons = serializedReasons(error);
   return {
     statusCode: (httpStatus ?? 500) as ContentfulStatusCode,
@@ -106,6 +111,7 @@ export function handledErrorResponseBody(error: unknown): {
       ...(tips?.length ? { tips } : {}),
       ...(docsUrl ? { docsUrl } : {}),
       ...(fault ? { fault } : {}),
+      retryable: retryable === true,
       ...(reasons.length ? { reasons } : {}),
     },
   };

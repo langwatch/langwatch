@@ -35,6 +35,7 @@ const asShape = (error: {
     meta: error.meta,
     fault: error.fault,
     httpStatus: 400,
+    retryable: false,
     tips: [],
     reasons: [],
   }) as unknown as HandledErrorShape;

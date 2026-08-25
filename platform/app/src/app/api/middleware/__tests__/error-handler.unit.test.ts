@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { InternalServerError } from "../../shared/errors";
-import { handleError } from "../error-handler";
+import { handleError, handledErrorResponseBody } from "../error-handler";
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
@@ -92,12 +92,13 @@ describe("handleError()", () => {
 
   describe("when error carries remediation fields", () => {
     /** @scenario "A handled error carries remediation for agent consumers" */
-    it("emits tips, docsUrl and fault in the body", async () => {
+    it("emits tips, docsUrl, fault and retryable in the body", async () => {
       const error = new (class extends HandledError {
         constructor() {
           super("query_memory_exceeded", "Query exceeded its memory limit", {
             httpStatus: 422,
             fault: "customer",
+            retryable: true,
             tips: ["Narrow the time range"],
             docsUrl: "https://docs.langwatch.ai/traces",
           });
@@ -113,6 +114,7 @@ describe("handleError()", () => {
       expect(body.tips).toEqual(["Narrow the time range"]);
       expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
       expect(body.fault).toBe("customer");
+      expect(body.retryable).toBe(true);
     });
 
     /** @scenario "Remediation fields are additive and optional" */
@@ -130,6 +132,27 @@ describe("handleError()", () => {
       expect(body).not.toHaveProperty("tips");
       expect(body).not.toHaveProperty("docsUrl");
       expect(body.fault).toBe("customer");
+      expect(body.retryable).toBe(false);
+    });
+
+    it("defaults retryability in an already-serialised reason chain", () => {
+      const { body } = handledErrorResponseBody({
+        code: "outer_failure",
+        message: "outer failure",
+        httpStatus: 400,
+        reasons: [{ kind: "legacy_inner_failure" }],
+      });
+
+      expect(body).toMatchObject({
+        retryable: false,
+        reasons: [
+          {
+            code: "legacy_inner_failure",
+            kind: "legacy_inner_failure",
+            retryable: false,
+          },
+        ],
+      });
     });
   });
 

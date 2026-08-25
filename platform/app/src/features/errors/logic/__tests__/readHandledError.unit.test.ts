@@ -26,6 +26,7 @@ describe("readHandledError", () => {
           code: "trace_not_found",
           httpStatus: 404,
           fault: "customer",
+          retryable: true,
           meta: { traceId: "abc" },
           tips: ["Check the trace id"],
           docsUrl: "https://docs.langwatch.ai/platform/data-retention",
@@ -38,10 +39,12 @@ describe("readHandledError", () => {
         code: "trace_not_found",
         httpStatus: 404,
         fault: "customer",
+        retryable: true,
         tips: ["Check the trace id"],
         traceId: "4bf92f",
       });
       expect(result?.reasons).toHaveLength(1);
+      expect(result?.reasons[0]?.retryable).toBe(false);
     });
   });
 
@@ -55,12 +58,13 @@ describe("readHandledError", () => {
       expect(result?.code).toBe("project_not_found");
     });
 
-    it("defaults a missing fault to customer, matching the server", () => {
+    it("defaults missing fault and retryability, matching the server", () => {
       const result = readHandledError(
         trpcError({ code: "project_not_found", httpStatus: 404 }),
       );
 
       expect(result?.fault).toBe("customer");
+      expect(result?.retryable).toBe(false);
     });
   });
 
@@ -72,23 +76,13 @@ describe("readHandledError", () => {
       ["no discriminant", trpcError({ httpStatus: 404 })],
       ["no httpStatus", trpcError({ code: "trace_not_found" })],
       ["a non-numeric httpStatus", trpcError({ code: "x", httpStatus: "404" })],
+      ["top-level null", null],
+      ["top-level absence", void 0],
+      ["a top-level string", "boom"],
+      ["a top-level number", 42],
+      ["a top-level array", [1, 2, 3]],
+      ["a top-level boolean", false],
     ])("returns null for %s", (_label, error) => {
-      expect(readHandledError(error)).toBeNull();
-    });
-
-    /**
-     * Not every rejection is an object. `throw "boom"` and a rejected promise
-     * with no value both reach a render path, and reading `.data` off them is
-     * the difference between a generic error state and a blank page.
-     */
-    it.each([
-      ["null", null],
-      ["undefined", undefined],
-      ["a bare string", "boom"],
-      ["a number", 42],
-      ["an array", [1, 2, 3]],
-      ["a boolean", false],
-    ])("returns null for %s at the top level", (_label, error) => {
       expect(readHandledError(error)).toBeNull();
     });
 
@@ -109,6 +103,7 @@ describe("readHandledError", () => {
         meta: {},
         tips: [],
         fault: "customer",
+        retryable: false,
         docsUrl: undefined,
         reasons: [],
       });
@@ -227,6 +222,7 @@ describe("readHandledError", () => {
         tips: ["Pick a different name"],
         docsUrl: "https://docs.langwatch.ai/datasets",
         fault: "customer",
+        retryable: true,
         trace: { traceId: "4bf92f", spanId: "00f067" },
       });
 
@@ -236,6 +232,7 @@ describe("readHandledError", () => {
         tips: ["Pick a different name"],
         docsUrl: "https://docs.langwatch.ai/datasets",
         traceId: "4bf92f",
+        retryable: true,
       });
       // The flat body spreads meta at the top level, and the sentence rides
       // along as `meta.message` — the channel the registry reads for a code it
@@ -308,6 +305,7 @@ describe("handledShapeFromSerialized", () => {
       } as never);
 
       expect(shape.fault).toBe("customer");
+      expect(shape.retryable).toBe(false);
     });
 
     it("defaults meta to an object every registry entry can read", () => {

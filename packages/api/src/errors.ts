@@ -100,6 +100,7 @@ interface ErrorResponseBody {
    */
   kind?: string;
   message: string;
+  retryable: boolean;
   meta?: Record<string, unknown>;
   reasons?: unknown[];
   traceId?: string;
@@ -140,6 +141,7 @@ function handledErrorToResponse({ err }: { err: HandledError }): {
       // this body goes to external API callers. Consumers that need prose read
       // `tips` / `docsUrl`, which are authored for exactly that.
       message: serialized.code,
+      retryable: serialized.retryable,
       meta: serialized.meta,
       reasons: serialized.reasons,
       traceId: serialized.traceId,
@@ -186,6 +188,7 @@ function formatError({ err }: { err: unknown }): {
       body: {
         code: status >= 500 ? "internal_error" : "http_error",
         message: status >= 500 ? "An unknown error occurred" : err.message,
+        retryable: false,
       },
     });
   }
@@ -194,7 +197,11 @@ function formatError({ err }: { err: unknown }): {
   const status: ContentfulStatusCode = 500;
   return finalizeErrorResponse({
     status,
-    body: { code: "internal_error", message: "An unknown error occurred" },
+    body: {
+      code: "internal_error",
+      message: "An unknown error occurred",
+      retryable: false,
+    },
   });
 }
 

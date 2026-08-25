@@ -1,5 +1,7 @@
-import type { SerializedHandledError } from "@langwatch/handled-error";
-import { z } from "zod";
+import {
+  serializedHandledErrorSchema,
+  type SerializedHandledError,
+} from "@langwatch/handled-error";
 
 /**
  * Parsed evaluation result with status information.
@@ -21,66 +23,6 @@ export type ParsedEvaluationResult = {
   details?: string;
   domainError?: SerializedHandledError;
 };
-
-// `code` is HandledError's real discriminant; `kind` is a deprecated
-// back-compat alias (see handled-error.ts). Older serialised payloads may
-// carry only one of the two, so at least one is required and the other is
-// derived from it.
-const serializedReasonSchema: z.ZodType<{
-  code: string;
-  kind: string;
-  fault?: "customer" | "platform" | "provider";
-  traceId?: string;
-  spanId?: string;
-  meta?: Record<string, unknown>;
-  tips?: readonly string[];
-  docsUrl?: string;
-  reasons?: unknown[];
-}> = z.lazy(() =>
-  z.object({
-    code: z.string(),
-    kind: z.string(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
-    traceId: z.string().optional(),
-    spanId: z.string().optional(),
-    meta: z.record(z.string(), z.unknown()).optional(),
-    tips: z.array(z.string()).optional(),
-    docsUrl: z.string().optional(),
-    reasons: z.array(serializedReasonSchema).optional(),
-  }),
-);
-
-const serializedHandledErrorSchema = z
-  .object({
-    code: z.string().optional(),
-    kind: z.string().optional(),
-    meta: z.record(z.string(), z.unknown()).optional(),
-    traceId: z.string().optional(),
-    spanId: z.string().optional(),
-    traceUrl: z.string().optional(),
-    httpStatus: z.number(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
-    tips: z.array(z.string()).optional(),
-    docsUrl: z.string().optional(),
-    reasons: z.array(serializedReasonSchema).optional(),
-  })
-  .refine((value) => value.code !== undefined || value.kind !== undefined)
-  .transform((value): SerializedHandledError => {
-    const code = value.code ?? value.kind!;
-    return {
-      code,
-      kind: value.kind ?? code,
-      httpStatus: value.httpStatus,
-      meta: value.meta ?? {},
-      traceId: value.traceId,
-      spanId: value.spanId,
-      traceUrl: value.traceUrl,
-      fault: value.fault ?? "customer",
-      ...(value.tips?.length ? { tips: value.tips } : {}),
-      ...(value.docsUrl ? { docsUrl: value.docsUrl } : {}),
-      reasons: (value.reasons ?? []) as SerializedHandledError["reasons"],
-    };
-  });
 
 function readSerializedDomainError(
   candidate: unknown,

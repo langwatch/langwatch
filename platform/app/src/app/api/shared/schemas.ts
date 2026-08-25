@@ -31,6 +31,7 @@ export const successSchema = z.object({ success: z.boolean() });
  *     { "error": { "type": "bad_request",
  *                  "code": "validation_error",
  *                  "message": "The query parameters didn't match the expected shape.",
+ *                  "retryable": false,
  *                  "meta": { "target": "query", "fields": ["from"] } } }
  *
  * `type` is the status CLASS, derived from the HTTP status and drawn from a
@@ -38,7 +39,8 @@ export const successSchema = z.object({ success: z.boolean() });
  * discriminant provider SDKs already branch on. `code` is the specific,
  * stable machine name for what happened, and is the field to branch on.
  * `message` is a sentence for a human, never parsed. `meta` carries the
- * structured detail the sentence deliberately leaves out.
+ * structured detail the sentence deliberately leaves out. `retryable` is an
+ * explicit instruction; it defaults to false and is never inferred from status.
  *
  * Keys inside `meta` are lower_snake_case, matching the rest of the wire.
  *
@@ -51,6 +53,7 @@ export const apiErrorSchema = z.object({
     type: z.string(),
     code: z.string(),
     message: z.string(),
+    retryable: z.boolean(),
     meta: z.record(z.string(), z.unknown()).optional(),
     /**
      * Correlation handles for the failing request, present when the request
@@ -96,6 +99,7 @@ export function apiErrorBody({
   code,
   message,
   meta,
+  retryable = false,
   traceId,
   spanId,
 }: {
@@ -103,6 +107,7 @@ export function apiErrorBody({
   code: string;
   message: string;
   meta?: Record<string, unknown>;
+  retryable?: boolean;
   traceId?: string;
   spanId?: string;
 }): ApiErrorBody {
@@ -111,6 +116,7 @@ export function apiErrorBody({
       type: apiErrorType(status),
       code,
       message,
+      retryable,
       ...(meta && Object.keys(meta).length > 0 ? { meta } : {}),
       ...(traceId ? { trace_id: traceId } : {}),
       ...(spanId ? { span_id: spanId } : {}),

@@ -406,6 +406,7 @@ function unhandledShape(): SerializedHandledError {
     httpStatus: 500,
     // An unclassified failure is potentially ours — log it like an incident.
     fault: "platform",
+    retryable: false,
     reasons: [],
   };
 }

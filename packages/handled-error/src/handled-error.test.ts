@@ -20,22 +20,25 @@ class TestError extends HandledError {
 }
 
 describe("HandledError.serialize", () => {
-  it("defaults fault to customer and omits empty remediation fields", () => {
+  it("defaults fault to customer, retryable to false, and omits empty remediation fields", () => {
     const serialized = new TestError().serialize();
 
     expect(serialized.fault).toBe("customer");
+    expect(serialized.retryable).toBe(false);
     expect(serialized).not.toHaveProperty("tips");
     expect(serialized).not.toHaveProperty("docsUrl");
   });
 
-  it("serializes tips, docsUrl and fault", () => {
+  it("serializes tips, docsUrl, fault and retryable", () => {
     const serialized = new TestError("boom", {
       fault: "platform",
+      retryable: true,
       tips: ["Try a smaller time range", "Select fewer fields"],
       docsUrl: "https://docs.langwatch.ai/traces",
     }).serialize();
 
     expect(serialized.fault).toBe("platform");
+    expect(serialized.retryable).toBe(true);
     expect(serialized.tips).toEqual(["Try a smaller time range", "Select fewer fields"]);
     expect(serialized.docsUrl).toBe("https://docs.langwatch.ai/traces");
   });
@@ -51,10 +54,15 @@ describe("HandledError.serialize", () => {
     const [handled, masked] = err.serialize().reasons;
     expect(handled).toMatchObject({
       code: "test_error",
+      retryable: false,
       tips: ["inner tip"],
       docsUrl: "https://x",
     });
-    expect(masked).toEqual({ code: "unknown", kind: "unknown" });
+    expect(masked).toEqual({
+      code: "unknown",
+      kind: "unknown",
+      retryable: false,
+    });
   });
 
   it("folds a reason's message into meta.message so the prose survives serialization", () => {
@@ -122,6 +130,7 @@ describe("handledErrorFromHerr", () => {
       trace_id: "0af7651916cd43dd8448eb211c80319c",
       span_id: "b7ad6b7169203331",
       fault: "customer",
+      retryable: true,
       tips: ["Contact your admin to raise the limit"],
       docs_url: "https://docs.langwatch.ai/gateway/budgets",
       reasons: [{ type: "unknown", message: "unknown" }],
@@ -129,6 +138,7 @@ describe("handledErrorFromHerr", () => {
 
     expect(err.code).toBe("budget_exceeded");
     expect(err.fault).toBe("customer");
+    expect(err.retryable).toBe(true);
     expect(err.tips).toEqual(["Contact your admin to raise the limit"]);
     expect(err.docsUrl).toBe("https://docs.langwatch.ai/gateway/budgets");
     // Wire ids are preserved on the error itself, not buried in meta.
@@ -181,6 +191,7 @@ class DuplicatedHandledError extends Error {
   readonly tips: readonly string[] = [];
   readonly docsUrl: string | undefined = undefined;
   readonly fault: HandledErrorFault = "customer";
+  readonly retryable = false;
 
   constructor(
     readonly code: string,
@@ -277,6 +288,7 @@ describe("serialising a reason chain", () => {
         code: "span_not_found",
         kind: "span_not_found",
         fault: "customer",
+        retryable: false,
         // The reason's own prose survives via the meta.message channel.
         meta: { message: "no span" },
       },
@@ -288,6 +300,8 @@ describe("serialising a reason chain", () => {
       reasons: [new Error("connection reset by peer")],
     });
 
-    expect(error.serialize().reasons).toEqual([{ code: "unknown", kind: "unknown" }]);
+    expect(error.serialize().reasons).toEqual([
+      { code: "unknown", kind: "unknown", retryable: false },
+    ]);
   });
 });

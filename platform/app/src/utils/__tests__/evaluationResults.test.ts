@@ -219,11 +219,18 @@ describe("parseEvaluationResult", () => {
           domainError: {
             code: "evaluator_execution_error",
             httpStatus: 401,
+            retryable: true,
             meta: { httpStatus: 401 },
             traceId: "trace-1",
             spanId: "span-1",
             traceUrl: "https://grafana.example.com/trace-1",
-            reasons: [{ code: "invalid_api_key", kind: "invalid_api_key" }],
+            reasons: [
+              {
+                code: "invalid_api_key",
+                kind: "invalid_api_key",
+                retryable: true,
+              },
+            ],
           },
         });
 
@@ -231,12 +238,19 @@ describe("parseEvaluationResult", () => {
           code: "evaluator_execution_error",
           kind: "evaluator_execution_error",
           httpStatus: 401,
+          retryable: true,
           fault: "customer",
           meta: { httpStatus: 401 },
           traceId: "trace-1",
           spanId: "span-1",
           traceUrl: "https://grafana.example.com/trace-1",
-          reasons: [{ code: "invalid_api_key", kind: "invalid_api_key" }],
+          reasons: [
+            {
+              code: "invalid_api_key",
+              kind: "invalid_api_key",
+              retryable: true,
+            },
+          ],
         });
       });
 
@@ -250,6 +264,7 @@ describe("parseEvaluationResult", () => {
           code: "evaluator_execution_error",
           kind: "evaluator_execution_error",
           httpStatus: 401,
+          retryable: false,
           fault: "customer",
           meta: {},
           traceId: undefined,

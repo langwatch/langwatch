@@ -566,6 +566,7 @@ describe("output validation", () => {
       // The Go envelope's name for the same value (see ErrorResponseBody.type).
       type: "internal_error",
       message: "An unknown error occurred",
+      retryable: false,
     });
   });
 });

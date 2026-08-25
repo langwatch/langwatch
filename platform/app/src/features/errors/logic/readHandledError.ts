@@ -2,6 +2,7 @@ import {
   goErrorCodes,
   type HandledErrorFault,
   nodeErrorCodes,
+  serializedReasonSchema,
   type SerializedHandledError,
   type SerializedReason,
 } from "@langwatch/handled-error";
@@ -25,6 +26,7 @@ export interface HandledErrorShape {
   meta: Record<string, unknown>;
   httpStatus: number;
   fault: HandledErrorFault;
+  retryable: boolean;
   tips: readonly string[];
   docsUrl: string | undefined;
   traceId: string | undefined;
@@ -76,6 +78,7 @@ function fromTrpcEnvelope(err: unknown): HandledErrorShape | null {
     httpStatus: candidate.httpStatus,
     meta: isRecord(candidate.meta) ? candidate.meta : {},
     fault: safeFault(candidate.fault),
+    retryable: candidate.retryable === true,
     tips: safeTips(candidate.tips),
     docsUrl: safeDocsUrl(candidate.docsUrl),
     traceId: typeof candidate.traceId === "string" ? candidate.traceId : undefined,
@@ -119,6 +122,7 @@ function fromRestBody(err: unknown): HandledErrorShape | null {
           : 0,
     meta: restMeta(err),
     fault: safeFault(err.fault),
+    retryable: err.retryable === true,
     tips: safeTips(err.tips),
     docsUrl: safeDocsUrl(err.docsUrl),
     traceId: typeof trace?.traceId === "string" ? trace.traceId : undefined,
@@ -141,6 +145,7 @@ const REST_ENVELOPE_KEYS = new Set([
   "tips",
   "docsUrl",
   "fault",
+  "retryable",
   "reasons",
   "trace",
   "httpStatus",
@@ -221,9 +226,12 @@ function safeTips(value: unknown): readonly string[] {
 const MAX_TIPS = 4;
 
 function safeReasons(value: unknown): readonly SerializedReason[] {
-  return Array.isArray(value)
-    ? (value.filter(isRecord) as unknown as SerializedReason[])
-    : [];
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((reason) => {
+    const parsed = serializedReasonSchema.safeParse(reason);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 /**
@@ -367,6 +375,7 @@ export function handledShapeFromSerialized(
     meta: isRecord(serialized.meta) ? serialized.meta : {},
     httpStatus: serialized.httpStatus,
     fault: safeFault(serialized.fault),
+    retryable: serialized.retryable === true,
     tips: safeTips(serialized.tips),
     docsUrl: safeDocsUrl(serialized.docsUrl),
     traceId: serialized.traceId,

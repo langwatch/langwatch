@@ -1,74 +1,9 @@
 import { trace } from "@opentelemetry/api";
-
-/**
- * Who is responsible for a handled error — the axis that drives log level and
- * alerting (handled-ness itself only decides what the *client* sees):
- *
- * - `customer`: the caller can fix it (bad filter, not found, permission).
- *   Expected; logged at warn, watched for spikes.
- * - `platform`: our infrastructure failed (ClickHouse down, worker spawn).
- *   Logged at error — an incident, not noise.
- * - `provider`: a third party failed (LLM provider outage, upstream 5xx).
- *   Logged at error, but never a bug in our code.
- *
- * Mirrors the fault classification in `services/aigateway/adapters/httpapi/faults.go`.
- */
-export type HandledErrorFault = "customer" | "platform" | "provider";
-
-export interface SerializedReason {
-  code: string;
-  /**
-   * @deprecated Back-compat alias of `code`, emitted during the
-   * `DomainError` → `HandledError` transition so clients still reading the old
-   * `kind` discriminant keep working. Read `code` in new code; this alias is
-   * removed once no consumer reads `kind`.
-   */
-  kind: string;
-  fault?: HandledErrorFault;
-  traceId?: string;
-  spanId?: string;
-  meta?: Record<string, unknown>;
-  tips?: readonly string[];
-  docsUrl?: string;
-  reasons?: SerializedReason[];
-}
-
-/**
- * Serialised, client-safe shape of a {@link HandledError}. Mirrors the Go
- * `herr.E` (`pkg/herr`): `code`/`meta`/`traceId`/`spanId`/`reasons` line up
- * field-for-field with `Code`/`Meta`/`TraceID`/`SpanID`/`Reasons`. `httpStatus`
- * and `traceUrl` are TypeScript-side conveniences with no `herr.E` equivalent
- * (Go maps code→status via a registry and builds the trace link elsewhere).
- *
- * `fault`, `tips` and `docsUrl` are the remediation channel: they let API,
- * CLI and MCP consumers (agents!) self-diagnose without a human interpreting
- * the error. All three are additive — older clients ignore them.
- */
-export interface SerializedHandledError {
-  code: string;
-  /**
-   * @deprecated Back-compat alias of `code`, emitted during the
-   * `DomainError` → `HandledError` transition so clients still reading the old
-   * `kind` discriminant keep working. Read `code` in new code; this alias is
-   * removed once no consumer reads `kind`.
-   */
-  kind: string;
-  meta: Record<string, unknown>;
-  traceId: string | undefined;
-  spanId: string | undefined;
-  /**
-   * A clickable Grafana link straight to this trace, present whenever a Grafana
-   * is configured (GRAFANA_BASE_URL — set automatically by haven locally).
-   * Included in production too: Grafana is access-controlled, so the URL leaks
-   * nothing to a client that can't reach it.
-   */
-  traceUrl?: string;
-  httpStatus: number;
-  fault: HandledErrorFault;
-  tips?: readonly string[];
-  docsUrl?: string;
-  reasons: SerializedReason[];
-}
+import type {
+  HandledErrorFault,
+  SerializedHandledError,
+  SerializedReason,
+} from "./serialized-handled-error";
 
 /**
  * The Go pkg/herr wire envelope — herr and HandledError are the SAME model
@@ -91,6 +26,7 @@ export interface HerrEnvelope {
   trace_id?: string;
   span_id?: string;
   fault?: HandledErrorFault;
+  retryable?: boolean;
   tips?: string[];
   docs_url?: string;
   reasons?: HerrEnvelope[];
@@ -111,51 +47,13 @@ export function setTraceUrlProvider(provider: TraceUrlProvider): void {
 }
 
 /**
- * Base class for all handled errors — the TypeScript counterpart of Go's
- * `herr.E` (`pkg/herr`). Its shape matches `herr.E` field-for-field:
- * `code`↔`Code`, `meta`↔`Meta`, `traceId`↔`TraceID`, `spanId`↔`SpanID`,
- * `reasons`↔`Reasons`. (`httpStatus` is TS-only; Go maps code→status via a
- * registry. Stack traces stay on the native `Error.stack` and never serialise.)
+ * TypeScript counterpart of Go's `herr.E`. Use the serialisable `code`, not
+ * `instanceof`, across process boundaries. {@link HandledError.isHandled} also
+ * survives duplicated bundle identities.
  *
- * `code` is a serialisable string discriminant — safe across process/worker
- * boundaries and serialisation (use instead of `instanceof` in those cases):
- *
- * ```ts
- * if (err.code === "evaluation_not_found") { ... }   // cross-process safe
- * if (err instanceof EvaluationNotFoundError) { ...}  // same-process only
- * ```
- *
- * For the broader "is this handled at all?" question, call
- * {@link HandledError.isHandled} rather than `instanceof HandledError`: it also
- * matches instances whose class identity a bundler duplicated, which bare
- * `instanceof` misses (see {@link hasHandledErrorBrand}).
- *
- * `meta` carries domain-specific context (e.g. `{ spanId }`) included in the
- * serialised shape. `httpStatus` is the suggested HTTP response code (defaults
- * to 500; subclasses set appropriate defaults). `traceId` / `spanId` are
- * captured automatically from the active OTel span. `reasons` serialises nested
- * HandledErrors by code and masks everything else as `{ code: "unknown" }`.
- *
- * `fault` says who's responsible (defaults to `"customer"` — annotate 5xx-ish
- * subclasses as `"platform"`/`"provider"` so incidents keep logging at error).
- * `tips` and `docsUrl` are the self-diagnosis channel for agents hitting the
- * API/CLI/MCP: short, actionable remediation steps and a link to the relevant
- * (markdown) doc. They serialise verbatim and are safe to show any client.
- *
- * Serialised shape:
- * ```json
- * {
- *   "code": "span_not_found",
- *   "meta": { "spanId": "abc" },
- *   "traceId": "...",
- *   "spanId": "...",
- *   "httpStatus": 404,
- *   "fault": "customer",
- *   "tips": ["Check the span id — spans expire after the retention window"],
- *   "docsUrl": "https://docs.langwatch.ai/...",
- *   "reasons": [{ "code": "invalid_span_id" }, { "code": "unknown" }]
- * }
- * ```
+ * Trace IDs come from the active OTel span unless supplied from a wire error.
+ * Nested handled causes retain their code; unknown causes are masked. `fault`,
+ * `tips`, and `docsUrl` are client-safe remediation metadata.
  */
 export abstract class HandledError extends Error {
   readonly isHandled = true as const;
@@ -164,6 +62,7 @@ export abstract class HandledError extends Error {
   readonly spanId: string | undefined;
   readonly httpStatus: number;
   readonly fault: HandledErrorFault;
+  readonly retryable: boolean;
   readonly tips: readonly string[];
   readonly docsUrl: string | undefined;
   readonly reasons: readonly Error[];
@@ -175,6 +74,7 @@ export abstract class HandledError extends Error {
       meta?: Record<string, unknown>;
       httpStatus?: number;
       fault?: HandledErrorFault;
+      retryable?: boolean;
       tips?: readonly string[];
       docsUrl?: string;
       reasons?: readonly Error[];
@@ -194,6 +94,7 @@ export abstract class HandledError extends Error {
     this.meta = options.meta ?? {};
     this.httpStatus = options.httpStatus ?? 500;
     this.fault = options.fault ?? "customer";
+    this.retryable = options.retryable ?? false;
     this.tips = options.tips ?? [];
     this.docsUrl = options.docsUrl;
     this.reasons = options.reasons ?? [];
@@ -214,6 +115,7 @@ export abstract class HandledError extends Error {
       ...(traceUrl ? { traceUrl } : {}),
       httpStatus: this.httpStatus,
       fault: this.fault,
+      retryable: this.retryable,
       ...(this.tips.length > 0 ? { tips: this.tips } : {}),
       ...(this.docsUrl ? { docsUrl: this.docsUrl } : {}),
       reasons: this.reasons.map(serializeReason),
@@ -316,6 +218,7 @@ export function handledErrorFromHerr(
         meta: body.meta,
         httpStatus: options.httpStatus,
         fault: body.fault,
+        retryable: body.retryable,
         tips: body.tips,
         docsUrl: body.docs_url,
         traceId: body.trace_id,
@@ -345,6 +248,7 @@ function serializeReason(error: Error): SerializedReason {
       // Deprecated back-compat alias — see SerializedReason.kind.
       kind: error.code,
       fault: error.fault,
+      retryable: error.retryable === true,
       ...(error.traceId ? { traceId: error.traceId } : {}),
       ...(error.spanId ? { spanId: error.spanId } : {}),
       ...(Object.keys(meta).length > 0 && { meta }),
@@ -355,13 +259,14 @@ function serializeReason(error: Error): SerializedReason {
       }),
     };
   }
-  return { code: "unknown", kind: "unknown" };
+  return { code: "unknown", kind: "unknown", retryable: false };
 }
 
 /** Options shared by the convenience subclasses below. */
 export interface HandledErrorOptions {
   meta?: Record<string, unknown>;
   fault?: HandledErrorFault;
+  retryable?: boolean;
   tips?: readonly string[];
   docsUrl?: string;
   reasons?: readonly Error[];

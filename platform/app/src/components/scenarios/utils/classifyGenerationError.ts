@@ -120,6 +120,7 @@ function explain(error: unknown): ErrorExplanation {
       meta: error.meta,
       httpStatus: 0,
       fault: "customer",
+      retryable: false,
       traceId: undefined,
       spanId: undefined,
       reasons: [],

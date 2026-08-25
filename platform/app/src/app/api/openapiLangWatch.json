@@ -8930,6 +8930,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -8944,7 +8947,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -8971,6 +8974,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -8985,7 +8991,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9012,6 +9018,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9026,7 +9035,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9053,6 +9062,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9067,7 +9079,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9094,6 +9106,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9108,7 +9123,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9338,6 +9353,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9352,7 +9370,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9379,6 +9397,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9393,7 +9414,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9420,6 +9441,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9434,7 +9458,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9461,6 +9485,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9475,7 +9502,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9597,6 +9624,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9611,7 +9641,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9638,6 +9668,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9652,7 +9685,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9679,6 +9712,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9693,7 +9729,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9720,6 +9756,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9734,7 +9773,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9845,6 +9884,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9859,7 +9901,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9886,6 +9928,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9900,7 +9945,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9927,6 +9972,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9941,7 +9989,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -9968,6 +10016,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -9982,7 +10033,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10114,6 +10165,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10128,7 +10182,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10155,6 +10209,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10169,7 +10226,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10196,6 +10253,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10210,7 +10270,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10237,6 +10297,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10251,7 +10314,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10278,6 +10341,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10292,7 +10358,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10411,6 +10477,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10425,7 +10494,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10452,6 +10521,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10466,7 +10538,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10493,6 +10565,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10507,7 +10582,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10534,6 +10609,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10548,7 +10626,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10575,6 +10653,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10589,7 +10670,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10669,6 +10750,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10683,7 +10767,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10710,6 +10794,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10724,7 +10811,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10751,6 +10838,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10765,7 +10855,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10792,6 +10882,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10806,7 +10899,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -10833,6 +10926,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -10847,7 +10943,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19057,6 +19153,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19071,7 +19170,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19098,6 +19197,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19112,7 +19214,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19139,6 +19241,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19153,7 +19258,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19180,6 +19285,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19194,7 +19302,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19485,6 +19593,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19499,7 +19610,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19526,6 +19637,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19540,7 +19654,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19567,6 +19681,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19581,7 +19698,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19608,6 +19725,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19622,7 +19742,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -19649,6 +19769,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -19663,7 +19786,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20218,6 +20341,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20232,7 +20358,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20259,6 +20385,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20273,7 +20402,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20300,6 +20429,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20314,7 +20446,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20341,6 +20473,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20355,7 +20490,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20382,6 +20517,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20396,7 +20534,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20643,6 +20781,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20657,7 +20798,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20684,6 +20825,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20698,7 +20842,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20725,6 +20869,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20739,7 +20886,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -20766,6 +20913,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -20780,7 +20930,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21190,6 +21340,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21204,7 +21357,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21231,6 +21384,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21245,7 +21401,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21272,6 +21428,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21286,7 +21445,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21313,6 +21472,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21327,7 +21489,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21354,6 +21516,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21368,7 +21533,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21395,6 +21560,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21409,7 +21577,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21679,6 +21847,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21693,7 +21864,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21720,6 +21891,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21734,7 +21908,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21761,6 +21935,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21775,7 +21952,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -21802,6 +21979,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -21816,7 +21996,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22082,6 +22262,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22096,7 +22279,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22123,6 +22306,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22137,7 +22323,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22164,6 +22350,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22178,7 +22367,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22205,6 +22394,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22219,7 +22411,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22468,6 +22660,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22482,7 +22677,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22509,6 +22704,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22523,7 +22721,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22550,6 +22748,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22564,7 +22765,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22591,6 +22792,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22605,7 +22809,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22854,6 +23058,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22868,7 +23075,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22895,6 +23102,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22909,7 +23119,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22936,6 +23146,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22950,7 +23163,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -22977,6 +23190,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -22991,7 +23207,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23043,6 +23259,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23057,7 +23276,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23084,6 +23303,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23098,7 +23320,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23125,6 +23347,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23139,7 +23364,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23166,6 +23391,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23180,7 +23408,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23207,6 +23435,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23221,7 +23452,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23261,6 +23492,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23275,7 +23509,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23302,6 +23536,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23316,7 +23553,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23343,6 +23580,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23357,7 +23597,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23384,6 +23624,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23398,7 +23641,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23425,6 +23668,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23439,7 +23685,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23732,6 +23978,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23746,7 +23995,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23773,6 +24022,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23787,7 +24039,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23814,6 +24066,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23828,7 +24083,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -23855,6 +24110,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -23869,7 +24127,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24202,6 +24460,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24216,7 +24477,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24243,6 +24504,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24257,7 +24521,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24284,6 +24548,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24298,7 +24565,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24325,6 +24592,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24339,7 +24609,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24366,6 +24636,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24380,7 +24653,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24852,6 +25125,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24866,7 +25142,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24893,6 +25169,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24907,7 +25186,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24934,6 +25213,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24948,7 +25230,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -24975,6 +25257,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -24989,7 +25274,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25016,6 +25301,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25030,7 +25318,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25314,6 +25602,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25328,7 +25619,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25355,6 +25646,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25369,7 +25663,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25396,6 +25690,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25410,7 +25707,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25437,6 +25734,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25451,7 +25751,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25812,6 +26112,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25826,7 +26129,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25853,6 +26156,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25867,7 +26173,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25894,6 +26200,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25908,7 +26217,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -25935,6 +26244,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -25949,7 +26261,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26252,6 +26564,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26266,7 +26581,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26293,6 +26608,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26307,7 +26625,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26334,6 +26652,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26348,7 +26669,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26375,6 +26696,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26389,7 +26713,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26450,6 +26774,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26464,7 +26791,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26491,6 +26818,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26505,7 +26835,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26532,6 +26862,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26546,7 +26879,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26573,6 +26906,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26587,7 +26923,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26614,6 +26950,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26628,7 +26967,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26678,6 +27017,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26692,7 +27034,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26719,6 +27061,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26733,7 +27078,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26760,6 +27105,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26774,7 +27122,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26801,6 +27149,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26815,7 +27166,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -26842,6 +27193,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -26856,7 +27210,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27026,6 +27380,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27040,7 +27397,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27067,6 +27424,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27081,7 +27441,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27108,6 +27468,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27122,7 +27485,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27149,6 +27512,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27163,7 +27529,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27349,6 +27715,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27363,7 +27732,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27390,6 +27759,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27404,7 +27776,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27431,6 +27803,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27445,7 +27820,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27472,6 +27847,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27486,7 +27864,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27513,6 +27891,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27527,7 +27908,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27763,6 +28144,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27777,7 +28161,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27804,6 +28188,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27818,7 +28205,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27845,6 +28232,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27859,7 +28249,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -27886,6 +28276,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -27900,7 +28293,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28054,6 +28447,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28068,7 +28464,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28095,6 +28491,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28109,7 +28508,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28136,6 +28535,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28150,7 +28552,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28177,6 +28579,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28191,7 +28596,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28434,6 +28839,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28448,7 +28856,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28475,6 +28883,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28489,7 +28900,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28516,6 +28927,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28530,7 +28944,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28557,6 +28971,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -28571,7 +28988,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -28898,9 +29315,12 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -29314,9 +29734,12 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -29458,9 +29881,12 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -29486,9 +29912,12 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -29707,9 +30136,12 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -29735,9 +30167,12 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -29956,9 +30391,12 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -56583,6 +57021,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -56597,7 +57038,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -56624,6 +57065,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -56638,7 +57082,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -56665,6 +57109,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -56679,7 +57126,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -56706,6 +57153,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -56720,7 +57170,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -56747,6 +57197,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -56761,7 +57214,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57191,6 +57644,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57205,7 +57661,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57232,6 +57688,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57246,7 +57705,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57273,6 +57732,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57287,7 +57749,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57314,6 +57776,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57328,7 +57793,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57679,6 +58144,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57693,7 +58161,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57720,6 +58188,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57734,7 +58205,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57761,6 +58232,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57775,7 +58249,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57802,6 +58276,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57816,7 +58293,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -57843,6 +58320,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -57857,7 +58337,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58216,6 +58696,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58230,7 +58713,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58257,6 +58740,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58271,7 +58757,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58298,6 +58784,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58312,7 +58801,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58339,6 +58828,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58353,7 +58845,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58380,6 +58872,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58394,7 +58889,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58547,6 +59042,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58561,7 +59059,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58588,6 +59086,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58602,7 +59103,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58629,6 +59130,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58643,7 +59147,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58670,6 +59174,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58684,7 +59191,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -58711,6 +59218,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -58725,7 +59235,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59094,6 +59604,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59108,7 +59621,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59135,6 +59648,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59149,7 +59665,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59176,6 +59692,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59190,7 +59709,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59217,6 +59736,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59231,7 +59753,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59258,6 +59780,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59272,7 +59797,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59364,6 +59889,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59378,7 +59906,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59405,6 +59933,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59419,7 +59950,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59446,6 +59977,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59460,7 +59994,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59487,6 +60021,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59501,7 +60038,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59528,6 +60065,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59542,7 +60082,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59694,6 +60234,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59708,7 +60251,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59735,6 +60278,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59749,7 +60295,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59776,6 +60322,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59790,7 +60339,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59817,6 +60366,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59831,7 +60383,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -59858,6 +60410,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -59872,7 +60427,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60058,6 +60613,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60072,7 +60630,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60099,6 +60657,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60113,7 +60674,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60140,6 +60701,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60154,7 +60718,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60181,6 +60745,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60195,7 +60762,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60222,6 +60789,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60236,7 +60806,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60331,6 +60901,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60345,7 +60918,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60372,6 +60945,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60386,7 +60962,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60413,6 +60989,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60427,7 +61006,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60454,6 +61033,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60468,7 +61050,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60562,6 +61144,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60576,7 +61161,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60603,6 +61188,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60617,7 +61205,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60644,6 +61232,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60658,7 +61249,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60685,6 +61276,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60699,7 +61293,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60828,6 +61422,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60842,7 +61439,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60869,6 +61466,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60883,7 +61483,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60910,6 +61510,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60924,7 +61527,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60951,6 +61554,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -60965,7 +61571,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -60992,6 +61598,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -61006,7 +61615,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -61180,6 +61789,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -61194,7 +61806,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -61221,6 +61833,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -61235,7 +61850,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -61262,6 +61877,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -61276,7 +61894,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -61303,6 +61921,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -61317,7 +61938,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -61916,6 +62537,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -61930,7 +62554,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -61957,6 +62581,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -61971,7 +62598,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -61998,6 +62625,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62012,7 +62642,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62039,6 +62669,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62053,7 +62686,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62528,6 +63161,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62542,7 +63178,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62569,6 +63205,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62583,7 +63222,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62610,6 +63249,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62624,7 +63266,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62651,6 +63293,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62665,7 +63310,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62795,6 +63440,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62809,7 +63457,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62836,6 +63484,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62850,7 +63501,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62877,6 +63528,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62891,7 +63545,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]
@@ -62918,6 +63572,9 @@
                         "message": {
                           "type": "string"
                         },
+                        "retryable": {
+                          "type": "boolean"
+                        },
                         "meta": {
                           "type": "object",
                           "propertyNames": {
@@ -62932,7 +63589,7 @@
                           "type": "string"
                         }
                       },
-                      "required": ["type", "code", "message"]
+                      "required": ["type", "code", "message", "retryable"]
                     }
                   },
                   "required": ["error"]

@@ -35,6 +35,7 @@ export function PermissionRequiredNotice({
     meta: { required_permission: permission },
     httpStatus: 403,
     fault: "customer",
+    retryable: false,
     tips: [],
     docsUrl: undefined,
     traceId: undefined,

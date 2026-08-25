@@ -59,6 +59,7 @@ describe("formatError", () => {
       expect(body.message).toBe("not_found");
       expect(JSON.stringify(body)).not.toContain("Resource not found: abc");
       expect(body.meta).toEqual({ id: "abc" });
+      expect(body.retryable).toBe(false);
     });
 
     it("carries fault, tips and docsUrl when present", () => {
@@ -74,6 +75,27 @@ describe("formatError", () => {
       expect(body.fault).toBe("customer");
       expect(body.tips).toEqual(["Narrow the time range"]);
       expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
+    });
+
+    it("carries an explicit retryability decision", () => {
+      const err = new TestError("provider_unavailable", "Provider unavailable", {
+        httpStatus: 503,
+        retryable: true,
+      });
+
+      const { body } = formatError({ err });
+
+      expect(body.retryable).toBe(true);
+    });
+
+    it("does not infer retryability from the HTTP status", () => {
+      const err = new TestError("provider_unavailable", "Provider unavailable", {
+        httpStatus: 503,
+      });
+
+      const { body } = formatError({ err });
+
+      expect(body.retryable).toBe(false);
     });
 
     /**
@@ -180,6 +202,7 @@ describe("formatError", () => {
       expect(status).toBe(403);
       expect(body.code).toBe("http_error");
       expect(body.message).toBe("Forbidden");
+      expect(body.retryable).toBe(false);
     });
   });
 
@@ -200,6 +223,7 @@ describe("formatError", () => {
           expect(status).toBe(500);
           expect(body.code).toBe("internal_error");
           expect(body.message).toBe("An unknown error occurred");
+          expect(body.retryable).toBe(false);
         } finally {
           process.env.NODE_ENV = originalEnv;
         }

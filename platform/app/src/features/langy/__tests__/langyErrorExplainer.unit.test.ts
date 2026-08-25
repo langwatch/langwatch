@@ -17,7 +17,13 @@ import {
  */
 
 function domain(overrides: Partial<LangyDomainError>): LangyDomainError {
-  return { code: "unknown", httpStatus: 500, meta: {}, ...overrides };
+  return {
+    code: "unknown",
+    httpStatus: 500,
+    meta: {},
+    retryable: false,
+    ...overrides,
+  };
 }
 
 describe("KNOWN_LANGY_ERROR_KINDS", () => {
@@ -563,7 +569,8 @@ describe("readLangyStreamError", () => {
           traceId: "t-1",
           spanId: "s-1",
           httpStatus: 429,
-          reasons: [],
+          retryable: true,
+          reasons: [{ kind: "provider_unavailable", retryable: true }],
         }),
       );
 
@@ -571,8 +578,9 @@ describe("readLangyStreamError", () => {
         code: "langy_agent_at_capacity",
         httpStatus: 429,
         meta: {},
+        retryable: true,
         traceId: "t-1",
-        reasons: undefined,
+        reasons: [{ kind: "provider_unavailable", retryable: true }],
       });
     });
   });

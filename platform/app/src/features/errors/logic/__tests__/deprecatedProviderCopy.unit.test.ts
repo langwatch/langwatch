@@ -29,6 +29,7 @@ const describeRefusal = (provider: string, replacement: string): string => {
     meta: { provider, replacement },
     httpStatus: 400,
     fault: "customer",
+    retryable: false,
     tips: [],
     docsUrl: undefined,
     traceId: undefined,
