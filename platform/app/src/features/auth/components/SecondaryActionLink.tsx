@@ -1,4 +1,4 @@
-import { Button } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import Link from "~/utils/compat/next-link";
 import "../auth.css";
 import { SHAPE } from "../authTheme";
@@ -9,9 +9,9 @@ import { SHAPE } from "../authTheme";
  *
  * It sits directly under the primary action, and it is not a peer of it: one
  * person in a hundred needs to switch screens, everyone else needs the filled
- * pill. Drawn at the primary's size it made the card read as two actions of
- * equal weight. So it is a small, muted ghost — visibly pressable on hover,
- * never competing for the first glance.
+ * pill. So it is a single centered line, muted at rest, reading as a link —
+ * never a second button competing for the first glance, and never a stray
+ * left-aligned caption.
  *
  * Not a `MethodButton`: a method is a way to finish THIS screen; this is a
  * way to leave it for another. It says the action outright — "Create an
@@ -32,26 +32,32 @@ export function SecondaryActionLink({
   testId?: string;
 }) {
   return (
-    <Button
-      asChild
-      variant="ghost"
-      alignSelf="center"
-      width="auto"
-      minHeight="32px"
-      paddingX="3"
-      fontSize="13px"
-      fontWeight={500}
-      color="fg.muted"
-      borderRadius={SHAPE.control}
-      _hover={{
-        color: "fg",
-        backgroundColor: "auth.fieldBg",
-      }}
-      data-testid={testId}
-    >
-      <Link viewTransition href={href}>
-        {label}
-      </Link>
-    </Button>
+    <Box width="full" textAlign="center" paddingY="1">
+      <Box
+        asChild
+        display="inline-block"
+        fontSize="13px"
+        fontWeight={500}
+        color="fg.muted"
+        paddingX="3"
+        paddingY="1.5"
+        borderRadius={SHAPE.control}
+        transition="color 0.15s ease, background-color 0.15s ease"
+        _hover={{
+          color: "fg",
+          backgroundColor: "auth.fieldBg",
+        }}
+        _focusVisible={{
+          outline: "2px solid",
+          outlineColor: "fg.subtle",
+          outlineOffset: "2px",
+        }}
+        data-testid={testId}
+      >
+        <Link viewTransition href={href}>
+          {label}
+        </Link>
+      </Box>
+    </Box>
   );
 }
