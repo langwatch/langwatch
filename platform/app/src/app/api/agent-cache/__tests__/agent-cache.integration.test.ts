@@ -280,67 +280,77 @@ describe("Feature: the agent cache", () => {
   });
 
   describe("given a legacy project API key", () => {
-    /** @scenario "A legacy project key reaches the agent cache" */
-    it("reaches the cache, the same as the rest of the project surface", async () => {
-      const written = await app.request(`/api/agent-cache/ACME_LEGACY`, {
-        method: "PUT",
-        headers: {
-          "X-Auth-Token": projectApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ value: "from-the-legacy-key" }),
-      });
-      expect(written.status).toBe(200);
+    describe("when it writes an entry and reads it back", () => {
+      /** @scenario "A legacy project key reaches the agent cache" */
+      it("reaches the cache, the same as the rest of the project surface", async () => {
+        const written = await app.request(`/api/agent-cache/ACME_LEGACY`, {
+          method: "PUT",
+          headers: {
+            "X-Auth-Token": projectApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ value: "from-the-legacy-key" }),
+        });
+        expect(written.status).toBe(200);
 
-      const res = await app.request(`/api/agent-cache/ACME_LEGACY`, {
-        headers: { "X-Auth-Token": projectApiKey },
+        const res = await app.request(`/api/agent-cache/ACME_LEGACY`, {
+          headers: { "X-Auth-Token": projectApiKey },
+        });
+        expect(res.status).toBe(200);
+        expect(((await res.json()) as { value: string }).value).toBe(
+          "from-the-legacy-key",
+        );
       });
-      expect(res.status).toBe(200);
-      expect(((await res.json()) as { value: string }).value).toBe(
-        "from-the-legacy-key",
-      );
     });
   });
 
   describe("given a caller that cannot manage the agent cache", () => {
-    /** @scenario "A caller without the manage grain is refused" */
-    it("refuses a viewer", async () => {
-      expect((await readEntry(ENTRY_NAME, viewerToken)).status).toBe(403);
-      expect(
-        (await writeEntry(ENTRY_NAME, viewerToken, { value: "x" })).status,
-      ).toBe(403);
+    describe("when a viewer reads and writes an entry", () => {
+      /** @scenario "A caller without the manage grain is refused" */
+      it("refuses a viewer", async () => {
+        expect((await readEntry(ENTRY_NAME, viewerToken)).status).toBe(403);
+        expect(
+          (await writeEntry(ENTRY_NAME, viewerToken, { value: "x" })).status,
+        ).toBe(403);
+      });
     });
 
-    /** @scenario "A request without an API key is refused" */
-    it("refuses a request that carries no API key", async () => {
-      const res = await app.request(`/api/agent-cache/${ENTRY_NAME}`, {
-        headers: { "X-Project-Id": projectId },
+    describe("when the request carries no API key", () => {
+      /** @scenario "A request without an API key is refused" */
+      it("refuses a request that carries no API key", async () => {
+        const res = await app.request(`/api/agent-cache/${ENTRY_NAME}`, {
+          headers: { "X-Project-Id": projectId },
+        });
+        expect(res.status).toBe(401);
       });
-      expect(res.status).toBe(401);
     });
   });
 
   describe("given the key a run puts in the sandbox", () => {
-    /** @scenario "The sandbox key reaches the agent cache" */
-    it("reaches the agent cache", async () => {
-      const written = await writeEntry("ACME_FROM_SANDBOX", sandboxToken, {
-        value: "written-in-the-sandbox",
-      });
-      expect(written.status).toBe(200);
+    describe("when it writes an entry and reads it back", () => {
+      /** @scenario "The sandbox key reaches the agent cache" */
+      it("reaches the agent cache", async () => {
+        const written = await writeEntry("ACME_FROM_SANDBOX", sandboxToken, {
+          value: "written-in-the-sandbox",
+        });
+        expect(written.status).toBe(200);
 
-      const res = await readEntry("ACME_FROM_SANDBOX", sandboxToken);
-      expect(res.status).toBe(200);
-      expect(((await res.json()) as { value: string }).value).toBe(
-        "written-in-the-sandbox",
-      );
+        const res = await readEntry("ACME_FROM_SANDBOX", sandboxToken);
+        expect(res.status).toBe(200);
+        expect(((await res.json()) as { value: string }).value).toBe(
+          "written-in-the-sandbox",
+        );
+      });
     });
 
-    /** @scenario "The sandbox key reaches nothing else" */
-    it("is refused everywhere else in the project", async () => {
-      const res = await promptsApp.request("/api/prompts", {
-        headers: headersFor(sandboxToken),
+    describe("when it calls another route of the same project", () => {
+      /** @scenario "The sandbox key reaches nothing else" */
+      it("is refused everywhere else in the project", async () => {
+        const res = await promptsApp.request("/api/prompts", {
+          headers: headersFor(sandboxToken),
+        });
+        expect(res.status).toBe(403);
       });
-      expect(res.status).toBe(403);
     });
   });
 });
