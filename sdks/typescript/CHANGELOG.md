@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.9.0...typescript-sdk@v1.10.0) (2026-08-25)
+
+
+### Features
+
+* **agent-plugin:** agent-declared working context with langwatch ingest context ([#7464](https://github.com/langwatch/langwatch/issues/7464)) ([9ffa03d](https://github.com/langwatch/langwatch/commit/9ffa03dfc1b1b2b777ee37bb42703de5c8fef0e0))
+
 ## [1.9.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.8.0...typescript-sdk@v1.9.0) (2026-08-25)
 
 
