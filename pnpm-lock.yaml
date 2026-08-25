@@ -1749,6 +1749,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../design-system
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

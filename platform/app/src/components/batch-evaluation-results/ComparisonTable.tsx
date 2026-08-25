@@ -17,7 +17,7 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { DiffCell, type DiffValue } from "./DiffCell";
 import { ExpandableDatasetCell } from "./ExpandableDatasetCell";

@@ -17,6 +17,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { type RefObject, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -27,7 +28,6 @@ import {
   DatasetTableProvider,
   type DatasetTableRowData,
 } from "./dataset-table-context";
-import { ColumnTypeIcon } from "./column-type-icon";
 import { datasetTableCss } from "./dataset-table-styles";
 import { JSON_LIKE_TYPES } from "./editable-cell";
 import { TableCell } from "./table-cell";

@@ -1,4 +1,5 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import {
   type ColumnDef,
   type ColumnSizingState,

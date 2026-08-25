@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import {
   type MouseEvent as ReactMouseEvent,
   type RefObject,
@@ -15,7 +16,6 @@ import {
   JSON_LIKE_TYPES,
   truncateCellValue,
 } from "./editable-cell-value";
-import { isTextLikelyOverflowing } from "./text-overflow";
 
 const MAX_DISPLAY_CHARACTERS = 5000;
 const COMPACT_MAX_HEIGHT = 160 - 17;

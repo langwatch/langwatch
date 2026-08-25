@@ -16,7 +16,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
-import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
 import { ComparisonWinnerCell } from "./ComparisonWinnerCell";

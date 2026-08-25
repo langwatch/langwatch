@@ -46,6 +46,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { api } from "~/utils/api";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";
 import {
@@ -60,7 +61,6 @@ import {
   type EditorRecord,
   rekeyEditorRecords,
   useTableKeyboardNavigation,
-  ColumnTypeIcon,
   VirtualizedTableBody,
 } from "@langwatch/dataset-web";
 import { useDatasetRecordSync } from "./useDatasetRecordSync";

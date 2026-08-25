@@ -13,23 +13,8 @@ import {
   Type,
 } from "lucide-react";
 
-export type DatasetColumnIconType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "json"
-  | "chat_messages"
-  | "image"
-  | "date"
-  | "list"
-  | "rag_contexts"
-  | "spans"
-  | "annotations"
-  | "evaluations"
-  | string;
-
-type ColumnTypeIconProps = {
-  type: DatasetColumnIconType;
+export type ColumnTypeIconProps = {
+  type: string;
   size?: number;
 };
 

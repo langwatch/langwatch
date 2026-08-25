@@ -31,7 +31,7 @@ import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 
 import { useEscapeKey } from "~/hooks/useEscapeKey";
-import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 
 import type {
   BatchComparisonColumn,

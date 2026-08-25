@@ -56,7 +56,6 @@ export {
   type DatasetTableRowData,
   type RowHeightMode,
 } from "./editor/dataset-table-context";
-export { ColumnTypeIcon, type DatasetColumnIconType } from "./editor/column-type-icon";
 export {
   DatasetPreviewTable,
   type DatasetPreviewRow,
@@ -68,7 +67,6 @@ export {
   type ColumnType as DatasetTableColumnType,
 } from "./editor/table-cell";
 export { VirtualizedTableBody } from "./editor/virtualized-table-body";
-export { isTextLikelyOverflowing } from "./editor/text-overflow";
 export {
   createDatasetEditorStore,
   rekeyEditorRecords,

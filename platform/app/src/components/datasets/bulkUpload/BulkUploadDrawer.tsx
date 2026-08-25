@@ -51,6 +51,7 @@ import {
 import { formatFileSize } from "react-papaparse";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { api } from "~/utils/api";
 import { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "../../shared/ColumnTypeSelect";
 import { Drawer } from "../../ui/drawer";
@@ -69,7 +70,6 @@ import {
   retryDatasetNormalize,
   type BulkUploadTransport,
   useBulkUpload,
-  ColumnTypeIcon,
 } from "@langwatch/dataset-web";
 
 // Visually hidden but kept in the tab order (not display:none) so the picker is

@@ -38,6 +38,10 @@
       "types": "./src/components/close-button.tsx",
       "default": "./src/components/close-button.tsx"
     },
+    "./column-type-icon": {
+      "types": "./src/components/column-type-icon.tsx",
+      "default": "./src/components/column-type-icon.tsx"
+    },
     "./dialog": {
       "types": "./src/components/dialog.tsx",
       "default": "./src/components/dialog.tsx"
@@ -89,6 +93,10 @@
     "./toaster": {
       "types": "./src/components/toaster.tsx",
       "default": "./src/components/toaster.tsx"
+    },
+    "./text-overflow": {
+      "types": "./src/text-overflow.ts",
+      "default": "./src/text-overflow.ts"
     },
     "./trigger-anchor": {
       "types": "./src/components/trigger-anchor.tsx",

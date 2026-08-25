@@ -16,7 +16,7 @@ import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useEscapeKey } from "~/hooks/useEscapeKey";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
-import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import {
   COLLAPSED_CELL_HEIGHT_PX,
   DEFAULT_ROW_HEIGHT,

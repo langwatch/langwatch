@@ -11,7 +11,7 @@ import { LuCheck, LuCopy } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEscapeKey } from "~/hooks/useEscapeKey";
-import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import {
   COLLAPSED_CELL_HEIGHT_PX,
   DEFAULT_ROW_HEIGHT,
