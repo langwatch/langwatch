@@ -154,3 +154,24 @@ export const SSO_DNS_RECORD_TYPE = "TXT" as const;
 export function ssoDnsRecordName({ domain }: { domain: string }): string {
   return `${SSO_DNS_RECORD_NAME}.${domain}`;
 }
+
+/**
+ * Where the domain serves the token when the customer chooses the file
+ * channel instead of DNS: the same minted value, as the entire body of a
+ * plain-text file at a well-known path.
+ *
+ * One fixed path for every organization, for the reason the record's label
+ * is one label: the VALUE is the secret, and a per-organization path would
+ * put a customer's identifier where anybody can fetch it. `https` is not a
+ * choice — a token read over plain HTTP could have been answered by anybody
+ * between us and the domain, which is exactly what the ceremony exists to
+ * rule out.
+ */
+export const SSO_VERIFICATION_FILE_PATH =
+  "/.well-known/langwatch-verification.txt" as const;
+
+/** The whole address the check fetches, which is also what the setup screen
+ *  shows the customer to put the file at. */
+export function ssoVerificationFileUrl({ domain }: { domain: string }): string {
+  return `https://${domain}${SSO_VERIFICATION_FILE_PATH}`;
+}

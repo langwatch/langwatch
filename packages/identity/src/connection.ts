@@ -63,6 +63,13 @@ export type SsoConnectionLifecycleState = z.infer<
  * How a domain claim is proved. Self-hosted installations that cannot
  * publish a TXT record prove ownership with their license token instead.
  *
+ * `https-file` is the published-proof ceremony's second channel: the same
+ * minted token, served by the domain at the well-known path instead of
+ * published as a TXT record, for the customer whose DNS is a ticket away
+ * but whose web server is not. It is a METHOD a verified fact can carry and
+ * not a ceremony of its own — the ceremony is minted once as `dns-txt` and
+ * either channel satisfies it (see `SSO_PUBLISHED_PROOF_CHANNELS`).
+ *
  * `operator-attested` is the D05 amendment: a LangWatch operator states out
  * of band that the domain is that organization's, which replaces the PROOF
  * and never the approval. It publishes nothing, so it carries no token and
@@ -74,10 +81,12 @@ export type SsoConnectionLifecycleState = z.infer<
  * serving production sign-ins through `Organization.ssoDomain` before
  * connections existed. The proof is that history, and re-running a DNS
  * ceremony against a domain the platform has been routing for years would
- * be theater. The ceremony commands accept the first two only.
+ * be theater. The ceremony commands accept only the methods in
+ * `SSO_VERIFICATION_CEREMONY_METHODS`.
  */
 export const SSO_VERIFICATION_METHODS = [
   "dns-txt",
+  "https-file",
   "license-token",
   "operator-attested",
   "legacy-configuration",
@@ -94,6 +103,26 @@ export const ssoVerificationCeremonyMethodSchema = z.enum(
 );
 export type SsoVerificationCeremonyMethod = z.infer<
   typeof ssoVerificationCeremonyMethodSchema
+>;
+
+/**
+ * The two channels one published-proof ceremony can be satisfied through.
+ *
+ * A ceremony on the published-proof tier mints ONE token and is recorded as
+ * `dns-txt` — that is still the ceremony's name — but the customer may hand
+ * the token back either way: as a TXT record on the domain, or as a file the
+ * domain serves at the well-known path. Both demonstrate the same thing,
+ * control of the domain, so both are decided by the same pending ceremony
+ * and the same hash. Which channel actually proved it is what the verified
+ * fact's `method` records, so the re-proof sweep re-reads the evidence where
+ * it actually lives.
+ */
+export const SSO_PUBLISHED_PROOF_CHANNELS = ["dns-txt", "https-file"] as const;
+export const ssoPublishedProofChannelSchema = z.enum(
+  SSO_PUBLISHED_PROOF_CHANNELS,
+);
+export type SsoPublishedProofChannel = z.infer<
+  typeof ssoPublishedProofChannelSchema
 >;
 
 /**

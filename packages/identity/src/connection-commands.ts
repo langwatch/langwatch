@@ -4,6 +4,7 @@ import {
   ssoConnectionTypeSchema,
   ssoDomainClaimAuthoritySchema,
   ssoIdpMetadataSchema,
+  ssoPublishedProofChannelSchema,
   ssoVerificationCeremonyMethodSchema,
 } from "./connection";
 import { identityActorSchema } from "./vocabulary";
@@ -202,7 +203,18 @@ export type AttestDomainCommandData = z.infer<
   typeof attestDomainCommandDataSchema
 >;
 
-export const verifyDomainCommandDataSchema = commandDataSchema(domainShape);
+/**
+ * `channel` is which published channel the caller's check actually read the
+ * token from — the TXT record, or the file at the well-known path. Optional,
+ * and absent it defaults to the pending ceremony's own method, so every
+ * caller that predates the file channel keeps meaning what it always meant.
+ * The guard refuses a channel on a ceremony that has none (`license-token`
+ * publishes nothing).
+ */
+export const verifyDomainCommandDataSchema = commandDataSchema({
+  ...domainShape,
+  channel: ssoPublishedProofChannelSchema.optional(),
+});
 export type VerifyDomainCommandData = z.infer<
   typeof verifyDomainCommandDataSchema
 >;
