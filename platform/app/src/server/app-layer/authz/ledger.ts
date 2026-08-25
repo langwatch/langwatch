@@ -1881,7 +1881,11 @@ export class GrantsLedgerWriter {
     bypass = "revocation",
   }: {
     organizationId: string;
-    where: { groupId?: string; userId?: string };
+    /** `userId` takes a list so one admin action is one removal: a group edit
+     *  dropping fifty people would otherwise be fifty findMany/updateMany
+     *  round-trips and fifty epoch bumps. An empty list matches nothing, which
+     *  is what it should mean -- it does NOT widen to the whole group. */
+    where: { groupId?: string; userId?: string | string[] };
     actor: LedgerActor;
     reason?: string;
     bypass?: "revocation" | "offboard";
@@ -1889,6 +1893,22 @@ export class GrantsLedgerWriter {
     if (where.groupId === undefined && where.userId === undefined) {
       throw new Error(
         "removeGroupMembersWhere refused a filter naming neither a group nor a user: it would end every membership in the organization",
+      );
+    }
+    // A blank id is not a filter, it is a missing one, and it has to be
+    // refused HERE rather than left to the clause below. `z.string()` accepts
+    // "", so a blank reaches this far as a well-typed value; a truthiness test
+    // when building the filter would then DROP the predicate rather than
+    // narrow on it, and `{ groupId, userId: "" }` would widen from one member
+    // to every live member of the group. The predicate that disappears is the
+    // one doing the limiting, so the failure is silent and total.
+    const blank = (id: string | undefined) => id !== undefined && id === "";
+    const userIds = Array.isArray(where.userId)
+      ? where.userId
+      : [where.userId].filter((id): id is string => id !== undefined);
+    if (blank(where.groupId) || userIds.some((id) => id === "")) {
+      throw new Error(
+        "removeGroupMembersWhere refused a filter carrying a blank id: a blank narrows nothing, and dropping it would end every membership the remaining predicate matches",
       );
     }
     // Deliberately NOT fenced on `Group.deletedAt`, unlike every READ of live
@@ -1900,8 +1920,14 @@ export class GrantsLedgerWriter {
     // to end. The tenancy bound is what this filter is for.
     const live = await liveGroupMemberships(this.prisma).findMany({
       where: {
-        ...(where.groupId ? { groupId: where.groupId } : {}),
-        ...(where.userId ? { userId: where.userId } : {}),
+        ...(where.groupId === undefined ? {} : { groupId: where.groupId }),
+        ...(where.userId === undefined
+          ? {}
+          : {
+              userId: Array.isArray(where.userId)
+                ? { in: where.userId }
+                : where.userId,
+            }),
         group: { organizationId },
       },
       select: { id: true, groupId: true, userId: true },

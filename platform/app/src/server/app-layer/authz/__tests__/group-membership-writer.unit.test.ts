@@ -244,6 +244,76 @@ describe("given an organization on the authorization ledger", () => {
     });
   });
 
+  describe("when a filter carries a blank id", () => {
+    it("refuses a blank user rather than emptying the whole group", async () => {
+      const { writer, db } = harness({ onLedger: true });
+
+      await expect(
+        writer.removeGroupMembersWhere({
+          organizationId: ORG_ID,
+          where: { groupId: GROUP_ID, userId: "" },
+          actor: ACTOR,
+        }),
+      ).rejects.toThrow(/blank id/);
+      // The point of the refusal: a dropped predicate would have read every
+      // live membership of the group and ended all of them.
+      expect(db.groupMembership.findMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a blank inside a list of users", async () => {
+      const { writer, db } = harness({ onLedger: true });
+
+      await expect(
+        writer.removeGroupMembersWhere({
+          organizationId: ORG_ID,
+          where: { groupId: GROUP_ID, userId: ["user_erin", ""] },
+          actor: ACTOR,
+        }),
+      ).rejects.toThrow(/blank id/);
+      expect(db.groupMembership.findMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a blank group", async () => {
+      const { writer, db } = harness({ onLedger: true });
+
+      await expect(
+        writer.removeGroupMembersWhere({
+          organizationId: ORG_ID,
+          where: { groupId: "" },
+          actor: ACTOR,
+        }),
+      ).rejects.toThrow(/blank id/);
+      expect(db.groupMembership.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when several users are removed at once", () => {
+    it("resolves them in one read rather than one per user", async () => {
+      const { writer, db } = harness({ onLedger: true });
+      db.groupMembership.findMany.mockResolvedValue([
+        liveMembershipRow({ id: "groupmember_1" }),
+        { id: "groupmember_2", groupId: GROUP_ID, userId: "user_erin" },
+      ]);
+
+      const ended = await writer.removeGroupMembersWhere({
+        organizationId: ORG_ID,
+        where: { groupId: GROUP_ID, userId: ["user_dana", "user_erin"] },
+        actor: ACTOR,
+      });
+
+      expect(ended).toEqual(["groupmember_1", "groupmember_2"]);
+      expect(db.groupMembership.findMany).toHaveBeenCalledTimes(1);
+      expect(db.groupMembership.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            groupId: GROUP_ID,
+            userId: { in: ["user_dana", "user_erin"] },
+          }),
+        }),
+      );
+    });
+  });
+
   describe("when a group's memberships are ended by filter", () => {
     /** @scenario "Deleting a group ends its memberships without erasing that they existed" */
     it("resolves the live rows and marks exactly those", async () => {
