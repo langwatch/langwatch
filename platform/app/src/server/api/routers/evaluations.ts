@@ -2,7 +2,6 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -106,8 +105,7 @@ export const evaluationsRouter = createTRPCRouter({
       if (result) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
         try {
-          const app = getApp();
-          await app.evaluations.reportEvaluation({
+          await ctx.app.evaluations.reportEvaluation({
             tenantId: input.projectId,
             evaluationId,
             evaluatorId: input.evaluatorType,
