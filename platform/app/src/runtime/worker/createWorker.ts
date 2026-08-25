@@ -10,20 +10,20 @@ import type { WorkerHandle } from "~/server/workers/startWorkers";
 export type WorkerRuntime = {
   kind: "worker";
   services: CapabilityRegistry;
-  legacy: App;
+  app: App;
   start(): Promise<void>;
   close(): Promise<void>;
 };
 
 export async function createWorker({
-  initializeLegacy,
-  startLegacy,
+  composeApp,
+  startWorker,
   features = [],
   resources = new ResourceScope(),
   ownsResources = true,
 }: {
-  initializeLegacy: () => App;
-  startLegacy: (app: App) => Promise<WorkerHandle>;
+  composeApp: () => App;
+  startWorker: (app: App) => Promise<WorkerHandle>;
   features?: readonly FeatureDefinition<Record<string, never>>[];
   resources?: ResourceScope;
   ownsResources?: boolean;
@@ -32,22 +32,22 @@ export async function createWorker({
     infrastructure: {},
     resources,
   }).build({ features, target: "worker" });
-  const legacy = initializeLegacy();
+  const app = composeApp();
   let handle: WorkerHandle | undefined;
   let closed = false;
   return {
     kind: "worker",
     services: built.registry,
-    legacy,
+    app,
     async start() {
       if (closed) throw new Error("Worker runtime is closed.");
-      handle ??= await startLegacy(legacy);
+      handle ??= await startWorker(app);
     },
     async close() {
       if (closed) return;
       closed = true;
       await handle?.shutdown();
-      await legacy.close({ terminating: true });
+      await app.close({ terminating: true });
       if (ownsResources) await resources.close();
     },
   };

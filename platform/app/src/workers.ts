@@ -44,7 +44,7 @@ void (async () => {
   const appBoot = new AppBoot({
     compose: async (_config, resources) => {
       // These imports are intentionally inside compose: config validation has
-      // completed before the legacy presets or worker transport evaluate.
+      // completed before the App composition or worker transport evaluate.
       const { createWorker } = await import("./runtime/worker");
       const { startWorkers } = await import("./server/workers/startWorkers");
       const { initializeWorkerApp } = (await import(
@@ -54,8 +54,8 @@ void (async () => {
       };
 
       const runtime = await createWorker({
-        initializeLegacy: initializeWorkerApp,
-        startLegacy: (app) =>
+        composeApp: initializeWorkerApp,
+        startWorker: (app) =>
           startWorkers({ shouldStartMetricsServer: true, app }),
         resources,
         ownsResources: false,

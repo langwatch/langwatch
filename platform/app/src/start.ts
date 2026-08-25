@@ -182,7 +182,7 @@ export const startApp = async (options: StartAppOptions) => {
   const appRuntime =
     options.appRuntime ??
     (await createApp({
-      initializeLegacy: isInProcessWorkerModeEnabled
+      composeApp: isInProcessWorkerModeEnabled
         ? initializeInProcessApp
         : initializeWebApp,
     }));
@@ -200,7 +200,7 @@ export const startApp = async (options: StartAppOptions) => {
   // process, and one that cannot reach Redis has nothing to serve. The probe
   // has already logged what and where (ADR-093).
   try {
-    await assertRedisReady({ app: appRuntime.legacy });
+    await assertRedisReady({ app: appRuntime.app });
   } catch (err) {
     // Synchronous stderr before exiting, for the same reason the server error
     // handler below does it: the probe logs through pino, whose transports are
@@ -247,7 +247,7 @@ export const startApp = async (options: StartAppOptions) => {
       : basePort);
 
   const mcpHandler = createMcpHandler();
-  const honoApp = createApiRouter(appRuntime.legacy);
+  const honoApp = createApiRouter(appRuntime.app);
   // The Node→Hono bridge. `getRequestListener` streams request bodies through
   // (no buffering — the Langy ndjson relay depends on this) and streams the
   // response back. `overrideGlobalObjects: false`: never patch the process's
@@ -406,7 +406,7 @@ export const startApp = async (options: StartAppOptions) => {
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
   const wsHandle = setupTRPCWebSocket(
     server as ReturnType<typeof createServer>,
-    appRuntime.legacy,
+    appRuntime.app,
   );
 
   server.once("error", (err) => {
@@ -548,7 +548,7 @@ export const startApp = async (options: StartAppOptions) => {
       // second listener.
       workerHandle = await startWorkers({
         shouldStartMetricsServer: false,
-        app: appRuntime.legacy,
+        app: appRuntime.app,
       });
       logger.info("in-process workers ready");
     } catch (error) {
