@@ -118,6 +118,12 @@ interface TranscriptRow {
   /** Opaque grouping key. Never parsed — see `conversationKeyOf`. */
   name?: string | null;
   conversationstarttime?: string | null;
+  /**
+   * Declared to record that the field exists and is deliberately unread. It
+   * names a storage chunk, not a conversation, so it is never an identity
+   * input — two rows of one conversation carry different values here and
+   * must still produce one trace.
+   */
   conversationtranscriptid?: string | null;
   metadata?: string | Record<string, unknown> | null;
   content?: string | { activities?: Activity[] | null } | null;
