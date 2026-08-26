@@ -36,6 +36,23 @@ export const scimReconciliationRouter = createTRPCRouter({
     scimReconciliation().getAll({ organizationId: input.organizationId }),
   ),
 
+  /**
+   * What the directory has been doing on one connection (ADR-126).
+   *
+   * `sso:view` like the rest of this router: reading the sequence is the same
+   * job as reading the state, and a reader trusted with one is trusted with
+   * the other. Naming another organization's connection reads that
+   * organization's log with this organization's tenant and finds nothing.
+   */
+  getActivity: scimViewProcedure
+    .input(z.object({ connectionId: z.string().min(1) }))
+    .query(async ({ input }) =>
+      scimReconciliation().getActivity({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+      }),
+    ),
+
   getById: scimViewProcedure
     .input(z.object({ connectionId: z.string().min(1) }))
     .query(async ({ input }) =>

@@ -21,7 +21,17 @@
  *                              so the remediation copy says so instead of a
  *                              control saying nothing.
  */
-import type { ScimSyncLifecycleState } from "@langwatch/identity";
+import {
+  SCIM_APPLY_FAILED_EVENT_TYPE,
+  SCIM_APPLY_RECOVERED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
+  SCIM_APPLY_RETIRED_EVENT_TYPE,
+  SCIM_GROUP_MAPPED_EVENT_TYPE,
+  SCIM_TOKEN_ISSUED_EVENT_TYPE,
+  SCIM_TOKEN_REVOKED_EVENT_TYPE,
+  SCIM_USER_PUSHED_EVENT_TYPE,
+  type ScimSyncLifecycleState,
+} from "@langwatch/identity";
 
 /** What a connection's sync says about itself, in words. */
 export interface ScimSyncStatusCopy {
@@ -113,4 +123,79 @@ export function directoryChangeCopy({
 }): string {
   const who = person ?? "a group";
   return kind === "removed" ? `${who} lost access` : `${who} was given access`;
+}
+
+/**
+ * One line of the activity feed (ADR-126).
+ *
+ * SAID AS THE DIRECTORY'S ACT, not as ours. Every one of these happened
+ * because a provider sent something, and the reader is trying to match what
+ * they see here against what they did over there — so the sentence names the
+ * operation the provider performed, in that vocabulary, rather than the
+ * internal state it moved.
+ *
+ * The person is named where we know them and described where we do not: a
+ * push whose user we have not resolved yet is still worth a line, and "a
+ * person" beats an identifier the reader has never seen. A failure's words
+ * come from the same error registry the failure panel uses, so the two
+ * surfaces cannot describe one failure differently.
+ */
+export const DIRECTORY_ACTIVITY_UNKNOWN_PERSON = "a person";
+
+export function directoryActivityCopy({
+  type,
+  op,
+  person,
+  failure,
+}: {
+  type: string;
+  /** The operation the fact names, when it names one. */
+  op: string | null;
+  /** The person's name or address, when we could resolve them. */
+  person: string | null;
+  /** The failure's words, already looked up, when this entry is a failure. */
+  failure: string | null;
+}): string {
+  const who = person ?? DIRECTORY_ACTIVITY_UNKNOWN_PERSON;
+  switch (type) {
+    case SCIM_TOKEN_ISSUED_EVENT_TYPE:
+      return "A provisioning token was issued for this connection";
+    case SCIM_USER_PUSHED_EVENT_TYPE:
+      return `${directoryUserOpCopy(op)} ${who}`;
+    case SCIM_GROUP_MAPPED_EVENT_TYPE:
+      return "Your directory sent a group";
+    case SCIM_APPLY_FAILED_EVENT_TYPE:
+      return failure ?? `Something your directory sent could not be applied`;
+    case SCIM_APPLY_RECOVERED_EVENT_TYPE:
+      return "A change that had been failing went through";
+    case SCIM_APPLY_RETIRED_EVENT_TYPE:
+      return failure
+        ? `${failure} — no longer being retried`
+        : "A change your directory sent will not be retried again";
+    case SCIM_APPLY_REDRIVEN_EVENT_TYPE:
+      return "A change that had been given up on was sent through again";
+    case SCIM_TOKEN_REVOKED_EVENT_TYPE:
+      return "This connection's provisioning token stopped working";
+    default:
+      // A fact this surface has no words for is still a fact, and dropping it
+      // would make the sequence lie about what happened. It says the least
+      // that is true rather than nothing at all.
+      return "Your directory did something we have no words for yet";
+  }
+}
+
+/** The provider's own verb for what it did to somebody. */
+function directoryUserOpCopy(op: string | null): string {
+  switch (op) {
+    case "create":
+      return "Your directory added";
+    case "update":
+      return "Your directory updated";
+    case "deactivate":
+      return "Your directory switched off access for";
+    case "remove":
+      return "Your directory removed";
+    default:
+      return "Your directory sent";
+  }
 }

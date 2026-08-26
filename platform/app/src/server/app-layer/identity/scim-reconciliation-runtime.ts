@@ -15,6 +15,7 @@ import type { ScimSyncLifecycle } from "@ee/scim/scim-sync.service";
 import { prisma } from "../../db";
 import { grantsService } from "../authz/runtime";
 import { PrismaScimReconciliationRepository } from "./repositories/scim-reconciliation.prisma.repository";
+import { EventLogScimSyncActivityRepository } from "./repositories/scim-sync-event-log.repository";
 import {
   ScimOversightService,
   type ScimRedriveApplyPort,
@@ -44,7 +45,13 @@ function deprovision(): ScimRedriveApplyPort {
 
 /** The organization's own read of its directory sync. */
 export function scimReconciliation(): ScimReconciliationService {
-  return new ScimReconciliationService({ reads: reads() });
+  return new ScimReconciliationService({
+    reads: reads(),
+    // The log, read as a sequence (ADR-126). It resolves the App's event
+    // store lazily for the same reason everything else here is built per
+    // call: there may not be an App yet at module scope.
+    activity: new EventLogScimSyncActivityRepository(),
+  });
 }
 
 /** The cross-customer operator surface, and its one guarded write. */

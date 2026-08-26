@@ -20,6 +20,7 @@
 import type { ScimSyncState } from "@langwatch/identity";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DirectoryCausedChange } from "../repositories/scim-reconciliation.prisma.repository";
+import type { DirectoryActivityEntry } from "../repositories/scim-sync-event-log.repository";
 import { ScimReconciliationService } from "../scim-reconciliation.service";
 
 const ACME = "org_acme";
@@ -118,13 +119,58 @@ function createReads({
   };
 }
 
+/**
+ * The log, as the activity feed reads it (ADR-126).
+ *
+ * Keyed by connection so the stand-in enforces the property the real read
+ * gets from tenancy: asking for somebody else's connection under this
+ * organization finds nothing, rather than finding it and being filtered.
+ */
+function createActivity(
+  entriesByConnection: Record<string, DirectoryActivityEntry[]> = {},
+) {
+  return {
+    findActivity: vi.fn(
+      async ({
+        organizationId,
+        connectionId,
+        limit,
+      }: {
+        organizationId: string;
+        connectionId: string;
+        limit: number;
+      }) => {
+        const owner = CONNECTIONS.find(
+          (connection) => connection.connectionId === connectionId,
+        );
+        if (owner?.organizationId !== organizationId) return [];
+        return (entriesByConnection[connectionId] ?? [])
+          .slice()
+          .sort((a, b) => b.occurredAtMs - a.occurredAtMs)
+          .slice(0, limit);
+      },
+    ),
+  };
+}
+
 let reads: ReturnType<typeof createReads>;
+let activity: ReturnType<typeof createActivity>;
 let service: ScimReconciliationService;
+
+function buildService(
+  entriesByConnection: Record<string, DirectoryActivityEntry[]> = {},
+) {
+  reads = createReads();
+  activity = createActivity(entriesByConnection);
+  service = new ScimReconciliationService({
+    reads: reads as never,
+    activity: activity as never,
+  });
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  reads = createReads();
-  service = new ScimReconciliationService({ reads: reads as never });
+  buildService();
 });
 
 describe("the organization's directory sync panel", () => {
@@ -238,7 +284,10 @@ describe("the organization's directory sync panel", () => {
           },
         ],
       });
-      service = new ScimReconciliationService({ reads: reads as never });
+      service = new ScimReconciliationService({
+        reads: reads as never,
+        activity: activity as never,
+      });
 
       const panel = await service.getAll({ organizationId: ACME });
       const okta = panel.connections.find(
@@ -291,6 +340,95 @@ describe("the organization's directory sync panel", () => {
       expect(reads.findAllConnections).toHaveBeenCalledWith({
         organizationId: ACME,
       });
+    });
+  });
+});
+
+/**
+ * The sequence, as against the state (ADR-126).
+ *
+ * These read the log rather than the projection, so what they pin is the
+ * ordering and the wording — the two things a folded head cannot give, and
+ * the two a person watching a provider they configured a minute ago is
+ * actually reading.
+ */
+describe("what the directory has been doing", () => {
+  const pushedSam: DirectoryActivityEntry = {
+    eventId: "evt_push",
+    type: "lw.identity.scim_user_pushed",
+    occurredAtMs: T0 + 1_000,
+    outcome: "ok",
+    userId: "user_sam",
+    externalId: "okta-sam",
+    groupId: null,
+    op: "create",
+    errorCode: null,
+  };
+  const failedAfterwards: DirectoryActivityEntry = {
+    eventId: "evt_fail",
+    type: "lw.identity.scim_apply_failed",
+    occurredAtMs: T0 + 2_000,
+    outcome: "refused",
+    userId: "user_sam",
+    externalId: null,
+    groupId: null,
+    op: "deactivate",
+    errorCode: "offboard_incomplete",
+  };
+
+  describe("when an administrator reads a connection's activity", () => {
+    /** @scenario "What the directory has been doing is listed newest first" */
+    it("lists what happened newest first, each with its time and whether it landed", async () => {
+      buildService({ [ACME_OKTA]: [pushedSam, failedAfterwards] });
+
+      const feed = await service.getActivity({
+        organizationId: ACME,
+        connectionId: ACME_OKTA,
+      });
+
+      expect(feed.map((entry) => entry.eventId)).toEqual([
+        "evt_fail",
+        "evt_push",
+      ]);
+      expect(feed[0]?.occurredAtMs).toBe(T0 + 2_000);
+      expect(feed.map((entry) => entry.outcome)).toEqual(["refused", "ok"]);
+    });
+
+    /** @scenario "A push and the failure that followed it are both in the sequence" */
+    it("keeps both the push and the failure, and says the failure in words", async () => {
+      buildService({ [ACME_OKTA]: [pushedSam, failedAfterwards] });
+
+      const feed = await service.getActivity({
+        organizationId: ACME,
+        connectionId: ACME_OKTA,
+      });
+
+      expect(feed).toHaveLength(2);
+      // The person the push was about is named, not identified.
+      expect(feed[1]?.summary).toContain("Sam Patel");
+      expect(feed[1]?.summary).not.toContain("user_sam");
+      // And the failure reads as words rather than as the reason code.
+      expect(feed[0]?.summary).not.toContain("offboard_incomplete");
+      expect(feed[0]?.summary.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when the connection named belongs to another organization", () => {
+    /** @scenario "Another organization's directory activity is not there to read" */
+    it("finds nothing, because the read was built from this organization", async () => {
+      buildService({
+        [GLOBEX_CONNECTION]: [{ ...pushedSam, eventId: "evt_globex" }],
+      });
+
+      const feed = await service.getActivity({
+        organizationId: ACME,
+        connectionId: GLOBEX_CONNECTION,
+      });
+
+      expect(feed).toEqual([]);
+      expect(activity.findActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: ACME }),
+      );
     });
   });
 });

@@ -58,6 +58,46 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     Given "acme" holds a second connection whose token has never been used
     When "ana" opens the SCIM settings page
     Then that connection reads as waiting for its first push
+
+  # ── The organization view: the sequence, not only the state ────────────
+
+  # ADR-126. The state answers "where does this stand"; somebody watching a
+  # provider they configured a minute ago is asking "did what I just did
+  # arrive, and what did you make of it". The facts for that are already in
+  # the scim_sync log -- pushes, group mappings, failures and their
+  # recoveries -- folded into a head and rendered as a head. This renders the
+  # sequence instead. No new fact, no projection: a read of the log.
+  @integration
+  Scenario: What the directory has been doing is listed newest first
+    When "ana" opens the SCIM settings page
+    Then "acme-okta" lists what the directory did, newest first
+    And each entry says when it happened and whether it landed
+
+  @integration
+  Scenario: A push and the failure that followed it are both in the sequence
+    Given the directory pushed a person into "acme-okta" and an apply then failed
+    When "ana" reads what the directory has been doing
+    Then both the push and the failure are listed, in the order they happened
+    And the failure is words rather than an error code
+
+  @integration
+  Scenario: A connection nothing has happened on says so rather than drawing an empty list
+    Given "acme" holds a second connection whose token has never been used
+    When "ana" reads what that connection has been doing
+    Then she is told nothing has come through it yet
+
+  @integration
+  Scenario: Another organization's directory activity is not there to read
+    When "ana" reads what the directory has been doing
+    Then nothing from "globex" is listed
+    And the read is built from "acme" rather than filtered down to it
+
+  @integration
+  Scenario: Seeing the sequence takes the same permission as seeing the state
+    Given "acme" has a reader who may see single sign-on but not manage it
+    When that reader opens the SCIM settings page
+    Then they read what the directory has been doing
+    And they are offered nothing that would write
     And nothing about it reads as an error
 
   # ── The organization view: what the directory did ──────────────────────

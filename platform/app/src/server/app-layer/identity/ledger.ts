@@ -104,6 +104,20 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
 export async function resolveIdentityEventStore(): Promise<
   EventStore<IdentityEvent>
 > {
+  return resolveEventStore<IdentityEvent>();
+}
+
+/**
+ * The same store, typed for whichever identity-area stream is being read.
+ *
+ * There is ONE store; the type parameter is the caller saying which stream's
+ * events it is about to narrow. The scim_sync log (ADR-126) reads through
+ * here rather than casting the identity resolver, which would have made the
+ * types say "identity events" about a stream that holds none.
+ */
+export async function resolveEventStore<TEvent>(): Promise<
+  EventStore<TEvent>
+> {
   const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
   let app = tryGetApp();
   while (!app && Date.now() < deadline) {
@@ -111,7 +125,7 @@ export async function resolveIdentityEventStore(): Promise<
     app = tryGetApp();
   }
   const eventStore = app?.eventSourcing?.isEnabled
-    ? app.eventSourcing.getEventStore<IdentityEvent>()
+    ? app.eventSourcing.getEventStore<TEvent>()
     : undefined;
   if (!eventStore) {
     // A plain Error on purpose (error doctrine): the caller cannot act on an

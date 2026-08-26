@@ -27,9 +27,14 @@ import type {
   ScimReconciliationReadRepository,
 } from "./repositories/scim-reconciliation.prisma.repository";
 import { RECENT_DIRECTORY_CHANGE_LIMIT } from "./repositories/scim-reconciliation.prisma.repository";
+import type {
+  DirectoryActivityEntry,
+  ScimSyncActivityReadRepository,
+} from "./repositories/scim-sync-event-log.repository";
 import {
   DIRECTORY_CHANGE_AUTHOR,
   DIRECTORY_FAILURE_REMEDIATION,
+  directoryActivityCopy,
   directoryChangeCopy,
   type ScimSyncStatusCopy,
   scimSyncStatusCopy,
@@ -90,10 +95,69 @@ export interface OrganizationReconciliation {
   recentChanges: ReconciliationChange[];
 }
 
+/**
+ * One line of what the directory has been doing (ADR-126).
+ *
+ * The sequence, as against `status`, which is where the connection stands.
+ * Somebody who configured a provider a minute ago is asking whether what they
+ * just did arrived, and a folded head cannot answer that — it says the same
+ * thing whether the last push was one event or four hundred.
+ */
+export interface DirectoryActivityEntryView {
+  /** The event this line IS, so a re-render cannot reorder or duplicate it. */
+  eventId: string;
+  summary: string;
+  occurredAtMs: number;
+  outcome: "ok" | "refused";
+}
+
+/** How many lines the feed carries. The question it answers is about the last
+ *  few minutes, so it is bounded rather than paged: a page control here would
+ *  invite reading it as an audit trail, which the audit page already is. */
+export const DIRECTORY_ACTIVITY_LIMIT = 25;
+
 export class ScimReconciliationService {
   constructor(
-    private readonly deps: { reads: ScimReconciliationReadRepository },
+    private readonly deps: {
+      reads: ScimReconciliationReadRepository;
+      /** The scim_sync log, read as a sequence (ADR-126). */
+      activity: ScimSyncActivityReadRepository;
+    },
   ) {}
+
+  /**
+   * What the directory has been doing on one connection, newest first.
+   *
+   * Organization-scoped the way every other read here is, and structurally so:
+   * the log is scanned in this organization's tenant, so another
+   * organization's connection is not filtered out — it is never found, which
+   * is the same answer a connection that does not exist gets.
+   *
+   * The people are resolved in one lookup rather than per line, the way the
+   * recent-changes list does it: a feed of twenty pushes about four people is
+   * four names, and asking twenty times would be twenty queries to say them.
+   */
+  async getActivity({
+    organizationId,
+    connectionId,
+    limit = DIRECTORY_ACTIVITY_LIMIT,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    limit?: number;
+  }): Promise<DirectoryActivityEntryView[]> {
+    const entries = await this.deps.activity.findActivity({
+      organizationId,
+      connectionId,
+      limit,
+    });
+    const names = await this.deps.reads.findPeopleNames({
+      userIds: entries
+        .map((entry) => entry.userId)
+        .filter((userId): userId is string => userId !== null),
+    });
+    return entries.map((entry) => toActivityView({ entry, names }));
+  }
 
   /**
    * Every connection of this organization that has a directory sync, with
@@ -198,6 +262,47 @@ function toReconciliationChange({
     occurredAtMs: change.occurredAtMs,
     kind: change.kind,
   };
+}
+
+/**
+ * One logged fact as a line of the feed.
+ *
+ * A failure's words come from the code-keyed registry, exactly as the failure
+ * panel's do — the same code has to read the same way in both places, or the
+ * page tells one story twice differently.
+ */
+function toActivityView({
+  entry,
+  names,
+}: {
+  entry: DirectoryActivityEntry;
+  names: Map<string, string>;
+}): DirectoryActivityEntryView {
+  return {
+    eventId: entry.eventId,
+    occurredAtMs: entry.occurredAtMs,
+    outcome: entry.outcome,
+    summary: directoryActivityCopy({
+      type: entry.type,
+      op: entry.op,
+      person: entry.userId ? (names.get(entry.userId) ?? null) : null,
+      failure: entry.errorCode ? failureWords(entry.errorCode) : null,
+    }),
+  };
+}
+
+/** A reason code as the words every other error surface gives it. */
+function failureWords(errorCode: string): string {
+  return explainHandledError({
+    code: errorCode,
+    meta: {},
+    httpStatus: 500,
+    fault: "platform",
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: [],
+  }).title;
 }
 
 function toConnectionReconciliation({
