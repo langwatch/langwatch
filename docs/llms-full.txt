@@ -57704,7 +57704,7 @@ Langy uses your own model accounts and API keys. Every turn it takes is itself a
 # FILE: ./langy/prompt-optimization.mdx
 
 ---
-title: Prompt Optimization
+title: Automatic Prompt Optimization
 description: Langy scores the current prompt, duplicates it, rewrites the duplicate, runs both against your evaluator, and reports the pass rate before and after with the cost.
 sidebarTitle: Prompt Optimization
 keywords:
@@ -57743,7 +57743,7 @@ Prompt optimization is a Langy skill that measures your prompt's current score, 
     Langy runs the candidate column against the same dataset rows and compares the results side by side.
   </Step>
   <Step title="It reports the result">
-    The closing message states both figures: the pass rate (or score) before and after, and what happened to cost. For example, "pass rate improved from 30% to 100%, cost increased from $0.0000733 to $0.0001543 per row."
+    The closing message states both figures: the pass rate (or score) before and after, and what happened to cost. For example, "pass rate improved from 30% to 100%, total cost $0.12."
   </Step>
 </Steps>
 
