@@ -274,6 +274,32 @@ func TestErrFromBifrost_OnlyProviderAnswersBecomeUpstreamErrors(t *testing.T) {
 		assert.Equal(t, "openai", ue.Provider)
 	})
 
+	// Bedrock sets IsBifrostError TRUE on a real provider response whose error
+	// body it could not unmarshal, and still carries the provider's status and
+	// raw body. Reading that flag as "no provider answered" would collapse every
+	// unparseable Bedrock 4xx into a generic 502 — the forwarding guarantee
+	// broken for the provider whose error bodies parse least reliably.
+	t.Run("when the provider answered but bifrost could not parse the body", func(t *testing.T) {
+		berr := &bfschemas.BifrostError{
+			IsBifrostError: true,
+			StatusCode:     bfPtr(403),
+			Error: &bfschemas.ErrorField{
+				Message: bfschemas.ErrProviderResponseUnmarshal,
+				Error:   errors.New("unexpected end of JSON input"),
+			},
+			ExtraFields: bfschemas.BifrostErrorExtraFields{
+				Provider:    bfschemas.Bedrock,
+				RawResponse: `{"__type":"AccessDeniedException"}`,
+			},
+		}
+
+		var ue *domain.UpstreamError
+		require.ErrorAs(t, errFromBifrost(context.Background(), berr, nil), &ue,
+			"a real provider status must still be forwarded verbatim")
+		assert.Equal(t, 403, ue.StatusCode)
+		assert.Equal(t, "bedrock", ue.Provider)
+	})
+
 	t.Run("when bifrost synthesized the status itself", func(t *testing.T) {
 		berr := &bfschemas.BifrostError{
 			IsBifrostError: true,
@@ -286,6 +312,23 @@ func TestErrFromBifrost_OnlyProviderAnswersBecomeUpstreamErrors(t *testing.T) {
 		var ue *domain.UpstreamError
 		assert.NotErrorAs(t, err, &ue, "no provider answered, so nothing may be forwarded as an answer")
 		assert.True(t, herr.IsCode(err, domain.ErrProviderTimeout))
+	})
+
+	t.Run("when the caller hung up and bifrost synthesized a 499", func(t *testing.T) {
+		berr := &bfschemas.BifrostError{
+			IsBifrostError: true,
+			StatusCode:     bfPtr(499),
+			Error: &bfschemas.ErrorField{
+				Type:    bfPtr(bfschemas.RequestCancelled),
+				Message: "request canceled by context",
+			},
+		}
+
+		err := errFromBifrost(context.Background(), berr, nil)
+
+		var ue *domain.UpstreamError
+		assert.NotErrorAs(t, err, &ue, "no provider answered 499; bifrost did")
+		assert.True(t, herr.IsCode(err, domain.ErrRequestAbandoned))
 	})
 }
 

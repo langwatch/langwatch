@@ -34,8 +34,9 @@ import (
 //	                ("failed to parse auth credentials JSON: ...").
 //
 // The rule that follows: forward as an upstream response only what a provider
-// actually answered (IsBifrostError false AND a status), and classify
-// everything else on Bifrost's own signals.
+// actually answered — a real status that Bifrost did not synthesize itself —
+// and classify everything else on Bifrost's own signals. IsBifrostError is a
+// useful hint but not the discriminant; bfIsProviderAnswer says why.
 //
 // This replaced a classifier that mapped status 0 to provider_timeout. Nothing
 // Bifrost reports with status 0 is a timeout — a real timeout always carries
@@ -58,9 +59,10 @@ import (
 //
 // Everything else is Bifrost's own verdict about a request that never got an
 // answer, and goes to classifyBifrostError. That includes the two statuses
-// Bifrost synthesizes (504 timeout, 499 for a caller hang-up): dressing them as an
-// UpstreamError would claim an upstream answered when none did, and would
-// attribute a caller hanging up to the provider.
+// Bifrost synthesizes (504 timeout, 499 for a caller hang-up): dressing them as
+// an UpstreamError would claim an upstream answered when none did, and would
+// attribute a caller hanging up to the provider. See bfIsProviderAnswer for why
+// the discriminant is the synthesized-status pair rather than IsBifrostError.
 //
 // This is the streaming-path counterpart to the non-stream
 // rawResponseFromBifrostError branch: streaming dispatch can only return an
@@ -70,10 +72,10 @@ func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeade
 	if berr == nil {
 		return herr.New(ctx, domain.ErrProviderError, herr.M{"message": "provider dispatch failed"})
 	}
-	status := bfStatus(berr)
-	if status <= 0 || berr.IsBifrostError {
+	if !bfIsProviderAnswer(berr) {
 		return bfApplyFallbackVerdict(classifyBifrostError(ctx, berr), berr)
 	}
+	status := bfStatus(berr)
 	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
 	errType, errCode := bfErrorTypeCode(berr)
 	return bfApplyFallbackVerdict(&domain.UpstreamError{
@@ -95,6 +97,35 @@ func bfApplyFallbackVerdict(err error, berr *bfschemas.BifrostError) error {
 		return err
 	}
 	return domain.WithNoFallback(err)
+}
+
+// bfIsProviderAnswer reports whether the error represents an HTTP response a
+// provider actually sent, and may therefore be forwarded verbatim.
+//
+// A status alone is not the test, because Bifrost synthesizes two statuses of
+// its own — 504 with request_timed_out when the deadline fires, and 499 with
+// RequestCancelled when the caller hangs up — and forwarding either as an
+// upstream answer would claim a provider replied when none did.
+//
+// Nor is IsBifrostError the test, tempting as it looks. Bedrock sets it TRUE on
+// a real provider response whose error body it could not unmarshal
+// (providers/bedrock/bedrock.go), while still carrying the provider's status and
+// its raw body. Reading that flag as "no provider answered" would collapse every
+// unparseable Bedrock 4xx into a generic 502 and break the forwarding guarantee
+// error-transparency.feature exists to hold — for the one provider whose error
+// bodies are least likely to parse.
+//
+// So the test is the pair Bifrost actually controls: a real status, from
+// something it did not synthesize itself.
+func bfIsProviderAnswer(berr *bfschemas.BifrostError) bool {
+	if bfStatus(berr) <= 0 {
+		return false
+	}
+	switch bfErrorType(berr) {
+	case bfschemas.RequestTimedOut, bfschemas.RequestCancelled:
+		return false
+	}
+	return true
 }
 
 // bifrostResponseHeaders reads the provider's HTTP response headers that
