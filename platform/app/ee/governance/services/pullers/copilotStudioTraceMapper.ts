@@ -860,6 +860,73 @@ function toolSpan(params: {
 }
 
 /**
+ * The single span every turn in one conversation hangs under.
+ *
+ * A trace's headline is folded across its root spans, so a conversation whose
+ * turns were each a root showed only whichever turn the fold read last. One
+ * chain span per conversation gives the fold one place to read, and it carries
+ * the arc: the first thing asked and the last thing answered.
+ */
+function conversationSpan(params: {
+  origin: RoutingOrigin;
+  group: ConversationGroup;
+  turns: Turn[];
+  traceId: string;
+  spanId: string;
+  threadId: string;
+  skipped: number;
+  conversationEndMs: number;
+}): OtlpJsonSpan {
+  const {
+    origin,
+    group,
+    turns,
+    traceId,
+    spanId,
+    threadId,
+    skipped,
+    conversationEndMs,
+  } = params;
+
+  const firstQuestion = turns.find((turn) => turn.question !== null)?.question;
+  const lastAnswer = [...turns]
+    .reverse()
+    .find((turn) => turn.answer !== null)?.answer;
+
+  const attributes: OtlpJsonAttr[] = [
+    stringAttr("langwatch.span.type", "chain"),
+    ...conversationAttrs({
+      origin,
+      group,
+      endMs: conversationEndMs,
+      skipped,
+      threadId,
+    }),
+  ];
+  if (firstQuestion) {
+    attributes.push(
+      stringAttr("langwatch.input", chatValue("user", firstQuestion)),
+    );
+  }
+  if (lastAnswer) {
+    attributes.push(
+      stringAttr("langwatch.output", chatValue("assistant", lastAnswer)),
+    );
+  }
+
+  return {
+    traceId,
+    spanId,
+    name: COPILOT_CONVERSATION_SPAN_NAME,
+    kind: 1,
+    startTimeUnixNano: msToNano(turns[0]!.startMs),
+    endTimeUnixNano: msToNano(conversationEndMs),
+    attributes,
+    status: { code: 1 },
+  };
+}
+
+/**
  * Map one run's pulled transcript rows to a single OTLP trace request.
  * Returns null when nothing routes.
  *
@@ -899,44 +966,18 @@ export function mapCopilotEventsToTraceRequest({
       turns[0]!.startMs,
     );
 
-    const firstQuestion = turns.find((t) => t.question !== null);
-    const lastAnswer = [...turns].reverse().find((t) => t.answer !== null);
-    const convAttrs: OtlpJsonAttr[] = [
-      stringAttr("langwatch.span.type", "chain"),
-      ...conversationAttrs({
+    spans.push(
+      conversationSpan({
         origin,
         group,
-        endMs: conversationEndMs,
-        skipped,
+        turns,
+        traceId: identity.traceId,
+        spanId: identity.rootSpanId,
         threadId: identity.threadId,
+        skipped,
+        conversationEndMs,
       }),
-    ];
-    if (firstQuestion?.question) {
-      convAttrs.push(
-        stringAttr(
-          "langwatch.input",
-          chatValue("user", firstQuestion.question),
-        ),
-      );
-    }
-    if (lastAnswer?.answer) {
-      convAttrs.push(
-        stringAttr(
-          "langwatch.output",
-          chatValue("assistant", lastAnswer.answer),
-        ),
-      );
-    }
-    spans.push({
-      traceId: identity.traceId,
-      spanId: identity.rootSpanId,
-      name: COPILOT_CONVERSATION_SPAN_NAME,
-      kind: 1,
-      startTimeUnixNano: msToNano(turns[0]!.startMs),
-      endTimeUnixNano: msToNano(conversationEndMs),
-      attributes: convAttrs,
-      status: { code: 1 },
-    });
+    );
 
     for (const turn of turns) {
       spans.push(

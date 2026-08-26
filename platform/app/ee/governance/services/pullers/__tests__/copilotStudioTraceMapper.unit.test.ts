@@ -195,7 +195,7 @@ describe("given a Copilot conversation stored in one row", () => {
     const turns = spans.filter(
       (s: { name: string }) => s.name === COPILOT_TURN_SPAN_NAME,
     );
-    const asked = turns.find((s: Record<string, unknown>) =>
+    const asked = turns.find((s) =>
       JSON.stringify(s).includes("How do I reset my laptop?"),
     );
     expect(attrsOf(asked!)["langwatch.user.id"]).toBe(AAD_OBJECT_ID);
@@ -760,31 +760,25 @@ describe("given a multi-turn conversation", () => {
   ]);
 
   it("wraps all turns under a single root conversation span", () => {
-    const roots = spans.filter(
-      (s: { parentSpanId?: string }) => !s.parentSpanId,
-    );
+    const roots = spans.filter((s) => !s.parentSpanId);
     expect(roots).toHaveLength(1);
-    expect(roots[0].name).toBe("copilot_studio.conversation");
+    expect(roots[0]?.name).toBe(COPILOT_CONVERSATION_SPAN_NAME);
   });
 
   it("makes every turn span a child of the conversation span", () => {
-    const root = spans.find(
-      (s: { parentSpanId?: string }) => !s.parentSpanId,
-    );
-    const turns = spans.filter(
-      (s: { name: string }) => s.name === "copilot_studio.turn",
-    );
+    const root = spans.find((s) => !s.parentSpanId);
+    expect(root).toBeDefined();
+    const turns = spans.filter((s) => s.name === COPILOT_TURN_SPAN_NAME);
     expect(turns.length).toBe(3);
     for (const turn of turns) {
-      expect(turn.parentSpanId).toBe(root.spanId);
+      expect(turn.parentSpanId).toBe(root?.spanId);
     }
   });
 
   it("puts the first user message as conversation input and last bot reply as output", () => {
-    const root = spans.find(
-      (s: { parentSpanId?: string }) => !s.parentSpanId,
-    );
-    const attrs = attrsOf(root);
+    const root = spans.find((s) => !s.parentSpanId);
+    expect(root).toBeDefined();
+    const attrs = attrsOf(root!);
     expect(attrs["langwatch.input"]).toContain("Tell me about France.");
     expect(attrs["langwatch.output"]).toContain(
       "Santiago is the capital of Chile.",
