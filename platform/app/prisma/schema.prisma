@@ -2849,6 +2849,19 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
+  // The folder (a SimulationSuite with kind "folder") this scenario is filed
+  // in, or null for an unfiled scenario. This column is the source of truth
+  // for folder membership; the folder's scenarioIds is a denormalized copy
+  // kept in step by reconcileFolderMembership (server/suites/folder-membership.ts).
+  // See specs/suites/folder-membership-invariant.feature.
+  folderId        String?
+  folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)
+  // Counts one up on every save of the editable fields. Each number has a
+  // ScenarioVersion row holding the state as saved; the unique constraint
+  // there is what keeps two concurrent saves from sharing a number. See
+  // specs/scenarios/scenario-versioning.feature.
+  version         Int       @default(1)
+  versions        ScenarioVersion[]
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -2856,6 +2869,46 @@ model Scenario {
   updatedAt       DateTime  @default(now()) @updatedAt
 
   @@index([projectId])
+  @@index([projectId, folderId])
+}
+
+// One saved state of a scenario's editable fields. Append-only: a restore
+// writes a new row rather than rewriting an old one. See
+// specs/scenarios/scenario-versioning.feature and
+// specs/scenarios/scenario-version-restore.feature.
+model ScenarioVersion {
+  id         String @id @default(nanoid())
+  scenarioId String
+  /// Deleting the case takes its history with it. Under relationMode="prisma"
+  /// the cascade is the client's, so a raw SQL delete still has to clear these
+  /// rows itself.
+  scenario   Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  /// The project of the parent case, carried here so every read filters by
+  /// tenant without a join. The service is what keeps the pair honest: no
+  /// composite foreign key can, under relationMode="prisma".
+  projectId  String
+  version    Int
+
+  authorId String?
+  /// Who wrote this version: "user", "api", "cli" or "langy".
+  authorLabel String
+
+  changeDescription String?
+
+  /// Envelope { schemaVersion, fields, changedFields } holding the editable
+  /// field set as saved and the names of the fields this save changed.
+  snapshot Json
+  /// Schema version of `snapshot`, so a later shape change can be read forward.
+  schemaVersion Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@unique([scenarioId, version])
+  // The history pages by version inside one scenario, and a restore reads one
+  // version number. Both name all three columns, so the sort key belongs in
+  // the index rather than being applied to fetched rows.
+  @@index([projectId, scenarioId, version])
+  @@index([createdAt])
 }
 
 model SimulationSuite {
@@ -2875,12 +2928,26 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
+  // "folder" | "custom" (see SUITE_KINDS in server/suites/types.ts). A folder
+  // is a suite that groups scenarios through Scenario.folderId; a custom suite
+  // is a hand-assembled run plan. String rather than a Prisma enum so a new
+  // kind needs no database migration.
+  kind            String     @default("custom")
+  // What the plan covers, as { mode } plus the mode's own field: "all",
+  // "folders" with folderIds, "labels" with labels, or "cases", which runs the
+  // stored scenarioIds. Null reads as "cases", so a plan written before scopes
+  // keeps the list it already held. A folder carries none: its members come
+  // from Scenario.folderId. See server/suites/scope.ts and
+  // specs/suites/run-plan-dynamic-scopes.feature.
+  scope           Json?
+  folderScenarios Scenario[] @relation("FolderScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
 
   @@unique([projectId, slug])
   @@index([projectId])
+  @@index([projectId, kind])
 }
 
 model Subscription {

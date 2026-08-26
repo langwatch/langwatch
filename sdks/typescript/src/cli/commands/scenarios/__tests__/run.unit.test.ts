@@ -85,6 +85,7 @@ describe("runScenarioCommand()", () => {
 
       expect(mockRun).toHaveBeenCalledWith("suite_ephemeral", {
         parameters: { account_tier: "gold", seats: 12, beta: true },
+        note: undefined,
       });
       expect(mockCreate.mock.calls[0]![0]).not.toHaveProperty("parameters");
     });
@@ -96,6 +97,7 @@ describe("runScenarioCommand()", () => {
 
       expect(mockRun).toHaveBeenCalledWith("suite_ephemeral", {
         parameters: undefined,
+        note: undefined,
       });
     });
   });
@@ -110,6 +112,64 @@ describe("runScenarioCommand()", () => {
       ).rejects.toThrow(ProcessExitError);
 
       expect(mockCreate).not.toHaveBeenCalled();
+    });
+  });
+
+  // The note rides the same run body a suite run uses: the ephemeral suite is
+  // the vehicle, and the note belongs to the batch it starts.
+  describe("when --note is given", () => {
+    /** @scenario "Run a scenario with a note" */
+    it("schedules the run with that note", async () => {
+      await runScenarioCommand("scenario_1", {
+        target: "http:agent_abc123",
+        note: "after the timeout fix",
+      });
+
+      expect(mockRun).toHaveBeenCalledWith("suite_ephemeral", {
+        parameters: undefined,
+        note: "after the timeout fix",
+      });
+    });
+
+    /** @scenario "Run a scenario with a note" */
+    it("shows the note in the confirmation", async () => {
+      await runScenarioCommand("scenario_1", {
+        target: "http:agent_abc123",
+        note: "after the timeout fix",
+      });
+
+      const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(printed).toContain("after the timeout fix");
+    });
+  });
+
+  describe("when --note is longer than the limit", () => {
+    /** @scenario "Run a scenario with a note over two hundred characters" */
+    it("refuses before anything is scheduled", async () => {
+      await expect(
+        runScenarioCommand("scenario_1", {
+          target: "http:agent_abc123",
+          note: "x".repeat(201),
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when --note holds only spaces", () => {
+    /** @scenario "Run a scenario with a note of only spaces" */
+    it("schedules the run with no note", async () => {
+      await runScenarioCommand("scenario_1", {
+        target: "http:agent_abc123",
+        note: "   ",
+      });
+
+      expect(mockRun).toHaveBeenCalledWith("suite_ephemeral", {
+        parameters: undefined,
+        note: undefined,
+      });
     });
   });
 });

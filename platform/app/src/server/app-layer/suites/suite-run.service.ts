@@ -5,6 +5,7 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
+import { withNote } from "~/server/scenarios/run-note";
 import type { RunSecretCiphertext } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
@@ -54,6 +55,18 @@ function withParameters(
   parameters: RunParameterValues | undefined,
 ): { parameters: RunParameterValues } | Record<string, never> {
   return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
+}
+
+/**
+ * The `scenarioVersion` entry of the reserved langwatch namespace, or nothing
+ * at all. The map built from the queue-time read holds every scheduled
+ * scenario, so an absent entry only happens if a caller schedules a scenario
+ * it never read; the run then records no version rather than an undefined.
+ */
+function withScenarioVersion(
+  version: number | undefined,
+): { scenarioVersion: number } | Record<string, never> {
+  return version !== undefined ? { scenarioVersion: version } : {};
 }
 
 /**
@@ -125,6 +138,12 @@ export class SuiteRunService {
     projectId: string;
     activeScenarioIds: string[];
     scenarioNameMap: Map<string, string>;
+    /**
+     * Each scenario's version from the same read that resolved the names, so
+     * every queued run says which state of its scenario it ran. Stamped at
+     * queue time: a later edit never changes what an old run says.
+     */
+    scenarioVersionMap: Map<string, number>;
     activeTargets: SuiteRunTarget[];
     repeatCount: number;
     skippedArchived: SuiteRunResult["skippedArchived"];
@@ -144,18 +163,25 @@ export class SuiteRunService {
      * credential.
      */
     secretParametersByScenarioId?: Map<string, RunSecretCiphertext>;
+    /**
+     * One short line describing why this batch was run. Stamped onto every run
+     * of the batch, so a run carries its note from its first moment.
+     */
+    note?: string;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
       projectId,
       activeScenarioIds,
       scenarioNameMap,
+      scenarioVersionMap,
       activeTargets,
       repeatCount,
       skippedArchived,
       idempotencyKey,
       parametersByScenarioId,
       secretParametersByScenarioId,
+      note,
     } = params;
 
     const batchRunId = params.batchRunId ?? generateBatchRunId();
@@ -224,7 +250,12 @@ export class SuiteRunService {
           scenarioSetId: setId,
           name: scenarioNameMap.get(item.scenarioId),
           metadata: {
-            langwatch: { targetReferenceId: item.target.referenceId },
+            langwatch: {
+              targetReferenceId: item.target.referenceId,
+              targetType: item.target.type,
+              ...withScenarioVersion(scenarioVersionMap.get(item.scenarioId)),
+            },
+            ...withNote(note),
             ...withParameters(parametersByScenarioId?.get(item.scenarioId)),
             ...withSecretParameterNames(secretParameters),
           },

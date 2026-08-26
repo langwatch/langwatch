@@ -315,14 +315,19 @@
                 "scenario create",
                 "scenario update",
                 "scenario run",
-                "scenario delete"
+                "scenario delete",
+                "scenario version list",
+                "scenario version get"
               ],
               "hints": {
                 "scenario list": "langwatch scenario list -o json",
                 "scenario get": "langwatch scenario get <id> -o json",
-                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\"",
-                "scenario run": "langwatch scenario run <id> --target http:agent_abc123 --wait",
-                "scenario delete": "langwatch scenario delete <id>"
+                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --folder \"Billing\"",
+                "scenario update": "langwatch scenario update <id> --folder \"Billing\"",
+                "scenario run": "langwatch scenario run <id> --target http:agent_abc123 --note \"after the timeout fix\" --wait",
+                "scenario delete": "langwatch scenario delete <id>",
+                "scenario version list": "langwatch scenario version list <id> -o json",
+                "scenario version get": "langwatch scenario version get <id> 2 -o json"
               },
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
@@ -411,13 +416,21 @@
                 "suite update",
                 "suite duplicate",
                 "suite run",
-                "suite delete"
+                "suite delete",
+                "suite folder list",
+                "suite folder create",
+                "suite folder rename",
+                "suite folder delete"
               ],
               "hints": {
                 "suite list": "langwatch suite list -o json",
                 "suite get": "langwatch suite get <id> -o json",
                 "suite create": "langwatch suite create \"regression\" --scenarios id1,id2 --targets http:agent_abc123",
-                "suite run": "langwatch suite run <id> --wait"
+                "suite run": "langwatch suite run <id> --note \"nightly regression\" --wait",
+                "suite folder list": "langwatch suite folder list -o json",
+                "suite folder create": "langwatch suite folder create \"Refunds\"",
+                "suite folder rename": "langwatch suite folder rename <folder> \"Refunds and credits\"",
+                "suite folder delete": "langwatch suite folder delete <folder>"
               },
               "skill": null,
               "docs": null

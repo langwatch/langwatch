@@ -1649,6 +1649,11 @@ const presentations = {
         : `${rejected} None of its scenarios declare parameters.`;
     },
   },
+  scenario_folder_not_found: {
+    title: "That test suite isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a test suite again.",
+  },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
     describe: (error) => {
@@ -1714,6 +1719,18 @@ const presentations = {
           : `${scenarioFieldLabel(error)} reads a secret parameter.`;
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
+  },
+  scenario_stale_version: {
+    // Nothing was written: the save is refused before the update, so the copy
+    // can promise the customer's own edit is still theirs to redo.
+    title: "This test case changed since you loaded it",
+    describe: () =>
+      "Reload to pick up the latest version, then make your change again.",
+  },
+  scenario_version_not_found: {
+    title: "That version is not available",
+    describe: () =>
+      "It may have been removed. Open the history to see what this test case still has.",
   },
   // ---- billing ----
   billing_customer_email_required: {
@@ -2079,6 +2096,21 @@ const presentations = {
   suite_invalid_target_references: {
     title: "This run plan points at targets that no longer exist",
     describe: () => "Edit the plan to remove them.",
+  },
+  suite_scope_empty: {
+    title: "This run plan covers no test case",
+    describe: () =>
+      "Its scope matches nothing right now. Widen it in the plan, then run again.",
+  },
+  suite_scope_not_allowed: {
+    title: "A test suite takes no scope",
+    describe: () =>
+      "It runs the test cases filed in it. File cases into it to change what it covers.",
+  },
+  suite_targets_required: {
+    title: "Choose an agent to run against",
+    describe: () =>
+      "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
   },
 
   // ---- automations & notifications ----

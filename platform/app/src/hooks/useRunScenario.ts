@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { showErrorToast } from "~/features/errors";
+import type { RunParameterValues } from "~/server/scenarios/parameters";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
 import { api } from "../utils/api";
@@ -18,6 +19,11 @@ interface RunCompleteResult {
 interface UseRunScenarioOptions {
   projectId: string | undefined;
   projectSlug: string | undefined;
+  /**
+   * Called as soon as the run is queued, before its first event lands. The
+   * run has no scenarioRunId yet; the batch is what there is to watch.
+   */
+  onQueued?: (result: { setId: string; batchRunId: string }) => void;
   /** Called when the run completes successfully. Navigate to the result here. */
   onRunComplete?: (result: RunCompleteResult) => void;
   /** Called when the run fails. Use this to show the failed run (e.g., open a drawer). */
@@ -29,6 +35,10 @@ interface RunScenarioParams {
   target: TargetValue;
   setId?: string;
   batchRunId?: string;
+  /** One short line describing why this run was started. */
+  note?: string;
+  /** Values that override the scenario's own parameter defaults for this run. */
+  parameters?: RunParameterValues;
 }
 
 /**
@@ -124,6 +134,7 @@ function buildRunOutcomeToast({
 export function useRunScenario({
   projectId,
   projectSlug,
+  onQueued,
   onRunComplete,
   onRunFailed,
 }: UseRunScenarioOptions) {
@@ -138,7 +149,8 @@ export function useRunScenario({
 
   const runScenario = useCallback(
     async (params: RunScenarioParams) => {
-      const { scenarioId, target, setId, batchRunId } = params;
+      const { scenarioId, target, setId, batchRunId, note, parameters } =
+        params;
       if (!projectId || !projectSlug || !target) return;
 
       // Check if model providers are configured before attempting to run
@@ -168,7 +180,11 @@ export function useRunScenario({
             target: { type: target.type, referenceId: target.id },
             setId,
             batchRunId,
+            note,
+            parameters,
           });
+
+        onQueued?.({ setId: returnedSetId, batchRunId: returnedBatchRunId });
 
         setIsPolling(true);
         const result = await pollForScenarioRun({
@@ -219,6 +235,7 @@ export function useRunScenario({
       projectSlug,
       hasEnabledProviders,
       runMutation,
+      onQueued,
       onRunComplete,
       onRunFailed,
       utils,
