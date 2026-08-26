@@ -25,6 +25,7 @@ import {
 } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import { runScenarioAndLog } from "./scenario-logger";
+import { request } from "./workbench-rest";
 
 const LW_BASE = LW_BASE_URL;
 const LW_KEY = LANGWATCH_API_KEY;
@@ -61,18 +62,20 @@ async function deleteAllTestDatasets() {
  * agents, so a turn that says "run it" is answered with a question about what
  * to run it against rather than a run.
  */
-async function seedRunTargetPrompt(handle: string): Promise<void> {
-  const res = await fetch(`${LW_BASE}/api/prompts`, {
+async function seedRunTargetPrompt({
+  handle,
+}: {
+  handle: string;
+}): Promise<void> {
+  // `request` backs off and retries a stack that refuses the connection while
+  // it is still booting, which a bare fetch turns into a failed seed.
+  const res = await request({
     method: "POST",
-    headers: {
-      "X-Auth-Token": LW_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    path: "/api/prompts",
+    body: {
       handle,
       prompt: "You are a customer support bot. Greet the customer by name.",
-    }),
-    signal: AbortSignal.timeout(20_000),
+    },
   });
   // 409 is the prompt already being there, which is the state this wants.
   if (!res.ok && res.status !== 409) {
@@ -1467,7 +1470,7 @@ describe("Langy via HTTP wrapper", () => {
       const stamp = Date.now();
       const scenarioName = `langy-greeting-check-${stamp}`;
       const targetHandle = `langy-greeting-target-${stamp}`;
-      await seedRunTargetPrompt(targetHandle);
+      await seedRunTargetPrompt({ handle: targetHandle });
 
       const before = await listScenarios();
       const beforeIds = new Set(before.map((s) => s.id));

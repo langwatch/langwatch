@@ -64,17 +64,27 @@ afterAll(() => {
 describe("given a project with one saved experiment", () => {
   const ns = nanoid(8);
 
-  let organization: Organization;
-  let team: Team;
-  let project: Project;
-  let experimentId: string;
+  // Optional, and read back that way in teardown: a `beforeAll` that fails
+  // part way leaves the rows after it unassigned, and a teardown that reads
+  // `project.id` then throws over the setup error that actually explains the
+  // run.
+  let organization: Organization | undefined;
+  let team: Team | undefined;
+  let project: Project | undefined;
+  let experimentId: string | undefined;
   const slug = `read-one-${ns}`;
 
   /** Returns the status and the parsed body, plus the raw text for messages. */
-  const read = async (slugOrId: string, apiKey?: string) => {
+  const read = async ({
+    slugOrId,
+    apiKey,
+  }: {
+    slugOrId: string;
+    apiKey?: string;
+  }) => {
     const response = await app.request(`/api/experiments/${slugOrId}`, {
       method: "GET",
-      headers: { "X-Auth-Token": apiKey ?? project.apiKey },
+      headers: { "X-Auth-Token": apiKey ?? project?.apiKey ?? "" },
     });
     const text = await response.text();
     return { status: response.status, text, body: JSON.parse(text) };
@@ -112,10 +122,15 @@ describe("given a project with one saved experiment", () => {
   });
 
   afterAll(async () => {
+    if (!organization) return;
     await cleanupTestRows(prisma, [
-      ["experiment", { projectId: project.id }],
-      ["project", { id: project.id }],
-      ["team", { id: team.id }],
+      ...(project
+        ? ([
+            ["experiment", { projectId: project.id }],
+            ["project", { id: project.id }],
+          ] as const)
+        : []),
+      ...(team ? ([["team", { id: team.id }]] as const) : []),
       ["organization", { id: organization.id }],
     ]);
   });
@@ -123,7 +138,7 @@ describe("given a project with one saved experiment", () => {
   describe("when reading it by the slug the list returns", () => {
     /** @scenario "Reading one experiment answers with the same shape the list uses" */
     it("answers with that experiment, in the list's own shape", async () => {
-      const { status, text, body } = await read(slug);
+      const { status, text, body } = await read({ slugOrId: slug });
 
       expect(status, text).toBe(200);
       expect(body.slug).toBe(slug);
@@ -142,7 +157,7 @@ describe("given a project with one saved experiment", () => {
   describe("when reading it by its id instead", () => {
     /** @scenario "Either identifier the list returns can be read back" */
     it("accepts the id, because the same list row carries it", async () => {
-      const { status, text, body } = await read(experimentId);
+      const { status, text, body } = await read({ slugOrId: experimentId! });
 
       expect(status, text).toBe(200);
       expect(body.id).toBe(experimentId);
@@ -156,7 +171,7 @@ describe("given a project with one saved experiment", () => {
     // that; the framework's bare `{"error":"Not Found"}` did not.
     /** @scenario "A slug that names no experiment is refused by name" */
     it("refuses with the experiment_not_found code", async () => {
-      const { status, text, body } = await read(`no-such-${ns}`);
+      const { status, text, body } = await read({ slugOrId: `no-such-${ns}` });
 
       expect(status, text).toBe(404);
       expect(body.error).toBe("experiment_not_found");
@@ -169,16 +184,23 @@ describe("given a project with one saved experiment", () => {
       const otherProject = await prisma.project.create({
         data: {
           ...projectFactory.build({ slug: `--proj-read-other-${ns}` }),
-          teamId: team.id,
+          teamId: team!.id,
           personalFeatures: {},
         },
       });
 
-      const { status, text } = await read(slug, otherProject.apiKey);
+      // In a finally, so a failed assertion above still takes the row back out
+      // and leaves the shared test database as it found it.
+      try {
+        const { status, text } = await read({
+          slugOrId: slug,
+          apiKey: otherProject.apiKey,
+        });
 
-      expect(status, text).toBe(404);
-
-      await cleanupTestRows(prisma, [["project", { id: otherProject.id }]]);
+        expect(status, text).toBe(404);
+      } finally {
+        await cleanupTestRows(prisma, [["project", { id: otherProject.id }]]);
+      }
     });
   });
 });
