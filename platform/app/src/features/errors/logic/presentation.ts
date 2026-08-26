@@ -795,9 +795,14 @@ const presentations = {
     // Distinct from `no_provider_configured` (nothing connected at all) and
     // from `llm_model_not_set` (a workflow node with an empty field): here a
     // provider exists but nothing has chosen which model to use.
+    //
+    // Names Default Models rather than "your project's model settings": the
+    // default is almost always written at the organization scope, which is
+    // where the onboarding seed lands it, so pointing at the project sent
+    // people to a page that was not the one holding the value.
     title: "Choose a model first",
     describe: () =>
-      "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
+      "Nothing has a model set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
   model_restricted_for_feature: {
     // Distinct from `model_not_configured`: a model IS set, but it's
@@ -2020,6 +2025,15 @@ const presentations = {
     title: "This dataset's columns have changed",
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
+  },
+  storage_not_writable: {
+    // fault: platform. Storage for this deployment was never provisioned, so
+    // retrying changes nothing and there is no customer-side setting to fix.
+    // Which directory and which variables an operator has to set are in the
+    // tips and in the server log, not here.
+    title: "Storage for this workspace isn't set up",
+    describe: () =>
+      "Nothing was saved. An administrator has to set up storage before rows can be added.",
   },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
