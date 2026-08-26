@@ -66316,6 +66316,15 @@ openapi: "GET /api/experiments/{slug}/workbench-state"
 
 ---
 
+# FILE: ./api-reference/experiments/read-one-experiment.mdx
+
+---
+title: "Read one experiment"
+openapi: "GET /api/experiments/{slug}"
+---
+
+---
+
 # FILE: ./api-reference/experiments/read-run-results.mdx
 
 ---
