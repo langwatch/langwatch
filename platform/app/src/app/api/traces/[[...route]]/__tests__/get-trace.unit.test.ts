@@ -138,7 +138,38 @@ describe("GET /:traceId", () => {
     output: { value: "world" },
     timestamps: { started_at: 1000, inserted_at: 2000, updated_at: 2000 },
     metadata: { thread_id: "t1" },
+    privacy: { droppedCategories: ["input"] },
+    contexts: [{ document_id: "doc-1", chunk_id: "chunk-1", content: "context" }],
+    expected_output: { value: "expected" },
+    metrics: {
+      first_token_ms: 12,
+      total_time_ms: 34,
+      prompt_tokens: 10,
+      completion_tokens: 20,
+      reasoning_tokens: 5,
+      cache_read_input_tokens: 3,
+      cache_creation_input_tokens: 2,
+      cache_creation_5m_input_tokens: 1,
+      cache_creation_1h_input_tokens: 1,
+      context_size_tokens: 40,
+      total_cost: 0.01,
+      tokens_estimated: false,
+    },
+    error: { has_error: true, message: "failed", stacktrace: ["line 1"] },
+    indexing_md5s: ["md5"],
+    events: [
+      {
+        event_id: "event-1",
+        event_type: "feedback",
+        project_id: "project-123",
+        metrics: { score: 1 },
+        event_details: { source: "test" },
+        trace_id: "trace-abc",
+        timestamps: { started_at: 1000, inserted_at: 2000, updated_at: 2000 },
+      },
+    ],
     spans: [],
+    redacted_by_visibility_window: true,
   };
 
   const sampleEvaluations: Evaluation[] = [
