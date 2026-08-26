@@ -81,18 +81,6 @@ const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
   "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
 
 /**
- * The query domain replaces the analytics SQL routes above. It stays excluded
- * for the same reason they are, and deliberately not for longer: writing the
- * reference pages is the documentation phase of the query-domain epic, and
- * publishing the new door before that phase would document a surface whose
- * deprecation story for the old one is not written yet.
- *
- * @see https://github.com/langwatch/langwatch/issues/7565
- */
-const UNDOCUMENTED_QUERY_DOMAIN =
-  "Not yet documented in the API reference: the query domain routes require the analytics:view permission, and their reference pages land with the documentation phase of the query-domain epic (langwatch/langwatch#7565).";
-
-/**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
  * entry, and the generator fails when one is owned by neither.
@@ -115,7 +103,6 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
-  "/api/v1/query": UNDOCUMENTED_QUERY_DOMAIN,
   "/api/v1/projects/{projectId}/analytics/query/clickhouse":
     UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/schema":
@@ -297,6 +284,17 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/analytics"],
     overviewDescription:
       "Query analytics timeseries data with metrics, aggregations, and filters.",
+  },
+  {
+    name: "Query",
+    dirName: "query",
+    pathPrefixes: ["/api/v1/query"],
+    overviewDescription:
+      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query. One JSON-RPC 2.0 endpoint serves both methods — read the envelope guide before you call it, especially for how auth failures answer differently from a refused query.",
+    // One path, two JSON-RPC methods: the generator makes one endpoint page for
+    // it, and the envelope page carries the real explanatory weight the
+    // generated page cannot (the two methods, the two error shapes).
+    extraPages: ["api-reference/query/json-rpc-envelope"],
   },
   {
     name: "Secrets",
