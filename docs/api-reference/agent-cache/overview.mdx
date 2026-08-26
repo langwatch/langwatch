@@ -1,0 +1,25 @@
+---
+title: "Overview"
+description: "A per-project store an agent keeps its own run state in. Values are encrypted at rest and each entry expires by itself."
+---
+
+## Intro
+
+The agent cache holds what an agent produced during a run, so the work happens
+once for the run instead of once for every row. A login session and a handle
+that cost money to obtain are the usual entries.
+
+Names are `UPPER_SNAKE_CASE` and up to 64 characters. A value is up to 32 KB. A
+lifetime is between 5 seconds and 24 hours, and is 15 minutes when the request
+names none.
+
+There is no listing route: names come from the agent code that wrote them.
+
+Every route needs an API key that can manage the agent cache. A read returns the
+value, so a caller that can overwrite an entry can already choose what the next
+read answers.
+
+Inside a code agent, use the [Python SDK's
+`langwatch.cache`](/agent-simulations/authenticated-agents#reusing-one-login-across-the-rows-of-a-run)
+rather than these routes directly. The platform gives each run its own
+credential, so agent code needs no key of its own.

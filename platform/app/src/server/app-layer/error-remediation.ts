@@ -313,6 +313,18 @@ const registry = {
     ],
   },
 
+  // ---- agent cache ----
+  // Read by agent code inside a run, so the tips name the next call rather
+  // than a page to open.
+  cache_entry_not_found: {
+    tips: [
+      "Store the entry before you read it; a read never creates one",
+      "Check the name, which is case sensitive",
+      "An entry is gone once its lifetime passes; store it again with a longer one if the run needs it for longer",
+    ],
+    docsPath: "/agent-simulations/authenticated-agents",
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [

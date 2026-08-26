@@ -34,10 +34,15 @@ import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation"
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type {
+  StudioClientEvent,
+  StudioServerEvent,
+} from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { tryMintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
@@ -1397,6 +1402,81 @@ async function* runCellEvaluators({
 }
 
 /**
+ * Whether any target this run executes puts Python in a sandbox, which is the
+ * only thing the agent cache credential is for.
+ */
+function runExecutesCode({
+  loadedAgents,
+  loadedWorkflows,
+}: {
+  loadedAgents: Map<string, TypedAgent>;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): boolean {
+  for (const agent of loadedAgents.values()) {
+    if (agent.type === "code") return true;
+  }
+  for (const workflow of loadedWorkflows?.values() ?? []) {
+    if (workflow.dsl.nodes.some((node) => node.type === "code")) return true;
+  }
+  return false;
+}
+
+/**
+ * The credential every code node of this run authenticates with, or undefined.
+ *
+ * One key for the whole run: every row shares the cache entries the run
+ * writes, and a key per row would leave a row of live credentials behind each
+ * run. A run that cannot get one still runs, and every row does its own work.
+ */
+async function mintRunSandboxApiKey({
+  projectId,
+  loadedAgents,
+  loadedWorkflows,
+}: {
+  projectId: string;
+  loadedAgents: Map<string, TypedAgent>;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): Promise<string | undefined> {
+  if (!runExecutesCode({ loadedAgents, loadedWorkflows })) return undefined;
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  const organizationId = project?.team?.organizationId;
+  if (!organizationId) return undefined;
+
+  return tryMintAgentSandboxApiKey({ prisma, projectId, organizationId });
+}
+
+/**
+ * Sets the run's sandbox credential on an event's workflow.
+ *
+ * Applied after `addEnvs` rather than inside it: `addEnvs` is shared by about
+ * ten callers and knows nothing about a run, so widening it would put a
+ * credential on events that have no run behind them. A one-off Studio run
+ * therefore carries no key, and every row of it does its own work.
+ */
+function withSandboxApiKey(
+  event: StudioClientEvent,
+  sandboxApiKey: string | undefined,
+): StudioClientEvent {
+  const { payload } = event;
+  if (!sandboxApiKey || !("workflow" in payload)) return event;
+  // The cast is what every writer of this union does: spreading one member of
+  // a discriminated union widens the payload back to the union, and there is
+  // no narrowing that survives the spread. `addEnvs` returns the same shape
+  // the same way.
+  return {
+    ...event,
+    payload: {
+      ...payload,
+      workflow: { ...payload.workflow, sandbox_api_key: sandboxApiKey },
+    },
+  } as StudioClientEvent;
+}
+
+/**
  * Executes a single cell and yields events.
  * @param isAborted - Optional function to check if execution should be aborted
  */
@@ -1408,6 +1488,8 @@ export async function* executeCell(
     prompt?: VersionedPrompt;
     agent?: TypedAgent;
     evaluators?: Map<string, { id: string; name: string; config: unknown }>;
+    /** The run's agent cache credential, when it minted one. */
+    sandboxApiKey?: string;
   },
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
@@ -1506,9 +1588,9 @@ export async function* executeCell(
       };
 
       // Add environment variables and process datasets
-      const enrichedEvent = await loadDatasets(
-        await addEnvs(rawEvent, projectId),
-        projectId,
+      const enrichedEvent = withSandboxApiKey(
+        await loadDatasets(await addEnvs(rawEvent, projectId), projectId),
+        loadedData.sandboxApiKey,
       );
 
       // Execute target and collect events
@@ -1622,6 +1704,7 @@ export async function* executeWorkflowCell({
   loadedEvaluators,
   resultMapperConfig,
   isAborted,
+  sandboxApiKey,
 }: {
   cell: ExecutionCell;
   projectId: string;
@@ -1630,6 +1713,8 @@ export async function* executeWorkflowCell({
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
+  /** The run's agent cache credential, when it minted one. */
+  sandboxApiKey?: string;
 }): AsyncGenerator<EvaluationV3Event> {
   yield {
     type: "cell_started",
@@ -1666,9 +1751,9 @@ export async function* executeWorkflowCell({
       },
     };
 
-    const enrichedEvent = await loadDatasets(
-      await addEnvs(rawEvent, projectId),
-      projectId,
+    const enrichedEvent = withSandboxApiKey(
+      await loadDatasets(await addEnvs(rawEvent, projectId), projectId),
+      sandboxApiKey,
     );
 
     const events: StudioServerEvent[] = [];
@@ -2566,6 +2651,15 @@ export async function* runOrchestrator(
     stripScoreEvaluatorIds: buildStripScoreEvaluatorIds(state.evaluators),
   };
 
+  // One agent cache credential for this whole run, minted only when a target
+  // actually runs Python. Undefined when nothing does, or when the mint
+  // failed, and the engine then injects nothing.
+  const sandboxApiKey = await mintRunSandboxApiKey({
+    projectId,
+    loadedAgents,
+    loadedWorkflows,
+  });
+
   // Dispatch event to ClickHouse.
   if (experimentId) {
     chDispatchTotal++;
@@ -2848,6 +2942,7 @@ export async function* runOrchestrator(
                 loadedWorkflows,
               ),
               evaluators: loadedEvaluators,
+              sandboxApiKey,
             };
 
             // Create abort checker bound to this run
@@ -2873,6 +2968,7 @@ export async function* runOrchestrator(
                   loadedEvaluators,
                   resultMapperConfig,
                   isAborted: checkAbort,
+                  sandboxApiKey,
                 })
               : executeCell(
                   cell,
@@ -3090,6 +3186,7 @@ export async function* runOrchestrator(
                     loadedAgents,
                   ),
                   evaluators: loadedEvaluators,
+                  sandboxApiKey,
                 };
 
                 const checkAbort = () => abortManager.isAborted(runId);

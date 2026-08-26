@@ -7,6 +7,7 @@ import { app as scimApp } from "@ee/scim/routes";
 import { app as webhooksApp } from "@ee/scim/webhooks";
 import { Hono } from "hono";
 import { app as adminApp } from "../../ee/admin/routes/admin";
+import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
@@ -169,6 +170,7 @@ export function createApiRouter() {
   api.route("/", scenarioEventsApp);
   api.route("/", scenariosApp);
   api.route("/", secretsApp);
+  api.route("/", agentCacheApp);
   api.route("/", simulationRunsApp);
   api.route("/", suitesApp);
   api.route("/", teamsApp);

@@ -158,6 +158,14 @@ export const CodeAgentDataSchema = z.object({
    * the studio's addEnvs behavior for in-app workflow execution.
    */
   secrets: z.record(z.string(), z.string()).default({}),
+  /**
+   * The run's own LangWatch credential, minted once for the run. It reaches
+   * the project's agent cache and nothing else, and expires by itself, so the
+   * code under test can keep state between turns without the project key ever
+   * entering the sandbox. Absent when the platform could not mint one, which
+   * leaves every turn doing its own work.
+   */
+  sandboxApiKey: z.string().optional(),
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 

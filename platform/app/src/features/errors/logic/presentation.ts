@@ -2881,6 +2881,15 @@ const presentations = {
     title: "Cache rule not found",
     describe: () => "It may have been archived by someone else.",
   },
+  cache_entry_not_found: {
+    // One answer for every way a read comes back empty: never written, past
+    // its lifetime, dropped, or written before the instance's encryption key
+    // changed. The next step is the same in all of them, so the copy names it
+    // and says nothing about which one happened.
+    title: "No cache entry with that name",
+    describe: () =>
+      "The entry was never stored, or its lifetime has passed. Produce the value again and store it.",
+  },
   budget_not_found: {
     title: "Budget not found",
     describe: () => "It may have been archived by someone else.",
