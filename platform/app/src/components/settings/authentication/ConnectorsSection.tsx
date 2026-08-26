@@ -21,6 +21,7 @@ import { ScimReconciliationPanel } from "~/components/settings/ScimReconciliatio
 import { SettingsDisclosure } from "~/components/settings/SettingsDisclosure";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
+import { isActiveConnection } from "~/features/directory/logic/connectionLifecycle";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
@@ -130,6 +131,19 @@ export function TokensSection({
   const labelFor = (id: string | null) =>
     connectionOptions.find((option) => option.connectionId === id)
       ?.providerId ?? id;
+  /**
+   * ONLY THE ONES THAT COULD CARRY IT. A token is bound to one connection and
+   * can only touch the people that connection provisioned, so a token issued
+   * against a draft, a rejected claim or a torn-down connection provisions
+   * nobody. Offering those was offering a dead end that authenticates
+   * perfectly and syncs nothing, discovered at the provider rather than here.
+   *
+   * The table below still resolves names from the full list: a token whose
+   * connection has since been retired is exactly the row whose name a reader
+   * needs, and drawing it as a bare identifier would be the worse half.
+   */
+  const issuableConnections = connectionOptions.filter(isActiveConnection);
+  const hasIssuableConnection = issuableConnections.length > 0;
 
   const handleGenerate = () => {
     const chosen = secret.trim();
@@ -334,27 +348,38 @@ export function TokensSection({
                 <Text fontWeight="600" fontSize="sm">
                   Connection
                 </Text>
-                <NativeSelect.Root>
-                  <NativeSelect.Field
-                    aria-label="Connection"
-                    value={connectionId}
-                    onChange={(event) => setConnectionId(event.target.value)}
-                  >
-                    <option value="">Choose a connection</option>
-                    {connectionOptions.map((option) => (
-                      <option
-                        key={option.connectionId}
-                        value={option.connectionId}
-                      >
-                        {option.providerId}
-                        {option.verifiedDomains.length > 0
-                          ? ` — ${option.verifiedDomains.join(", ")}`
-                          : ""}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
+                {hasIssuableConnection ? (
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      aria-label="Connection"
+                      value={connectionId}
+                      onChange={(event) => setConnectionId(event.target.value)}
+                    >
+                      <option value="">Choose a connection</option>
+                      {issuableConnections.map((option) => (
+                        <option
+                          key={option.connectionId}
+                          value={option.connectionId}
+                        >
+                          {option.providerId}
+                          {option.verifiedDomains.length > 0
+                            ? ` — ${option.verifiedDomains.join(", ")}`
+                            : ""}
+                        </option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                ) : (
+                  /* An empty dropdown is a fault a reader has to diagnose.
+                     Nothing to choose here has one cause and one remedy, so
+                     it says both rather than leaving a control that opens
+                     onto nothing. */
+                  <Text color="fg.muted" fontSize="sm">
+                    No single sign-on connection is live yet. Finish setting one
+                    up and turn it on, and it can carry a token.
+                  </Text>
+                )}
               </VStack>
               <VStack gap={1} align="start" width="full">
                 <Text fontWeight="600" fontSize="sm">
@@ -398,7 +423,7 @@ export function TokensSection({
               <Button
                 width="full"
                 onClick={handleGenerate}
-                disabled={generateMutation.isPending}
+                disabled={generateMutation.isPending || !hasIssuableConnection}
               >
                 {secret.trim().length > 0 ? "Save token" : "Generate token"}
               </Button>

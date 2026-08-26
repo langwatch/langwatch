@@ -568,6 +568,31 @@ Feature: The people and access settings, as one cluster
       When the sources are summarised into one chip
       Then the chip does not say everything is working
 
+  # A token is bound to one connection and can only touch the people that
+  # connection provisioned. Bound to one that does not route, it authenticates
+  # perfectly and provisions nobody -- and the administrator learns that at the
+  # provider, days later, rather than here where the choice was made.
+  Rule: a provisioning token is only offered the connections that could carry it
+
+    @integration
+    Scenario: Only live connections are offered when issuing a provisioning token
+      Given "acme" has a live connection and one that was never turned on
+      When "ana" goes to issue a provisioning token
+      Then only the live connection is offered to bind it to
+
+    @integration
+    Scenario: An organization with nothing live says so rather than offering an empty choice
+      Given "acme" has no connection that is live
+      When "ana" goes to issue a provisioning token
+      Then she is told no connection is live yet
+      And issuing is not offered until one is
+
+    @integration
+    Scenario: A token issued against a connection since retired still names it
+      Given "acme" holds a token issued against a connection that has been torn down
+      When "ana" reads the provisioning tokens
+      Then the token still names the connection it was issued against
+
   Rule: setting up and checking are two modes of one page
 
     @integration
