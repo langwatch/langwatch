@@ -202,7 +202,7 @@ Feature: The run dialog
 
   @integration
   Scenario: The note of a run is never remembered
-    Given a test suite run with the note "checking the stricter rubric"
+    Given a test suite run with the note "checking the stricter criterion"
     When the run dialog for that suite is opened again
     Then no note field is shown
     And "Add a note to your run" is offered again

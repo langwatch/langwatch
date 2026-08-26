@@ -127,7 +127,7 @@ function TitleAndSuiteRow({
 }
 
 /** What the user is trying to do, and what the judge must check. */
-function SituationAndRubrics({
+function SituationAndCriteria({
   draft,
   setDraft,
 }: {
@@ -150,17 +150,17 @@ function SituationAndRubrics({
       </Box>
 
       <Box>
-        <FieldLabel>Rubrics · one per line</FieldLabel>
+        <FieldLabel>Criteria · one per line</FieldLabel>
         <Textarea
           {...DIALOG_FIELD_STYLE}
           rows={4}
           resize="none"
-          aria-label="Rubrics"
+          aria-label="Criteria"
           placeholder={
             "Keeps a calm tone\nGives the refund status without being asked twice\nDoes not promise compensation we do not offer"
           }
-          value={draft.rubrics}
-          onChange={(event) => setDraft({ rubrics: event.target.value })}
+          value={draft.criteria}
+          onChange={(event) => setDraft({ criteria: event.target.value })}
         />
         <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
           The judge scores each line as pass or fail on the finished
@@ -228,7 +228,7 @@ export function CaseModalFields({
         />
       )}
       <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
-      <SituationAndRubrics draft={draft} setDraft={setDraft} />
+      <SituationAndCriteria draft={draft} setDraft={setDraft} />
       <CustomizeSection editor={editor} />
     </VStack>
   );

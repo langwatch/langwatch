@@ -454,7 +454,7 @@ describe("the live one-off run in the drawer", () => {
   });
 
   /** @scenario "The judge verdict appears after the conversation ends" */
-  it("shows the verdict, each rubric, the duration and the cost when the judge finishes", () => {
+  it("shows the verdict, each criterion, the duration and the cost when the judge finishes", () => {
     const view = renderDrawer();
     expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
 

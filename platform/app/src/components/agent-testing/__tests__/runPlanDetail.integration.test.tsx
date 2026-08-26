@@ -169,7 +169,7 @@ function threeBatches(): ScenarioRunData[] {
       batchRunId: "batch_3",
       scenarioRunId: "run_3",
       timestamp: NOW,
-      metadata: { note: "switched judge to the stricter rubric" },
+      metadata: { note: "switched judge to the stricter criterion" },
     }),
     makeRun({
       batchRunId: "batch_2",
@@ -279,7 +279,7 @@ describe("<RunPlanDetail/>", () => {
     const entry = screen.getByTestId("runs-sidebar-item-batch_3");
     expect(within(entry).getByText("Run #3")).toBeInTheDocument();
     expect(
-      within(entry).getByText("switched judge to the stricter rubric"),
+      within(entry).getByText("switched judge to the stricter criterion"),
     ).toBeInTheDocument();
     expect(within(entry).getByText("2h ago")).toBeInTheDocument();
     expect(within(entry).getByText("100%")).toBeInTheDocument();
@@ -291,7 +291,7 @@ describe("<RunPlanDetail/>", () => {
 
     const entry = screen.getByTestId("runs-sidebar-item-batch_3");
     const note = within(entry).getByTestId("runs-sidebar-item-batch_3-note");
-    expect(note).toHaveTextContent("switched judge to the stricter rubric");
+    expect(note).toHaveTextContent("switched judge to the stricter criterion");
     expect(within(entry).getByText("2h ago")).toBeInTheDocument();
     expect(within(entry).getByText("100%")).toBeInTheDocument();
   });
@@ -583,7 +583,7 @@ describe("<RunPlanDetail/>", () => {
     const line = screen.getByTestId("run-summary-line");
     expect(within(line).getByText("Run #3")).toBeInTheDocument();
     expect(within(line).getByTestId("run-summary-note")).toHaveTextContent(
-      "switched judge to the stricter rubric",
+      "switched judge to the stricter criterion",
     );
   });
 

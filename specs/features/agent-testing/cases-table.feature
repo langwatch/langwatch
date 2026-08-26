@@ -150,7 +150,7 @@ Feature: The test cases table
     Given the Agent Testing page is open
     When "New test case" is chosen
     Then the case dialog opens titled "New test case"
-    And it asks for a title, a test suite, a situation and the rubrics
+    And it asks for a title, a test suite, a situation and the criteria
     And no step asks to write the case with a model first
 
   @integration
@@ -170,7 +170,7 @@ Feature: The test cases table
 
   @integration
   Scenario: Save and Run saves the case and then asks what to run it against
-    Given the case dialog holds a title and one rubric
+    Given the case dialog holds a title and one criterion
     When "Save & Run" is chosen
     Then the case is saved
     And the run dialog opens for the case that was saved

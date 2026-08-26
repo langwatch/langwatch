@@ -50,7 +50,7 @@ Feature: Running one test case keeps the person in place
     Given a one-off run whose conversation has ended
     When the judge finishes
     Then the verdict appears in the drawer
-    And each rubric reads as met or not met
+    And each criterion reads as met or not met
     And the duration and the cost of the run read in the drawer
 
   @integration

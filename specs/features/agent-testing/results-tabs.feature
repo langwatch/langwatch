@@ -58,7 +58,7 @@ Feature: The Results tab
 
   @integration
   Scenario: A sidebar entry shows the number, the note, the age and the pass rate
-    Given a run started with the note "switched judge to the stricter rubric"
+    Given a run started with the note "switched judge to the stricter criterion"
     When the runs sidebar is read
     Then the entry carries its run number
     And it shows the note

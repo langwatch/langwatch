@@ -987,13 +987,13 @@ describe("<RunDialog/>", () => {
     await user.click(screen.getByTestId("customize-chip-note"));
     await user.type(
       screen.getByLabelText("Note for the run"),
-      "switched judge to the stricter rubric",
+      "switched judge to the stricter criterion",
     );
     await user.click(screen.getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
     expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
-      note: "switched judge to the stricter rubric",
+      note: "switched judge to the stricter criterion",
     });
   });
 

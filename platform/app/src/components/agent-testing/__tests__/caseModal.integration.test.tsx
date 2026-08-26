@@ -213,7 +213,7 @@ describe("the test case dialog", () => {
       expect(screen.getByLabelText("Title")).toBeInTheDocument();
       expect(screen.getByLabelText("Test suite")).toBeInTheDocument();
       expect(screen.getByLabelText("Situation")).toBeInTheDocument();
-      expect(screen.getByLabelText("Rubrics")).toBeInTheDocument();
+      expect(screen.getByLabelText("Criteria")).toBeInTheDocument();
       expect(dialog.textContent).not.toMatch(/with AI|Langy/i);
     });
 
@@ -285,7 +285,7 @@ describe("the test case dialog", () => {
       await screen.findByTestId("case-modal");
 
       await user.type(screen.getByLabelText("Title"), "Angry customer");
-      await user.type(screen.getByLabelText("Rubrics"), "Keeps a calm tone");
+      await user.type(screen.getByLabelText("Criteria"), "Keeps a calm tone");
       await user.click(screen.getByTestId("case-modal-save-and-run"));
 
       expect(mockCreate).toHaveBeenCalledWith(

@@ -634,14 +634,14 @@ describe("Feature: Suites REST API", () => {
 
         const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
           idempotencyKey: "run-key-note-1",
-          note: "switched judge to the stricter rubric",
+          note: "switched judge to the stricter criterion",
         });
 
         expect(res.status).toBe(200);
         expect(queueSimulationRun).toHaveBeenCalledTimes(6);
         for (const call of queueSimulationRun.mock.calls) {
           expect(call[0].metadata).toMatchObject({
-            note: "switched judge to the stricter rubric",
+            note: "switched judge to the stricter criterion",
           });
         }
       });

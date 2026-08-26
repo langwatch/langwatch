@@ -1,7 +1,7 @@
 Feature: The wide run detail drawer
   As a person reading a finished run
   I want the judge results beside the conversation when the screen allows
-  So that I can read a rubric and the message that decided it at the same time
+  So that I can read a criterion and the message that decided it at the same time
 
   Background: one drawer, two layouts.
     Agent Testing opens the same run detail drawer the current product uses,
@@ -47,7 +47,7 @@ Feature: The wide run detail drawer
 
   @integration
   Scenario: Both parts scroll on their own in the side-by-side layout
-    Given a long conversation and a long list of rubrics side by side
+    Given a long conversation and a long list of criteria side by side
     When the conversation is scrolled
     Then the results stay where they are
     And scrolling the results does not move the conversation
@@ -56,7 +56,7 @@ Feature: The wide run detail drawer
 
   @integration
   Scenario: The drawer shows the same content in both layouts
-    Given a finished run with a conversation, rubric verdicts, a duration and a cost
+    Given a finished run with a conversation, criterion verdicts, a duration and a cost
     When the drawer is read in the wide layout and then in the stacked layout
     Then the same conversation, verdicts, duration and cost are shown in both
 
