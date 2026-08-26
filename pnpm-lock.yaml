@@ -3204,6 +3204,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../contract
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^7.0.2

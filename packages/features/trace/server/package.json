@@ -23,7 +23,8 @@
   "dependencies": {
     "@langwatch/eventing": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*"
+    "@langwatch/trace-contract": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

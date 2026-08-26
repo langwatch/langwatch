@@ -6,6 +6,12 @@ viewer-safe, cursor-paged span tree and row-version delta. Both read
 `trace_analytics` remains the lighter analytical source, and
 `trace_analytics_rollup` the time-series source.
 
+Raw spans and logs pass through one deterministic canonicalisation service
+before the pipeline derives four deliberately different projection shapes:
+trace summaries, trace analytics, stored spans and timeseries rollups. The app
+keeps process composition and transport adapters; it does not implement a
+second canonicalisation path.
+
 ## Journey
 
 1. A transport authenticates the project and resolves viewer capabilities.

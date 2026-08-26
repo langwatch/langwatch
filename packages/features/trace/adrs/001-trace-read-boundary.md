@@ -52,6 +52,12 @@ not substitutes.
 The app composition root creates one Trace service and exposes it through
 `context.app`. Request handlers do not construct repositories or services.
 
+Canonicalisation has a separate synchronous, deterministic lifecycle from the
+asynchronous tenant read service. One process-owned
+`TraceCanonicalisationService` is shared by trace summary, trace analytics,
+span storage and timeseries rollup projections, and by log and coding-agent
+callers. Its format adapters are private implementation details.
+
 ## Environment and configuration
 
 Trace reads no environment variables. The ClickHouse client and semantic
@@ -72,8 +78,10 @@ before crossing the transport boundary, including nullish field behaviour.
 
 Portable response schemas now live in the Trace contract and the legacy router
 schema module is only a re-export. This slice does not move the corresponding
-header, full/detail, list/search, resource or signal reads, nor projections,
-eventing, overlays, evaluations, enrichment or logs.
+header, full/detail, list/search, resource or signal reads, nor their app-owned
+projection/eventing implementations, overlays, evaluations, enrichment or
+logs. Canonicalisation itself is shared by the four existing projections and
+the trace/log/coding-agent readers.
 The browser package contains only display behaviour and cannot fetch,
 authorize, compose, or reshape a trace response. It also owns the
 transport-neutral loaded-row find behaviour and the flame-graph presentation.
