@@ -103,6 +103,35 @@ func TestSharedSessionCodeAgent_RowLogsInAgainOnceTheEntryHasLapsed(t *testing.T
 	assert.Equal(t, "session-1", stubs.storedSession(), "the entry was replaced")
 }
 
+// @scenario "A row logs in again when the target refuses the stored session"
+//
+// The lifetime the agent stores is what the target promised, never a promise
+// the target has to keep: it ends a session on a restart, when an operator
+// closes it, or when the password changes. Found by running the example against
+// a stub that had forgotten its sessions: every row sent the stored session,
+// took a 401, and failed the run. One refused row now costs one login.
+func TestSharedSessionCodeAgent_RowLogsInAgainWhenTheTargetRefusesTheSession(t *testing.T) {
+	stubs := newSharedSessionStubs(t, "p4ssw0rd")
+	stubs.seedForgottenSession("session-the-target-has-ended")
+
+	res, err := sharedSessionExec(t, stubs.cacheServer.URL).
+		Execute(context.Background(), stubs.rowRequest(loadSharedSessionExample(t)))
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected success, got %+v", res.Error)
+
+	assert.Equal(t, 1, stubs.loginCount(), "a refused session means one login")
+	require.Len(t, stubs.apiSessions, 2, "the refused send, then the retry")
+	assert.Equal(t, "session-the-target-has-ended", stubs.apiSessions[0])
+	assert.Equal(t, "session-1", stubs.apiSessions[1], "the retry uses the new session")
+	assert.Equal(t, "session-1", stubs.storedSession(),
+		"the rows that follow read the new session, not the refused one")
+	assert.Equal(t, "hello from the protected api", res.Outputs["output"])
+
+	// The password reaches no captured stream, on this path as on the others.
+	assert.NotContains(t, res.Stdout, "p4ssw0rd")
+	assert.NotContains(t, res.Stderr, "p4ssw0rd")
+}
+
 // @scenario "A row reads a session stored after its own row started"
 func TestSharedSessionCodeAgent_RowReadsASessionStoredAfterItStarted(t *testing.T) {
 	stubs := newSharedSessionStubs(t, "p4ssw0rd")

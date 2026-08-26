@@ -283,6 +283,19 @@ func (s *sharedSessionStubs) seedSession(session string, ttl time.Duration) {
 	s.mintedSessions = append(s.mintedSessions, session)
 }
 
+// seedForgottenSession puts a session in the cache that the protected API will
+// refuse, which is what an earlier row's session looks like after the target
+// system restarts, an operator closes the session, or the password changes.
+// The entry itself is live: only the target has moved on.
+func (s *sharedSessionStubs) seedForgottenSession(session string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stored[sharedSessionEntryName] = cacheEntry{
+		value:     session,
+		expiresAt: time.Now().Add(time.Minute),
+	}
+}
+
 // rowRequest builds one row's execution. The secrets map is the snapshot the
 // platform reads when the row starts. It names the target system only: the
 // LangWatch credential arrives in the sandbox environment, and the session is

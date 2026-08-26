@@ -48,6 +48,18 @@ Feature: A code agent logs in once for a whole run
       # no timestamp and does no arithmetic on one.
 
     @integration
+    Scenario: A row logs in again when the target refuses the stored session
+      Given the cache holds a session the target system no longer accepts
+      When the row runs
+      Then the row is refused once
+      And the row logs in and sends its work again
+      And the new session replaces the entry for the rows that follow
+      # The stored lifetime is what the target promised, not a promise it has
+      # to keep: a restart, an operator closing the session or a password
+      # change ends one early. Without this the whole run fails on a session
+      # that stopped working, instead of paying for one login.
+
+    @integration
     Scenario: A row reads a session stored after its own row started
       Given the row's snapshot was taken while the cache was empty
       And another row stored a session after that
