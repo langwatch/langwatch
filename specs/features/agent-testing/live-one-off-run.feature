@@ -54,11 +54,12 @@ Feature: Running one test case keeps the person in place
     And the duration and the cost of the run read in the drawer
 
   @integration
-  Scenario: The drawer offers Rerun and Edit for that case
+  Scenario: The drawer offers Open Scenario for that case
     Given the run detail drawer is open on a finished one-off run
     When its header is read
-    Then Rerun and Edit are offered
-    And Edit opens the editor for that test case
+    Then a single "Open Scenario" button is offered
+    And it opens the editor for that test case
+    And a rerun is started from the case editor through its "Save & Run" control
 
   @integration
   Scenario: Closing the drawer leaves the table where it was
