@@ -1947,7 +1947,7 @@ secured
       );
     }
 
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = new ActivityMonitorService({ prisma });
     const events = await monitor.eventsForSource({
       organizationId: tokenRecord.organization_id,
       sourceId,
@@ -2006,7 +2006,7 @@ secured
         404,
       );
     }
-    const monitor = new ActivityMonitorService(prisma);
+    const monitor = new ActivityMonitorService({ prisma });
     const health = await monitor.sourceHealthMetrics({
       organizationId: tokenRecord.organization_id,
       sourceId,

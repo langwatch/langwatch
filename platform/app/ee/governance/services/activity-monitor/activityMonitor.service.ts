@@ -383,21 +383,33 @@ function emptyDenseBuckets(
 // ---------------------------------------------------------------------------
 
 export class ActivityMonitorService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    /**
-     * The activity-monitor read side, from the App. `undefined` on a
-     * deployment without ClickHouse — every method degrades to its
-     * empty-state shape, same as the pre-repository "no client" fallback.
-     */
-    private readonly repository?: ActivityMonitorClickHouseRepository,
-  ) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The activity-monitor read side, from the App. `undefined` on a
+   * deployment without ClickHouse — every method degrades to its
+   * empty-state shape, same as the pre-repository "no client" fallback.
+   */
+  private readonly repository?: ActivityMonitorClickHouseRepository;
 
-  static create(
-    prisma: PrismaClient,
-    repository?: ActivityMonitorClickHouseRepository,
-  ): ActivityMonitorService {
-    return new ActivityMonitorService(prisma, repository);
+  constructor({
+    prisma,
+    repository,
+  }: {
+    prisma: PrismaClient;
+    repository?: ActivityMonitorClickHouseRepository;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+  }
+
+  static create({
+    prisma,
+    repository,
+  }: {
+    prisma: PrismaClient;
+    repository?: ActivityMonitorClickHouseRepository;
+  }): ActivityMonitorService {
+    return new ActivityMonitorService({ prisma, repository });
   }
 
   /**

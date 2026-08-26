@@ -44,10 +44,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.summary({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -75,10 +75,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.spendByUser({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -111,10 +111,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.spendByTeam({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -144,10 +144,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.spendByDepartment({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -174,10 +174,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.spendOverTime({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
@@ -193,10 +193,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.ingestionSourcesHealth({
         organizationId: input.organizationId,
       });
@@ -218,10 +218,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.recentAnomalies({
         organizationId: input.organizationId,
         limit: input.limit,
@@ -245,10 +245,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.eventsForSource(input);
     }),
 
@@ -266,10 +266,10 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ActivityMonitorService.create(
-        ctx.prisma,
-        getApp().governance.activityMonitor,
-      );
+      const service = ActivityMonitorService.create({
+        prisma: ctx.prisma,
+        repository: getApp().governance.activityMonitor,
+      });
       return await service.sourceHealthMetrics(input);
     }),
 });
