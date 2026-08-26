@@ -8,6 +8,7 @@ import {
   type Project,
   type ProjectName,
   type ProjectWithTeam,
+  type TraceDestinationProject,
 } from "@langwatch/project-contract";
 import {
   OrganizationHasNoTeamError,
@@ -63,6 +64,13 @@ const applicationProject: Project = projectSchema.parse({
   lastCodingAgentPullRequestAt: null,
 });
 
+const traceDestination = {
+  id: "trace_project",
+  teamId: "trace_team",
+  apiKey: "trace-api-key",
+  archivedAt: null,
+};
+
 const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithTeam => ({
   ...applicationProject,
   team: {
@@ -94,6 +102,9 @@ class StubRepository extends ProjectRepository {
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectName[]>>(
     async () => [],
   );
+  findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(
+    async () => [],
+  );
   create = vi.fn(async () => applicationProject);
   tryGetById = vi.fn(async () => applicationProject);
   tryGetWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(
@@ -112,12 +123,32 @@ class StubRepository extends ProjectRepository {
     pagination: { page: 1, limit: 50, total: 1 },
   }));
   findActiveByScopes = vi.fn(async () => [applicationProject]);
+  tryFindLiveTraceDestination = vi.fn(
+    async (_input: {
+      organizationId: string;
+      projectId: string;
+    }): Promise<TraceDestinationProject | null> => null,
+  );
+  tryFindOldestGovernanceTraceDestination = vi.fn(
+    async (_organizationId: string): Promise<TraceDestinationProject | null> => null,
+  );
+  countLiveNonGovernanceProjects = vi.fn(async () => 0);
+  tryGetTraceDestination = vi.fn(async () => null);
+  listTraceDestinations = vi.fn(async () => []);
 }
 
 class StubOrganizationService extends OrganizationServiceContract {
   teamId: string | null = "oldest-team";
   readonly createdTeams: CreateOrganizationTeamInput[] = [];
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
+
+  getOrganizationMembers(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
+  isMember(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
 
   async getOldestTeamId(): Promise<string> {
     if (!this.teamId) throw new OrganizationHasNoTeamError("org");
@@ -290,6 +321,86 @@ const createService = (
   });
 
 describe("ProjectService", () => {
+  it("resolves a live explicit trace destination without falling back", async () => {
+    const repository = new StubRepository();
+    repository.tryFindLiveTraceDestination.mockResolvedValue(traceDestination);
+
+    await expect(
+      createService(repository).resolveTraceDestination({
+        organizationId: "org",
+        projectScopeIds: ["other"],
+        traceProjectId: traceDestination.id,
+      }),
+    ).resolves.toEqual({ outcome: "resolved", project: traceDestination });
+    expect(repository.tryFindOldestGovernanceTraceDestination).not.toHaveBeenCalled();
+  });
+
+  it("rejects an explicit trace destination outside the live organization", async () => {
+    const repository = new StubRepository();
+
+    await expect(
+      createService(repository).resolveTraceDestination({
+        organizationId: "org",
+        projectScopeIds: [],
+        traceProjectId: "missing",
+      }),
+    ).resolves.toEqual({ outcome: "unknown" });
+    expect(repository.tryFindOldestGovernanceTraceDestination).not.toHaveBeenCalled();
+  });
+
+  it("uses the only live project scope as the trace destination", async () => {
+    const repository = new StubRepository();
+    repository.tryFindLiveTraceDestination.mockResolvedValue(traceDestination);
+
+    await expect(
+      createService(repository).resolveTraceDestination({
+        organizationId: "org",
+        projectScopeIds: [traceDestination.id],
+      }),
+    ).resolves.toEqual({ outcome: "resolved", project: traceDestination });
+  });
+
+  it("uses the oldest governance destination when there is no alternative", async () => {
+    const repository = new StubRepository();
+    repository.tryFindOldestGovernanceTraceDestination.mockResolvedValue(
+      traceDestination,
+    );
+
+    await expect(
+      createService(repository).resolveTraceDestination({
+        organizationId: "org",
+        projectScopeIds: [],
+      }),
+    ).resolves.toEqual({ outcome: "resolved", project: traceDestination });
+  });
+
+  it("reports ambiguity when a governance fallback would hide live alternatives", async () => {
+    const repository = new StubRepository();
+    repository.tryFindOldestGovernanceTraceDestination.mockResolvedValue(
+      traceDestination,
+    );
+    repository.countLiveNonGovernanceProjects.mockResolvedValue(1);
+
+    await expect(
+      createService(repository).resolveTraceDestination({
+        organizationId: "org",
+        projectScopeIds: ["a", "b"],
+      }),
+    ).resolves.toEqual({ outcome: "ambiguous", projectScopeCount: 2 });
+  });
+
+  it("reports no trace destination when there is no governance project", async () => {
+    const repository = new StubRepository();
+
+    await expect(
+      createService(repository).resolveTraceDestination({
+        organizationId: "org",
+        projectScopeIds: [],
+      }),
+    ).resolves.toEqual({ outcome: "no_destination" });
+    expect(repository.countLiveNonGovernanceProjects).not.toHaveBeenCalled();
+  });
+
   it("returns the existing internal project without creating", async () => {
     const repository = new StubRepository();
     repository.existing = project;
@@ -439,8 +550,18 @@ describe("ProjectService", () => {
   it("loads project names in one deduplicated repository call", async () => {
     const repository = new StubRepository();
     repository.findNamesByIds.mockResolvedValue([
-      { id: "project_1", name: "First" },
-      { id: "project_2", name: "Second" },
+      {
+        id: "project_1",
+        name: "First",
+        slug: "first",
+        organizationId: "org",
+      },
+      {
+        id: "project_2",
+        name: "Second",
+        slug: "second",
+        organizationId: "org",
+      },
     ]);
 
     await expect(
@@ -448,10 +569,30 @@ describe("ProjectService", () => {
         projectIds: ["project_1", "project_2", "project_1"],
       }),
     ).resolves.toEqual([
-      { id: "project_1", name: "First" },
-      { id: "project_2", name: "Second" },
+      {
+        id: "project_1",
+        name: "First",
+        slug: "first",
+        organizationId: "org",
+      },
+      {
+        id: "project_2",
+        name: "Second",
+        slug: "second",
+        organizationId: "org",
+      },
     ]);
     expect(repository.findNamesByIds).toHaveBeenCalledWith(["project_1", "project_2"]);
+  });
+
+  it("lists durable project ids for an organization", async () => {
+    const repository = new StubRepository();
+    repository.findIdsByOrganization.mockResolvedValue(["project_1", "project_2"]);
+
+    await expect(
+      createService(repository).listIdsByOrganization({ organizationId: "org" }),
+    ).resolves.toEqual(["project_1", "project_2"]);
+    expect(repository.findIdsByOrganization).toHaveBeenCalledWith("org");
   });
 
   it("bounds active project scope queries and reports another page", async () => {

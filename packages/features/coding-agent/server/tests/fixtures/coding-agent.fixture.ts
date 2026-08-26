@@ -665,6 +665,10 @@ export class TestProjectService extends ProjectService {
     throw new Error("not used by Coding Agent tests");
   }
 
+  async listIdsByOrganization(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
   async listActiveByScopes(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
@@ -685,15 +689,23 @@ export class TestProjectService extends ProjectService {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async isFeatureEnabled(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
   async tryGetTraceSharingConfig(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
 
   async resolveOrgAdmin(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
+  async resolveTraceDestination(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
+  async tryGetTraceDestination(): Promise<never> {
+    throw new Error("not used by Coding Agent tests");
+  }
+
+  async listTraceDestinations(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
 }

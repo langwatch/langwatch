@@ -19,6 +19,8 @@ import {
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
+  type TraceDestinationProject,
+  traceDestinationProjectSchema,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
@@ -302,10 +304,31 @@ export class PrismaProjectRepository extends ProjectRepository {
       return [];
     }
 
-    return this.prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        team: { select: { organizationId: true } },
+      },
     });
+
+    return projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      organizationId: project.team.organizationId,
+    }));
+  }
+
+  async findIdsByOrganization(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+
+    return projects.map((project) => project.id);
   }
 
   async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
@@ -346,6 +369,74 @@ export class PrismaProjectRepository extends ProjectRepository {
       select: { id: true, isPersonal: true },
     });
   }
+
+  async tryFindLiveTraceDestination(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<TraceDestinationProject | null> {
+    const row = await this.prisma.project.findFirst({
+      where: {
+        id: input.projectId,
+        team: { organizationId: input.organizationId },
+        archivedAt: null,
+      },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+
+    return row ? traceDestinationProjectSchema.parse(row) : null;
+  }
+
+  async tryFindOldestGovernanceTraceDestination(
+    organizationId: string,
+  ): Promise<TraceDestinationProject | null> {
+    const row = await this.prisma.project.findFirst({
+      where: {
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        team: { organizationId },
+        archivedAt: null,
+      },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+
+    return row ? traceDestinationProjectSchema.parse(row) : null;
+  }
+
+  countLiveNonGovernanceProjects(organizationId: string): Promise<number> {
+    return this.prisma.project.count({
+      where: {
+        team: { organizationId },
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        archivedAt: null,
+      },
+    });
+  }
+
+  async tryGetTraceDestination(
+    projectId: string,
+  ): Promise<TraceDestinationProject | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+    return row ? traceDestinationProjectSchema.parse(row) : null;
+  }
+
+  async listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+    if (projectIds.length === 0) return [];
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+    const byId = new Map(
+      rows.map((row) => [row.id, traceDestinationProjectSchema.parse(row)]),
+    );
+    return projectIds.flatMap((projectId) => {
+      const project = byId.get(projectId);
+      return project ? [project] : [];
+    });
+  }
+
   private mapProject(row: PrismaProject | null): Project | null {
     return row ? projectSchema.parse(row) : null;
   }

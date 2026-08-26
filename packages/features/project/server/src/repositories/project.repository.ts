@@ -8,6 +8,7 @@ import type {
   ProjectWithTeam,
   SearchProjectsResult,
   TraceSharingConfig,
+  TraceDestinationProject,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
@@ -73,6 +74,7 @@ export abstract class ProjectRepository {
     teamId: string;
   }): Promise<Project[]>;
   abstract findNamesByIds(projectIds: string[]): Promise<ProjectName[]>;
+  abstract findIdsByOrganization(organizationId: string): Promise<string[]>;
   abstract findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
   abstract tryFindBySlugInTeam(input: {
     slug: string;
@@ -82,4 +84,18 @@ export abstract class ProjectRepository {
     teamId: string;
     organizationId: string;
   }): Promise<{ id: string; isPersonal: boolean } | null>;
+  abstract tryFindLiveTraceDestination(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<TraceDestinationProject | null>;
+  abstract tryFindOldestGovernanceTraceDestination(
+    organizationId: string,
+  ): Promise<TraceDestinationProject | null>;
+  abstract countLiveNonGovernanceProjects(organizationId: string): Promise<number>;
+  abstract tryGetTraceDestination(
+    projectId: string,
+  ): Promise<TraceDestinationProject | null>;
+  abstract listTraceDestinations(
+    projectIds: string[],
+  ): Promise<TraceDestinationProject[]>;
 }

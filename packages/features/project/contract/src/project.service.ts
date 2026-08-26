@@ -6,12 +6,16 @@ import type {
   OrgAdminResolution,
   PaginatedProjects,
   Project,
-  ProjectFeatureFlag,
   ProjectName,
+  ProjectIdsByOrganizationInput,
+  ProjectNamesByIdsInput,
   ProjectWithTeam,
   ProjectPresenceInput,
   SearchProjectsResult,
   TraceSharingConfig,
+  TraceDestinationDecision,
+  TraceDestinationInput,
+  TraceDestinationProject,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "./project";
@@ -59,7 +63,9 @@ export abstract class ProjectService {
     organizationId: string;
     teamId: string;
   }): Promise<Project[]>;
-  abstract listNamesByIds(input: { projectIds: string[] }): Promise<ProjectName[]>;
+  abstract listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectName[]>;
+  /** Includes archived projects because durable spend remains attributable to them. */
+  abstract listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
   /** Lists active projects reached by the supplied organization/team/project scopes. */
   abstract listActiveByScopes(
     input: ActiveProjectsByScopesInput,
@@ -78,12 +84,19 @@ export abstract class ProjectService {
     organizationId?: string;
     limit?: number;
   }): Promise<SearchProjectsResult[]>;
-  abstract isFeatureEnabled(
-    projectId: string,
-    flag: ProjectFeatureFlag,
-  ): Promise<boolean>;
   abstract tryGetTraceSharingConfig(
     projectId: string,
   ): Promise<TraceSharingConfig | null>;
   abstract resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
+  abstract resolveTraceDestination(
+    input: TraceDestinationInput,
+  ): Promise<TraceDestinationDecision>;
+  /** Follows a stored Gateway trace-destination pointer, including archived projects. */
+  abstract tryGetTraceDestination(
+    projectId: string,
+  ): Promise<TraceDestinationProject | null>;
+  /** Batch counterpart for Gateway listings; unknown ids are omitted. */
+  abstract listTraceDestinations(
+    projectIds: string[],
+  ): Promise<TraceDestinationProject[]>;
 }

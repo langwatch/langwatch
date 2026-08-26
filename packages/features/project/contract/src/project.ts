@@ -172,23 +172,76 @@ export interface SearchProjectsResult {
   slug: string;
 }
 
-export interface ProjectName {
-  id: string;
-  name: string;
-}
+export const projectNameSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    slug: z.string().min(1),
+    organizationId: z.string().min(1),
+  })
+  .strict();
+export type ProjectName = z.infer<typeof projectNameSchema>;
+
+export const projectNamesByIdsInputSchema = z
+  .object({ projectIds: z.array(z.string().min(1)) })
+  .strict();
+export type ProjectNamesByIdsInput = z.infer<typeof projectNamesByIdsInputSchema>;
+
+export const projectIdsByOrganizationInputSchema = z
+  .object({ organizationId: z.string().min(1) })
+  .strict();
+export type ProjectIdsByOrganizationInput = z.infer<
+  typeof projectIdsByOrganizationInputSchema
+>;
 
 export interface TraceSharingConfig {
   orgEnabled: boolean;
   projectEnabled: boolean;
 }
 
+/** Internal Gateway-only trace export credential, never a transport DTO. */
+export const traceDestinationProjectSchema = z
+  .object({
+    id: z.string().min(1),
+    teamId: z.string().min(1),
+    apiKey: z.string(),
+    archivedAt: z.date().nullable(),
+  })
+  .strict();
+export type TraceDestinationProject = z.infer<typeof traceDestinationProjectSchema>;
+
+export const traceDestinationProjectIdSchema = z.string().min(1);
+export const traceDestinationProjectIdsSchema = z.array(traceDestinationProjectIdSchema);
+
+export const traceDestinationInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    projectScopeIds: z.array(z.string().min(1)),
+    traceProjectId: z.string().min(1).nullable().optional(),
+  })
+  .strict();
+export type TraceDestinationInput = z.infer<typeof traceDestinationInputSchema>;
+
+export const traceDestinationDecisionSchema = z.discriminatedUnion("outcome", [
+  z
+    .object({ outcome: z.literal("resolved"), project: traceDestinationProjectSchema })
+    .strict(),
+  z.object({ outcome: z.literal("unknown") }).strict(),
+  z
+    .object({
+      outcome: z.literal("ambiguous"),
+      projectScopeCount: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z.object({ outcome: z.literal("no_destination") }).strict(),
+]);
+export type TraceDestinationDecision = z.infer<typeof traceDestinationDecisionSchema>;
+
 export interface OrgAdminResolution {
   userId: string | null;
   organizationId: string | null;
   firstMessage: boolean;
 }
-
-export type ProjectFeatureFlag = `feature${string}`;
 
 export interface UpdateProjectMetadataInput {
   id: string;

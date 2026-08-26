@@ -20,6 +20,7 @@ export class TestProjectService extends ProjectService {
   listByOrganization = unsupported<ProjectService["listByOrganization"]>();
   listByTeam = unsupported<ProjectService["listByTeam"]>();
   listNamesByIds = unsupported<ProjectService["listNamesByIds"]>();
+  listIdsByOrganization = unsupported<ProjectService["listIdsByOrganization"]>();
   listActiveByScopes = unsupported<ProjectService["listActiveByScopes"]>();
   updateMetadata = unsupported<ProjectService["updateMetadata"]>();
   touchCodingAgentSessionSeen =
@@ -27,7 +28,9 @@ export class TestProjectService extends ProjectService {
   touchCodingAgentPullRequestSeen =
     unsupported<ProjectService["touchCodingAgentPullRequestSeen"]>();
   searchByQuery = unsupported<ProjectService["searchByQuery"]>();
-  isFeatureEnabled = unsupported<ProjectService["isFeatureEnabled"]>();
   tryGetTraceSharingConfig = unsupported<ProjectService["tryGetTraceSharingConfig"]>();
   resolveOrgAdmin = unsupported<ProjectService["resolveOrgAdmin"]>();
+  resolveTraceDestination = unsupported<ProjectService["resolveTraceDestination"]>();
+  tryGetTraceDestination = unsupported<ProjectService["tryGetTraceDestination"]>();
+  listTraceDestinations = unsupported<ProjectService["listTraceDestinations"]>();
 }

@@ -233,6 +233,10 @@ export class TestProjectService extends ProjectService {
     return unsupported();
   }
 
+  listIdsByOrganization(): never {
+    return unsupported();
+  }
+
   listActiveByScopes(): never {
     return unsupported();
   }
@@ -249,15 +253,23 @@ export class TestProjectService extends ProjectService {
     return unsupported();
   }
 
-  isFeatureEnabled(): never {
-    return unsupported();
-  }
-
   tryGetTraceSharingConfig(): never {
     return unsupported();
   }
 
   resolveOrgAdmin(): never {
+    return unsupported();
+  }
+
+  resolveTraceDestination(): never {
+    return unsupported();
+  }
+
+  tryGetTraceDestination(): never {
+    return unsupported();
+  }
+
+  listTraceDestinations(): never {
     return unsupported();
   }
 }

@@ -7,7 +7,7 @@ import {
   type ProjectKeyMapPort,
   type ProjectStoredObjectsPort,
 } from "../ports/project.port";
-import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository";
+import { PrismaProjectRepository } from "../repositories/prisma/prisma-project.repository";
 import { ProjectService } from "../services/project.service";
 
 class FunctionProjectCredentials extends ProjectCredentialsPort {

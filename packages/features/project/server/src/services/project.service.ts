@@ -8,6 +8,8 @@ import {
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
   projectPaginationSchema,
+  projectIdsByOrganizationInputSchema,
+  projectNamesByIdsInputSchema,
   projectPresenceInputSchema,
   updateProjectInputSchema,
   type ActiveProjectsByScopes,
@@ -17,11 +19,17 @@ import {
   type OrgAdminResolution,
   type PaginatedProjects,
   type Project,
-  type ProjectFeatureFlag,
   type ProjectName,
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
+  traceDestinationDecisionSchema,
+  type TraceDestinationDecision,
+  type TraceDestinationInput,
+  type TraceDestinationProject,
+  traceDestinationInputSchema,
+  traceDestinationProjectIdSchema,
+  traceDestinationProjectIdsSchema,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
 import {
@@ -112,6 +120,64 @@ export class ProjectService extends ProjectServiceContract {
   tryFindInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
     const parsed = internalProjectQuerySchema.parse(input);
     return this.repository.tryFindInternalByOrganization(parsed.organizationId);
+  }
+
+  async resolveTraceDestination(
+    input: TraceDestinationInput,
+  ): Promise<TraceDestinationDecision> {
+    const parsed = traceDestinationInputSchema.parse(input);
+    if (parsed.traceProjectId) {
+      const project = await this.repository.tryFindLiveTraceDestination({
+        organizationId: parsed.organizationId,
+        projectId: parsed.traceProjectId,
+      });
+      const decision = project
+        ? { outcome: "resolved" as const, project }
+        : { outcome: "unknown" as const };
+
+      return traceDestinationDecisionSchema.parse(decision);
+    }
+
+    if (parsed.projectScopeIds.length === 1) {
+      const project = await this.repository.tryFindLiveTraceDestination({
+        organizationId: parsed.organizationId,
+        projectId: parsed.projectScopeIds[0]!,
+      });
+      if (project) {
+        return traceDestinationDecisionSchema.parse({ outcome: "resolved", project });
+      }
+    }
+
+    const governance = await this.repository.tryFindOldestGovernanceTraceDestination(
+      parsed.organizationId,
+    );
+    if (!governance) {
+      return { outcome: "no_destination" };
+    }
+
+    const alternatives = await this.repository.countLiveNonGovernanceProjects(
+      parsed.organizationId,
+    );
+    const decision =
+      alternatives > 0
+        ? {
+            outcome: "ambiguous" as const,
+            projectScopeCount: parsed.projectScopeIds.length,
+          }
+        : { outcome: "resolved" as const, project: governance };
+
+    return traceDestinationDecisionSchema.parse(decision);
+  }
+
+  tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+    return this.repository.tryGetTraceDestination(
+      traceDestinationProjectIdSchema.parse(projectId),
+    );
+  }
+
+  listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+    const parsed = traceDestinationProjectIdsSchema.parse(projectIds);
+    return this.repository.listTraceDestinations([...new Set(parsed)]);
   }
 
   async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
@@ -329,7 +395,13 @@ export class ProjectService extends ProjectServiceContract {
   }
 
   listNamesByIds(input: { projectIds: string[] }): Promise<ProjectName[]> {
-    return this.repository.findNamesByIds([...new Set(input.projectIds)]);
+    const parsed = projectNamesByIdsInputSchema.parse(input);
+    return this.repository.findNamesByIds([...new Set(parsed.projectIds)]);
+  }
+
+  listIdsByOrganization(input: { organizationId: string }): Promise<string[]> {
+    const parsed = projectIdsByOrganizationInputSchema.parse(input);
+    return this.repository.findIdsByOrganization(parsed.organizationId);
   }
 
   async listActiveByScopes(
@@ -377,11 +449,6 @@ export class ProjectService extends ProjectServiceContract {
     limit?: number;
   }): Promise<SearchProjectsResult[]> {
     return this.repository.searchByQuery(input);
-  }
-
-  async isFeatureEnabled(projectId: string, flag: ProjectFeatureFlag): Promise<boolean> {
-    const project = await this.repository.tryGetById(projectId);
-    return Boolean(project && (project as unknown as Record<string, unknown>)[flag]);
   }
 
   tryGetTraceSharingConfig(projectId: string): Promise<TraceSharingConfig | null> {
