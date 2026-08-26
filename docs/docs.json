@@ -1598,6 +1598,10 @@
         "href": "https://docs.langwatch.ai/llms.txt"
       },
       {
+        "label": "Report an issue",
+        "href": "https://docs.langwatch.ai/support"
+      },
+      {
         "label": "Sign In",
         "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=navbar-signin"
       }
@@ -1606,26 +1610,6 @@
       "type": "github",
       "href": "https://github.com/langwatch/langwatch"
     }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/langwatch/langwatch",
-      "website": "https://langwatch.ai",
-      "x-twitter": "https://x.com/langwatchai",
-      "linkedin": "https://www.linkedin.com/company/langwatch/",
-      "youtube": "https://www.youtube.com/@LangWatch"
-    },
-    "links": [
-      {
-        "header": "For agents",
-        "items": [
-          {
-            "label": "For agents: report an issue using npx langwatch report",
-            "href": "https://langwatch.ai/docs/support"
-          }
-        ]
-      }
-    ]
   },
   "integrations": {
     "gtm": {
