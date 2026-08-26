@@ -105,9 +105,25 @@ boundaries are being merged.
 Two catalogue owners do not yet have their declared package roots: `auth` and
 `telemetry`. Their batches must establish strict packages before moving code;
 the absence is not permission to put their behaviour in an application bag.
-The other two major mixed bags are `server/event-sourcing` (422 files) and
+The other two major mixed bags are `server/event-sourcing` (457 files) and
 `server/app-layer` (396). They are split by the named owners above and are never
 moved wholesale.
+
+### Event-sourcing decomposition
+
+`server/event-sourcing` is not an Eventing package candidate:
+
+| Committed files | Owner                                                                                                                                                                |
+| --------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|             420 | Feature server packages: Automation, Enterprise Billing, Coding Agent, Evaluation, Experiment, Gateway, GitHub, Langy, Telemetry, Simulation, Suite, Topic and Trace |
+|              36 | `apps/worker` and Ops composition: concrete adapters, registry, process maintenance, replay presets and infrastructure integration coverage                          |
+|               1 | Delete unused `pipelines/shared/analyticsStoreBase.ts`                                                                                                               |
+|               0 | One-for-one moves into `packages/eventing`; that package already owns the reusable framework                                                                         |
+
+The 131-file Trace pipeline needs an internal split: Trace owns its aggregate,
+commands and projections; Evaluation, Experiment, Simulation, project metadata
+and broadcast reactions remain named feature or worker adapters. Directory
+proximity does not transfer their ownership to Trace.
 
 ## Deletion batches
 
