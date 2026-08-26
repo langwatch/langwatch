@@ -104,7 +104,7 @@ export function ScenarioRunActions({
               <Menu.Item value="open-thread" onClick={onOpenThread}>
                 <HStack gap={2}>
                   <Icon as={MessagesSquare} boxSize={3.5} />
-                  <Text>Open Traces</Text>
+                  <Text>Open thread</Text>
                 </HStack>
               </Menu.Item>
             )}

@@ -113,37 +113,36 @@ describe("the Results tab loading gate", () => {
     vi.clearAllMocks();
   });
 
-  /** @scenario A plan opened on a hard reload never flashes a not-found state */
-  it("reads as a skeleton while the plan record is still on its way", () => {
-    // The URL names a plan the store does not know yet, so `selectedPlan` is
-    // null. While ANY query behind the plans read is loading, the tab must
-    // read as a skeleton, not as the plans list and not as its empty state.
-    mockSuitesGetAll.mockReturnValue({ data: undefined, isLoading: true });
+  describe("given the URL names a plan the store does not know yet", () => {
+    describe("when any query behind the plans read is still loading", () => {
+      /** @scenario A plan opened on a hard reload never flashes a not-found state */
+      it("reads as a skeleton, not as the plans list nor its empty state", () => {
+        mockSuitesGetAll.mockReturnValue({ data: undefined, isLoading: true });
 
-    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
-    expect(
-      screen.getByTestId("agent-testing-run-plan-loading"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("agent-testing-run-plans-table"),
-    ).not.toBeInTheDocument();
-  });
+        expect(
+          screen.getByTestId("agent-testing-run-plan-loading"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("agent-testing-run-plans-table"),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
+      });
+    });
 
-  /** @scenario The plans list shows on its own once every plans query settles */
-  it("reads as the plans list once the queries settle and the plan does not exist", () => {
-    // Every query has finished; the plan named in the URL is not in the list.
-    // With no loading in flight, the fall-through is the plans list, not the
-    // loading skeleton.
-    mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    describe("when every plans query has settled and the plan is not in the list", () => {
+      /** @scenario The plans list shows on its own once every plans query settles */
+      it("reads as the plans list empty state, never as the loading skeleton", () => {
+        mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
 
-    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
-    expect(
-      screen.queryByTestId("agent-testing-run-plan-loading"),
-    ).not.toBeInTheDocument();
-    // With no plans, the empty state reads on the tab; it never flashes
-    // between the skeleton and the plan record.
-    expect(screen.getByText("No runs yet")).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("agent-testing-run-plan-loading"),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText("No runs yet")).toBeInTheDocument();
+      });
+    });
   });
 });
