@@ -18,8 +18,12 @@ exposes one portable `LangyService`.
 ## Public surfaces and transports
 
 tRPC names, HTTP paths, relay frames, worker endpoints and response shapes do
-not change. The web package owns controlled presentation; app pages, state,
-routing and transport hooks remain composition.
+not change. The web package owns controlled presentation and deterministic
+browser behaviour; app pages, state, routing, route builders, and transport
+hooks remain composition. Capability resolution, feature-map lookups, result
+formatting, derived cards, failed-card disclosures, choices, and streaming
+previews are web-owned. The app supplies only named ports for viewer hydration,
+SPA links, and the analytics chart.
 
 ## Dependencies
 

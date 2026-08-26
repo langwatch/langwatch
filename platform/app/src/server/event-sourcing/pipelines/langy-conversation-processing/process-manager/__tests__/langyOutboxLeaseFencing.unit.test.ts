@@ -8,7 +8,7 @@ import {
   ProcessManagerService,
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AGENT_DISPATCH_TIMEOUT_MS } from "~/server/app-layer/langy/langyWorker";
+import { AGENT_DISPATCH_TIMEOUT_MS } from "@langwatch/langy-server";
 import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,

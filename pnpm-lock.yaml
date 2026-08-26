@@ -2370,9 +2370,15 @@ importers:
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../design-system
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract
+      lucide-react:
+        specifier: ^1.22.0
+        version: 1.22.0(react@19.2.8)
       motion:
         specifier: ^12.42.2
         version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -3985,6 +3991,9 @@ importers:
       '@langwatch/github-server':
         specifier: workspace:*
         version: link:../../packages/features/github/server
+      '@langwatch/github-web':
+        specifier: workspace:*
+        version: link:../../packages/features/github/web
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../packages/group-queue

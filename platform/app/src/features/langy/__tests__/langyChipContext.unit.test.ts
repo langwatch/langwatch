@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SELECT_ALL_MATCHING_CAP } from "../../traces-v2/stores/selectionStore";
+import { SELECT_ALL_MATCHING_CAP } from "@langwatch/trace-web";
 import { filterContextChip } from "../hooks/useLangyFilterContext";
 import { selectionContextChip } from "../hooks/useLangySelectionContext";
 import { describeChipContext } from "../logic/langyChipContext";

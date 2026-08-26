@@ -22,18 +22,20 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
-    "@langwatch/langy-contract": "workspace:*",
     "@emotion/react": "^11.14.0",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "lucide-react": "^1.22.0",
     "motion": "^12.42.2",
     "react": "^19.2.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@testing-library/react": "^16.3.2",
+    "jsdom": "^30.0.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9",
-    "jsdom": "^30.0.1"
+    "vitest": "^4.1.9"
   }
 }

@@ -27,9 +27,9 @@ import { HStack, Text, VStack } from "@chakra-ui/react";
 import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Tooltip } from "~/components/ui/tooltip";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { langyThinkingShimmerStyles } from "@langwatch/langy-web";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useReducedMotion } from "../../hooks/use-reduced-motion";
+import { langyThinkingShimmerStyles } from "../../values/langy-shimmer";
 
 /** The provenance line, and the longer answer behind it. */
 const MADE_BY_LANGY_LABEL = "Made by Langy";

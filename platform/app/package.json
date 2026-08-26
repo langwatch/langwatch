@@ -151,6 +151,7 @@
     "@langwatch/gateway-server": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/github-server": "workspace:*",
+    "@langwatch/github-web": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",

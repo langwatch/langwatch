@@ -34,6 +34,19 @@ Feature: Langy service capability
     And application page composition, state, routes, and transport hooks remain in the application
     And application-specific tool descriptions are supplied through a named narrator port
 
+  Scenario: derived cards keep app capabilities at the edge
+    Given a Langy answer contains a validated derived card
+    When the browser renders its table, stats, choices, failure disclosure, or streaming preview
+    Then the presentation comes from the Langy web package
+    And viewer hydration, SPA navigation, and charts enter through named app ports
+
+  Scenario: capability cards use one portable browser registry
+    Given a LangWatch CLI result with a resource and verb
+    When the browser resolves its capability and result formatting
+    Then the Langy web package uses the shared feature map and capability catalog
+    And unknown resources still receive the neutral fallback card
+    And route construction and transport hydration remain in the application
+
   Scenario: feedback prompt keeps its existing cadence
     Given a process-owned LangyService with Redis available
     When feedback is checked after an assistant answer

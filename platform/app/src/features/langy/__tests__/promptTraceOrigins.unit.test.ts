@@ -12,7 +12,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import { ORIGIN_DISPLAY } from "../../traces-v2/utils/originDisplay";
+import { ORIGIN_DISPLAY } from "@langwatch/trace-web";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptPath = path.resolve(

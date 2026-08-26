@@ -10,8 +10,10 @@ and the Langy event-sourcing pipeline.
   Redis-backed feedback cadence. Its HTTP worker adapter owns probe, warm,
   dispatch, and cancel calls to the agent manager.
 - `web/` contains browser-safe helpers, deterministic behaviour, and reusable
-  controlled presentation. App pages/routes, state, and transport hooks remain
-  in `platform/app`.
+  controlled presentation, including capability resolution, feature-map
+  lookups, result formatting, derived cards, choices, failure disclosures, and
+  streaming previews. App pages/routes, state, viewer hydration, charts, route
+  builders, and transport hooks remain in `platform/app`.
 - `specs/` and `adrs/` record the current behavioural and architectural facts.
 
 The process builds one `LangyService` through `PostgresLangyAdapter` and

@@ -6,7 +6,7 @@
  * public entry points exist; behaviour is pinned by the dedicated tests.
  */
 import { describe, expect, it } from "vitest";
-import { useGitHubConnectPopup } from "~/features/github/useGitHubConnectPopup";
+import { useGitHubConnectPopup } from "@langwatch/github-web";
 import { LangyGitHubConnectCard } from "../components/github/LangyGitHubConnectCard";
 import { LangySkillChipView } from "../components/LangySkillChip";
 import { MessageContent, ProposalCard } from "../components/MessageContent";
