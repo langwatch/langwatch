@@ -3,6 +3,7 @@ import type {
   SsoDomainFileLookup,
 } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
+import { classify } from "@langwatch/ssrf";
 import { lookup } from "dns/promises";
 
 /**
@@ -215,36 +216,23 @@ const isIpLiteral = (host: string): boolean =>
   /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
 
 /**
- * Loopback, link-local, private and unique-local space, in both families.
+ * Whether an address is somewhere on the public internet.
  *
- * Written out rather than taken from a package: the list is short, it is the
- * part of this that must not silently change under a dependency bump, and
- * every entry is here because a fetch reaching it is a fetch reaching our own
- * network rather than a customer's.
+ * Delegated to `@langwatch/ssrf` rather than written out here. That table is
+ * shared byte-for-byte with the Go AI gateway, the Go Langy egress proxy and
+ * the NLP service, and it is tested by one corpus — so a fetch this app is
+ * willing to make is one every other egress path would make too.
+ *
+ * Doing it by hand is what put a hole here: the WHATWG URL parser rewrites
+ * `::ffff:127.0.0.1` as `::ffff:7f00:1`, so a strip of the literal `::ffff:`
+ * prefix left `7f00:1` — still a colon, matching no private IPv6 prefix, and
+ * judged public. Loopback and the cloud metadata endpoint both reached the
+ * fetch that way. `classify` resolves `::` elision and the embedded IPv4 tail
+ * before it decides, and covers the CGNAT, NAT64, 6to4, benchmarking,
+ * documentation and reserved ranges a short hand-rolled list leaves out.
  */
 function isPublicAddress(address: string): boolean {
-  const ip = address.toLowerCase().replace(/^::ffff:/, "");
-
-  if (ip.includes(":")) {
-    if (ip === "::" || ip === "::1") return false;
-    // fc00::/7 (unique local), fe80::/10 (link local).
-    if (/^f[cd]/.test(ip)) return false;
-    if (/^fe[89ab]/.test(ip)) return false;
-    return true;
-  }
-
-  const octets = ip.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((o) => Number.isNaN(o) || o > 255)) {
-    return false;
-  }
-  const [a = 0, b = 0] = octets;
-  if (a === 0 || a === 10 || a === 127) return false;
-  if (a === 169 && b === 254) return false; // link local, and the metadata service
-  if (a === 172 && b >= 16 && b <= 31) return false;
-  if (a === 192 && b === 168) return false;
-  if (a === 100 && b >= 64 && b <= 127) return false; // carrier-grade NAT
-  if (a >= 224) return false; // multicast and reserved
-  return true;
+  return classify(address) === "global";
 }
 
 /** What an answered fetch actually says, in the port's three outcomes. */

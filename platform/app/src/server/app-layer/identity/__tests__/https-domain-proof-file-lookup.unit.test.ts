@@ -168,6 +168,100 @@ describe("given a fetch aimed somewhere on our own network", () => {
     });
   });
 
+  // Every case above spells the private address the dotted way, and that is
+  // exactly why the guard shipped with a hole: an address wearing an IPv6
+  // coat took the other branch and was judged public. The WHATWG URL parser
+  // re-serialises `::ffff:127.0.0.1` as `::ffff:7f00:1`, so the guard's
+  // prefix strip left `7f00:1` — still a colon, no private prefix, allowed.
+  describe("when the private address is written as IPv4-mapped IPv6", () => {
+    const mapped: Array<[string, string]> = [
+      ["::ffff:127.0.0.1", "loopback, spelled the dotted way"],
+      ["::ffff:7f00:1", "the same loopback, as the URL parser rewrites it"],
+      ["::ffff:a9fe:a9fe", "the cloud metadata endpoint"],
+      ["::ffff:10.0.0.5", "private space"],
+      ["::ffff:c0a8:1", "private space, in hex"],
+    ];
+
+    // NOT covered, and deliberately not forked here: the deprecated
+    // v4-COMPATIBLE form (`::7f00:1`, RFC 4291 §2.5.5.1) classifies as global
+    // in `@langwatch/ssrf`. That table is shared byte-for-byte with the Go AI
+    // gateway, the Go Langy egress proxy and the NLP service, so one consumer
+    // quietly disagreeing with it is worse than the gap. Raise it there.
+
+    for (const [address, why] of mapped) {
+      it(`refuses ${address} — ${why}`, async () => {
+        const { lookup, asked } = lookupAnswering(async () =>
+          respond(200, "lw-token-123"),
+        );
+
+        const result = await lookup.fetchVerificationFile({
+          domain: "acme.com",
+          url: `https://[${address}]/.well-known/langwatch-verification.txt`,
+        });
+
+        expect(result).toEqual({
+          outcome: "unreachable",
+          reason: "host_not_public",
+        });
+        expect(asked).toEqual([]);
+      });
+    }
+
+    it("refuses a redirect into mapped private space", async () => {
+      const { lookup, asked } = lookupAnswering(async () => {
+        const response = new Response(null, {
+          status: 302,
+          headers: {
+            location:
+              "https://[::ffff:169.254.169.254]/latest/meta-data/iam/security-credentials/",
+          },
+        });
+        Object.defineProperty(response, "url", { value: URL_UNDER_TEST });
+        return response;
+      });
+
+      const result = await lookup.fetchVerificationFile({
+        domain: "acme.com",
+        url: URL_UNDER_TEST,
+      });
+
+      expect(result).toEqual({
+        outcome: "unreachable",
+        reason: "host_not_public",
+      });
+      expect(asked).toEqual([URL_UNDER_TEST]);
+    });
+
+    it("still reaches a public address wearing the same coat", async () => {
+      // The unwrapping must not refuse the whole notation — only what it
+      // unwraps to. 8.8.8.8 is public however it is spelled.
+      const { lookup, asked } = lookupAnswering(async () =>
+        respond(200, "lw-token-123"),
+      );
+
+      const result = await lookup.fetchVerificationFile({
+        domain: "acme.com",
+        url: "https://[::ffff:808:808]/.well-known/langwatch-verification.txt",
+      });
+
+      expect(result).toEqual({ outcome: "served", values: ["lw-token-123"] });
+      expect(asked).toHaveLength(1);
+    });
+
+    it("still reaches an ordinary public IPv6 address", async () => {
+      const { lookup } = lookupAnswering(async () =>
+        respond(200, "lw-token-123"),
+      );
+
+      expect(
+        await lookup.fetchVerificationFile({
+          domain: "acme.com",
+          url: "https://[2606:4700:4700::1111]/.well-known/langwatch-verification.txt",
+        }),
+      ).toEqual({ outcome: "served", values: ["lw-token-123"] });
+    });
+  });
+
   describe("when the domain resolves into private space", () => {
     it("refuses the name even though the name itself looks ordinary", async () => {
       // The shape check at claim time cannot catch this: `intranet.acme.com`

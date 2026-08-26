@@ -41,7 +41,18 @@ const {
   askStateRef: {
     current: { error: null as unknown, isPending: false, isSuccess: false },
   },
-  signInMock: vi.fn(),
+  // `signIn.passkey` is what the rail's passkey button dials. A bare mock has
+  // no such property, so the call threw and the ceremony was torn down again
+  // in the same tick it went up — which made the scenario below a race
+  // against the error path rather than a claim about the ceremony.
+  //
+  // A promise that never settles is the honest double: the scenario is about
+  // what the screen looks like WHILE the ceremony is running, and a real
+  // ceremony is outstanding for exactly as long as somebody is looking at
+  // their authenticator.
+  signInMock: Object.assign(vi.fn(), {
+    passkey: vi.fn(() => new Promise(() => undefined)),
+  }),
   signOutMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   hardRedirectMock: vi.fn(),
