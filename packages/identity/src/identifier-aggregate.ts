@@ -7,6 +7,7 @@ import {
   type IdentityFact,
   type IdentityFactInput,
   type IdentityFactInputOf,
+  type IdentityFactOf,
   type IdentityHeads,
   LINK_PROPOSED_EVENT_TYPE,
   PRIMARY_CHANGED_EVENT_TYPE,
@@ -127,76 +128,144 @@ export function reduceIdentifier({
   fact: IdentityFact;
 }): IdentifierHead {
   switch (fact.type) {
-    case IDENTIFIER_ATTACHED_EVENT_TYPE: {
-      if (fact.data.identifierId !== identifierId) return head;
-      // Idempotent re-application: the same fact (same deterministic id)
-      // never regresses a later lifecycle state.
-      if (head) return head;
-      const { data } = fact;
-      return {
-        identifierId: data.identifierId,
-        userId: data.userId,
-        provider: data.provider,
-        value: data.value,
-        domain: data.domain,
-        identifierHash: data.identifierHash,
-        accountId: data.accountId,
-        providerId: data.providerId,
-        issuer: data.issuer,
-        providerAccountId: data.providerAccountId,
-        connectionId: data.connectionId,
-        state: data.state,
-        verifiedAtMs: data.state === "VERIFIED" ? fact.occurredAt : null,
-        attachedAtMs: fact.occurredAt,
-        detachedAtMs: null,
-      };
-    }
-    case IDENTIFIER_VERIFIED_EVENT_TYPE: {
-      if (fact.data.identifierId !== identifierId || !head) return head;
-      // A tombstone or dead end never resurrects; PRIMARY stays PRIMARY.
-      if (head.state !== "ATTACHED" && head.state !== "VERIFIED") return head;
-      return {
-        ...head,
-        state: head.state === "ATTACHED" ? "VERIFIED" : head.state,
-        verifiedAtMs: head.verifiedAtMs ?? fact.occurredAt,
-      };
-    }
-    case IDENTIFIER_DEAD_ENDED_EVENT_TYPE: {
-      if (fact.data.identifierId !== identifierId || !head) return head;
-      if (head.state !== "ATTACHED") return head;
-      return { ...head, state: "DEAD_END" };
-    }
-    case PRIMARY_CHANGED_EVENT_TYPE: {
-      if (!head) return head;
-      // The promoted half. A head that cannot take PRIMARY is left alone,
-      // so a fact naming a tombstone or a dead end moves nothing.
-      if (fact.data.identifierId === identifierId) {
-        if (head.state !== "VERIFIED" && head.state !== "PRIMARY") return head;
-        return { ...head, state: "PRIMARY" };
-      }
-      // The demoted half: a promotion of somebody else, delivered to a head
-      // standing PRIMARY. Exactly one PRIMARY per person is the invariant, and
-      // this is the half of it a stream can enforce alone — the other half is
-      // `primaryChangeFacts` naming every stream that has to be told.
-      if (head.state !== "PRIMARY") return head;
-      return { ...head, state: "VERIFIED" };
-    }
-    case IDENTIFIER_DETACHED_EVENT_TYPE: {
-      if (fact.data.identifierId !== identifierId || !head) return head;
-      if (head.state === "DETACHED") return head;
-      return { ...head, state: "DETACHED", detachedAtMs: fact.occurredAt };
-    }
-    case USER_ERASED_EVENT_TYPE: {
-      // Erasure wipes the value and the hash and keeps everything else: the
-      // row, the domain (an org-level fact), the state and the dates.
-      if (!head) return head;
-      return { ...head, value: null, identifierHash: null };
-    }
+    case IDENTIFIER_ATTACHED_EVENT_TYPE:
+      return foldAttached({ identifierId, head, fact });
+    case IDENTIFIER_VERIFIED_EVENT_TYPE:
+      return foldVerified({ identifierId, head, fact });
+    case IDENTIFIER_DEAD_ENDED_EVENT_TYPE:
+      return foldDeadEnded({ identifierId, head, fact });
+    case PRIMARY_CHANGED_EVENT_TYPE:
+      return foldPrimaryChanged({ identifierId, head, fact });
+    case IDENTIFIER_DETACHED_EVENT_TYPE:
+      return foldDetached({ identifierId, head, fact });
+    case USER_ERASED_EVENT_TYPE:
+      return foldErased({ head });
     case LINK_PROPOSED_EVENT_TYPE:
       // A proposal changes no head, on purpose: it states that a link was NOT
       // made and needs a human.
       return head;
   }
+}
+
+/** The row this stream did not have — unless it already has one. */
+function foldAttached({
+  identifierId,
+  head,
+  fact,
+}: {
+  identifierId: string;
+  head: IdentifierHead;
+  fact: IdentityFactOf<typeof IDENTIFIER_ATTACHED_EVENT_TYPE>;
+}): IdentifierHead {
+  if (fact.data.identifierId !== identifierId) return head;
+  // Idempotent re-application: the same fact (same deterministic id)
+  // never regresses a later lifecycle state.
+  if (head) return head;
+  const { data } = fact;
+  return {
+    identifierId: data.identifierId,
+    userId: data.userId,
+    provider: data.provider,
+    value: data.value,
+    domain: data.domain,
+    identifierHash: data.identifierHash,
+    accountId: data.accountId,
+    providerId: data.providerId,
+    issuer: data.issuer,
+    providerAccountId: data.providerAccountId,
+    connectionId: data.connectionId,
+    state: data.state,
+    verifiedAtMs: data.state === "VERIFIED" ? fact.occurredAt : null,
+    attachedAtMs: fact.occurredAt,
+    detachedAtMs: null,
+  };
+}
+
+/** ATTACHED becomes VERIFIED, and the verification time is stamped once. */
+function foldVerified({
+  identifierId,
+  head,
+  fact,
+}: {
+  identifierId: string;
+  head: IdentifierHead;
+  fact: IdentityFactOf<typeof IDENTIFIER_VERIFIED_EVENT_TYPE>;
+}): IdentifierHead {
+  if (fact.data.identifierId !== identifierId || !head) return head;
+  // A tombstone or dead end never resurrects; PRIMARY stays PRIMARY.
+  if (head.state !== "ATTACHED" && head.state !== "VERIFIED") return head;
+  return {
+    ...head,
+    state: head.state === "ATTACHED" ? "VERIFIED" : head.state,
+    verifiedAtMs: head.verifiedAtMs ?? fact.occurredAt,
+  };
+}
+
+/** Only an ATTACHED head dead-ends; anything further along is left alone. */
+function foldDeadEnded({
+  identifierId,
+  head,
+  fact,
+}: {
+  identifierId: string;
+  head: IdentifierHead;
+  fact: IdentityFactOf<typeof IDENTIFIER_DEAD_ENDED_EVENT_TYPE>;
+}): IdentifierHead {
+  if (fact.data.identifierId !== identifierId || !head) return head;
+  if (head.state !== "ATTACHED") return head;
+  return { ...head, state: "DEAD_END" };
+}
+
+/**
+ * Both halves of a promotion, as the one head in front of us sees them.
+ *
+ * The promoted half leaves a head that cannot take PRIMARY alone, so a fact
+ * naming a tombstone or a dead end moves nothing. The demoted half is a
+ * promotion of somebody else, delivered to a head standing PRIMARY: exactly one
+ * PRIMARY per person is the invariant, and this is the half of it a stream can
+ * enforce alone — the other half is `primaryChangeFacts` naming every stream
+ * that has to be told.
+ */
+function foldPrimaryChanged({
+  identifierId,
+  head,
+  fact,
+}: {
+  identifierId: string;
+  head: IdentifierHead;
+  fact: IdentityFactOf<typeof PRIMARY_CHANGED_EVENT_TYPE>;
+}): IdentifierHead {
+  if (!head) return head;
+  if (fact.data.identifierId === identifierId) {
+    if (head.state !== "VERIFIED" && head.state !== "PRIMARY") return head;
+    return { ...head, state: "PRIMARY" };
+  }
+  if (head.state !== "PRIMARY") return head;
+  return { ...head, state: "VERIFIED" };
+}
+
+/** The tombstone, stamped once. */
+function foldDetached({
+  identifierId,
+  head,
+  fact,
+}: {
+  identifierId: string;
+  head: IdentifierHead;
+  fact: IdentityFactOf<typeof IDENTIFIER_DETACHED_EVENT_TYPE>;
+}): IdentifierHead {
+  if (fact.data.identifierId !== identifierId || !head) return head;
+  if (head.state === "DETACHED") return head;
+  return { ...head, state: "DETACHED", detachedAtMs: fact.occurredAt };
+}
+
+/**
+ * Erasure wipes the value and the hash and keeps everything else: the row, the
+ * domain (an org-level fact), the state and the dates.
+ */
+function foldErased({ head }: { head: IdentifierHead }): IdentifierHead {
+  if (!head) return head;
+  return { ...head, value: null, identifierHash: null };
 }
 
 /**

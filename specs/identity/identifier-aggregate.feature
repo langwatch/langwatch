@@ -2,7 +2,7 @@ Feature: An identifier is an aggregate - one stream per identifier
   As the LangWatch platform
   I need each sign-in identifier to own its event stream instead of sharing
   one stream with every other identifier the same person holds
-  So that two ceremonies about two different identifiers stop serialising
+  So that two ceremonies about two different identifiers stop serializing
   against each other, and a fold costs one identifier rather than a person
 
   # ADR-127, on top of ADR-101 (the identity pipeline) and ADR-110 (a grant
@@ -24,7 +24,7 @@ Feature: An identifier is an aggregate - one stream per identifier
   #                                and both the old and the new streams are
   #                                inside it.
   #
-  # A shared stream was carrying two things. One was SERIALISATION - the
+  # A shared stream was carrying two things. One was SERIALIZATION - the
   # queue keys its lane on the aggregate id - and that is what we are
   # deliberately giving up, for the ceremonies that happen at volume. It is
   # NOT given up for the two commands whose guards read the whole person and

@@ -17,7 +17,7 @@ answer to the problem it creates: an invariant that used to be swept by a
 shared fold becomes a filter the command reads before it states its facts.
 
 **Related:** [ADR-116](116-account-linkage-is-event-truth.md) (the address lock,
-which already externalised the uniqueness invariant),
+which already externalized the uniqueness invariant),
 [ADR-119](119-an-account-is-never-left-with-one-way-in.md) (the strands guard),
 ADR-029 §4 (purge tractability — why the tenant is the person).
 
@@ -44,7 +44,7 @@ Three things follow from that, and only the first is obviously wanted.
 
 **One lane per person.** The queue's group key is
 `${tenantId}/${jobPath}/${aggregateType}:${aggregateId}`, so every ceremony a
-person can run is serialised against every other. Attaching a passkey waits
+person can run is serialized against every other. Attaching a passkey waits
 behind verifying an email that has nothing to do with it.
 
 **A fold whose cost is the person, not the fact.** `load()` reads the person's
@@ -66,7 +66,7 @@ guards is not: `mfa-guards.ts` never reads an identifier, and `guards.ts`'s
 detach counts VERIFIED and PRIMARY heads and refuses a passkey-only remainder
 without reading a factor at all. (ADR-119 states the "one way in" principle and
 says the detach guards are D07's; the rule as built lives in
-`guards.ts` and `specs/identity/passkeys.feature`.) The lane serialises two
+`guards.ts` and `specs/identity/passkeys.feature`.) The lane serializes two
 families that share a person and, today, no invariant.
 
 ## Decision
@@ -152,7 +152,7 @@ changes nothing about it. The provider-subject collision is likewise arbitrated
 by a partial unique index on the projection, not by fold state.
 
 **A fourth is a genuine loss, named.** Two-step verification stays on the
-person's stream, so factor commands and identifier commands stop serialising.
+person's stream, so factor commands and identifier commands stop serializing.
 Nothing today reads across them (above), so nothing breaks on the day this
 lands. What this ADR forbids is acquiring such a coupling later and relying on
 the lane for it: a cross-family invariant is enforced by a read and a refusal in
@@ -189,7 +189,7 @@ currently relying on that lane without saying so. `markPrimary` and
 `detachIdentifier` both read the WHOLE person and refuse on what they read: one
 finds every standing PRIMARY, the other counts the ways in that would remain
 (ADR-119's strands guard, `guards.ts`). Today those reads are decisive because
-every command a person can run is serialised behind them. Per identifier they
+every command a person can run is serialized behind them. Per identifier they
 are not: two concurrent promotions each see no standing PRIMARY and both state
 `previousIdentifierId: null`, leaving two heads PRIMARY; two concurrent detaches
 each see the other still VERIFIED and between them strand the account. That is
@@ -315,13 +315,13 @@ the log, and no window in which a person's history is half in one place and half
 in another. (New facts do fan out into one event per stream, above — that is the
 routing working, not a copy of history.)
 
-**What we give up** is a lane that was serialising two families with no shared
+**What we give up** is a lane that was serializing two families with no shared
 invariant, and the ability to add such an invariant later without doing the work
 properly. We take that knowingly.
 
 ## Consequences
 
-- A person's ceremonies stop serialising against each other. Two identifiers can
+- A person's ceremonies stop serializing against each other. Two identifiers can
   attach concurrently; the backfill adopts a person's accounts in parallel.
 - A fold apply becomes one identifier: one row loaded, one row written. The cost
   of an event stops depending on how many identifiers the person holds.
