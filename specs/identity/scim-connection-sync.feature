@@ -111,6 +111,14 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # ── Who the directory means ────────────────────────────────────────────
 
   @unit
+  Scenario: A blank external identifier is read as none rather than refused
+    Given a provisioning client that has no external identifier for a person
+    And it sends the field anyway, empty
+    When it pushes that person
+    Then the person is accepted with no external identifier
+    And the push is not refused over a field nothing required
+
+  @unit
   Scenario: A person keeps their place when their address changes
     Given a person provisioned through "okta-primary"
     When the directory pushes them again with a new email address and the same directory identifier
