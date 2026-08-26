@@ -21,7 +21,9 @@ import { describe, expect, it } from "vitest";
 import { spanSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   COPILOT_CONVERSATION_ACTION,
+  COPILOT_CONVERSATION_SPAN_NAME,
   COPILOT_ROUTING_PROFILE,
+  COPILOT_TURN_SPAN_NAME,
   mapCopilotEventsToTraceRequest,
 } from "../copilotStudioTraceMapper";
 import type { NormalizedPullEvent } from "../pullerAdapter";
@@ -135,6 +137,12 @@ function spansOf(events: NormalizedPullEvent[]) {
   return request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
 }
 
+function turnSpansOf(events: NormalizedPullEvent[]) {
+  return spansOf(events).filter(
+    (s: { name: string }) => s.name === COPILOT_TURN_SPAN_NAME,
+  );
+}
+
 function attrsOf(span: { attributes?: { key: string; value: unknown }[] }) {
   return Object.fromEntries(
     (span.attributes ?? []).map((a) => [
@@ -184,7 +192,10 @@ describe("given a Copilot conversation stored in one row", () => {
 
   /** @scenario "A person's turn is attributed to that person" */
   it("attributes the question to the account that asked it", () => {
-    const asked = spans.find((s) =>
+    const turns = spans.filter(
+      (s: { name: string }) => s.name === COPILOT_TURN_SPAN_NAME,
+    );
+    const asked = turns.find((s: Record<string, unknown>) =>
       JSON.stringify(s).includes("How do I reset my laptop?"),
     );
     expect(attrsOf(asked!)["langwatch.user.id"]).toBe(AAD_OBJECT_ID);
@@ -322,9 +333,9 @@ describe("given a conversation Microsoft stored across several rows", () => {
         ),
       ],
     });
-    const spans = spansOf([copilotEvent(jumbled)]);
-    expect(spans).toHaveLength(1);
-    const attrs = attrsOf(spans[0]!);
+    const turns = turnSpansOf([copilotEvent(jumbled)]);
+    expect(turns).toHaveLength(1);
+    const attrs = attrsOf(turns[0]!);
     expect(attrs["langwatch.input"]).toContain("How do I reset it?");
     expect(attrs["langwatch.output"]).toContain("Hold the power button.");
   });
@@ -355,9 +366,9 @@ describe("given a conversation Microsoft stored across several rows", () => {
         ),
       ],
     });
-    const spans = spansOf([copilotEvent(withUndateable)]);
-    expect(spans).toHaveLength(1);
-    const attrs = attrsOf(spans[0]!);
+    const turns = turnSpansOf([copilotEvent(withUndateable)]);
+    expect(turns).toHaveLength(1);
+    const attrs = attrsOf(turns[0]!);
     expect(attrs["langwatch.input"]).toContain("How do I reset it?");
     expect(attrs["langwatch.output"]).toContain("Hold the power button.");
   });
@@ -411,9 +422,9 @@ describe("given a conversation Microsoft stored across several rows", () => {
         },
       ],
     });
-    const spans = spansOf([copilotEvent(stringRoles)]);
-    expect(spans).toHaveLength(1);
-    const attrs = attrsOf(spans[0]!);
+    const turns = turnSpansOf([copilotEvent(stringRoles)]);
+    expect(turns).toHaveLength(1);
+    const attrs = attrsOf(turns[0]!);
     expect(attrs["langwatch.input"]).toContain("Is the printer online?");
     expect(attrs["langwatch.output"]).toContain("It is online.");
   });
@@ -461,11 +472,11 @@ describe("given a stored name that does not match the shape we observed", () => 
   /** @scenario "The conversation's stored label is used whole, never taken apart" */
   it("groups a name with no underscore and one with several", () => {
     for (const name of ["plainname", "a_b_c_d"]) {
-      const spans = spansOf([
+      const turns = turnSpansOf([
         copilotEvent(transcriptRow({ activities: CHAT, name })),
       ]);
-      expect(new Set(spans.map((s) => s.traceId)).size).toBe(1);
-      expect(spans.length).toBe(CHAT.length - 1);
+      expect(new Set(turns.map((s) => s.traceId)).size).toBe(1);
+      expect(turns.length).toBe(CHAT.length - 1);
     }
   });
 
@@ -562,9 +573,12 @@ describe("given activities the mapper must not turn into turns", () => {
         }),
       ),
     ]);
-    // Two turns from three messages: the greeting, then the question paired
-    // with its answer. The bookkeeping entries add nothing.
-    expect(spans).toHaveLength(2);
+    // Two turns from three messages, plus the conversation span that wraps
+    // them. The bookkeeping entries add nothing.
+    const turns = spans.filter(
+      (s: { name: string }) => s.name === COPILOT_TURN_SPAN_NAME,
+    );
+    expect(turns).toHaveLength(2);
   });
 });
 
@@ -628,10 +642,12 @@ describe("given a tool call the agent ran", () => {
       ),
     ]);
     const tool = spans.find(
-      (s) => attrsOf(s)["langwatch.span.type"] === "tool",
+      (s: { name: string }) => s.name === "copilot_studio.tool_call",
     );
-    const asked = spans.find((s) =>
-      JSON.stringify(s).includes("How do I reset my laptop?"),
+    const asked = spans.find(
+      (s: { name: string }) =>
+        s.name === COPILOT_TURN_SPAN_NAME &&
+        JSON.stringify(s).includes("How do I reset my laptop?"),
     );
     expect(tool!.parentSpanId).toBe(asked!.spanId);
   });
@@ -666,11 +682,13 @@ describe("given what the agent was running", () => {
   });
 
   it("never prices a conversation — the agent name resolves to no model", () => {
-    const spans = spansOf([copilotEvent(transcriptRow({ activities: CHAT }))]);
-    expect(attrsOf(spans[0]!)["gen_ai.request.model"]).toBe(
+    const turns = turnSpansOf([
+      copilotEvent(transcriptRow({ activities: CHAT })),
+    ]);
+    expect(attrsOf(turns[0]!)["gen_ai.request.model"]).toBe(
       "microsoft/copilot-studio",
     );
-    const keys = (spans[0]!.attributes ?? []).map(
+    const keys = (turns[0]!.attributes ?? []).map(
       (a: { key: string }) => a.key,
     );
     expect(keys.filter((k: string) => k.startsWith("gen_ai.usage."))).toEqual(
@@ -700,6 +718,77 @@ describe("given a conversation held while designing the agent", () => {
     ]);
     expect(spans.length).toBeGreaterThan(0);
     expect(attrsOf(spans[0]!)["copilot_studio.design_mode"]).toBe("true");
+  });
+});
+
+describe("given a multi-turn conversation", () => {
+  const MULTI_TURN_CHAT = [
+    userMessage(
+      "a1000000-1000-4000-8000-100000000001",
+      "Tell me about France.",
+      1_787_685_280_000,
+    ),
+    agentMessage(
+      "a1000000-1000-4000-8000-100000000002",
+      "France is a country in Western Europe.",
+      1_787_685_282_000,
+    ),
+    userMessage(
+      "a1000000-1000-4000-8000-100000000003",
+      "What is the capital?",
+      1_787_685_284_000,
+    ),
+    agentMessage(
+      "a1000000-1000-4000-8000-100000000004",
+      "Paris is the capital of France.",
+      1_787_685_286_000,
+    ),
+    userMessage(
+      "a1000000-1000-4000-8000-100000000005",
+      "What about Chile?",
+      1_787_685_288_000,
+    ),
+    agentMessage(
+      "a1000000-1000-4000-8000-100000000006",
+      "Santiago is the capital of Chile.",
+      1_787_685_290_000,
+    ),
+  ];
+
+  const spans = spansOf([
+    copilotEvent(transcriptRow({ activities: MULTI_TURN_CHAT })),
+  ]);
+
+  it("wraps all turns under a single root conversation span", () => {
+    const roots = spans.filter(
+      (s: { parentSpanId?: string }) => !s.parentSpanId,
+    );
+    expect(roots).toHaveLength(1);
+    expect(roots[0].name).toBe("copilot_studio.conversation");
+  });
+
+  it("makes every turn span a child of the conversation span", () => {
+    const root = spans.find(
+      (s: { parentSpanId?: string }) => !s.parentSpanId,
+    );
+    const turns = spans.filter(
+      (s: { name: string }) => s.name === "copilot_studio.turn",
+    );
+    expect(turns.length).toBe(3);
+    for (const turn of turns) {
+      expect(turn.parentSpanId).toBe(root.spanId);
+    }
+  });
+
+  it("puts the first user message as conversation input and last bot reply as output", () => {
+    const root = spans.find(
+      (s: { parentSpanId?: string }) => !s.parentSpanId,
+    );
+    const attrs = attrsOf(root);
+    expect(attrs["langwatch.input"]).toContain("Tell me about France.");
+    expect(attrs["langwatch.output"]).toContain(
+      "Santiago is the capital of Chile.",
+    );
   });
 });
 

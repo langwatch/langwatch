@@ -62,6 +62,8 @@ export const COPILOT_CONVERSATION_ACTION = "copilot_conversation" as const;
  */
 const COPILOT_AGENT_MODEL = "microsoft/copilot-studio" as const;
 
+export const COPILOT_CONVERSATION_SPAN_NAME =
+  "copilot_studio.conversation" as const;
 export const COPILOT_TURN_SPAN_NAME = "copilot_studio.turn" as const;
 export const COPILOT_TOOL_SPAN_NAME = "copilot_studio.tool_call" as const;
 
@@ -767,6 +769,7 @@ function turnSpan(params: {
   group: ConversationGroup;
   turn: Turn;
   traceId: string;
+  parentSpanId: string;
   threadId: string;
   spanSeed: string;
   skipped: number;
@@ -777,6 +780,7 @@ function turnSpan(params: {
     group,
     turn,
     traceId,
+    parentSpanId,
     threadId,
     spanSeed,
     skipped,
@@ -810,6 +814,7 @@ function turnSpan(params: {
   return {
     traceId,
     spanId: hashId(`${spanSeed}:${turn.seedActivityId}`, 16),
+    parentSpanId,
     name: COPILOT_TURN_SPAN_NAME,
     kind: 1,
     startTimeUnixNano: msToNano(turn.startMs),
@@ -894,6 +899,45 @@ export function mapCopilotEventsToTraceRequest({
       turns[0]!.startMs,
     );
 
+    const firstQuestion = turns.find((t) => t.question !== null);
+    const lastAnswer = [...turns].reverse().find((t) => t.answer !== null);
+    const convAttrs: OtlpJsonAttr[] = [
+      stringAttr("langwatch.span.type", "chain"),
+      ...conversationAttrs({
+        origin,
+        group,
+        endMs: conversationEndMs,
+        skipped,
+        threadId: identity.threadId,
+      }),
+    ];
+    if (firstQuestion?.question) {
+      convAttrs.push(
+        stringAttr(
+          "langwatch.input",
+          chatValue("user", firstQuestion.question),
+        ),
+      );
+    }
+    if (lastAnswer?.answer) {
+      convAttrs.push(
+        stringAttr(
+          "langwatch.output",
+          chatValue("assistant", lastAnswer.answer),
+        ),
+      );
+    }
+    spans.push({
+      traceId: identity.traceId,
+      spanId: identity.rootSpanId,
+      name: COPILOT_CONVERSATION_SPAN_NAME,
+      kind: 1,
+      startTimeUnixNano: msToNano(turns[0]!.startMs),
+      endTimeUnixNano: msToNano(conversationEndMs),
+      attributes: convAttrs,
+      status: { code: 1 },
+    });
+
     for (const turn of turns) {
       spans.push(
         turnSpan({
@@ -901,6 +945,7 @@ export function mapCopilotEventsToTraceRequest({
           group,
           turn,
           traceId: identity.traceId,
+          parentSpanId: identity.rootSpanId,
           threadId: identity.threadId,
           spanSeed: identity.spanSeed,
           skipped,
