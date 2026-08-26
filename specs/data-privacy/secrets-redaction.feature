@@ -478,6 +478,36 @@ Feature: Redacting secrets from traces
     When the attribute is redacted
     Then the email address is replaced
 
+  # Better Auth writes two observability attributes whose names contain
+  # "auth" but whose values are short, non-credential enumerations. They need
+  # to bypass only the sensitive-name rule. Every value-based secret rule,
+  # customer pattern and personal-data rule must keep running, and no sibling
+  # name in the namespace inherits the exemption.
+
+  @regression @unit
+  Scenario: Better Auth observability attributes keep non-sensitive values
+    Given a Better Auth observability attribute with a non-sensitive value
+    When the attribute is redacted
+    Then the value is left exactly as written
+
+  @regression @unit
+  Scenario: A credential attribute beside Better Auth observability attributes is still redacted
+    Given another Better Auth attribute whose name says it holds a credential
+    When the attribute is redacted
+    Then the value is replaced even when it has no secret shape
+
+  @regression @unit
+  Scenario: A secret under a Better Auth observability attribute is still redacted
+    Given a Better Auth observability attribute holding a secret
+    When the attribute is redacted
+    Then the secret is replaced
+
+  @regression @unit
+  Scenario: Personal data under a Better Auth observability attribute is still redacted
+    Given a Better Auth observability attribute holding personal data
+    When the attribute is redacted
+    Then the personal data is replaced
+
   # A handle and a version number are not identifier names, and they do not need
   # to be. A handle accepts lowercase letters, digits, hyphens, underscores and
   # one slash, and the shape rule needs two uppercase characters before it
