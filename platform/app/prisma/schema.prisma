@@ -288,6 +288,20 @@ model Identifier {
   verifiedAt        DateTime?
   attachedAt        DateTime
   detachedAt        DateTime?
+  // When this identifier last ANSWERED a sign-in resolution — the address or
+  // provider subject someone presented matched this row and it named the
+  // account. Row-truth, never an event: a sign-in happens on every visit, and
+  // one event per visit would bloat the log for a fact no decision folds.
+  // Written fire-and-forget the way `ApiKey.lastUsedAt` is, so a failed touch
+  // costs a timestamp rather than a sign-in.
+  //
+  // Deliberately NOT "last successfully signed in with". Resolution runs
+  // BEFORE the password, passkey or IdP answer is checked, so this moves on a
+  // wrong password too. It is here to answer "is this method still in use?"
+  // for stale-credential sweeps and for showing somebody their own sign-in
+  // methods — never to prove an authentication happened. `User.lastLoginAt`
+  // is the fact that means a session was minted.
+  lastUsedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 

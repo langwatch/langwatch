@@ -1,0 +1,25 @@
+-- When an identifier last ANSWERED a sign-in resolution (D01/ADR-116).
+--
+-- Row-truth, not event truth. Every other column on this table is written by
+-- the fold from the identity event log; this one is not, and deliberately so:
+-- a sign-in happens on every visit, so one event per use would grow the log
+-- without any decision folding it. `ApiKey.lastUsedAt` is the same shape for
+-- the same reason, written fire-and-forget after the fact it records.
+--
+-- Nullable with no backfill, and NULL is meaningful: it says "not seen since
+-- this column existed", which is honestly all we know. Backfilling it from
+-- `User.lastLoginAt` would be a lie in both directions — it would attribute
+-- one person's most recent sign-in to every identifier they hold, including
+-- methods they have not used in a year, which is the exact question this
+-- column exists to answer.
+--
+-- Additive. No index: nothing filters or sorts on it today. A stale-method
+-- sweep would want one, and should add it in its own migration alongside the
+-- query that needs it, rather than paying for it now.
+--
+-- To roll back, uncomment and run manually. Dropping the column loses only
+-- last-use timestamps, which resume accruing on the next sign-in.
+-- ALTER TABLE "Identifier" DROP COLUMN "lastUsedAt";
+
+-- AlterTable
+ALTER TABLE "Identifier" ADD COLUMN "lastUsedAt" TIMESTAMP(3);
