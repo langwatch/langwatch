@@ -248,6 +248,45 @@ const CURSOR_MUST_NOT_MOVE: ReportImmutabilityVerdict = {
  * because it is the same thing the adapter consults, and it is read through
  * the shared predicate so the two cannot drift apart.
  */
+/**
+ * The adapter a source runs under is fixed at create.
+ *
+ * Without this, the destination check above can be walked around rather than
+ * defeated. It reads the adapter off the stored row, so it validates a
+ * `databricks_genie` source against the Databricks host rule — but the request
+ * that satisfied that rule with a real workspace URL can also carry
+ * `adapter: "http_polling"` and a `url` of its own. The check passes, the new
+ * adapter is written, and the next run resolves the stored credential envelope
+ * and sends it to that URL. The caller never reads the secret; the server
+ * delivers it.
+ *
+ * Pinning the adapter is what makes the destination rule mean anything: a
+ * config can only ever be judged against the rules of the adapter that will
+ * actually run it. Absent still means unchanged — the composer does not render
+ * this field, so a client cannot send it back.
+ */
+export function assertAdapterUnchanged({
+  stored,
+  incoming,
+}: {
+  stored: Record<string, unknown>;
+  incoming: Record<string, unknown>;
+}): void {
+  const storedAdapter = stored.adapter;
+  if (typeof storedAdapter !== "string") return;
+  if (incoming.adapter === undefined) return;
+  if (incoming.adapter === storedAdapter) return;
+
+  const complaint =
+    `This source runs on the ${storedAdapter} adapter, which is fixed when ` +
+    "the source is created. Changing it would point the credentials this " +
+    "source already holds at a different service. Archive this source and " +
+    "create a new one to change how it pulls.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
 export function assertReportUnchangedOncePulled({
   existing,
   incoming,
@@ -635,6 +674,7 @@ export class IngestionSourceService {
           incoming[key] = stored[key];
         }
       }
+      assertAdapterUnchanged({ stored, incoming });
       ({ cursorMustNotMove } = assertReportUnchangedOncePulled({
         existing,
         incoming,
