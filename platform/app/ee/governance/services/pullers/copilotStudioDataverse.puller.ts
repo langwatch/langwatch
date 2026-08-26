@@ -131,10 +131,17 @@ const tokenResponseSchema = z.object({
  */
 const transcriptRowSchema = z
   .object({
-    conversationtranscriptid: z.string(),
+    // Both of these end up interpolated bare into the next run's `$filter`,
+    // where `conversationtranscriptid` is an `Edm.Guid` and `createdon` an
+    // `Edm.DateTimeOffset` — neither takes quotes. A row whose value carries
+    // OData operator text would therefore build a broken predicate, and
+    // because that value is persisted as the cursor, every later run would
+    // repeat the same 400 with the cursor unchanged. Constrained here so a
+    // row like that is counted and dropped instead of poisoning the walk.
+    conversationtranscriptid: z.string().uuid(),
     name: z.string().nullable().optional(),
     conversationstarttime: z.string().nullable().optional(),
-    createdon: z.string().nullable().optional(),
+    createdon: z.string().datetime({ offset: true }).nullable().optional(),
     content: z.string().nullable().optional(),
     metadata: z.string().nullable().optional(),
     schematype: z.string().nullable().optional(),
@@ -155,7 +162,8 @@ const botRowSchema = z
   })
   .passthrough();
 
-const botsPageSchema = z.object({
+/** The envelope every OData collection read comes back in. */
+const odataPageSchema = z.object({
   value: z.array(z.unknown()).default([]),
   "@odata.nextLink": z.string().optional(),
 });
@@ -166,33 +174,26 @@ interface BotRecord {
   botModifiedOn?: string;
 }
 
-const pageSchema = z.object({
-  value: z.array(z.unknown()).default([]),
-  "@odata.nextLink": z.string().optional(),
-});
-
 /**
  * The cursor. `createdon` alone is not enough — rows written in the same
  * instant would either repeat forever or be skipped depending on which way
  * the comparison leaned, so the row id breaks the tie.
+ *
+ * Constrained to the same shapes the row schema enforces, because a cursor is
+ * read back from storage on a later run: whatever wrote it, only a value that
+ * can be interpolated into `$filter` may come back out.
  */
-interface Cursor {
-  createdon: string;
-  conversationtranscriptid: string;
-}
+const cursorSchema = z.object({
+  createdon: z.string().datetime({ offset: true }),
+  conversationtranscriptid: z.string().uuid(),
+});
+type Cursor = z.infer<typeof cursorSchema>;
 
 function parseCursor(raw: string | null): Cursor | null {
   if (!raw) return null;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      typeof (parsed as Cursor).createdon === "string" &&
-      typeof (parsed as Cursor).conversationtranscriptid === "string"
-    ) {
-      return parsed as Cursor;
-    }
+    const parsed = cursorSchema.safeParse(JSON.parse(raw));
+    if (parsed.success) return parsed.data;
   } catch {
     // A cursor we cannot read is treated as no cursor: re-reading a window is
     // survivable because identifiers are derived, but skipping one is not.
@@ -483,17 +484,23 @@ function readTranscriptRow(params: {
 
 /** Read one page's rows into the walk. */
 function readPageRows(params: {
-  page: z.infer<typeof pageSchema>;
+  page: z.infer<typeof odataPageSchema>;
   walk: TranscriptWalk;
   bots: Map<string, BotRecord>;
 }): void {
   const { page, walk, bots } = params;
   for (const raw of page.value) {
-    if (!raw || typeof raw !== "object") continue;
+    // A row shaped unlike the rest is counted, not fatal: one bad row must not
+    // cost the whole window. Both arms below are that same case — an entry
+    // that is not an object at all is no more readable than one that fails the
+    // schema, and dropping it silently would report a page of rubbish as a
+    // source with nothing in it.
+    if (!raw || typeof raw !== "object") {
+      walk.errorCount += 1;
+      continue;
+    }
     const read = readTranscriptRow({ raw, previous: walk.last, bots });
     if (!read) {
-      // A row shaped unlike the rest is counted, not fatal: one bad row must
-      // not cost the whole window.
       walk.errorCount += 1;
       continue;
     }
@@ -738,7 +745,7 @@ export class CopilotStudioDataversePuller
     environmentUrl: string;
     token: string;
     signal?: AbortSignal;
-  }): Promise<z.infer<typeof botsPageSchema> | null> {
+  }): Promise<z.infer<typeof odataPageSchema> | null> {
     const { environmentUrl, token, signal } = params;
     const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/bots`;
     const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
@@ -760,14 +767,14 @@ export class CopilotStudioDataversePuller
       );
       return null;
     }
-    return botsPageSchema.parse(await response.json());
+    return odataPageSchema.parse(await response.json());
   }
 
   private async fetchPage(params: {
     url: string;
     token: string;
     signal?: AbortSignal;
-  }): Promise<z.infer<typeof pageSchema>> {
+  }): Promise<z.infer<typeof odataPageSchema>> {
     const { url, token, signal } = params;
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await ssrfSafeFetch(url, {
@@ -785,6 +792,6 @@ export class CopilotStudioDataversePuller
         `copilot studio dataverse puller: the environment refused the read (HTTP ${response.status})`,
       );
     }
-    return pageSchema.parse(await response.json());
+    return odataPageSchema.parse(await response.json());
   }
 }

@@ -24,6 +24,7 @@ interface FetchCall {
 let capturedCalls: FetchCall[] = [];
 let responseQueue: Array<{ status: number; body: unknown }> = [];
 let warnings: string[] = [];
+let errors: string[] = [];
 let transcripts: TranscriptTable | null = null;
 
 /**
@@ -205,7 +206,7 @@ function serveTranscriptPage(
 
 function transcriptRow(overrides: Record<string, unknown> = {}) {
   return {
-    conversationtranscriptid: "row-1",
+    conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
     name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
     conversationstarttime: "2026-08-25T19:14:34Z",
     createdon: "2026-08-25T19:44:43Z",
@@ -232,6 +233,7 @@ beforeEach(() => {
   capturedCalls = [];
   responseQueue = [];
   warnings = [];
+  errors = [];
   transcripts = null;
   // The logger is captured because one of this adapter's promises is a
   // diagnostic one: the misconfiguration it has to survive is also the one it
@@ -241,7 +243,7 @@ beforeEach(() => {
     ...(await importOriginal<Record<string, unknown>>()),
     createLogger: () => ({
       warn: (...args: unknown[]) => warnings.push(args.map(String).join(" ")),
-      error: () => undefined,
+      error: (...args: unknown[]) => errors.push(args.map(String).join(" ")),
       info: () => undefined,
       debug: () => undefined,
     }),
@@ -516,7 +518,7 @@ describe("given a run against an environment holding one conversation", () => {
         value: [
           transcriptRow(),
           transcriptRow({
-            conversationtranscriptid: "row-2",
+            conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
             _bot_conversationtranscriptid_value:
               "00000000-0000-4000-8000-00000000dead",
           }),
@@ -673,7 +675,7 @@ describe("given a cursor from a previous run", () => {
       {
         cursor: JSON.stringify({
           createdon: "2026-08-25T19:44:43Z",
-          conversationtranscriptid: "row-1",
+          conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
         }),
         credentials: CREDENTIALS,
       },
@@ -688,7 +690,7 @@ describe("given a cursor from a previous run", () => {
     expect(query).toContain(
       "(createdon gt 2026-08-25T19:44:43Z or " +
         "(createdon eq 2026-08-25T19:44:43Z and " +
-        "conversationtranscriptid gt row-1))",
+        "conversationtranscriptid gt 11111111-1111-4111-8111-111111111111))",
     );
     expect(query).not.toContain("conversationtranscriptid ne");
   });
@@ -740,7 +742,7 @@ describe("given a cursor from a previous run", () => {
         value: [
           transcriptRow(),
           transcriptRow({
-            conversationtranscriptid: "row-2",
+            conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
             createdon: "2026-08-25T19:45:12Z",
           }),
         ],
@@ -754,7 +756,7 @@ describe("given a cursor from a previous run", () => {
 
     expect(JSON.parse(result.cursor!)).toEqual({
       createdon: "2026-08-25T19:45:12Z",
-      conversationtranscriptid: "row-2",
+      conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
     });
   });
 
@@ -765,7 +767,7 @@ describe("given a cursor from a previous run", () => {
 
     const cursor = JSON.stringify({
       createdon: "2026-08-25T19:44:43Z",
-      conversationtranscriptid: "row-1",
+      conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
     });
     const result = await adapter.runOnce(
       { cursor, credentials: CREDENTIALS },
@@ -784,14 +786,14 @@ describe("given several conversations written in the same instant", () => {
   const LATER = "2026-08-25T19:45:12Z";
   const ROWS = [
     transcriptRow({
-      conversationtranscriptid: "row-a",
+      conversationtranscriptid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       createdon: SAME_INSTANT,
     }),
     transcriptRow({
-      conversationtranscriptid: "row-b",
+      conversationtranscriptid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       createdon: SAME_INSTANT,
     }),
-    transcriptRow({ conversationtranscriptid: "row-c", createdon: LATER }),
+    transcriptRow({ conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", createdon: LATER }),
   ];
 
   /**
@@ -832,7 +834,7 @@ describe("given several conversations written in the same instant", () => {
     // cursor that keeps every same-instant row but the saved id, the third
     // run answers with `row-a` again and the pair alternates forever without
     // `row-c` ever being read.
-    expect(seen).toEqual(["row-a", "row-b", "row-c"]);
+    expect(seen).toEqual(["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"]);
   });
 
   it("advances the cursor strictly forward on every restart", async () => {
@@ -847,9 +849,9 @@ describe("given several conversations written in the same instant", () => {
     }
 
     expect(cursors).toEqual([
-      { createdon: SAME_INSTANT, conversationtranscriptid: "row-a" },
-      { createdon: SAME_INSTANT, conversationtranscriptid: "row-b" },
-      { createdon: LATER, conversationtranscriptid: "row-c" },
+      { createdon: SAME_INSTANT, conversationtranscriptid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+      { createdon: SAME_INSTANT, conversationtranscriptid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+      { createdon: LATER, conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
     ]);
   });
 
@@ -863,7 +865,7 @@ describe("given several conversations written in the same instant", () => {
       {
         cursor: JSON.stringify({
           createdon: SAME_INSTANT,
-          conversationtranscriptid: "row-a",
+          conversationtranscriptid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         }),
         credentials: CREDENTIALS,
       },
@@ -871,12 +873,12 @@ describe("given several conversations written in the same instant", () => {
     );
 
     expect(result.events.map((event) => event.source_event_id)).toEqual([
-      "row-b",
-      "row-c",
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     ]);
     expect(JSON.parse(result.cursor!)).toEqual({
       createdon: LATER,
-      conversationtranscriptid: "row-c",
+      conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     });
   });
 
@@ -887,7 +889,7 @@ describe("given several conversations written in the same instant", () => {
 
     const cursor = JSON.stringify({
       createdon: LATER,
-      conversationtranscriptid: "row-c",
+      conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     });
     const result = await adapter.runOnce(
       { cursor, credentials: CREDENTIALS },
@@ -918,7 +920,7 @@ describe("given the pull goes wrong", () => {
 
     const cursor = JSON.stringify({
       createdon: "2026-08-25T19:44:43Z",
-      conversationtranscriptid: "row-1",
+      conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
     });
     const result = await adapter.runOnce(
       { cursor, credentials: CREDENTIALS },
@@ -946,6 +948,13 @@ describe("given the pull goes wrong", () => {
     );
 
     expect(result.errorCount).toBe(1);
+    // Asserted on what the logger was handed, not on the result: `PullResult`
+    // carries events, a cursor and a count and has never had anywhere to put a
+    // message, so `JSON.stringify(result)` could not have contained the secret
+    // however badly the failure path leaked it. The log line is where the
+    // reason actually travels, and the source page shows it.
+    expect(errors.join("\n")).toContain("copilot studio dataverse pull failed");
+    expect(errors.join("\n")).not.toContain(CREDENTIALS.clientSecret);
     expect(JSON.stringify(result)).not.toContain(CREDENTIALS.clientSecret);
   });
 
@@ -964,5 +973,60 @@ describe("given the pull goes wrong", () => {
 
     expect(result.errorCount).toBe(1);
     expect(result.events).toHaveLength(1);
+  });
+
+  /**
+   * An entry that is not an object at all is no more readable than one that
+   * fails the schema, and it used to be dropped by a bare `continue`. A page
+   * of those then came back as zero events, zero errors and an unmoved cursor
+   * — which the worker reads as a source with nothing in it, so nobody ever
+   * learns the rows were discarded.
+   */
+  it("counts a page entry that is not a row at all", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({
+      status: 200,
+      body: { value: [null, "not a row", 42] },
+    });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.errorCount).toBe(3);
+    expect(result.events).toHaveLength(0);
+  });
+
+  /**
+   * The cursor is interpolated bare into the next run's `$filter`, so what
+   * comes back out of storage has to be the shape that goes in. A stored value
+   * that is not restarts the window instead: re-reading is survivable because
+   * every identifier is derived, where replaying a broken predicate is a run
+   * that fails identically forever with nothing moving.
+   */
+  it("restarts the window rather than replay a cursor it cannot use", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+    await adapter.runOnce(
+      {
+        cursor: JSON.stringify({
+          createdon: "2026-08-25T19:44:43Z",
+          conversationtranscriptid: "row-1 or 1 eq 1",
+        }),
+        credentials: CREDENTIALS,
+      },
+      adapter.validateConfig(CONFIG),
+    );
+
+    const query = decodeURIComponent(transcriptCall().url);
+    expect(query).not.toContain("1 eq 1");
+    // The first-run window, not a continuation: the stored pair was refused,
+    // so there is nothing to continue from.
+    expect(query).toContain("createdon ge");
+    expect(query).not.toContain("createdon gt");
   });
 });
