@@ -55,6 +55,7 @@ import {
 } from "./genieTraceMapper";
 import {
   type NormalizedPullEvent,
+  type PullerAdapter,
   type PullResult,
   pullerAdapterRegistry,
   registerBuiltInPullers,
@@ -136,6 +137,53 @@ export interface PulledUsageDispatcher {
   ): Promise<void>;
 }
 
+/**
+ * Answers what a source's `pullConfig` says to run, and refuses the run when it
+ * does not name a registered adapter or does not validate against one.
+ *
+ * Split out of `runIngestionPull` so the dispatcher reads as the sequence it
+ * documents — resolve, run, write — instead of as a guard chain wrapped around
+ * a single call.
+ */
+function resolvePullAdapter(params: {
+  ingestionSourceId: string;
+  pullConfig: Record<string, unknown>;
+}): { adapterId: string; adapter: PullerAdapter; validatedConfig: unknown } {
+  const { ingestionSourceId, pullConfig } = params;
+
+  const adapterId = pullConfig.adapter;
+  if (typeof adapterId !== "string") {
+    logger.warn(
+      { ingestionSourceId },
+      "IngestionSource has no pullConfig.adapter; not a pull-mode source",
+    );
+    throw new Error("IngestionSource has no pullConfig.adapter");
+  }
+
+  const adapter = pullerAdapterRegistry.get(adapterId);
+  if (!adapter) {
+    logger.error(
+      { ingestionSourceId, adapterId },
+      "Unknown adapter id — refusing to dispatch",
+    );
+    throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
+  }
+
+  try {
+    return {
+      adapterId,
+      adapter,
+      validatedConfig: adapter.validateConfig(pullConfig),
+    };
+  } catch (error) {
+    logger.error(
+      { ingestionSourceId, adapterId, error },
+      "pullConfig validation failed",
+    );
+    throw error;
+  }
+}
+
 export async function runIngestionPull(params: {
   sourceId: string;
   cursor: string | null;
@@ -170,33 +218,10 @@ export async function runIngestionPull(params: {
   }
 
   const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
-  const adapterId = pullConfig.adapter;
-  if (typeof adapterId !== "string") {
-    logger.warn(
-      { ingestionSourceId },
-      "IngestionSource has no pullConfig.adapter; not a pull-mode source",
-    );
-    throw new Error("IngestionSource has no pullConfig.adapter");
-  }
-  const adapter = pullerAdapterRegistry.get(adapterId);
-  if (!adapter) {
-    logger.error(
-      { ingestionSourceId, adapterId },
-      "Unknown adapter id — refusing to dispatch",
-    );
-    throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
-  }
-
-  let validatedConfig: unknown;
-  try {
-    validatedConfig = adapter.validateConfig(pullConfig);
-  } catch (error) {
-    logger.error(
-      { ingestionSourceId, adapterId, error },
-      "pullConfig validation failed",
-    );
-    throw error;
-  }
+  const { adapterId, adapter, validatedConfig } = resolvePullAdapter({
+    ingestionSourceId,
+    pullConfig,
+  });
 
   const credentials = decryptCredentials(pullConfig.credentials);
 
