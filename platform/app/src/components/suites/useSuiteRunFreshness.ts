@@ -14,7 +14,7 @@ import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
-import { getAdaptivePollingInterval } from "./getAdaptivePollingInterval";
+import { getAdaptivePollingInterval } from "@langwatch/suite-web";
 
 interface UseSuiteRunFreshnessOptions {
   /** When provided, scopes the probe to a single scenario set. */

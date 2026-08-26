@@ -25,7 +25,7 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-import { NowProvider } from "../NowProvider";
+import { NowProvider } from "@langwatch/suite-web";
 import { SuiteSidebar } from "../SuiteSidebar";
 import { toExternalSetSelection } from "../useSuiteRouting";
 

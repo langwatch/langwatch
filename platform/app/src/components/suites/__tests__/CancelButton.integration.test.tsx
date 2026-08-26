@@ -16,9 +16,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { RunRow } from "../RunRow";
-import { ScenarioTargetRow } from "../ScenarioTargetRow";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+import { RunRow, ScenarioTargetRow } from "@langwatch/suite-web";
+import {
+  makeBatchRun,
+  makeScenarioRunData,
+  makeSummary,
+} from "@langwatch/suite-web/testing";
 
 vi.mock("../usePrefetchRunState", () => ({
   usePrefetchRunState: () => vi.fn(),

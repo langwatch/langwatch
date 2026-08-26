@@ -13,8 +13,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioGridCard } from "../ScenarioGridCard";
-import { makeScenarioRunData } from "./test-helpers";
+import { ScenarioGridCard } from "@langwatch/suite-web";
+import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
 const prefetchMock = vi.hoisted(() => vi.fn());
 vi.mock("../usePrefetchRunState", () => ({
@@ -174,6 +174,7 @@ describe("<ScenarioGridCard/>", () => {
           })}
           targetName={null}
           onClick={vi.fn()}
+          onPrefetch={() => prefetchMock("run_hover")}
         />,
         { wrapper: Wrapper },
       );

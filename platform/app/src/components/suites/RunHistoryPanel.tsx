@@ -22,6 +22,8 @@ import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -32,11 +34,15 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { isSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { GroupRow } from "./GroupRow";
-import { RunHistoryFilters, type RunHistoryFilterValues } from "./RunHistoryFilters";
-import { RunHistorySkeleton } from "./RunHistorySkeleton";
-import { RunRow } from "./RunRow";
-import { RunSummaryCounts } from "./RunSummaryCounts";
+import {
+  GroupRow,
+  RunHistoryFilters,
+  RunHistorySkeleton,
+  RunRow,
+  RunSummaryCounts,
+  type RunHistoryFilterValues,
+  type ScenarioRunContextRenderer,
+} from "@langwatch/suite-web";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -45,14 +51,24 @@ import {
   groupRunsByScenarioId,
   groupRunsByTarget,
   resolveOriginLabel,
-} from "./run-history-transforms";
+} from "@langwatch/suite-web";
 import { ScenarioRunExportDialog } from "./ScenarioRunExportDialog";
-import { useAutoExpansion } from "./useAutoExpansion";
+import { useAutoExpansion } from "@langwatch/suite-web";
 import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import { useExportScenarioRuns } from "./useExportScenarioRuns";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
-import { useRunHistoryStore } from "./useRunHistoryStore";
-import { useScrollToBatch } from "./useScrollToBatch";
+import { usePrefetchRunState } from "./usePrefetchRunState";
+import { useRunHistoryStore, useScrollToBatch } from "@langwatch/suite-web";
+
+const renderScenarioContext: ScenarioRunContextRenderer = ({
+  scenarioRunId,
+  name,
+  children,
+}) => (
+  <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>
+    {children}
+  </LangyContextTarget>
+);
 
 export type RunHistoryStats = {
   runCount: number;
@@ -87,6 +103,7 @@ export function RunHistoryPanel({
 }: RunHistoryPanelProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
+  const prefetchRunState = usePrefetchRunState();
 
   // Use zustand store for filters, groupBy, and viewMode with URL sync
   const groupBy = useRunHistoryStore((s) => s.groupBy);
@@ -530,6 +547,8 @@ export function RunHistoryPanel({
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                     isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                    onPrefetchRun={prefetchRunState}
+                    renderScenarioContext={renderScenarioContext}
                   />
                 );
               })
@@ -551,6 +570,8 @@ export function RunHistoryPanel({
                         : undefined
                     }
                     cancellingJobId={cancellingJobId}
+                    onPrefetchRun={prefetchRunState}
+                    renderScenarioContext={renderScenarioContext}
                   />
                 );
               })}

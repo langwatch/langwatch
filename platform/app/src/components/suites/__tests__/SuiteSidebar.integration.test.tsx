@@ -30,7 +30,7 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-import { NowProvider } from "../NowProvider";
+import { NowProvider } from "@langwatch/suite-web";
 import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../SuiteSidebar";
 import { ALL_RUNS_ID } from "../useSuiteRouting";
 

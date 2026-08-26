@@ -3,7 +3,7 @@ import { Download } from "lucide-react";
 import { useState } from "react";
 import type { ScenarioRunExportMode } from "~/server/export/scenario-runs/types";
 import { Dialog } from "../ui/dialog";
-import { Radio, RadioGroup } from "../ui/radio";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 
 /**
  * Each mode states what one row is. That is the only thing distinguishing

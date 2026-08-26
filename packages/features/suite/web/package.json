@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./tests/test-helpers.ts",
+      "default": "./tests/test-helpers.ts"
     }
   },
   "scripts": {
@@ -22,11 +26,14 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@langwatch/design-system": "workspace:*",
     "@langwatch/simulation-contract": "workspace:*",
+    "@tanstack/react-virtual": "^3.14.5",
     "lucide-react": "^1.22.0",
     "react": "^19.2.7",
     "react-feather": "^2.0.10",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

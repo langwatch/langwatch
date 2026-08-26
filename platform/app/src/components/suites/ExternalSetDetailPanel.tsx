@@ -13,28 +13,47 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { HandledErrorAlert } from "~/features/errors";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
-import { GroupRow } from "./GroupRow";
-import { RunHistoryFilters, type RunHistoryFilterValues } from "./RunHistoryFilters";
-import { RunHistorySkeleton } from "./RunHistorySkeleton";
-import { RunRow } from "./RunRow";
+import {
+  GroupRow,
+  RunHistoryFilters,
+  RunHistorySkeleton,
+  RunRow,
+  type RunHistoryFilterValues,
+  type ScenarioRunContextRenderer,
+} from "@langwatch/suite-web";
 import {
   availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
   groupRunsByBatchId,
   groupRunsByScenarioId,
-} from "./run-history-transforms";
-import { ScenarioTabConnectedBadge } from "./ScenarioTabConnectedBadge";
-import { useAutoExpansion } from "./useAutoExpansion";
-import { useRunHistoryStore } from "./useRunHistoryStore";
-import { useScrollToBatch } from "./useScrollToBatch";
+} from "@langwatch/suite-web";
+import {
+  ScenarioTabConnectedBadge,
+  useAutoExpansion,
+  useRunHistoryStore,
+  useScrollToBatch,
+} from "@langwatch/suite-web";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
+import { usePrefetchRunState } from "./usePrefetchRunState";
+
+const renderScenarioContext: ScenarioRunContextRenderer = ({
+  scenarioRunId,
+  name,
+  children,
+}) => (
+  <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>
+    {children}
+  </LangyContextTarget>
+);
 
 type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
@@ -57,6 +76,7 @@ export function ExternalSetDetailPanel({
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const prefetchRunState = usePrefetchRunState();
   const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
   const runListRef = useRef<HTMLDivElement>(null);
 
@@ -299,6 +319,8 @@ export function ExternalSetDetailPanel({
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
                           isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                          onPrefetchRun={prefetchRunState}
+                          renderScenarioContext={renderScenarioContext}
                         />
                       );
                     })
@@ -314,6 +336,8 @@ export function ExternalSetDetailPanel({
                           onScenarioRunClick={handleScenarioRunClick}
                           resolveTargetName={resolveTargetName}
                           viewMode={viewMode}
+                          onPrefetchRun={prefetchRunState}
+                          renderScenarioContext={renderScenarioContext}
                         />
                       );
                     })}

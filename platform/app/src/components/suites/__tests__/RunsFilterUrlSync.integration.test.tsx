@@ -35,7 +35,7 @@ vi.mock(
 );
 
 import { useRouter } from "~/utils/compat/next-router";
-import { createRunHistoryStore } from "../useRunHistoryStore";
+import { createRunHistoryStore } from "@langwatch/suite-web";
 import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting } from "../useSuiteRouting";
 
 type Store = ReturnType<typeof createRunHistoryStore>;

@@ -12,8 +12,11 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RunHistoryFilters, type RunHistoryFilterValues } from "../RunHistoryFilters";
-import { availableGroupByOptions } from "../run-history-transforms";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
+  availableGroupByOptions,
+} from "@langwatch/suite-web";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

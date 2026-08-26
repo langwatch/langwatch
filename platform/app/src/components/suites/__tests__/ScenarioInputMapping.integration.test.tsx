@@ -30,10 +30,6 @@ vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", 
   CodeEditor: () => null,
 }));
 
-vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
-  TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
-}));
-
 // -- Helpers --
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

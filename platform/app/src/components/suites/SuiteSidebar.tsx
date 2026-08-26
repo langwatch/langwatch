@@ -41,7 +41,7 @@ import type {
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { SearchInput } from "../ui/SearchInput";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import { ALL_RUNS_ID, toExternalSetSelection } from "./useSuiteRouting";
 import { VoiceAgentsCallout } from "./VoiceAgentsCallout";
 

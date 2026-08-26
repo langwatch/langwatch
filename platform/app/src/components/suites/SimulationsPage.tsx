@@ -48,7 +48,7 @@ import type { ScenarioTabNavigatePayload } from "~/server/scenarios/browser-tab/
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { NowProvider } from "./NowProvider";
+import { NowProvider } from "@langwatch/suite-web";
 
 export default function SimulationsPage() {
   const { project } = useOrganizationTeamProject();

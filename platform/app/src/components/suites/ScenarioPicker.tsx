@@ -8,9 +8,9 @@
 import { Badge, Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
-import { SearchInput } from "../ui/SearchInput";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import { TagList } from "../ui/TagList";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface Scenario {
   id: string;

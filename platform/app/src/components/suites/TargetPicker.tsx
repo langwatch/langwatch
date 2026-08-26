@@ -9,8 +9,8 @@ import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react"
 import { AlertTriangle, Plus, X } from "lucide-react";
 import type { SuiteTarget } from "~/server/suites/types";
 import { Checkbox } from "../ui/checkbox";
-import { SearchInput } from "../ui/SearchInput";
-import { Tooltip } from "../ui/tooltip";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface AvailableTarget {
   name: string;

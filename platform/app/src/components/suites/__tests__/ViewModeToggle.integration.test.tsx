@@ -12,11 +12,18 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GroupRow } from "../GroupRow";
-import { RunHistoryFilters, type RunHistoryFilterValues } from "../RunHistoryFilters";
-import { RunRow } from "../RunRow";
-import type { RunGroup, RunGroupSummary } from "../run-history-transforms";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers";
+import {
+  GroupRow,
+  RunHistoryFilters,
+  RunRow,
+  type RunGroup,
+  type RunGroupSummary,
+} from "@langwatch/suite-web";
+import {
+  makeBatchRun,
+  makeScenarioRunData,
+  makeSummary,
+} from "@langwatch/suite-web/testing";
 
 vi.mock("../usePrefetchRunState", () => ({
   usePrefetchRunState: () => vi.fn(),
