@@ -13,6 +13,8 @@
     "src/server/app-layer/authz/**/*.ts",
     "src/server/api/routers/**/*.ts",
     "ee/scim/**/*.ts",
+    "ee/admin/**/*.ts",
+    "ee/admin/**/*.tsx",
     "src/features/auth/**/*.ts",
     "src/features/auth/**/*.tsx",
     "src/features/sso/**/*.ts",

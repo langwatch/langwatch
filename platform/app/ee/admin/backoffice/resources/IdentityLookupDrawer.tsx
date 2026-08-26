@@ -124,6 +124,143 @@ function PersonFacts({ person }: { person: Person }) {
  * is the answer to half the support cases that reach this page, and a list
  * that hid them would send the operator back to a database console.
  */
+/**
+ * One sign-in method, and what an operator may do to it.
+ *
+ * Lifted out of the panel's `map` because the callback carried the whole row:
+ * its dates, its session count, and the two repair buttons with the naming
+ * rule between them. A row is a thing; a closure that draws a row is a
+ * closure nobody can read.
+ */
+function IdentifierRow({
+  identifier,
+  sessions,
+  canRepair,
+  nameable,
+  onEndSessions,
+  onRemove,
+}: {
+  identifier: PersonDetail["identifiers"][number];
+  sessions: PersonDetail["sessions"];
+  canRepair: boolean;
+  nameable: boolean;
+  onEndSessions: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Box borderWidth="1px" borderRadius="md" padding={3}>
+      <HStack justify="space-between" align="start">
+        <VStack align="start" gap={0}>
+          <Text>
+            {identifier.value ?? identifier.provider} ·{" "}
+            {identifierStateLabel(identifier.state)}
+          </Text>
+          <Text fontSize="sm" color="fg.muted">
+            Attached {formatDateTime(new Date(identifier.attachedAtMs))}
+            {identifier.verifiedAtMs
+              ? ` · proved by ${identifier.provider} on ${formatDateTime(
+                  new Date(identifier.verifiedAtMs),
+                )}`
+              : " · nothing has proved it"}
+            {identifier.detachedAtMs
+              ? ` · stopped counting ${formatDateTime(
+                  new Date(identifier.detachedAtMs),
+                )}`
+              : ""}
+          </Text>
+          {sessions.length > 0 && (
+            <Text fontSize="sm" color="fg.muted">
+              {sessions.length} signed-in{" "}
+              {sessions.length === 1 ? "device" : "devices"}
+            </Text>
+          )}
+        </VStack>
+        {canRepair && (
+          <HStack gap={2}>
+            {sessions.length > 0 && (
+              <Button size="xs" variant="outline" onClick={onEndSessions}>
+                End its sessions
+              </Button>
+            )}
+            {nameable ? (
+              <Button
+                size="xs"
+                variant="outline"
+                colorPalette="red"
+                onClick={onRemove}
+              >
+                Remove
+              </Button>
+            ) : (
+              <Text fontSize="xs" color="fg.muted" maxWidth="220px">
+                Repairs are unavailable: this person's organization cannot be
+                named, so there is no way to confirm which customer this would
+                affect.
+              </Text>
+            )}
+          </HStack>
+        )}
+      </HStack>
+    </Box>
+  );
+}
+
+/** The confirmation, which names the customer a repair would land on. */
+function RemoveMethodDialog({
+  identifierId,
+  personName,
+  organizationName,
+  onCancel,
+  onConfirm,
+}: {
+  identifierId: string | null;
+  personName: string | null;
+  organizationName: string | null;
+  onCancel: () => void;
+  onConfirm: (identifierId: string) => void;
+}) {
+  return (
+    <Dialog.Root
+      open={identifierId !== null}
+      onOpenChange={({ open }) => {
+        if (!open) onCancel();
+      }}
+    >
+      <Dialog.Content>
+        <Dialog.Header>
+          <Dialog.Title>
+            {repairConfirmationTitle({
+              verb: "Remove a sign-in method",
+              personName: personName ?? "",
+              organizationName: organizationName ?? "",
+            })}
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Text>
+            {personName} will no longer be able to sign in with this method. If
+            it is their last way in, or the last one we could reach them at, the
+            removal is refused and nothing changes.
+          </Text>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette="red"
+            onClick={() => {
+              if (identifierId) onConfirm(identifierId);
+            }}
+          >
+            Remove
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
 function MethodsPanel({
   detail,
   canRepair,
@@ -183,147 +320,51 @@ function MethodsPanel({
         </Text>
       )}
       <VStack align="stretch" gap={3}>
-        {detail.identifiers.map((identifier) => {
-          const sessions = detail.sessions.filter(
-            (session) => session.identifierId === identifier.identifierId,
-          );
-          return (
-            <Box
-              key={identifier.identifierId}
-              borderWidth="1px"
-              borderRadius="md"
-              padding={3}
-            >
-              <HStack justify="space-between" align="start">
-                <VStack align="start" gap={0}>
-                  <Text>
-                    {identifier.value ?? identifier.provider} ·{" "}
-                    {identifierStateLabel(identifier.state)}
-                  </Text>
-                  <Text fontSize="sm" color="fg.muted">
-                    Attached {formatDateTime(new Date(identifier.attachedAtMs))}
-                    {identifier.verifiedAtMs
-                      ? ` · proved by ${identifier.provider} on ${formatDateTime(
-                          new Date(identifier.verifiedAtMs),
-                        )}`
-                      : " · nothing has proved it"}
-                    {identifier.detachedAtMs
-                      ? ` · stopped counting ${formatDateTime(
-                          new Date(identifier.detachedAtMs),
-                        )}`
-                      : ""}
-                  </Text>
-                  {sessions.length > 0 && (
-                    <Text fontSize="sm" color="fg.muted">
-                      {sessions.length} signed-in{" "}
-                      {sessions.length === 1 ? "device" : "devices"}
-                    </Text>
-                  )}
-                </VStack>
-                {canRepair && (
-                  <HStack gap={2}>
-                    {sessions.length > 0 && (
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        onClick={() =>
-                          endSessions.mutate({
-                            userId,
-                            identifierId: identifier.identifierId,
-                          })
-                        }
-                      >
-                        End its sessions
-                      </Button>
-                    )}
-                    {nameable ? (
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        colorPalette="red"
-                        onClick={() => setDetaching(identifier.identifierId)}
-                      >
-                        Remove
-                      </Button>
-                    ) : (
-                      <Text fontSize="xs" color="fg.muted" maxWidth="220px">
-                        Repairs are unavailable: this person's organization
-                        cannot be named, so there is no way to confirm which
-                        customer this would affect.
-                      </Text>
-                    )}
-                  </HStack>
-                )}
-              </HStack>
-            </Box>
-          );
-        })}
+        {detail.identifiers.map((identifier) => (
+          <IdentifierRow
+            key={identifier.identifierId}
+            identifier={identifier}
+            sessions={detail.sessions.filter(
+              (session) => session.identifierId === identifier.identifierId,
+            )}
+            canRepair={canRepair}
+            nameable={nameable}
+            onEndSessions={() =>
+              endSessions.mutate({
+                userId,
+                identifierId: identifier.identifierId,
+              })
+            }
+            onRemove={() => setDetaching(identifier.identifierId)}
+          />
+        ))}
       </VStack>
 
-      <Dialog.Root
-        open={detaching !== null}
-        onOpenChange={({ open }) => {
-          if (!open) setDetaching(null);
+      <RemoveMethodDialog
+        identifierId={detaching}
+        personName={personName}
+        organizationName={organizationName}
+        onCancel={() => setDetaching(null)}
+        onConfirm={(identifierId) => {
+          detach.mutate({ userId, identifierId });
+          setDetaching(null);
         }}
-      >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>
-              {repairConfirmationTitle({
-                verb: "Remove a sign-in method",
-                personName: personName ?? "",
-                organizationName: organizationName ?? "",
-              })}
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text>
-              {personName} will no longer be able to sign in with this method.
-              If it is their last way in, or the last one we could reach them
-              at, the removal is refused and nothing changes.
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="ghost" onClick={() => setDetaching(null)}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              onClick={() => {
-                if (detaching) {
-                  detach.mutate({ userId, identifierId: detaching });
-                }
-                setDetaching(null);
-              }}
-            >
-              Remove
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+      />
     </Box>
   );
 }
 
 /**
- * Everything waiting on a human, on one panel.
+ * The four repairs the waiting panel can make, and nothing else.
  *
- * Sign-ins awaiting confirmation, invitations with their expiry, and domain
- * claims awaiting review. When none of the three has anything, the panel is
- * ONE LINE — three empty sections each explaining their own emptiness is a
- * page filled up to say nothing.
+ * A hook rather than seventy lines at the top of the panel: every one of these
+ * is the same shape — invalidate, say what happened, and let the code-keyed
+ * registry own the words on the way down — and reading the panel's markup
+ * meant scrolling past all four of them first. Returns the mutations, never
+ * anything to render.
  */
-function WaitingPanel({
-  detail,
-  canRepair,
-  userId,
-}: {
-  detail: PersonDetail;
-  canRepair: boolean;
-  userId: string;
-}) {
+function useWaitingDecisions() {
   const utils = api.useContext();
-  const nowMs = Date.now();
   const invalidate = async () => {
     await utils.identityLookup.invalidate();
   };
@@ -388,6 +429,29 @@ function WaitingPanel({
         fallbackTitle: "Couldn't extend the invitation",
       }),
   });
+
+  return { decide, resend, extend };
+}
+
+/**
+ * Everything waiting on a human, on one panel.
+ *
+ * Sign-ins awaiting confirmation, invitations with their expiry, and domain
+ * claims awaiting review. When none of the three has anything, the panel is
+ * ONE LINE — three empty sections each explaining their own emptiness is a
+ * page filled up to say nothing.
+ */
+function WaitingPanel({
+  detail,
+  canRepair,
+  userId,
+}: {
+  detail: PersonDetail;
+  canRepair: boolean;
+  userId: string;
+}) {
+  const nowMs = Date.now();
+  const { decide, resend, extend } = useWaitingDecisions();
 
   if (detail.waiting.isEmpty) {
     return (
