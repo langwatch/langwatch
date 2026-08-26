@@ -49,18 +49,21 @@ describe("agent report discovery notices", () => {
     });
   });
 
-  describe("given the docs navbar", () => {
-    /** @scenario "The docs navbar carries the report link on every page" */
-    it("keeps a link to the support guide reachable from every page", () => {
-      const config = JSON.parse(read("docs/docs.json")) as {
-        navbar: { links: { label: string; href: string }[] };
-      };
-      const link = config.navbar.links.find((item) =>
-        item.label.includes("Report an issue"),
-      );
+  describe("given the attribution footer", () => {
+    /** @scenario "The attribution footer carries the report line on every page" */
+    it("injects the agent report line above the Powered by note", () => {
+      const script = read("docs/posthog.js");
+      expect(
+        script,
+        "posthog.js lost the footer injection",
+      ).toContain("lw-agent-report");
+      expect(script).toContain("npx langwatch report");
+      expect(script).toContain('href="/support"');
 
-      expect(link, "the docs navbar lost the report link").toBeDefined();
-      expect(link!.href).toBe("https://docs.langwatch.ai/support");
+      const css = read("docs/style.css");
+      expect(css, "style.css lost the report line style").toContain(
+        ".lw-agent-report",
+      );
     });
   });
 

@@ -458,3 +458,38 @@ code {
 #sidebar-group .group > img {
   align-self: center;
 }
+
+/* ── Agent report line in the attribution footer ──
+   Injected by docs/posthog.js into the theme's #footer band, above the
+   Powered by row. The band is a flex row; wrap it so the line takes a full
+   row of its own, with the Powered by row below it. */
+#footer {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.lw-agent-report {
+  flex: 0 0 100%;
+  font-size: 14px;
+  color: #9ca3af;
+  padding-bottom: 12px;
+}
+.lw-agent-report a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lw-agent-report a:hover { color: #6b7280; }
+.lw-agent-report code {
+  font-size: 13px;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.dark .lw-agent-report { color: #6b7280; }
+.dark .lw-agent-report a:hover { color: #9ca3af; }
+.dark .lw-agent-report code {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #374151;
+}

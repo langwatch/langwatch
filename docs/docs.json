@@ -1598,10 +1598,6 @@
         "href": "https://docs.langwatch.ai/llms.txt"
       },
       {
-        "label": "Report an issue",
-        "href": "https://docs.langwatch.ai/support"
-      },
-      {
         "label": "Sign In",
         "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=navbar-signin"
       }

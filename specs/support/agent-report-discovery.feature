@@ -23,9 +23,10 @@ Feature: Agent Report Discovery Across Access Points
     Then a small "For agents" note says issues found while following the page can be reported with "npx langwatch report"
 
   @unit
-  Scenario: The docs navbar carries the report link on every page
-    When a reader opens any docs page on a desktop screen
-    Then the navbar shows a "Report an issue" link to the support documentation
+  Scenario: The attribution footer carries the report line on every page
+    When a reader reaches the bottom of any docs page
+    Then a line above the Powered by note tells an AI agent to report issues with "npx langwatch report"
+    And following it lands on the support documentation
 
   @unit
   Scenario: The docs have a page documenting the report command
