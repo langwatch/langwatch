@@ -621,7 +621,16 @@ export class IngestionSourceService {
       // must mean "unchanged" for all of them, not just the secret.
       const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
       for (const key of Object.keys(stored)) {
-        const hiddenFromClients = key === "credentials" || key.startsWith("_");
+        // `adapter` and `schedule` join the list for the same reason as the
+        // rest: the composer deliberately renders neither, so a client cannot
+        // send them back and absent must mean unchanged. Dropping `adapter`
+        // leaves a pull source the worker can no longer dispatch — a rename
+        // would quietly stop the source pulling.
+        const hiddenFromClients =
+          key === "credentials" ||
+          key === "adapter" ||
+          key === "schedule" ||
+          key.startsWith("_");
         if (hiddenFromClients && incoming[key] === undefined) {
           incoming[key] = stored[key];
         }
@@ -630,7 +639,12 @@ export class IngestionSourceService {
         existing,
         incoming,
       }));
-      assertPullDestinationAllowed(incoming);
+      // The adapter comes from the stored row, not from `incoming`. The edit
+      // form sends back only the fields it renders and `adapter` is not one of
+      // them, so dispatching on the incoming value would make this check do
+      // nothing on precisely the request that repoints the host — leaving the
+      // destination pinned at create and free afterwards.
+      assertPullDestinationAllowed(incoming, stored.adapter as string);
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
       ) as Prisma.InputJsonValue;

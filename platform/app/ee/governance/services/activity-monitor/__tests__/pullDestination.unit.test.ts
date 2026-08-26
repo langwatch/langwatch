@@ -180,6 +180,53 @@ describe("given a Copilot config pointed somewhere the secret must never go", ()
   });
 });
 
+describe("given a config whose adapter is known only to the caller", () => {
+  /**
+   * The update path cannot read the adapter from the config it is checking.
+   * The edit form sends back only the fields it renders, and `adapter` is
+   * deliberately not one of them — so dispatching on the incoming value makes
+   * the check do nothing on precisely the request that repoints the host.
+   * The caller passes the adapter from the stored row instead.
+   *
+   * @scenario "An environment address Microsoft does not host is refused at save time"
+   */
+  it("checks the destination using the adapter the caller supplies", () => {
+    const withoutAdapter = {
+      environmentUrl: "https://attacker.example.com",
+      credentials: { clientSecret: "app-secret" },
+    };
+    // Without the caller's adapter there is nothing to dispatch on, which is
+    // the hole: the same config sails through.
+    expect(() => assertPullDestinationAllowed(withoutAdapter)).not.toThrow();
+    expect(() =>
+      assertPullDestinationAllowed(
+        withoutAdapter,
+        COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+      ),
+    ).toThrow(/Power Platform environment address/);
+  });
+
+  it("does the same for a workspace being repointed", () => {
+    expect(() =>
+      assertPullDestinationAllowed(
+        { workspaceUrl: "https://attacker.example.com" },
+        DATABRICKS_GENIE_ADAPTER_ID,
+      ),
+    ).toThrow(/Databricks workspace address/);
+  });
+
+  it("prefers the caller's adapter over one carried in the config", () => {
+    // A request that names a harmless adapter alongside a repointed host must
+    // not talk the check out of the stored adapter's rule.
+    expect(() =>
+      assertPullDestinationAllowed(
+        { adapter: "http_polling", environmentUrl: "https://attacker.example.com" },
+        COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+      ),
+    ).toThrow(/Power Platform environment address/);
+  });
+});
+
 describe("given a config for an adapter with no fixed destination", () => {
   describe("when the destination is checked", () => {
     it("leaves it alone rather than inventing a rule for it", () => {
