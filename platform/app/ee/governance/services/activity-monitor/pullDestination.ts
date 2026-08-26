@@ -17,13 +17,52 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import {
-  COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
-  isDataverseEnvironmentOrigin,
-} from "../pullers/dataverseEnvironment";
-import {
   DATABRICKS_GENIE_ADAPTER_ID,
   isDatabricksWorkspaceOrigin,
 } from "../pullers/databricksGenie.puller";
+import {
+  COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+  isDataverseEnvironmentOrigin,
+} from "../pullers/dataverseEnvironment";
+
+/**
+ * The adapters whose destination is knowable, and how to check it.
+ *
+ * A table rather than a branch per adapter: pinning a new adapter is then a
+ * data entry, and the check itself has one shape that cannot drift between
+ * adapters. A `Map` rather than an object literal because the key comes from
+ * request data — an object literal would resolve `"toString"` to something
+ * inherited from `Object.prototype` and check against nonsense.
+ */
+const PINNED_DESTINATIONS = new Map<
+  string,
+  {
+    /** The config field naming the host the credential is sent to. */
+    field: string;
+    isAllowed: (value: string) => boolean;
+    /** Customer-safe copy naming the addresses this adapter may reach. */
+    message: string;
+  }
+>([
+  [
+    DATABRICKS_GENIE_ADAPTER_ID,
+    {
+      field: "workspaceUrl",
+      isAllowed: isDatabricksWorkspaceOrigin,
+      message:
+        "Workspace URL must be an https Databricks workspace address, ending in .azuredatabricks.net, .cloud.databricks.com or .gcp.databricks.com.",
+    },
+  ],
+  [
+    COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+    {
+      field: "environmentUrl",
+      isAllowed: isDataverseEnvironmentOrigin,
+      message:
+        "Environment URL must be an https Power Platform environment address, ending in .dynamics.com, .microsoftdynamics.us, .appsplatform.us or .dynamics.cn. Environments served from a custom domain are not supported yet — contact support.",
+    },
+  ],
+]);
 
 /**
  * Reject a pull config whose destination is not one this adapter may reach.
@@ -46,28 +85,13 @@ export function assertPullDestinationAllowed(
   // The stored adapter wins: it is server-held, where the incoming one is
   // whatever the request carried.
   const adapter = adapterId ?? parserConfig.adapter;
+  if (typeof adapter !== "string") return;
 
-  if (adapter === DATABRICKS_GENIE_ADAPTER_ID) {
-    const workspaceUrl = parserConfig.workspaceUrl;
-    if (
-      typeof workspaceUrl !== "string" ||
-      !isDatabricksWorkspaceOrigin(workspaceUrl)
-    ) {
-      throw new ValidationError(
-        "Workspace URL must be an https Databricks workspace address, ending in .azuredatabricks.net, .cloud.databricks.com or .gcp.databricks.com.",
-      );
-    }
-  }
+  const pinned = PINNED_DESTINATIONS.get(adapter);
+  if (!pinned) return;
 
-  if (adapter === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
-    const environmentUrl = parserConfig.environmentUrl;
-    if (
-      typeof environmentUrl !== "string" ||
-      !isDataverseEnvironmentOrigin(environmentUrl)
-    ) {
-      throw new ValidationError(
-        "Environment URL must be an https Power Platform environment address, ending in .dynamics.com, .microsoftdynamics.us, .appsplatform.us or .dynamics.cn. Environments served from a custom domain are not supported yet — contact support.",
-      );
-    }
+  const destination = parserConfig[pinned.field];
+  if (typeof destination !== "string" || !pinned.isAllowed(destination)) {
+    throw new ValidationError(pinned.message);
   }
 }
