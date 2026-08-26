@@ -117,13 +117,24 @@ describe.skipIf(!hasCredentialsSecret)(
       ]);
     });
 
-    /** The single config attached at the organization scope, as stored. */
+    /**
+     * The single config attached at the organization scope, as stored.
+     *
+     * The count is a precondition of the helper rather than a claim of any one
+     * case: every case here reads one config, so a second one means the setup
+     * drifted and each assertion below would be reading an arbitrary half of
+     * the answer. It throws rather than asserts, so the failure names the
+     * setup instead of pointing at whichever case ran first.
+     */
     const storedConfig = async (): Promise<Record<string, string>> => {
-      const configs = await new ModelDefaultsRepository(prisma).findConfigsAtScope(
-        "ORGANIZATION",
-        organizationId,
-      );
-      expect(configs).toHaveLength(1);
+      const configs = await new ModelDefaultsRepository(
+        prisma,
+      ).findConfigsAtScope("ORGANIZATION", organizationId);
+      if (configs.length !== 1) {
+        throw new Error(
+          `expected exactly one config at the organization scope, found ${configs.length}`,
+        );
+      }
       return (configs[0]!.config ?? {}) as Record<string, string>;
     };
 
@@ -220,7 +231,9 @@ describe.skipIf(!hasCredentialsSecret)(
 
         // The create path seeds too, so start from the Anthropic-only shape the
         // bug reproduces on: DEFAULT + FAST, no EMBEDDINGS.
-        await prisma.modelDefaultConfig.deleteMany({ where: { organizationId } });
+        await prisma.modelDefaultConfig.deleteMany({
+          where: { organizationId },
+        });
         await seedAnthropicOnly();
         expect((await storedConfig()).EMBEDDINGS).toBeUndefined();
 

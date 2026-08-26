@@ -34,77 +34,109 @@ export function LangyFailureReference({
 
   if (!code && !raw) return null;
 
-  const detailsLabel = isOpen ? "Hide details" : "Show details";
-
   return (
     <VStack align="stretch" gap={1}>
       <HStack gap={1.5} align="center">
-        {code ? (
-          <Text
-            textStyle="2xs"
-            fontFamily="mono"
-            color="fg.subtle"
-            userSelect="text"
-            truncate
-            title={code}
-          >
-            {code}
-          </Text>
-        ) : null}
+        {code ? <FailureCode code={code} /> : null}
         {raw ? (
-          <Button
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            aria-expanded={isOpen}
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            {isOpen ? (
-              <ChevronDown size={11} aria-hidden="true" />
-            ) : (
-              <ChevronRight size={11} aria-hidden="true" />
-            )}
-            {detailsLabel}
-          </Button>
+          <DetailsToggle isOpen={isOpen} onToggle={() => setIsOpen(!isOpen)} />
         ) : null}
-        <Button
-          size="2xs"
-          variant="ghost"
-          color={copied ? "green.fg" : "fg.subtle"}
-          aria-label={
-            copied ? "Copied the error details" : "Copy the error details"
-          }
-          onClick={() => copy(raw ?? code ?? "")}
-        >
-          {copied ? (
-            <Check size={11} aria-hidden="true" />
-          ) : (
-            <Copy size={11} aria-hidden="true" />
-          )}
-        </Button>
+        <CopyButton copied={copied} onCopy={() => copy(raw ?? code ?? "")} />
       </HStack>
-      {isOpen && raw ? (
-        <Box
-          as="pre"
-          textStyle="2xs"
-          fontFamily="mono"
-          color="fg.muted"
-          userSelect="text"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-          maxHeight="180px"
-          overflowY="auto"
-          borderWidth="1px"
-          borderStyle="solid"
-          borderColor="border.muted"
-          borderRadius="6px"
-          background="bg.subtle"
-          padding={2}
-          margin={0}
-        >
-          {raw}
-        </Box>
-      ) : null}
+      {isOpen && raw ? <FailureDetails raw={raw} /> : null}
     </VStack>
+  );
+}
+
+function FailureCode({ code }: { code: string }) {
+  return (
+    <Text
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg.subtle"
+      userSelect="text"
+      truncate
+      title={code}
+    >
+      {code}
+    </Text>
+  );
+}
+
+function DetailsToggle({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      size="2xs"
+      variant="ghost"
+      color="fg.subtle"
+      aria-expanded={isOpen}
+      onClick={onToggle}
+    >
+      {isOpen ? (
+        <ChevronDown size={11} aria-hidden="true" />
+      ) : (
+        <ChevronRight size={11} aria-hidden="true" />
+      )}
+      {isOpen ? "Hide details" : "Show details"}
+    </Button>
+  );
+}
+
+/** Copies the whole failure, which is what a support thread needs, not the code. */
+function CopyButton({
+  copied,
+  onCopy,
+}: {
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <Button
+      size="2xs"
+      variant="ghost"
+      color={copied ? "green.fg" : "fg.subtle"}
+      aria-label={
+        copied ? "Copied the error details" : "Copy the error details"
+      }
+      onClick={onCopy}
+    >
+      {copied ? (
+        <Check size={11} aria-hidden="true" />
+      ) : (
+        <Copy size={11} aria-hidden="true" />
+      )}
+    </Button>
+  );
+}
+
+/** Bounded and scrollable: a traceback is unbounded and the card is not. */
+function FailureDetails({ raw }: { raw: string }) {
+  return (
+    <Box
+      as="pre"
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg.muted"
+      userSelect="text"
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+      maxHeight="180px"
+      overflowY="auto"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      borderRadius="6px"
+      background="bg.subtle"
+      padding={2}
+      margin={0}
+    >
+      {raw}
+    </Box>
   );
 }

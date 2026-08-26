@@ -193,7 +193,9 @@ describe("Langy tool failure card", () => {
       const alert = screen.getByRole("alert");
       expect(alert.textContent).toContain("This step couldn't be completed.");
       expect(alert.textContent).not.toContain("JSONDecodeError");
-      expect(alert.textContent).not.toContain("Traceback (most recent call last)");
+      expect(alert.textContent).not.toContain(
+        "Traceback (most recent call last)",
+      );
     });
 
     /** @scenario "The traceback stays reachable behind the disclosure" */

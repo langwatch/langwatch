@@ -345,9 +345,11 @@ describe("versionedPromptToPromptConfigFormValues", () => {
 
       const result = versionedPromptToPromptConfigFormValues(prompt);
 
-      expect(result.version.configData.demonstrations?.inline?.records).toEqual({
-        input: ["a question"],
-      });
+      expect(result.version.configData.demonstrations?.inline?.records).toEqual(
+        {
+          input: ["a question"],
+        },
+      );
     });
   });
 

@@ -29,7 +29,9 @@ function preferReducedMotion() {
   );
 }
 
-function renderCard(metrics: Parameters<typeof StreamingStatCard>[0]["metrics"]) {
+function renderCard(
+  metrics: Parameters<typeof StreamingStatCard>[0]["metrics"],
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <StreamingStatCard metrics={metrics} />
@@ -45,9 +47,7 @@ describe("StreamingStatCard", () => {
   describe("given a metric with a suffix and a reading smaller than a hundredth", () => {
     /** @scenario "A live turn metric with a suffix keeps the digits of a small reading" */
     it("keeps the digits rather than drawing the reading as zero", () => {
-      renderCard([
-        { value: 0.0001543, label: "cost per row", suffix: " usd" },
-      ]);
+      renderCard([{ value: 0.0001543, label: "cost per row", suffix: " usd" }]);
 
       expect(screen.getByText("0.0001543 usd")).toBeTruthy();
       expect(screen.queryByText("0 usd")).toBeNull();
