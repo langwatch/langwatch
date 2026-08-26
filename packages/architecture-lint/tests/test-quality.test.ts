@@ -78,6 +78,34 @@ describe("test quality", () => {
     expect(policies(root, file)).toEqual([]);
   });
 
+  it("accepts a local helper that contains real assertions", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-assertion-helper-"));
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        'function assertParity(actual: string) { expect(actual).toBe("ok"); }',
+        'it("checks parity", () => { assertParity(doWork()); });',
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual([]);
+  });
+
+  it("does not trust an assertion-shaped helper without an assertion", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-quality-empty-helper-"));
+    const file = writeFixture(
+      root,
+      "src/example.test.ts",
+      [
+        "function assertParity(actual: string) { log(actual); }",
+        'it("checks nothing", () => { assertParity(doWork()); });',
+      ].join("\n"),
+    );
+
+    expect(policies(root, file)).toEqual(["test-quality"]);
+  });
+
   it("rejects known literal tautologies", () => {
     const root = mkdtempSync(join(tmpdir(), "test-quality-tautology-"));
     const file = writeFixture(

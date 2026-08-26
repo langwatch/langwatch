@@ -110,14 +110,56 @@ function isAssertionCall(node: ts.CallExpression): boolean {
   );
 }
 
-function containsAssertion(callback: TestCallback): boolean {
+function containsAssertion(
+  callback: TestCallback,
+  assertionHelpers: ReadonlySet<string>,
+): boolean {
   let assertion = false;
   const visit = (node: ts.Node): void => {
     if (assertion) return;
-    if (ts.isCallExpression(node) && isAssertionCall(node)) assertion = true;
+    if (ts.isCallExpression(node)) {
+      const helper = ts.isIdentifier(node.expression)
+        ? assertionHelpers.has(node.expression.text)
+        : false;
+      if (isAssertionCall(node) || helper) assertion = true;
+    }
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(callback.body, visit);
+  return assertion;
+}
+
+function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
+  const helpers = new Set<string>();
+
+  for (const statement of source.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
+      if (nodeContainsAssertion(statement.body)) helpers.add(statement.name.text);
+      continue;
+    }
+
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue;
+      const initializer = declaration.initializer;
+      if (!ts.isArrowFunction(initializer) && !ts.isFunctionExpression(initializer)) {
+        continue;
+      }
+      if (nodeContainsAssertion(initializer.body)) helpers.add(declaration.name.text);
+    }
+  }
+
+  return helpers;
+}
+
+function nodeContainsAssertion(node: ts.Node): boolean {
+  let assertion = false;
+  const visit = (child: ts.Node): void => {
+    if (assertion) return;
+    if (ts.isCallExpression(child) && isAssertionCall(child)) assertion = true;
+    ts.forEachChild(child, visit);
+  };
+  visit(node);
   return assertion;
 }
 
@@ -287,10 +329,11 @@ function lintTestFile(file: string): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const imports = collectImportBindings(source);
   const mockedModules = collectMockedModules(source);
+  const assertionHelpers = collectAssertionHelpers(source);
   const duplicateBodies = new Map<string, TestCall>();
 
   for (const test of collectTestCalls(source)) {
-    if (!containsAssertion(test.callback)) {
+    if (!containsAssertion(test.callback, assertionHelpers)) {
       violations.push({
         policy: "test-quality",
         file,
