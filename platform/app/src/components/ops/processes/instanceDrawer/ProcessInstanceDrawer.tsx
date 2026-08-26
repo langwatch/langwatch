@@ -2,7 +2,7 @@ import { Button, CodeBlock, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuCopy } from "react-icons/lu";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { useShikiAdapter } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";

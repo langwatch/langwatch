@@ -17,7 +17,7 @@ import type { GroupInfo } from "@langwatch/ops-contract";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";

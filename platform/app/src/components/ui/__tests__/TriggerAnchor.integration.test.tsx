@@ -15,8 +15,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { TriggerAnchor } from "../TriggerAnchor";
-import { Tooltip } from "../tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 const REASON = "Create a project first to add a model provider.";
 

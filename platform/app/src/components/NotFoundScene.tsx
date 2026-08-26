@@ -1,8 +1,8 @@
 import { Box, Button, Center, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Home, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useColorMode, useColorModeValue } from "~/components/ui/color-mode";
-import { SimpleSlider } from "~/components/ui/slider";
+import { useColorMode, useColorModeValue } from "@langwatch/design-system/color-mode";
+import { SimpleSlider } from "@langwatch/design-system/slider";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
 import {

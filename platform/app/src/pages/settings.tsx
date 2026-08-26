@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Lock } from "react-feather";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { OrganizationIntent, Project } from "~/generated/prisma/client";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";

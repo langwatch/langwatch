@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
 import type React from "react";
-import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "~/components/ui/menu";
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
 
 export interface OverflowMenuItem {
   id: string;

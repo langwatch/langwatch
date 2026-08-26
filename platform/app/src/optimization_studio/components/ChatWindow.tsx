@@ -5,7 +5,7 @@ import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { SmallLabel } from "~/components/SmallLabel";
 import { Dialog } from "~/components/ui/dialog";
-import { InputGroup } from "~/components/ui/input-group";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";

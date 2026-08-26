@@ -31,7 +31,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
-import { Select } from "~/components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA, VariableInfoIcon } from "@langwatch/automation-web";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import {

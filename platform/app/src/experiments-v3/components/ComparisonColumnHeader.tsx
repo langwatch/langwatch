@@ -3,7 +3,7 @@ import { keyframes } from "@emotion/react";
 import { CircleAlert, Swords } from "lucide-react";
 import { useMemo } from "react";
 
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useOpenComparisonEditor } from "../hooks/useOpenEvaluatorEditor";
 import { useTargetNames } from "../hooks/useTargetName";

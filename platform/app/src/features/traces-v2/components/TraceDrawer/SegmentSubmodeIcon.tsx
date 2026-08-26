@@ -1,6 +1,6 @@
 import { Box, Icon } from "@chakra-ui/react";
 import type { IconType } from "react-icons";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface SegmentSubmodeIconProps {
   icon: IconType;

@@ -6,7 +6,7 @@ import {
 } from "@langwatch/coding-agent-web";
 import type React from "react";
 
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatTokens } from "~/features/traces-v2/utils/formatters";
 
 /**

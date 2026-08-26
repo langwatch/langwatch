@@ -1,6 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { MeterBar } from "~/components/ui/MeterBar";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatDuration } from "@langwatch/trace-web";
 import { MonoCell } from "../../../MonoCell";
 

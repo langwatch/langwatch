@@ -1,6 +1,6 @@
 import { Box, HStack, Icon, Menu, Text } from "@chakra-ui/react";
 import { LuEye, LuEyeOff } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { usePresenceFeatureEnabled } from "~/features/presence/hooks/usePresenceFeatureEnabled";
 import { usePresencePreferencesStore } from "~/features/presence/stores/presencePreferencesStore";
 

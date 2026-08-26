@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { buildMarkdownComponents } from "./components";
 
 /**

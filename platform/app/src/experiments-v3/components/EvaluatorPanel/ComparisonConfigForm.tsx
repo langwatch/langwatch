@@ -12,8 +12,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-import { Menu } from "~/components/ui/menu";
-import { Switch } from "~/components/ui/switch";
+import { Menu } from "@langwatch/design-system/menu";
+import { Switch } from "@langwatch/design-system/switch";
 import {
   type AvailableSource,
   type FieldMapping,

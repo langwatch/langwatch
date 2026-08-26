@@ -32,7 +32,7 @@ vi.mock("~/features/automations/editors/templateAuthoring", async (original) => 
     LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
   };
 });
-vi.mock("~/components/ui/color-mode", () => ({
+vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 vi.mock("~/utils/api", () => ({

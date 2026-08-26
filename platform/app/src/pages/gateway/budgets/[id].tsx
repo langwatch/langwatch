@@ -24,7 +24,7 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

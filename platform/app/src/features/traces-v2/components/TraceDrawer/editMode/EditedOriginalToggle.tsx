@@ -1,6 +1,6 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuGitCompare } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { type TraceOverlayView, useTraceEditStore } from "../../../stores/traceEditStore";

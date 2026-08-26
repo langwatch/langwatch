@@ -3,7 +3,7 @@ import type { SessionListRow } from "@langwatch/coding-agent-web";
 import { MoreVertical } from "lucide-react";
 import type React from "react";
 
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 /**
  * Everything a reader can do with a row other than choose it. Choosing the row

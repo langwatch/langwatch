@@ -1,7 +1,7 @@
 import { Box, VStack } from "@chakra-ui/react";
 import { Filter } from "lucide-react";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { FilterField } from "~/server/filters/types";
 
 interface GraphFilterIndicatorProps {

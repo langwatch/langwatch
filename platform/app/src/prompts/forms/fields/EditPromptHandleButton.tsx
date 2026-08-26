@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";

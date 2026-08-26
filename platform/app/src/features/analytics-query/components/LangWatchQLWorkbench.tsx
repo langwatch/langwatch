@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { LangWatchQLWorkbench as PackageWorkbench } from "@langwatch/analytics-web";
 
 import { usePeriodSelector } from "~/components/PeriodSelector";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { HandledErrorAlert } from "~/features/errors";
 
 import { useLangWatchQLQuery } from "../hooks/useLangWatchQLQuery";

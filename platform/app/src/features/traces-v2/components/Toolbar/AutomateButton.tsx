@@ -1,7 +1,7 @@
 import { Button, Icon } from "@chakra-ui/react";
 import { Zap } from "lucide-react";
 import { useDrawer } from "~/components/CurrentDrawer";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getCurrentFilterText } from "../../stores/filterStore";
 

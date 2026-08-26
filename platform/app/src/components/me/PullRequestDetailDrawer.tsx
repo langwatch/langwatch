@@ -11,7 +11,7 @@ import type React from "react";
 
 import { GitHub } from "~/components/icons/GitHub";
 import { Drawer } from "~/components/ui/drawer";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
 import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";

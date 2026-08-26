@@ -11,9 +11,9 @@ import {
   LuUser,
   LuWrench,
 } from "react-icons/lu";
-import { useColorMode } from "~/components/ui/color-mode";
-import { Popover } from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import {
   type AttributeFormat,

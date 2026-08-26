@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CHAPTERS, type ChapterId, chapterIndex } from "../chapters/chapters";
 import type { StageId } from "../chapters/onboardingJourneyConfig";
 

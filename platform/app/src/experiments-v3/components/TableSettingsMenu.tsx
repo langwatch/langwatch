@@ -25,9 +25,9 @@ import {
 import React, { useState } from "react";
 import { LuGauge } from "react-icons/lu";
 import type { RowHeightMode } from "~/components/datasets/editor/DatasetTableContext";
-import { Popover } from "~/components/ui/popover";
-import { SimpleSlider } from "~/components/ui/slider";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Popover } from "@langwatch/design-system/popover";
+import { SimpleSlider } from "@langwatch/design-system/slider";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DEFAULT_CONCURRENCY } from "../types";

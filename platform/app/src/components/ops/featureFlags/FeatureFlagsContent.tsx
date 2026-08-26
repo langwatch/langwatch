@@ -14,8 +14,8 @@ import {
 } from "@chakra-ui/react";
 import { Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Switch } from "~/components/ui/switch";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { usePublicEnv } from "~/hooks/usePublicEnv";

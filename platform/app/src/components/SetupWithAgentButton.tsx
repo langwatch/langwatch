@@ -1,7 +1,7 @@
 import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";

@@ -1,6 +1,6 @@
 import { Avatar, type AvatarRootProps, Box } from "@chakra-ui/react";
 import { useState } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PresenceSession } from "@langwatch/presence-contract";
 import { presenceDisplayName, presenceSessionColor } from "../utils/sessionColor";
 

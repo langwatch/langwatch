@@ -60,7 +60,7 @@ import { formatExpiry, isExpired } from "~/components/gateway/virtualKeyExpirati
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

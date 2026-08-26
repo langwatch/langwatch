@@ -11,7 +11,7 @@ import { Info } from "react-feather";
 import type { FieldErrors } from "react-hook-form";
 
 import { FormErrorDisplay } from "~/components/FormErrorDisplay";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export interface HorizontalFormControlProps extends SystemStyleObject {
   label: string | ReactNode;

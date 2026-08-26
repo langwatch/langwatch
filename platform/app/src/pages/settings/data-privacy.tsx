@@ -73,10 +73,10 @@ import {
 } from "~/components/settings/ScopeFilter";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Drawer } from "~/components/ui/drawer";
-import { Menu } from "~/components/ui/menu";
-import { Select } from "~/components/ui/select";
+import { Menu } from "@langwatch/design-system/menu";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";

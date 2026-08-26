@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { DatasetReference } from "../../types";
 

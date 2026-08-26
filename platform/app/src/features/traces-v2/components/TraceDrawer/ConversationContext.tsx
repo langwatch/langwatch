@@ -18,7 +18,7 @@ import {
   LuMessageCircle,
 } from "react-icons/lu";
 import { RedactedInline } from "~/components/ui/RedactedField";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import {
   type ConversationTurn,

@@ -9,9 +9,9 @@ import {
   LuTrash2,
 } from "react-icons/lu";
 import { DeleteConfirmationDialog } from "~/components/ui/delete-confirmation-dialog";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";

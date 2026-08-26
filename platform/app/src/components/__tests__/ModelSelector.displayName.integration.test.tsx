@@ -24,7 +24,7 @@
  * ModelMultiSelect.displayName.integration.test.tsx's pattern.
  *
  * Query strategy: unlike ModelMultiSelect (a plain checkbox list),
- * `ModelSelector` renders through `~/components/ui/select`, so
+ * `ModelSelector` renders through `@langwatch/design-system/select`, so
  * `Select.HiddenSelect` mirrors every item as a native `<option>` sibling.
  * Queries are scoped to the listbox (mounted in the DOM regardless of
  * open state) to avoid matching that hidden mirror — same strategy as

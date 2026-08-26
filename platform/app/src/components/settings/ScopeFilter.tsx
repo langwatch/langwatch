@@ -14,7 +14,7 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Building2, ChevronDown, Folder, Users } from "lucide-react";
 import { useState } from "react";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import type { AvailableScopes } from "~/hooks/useAvailableScopes";
 
 export type { AvailableScopes };

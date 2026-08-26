@@ -1,7 +1,7 @@
 import { Box, Button, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuArrowRight } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { truncateId } from "@langwatch/trace-web";
 import { type EvalEntry, isNoVerdict, STATUS } from "./utils";
 

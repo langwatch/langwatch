@@ -3,7 +3,7 @@ import { ExternalLink, Info } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Link } from "~/components/ui/link";
-import { Popover } from "~/components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 
 type FieldInfoTooltipProps = {
   description: string;

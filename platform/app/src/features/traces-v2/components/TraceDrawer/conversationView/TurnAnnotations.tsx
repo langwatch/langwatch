@@ -3,7 +3,7 @@ import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
 import { Checkbox } from "~/components/ui/checkbox";
-import { Popover } from "~/components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";

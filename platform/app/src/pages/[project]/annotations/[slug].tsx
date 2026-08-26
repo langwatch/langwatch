@@ -2,7 +2,7 @@ import { Box, Flex, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";

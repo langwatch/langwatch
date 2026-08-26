@@ -10,8 +10,8 @@ import {
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { allModelOptions, useModelSelectionOptions } from "~/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
-import { Popover } from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigOutputType } from "~/types";
 

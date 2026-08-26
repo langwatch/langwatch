@@ -37,7 +37,7 @@ vi.mock("~/utils/compat/next-dynamic", () => ({
     },
 }));
 
-vi.mock("~/components/ui/color-mode", () => ({
+vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 

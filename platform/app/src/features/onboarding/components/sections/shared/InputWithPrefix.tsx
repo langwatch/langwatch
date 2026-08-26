@@ -10,7 +10,7 @@ import {
 import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { useColorModeValue } from "~/components/ui/color-mode";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
 
 interface InputWithPrefixProps {

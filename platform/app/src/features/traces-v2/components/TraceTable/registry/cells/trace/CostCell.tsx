@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import type { ReactElement } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceListItem } from "../../../../../types/trace";
 import { formatCost } from "@langwatch/trace-web";
 import { CostBreakdownTooltipContent } from "../../../../shared/CostBreakdownTooltip";

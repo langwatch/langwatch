@@ -15,8 +15,8 @@ import {
   type ScopeTriadEntry,
 } from "~/components/settings/ScopeChipPicker";
 import { Drawer } from "~/components/ui/drawer";
-import { Select } from "~/components/ui/select";
-import { Switch } from "~/components/ui/switch";
+import { Select } from "@langwatch/design-system/select";
+import { Switch } from "@langwatch/design-system/switch";
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,

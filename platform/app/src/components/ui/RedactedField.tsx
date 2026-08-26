@@ -4,7 +4,7 @@ import { Lock } from "react-feather";
 import { useFieldRedaction } from "~/hooks/useFieldRedaction";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import NextLink from "~/utils/compat/next-link";
-import { Tooltip } from "./tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface RedactedFieldProps {
   field: "input" | "output";

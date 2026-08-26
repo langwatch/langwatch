@@ -15,7 +15,7 @@ import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
 import { Link } from "~/components/ui/link";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";

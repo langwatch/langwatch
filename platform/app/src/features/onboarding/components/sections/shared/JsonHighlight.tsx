@@ -1,6 +1,6 @@
 import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
 import type React from "react";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useShikiAdapter } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
 
 export function JsonHighlight({

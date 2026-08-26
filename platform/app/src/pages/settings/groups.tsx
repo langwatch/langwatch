@@ -22,7 +22,7 @@ import {
 } from "~/components/settings/GroupBindingInputRow";
 import { GroupDetailDialog } from "~/components/settings/GroupDetailDialog";
 import { Dialog } from "~/components/ui/dialog";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import SettingsLayout from "../../components/SettingsLayout";

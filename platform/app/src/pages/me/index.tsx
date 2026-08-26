@@ -24,7 +24,7 @@ import { spentSubline } from "~/components/me/spentSubline";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import Head from "~/utils/compat/next-head";
 

@@ -12,7 +12,7 @@ import { Mail, MoreVertical, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Link } from "~/components/ui/link";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import type { RouterOutputs } from "~/utils/api";
 import { orgRoleOptions } from "../settings/OrganizationUserRoleField";
 import { WaitingApprovalActions } from "./WaitingApprovalActions";

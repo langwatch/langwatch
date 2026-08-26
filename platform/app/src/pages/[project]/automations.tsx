@@ -26,10 +26,10 @@ import { HoverableBigText } from "~/components/HoverableBigText";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
 import { Link } from "~/components/ui/link";
-import { Menu } from "~/components/ui/menu";
-import { Switch } from "~/components/ui/switch";
+import { Menu } from "@langwatch/design-system/menu";
+import { Switch } from "@langwatch/design-system/switch";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
   AutomationHistory,

@@ -2,7 +2,7 @@ import { Box, Flex, IconButton } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ConnectionState } from "~/hooks/useSSESubscription";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";

@@ -21,8 +21,8 @@ import {
   LuTrash2,
 } from "react-icons/lu";
 
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   EVALUATION_STATUS_COLORS,
   getStatusLabel,

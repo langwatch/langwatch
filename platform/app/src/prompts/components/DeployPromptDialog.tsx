@@ -23,9 +23,9 @@ import {
   DialogRoot,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Select } from "~/components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { usePromptTags } from "~/prompts/hooks/usePromptTags";

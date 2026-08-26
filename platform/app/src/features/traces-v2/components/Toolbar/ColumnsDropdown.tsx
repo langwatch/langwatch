@@ -1,8 +1,8 @@
 import { Button } from "@chakra-ui/react";
 import { ChevronDown, Columns3 } from "lucide-react";
 import type React from "react";
-import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
-import { Tooltip } from "~/components/ui/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Popover } from "../../../../components/ui/popover";
 import { ColumnPickerContent } from "./ColumnPickerContent";
 

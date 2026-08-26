@@ -31,7 +31,7 @@ import type { AiToolEntry } from "~/components/me/tiles/types";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";

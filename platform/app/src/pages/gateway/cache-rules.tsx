@@ -21,7 +21,7 @@ import { CacheRuleEditDrawer } from "~/components/gateway/CacheRuleEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

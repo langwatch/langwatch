@@ -11,7 +11,7 @@
 import { Box, Circle, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
 import { LuChevronRight, LuCircleX } from "react-icons/lu";
 
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import {
   EVALUATION_STATUS_COLORS,

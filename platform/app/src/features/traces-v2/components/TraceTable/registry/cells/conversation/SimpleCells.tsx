@@ -1,6 +1,6 @@
 import { chakra, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceStatus } from "../../../../../types/trace";
 import { formatTokens } from "@langwatch/trace-web";
 import type { ConversationGroup } from "../../../conversationGroups";

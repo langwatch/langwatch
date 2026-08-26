@@ -12,8 +12,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Dialog } from "../dialog";
-import { Menu } from "../menu";
-import { Popover } from "../popover";
+import { Menu } from "@langwatch/design-system/menu";
+import { Popover } from "@langwatch/design-system/popover";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

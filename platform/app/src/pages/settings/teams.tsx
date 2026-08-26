@@ -18,7 +18,7 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
-import { Select } from "~/components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { OrganizationUserRole } from "~/generated/prisma/client";

@@ -26,8 +26,8 @@ import {
   LuTrash2,
   LuWorkflow,
 } from "react-icons/lu";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { VersionBadge } from "@langwatch/prompt-web";

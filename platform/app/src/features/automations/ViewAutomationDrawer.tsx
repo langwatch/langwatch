@@ -16,7 +16,7 @@ import { Calendar, TrendingUp } from "react-feather";
 import { resolveSeriesLabel, type TriggerActionParams } from "@langwatch/automation-web";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,

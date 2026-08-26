@@ -1,5 +1,5 @@
 import { Text } from "@chakra-ui/react";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { RenderedMarkdown, ShikiCodeBlock } from "./markdownView";
 import {
   AssistantTurnCard,

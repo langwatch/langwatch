@@ -2,7 +2,7 @@ import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
 import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useIsNewAccount } from "../../hooks/useIsNewAccount";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useTourEntryPoints } from "../../onboarding";

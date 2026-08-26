@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "@langwatch/automation-web";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
-vi.mock("~/components/ui/color-mode", () => ({
+vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 /** Channels the mocked listSlackChannels mutation has "already loaded". Tests

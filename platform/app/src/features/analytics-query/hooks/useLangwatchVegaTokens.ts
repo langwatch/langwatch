@@ -15,7 +15,7 @@
 import { useToken } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { getRawColorValue, useColorMode } from "~/components/ui/color-mode";
+import { getRawColorValue, useColorMode } from "@langwatch/design-system/color-mode";
 import { rotatingColors } from "~/utils/rotatingColors";
 
 import type {

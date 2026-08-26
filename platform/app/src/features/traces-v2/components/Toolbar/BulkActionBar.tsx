@@ -5,7 +5,7 @@ import { useState } from "react";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useLangyStore } from "~/features/langy/stores/langyStore";

@@ -19,8 +19,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Radio, RadioGroup } from "~/components/ui/radio";
-import { Select } from "~/components/ui/select";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
+import { Select } from "@langwatch/design-system/select";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { ENTERPRISE_TEMPLATE } from "@langwatch/enterprise-licensing-contract";

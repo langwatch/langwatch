@@ -2,7 +2,7 @@ import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
 import {
   selectPeersMatching,

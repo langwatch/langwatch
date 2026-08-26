@@ -25,8 +25,8 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangySkill } from "~/shared/langy/langySkills";
 import { describeChipContext } from "../logic/langyChipContext";

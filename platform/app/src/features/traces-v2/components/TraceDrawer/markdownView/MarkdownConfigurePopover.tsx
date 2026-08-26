@@ -7,8 +7,8 @@ import {
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { Radio, RadioGroup } from "~/components/ui/radio";
+} from "@langwatch/design-system/popover";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import type { MarkdownConfig, SpanDetailLevel, SpanLayout, SpanScope } from "./types";
 
 export function MarkdownConfigurePopover({

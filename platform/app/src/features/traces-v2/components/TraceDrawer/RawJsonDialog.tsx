@@ -10,9 +10,9 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons/lu";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Dialog } from "~/components/ui/dialog";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useSpansFull } from "../../hooks/useSpansFull";

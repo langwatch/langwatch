@@ -150,7 +150,7 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
   },
 }));
 
-vi.mock("~/components/ui/menu", () => ({
+vi.mock("@langwatch/design-system/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,

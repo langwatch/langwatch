@@ -18,7 +18,7 @@ import {
   LuPlus,
   LuSquare,
 } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { describeCellFailure } from "~/experiments-v3/utils/cellFailure";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";

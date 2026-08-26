@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
-import { Popover } from "~/components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { api } from "~/utils/api";
 
 interface SecretsIndicatorProps {

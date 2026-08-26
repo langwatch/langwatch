@@ -1,4 +1,4 @@
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { LangWatchQLEditor as PackageEditor } from "@langwatch/analytics-web";
 import type { LangWatchQLEditorProps } from "@langwatch/analytics-web";
 

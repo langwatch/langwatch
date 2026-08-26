@@ -22,8 +22,8 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { Drawer } from "~/components/ui/drawer";
-import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
-import { Tooltip } from "~/components/ui/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   FIELD_VALUES,
   SEARCH_FIELDS,

@@ -1,7 +1,7 @@
 import { Button, Portal, Text } from "@chakra-ui/react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useLocalStorage } from "usehooks-ts";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { useRouter } from "~/utils/compat/next-router";

@@ -3,7 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { LangwatchSignalBucket, SpanTreeNode } from "@langwatch/trace-contract";
 import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";

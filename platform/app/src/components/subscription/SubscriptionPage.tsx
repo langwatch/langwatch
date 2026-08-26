@@ -23,7 +23,7 @@ import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { Link } from "~/components/ui/link";
-import { Select } from "~/components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import {

@@ -5,7 +5,7 @@ import { showErrorToast } from "~/features/errors";
 import type { CopyTargetProject } from "~/hooks/useProjectsForCopy";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { Dialog } from "./dialog";
-import { Select } from "./select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "./toaster";
 
 export type ReplicateToProjectDialogProps = {

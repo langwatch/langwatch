@@ -2,7 +2,7 @@ import { Flex, HStack, Icon } from "@chakra-ui/react";
 import { forwardRef } from "react";
 import type { IconType } from "react-icons";
 import { LuChevronDown } from "react-icons/lu";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { SegmentSubmodeIcon } from "./SegmentSubmodeIcon";
 
 /**

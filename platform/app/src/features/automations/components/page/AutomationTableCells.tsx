@@ -15,7 +15,7 @@ import {
 } from "@langwatch/automation-contract";
 import { resolveSeriesLabel, type TriggerActionParams } from "@langwatch/automation-web";
 import { HelpCircle, Plus } from "react-feather";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,

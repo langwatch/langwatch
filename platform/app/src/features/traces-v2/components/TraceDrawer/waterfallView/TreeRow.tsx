@@ -9,7 +9,7 @@ import {
   LuTrash2,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { useSpanHoverStore } from "@langwatch/trace-web";

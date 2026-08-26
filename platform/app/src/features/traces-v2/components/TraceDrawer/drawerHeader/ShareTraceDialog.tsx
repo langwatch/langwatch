@@ -15,9 +15,9 @@ import type { IconType } from "react-icons";
 import { LuBuilding2, LuCopy, LuFolderClosed, LuGlobe, LuTrash2 } from "react-icons/lu";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
-import { Select } from "~/components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import {
   type ShareExpiryOption,

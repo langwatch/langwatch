@@ -15,8 +15,8 @@ import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
 
 import { Dialog } from "~/components/ui/dialog";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/workflow-code-editor.transport";
 import type { Field } from "@langwatch/workflow-contract";
 import { FieldTypeSelect } from "@langwatch/prompt-web";

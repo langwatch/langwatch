@@ -147,7 +147,7 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
   },
 }));
 
-vi.mock("~/components/ui/menu", () => ({
+vi.mock("@langwatch/design-system/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
@@ -163,7 +163,7 @@ vi.mock("~/components/ui/menu", () => ({
   },
 }));
 
-vi.mock("~/components/ui/switch", () => ({
+vi.mock("@langwatch/design-system/switch", () => ({
   Switch: ({
     checked,
     disabled,
@@ -195,7 +195,7 @@ vi.mock("~/components/ui/link", () => ({
   }) => <a href={href}>{children}</a>,
 }));
 
-vi.mock("~/components/ui/tooltip", () => ({
+vi.mock("@langwatch/design-system/tooltip", () => ({
   Tooltip: ({ children }: { children?: ReactNode; content?: ReactNode }) => (
     <>{children}</>
   ),

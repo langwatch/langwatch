@@ -7,8 +7,8 @@ import {
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
+} from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   MenuContent,
   MenuContextTrigger,

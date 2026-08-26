@@ -16,7 +16,7 @@ import {
   LuPinOff,
   LuScanSearch,
 } from "react-icons/lu";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";

@@ -29,7 +29,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";

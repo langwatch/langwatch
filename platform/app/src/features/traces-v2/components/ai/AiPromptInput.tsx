@@ -3,7 +3,7 @@ import { keyframes } from "@emotion/react";
 import { Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { aiBrandPalette } from "./aiBrandPalette";

@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { SimpleSlider } from "~/components/ui/slider";
+import { SimpleSlider } from "@langwatch/design-system/slider";
 import {
   EVALUATOR_LABEL_FIELD,
   EVALUATOR_VERDICT_FIELD,

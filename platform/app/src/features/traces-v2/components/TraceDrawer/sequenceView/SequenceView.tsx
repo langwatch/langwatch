@@ -1,9 +1,9 @@
 import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuFilter, LuMaximize, LuMinus, LuPlus } from "react-icons/lu";
-import { useColorMode } from "~/components/ui/color-mode";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { generateMermaidSyntax } from "./mermaid";
 import { generateTopologySyntax } from "./topologyMermaid";

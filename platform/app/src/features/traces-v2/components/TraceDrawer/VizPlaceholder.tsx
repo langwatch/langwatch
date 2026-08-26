@@ -14,7 +14,7 @@ import {
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
 // so cursors render anywhere a peer's cursor lands in the drawer — the

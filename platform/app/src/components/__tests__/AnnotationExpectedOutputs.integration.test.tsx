@@ -39,7 +39,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/ui/tooltip", () => ({
+vi.mock("@langwatch/design-system/tooltip", () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 

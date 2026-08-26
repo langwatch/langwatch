@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Icon, Skeleton, VStack } from "@chakra-ui/react";
 import { LuX } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface TraceDrawerSkeletonProps {
   onClose: () => void;

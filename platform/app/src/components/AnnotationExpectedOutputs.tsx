@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import { useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AnnotationPopover } from "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

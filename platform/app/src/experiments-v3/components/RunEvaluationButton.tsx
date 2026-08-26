@@ -14,7 +14,7 @@
 import { Button, Spinner } from "@chakra-ui/react";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";

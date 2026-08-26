@@ -1,7 +1,12 @@
 import { Badge, HStack } from "@chakra-ui/react";
 import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PopoverAnchor, PopoverBody, PopoverContent, PopoverRoot } from "./popover";
+import {
+  PopoverAnchor,
+  PopoverBody,
+  PopoverContent,
+  PopoverRoot,
+} from "@langwatch/design-system/popover";
 
 /**
  * BetaPill indicates a feature is in beta.

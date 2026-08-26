@@ -1,6 +1,6 @@
 import { LuPlus } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { useCreateDraftPrompt } from "../../hooks/useCreateDraftPrompt";

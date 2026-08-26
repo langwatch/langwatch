@@ -7,7 +7,7 @@ import type {
   ContentPrivacy,
 } from "~/server/api/routers/tracesV2.schemas";
 import NextLink from "~/utils/compat/next-link";
-import { Tooltip } from "./tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * Generic, per-category read-time privacy markers for a span's content. Every

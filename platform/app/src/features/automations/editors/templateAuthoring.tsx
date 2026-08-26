@@ -5,7 +5,7 @@ import * as React from "react";
 import { useEffect, useMemo, useRef } from "react";
 import { FaSlack } from "react-icons/fa";
 import { Markdown } from "~/components/Markdown";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import dynamic from "~/utils/compat/next-dynamic";
 import {
   monacoBackgroundFor,

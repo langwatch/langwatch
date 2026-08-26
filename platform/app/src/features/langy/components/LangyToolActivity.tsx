@@ -36,7 +36,7 @@ import {
 import type { UIMessage } from "ai";
 import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { type CapabilityCommand, commandOfToolCall } from "@langwatch/langy-web";

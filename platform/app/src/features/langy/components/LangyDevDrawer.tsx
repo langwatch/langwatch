@@ -48,7 +48,7 @@ import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import {
   INSPECTOR_TUCK,

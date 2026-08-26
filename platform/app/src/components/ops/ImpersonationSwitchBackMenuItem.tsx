@@ -1,5 +1,5 @@
 import { Separator } from "@chakra-ui/react";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 
 export const ImpersonationSwitchBackMenuItem = () => {

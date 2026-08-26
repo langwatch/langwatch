@@ -9,8 +9,8 @@ import {
 } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
-import { InputGroup } from "~/components/ui/input-group";
-import { Select } from "~/components/ui/select";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import {

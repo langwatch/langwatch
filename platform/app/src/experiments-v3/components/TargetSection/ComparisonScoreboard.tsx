@@ -1,5 +1,5 @@
 import { Text } from "@chakra-ui/react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TargetConfig } from "../../types";
 import type { ComparisonAggregate } from "../../utils/computeAggregates";
 import { labelNamesVariant } from "../../utils/normalizeComparison";

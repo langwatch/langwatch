@@ -15,7 +15,7 @@ import { useState } from "react";
 
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
 import { Drawer } from "~/components/ui/drawer";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { ComponentProps } from "react";
 import { BackofficeTable as OpsBackofficeTable } from "@langwatch/ops-web";
-import { SearchInput } from "~/components/ui/SearchInput";
+import { SearchInput } from "@langwatch/design-system/search-input";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { HandledErrorAlert } from "~/features/errors";
 

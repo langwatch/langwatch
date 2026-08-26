@@ -2,7 +2,7 @@ import { Badge, Box, Button, HStack, Portal, Text } from "@chakra-ui/react";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { ProjectAvatar } from "~/components/ProjectAvatar";
 import { Link } from "~/components/ui/link";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { useWorkspaceData } from "~/components/useWorkspaceData";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";

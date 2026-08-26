@@ -1,7 +1,7 @@
 import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronDown, HelpCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /** Single-open accordion wiring, passed down from the main list. When present,
  *  the facet collapses to its header + a one-line summary and the header

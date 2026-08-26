@@ -3,7 +3,7 @@ import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LocalPromptConfig, TargetConfig } from "~/experiments-v3/types";
 import { createInitialState, type DatasetReference } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";

@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * The /me rendering of `api.user.budgetOverview`: one row per budget

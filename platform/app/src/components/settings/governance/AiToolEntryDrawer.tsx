@@ -34,7 +34,7 @@ import {
 } from "~/components/settings/ScopeChipPicker";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
-import { Switch } from "~/components/ui/switch";
+import { Switch } from "@langwatch/design-system/switch";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

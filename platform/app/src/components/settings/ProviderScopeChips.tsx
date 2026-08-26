@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * Scope kinds a chip can render. ORGANIZATION/TEAM/PROJECT mirror the

@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
 
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 /**
  * The per-row overflow menu (see

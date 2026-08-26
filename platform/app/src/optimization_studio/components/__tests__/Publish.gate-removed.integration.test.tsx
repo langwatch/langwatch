@@ -139,7 +139,7 @@ vi.mock("../AddModelProviderKey", () => ({
   AddModelProviderKey: () => null,
 }));
 
-vi.mock("~/components/ui/menu", () => ({
+vi.mock("@langwatch/design-system/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
@@ -176,7 +176,7 @@ vi.mock("~/components/ui/dialog", () => ({
   },
 }));
 
-vi.mock("~/components/ui/tooltip", () => ({
+vi.mock("@langwatch/design-system/tooltip", () => ({
   Tooltip: ({ content, children }: { content?: ReactNode; children?: ReactNode }) => (
     <span data-tooltip-content={typeof content === "string" ? content : ""}>
       {children}

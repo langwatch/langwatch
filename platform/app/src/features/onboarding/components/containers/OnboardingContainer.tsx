@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useAnalytics } from "react-contextual-analytics";
 import { FullLogo } from "~/components/icons/FullLogo";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { signOut } from "~/utils/auth-client";
 import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";

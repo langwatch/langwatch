@@ -42,7 +42,7 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { Pagination } from "~/components/ui/Pagination";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";

@@ -1,6 +1,6 @@
 import { Box, CodeBlock, Flex, Spinner } from "@chakra-ui/react";
 import { useRef } from "react";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";

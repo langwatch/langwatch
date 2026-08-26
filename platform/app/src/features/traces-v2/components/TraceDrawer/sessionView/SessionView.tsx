@@ -1,7 +1,7 @@
 import { Box, Grid, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { formatCost } from "../../../utils/formatters";

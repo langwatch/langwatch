@@ -93,7 +93,7 @@ vi.mock("~/prompts/components/GeneratePromptApiSnippetDialog", () => {
 // Mock the custom Select to render a native <select> for testability.
 // SelectRoot forwards flex and maxWidth as data attributes so tests can
 // assert the anti-overflow layout props without relying on JSDOM style computation.
-vi.mock("~/components/ui/select", () => {
+vi.mock("@langwatch/design-system/select", () => {
   const SelectRoot = ({
     children,
     collection,

@@ -17,7 +17,7 @@ import type { NotificationCadence } from "@langwatch/automation-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { describeError } from "~/features/errors";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

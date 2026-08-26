@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { resolveSnippetGatewayBaseUrl } from "./gatewaySnippetUrl";
 

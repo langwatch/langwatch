@@ -22,7 +22,7 @@ import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Dialog } from "~/components/ui/dialog";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 import type { SavedChartSummary } from "../hooks/useSavedWorkbenchCharts";
 

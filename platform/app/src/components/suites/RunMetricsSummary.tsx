@@ -19,7 +19,7 @@ import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import type { RunGroupSummary } from "./run-history-transforms";
 

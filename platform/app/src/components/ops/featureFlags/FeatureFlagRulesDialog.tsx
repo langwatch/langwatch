@@ -27,8 +27,8 @@ import {
   SelectRoot,
   SelectTrigger,
   SelectValueText,
-} from "~/components/ui/select";
-import { Switch } from "~/components/ui/switch";
+} from "@langwatch/design-system/select";
+import { Switch } from "@langwatch/design-system/switch";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import type { FeatureFlagRules } from "~/server/featureFlag";

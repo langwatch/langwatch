@@ -2,7 +2,7 @@ import { HStack } from "@chakra-ui/react";
 import { TabIdProvider } from "@langwatch/prompt-web";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { AddPromptButton } from "../sidebar/AddPromptButton";
 import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton";

@@ -3,7 +3,7 @@ import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   MenuContent,
   MenuItem,

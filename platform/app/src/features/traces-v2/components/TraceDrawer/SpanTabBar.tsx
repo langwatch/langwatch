@@ -11,8 +11,8 @@ import {
   LuX,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
 import {
   selectPeersMatching,

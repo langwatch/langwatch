@@ -13,8 +13,8 @@ import { Search, X } from "lucide-react";
 import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
-import { InputGroup } from "~/components/ui/input-group";
-import { Select } from "~/components/ui/select";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Select } from "@langwatch/design-system/select";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import {

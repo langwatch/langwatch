@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";

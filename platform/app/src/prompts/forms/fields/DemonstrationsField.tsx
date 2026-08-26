@@ -2,7 +2,7 @@ import { Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
 import { Edit2, Info } from "react-feather";
 import { Controller, useFormContext } from "react-hook-form";
 import { DatasetPreview } from "~/components/datasets/DatasetPreview";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "~/prompts";
 import { transposeColumnsFirstToRowsFirstWithId } from "../../../optimization_studio/utils/datasetUtils";

@@ -3,7 +3,7 @@ import type { PeriodSelection } from "@langwatch/coding-agent-web";
 import type React from "react";
 
 import { computeRelativeWindow, PeriodSelector } from "~/components/PeriodSelector";
-import { SearchInput } from "~/components/ui/SearchInput";
+import { SearchInput } from "@langwatch/design-system/search-input";
 
 /**
  * The window the period control shows while no period has been picked. It is

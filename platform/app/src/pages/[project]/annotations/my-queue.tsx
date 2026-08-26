@@ -13,7 +13,7 @@ import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import { LuPencil } from "react-icons/lu";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useColorMode } from "~/components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { showErrorToast } from "~/features/errors";

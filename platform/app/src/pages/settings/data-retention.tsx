@@ -31,7 +31,7 @@ import { RetentionAndUsageCard } from "~/components/data-retention/RetentionAndU
 import { RetroactiveProgressCard } from "~/components/data-retention/RetroactiveProgressCard";
 import SettingsLayout from "~/components/SettingsLayout";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";

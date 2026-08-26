@@ -1,6 +1,6 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuPackage } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { InstrumentationScope } from "@langwatch/trace-contract";
 
 interface ScopeChipProps {

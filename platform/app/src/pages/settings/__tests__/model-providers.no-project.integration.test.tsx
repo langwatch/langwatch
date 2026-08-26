@@ -161,7 +161,7 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
 
 // Menu content renders inline so a pick is one click away. Anything the
 // page decides not to mount therefore stays genuinely absent from the DOM.
-vi.mock("~/components/ui/menu", () => ({
+vi.mock("@langwatch/design-system/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Trigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -201,7 +201,7 @@ vi.mock("~/components/ui/dialog", () => ({
   },
 }));
 
-vi.mock("~/components/ui/tooltip", () => ({
+vi.mock("@langwatch/design-system/tooltip", () => ({
   Tooltip: ({
     children,
     content,

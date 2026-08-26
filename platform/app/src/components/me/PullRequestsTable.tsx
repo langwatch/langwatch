@@ -24,10 +24,10 @@ import {
 } from "~/components/PeriodSelector";
 import { ListTable } from "~/components/ui/ListTable";
 import { Link } from "~/components/ui/link";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { Pagination } from "~/components/ui/Pagination";
-import { SearchInput } from "~/components/ui/SearchInput";
-import { Tooltip } from "~/components/ui/tooltip";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
 import { formatCost, formatTokens } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";

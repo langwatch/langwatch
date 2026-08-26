@@ -27,7 +27,7 @@ import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { ContactSalesBlock } from "~/components/subscription/ContactSalesBlock";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { WebhookDeliveriesDrawer } from "~/components/webhooks/WebhookDeliveriesDrawer";
 import { WebhookDestinationCell } from "~/components/webhooks/WebhookDestinationCell";
 import { WebhookEndpointDrawer } from "~/components/webhooks/WebhookEndpointDrawer";

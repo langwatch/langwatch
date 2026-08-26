@@ -3,7 +3,7 @@ import { forwardRef, useState } from "react";
 import { LuMessageSquare } from "react-icons/lu";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
-import { Popover } from "~/components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceAnchor } from "../../../hooks/useAnchoredAnnotations";

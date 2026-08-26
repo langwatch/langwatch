@@ -4,9 +4,9 @@ import {
   SuggestBody,
   type PopoverAnnotationFormInput,
 } from "@langwatch/annotation-web";
-import { Popover } from "~/components/ui/popover";
-import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Popover } from "@langwatch/design-system/popover";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { usePopoverAnnotationForm } from "./useAnnotationForm";
 
 interface AnnotationPopoverProps extends PopoverAnnotationFormInput {

@@ -27,10 +27,10 @@ import {
   MenuContextTrigger,
   MenuItem,
   MenuRoot,
-} from "~/components/ui/menu";
-import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
+} from "@langwatch/design-system/menu";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";

@@ -2,7 +2,7 @@ import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { displayValue, serializeValue } from "@langwatch/design-system/json-value-text";
 

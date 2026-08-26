@@ -56,8 +56,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangyConversationListItemDto } from "../data/langy.dtos";
 import { useLangyConversationListQuery } from "../data/useLangyConversationListQuery";
 import { formatLangyConversationDate } from "@langwatch/langy-web";

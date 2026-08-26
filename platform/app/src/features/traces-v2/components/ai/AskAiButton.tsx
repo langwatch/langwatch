@@ -4,15 +4,15 @@ import { MeshGradient } from "@paper-design/shaders-react";
 import { Sparkles, Zap } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
-import { useColorModeValue } from "~/components/ui/color-mode";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import {
   PopoverArrow,
   PopoverBody,
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
+} from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import NextLink from "~/utils/compat/next-link";
 import { aiBrandPalette, aiBrandPaletteHot } from "./aiBrandPalette";

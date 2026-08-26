@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-re
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { MenuLink } from "~/components/MenuLink";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

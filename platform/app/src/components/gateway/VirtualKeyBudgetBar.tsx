@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { MeterBar } from "~/components/ui/MeterBar";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { formatBudgetUsd } from "./formatBudgetUsd";
 

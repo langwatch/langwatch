@@ -33,7 +33,7 @@ import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { useNow } from "~/hooks/useNow";
 import type {

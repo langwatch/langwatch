@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { RuntimeParametersField } from "~/prompts/forms/fields/RuntimeParametersField";

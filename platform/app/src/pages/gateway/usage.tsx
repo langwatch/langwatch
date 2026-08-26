@@ -35,7 +35,7 @@ import {
 } from "~/components/gateway/tracesHrefForKey";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
-import { Tooltip as UITooltip } from "~/components/ui/tooltip";
+import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRollingWindow } from "~/hooks/useRollingWindow";

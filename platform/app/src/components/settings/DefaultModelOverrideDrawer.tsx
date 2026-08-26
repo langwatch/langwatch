@@ -30,7 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { modelSelectorOptions } from "~/components/ModelSelector";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { syncLangyAfterDefaultModelWrite } from "~/features/langy/logic/codingDefaultSync";
 import { useDrawer } from "~/hooks/useDrawer";

@@ -2,8 +2,8 @@ import { Box, Button, Field, HStack, Text, Textarea, VStack } from "@chakra-ui/r
 import { Upload, X } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { Link } from "~/components/ui/link";
-import { Radio, RadioGroup } from "~/components/ui/radio";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import {
   CONTACT_SALES_URL,

@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Icon, Input, Text } from "@chakra-ui/react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuEye, LuLock, LuPin, LuPinOff } from "react-icons/lu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";

@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { ExternalLink } from "react-feather";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * Links the studio evaluations panel across to the full experiment

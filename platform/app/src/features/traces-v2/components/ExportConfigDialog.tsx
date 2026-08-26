@@ -2,7 +2,7 @@ import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Download } from "lucide-react";
 import { useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
-import { Radio, RadioGroup } from "~/components/ui/radio";
+import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import type { ExportFormat, ExportMode } from "~/server/export/types";
 
 interface ExportConfigDialogProps {

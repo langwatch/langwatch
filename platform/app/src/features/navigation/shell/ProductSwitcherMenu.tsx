@@ -1,7 +1,7 @@
 import type { ButtonProps } from "@chakra-ui/react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { Menu } from "~/components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { useRouter } from "~/utils/compat/next-router";
 import { trackEvent } from "~/utils/tracking";
 import {

@@ -4,7 +4,7 @@ import { useCallback, useMemo } from "react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
-import { Switch } from "~/components/ui/switch";
+import { Switch } from "@langwatch/design-system/switch";
 import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { LiquidConditionEditor, useWorkflowStore } from "@langwatch/workflow-web";

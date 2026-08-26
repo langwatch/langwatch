@@ -5,7 +5,7 @@ import { BarChart2, Bell } from "lucide-react";
 import { useMemo } from "react";
 import { deriveSeriesIdentifier } from "@langwatch/automation-contract";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";

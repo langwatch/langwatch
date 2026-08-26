@@ -155,7 +155,7 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
 }));
 
 // Menu content renders inline so picking a provider is one click away.
-vi.mock("~/components/ui/menu", () => ({
+vi.mock("@langwatch/design-system/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Trigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -192,7 +192,7 @@ vi.mock("~/components/ui/dialog", () => ({
   },
 }));
 
-vi.mock("~/components/ui/tooltip", () => ({
+vi.mock("@langwatch/design-system/tooltip", () => ({
   Tooltip: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 

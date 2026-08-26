@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";

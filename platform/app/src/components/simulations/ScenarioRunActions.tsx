@@ -7,8 +7,8 @@ import {
   MoreVertical,
   Play,
 } from "lucide-react";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface ScenarioRunActionsProps {
   /** The scenario data, or null/undefined if not found. */

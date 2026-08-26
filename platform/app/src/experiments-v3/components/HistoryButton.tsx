@@ -11,7 +11,7 @@
 import { Button } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

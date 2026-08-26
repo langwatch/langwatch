@@ -13,7 +13,7 @@ import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web";
 import { Square } from "lucide-react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
