@@ -8,15 +8,12 @@
  *  - **The per-method payloads** ({@link lwqlQuerySchema} and the result
  *    schemas) — what one method's `params` and `result` mean.
  *
- * The payload schemas are lifted verbatim from the routes they supersede
- * (`api/analytics-sql/[[...route]]/app.v1.ts`), and deliberately so: the two
- * families answer with the same payloads while both are mounted, and a
- * consumer migrating from one to the other must not have to diff two
- * hand-maintained copies to find out. The comments came with them, because
- * each one records a contract decision rather than describing the code.
- *
- * When `analytics-sql` is removed (issue #7565), that file's copies go with
- * it and this module is the survivor.
+ * The payload schemas were lifted verbatim from the routes this door
+ * superseded (`api/analytics-sql/[[...route]]/app.v1.ts`, removed by issue
+ * #7565), and deliberately so: this module is what a consumer migrating from
+ * the old REST endpoints should find unchanged in shape, so the comments came
+ * with them — each one records a contract decision rather than describing the
+ * code.
  *
  * @see ~/server/analytics/lwql — the service that owns the runtime types
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900

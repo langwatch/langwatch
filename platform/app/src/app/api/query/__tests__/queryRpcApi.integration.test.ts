@@ -3,11 +3,11 @@
  *
  * The service, the executor and the tenant-isolation row policy are already
  * exhaustively proved — at the executor level by the proof suite, and through
- * an HTTP door by `analytics-sql/__tests__/lwqlRestApi.integration.test.ts`,
- * which drives the surface this family supersedes end to end: auth, RBAC,
- * validator, gated columns, diagnostics, truncation, credential leakage, all
- * of it. Repeating that coverage here would test the same service twice and
- * miss the point of a second suite.
+ * this same HTTP door by `./queryRpcServiceProofs.integration.test.ts`, which
+ * drives the surface end to end: auth, RBAC, validator, gated columns,
+ * diagnostics, truncation, credential leakage, all of it. Repeating that
+ * coverage here would test the same service twice and miss the point of a
+ * second suite.
  *
  * What is actually new is the door, and it changes two things that matter:
  *
@@ -38,7 +38,7 @@
  *
  * @see specs/analytics/lwql-api.feature
  * @see ./queryRpc.unit.test.ts — the envelope proved without a database
- * @see src/app/api/analytics-sql/__tests__/lwqlRestApi.integration.test.ts — the service/isolation proof this suite does not repeat
+ * @see ./queryRpcServiceProofs.integration.test.ts — the service/isolation proof this suite does not repeat
  * @see ~/server/analytics/lwql — the service under test
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
@@ -233,11 +233,12 @@ describe("given the /api/v1/query JSON-RPC family", () => {
   };
 
   beforeAll(async () => {
-    // The suite this family supersedes runs with this switch on via the same
-    // env override; set here for parity even though this door's routes call
-    // no flag gate of their own (the gate lives in analytics-sql's route
-    // guards, not in the shared service) — so a future route-level gate
-    // added to this family would find the suite already running with it on.
+    // The REST routes that used to gate on this switch were removed by issue
+    // #7565 along with the door they guarded; this family's routes call no
+    // flag gate of their own. `RELEASE_LWQL_WORKBENCH` now controls only the
+    // internal workbench UI, not any API path — set here purely for parity
+    // with the sibling suite, so a future route-level gate added to this
+    // family would find the suite already running with it on.
     process.env.RELEASE_LWQL_WORKBENCH = "1";
 
     postgres = await startLangWatchQLPostgres();

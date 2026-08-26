@@ -115,8 +115,8 @@ export function createApiRouter() {
 
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
-  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL (superseded by queryApp)
-  api.route("/", queryApp); // /api/v1/query — LWQL query domain, JSON-RPC (replaces the analytics-sql routes above)
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/charts/* — saved workbench charts only; the raw-LWQL routes this app used to serve were removed (issue #7565)
+  api.route("/", queryApp); // /api/v1/query — LWQL query domain, JSON-RPC; the only HTTP door for raw LangWatchQL
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
   api.route("/", dashboardsApp);

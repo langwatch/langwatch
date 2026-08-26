@@ -6,7 +6,8 @@
  *  - `POST /api/v1/query` — methods `query.run` and `query.schema`
  *
  * This supersedes `/api/v1/projects/{projectId}/analytics/query/clickhouse`
- * and its sibling `.../analytics/schema` (issue #7565). Three things move:
+ * and its sibling `.../analytics/schema` — both removed (issue #7565), so this
+ * is now the only HTTP door for raw LangWatchQL. Three things moved:
  *
  *  1. **The engine leaves the URL.** `/clickhouse` named the storage engine on
  *     a public path while Postgres-backed views already routed through the same
