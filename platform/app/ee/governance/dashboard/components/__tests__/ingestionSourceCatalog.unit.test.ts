@@ -79,34 +79,23 @@ describe("given the ingestion-source catalog", () => {
     });
   });
 
-  describe("when a source type has been retired", () => {
-    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
-    it("keeps the retired OpenAI source in the list", () => {
-      const options = gatedSourceTypeOptions({ isEnterprise: true });
-
-      expect(options.map((o) => o.value)).toContain("openai_compliance");
+  describe("when the old OpenAI compliance source has been retired", () => {
+    /** @scenario "The old OpenAI source can no longer be chosen" */
+    it("is not offered on any plan", () => {
+      for (const isEnterprise of [true, false]) {
+        const offered = gatedSourceTypeOptions({ isEnterprise }).map(
+          (o) => o.value,
+        );
+        expect(offered).not.toContain("openai_compliance");
+      }
     });
 
-    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
-    it("marks it retired and refuses to let it be picked", () => {
-      const options = gatedSourceTypeOptions({ isEnterprise: true });
-      const retired = options.find((o) => o.value === "openai_compliance");
-
-      expect(retired?.deprecated).toBe(true);
-      // An enterprise plan locks nothing, so the plan gate alone would leave
-      // this selectable — being retired is a separate reason to be inert.
-      expect(retired?.locked).toBe(false);
-      expect(isSourceTypeSelectable(retired!)).toBe(false);
-    });
-
-    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
-    it("leaves every other type selectable on an enterprise plan", () => {
-      const options = gatedSourceTypeOptions({ isEnterprise: true });
-      const unselectable = options
-        .filter((o) => !isSourceTypeSelectable(o))
-        .map((o) => o.value);
-
-      expect(unselectable).toEqual(["openai_compliance"]);
+    /** @scenario "Sources already configured on the old type still display" */
+    it("still resolves a label for sources already configured on it", () => {
+      expect(SOURCE_TYPE_LABEL.openai_compliance).toBeTruthy();
+      expect(
+        SOURCE_TYPE_OPTIONS.some((o) => o.value === "openai_compliance"),
+      ).toBe(true);
     });
 
     /** @scenario "The old OpenAI source is still listed and cannot be chosen" */

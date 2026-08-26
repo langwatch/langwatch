@@ -188,6 +188,7 @@ export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
   "http_custom",
   "databricks_genie",
   "copilot_studio_dataverse",
+  "openai_admin",
   "anthropic_admin",
 ] as const;
 
