@@ -880,16 +880,38 @@ restart_counts() {
     -o jsonpath='{range .items[*]}{.metadata.name}={.status.containerStatuses[0].restartCount}{"\n"}{end}' | sort
 }
 
+# restartCount alone CANNOT detect a StatefulSet re-roll, which is exactly what
+# AC26 forbids: a re-rolled pod is a brand new pod whose counter starts at 0, so
+# a full second rolling restart leaves before and after identical at 0=0 and the
+# assertion passes vacuously. The plan names restartCount so it stays and is
+# still asserted; pod UID + creationTimestamp is the detector that actually
+# closes AC26. This strengthens the AC, it does not relax it.
+pod_identities() {
+  kc get pods -l "app.kubernetes.io/name=${FULLNAME}" \
+    -o jsonpath='{range .items[*]}{.metadata.name}={.metadata.uid}@{.metadata.creationTimestamp}{"\n"}{end}' | sort
+}
+
 ac26_idempotency() {
   ac "AC26" "replicated idempotency — a second identical upgrade is a no-op"
   measure "restart counts before the second upgrade" restart_counts
   local restarts_before="$MEASURED"
+  measure "pod identities (uid@created) before the second upgrade" pod_identities
+  local identities_before="$MEASURED"
 
   upgrade_to_tag "$NEW_TAG" || ac_fail "the second, identical helm upgrade FAILED"
   wait_topology_ready
 
   measure "restart counts after the second upgrade" restart_counts
   local restarts_after="$MEASURED"
+  measure "pod identities (uid@created) after the second upgrade" pod_identities
+  local identities_after="$MEASURED"
+  if [[ "$identities_after" != "$identities_before" ]]; then
+    ac_fail "the second identical upgrade REPLACED pods — the StatefulSet re-rolled. before:
+${identities_before}
+after:
+${identities_after}
+Pod UIDs changed, so restartCount would have read 0=0 and passed vacuously. Every upgrade is two rolling restarts."
+  fi
   if [[ "$restarts_after" != "$restarts_before" ]]; then
     ac_fail "the second identical upgrade re-rolled the StatefulSet. before:
 ${restarts_before}
@@ -897,7 +919,7 @@ after:
 ${restarts_after}
 That is a FAIL, not a cosmetic difference: it means every upgrade is two rolling restarts."
   fi
-  pass "AC26 no pod restarts beyond the first pass"
+  pass "AC26 no pod restarts and no pod replacement beyond the first pass"
 
   capture_entities "${RUN_DIR}/post-second" "post-second-upgrade@${NEW_TAG}"
   local pod cls
