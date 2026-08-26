@@ -75,10 +75,14 @@ function attributesOf(request: unknown) {
 describe("given a source mapping its own conversations", () => {
   describe("when the batch carries the events its own profile recognises", () => {
     it("routes the events its own profile recognises", () => {
-      const request = mapGenieEventsToTraceRequest(
-        [conversationEvent("copilot_conversation")],
-        { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
-      );
+      const request = mapGenieEventsToTraceRequest({
+        events: [conversationEvent("copilot_conversation")],
+        origin: {
+          ...ORIGIN,
+          sourceType: "copilot_studio",
+          profile: OTHER_PROFILE,
+        },
+      });
 
       expect(request).not.toBeNull();
       expect((request as any).resourceSpans[0].scopeSpans[0].scope.name).toBe(
@@ -87,10 +91,14 @@ describe("given a source mapping its own conversations", () => {
     });
 
     it("emits spans a second source's batch can actually be ingested from", () => {
-      const request = mapGenieEventsToTraceRequest(
-        [conversationEvent("copilot_conversation")],
-        { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
-      );
+      const request = mapGenieEventsToTraceRequest({
+        events: [conversationEvent("copilot_conversation")],
+        origin: {
+          ...ORIGIN,
+          sourceType: "copilot_studio",
+          profile: OTHER_PROFILE,
+        },
+      });
 
       // The same gate Genie's own mapping is held to. Without it the assertions
       // below could pass on a span the trace pipeline would reject on arrival.
@@ -103,10 +111,14 @@ describe("given a source mapping its own conversations", () => {
 
     /** @scenario "The conversation shape travels with the source, not with Genie" */
     it("names its own agent and provenance rather than inheriting Genie's", () => {
-      const request = mapGenieEventsToTraceRequest(
-        [conversationEvent("copilot_conversation")],
-        { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
-      );
+      const request = mapGenieEventsToTraceRequest({
+        events: [conversationEvent("copilot_conversation")],
+        origin: {
+          ...ORIGIN,
+          sourceType: "copilot_studio",
+          profile: OTHER_PROFILE,
+        },
+      });
 
       const attrs = attributesOf(request);
       expect(attrs["gen_ai.request.model"]).toBe("microsoft/copilot-studio");
@@ -117,14 +129,14 @@ describe("given a source mapping its own conversations", () => {
   describe("when the batch carries a Genie question instead", () => {
     /** @scenario "The conversation shape travels with the source, not with Genie" */
     it("leaves another source's events alone", () => {
-      const request = mapGenieEventsToTraceRequest(
-        [conversationEvent("genie_query")],
-        {
+      const request = mapGenieEventsToTraceRequest({
+        events: [conversationEvent("genie_query")],
+        origin: {
           ...ORIGIN,
           sourceType: "copilot_studio",
           profile: OTHER_PROFILE,
         },
-      );
+      });
 
       expect(request).toBeNull();
     });
@@ -134,10 +146,10 @@ describe("given a source mapping its own conversations", () => {
 describe("given Genie's own profile", () => {
   describe("when a question is mapped", () => {
     it("produces exactly what it produced before profiles existed", () => {
-      const request = mapGenieEventsToTraceRequest(
-        [conversationEvent("genie_query")],
-        ORIGIN,
-      );
+      const request = mapGenieEventsToTraceRequest({
+        events: [conversationEvent("genie_query")],
+        origin: ORIGIN,
+      });
 
       const scopeSpan = (request as any).resourceSpans[0].scopeSpans[0];
       expect(scopeSpan.scope.name).toBe("langwatch.ingestion.databricks_genie");
@@ -151,15 +163,15 @@ describe("given Genie's own profile", () => {
   describe("when the event names the author's directory id", () => {
     it("still carries the author through for the identity stack to resolve", () => {
       const event = conversationEvent("genie_query");
-      const request = mapGenieEventsToTraceRequest(
-        [
+      const request = mapGenieEventsToTraceRequest({
+        events: [
           {
             ...event,
             extra: { ...event.extra, actorUserId: "entra-object-id" },
           },
         ],
-        ORIGIN,
-      );
+        origin: ORIGIN,
+      });
 
       expect(attributesOf(request)["langwatch.user.id"]).toBe(
         "entra-object-id",

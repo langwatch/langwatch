@@ -127,7 +127,10 @@ function attrsOf(span: { attributes?: { key: string; value: unknown }[] }) {
 }
 
 function spansOf(events: NormalizedPullEvent[]) {
-  const request = mapGenieEventsToTraceRequest(events, ORIGIN);
+  const request = mapGenieEventsToTraceRequest({
+    events: events,
+    origin: ORIGIN,
+  });
   return request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
 }
 
@@ -328,7 +331,9 @@ describe("given events that are not conversations", () => {
       ...genieEvent(completedMessage()),
       action: "usage_bucket",
     };
-    expect(mapGenieEventsToTraceRequest([aggregate], ORIGIN)).toBeNull();
+    expect(
+      mapGenieEventsToTraceRequest({ events: [aggregate], origin: ORIGIN }),
+    ).toBeNull();
   });
 });
 
@@ -338,14 +343,19 @@ describe("given a message a sweep caught mid-answer", () => {
       const inFlight = genieEvent(
         completedMessage({ status: "ASKING_AI", attachments: [] }),
       );
-      expect(mapGenieEventsToTraceRequest([inFlight], ORIGIN)).toBeNull();
+      expect(
+        mapGenieEventsToTraceRequest({ events: [inFlight], origin: ORIGIN }),
+      ).toBeNull();
     });
   });
 
   describe("when the re-read finds the status settled", () => {
     it("routes the message", () => {
       const settled = genieEvent(completedMessage());
-      const request = mapGenieEventsToTraceRequest([settled], ORIGIN);
+      const request = mapGenieEventsToTraceRequest({
+        events: [settled],
+        origin: ORIGIN,
+      });
       expect(request).not.toBeNull();
     });
   });
@@ -355,7 +365,9 @@ describe("given a message a sweep caught mid-answer", () => {
       const unknown = genieEvent(
         completedMessage({ status: "SOMETHING_NEW", attachments: [] }),
       );
-      expect(mapGenieEventsToTraceRequest([unknown], ORIGIN)).toBeNull();
+      expect(
+        mapGenieEventsToTraceRequest({ events: [unknown], origin: ORIGIN }),
+      ).toBeNull();
     });
   });
 
@@ -364,7 +376,10 @@ describe("given a message a sweep caught mid-answer", () => {
       const statusless = genieEvent(
         completedMessage({ status: undefined, attachments: [] }),
       );
-      const request = mapGenieEventsToTraceRequest([statusless], ORIGIN);
+      const request = mapGenieEventsToTraceRequest({
+        events: [statusless],
+        origin: ORIGIN,
+      });
       expect(request).not.toBeNull();
     });
   });
@@ -378,7 +393,10 @@ describe("given two ingestion sources routing into one destination project", () 
   const message = completedMessage();
 
   function rootOf(origin: typeof ORIGIN) {
-    const request = mapGenieEventsToTraceRequest([genieEvent(message)], origin);
+    const request = mapGenieEventsToTraceRequest({
+      events: [genieEvent(message)],
+      origin: origin,
+    });
     const spans = request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
     return spans.find((s) => s.name === GENIE_MESSAGE_SPAN_NAME)!;
   }

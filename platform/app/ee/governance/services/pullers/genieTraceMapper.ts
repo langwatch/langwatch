@@ -285,10 +285,13 @@ function extraString(
  * Without this line an Anthropic Admin source that acquired a destination
  * would have its billing rows rendered as messages someone said.
  */
-export function mapGenieEventsToTraceRequest(
-  events: NormalizedPullEvent[],
-  origin: GenieRoutingOrigin,
-): IExportTraceServiceRequest | null {
+export function mapGenieEventsToTraceRequest({
+  events,
+  origin,
+}: {
+  events: NormalizedPullEvent[];
+  origin: GenieRoutingOrigin;
+}): IExportTraceServiceRequest | null {
   // `action` is typed as a string but arrives from a puller's own mapping, so
   // an event that never set one reads as undefined at runtime. Requiring a
   // non-empty action on both sides keeps two absences from matching each

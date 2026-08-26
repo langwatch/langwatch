@@ -411,11 +411,14 @@ export async function routeConversationsToTraceDestination({
   const profile = CONVERSATION_ROUTING_PROFILES.get(source.sourceType);
   if (!profile) return;
 
-  const request = mapGenieEventsToTraceRequest(events, {
-    ingestionSourceId: source.id,
-    organizationId: source.organizationId,
-    sourceType: source.sourceType,
-    profile,
+  const request = mapGenieEventsToTraceRequest({
+    events,
+    origin: {
+      ingestionSourceId: source.id,
+      organizationId: source.organizationId,
+      sourceType: source.sourceType,
+      profile,
+    },
   });
   if (!request) return;
 
