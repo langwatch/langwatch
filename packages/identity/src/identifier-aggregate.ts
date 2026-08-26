@@ -181,7 +181,11 @@ function foldAttached({
   };
 }
 
-/** ATTACHED becomes VERIFIED, and the verification time is stamped once. */
+/**
+ * Idempotent by construction, because a redelivered verify is normal: the
+ * verification time keeps its FIRST value, and a head already standing PRIMARY
+ * does not fall back down a step to VERIFIED.
+ */
 function foldVerified({
   identifierId,
   head,
@@ -201,7 +205,11 @@ function foldVerified({
   };
 }
 
-/** Only an ATTACHED head dead-ends; anything further along is left alone. */
+/**
+ * A dead end reports on a verification that never landed, so a head that has
+ * since verified, taken PRIMARY or been detached has outrun the fact. Such a
+ * fact is stale rather than wrong, which is why it is dropped and not refused.
+ */
 function foldDeadEnded({
   identifierId,
   head,
@@ -244,7 +252,10 @@ function foldPrimaryChanged({
   return { ...head, state: "VERIFIED" };
 }
 
-/** The tombstone, stamped once. */
+/**
+ * `detachedAtMs` records the first detach and is never re-dated, so a replay
+ * that redelivers the fact cannot move a tombstone other reads already quote.
+ */
 function foldDetached({
   identifierId,
   head,
