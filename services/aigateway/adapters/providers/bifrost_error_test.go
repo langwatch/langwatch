@@ -16,11 +16,11 @@ import (
 
 func bfPtr[T any](v T) *T { return &v }
 
-// The five failures production actually produced, taken verbatim from a week
-// of gateway logs. Every one of them was reported to the client as HTTP 504
-// "Gateway Timeout", attributed to the provider, retried across the whole
-// credential chain and counted as a circuit-breaker failure — and not one of
-// them was a timeout or fixable by a retry. This test is the incident.
+// The messages behind all 23 production provider_timeout events in the 7 days
+// before this change, taken verbatim from the gateway's own logs. Each was
+// answered 504, attributed to the provider, retried across the credential
+// chain, and counted as a circuit-breaker failure. None is a timeout, and each
+// repeats identically on retry.
 // @scenario "An engine failure that never reached a provider is terminal, not a timeout"
 func TestClassifyBifrostError_ProductionFailuresAreNotTimeouts(t *testing.T) {
 	cases := []struct {

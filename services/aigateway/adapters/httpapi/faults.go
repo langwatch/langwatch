@@ -153,7 +153,7 @@ func logRequestError(logger *zap.Logger, ctx context.Context, failure requestErr
 // Bifrost splits a failure into a category ("error creating auth token source")
 // and a wrapped cause ("failed to parse auth credentials JSON: ..."), the
 // gateway carried only the category, and the category is the same string for
-// five different credential problems with five different fixes.
+// six different credential problems with different fixes.
 //
 // Capped and never quoted from a request body — a reason here is authored by
 // the engine or a provider SDK, not echoed from customer input.

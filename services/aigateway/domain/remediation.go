@@ -15,11 +15,9 @@ import (
 // place to audit the customer-facing copy, and a docs path CI can verify
 // actually exists under `docs/` (remediation_test.go).
 //
-// Why it matters more here than anywhere else in the platform: an error from
-// the gateway is usually read by an agent or an SDK, not by a person looking at
-// our UI, and often by someone who cannot see our settings screens at all. The
-// tips ARE the interface. A gateway error that says only "the credentials were
-// not accepted" leaves the reader to guess between five different fixes.
+// Gateway errors are read over the wire by SDKs and agents, which have no
+// access to the settings screens the fix lives on, so the tips are the only
+// channel carrying it.
 //
 // Dynamic detail (which model, which provider) does NOT belong here — the
 // classifier composes it into `meta`, and Remediate leaves `meta` alone.
@@ -51,10 +49,10 @@ var providerDocsPath = map[string]string{
 	"anthropic": "/ai-gateway/providers/anthropic",
 }
 
-// providerCredentialTips names what a given provider's credential actually is,
-// because "check your credentials" means something different for each of them:
-// a service-account document, an IAM role, an API key. Naming the artifact is
-// the difference between a tip and a shrug.
+// providerCredentialTips names the credential artifact per provider, since it
+// differs: a service-account JSON document (Vertex), an access key and secret
+// (Bedrock), a key plus a resource endpoint (Azure), a project-scoped API key
+// (Gemini). Providers absent here fall back to the code's generic tips.
 var providerCredentialTips = map[string][]string{
 	"vertex": {
 		"Vertex AI authenticates with a Google Cloud service-account JSON document, not an API key — paste the whole file contents into the provider's credentials field",
@@ -160,19 +158,14 @@ func Remediate(e herr.E) herr.E {
 }
 
 // maxTips mirrors MAX_TIPS in
-// platform/app/src/features/errors/logic/readHandledError.ts, where the client
-// truncates the list on arrival ("more than this is a document, not
-// remediation"). Truncating HERE instead of sending more and letting the client
-// drop the tail is what keeps the choice of which advice survives with the
-// person who wrote it: the client cuts from the end, so an over-long list loses
-// whatever happened to be last rather than whatever mattered least.
+// platform/app/src/features/errors/logic/readHandledError.ts, where safeTips
+// slices the array on arrival. The client cuts from the end, so a longer list
+// loses its tail regardless; truncating here means the ordering below decides
+// what survives.
 const maxTips = 4
 
-// tipsFor puts the provider-specific advice first, then fills the remaining
-// room with the generic advice. "Check your credentials" is the same sentence
-// for every provider and tells the reader nothing; "paste the whole
-// service-account JSON document" tells them what to go and do, so it is the
-// advice that must survive the cap.
+// tipsFor emits the provider-specific advice first so the cap keeps it, then
+// fills the remaining room from the code's generic tips.
 func tipsFor(entry remediation, code herr.Code, provider string) []string {
 	if code != ErrProviderCredentialInvalid && code != ErrProviderCredentialRejected {
 		return capTips(entry.tips)
@@ -194,9 +187,9 @@ func capTips(tips []string) []string {
 	return tips[:maxTips]
 }
 
-// docsFor prefers the provider's own setup page over the generic index — a
-// Vertex credential failure should land on the Vertex page, not on a list of
-// every provider we support.
+// docsFor resolves the provider's own setup page for the three codes whose fix
+// is provider-specific, falling back to the code's own docsPath. A provider
+// absent from providerDocsPath also falls back.
 func docsFor(entry remediation, code herr.Code, provider string) string {
 	if code == ErrProviderCredentialInvalid || code == ErrProviderCredentialRejected ||
 		code == ErrProviderConfigInvalid {
@@ -210,9 +203,9 @@ func docsFor(entry remediation, code herr.Code, provider string) string {
 	return docsBase + entry.docsPath
 }
 
-// RemediationDocsPaths returns every docs path the registry can emit, for the
-// test that checks each one exists in the repo. A link to a page nobody wrote
-// is worse than no link: it reads as an answer and ends on a 404.
+// RemediationDocsPaths returns every docs path the registry can emit, so
+// remediation_test.go can check each resolves to a file under docs/. Paths are
+// stored unresolved for exactly this reason; docsFor prepends docsBase.
 func RemediationDocsPaths() []string {
 	seen := map[string]bool{}
 	var paths []string

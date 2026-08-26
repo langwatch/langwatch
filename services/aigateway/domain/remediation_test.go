@@ -12,8 +12,8 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 )
 
-// A link to a page nobody wrote is worse than no link: it reads as an answer
-// and ends on a 404, at the moment the reader is already stuck.
+// Every path the registry can emit must resolve to a file under docs/, since
+// nothing else checks them and a wrong one 404s only for the customer.
 // @scenario "A terminal provider failure tells the caller how to fix it"
 func TestRemediationDocsPathsAllExist(t *testing.T) {
 	root := repoRoot(t)

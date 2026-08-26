@@ -192,7 +192,7 @@ func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 // only one of the two can be both actionable and safe to show a customer.
 // Bifrost splits a failure into a category ("error creating auth token
 // source") and a wrapped cause, the gateway carried only the category, and the
-// category is one string for five credential problems with five different
+// category is one string for six credential problems with different
 // fixes — which is what made a production Vertex failure undiagnosable from
 // the logs.
 func TestWriteErrorLogsTheUnderlyingCauseOfAHandledError(t *testing.T) {

@@ -15,39 +15,36 @@ import (
 
 // --- Error classification ---
 //
-// Bifrost hands back one type for every failure, *bfschemas.BifrostError, and
-// the whole job here is telling apart the four things it can mean. Bifrost
-// says which through three fields, and reading them is the difference between
-// a useful answer and a lie:
+// Bifrost returns one type for every failure, *bfschemas.BifrostError. What it
+// means is carried in four fields (bifrost/core@v1.4.22):
 //
-//	IsBifrostError  false ⇒ the PROVIDER produced this. Every provider-answered
-//	                error goes through HandleProviderAPIError / NewProviderAPIError,
-//	                which always set a StatusCode. true ⇒ Bifrost produced it
-//	                itself and no provider response exists to forward.
-//	StatusCode      the provider's real HTTP status when one was received.
-//	                Bifrost also synthesizes two of its own: 504 with
-//	                Error.Type=request_timed_out for a genuine timeout, and 499
-//	                with RequestCancelled when the caller went away.
-//	Error.Error     the wrapped Go error that says WHY. Bifrost's own message
-//	                is a category ("error creating auth token source"); the
-//	                cause underneath is the sentence an operator needs
-//	                ("failed to parse auth credentials JSON: ...").
+//	StatusCode      the provider's HTTP status when a response was received.
+//	                Bifrost synthesizes exactly two of its own: 504 paired with
+//	                Error.Type=request_timed_out, and 499 paired with
+//	                RequestCancelled. No other status is synthesized.
+//	Error.Type      set for those two, and for the provider taxonomy
+//	                (authentication_error, authorization_error, rate_limit_error,
+//	                invalid_request_error, api_error, network_error).
+//	Error.Message   a category string, often one of the exported constants in
+//	                schemas/provider.go. "error creating auth token source" is
+//	                the same message for all six error returns of
+//	                providers/vertex/vertex.go#getAuthTokenSource.
+//	Error.Error     the wrapped Go error naming which of them it was, e.g.
+//	                "failed to parse auth credentials JSON: ...". Nothing in
+//	                this service read it before this file existed.
 //
-// The rule that follows: forward as an upstream response only what a provider
-// actually answered — a real status that Bifrost did not synthesize itself —
-// and classify everything else on Bifrost's own signals. IsBifrostError is a
-// useful hint but not the discriminant; bfIsProviderAnswer says why.
+// IsBifrostError is NOT a reliable "did a provider answer" flag: bedrock.go:300
+// sets it true on a real provider response whose error body failed to
+// unmarshal, keeping the provider's status and raw body. bfIsProviderAnswer
+// uses the synthesized-status pair instead.
 //
-// This replaced a classifier that mapped status 0 to provider_timeout. Nothing
-// Bifrost reports with status 0 is a timeout — a real timeout always carries
-// 504 and request_timed_out — so every credential, configuration and routing
-// failure in the engine was reported to clients as a 504 "Gateway Timeout",
-// attributed to the provider, retried through the fallback chain, and fed to
-// the circuit breaker. Over one week in production all 23 of them were
-// misclassified: "no keys found that support model", "deployments not set",
-// "chat_completion is not supported by elevenlabs provider" and "failed to
-// retrieve aws credentials". Not one was a timeout, and none of the four is
-// something a retry can fix.
+// The classifier this replaced mapped status 0 to provider_timeout. A timeout
+// always carries 504 + request_timed_out, so status 0 is never one. Over the
+// 7 days before this change, all 23 production provider_timeout events were
+// misclassifications — "no keys found that support model" (11), "deployments
+// not set" (5), "chat_completion is not supported by elevenlabs provider" (4),
+// "failed to retrieve aws credentials" (3) — and 6 of the 9 matching spans in
+// that window completed in under 100ms.
 
 // errFromBifrost turns a Bifrost dispatch error into the error the gateway
 // surfaces to the client.
@@ -102,21 +99,20 @@ func bfApplyFallbackVerdict(err error, berr *bfschemas.BifrostError) error {
 // bfIsProviderAnswer reports whether the error represents an HTTP response a
 // provider actually sent, and may therefore be forwarded verbatim.
 //
-// A status alone is not the test, because Bifrost synthesizes two statuses of
-// its own — 504 with request_timed_out when the deadline fires, and 499 with
-// RequestCancelled when the caller hangs up — and forwarding either as an
-// upstream answer would claim a provider replied when none did.
+// A status alone is not sufficient: Bifrost synthesizes 504/request_timed_out
+// (providers/utils/utils.go MakeRequestWithContext, NewBifrostTimeoutError) and
+// 499/RequestCancelled (same file, and core/utils.go), neither of which is a
+// provider response.
 //
-// Nor is IsBifrostError the test, tempting as it looks. Bedrock sets it TRUE on
-// a real provider response whose error body it could not unmarshal
-// (providers/bedrock/bedrock.go), while still carrying the provider's status and
-// its raw body. Reading that flag as "no provider answered" would collapse every
-// unparseable Bedrock 4xx into a generic 502 and break the forwarding guarantee
-// error-transparency.feature exists to hold — for the one provider whose error
-// bodies are least likely to parse.
+// IsBifrostError is not sufficient either. bedrock.go:300 sets it true on a
+// real provider response whose error body failed to unmarshal, keeping the
+// provider's status and raw body; treating that as "no provider answered" would
+// turn every unparseable Bedrock 4xx into a 502, contrary to
+// specs/ai-gateway/error-transparency.feature. Covered by the
+// "when the provider answered but bifrost could not parse the body" subtest.
 //
-// So the test is the pair Bifrost actually controls: a real status, from
-// something it did not synthesize itself.
+// The test used here is therefore: a status > 0 whose Error.Type is neither of
+// the two synthesized values.
 func bfIsProviderAnswer(berr *bfschemas.BifrostError) bool {
 	if bfStatus(berr) <= 0 {
 		return false
@@ -168,11 +164,12 @@ func forwardableUpstreamHeaders(in map[string]string) map[string]string {
 }
 
 // classifyBifrostError maps a Bifrost-origin failure onto the gateway's own
-// taxonomy: the code decides the client's HTTP status, whether the dispatcher
-// retries and falls over to the next credential, whose fault an operator is
-// paged for, and what the customer is told to do about it. Getting it wrong is
-// not cosmetic — provider_timeout means "retry me", and a credential that
-// cannot mint a token will fail identically on every credential in the chain.
+// taxonomy. The code it picks drives four things:
+//
+//	httpapi/router.go#registerErrorStatuses   the client's HTTP status
+//	app/dispatch.go#classifyProviderError     retry and fallback-chain behavior
+//	httpapi/faults.go#faultForCode            log level and fault attribution
+//	domain/remediation.go                     the tips and docs link
 //
 // Order matters. The explicit signals Bifrost sets (Error.Type, then its own
 // exported message constants) are read before anything is inferred from the
