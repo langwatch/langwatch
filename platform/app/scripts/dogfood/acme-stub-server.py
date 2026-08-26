@@ -85,17 +85,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/login":
-            return self._login()
-        if self.path in ("/work", "/chat"):
-            return self._work()
-        if self.path == "/_reset":
-            return self._reset()
-        self._send(404, {"error": "no such route"})
+            self._login()
+        elif self.path in ("/work", "/chat"):
+            self._work()
+        elif self.path == "/_reset":
+            self._reset()
+        else:
+            self._send(404, {"error": "no such route"})
 
     def do_GET(self):
         if self.path == "/_stats":
-            return self._stats()
-        self._send(404, {"error": "no such route"})
+            self._stats()
+        else:
+            self._send(404, {"error": "no such route"})
 
     def _login(self):
         body = self._body()
@@ -103,7 +105,8 @@ class Handler(BaseHTTPRequestHandler):
             with lock:
                 state["rejected"] += 1
                 note(f"login REFUSED for {body.get('username')!r}")
-            return self._send(401, {"error": "bad credentials"})
+            self._send(401, {"error": "bad credentials"})
+            return
 
         if LOGIN_DELAY_SECONDS:
             time.sleep(LOGIN_DELAY_SECONDS)
@@ -125,14 +128,20 @@ class Handler(BaseHTTPRequestHandler):
             if issued_at is None:
                 state["rejected"] += 1
                 note(f"work REFUSED, session not issued here: {session!r}")
-                return self._send(401, {"error": "unknown session"})
-            if time.time() - issued_at > SESSION_TTL_SECONDS:
+                refusal = "unknown session"
+            elif time.time() - issued_at > SESSION_TTL_SECONDS:
                 state["rejected"] += 1
                 note(f"work REFUSED, session expired: {session}")
-                return self._send(401, {"error": "session expired"})
-            state["works"] += 1
-            state["used"][session] = state["used"].get(session, 0) + 1
-            note(f"work #{state['works']} with {session} :: {body.get('message')!r}")
+                refusal = "session expired"
+            else:
+                refusal = None
+                state["works"] += 1
+                state["used"][session] = state["used"].get(session, 0) + 1
+                note(f"work #{state['works']} with {session} :: {body.get('message')!r}")
+
+        if refusal:
+            self._send(401, {"error": refusal})
+            return
 
         self._send(200, {"reply": f"handled {body.get('message')!r} as {USERNAME}"})
 
