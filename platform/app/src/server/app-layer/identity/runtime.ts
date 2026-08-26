@@ -168,6 +168,13 @@ import {
 } from "./write-gate";
 
 /**
+ * The connection-id predicate, re-stated for the same reason: it composes
+ * nothing, but it lives in `@langwatch/identity-server`, and that package is
+ * one of the two the boundary test says better-auth may reach only through
+ * here.
+ */
+export { looksLikeSsoConnectionId } from "@langwatch/identity-server";
+/**
  * The method-set policy, re-stated on the runtime because the runtime is the
  * app's ONE door into app-layer identity (ADR-115) — and better-auth is the
  * caller the boundary test names. It composes nothing: these are policy

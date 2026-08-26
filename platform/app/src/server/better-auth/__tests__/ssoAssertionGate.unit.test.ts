@@ -4,8 +4,16 @@ import type { PrismaClient } from "~/generated/prisma/client";
 // The composition root builds a live Prisma client at module load. The seam
 // under test takes its client as an argument, so the module only has to be
 // importable.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
+vi.mock("~/server/app-layer/identity/runtime", async () => ({
   joinRequestsService: () => ({ requestFromSsoArrival: vi.fn() }),
+  // Re-stated by the runtime because that is better-auth's one identity
+  // door. It composes nothing, so the real one is what belongs here — a
+  // stub would decide the very thing these scenarios are about.
+  looksLikeSsoConnectionId: (
+    await vi.importActual<typeof import("@langwatch/identity-server")>(
+      "@langwatch/identity-server",
+    )
+  ).looksLikeSsoConnectionId,
 }));
 vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,

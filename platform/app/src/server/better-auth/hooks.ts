@@ -2,7 +2,6 @@ import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { normalizeDomain, type SsoArrivalPolicy } from "@langwatch/identity";
-import { looksLikeSsoConnectionId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
@@ -17,7 +16,10 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { joinRequestsService } from "~/server/app-layer/identity/runtime";
+import {
+  joinRequestsService,
+  looksLikeSsoConnectionId,
+} from "~/server/app-layer/identity/runtime";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
