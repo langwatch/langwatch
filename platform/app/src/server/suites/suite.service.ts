@@ -676,10 +676,10 @@ export class SuiteService {
 
   /**
    * Runs every non-archived scenario of the project through the managed
-   * "All test cases" suite.
+   * "All scenarios" suite.
    *
    * The suite is a per-project singleton found by {@link RUN_ALL_SUITE_LABEL}
-   * (never by name, since a person may name their own plan "All test cases"). Its
+   * (never by name, since a person may name their own plan "All scenarios"). Its
    * scenarioIds are refreshed to all active scenarios at each run, and the
    * targets chosen in the run dialog are persisted onto it so the next run
    * preselects them. It is a kind "custom" suite, so v1 lists it as an

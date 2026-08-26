@@ -1242,7 +1242,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
   /**
    * The latest run result per scenario inside the window, for the last-result
-   * cells of the test cases table.
+   * cells of the scenarios table.
    *
    * "Latest" is resolved with argMax over UpdatedAt across the scenario's
    * deduped runs, matching how every other latest-wins read in this file

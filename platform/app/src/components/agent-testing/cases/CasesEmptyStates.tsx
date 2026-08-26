@@ -14,7 +14,7 @@ export type EmptyStateActionProps = {
 };
 
 /**
- * What a project with no test case at all reads. It says what a test case is
+ * What a project with no scenario at all reads. It says what a scenario is
  * before it asks for one.
  */
 export function FirstCaseEmptyState({
@@ -27,9 +27,9 @@ export function FirstCaseEmptyState({
         <EmptyState.Indicator>
           <FlaskConical size={28} />
         </EmptyState.Indicator>
-        <EmptyState.Title>Write your first test case</EmptyState.Title>
+        <EmptyState.Title>Write your first scenario</EmptyState.Title>
         <EmptyState.Description>
-          A test case is one situation you put your agent in, with the criteria
+          A scenario is one situation you put your agent in, with the criteria
           it must meet. LangWatch plays the situation against your agent and a
           judge says whether each criterion was met.
         </EmptyState.Description>
@@ -37,7 +37,7 @@ export function FirstCaseEmptyState({
           <Box paddingTop={2}>
             <Button size="sm" colorPalette="blue" onClick={onNewTestCase}>
               <Plus size={14} />
-              New test case
+              New scenario
             </Button>
           </Box>
         )}
@@ -47,7 +47,7 @@ export function FirstCaseEmptyState({
 }
 
 /**
- * What a test suite that holds nothing yet reads. The New test case button
+ * What a test suite that holds nothing yet reads. The New scenario button
  * sits in the panel header above, so the line only says what to do.
  */
 export function NoCasesHereEmptyState() {
@@ -63,7 +63,7 @@ export function NoCasesHereEmptyState() {
       color={FG_MUTED}
       data-testid="agent-testing-empty-suite"
     >
-      Empty suite. Add a test case, or move one here from another suite.
+      Empty suite. Add a scenario, or move one here from another suite.
     </Box>
   );
 }

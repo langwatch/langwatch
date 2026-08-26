@@ -446,15 +446,15 @@ describe("<RunPlanDetail/>", () => {
     ).toBeInTheDocument();
   });
 
-  /** @scenario "The row menu of a result opens the editor of the test case" */
-  it("opens the editor of the test case from the row menu", async () => {
+  /** @scenario "The row menu of a result opens the editor of the scenario" */
+  it("opens the editor of the scenario from the row menu", async () => {
     const user = userEvent.setup();
     setRuns([makeRun({ scenarioRunId: "run_a", scenarioId: "scen_7" })]);
     renderDetail();
 
     await user.click(screen.getByRole("button", { name: /^Actions for / }));
     await user.click(
-      await screen.findByRole("menuitem", { name: "Edit test case" }),
+      await screen.findByRole("menuitem", { name: "Edit scenario" }),
     );
 
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingCaseEditor", {
@@ -462,7 +462,7 @@ describe("<RunPlanDetail/>", () => {
     });
   });
 
-  /** @scenario "The row menu of a result runs the test case again on its own" */
+  /** @scenario "The row menu of a result runs the scenario again on its own" */
   it("offers the conversation and a rerun on the row menu", async () => {
     const user = userEvent.setup();
     setRuns([makeRun({ scenarioRunId: "run_a", scenarioId: "scen_7" })]);
@@ -474,7 +474,7 @@ describe("<RunPlanDetail/>", () => {
       await screen.findByRole("menuitem", { name: "Open the conversation" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "Rerun this test case" }),
+      screen.getByRole("menuitem", { name: "Rerun this scenario" }),
     ).toBeInTheDocument();
   });
 
@@ -807,9 +807,9 @@ describe("<RunPlanDetail/>", () => {
     expect(props.setRelativePeriod).toHaveBeenCalledWith("90d");
   });
 
-  /** @scenario "Each run under One-off runs is named for the test case that ran" */
+  /** @scenario "Each run under One-off runs is named for the scenario that ran" */
   /** @scenario "The finished one-off run is listed under One-off runs" */
-  it("names a one-off run after the test case that ran", async () => {
+  it("names a one-off run after the scenario that ran", async () => {
     const user = userEvent.setup();
     setRuns([
       makeRun({

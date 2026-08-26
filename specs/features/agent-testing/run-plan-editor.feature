@@ -30,9 +30,9 @@ Feature: The run plan editor
   Scenario: A test suite states its scope instead of offering a picker
     Given a run plan that is a test suite
     When the General tab is read
-    Then it says the test cases come from that test suite
+    Then it says the scenarios come from that test suite
     And it says how many cases that is
-    And no test case picker is offered
+    And no scenario picker is offered
 
   @integration
   Scenario: The tabs hold the models and the execution options
@@ -43,12 +43,12 @@ Feature: The run plan editor
     And no agent or prompt is picked in the editor
 
   @integration
-  Scenario: A new run plan covers every test case
+  Scenario: A new run plan covers every scenario
     Given no run plan is being edited
     When the run plan editor is opened
     Then the What runs block offers all four scopes
-    And "All test cases" is the one chosen
-    And it says how many test cases will run
+    And "All scenarios" is the one chosen
+    And it says how many scenarios will run
 
   @integration
   Scenario: A plan can be scoped to chosen test suites
@@ -61,19 +61,19 @@ Feature: The run plan editor
   Scenario: A plan can be scoped to chosen labels
     Given the run plan editor is open
     When "Selected labels" is chosen
-    Then every label used by a test case reads as a chip
+    Then every label used by a scenario reads as a chip
     And the count follows the chips that are on
 
   @integration
-  Scenario: A plan can hold a hand-picked list of test cases
+  Scenario: A plan can hold a hand-picked list of scenarios
     Given the run plan editor is open
-    When "Specific test cases" is chosen
-    Then the test cases read under the name of the test suite they are filed in
+    When "Specific scenarios" is chosen
+    Then the scenarios read under the name of the test suite they are filed in
     And the count follows the cases that are ticked
 
   @integration
   Scenario: Saving a run plan writes it and closes the dialog
-    Given a run plan with a name, a test case and a target
+    Given a run plan with a name, a scenario and a target
     When Save is chosen
     Then the plan is written
     And the dialog closes

@@ -1,5 +1,5 @@
 /**
- * The one place a run plan's scope becomes a list of test cases.
+ * The one place a run plan's scope becomes a list of scenarios.
  *
  * A dynamic scope is a rule, so the list it means changes as cases are
  * written, filed, labelled and archived. It is resolved when the run starts,
@@ -64,7 +64,7 @@ export async function resolveAndCacheScope({
 }
 
 /**
- * The test cases a run of this plan covers.
+ * The scenarios a run of this plan covers.
  *
  * A dynamic scope is resolved and cached in one transaction; a static one is
  * the list the plan already holds, returned untouched.

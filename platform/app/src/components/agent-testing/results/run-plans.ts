@@ -62,7 +62,7 @@ export type RunPlan = {
   scenarioSetId: string;
   /** The suite the plan was made from, when it is one. */
   suiteId: string | null;
-  /** How many test cases the plan holds, or null when only the code that ran knows. */
+  /** How many scenarios the plan holds, or null when only the code that ran knows. */
   caseCount: number | null;
   lastRun: RunPlanLastRun | null;
 };
@@ -76,7 +76,7 @@ export type RunPlan = {
  */
 export function planScopeNote(kind: RunPlanKind): string {
   if (kind === "external") return "External set · runs from code";
-  if (kind === "one-off") return "Single test cases, run one at a time";
+  if (kind === "one-off") return "Single scenarios, run one at a time";
   return "Run plan";
 }
 
@@ -317,7 +317,7 @@ export function batchNote(scenarioRuns: ScenarioRunData[]): string | null {
 }
 
 /**
- * What a one-off run reads as: the test case that ran. A one-off batch holds
+ * What a one-off run reads as: the scenario that ran. A one-off batch holds
  * one run, so its case names the batch.
  *
  * @see specs/suites/one-off-runs-surface.feature

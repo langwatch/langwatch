@@ -260,7 +260,7 @@ describe("running a folder", () => {
     });
   });
 
-  describe("running all test cases", () => {
+  describe("running all scenarios", () => {
     it("creates the managed suite once, refreshes it, and schedules every active case", async () => {
       const folder = await suiteService.createFolder({
         projectId,
@@ -288,7 +288,7 @@ describe("running a folder", () => {
       const managed = await prisma.simulationSuite.findFirstOrThrow({
         where: { id: result.suiteId, projectId },
       });
-      expect(managed.name).toBe("All test cases");
+      expect(managed.name).toBe("All scenarios");
       expect(managed.labels).toContain("managed:run-all");
 
       // A second run reuses the same managed suite, and its membership is

@@ -1,5 +1,5 @@
 /**
- * Every way the Test cases tab opens one case: the editor drawer, the version
+ * Every way the Scenarios tab opens one case: the editor drawer, the version
  * history, and the run it last had.
  *
  * @see specs/features/agent-testing/cases-table.feature

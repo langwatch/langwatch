@@ -107,10 +107,10 @@ function FixedScopeRow({
       data-testid="plan-fixed-scope"
     >
       <Folder size={13} color="var(--chakra-colors-fg-muted)" />
-      <Text color="fg.muted">Test cases from the {suiteName} test suite</Text>
+      <Text color="fg.muted">Scenarios from the {suiteName} test suite</Text>
       <Box flex={1} />
       <Text fontSize="11.5px" color={FG_MUTED} whiteSpace="nowrap">
-        {caseCount === 1 ? "1 case" : `${caseCount} cases`}
+        {caseCount === 1 ? "1 scenario" : `${caseCount} scenarios`}
       </Text>
     </HStack>
   );

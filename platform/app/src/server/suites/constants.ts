@@ -5,12 +5,12 @@ export const MAX_REPEAT_COUNT = 5;
 export const ARCHIVED_SLUG_SUFFIX = "--archived";
 
 /**
- * Label that marks the managed per-project "run all test cases" suite.
+ * Label that marks the managed per-project "run all scenarios" suite.
  *
  * The suite is found by this label, never by name or slug: a person can name
- * their own plan "All test cases" without colliding with the managed one.
+ * their own plan "All scenarios" without colliding with the managed one.
  */
 export const RUN_ALL_SUITE_LABEL = "managed:run-all";
 
-/** Display name of the managed "run all test cases" suite. */
-export const RUN_ALL_SUITE_NAME = "All test cases";
+/** Display name of the managed "run all scenarios" suite. */
+export const RUN_ALL_SUITE_NAME = "All scenarios";

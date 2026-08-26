@@ -4,11 +4,11 @@
  * A suite (kind "folder") shows the same run plan questions as a run plan,
  * minus "What runs". Tabs:
  * - General: the suite name and its labels.
- * - Test cases: the cases filed under the suite, with an Add and a Remove.
+ * - Scenarios: the cases filed under the suite, with an Add and a Remove.
  * - Simulation models: the user simulator and the judge overrides.
  * - Execution: the repeat count, matching the plan editor.
  *
- * The Test cases tab is a static list, not a picker: cases join the suite by
+ * The Scenarios tab is a static list, not a picker: cases join the suite by
  * being filed there (Scenario.folderId), so an Add opens a small picker
  * dialog for cases NOT yet filed and confirming moves them to this suite.
  *
@@ -70,7 +70,7 @@ type SuiteTab = "general" | "cases" | "models" | "execution";
 
 const TABS: { id: SuiteTab; label: string }[] = [
   { id: "general", label: "General" },
-  { id: "cases", label: "Test cases" },
+  { id: "cases", label: "Scenarios" },
   { id: "models", label: "Simulation models" },
   { id: "execution", label: "Execution" },
 ];
@@ -176,7 +176,7 @@ function useSuiteEditorMutations({
       invalidate();
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't move the test case" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't move the scenario" }),
   });
 
   return { updateMutation, moveMutation, runMutation, shouldRunAfterSaveRef };
@@ -569,7 +569,7 @@ function CasesTab({
     <VStack align="stretch" gap={3} data-testid="suite-editor-cases-list">
       {cases.length === 0 ? (
         <Text fontSize="12px" color={FG_MUTED}>
-          No test cases in this suite yet.
+          No scenarios in this suite yet.
         </Text>
       ) : (
         <VStack align="stretch" gap={1}>
@@ -605,7 +605,7 @@ function CasesTab({
         alignSelf="flex-start"
       >
         <Plus size={13} />
-        Add test cases
+        Add scenarios
       </SmallButton>
     </VStack>
   );
@@ -714,7 +714,7 @@ function AddCasesPickerList({
   if (cases.length === 0) {
     return (
       <Text fontSize="12px" color={FG_MUTED}>
-        Every test case is already in this suite.
+        Every scenario is already in this suite.
       </Text>
     );
   }
@@ -789,7 +789,7 @@ function AddCasesPickerDialog({
           paddingY={3.5}
         >
           <Dialog.Title fontSize="14px" fontWeight="semibold">
-            Add test cases to the test suite
+            Add scenarios to the test suite
           </Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>

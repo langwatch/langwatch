@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Running one test case keeps the person in place: the run dialog confirms,
+ * Running one scenario keeps the person in place: the run dialog confirms,
  * the wide drawer opens at queue time, the conversation streams into it, and
  * the verdict lands in the same drawer.
  *
@@ -234,7 +234,7 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
     id: "case_1",
     name: "Angry refund request",
     labels: [],
-    // Loose so the row reads at the root of the All test cases surface.
+    // Loose so the row reads at the root of the All scenarios surface.
     folderId: null,
     parameters: null,
     createdAt: new Date("2026-07-06T12:00:00.000Z"),

@@ -41,7 +41,7 @@ export function RailSectionHeading({
 
 export type RailItemProps = {
   label: string;
-  /** Absent on the row that stands for every test case. */
+  /** Absent on the row that stands for every scenario. */
   icon?: React.ReactNode;
   selected: boolean;
   collapsed: boolean;

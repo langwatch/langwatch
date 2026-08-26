@@ -126,13 +126,13 @@ describe("<FolderHeaderRow/>", () => {
     renderRow();
 
     expect(screen.getByText("Checkout")).toBeInTheDocument();
-    expect(screen.getByLabelText("4 test cases")).toBeInTheDocument();
+    expect(screen.getByLabelText("4 scenarios")).toBeInTheDocument();
   });
 
   it("counts one case as one", () => {
     renderRow({ caseCount: 1 });
 
-    expect(screen.getByLabelText("1 test case")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 scenario")).toBeInTheDocument();
   });
 
   it("carries no result summary beside the name", () => {

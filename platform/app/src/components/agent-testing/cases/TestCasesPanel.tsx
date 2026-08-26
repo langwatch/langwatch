@@ -1,5 +1,5 @@
 /**
- * The cases panel of the Test cases tab, wired to the tab model.
+ * The cases panel of the Scenarios tab, wired to the tab model.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -14,7 +14,7 @@ import type { TestCasesTabModel } from "./useTestCasesTab";
 /** The name of the selected set, as the panel header reads it. */
 function panelTitle({ base, view }: TestCasesTabModel): string {
   if (base.selection.kind === "all") {
-    return view.folderGroups.length > 0 ? "Test suites" : "All test cases";
+    return view.folderGroups.length > 0 ? "Test suites" : "All scenarios";
   }
   if (base.selection.kind === "suite") {
     return view.selectedSuite?.name ?? "Test suite";

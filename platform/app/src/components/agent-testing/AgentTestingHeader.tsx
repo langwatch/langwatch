@@ -6,7 +6,7 @@
  * is beside it. Leaving the plan hands the title back to the page.
  *
  * Neither tab carries an action here. Every write entry sits in the section
- * header above the table it writes into: New test case beside the set it files
+ * header above the table it writes into: New scenario beside the set it files
  * into, New run plan beside the Test Runs list it adds to.
  *
  * @see specs/features/agent-testing/page-structure.feature
@@ -20,7 +20,7 @@ import type { OpenPlanTitle } from "./useAgentTestingStore";
 export type AgentTestingHeaderProps = {
   tab: AgentTestingTab;
   onTabChange: (tab: AgentTestingTab) => void;
-  /** How many test cases the project holds, beside the Test cases tab. */
+  /** How many scenarios the project holds, beside the Scenarios tab. */
   casesCount?: number;
   /** How many run plans the project holds, beside the Results tab. */
   plansCount?: number;
@@ -95,7 +95,7 @@ export function AgentTestingHeader({
             <Tabs.List borderBottomWidth={0} gap={1}>
               <AgentTestingTabTrigger
                 value="cases"
-                label="Test cases"
+                label="Scenarios"
                 count={casesCount}
               />
               <AgentTestingTabTrigger

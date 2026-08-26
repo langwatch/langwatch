@@ -1,5 +1,5 @@
 /**
- * Every write the Test cases tab makes, and the dialog state each write needs
+ * Every write the Scenarios tab makes, and the dialog state each write needs
  * to close itself when it lands.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -86,20 +86,20 @@ export function useCaseMutations(projectId: string): CaseMutations {
       invalidate();
       setCaseToArchive(null);
     },
-    onError: toastOnError("Couldn't archive the test case"),
+    onError: toastOnError("Couldn't archive the scenario"),
   });
 
   const duplicate = api.scenarios.duplicate.useMutation({
     onSuccess: () => {
       invalidate();
-      toaster.create({ title: "Test case duplicated", type: "success" });
+      toaster.create({ title: "Scenario duplicated", type: "success" });
     },
-    onError: toastOnError("Couldn't duplicate the test case"),
+    onError: toastOnError("Couldn't duplicate the scenario"),
   });
 
   const move = api.scenarios.moveToFolder.useMutation({
     onSuccess: invalidate,
-    onError: toastOnError("Couldn't move the test case"),
+    onError: toastOnError("Couldn't move the scenario"),
   });
 
   return {

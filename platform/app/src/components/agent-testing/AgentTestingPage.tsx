@@ -1,5 +1,5 @@
 /**
- * Agent Testing: one page with the test cases and the results in tabs.
+ * Agent Testing: one page with the scenarios and the results in tabs.
  *
  * The page is the only mount point of the live-run subscription and of the
  * case editor, and every move inside it is a shallow address push, so a run
@@ -23,7 +23,7 @@ import { useHydrateViewFromUrl } from "./useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
-/** How many test cases and how many run plans the tabs count. */
+/** How many scenarios and how many run plans the tabs count. */
 function useTabCounts(projectId: string) {
   const { data: scenarios } = api.scenarios.getAll.useQuery(
     { projectId },

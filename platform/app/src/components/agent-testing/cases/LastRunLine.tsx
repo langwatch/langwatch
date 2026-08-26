@@ -18,7 +18,7 @@ import {
   type TestCase,
 } from "./test-cases";
 
-/** What the line reads for the All test cases view. */
+/** What the line reads for the All scenarios view. */
 export const ALL_CASES_LAST_RUN_LABEL = "Last full run at";
 /** What it reads for one test suite. */
 export const SUITE_LAST_RUN_LABEL = "Last run on";

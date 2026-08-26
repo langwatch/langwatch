@@ -65,20 +65,20 @@ const NOTE_FLAG_HELP =
 
 /** Help for the `--folder` flag on the scenario write commands. */
 const FOLDER_FLAG_HELP =
-  "The test suite folder to file this test case in, named by ID or by name.";
+  "The test suite folder to file this scenario in, named by ID or by name.";
 
 /**
  * Help for the three scope flags of the suite write commands. They answer one
  * question, so only one of them may be given.
  */
 const SCOPE_ALL_FLAG_HELP =
-  "Cover every active test case of the project. The set is read again at each run, so a test case written later runs too.";
+  "Cover every active scenario of the project. The set is read again at each run, so a scenario written later runs too.";
 
 const SCOPE_FOLDER_FLAG_HELP =
-  "Cover the test cases filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
+  "Cover the scenarios filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
 
 const SCOPE_LABEL_FLAG_HELP =
-  "Cover the test cases carrying this label. Repeat the flag for more than one.";
+  "Cover the scenarios carrying this label. Repeat the flag for more than one.";
 
 /**
  * Reads the `--folder` / `--no-folder` pair.
@@ -2822,7 +2822,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
     .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
     .option("--folder <folder>", FOLDER_FLAG_HELP)
-    .option("--no-folder", "Take the test case out of its test suite folder")
+    .option("--no-folder", "Take the scenario out of its test suite folder")
     .option("-f, --format <format>", "Output format: table (default) or json", "table");
 
   const readScenarioFolderFlags = trackFolderFlags(scenarioUpdateCmd);
@@ -2856,7 +2856,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       await impl(id, options);
     });
 
-  // Version history of a test case. Nested under `scenario` because a version
+  // Version history of a scenario. Nested under `scenario` because a version
   // is a state of one case, never a resource of its own.
   const scenarioVersionCmd = scenarioCmd
     .command("version")
@@ -2997,11 +2997,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   // Test suite folders. Nested under `suite` because a folder IS a suite: it
-  // holds the test cases filed into it and runs through the same path a run
+  // holds the scenarios filed into it and runs through the same path a run
   // plan does, with `langwatch suite run <folder-id>`.
   const suiteFolderCmd = suiteCmd
     .command("folder")
-    .description("Manage test suite folders, the groups a test case is filed in");
+    .description("Manage test suite folders, the groups a scenario is filed in");
 
   emitsResult(
     suiteFolderCmd
@@ -3039,7 +3039,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     suiteFolderCmd
       .command("delete <folder>")
-      .description("Archive a test suite folder and every test case filed in it")
+      .description("Archive a test suite folder and every scenario filed in it")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (folder: string) => {
       const { deleteFolderCommand: impl } = await import("./commands/suites/folders/delete.js");

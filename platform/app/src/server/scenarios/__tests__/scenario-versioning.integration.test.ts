@@ -86,7 +86,7 @@ beforeEach(async () => {
 
 describe("scenario versioning", () => {
   describe("numbering", () => {
-    /** @scenario "A new test case starts at version 1" */
+    /** @scenario "A new scenario starts at version 1" */
     it("starts a new case at version 1 with one entry named Created", async () => {
       const scenario = await createCase();
 
@@ -349,7 +349,7 @@ describe("scenario versioning", () => {
       });
     }
 
-    /** @scenario "A test case created before versions existed shows a made-up first entry" */
+    /** @scenario "A scenario created before versions existed shows a made-up first entry" */
     it("shows one synthesized Created entry with the creation date", async () => {
       const scenario = await createPreVersioningCase();
 

@@ -1,5 +1,5 @@
 /**
- * Write or edit one test case, in a right-side drawer.
+ * Write or edit one scenario, in a right-side drawer.
  *
  * The drawer asks four questions: what the case is called, which suite it
  * belongs to, what the user is trying to do, and what the judge must check.

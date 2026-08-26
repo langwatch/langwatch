@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Test case history in the interface: the version chip in the editor, the
+ * Scenario history in the interface: the version chip in the editor, the
  * version list with its restore, and the stale-save offer.
  *
  * @see specs/features/agent-testing/case-version-history.feature
@@ -320,7 +320,7 @@ describe("the version chip in the case editor", () => {
 
     const notice = await screen.findByTestId("scenario-stale-version");
     expect(notice).toHaveTextContent(
-      "This test case changed since it was opened",
+      "This scenario changed since it was opened",
     );
     expect(notice).toHaveTextContent("version 6");
     // The reload replaces the form, so the offer has to say the edits go.

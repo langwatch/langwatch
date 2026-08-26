@@ -7,7 +7,7 @@ import type { CommandResult } from "../../../utils/output";
 import { FolderReferenceError, resolveFolderReference } from "./resolveFolder";
 
 /**
- * Archives a test suite folder and every test case filed in it.
+ * Archives a test suite folder and every scenario filed in it.
  *
  * The platform archives rather than erases, so the folder and its cases stay
  * readable and their run history is kept.
@@ -47,7 +47,7 @@ export const deleteFolderCommand = async (
 
     spinner.succeed(
       caseCount > 0
-        ? `Test suite folder "${folderName}" archived, with its ${caseCount} test case${caseCount !== 1 ? "s" : ""}`
+        ? `Test suite folder "${folderName}" archived, with its ${caseCount} scenario${caseCount !== 1 ? "s" : ""}`
         : `Test suite folder "${folderName}" archived`,
     );
 

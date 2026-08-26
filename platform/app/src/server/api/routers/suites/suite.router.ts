@@ -201,8 +201,8 @@ export const suiteRouter = createTRPCRouter({
     }),
 
   /**
-   * Runs every non-archived test case of the project through the managed
-   * "All test cases" suite (created on first use, refreshed at each run).
+   * Runs every non-archived scenario of the project through the managed
+   * "All scenarios" suite (created on first use, refreshed at each run).
    */
   runAll: protectedProcedure
     .input(

@@ -154,7 +154,7 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
-    /** @scenario "A case created from the All test cases view starts unfiled" */
+    /** @scenario "A case created from the All scenarios view starts unfiled" */
     it("leaves a case created without a folder unfiled", async () => {
       const scenario = await createCase({ name: "Unfiled" });
 

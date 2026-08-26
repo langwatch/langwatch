@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The Agent Testing address is behind the release flag AND behind permission
- * to read test cases. The flag decides whether the address exists at all, and
+ * to read scenarios. The flag decides whether the address exists at all, and
  * it grants nothing on its own.
  *
  * @see specs/features/agent-testing/page-structure.feature
@@ -180,15 +180,15 @@ describe("the Agent Testing address", () => {
         screen.getByRole("heading", { name: "Agent Testing" }),
       ).toBeInTheDocument();
       const tabNames = screen.getAllByRole("tab").map((tab) => tab.textContent);
-      expect(tabNames).toEqual(["Test cases", "Results"]);
+      expect(tabNames).toEqual(["Scenarios", "Results"]);
     });
 
-    describe("and the person may not read test cases", () => {
+    describe("and the person may not read scenarios", () => {
       beforeEach(() => {
         state.permitted = false;
       });
 
-      /** @scenario "A person without permission to read test cases cannot open the page" */
+      /** @scenario "A person without permission to read scenarios cannot open the page" */
       it("refuses the page, so the flag alone grants nothing", () => {
         render(<AgentTestingRoute />, { wrapper: Wrapper });
 

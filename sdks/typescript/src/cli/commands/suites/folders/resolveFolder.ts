@@ -23,7 +23,7 @@ export class FolderReferenceError extends Error {
  * case. A name two folders share is refused with both ids, because picking
  * one for the caller would file the case somewhere they did not ask for.
  *
- * Only folders are offered: a run plan is not a place a test case can live.
+ * Only folders are offered: a run plan is not a place a scenario can live.
  *
  * @see specs/features/scenario-cli.feature
  * @see specs/features/suite-cli.feature

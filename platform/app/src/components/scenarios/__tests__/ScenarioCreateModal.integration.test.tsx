@@ -179,7 +179,7 @@ describe("<ScenarioCreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows the Agent Testing test case labels", () => {
+    it("shows the Agent Testing scenario labels", () => {
       render(
         <ScenarioCreateModal
           open={true}
@@ -190,9 +190,9 @@ describe("<ScenarioCreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("New test case")).toBeInTheDocument();
+      expect(within(dialog).getByText("New scenario")).toBeInTheDocument();
       expect(
-        within(dialog).getByText("What should this test case prove?"),
+        within(dialog).getByText("What should this scenario prove?"),
       ).toBeInTheDocument();
       expect(
         within(dialog).queryByText("Create new scenario"),

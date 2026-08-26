@@ -106,7 +106,7 @@ describe("the suite folder commands", () => {
     });
 
     /** @scenario "List test suite folders" */
-    it("shows the name, ID and test case count of each folder", async () => {
+    it("shows the name, ID and scenario count of each folder", async () => {
       mockGetAll.mockResolvedValue([makeFolder()]);
 
       const result = await listFoldersCommand();
@@ -115,7 +115,7 @@ describe("the suite folder commands", () => {
       const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(printed).toContain("Refunds");
       expect(printed).toContain("folder_abc");
-      expect(printed).toContain("Test cases");
+      expect(printed).toContain("Scenarios");
       expect(printed).toContain("2");
     });
 
@@ -146,7 +146,7 @@ describe("the suite folder commands", () => {
     });
 
     /** @scenario "Create a test suite folder" */
-    it("creates it holding no test cases", async () => {
+    it("creates it holding no scenarios", async () => {
       mockCreate.mockResolvedValue(makeFolder({ scenarioIds: [] }));
 
       const result = await createFolderCommand("Refunds");
@@ -204,7 +204,7 @@ describe("the suite folder commands", () => {
     });
 
     /** @scenario "Delete (archive) a test suite folder" */
-    it("says its test cases were archived too", async () => {
+    it("says its scenarios were archived too", async () => {
       mockGetAll.mockResolvedValue([makeFolder()]);
 
       const result = await deleteFolderCommand("folder_abc");

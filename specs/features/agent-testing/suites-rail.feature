@@ -1,26 +1,26 @@
 Feature: The test suites rail
-  As a person with many test cases
+  As a person with many scenarios
   I want a rail on the left with my test suites and the sets that run from code
   So that I can move between them without losing my place
 
   Background: what the rail holds.
-    The rail is glued to the left edge of the page. It holds All test cases at
+    The rail is glued to the left edge of the page. It holds All scenarios at
     the top, then the test suites of the project, then the external sets that
     run from code. The period picker sits at the foot of the rail.
 
     An external set is read-only in the platform. It has no Run and no Edit,
     and choosing it opens its results.
 
-    No row of the rail carries a count. How many test cases a set holds reads
+    No row of the rail carries a count. How many scenarios a set holds reads
     beside the title of the panel, once, and not on every row.
 
   # --- What is listed ---
 
   @integration
-  Scenario: The rail lists All test cases, then the test suites, then the external sets
+  Scenario: The rail lists All scenarios, then the test suites, then the external sets
     Given a project with two test suites and one external set
     When the Agent Testing page is opened
-    Then "All test cases" is the first entry
+    Then "All scenarios" is the first entry
     And the two test suites follow it under a "Test Suites" heading
     And the external set follows them under a "From Code" heading
     And no entry carries a count
@@ -52,7 +52,7 @@ Feature: The test suites rail
   Scenario: The row menu of a test suite offers its five actions in order
     Given a test suite in the rail
     When its row menu is opened
-    Then the actions read, in order: "New test case", "Run suite", "Edit suite", "Open last run", "Archive suite"
+    Then the actions read, in order: "New scenario", "Run suite", "Edit suite", "Open last run", "Archive suite"
 
   @integration
   Scenario: Open last run goes straight to the last run of that suite
@@ -81,22 +81,22 @@ Feature: The test suites rail
     Given a test suite in the rail
     When "Edit suite" is chosen from its row menu
     Then the suite editor drawer opens
-    And it holds four tabs: "General", "Test cases", "Simulation models", "Execution"
+    And it holds four tabs: "General", "Scenarios", "Simulation models", "Execution"
 
   @integration
-  Scenario: The Test cases tab lists the cases filed under the suite and offers add and remove controls
+  Scenario: The Scenarios tab lists the cases filed under the suite and offers add and remove controls
     Given the suite editor drawer is open on a test suite
-    When the "Test cases" tab is chosen
-    Then every test case filed under the suite is listed
+    When the "Scenarios" tab is chosen
+    Then every scenario filed under the suite is listed
     And every row carries a remove control
-    And an "Add test cases" control is offered
+    And an "Add scenarios" control is offered
 
   @integration
-  Scenario: Add test cases opens a picker of cases not currently in the suite
+  Scenario: Add scenarios opens a picker of cases not currently in the suite
     Given the suite editor drawer is open on a test suite
-    And a test case not filed under the suite exists
-    When "Add test cases" is chosen
-    Then a dialog lists the test cases not currently in the suite
+    And a scenario not filed under the suite exists
+    When "Add scenarios" is chosen
+    Then a dialog lists the scenarios not currently in the suite
     And selecting one and confirming files it under the suite
 
   @integration
@@ -104,7 +104,7 @@ Feature: The test suites rail
     Given a person with read-only access to the project
     When a test suite row menu is opened
     Then "Open last run" is the only action offered
-    And "New test case", "Run suite", "Edit suite" and "Archive suite" are not offered
+    And "New scenario", "Run suite", "Edit suite" and "Archive suite" are not offered
 
   # --- Selection ---
 

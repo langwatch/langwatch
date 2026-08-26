@@ -3252,7 +3252,7 @@ export interface paths {
         get: operations["getApiSuitesById"];
         put?: never;
         post?: never;
-        /** @description Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction. */
+        /** @description Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction. */
         delete: operations["deleteApiSuitesById"];
         options?: never;
         head?: never;
@@ -24533,7 +24533,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -24633,7 +24633,7 @@ export interface operations {
                     description?: string;
                     /** @default [] */
                     scenarioIds?: string[];
-                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -24680,7 +24680,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -24788,7 +24788,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -24979,7 +24979,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
-                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                     scope?: {
                         /** @constant */
                         mode: "all";
@@ -25024,7 +25024,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";
@@ -25144,7 +25144,7 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        /** @description What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan. */
                         scope: {
                             /** @constant */
                             mode: "all";

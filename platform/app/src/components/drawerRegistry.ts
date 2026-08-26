@@ -341,7 +341,7 @@ export const drawers = {
   // Agent Testing v2 case editor, opened from the cases table, the run rows
   // and the run drawer.
   agentTestingCaseEditor: AgentTestingCaseEditorDrawer,
-  // Agent Testing v2 suite editor: tabs for General, Test cases,
+  // Agent Testing v2 suite editor: tabs for General, Scenarios,
   // Simulation models and Execution.
   agentTestingSuiteEditor: AgentTestingSuiteEditorDrawer,
   // Data privacy

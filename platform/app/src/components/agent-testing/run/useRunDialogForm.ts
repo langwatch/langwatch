@@ -501,7 +501,7 @@ function buildCustomizeRunChips({
 }
 
 /**
- * How many test cases a run of this subject covers, or nothing while the case
+ * How many scenarios a run of this subject covers, or nothing while the case
  * list a "run everything" subject needs is still on its way.
  */
 function caseCountOf(

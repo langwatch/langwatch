@@ -376,7 +376,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the test cases and the results in tabs, test suites as folders of test cases, run notes, test case versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the current Simulations pages and menu group exactly as they are; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled.",
+      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the current Simulations pages and menu group exactly as they are; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled.",
   },
   {
     // D12 (ADR-117). Named `join_requests` rather than the usual

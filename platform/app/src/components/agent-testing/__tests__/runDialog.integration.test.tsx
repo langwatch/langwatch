@@ -182,7 +182,7 @@ function renderDialog(subject: RunDialogSubject) {
   return { onClose, onRunStarted };
 }
 
-/** A test case that declares the parameters a run may override. */
+/** A scenario that declares the parameters a run may override. */
 function casesDeclaring(parameters: unknown) {
   return {
     data: [
@@ -736,7 +736,7 @@ describe("<RunDialog/>", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
     const run = screen.getByTestId("run-dialog-run");
-    expect(run).toHaveTextContent("Run 2 cases");
+    expect(run).toHaveTextContent("Run 2 scenarios");
     expect(run).not.toHaveAttribute("aria-haspopup");
   });
 
@@ -1065,7 +1065,7 @@ describe("<RunDialog/>", () => {
   });
 });
 
-describe("run entries on the Test cases tab", () => {
+describe("run entries on the Scenarios tab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -1111,7 +1111,7 @@ describe("run entries on the Test cases tab", () => {
   /** @scenario "Clicking the Run button does not open the row" */
   it("opens the run dialog from the row Run button, not the run drawer", async () => {
     const user = userEvent.setup();
-    // Loose so the row reads at the root of the All test cases surface.
+    // Loose so the row reads at the root of the All scenarios surface.
     mockScenariosGetAll.mockReturnValue({
       data: [
         {

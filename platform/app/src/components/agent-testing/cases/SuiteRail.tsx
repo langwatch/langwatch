@@ -1,5 +1,5 @@
 /**
- * The rail on the left of the Test cases tab: All test cases, the test suites
+ * The rail on the left of the Scenarios tab: All scenarios, the test suites
  * of the project, and the sets that run from code.
  *
  * The rail is a view over what it is given. Every action it offers is a
@@ -31,7 +31,7 @@ export const SUITE_RAIL_WIDTH = 218;
 /** What the archive dialog of a test suite says. */
 export const SUITE_ARCHIVE_TITLE = "Archive test suite?";
 export const SUITE_ARCHIVE_DESCRIPTION =
-  "The test cases in it are archived as well. Test runs are preserved.";
+  "The scenarios in it are archived as well. Test runs are preserved.";
 
 export type SuiteRailProps = {
   selection: AgentTestingSelection;

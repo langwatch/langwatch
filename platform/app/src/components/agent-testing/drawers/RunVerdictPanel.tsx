@@ -18,7 +18,7 @@ import { FG_MUTED } from "../shared/design";
 
 /**
  * The criteria of a run split into passed and failed, each list held in the
- * order the test case declares them.
+ * order the scenario declares them.
  *
  * The judge answers with two lists, met and unmet, which lose the order the
  * case was written in. The case still holds that order, so it is what each
@@ -273,7 +273,7 @@ export function RunVerdictPanel({
   metCriteria: readonly string[];
   /** The criteria the judge missed, in any order the judge returned them. */
   unmetCriteria: readonly string[];
-  /** The criteria the test case declares, in its own order. */
+  /** The criteria the scenario declares, in its own order. */
   declaredCriteria: readonly string[];
   /** What the judge said about the run as a whole, if anything. */
   reasoning?: string | null;

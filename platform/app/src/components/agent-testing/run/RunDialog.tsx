@@ -34,7 +34,7 @@ export type {
 } from "./run-dialog-types";
 
 function subjectTitle(subject: RunDialogSubject): string {
-  return subject.kind === "all" ? "All test cases" : subject.name;
+  return subject.kind === "all" ? "All scenarios" : subject.name;
 }
 
 /**
@@ -74,9 +74,9 @@ function runBlockedReason({
   if (controller.isBusy) return null;
   if (form.caseCount === 0) {
     if (subject?.kind === "suite") {
-      return "This test suite holds no test case to run.";
+      return "This test suite holds no scenario to run.";
     }
-    return "The scope holds no test case to run.";
+    return "The scope holds no scenario to run.";
   }
   if (!form.target && (subject?.kind === "case" || !controller.hasAnyTarget)) {
     return "Choose an agent to run against.";

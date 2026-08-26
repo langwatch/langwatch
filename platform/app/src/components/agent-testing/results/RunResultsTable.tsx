@@ -1,8 +1,8 @@
 /**
- * The results of one run as a table: one row per test case and target pair,
+ * The results of one run as a table: one row per scenario and target pair,
  * with the verdict, the evaluators, the duration and the cost.
  *
- * The table is a grid inside one bordered card, the way the Test cases table
+ * The table is a grid inside one bordered card, the way the Scenarios table
  * is drawn, so both tabs read as one surface.
  *
  * A row that is still going can be stopped on its own. A row that finished
@@ -32,9 +32,9 @@ export type RunResultsTableProps = {
   /** Absent when the person may not stop runs, or when the set is not ours. */
   onCancelRun?: (scenarioRun: ScenarioRunData) => void;
   cancellingJobId?: string | null;
-  /** Opens the editor of the test case the row ran. */
+  /** Opens the editor of the scenario the row ran. */
   onEditCase?: (scenarioRun: ScenarioRunData) => void;
-  /** Runs the test case the row ran again, on its own. */
+  /** Runs the scenario the row ran again, on its own. */
   onRerunCase?: (scenarioRun: ScenarioRunData) => void;
 };
 
@@ -77,7 +77,7 @@ export function RunResultsTable({
         color={FG_MUTED}
       >
         <Text as="span">Result</Text>
-        <Text as="span">Test case</Text>
+        <Text as="span">Scenario</Text>
         <Text as="span">Evaluators</Text>
         <Text as="span" textAlign="right">
           Time · cost

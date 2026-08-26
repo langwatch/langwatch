@@ -1,5 +1,5 @@
 /**
- * The dialogs the Test cases tab keeps mounted: the run dialog and the
+ * The dialogs the Scenarios tab keeps mounted: the run dialog and the
  * archive confirmation of a case. The suite editor is a drawer, not a
  * dialog, so it lives in the drawer registry.
  *

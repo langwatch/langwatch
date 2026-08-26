@@ -347,7 +347,7 @@ describe("the wide run detail drawer", () => {
   });
 
   /** @scenario "The drawer header opens the case editor from one labelled button" */
-  /** @scenario "The drawer header offers Open Scenario for the test case that ran" */
+  /** @scenario "The drawer header offers Open Scenario for the scenario that ran" */
   /** @scenario "The drawer offers Open Scenario for that case" */
   it("offers one Open Scenario button that opens the case editor", async () => {
     const user = userEvent.setup();

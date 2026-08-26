@@ -6,9 +6,9 @@
  * never remounts and the live-run subscription it holds is never dropped.
  *
  * Addresses:
- *   /agent-testing                                  Test cases, all cases
- *   /agent-testing/suites/:suiteSlug                Test cases, one suite
- *   /agent-testing/external/:setId                  Test cases, external set
+ *   /agent-testing                                  Scenarios, all cases
+ *   /agent-testing/suites/:suiteSlug                Scenarios, one suite
+ *   /agent-testing/external/:setId                  Scenarios, external set
  *   /agent-testing/results                          Results, run plans list
  *   /agent-testing/results/:planSlug                Results, one plan
  *   /agent-testing/results/:planSlug/:batchRunId    Results, one run
@@ -236,7 +236,7 @@ export function useAgentTestingRouting(): AgentTestingRouting {
   const setTab = useCallback(
     (tab: AgentTestingTab) => {
       // Each tab opens on its own root: the Results tab drops the plan and the
-      // run it held, and the Test cases tab opens on all cases.
+      // run it held, and the Scenarios tab opens on all cases.
       push({ ...DEFAULT_STATE, tab });
     },
     [push],

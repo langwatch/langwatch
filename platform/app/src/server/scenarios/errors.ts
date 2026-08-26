@@ -53,7 +53,7 @@ export class ScenarioStaleVersionError extends HandledError {
   constructor({ currentVersion }: { currentVersion: number }) {
     super(
       "scenario_stale_version",
-      "This test case changed since it was loaded",
+      "This scenario changed since it was loaded",
       {
         httpStatus: 409,
         fault: "customer",

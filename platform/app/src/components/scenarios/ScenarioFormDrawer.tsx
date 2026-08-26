@@ -84,13 +84,13 @@ export type ScenarioFormDrawerProps = {
 
 export type ScenarioEditorVariant = "agent-testing";
 
-/** What the Agent Testing editor says a test case is for. */
+/** What the Agent Testing editor says a scenario is for. */
 export const AGENT_TESTING_EDITOR_DESCRIPTION =
   "Test your agent on a critical path or edge case";
 
-/** Why Run is off on a test case that has never run. */
+/** Why Run is off on a scenario that has never run. */
 export const NO_REMEMBERED_TARGET_HINT =
-  "Run this test case from the table first, to choose the agent it runs against.";
+  "Run this scenario from the table first, to choose the agent it runs against.";
 
 /**
  * Model overrides chosen in the run dialog. Omitted on a plain save so the
@@ -114,7 +114,7 @@ function savedToastTitle({
   isUpdate: boolean;
 }): string {
   if (isAgentTesting) {
-    return isUpdate ? "Test case updated" : "Test case created";
+    return isUpdate ? "Scenario updated" : "Scenario created";
   }
   return isUpdate ? "Scenario updated" : "Scenario created";
 }
@@ -670,7 +670,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             {isAgentTesting ? (
               <HStack gap={2}>
                 <Heading size="md">
-                  {scenarioId || scenario ? "Edit test case" : "New test case"}
+                  {scenarioId || scenario ? "Edit scenario" : "New scenario"}
                 </Heading>
                 <CaseVersionChip version={scenario?.version} />
               </HStack>
@@ -777,7 +777,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 is an error state, not a form. `handleSave` refuses either way,
                 so this is what says so rather than what enforces it. */}
             {/* Agent Testing reads three plain buttons: Cancel, Save, Run.
-                The Run button uses the agent this test case last ran against,
+                The Run button uses the agent this scenario last ran against,
                 which the run dialog on the table remembers. */}
             {!hasReadFailed && isAgentTesting && (
               <>
@@ -931,7 +931,7 @@ function StaleVersionNotice({
       data-testid="scenario-stale-version"
     >
       <Text fontSize="sm" fontWeight="medium">
-        This test case changed since it was opened
+        This scenario changed since it was opened
       </Text>
       <Text fontSize="xs" color="fg.muted">
         Somebody else saved{" "}

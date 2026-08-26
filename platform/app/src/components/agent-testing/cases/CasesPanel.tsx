@@ -1,5 +1,5 @@
 /**
- * The right half of the Test cases tab: what is selected, the cases in it,
+ * The right half of the Scenarios tab: what is selected, the cases in it,
  * and how the whole set last did.
  *
  * The panel is a view over what it is given, so the reads and the writes stay
@@ -32,10 +32,10 @@ export type CasesPanelProps = {
   selection: AgentTestingSelection;
   /** The name of the selected set, as the header reads it. */
   title: string;
-  /** The real test suites, as folder rows on the All test cases surface. */
+  /** The real test suites, as folder rows on the All scenarios surface. */
   folderGroups: CaseGroup[];
   /**
-   * Cases at the root of the surface: on All test cases these are the ones
+   * Cases at the root of the surface: on All scenarios these are the ones
    * filed in no test suite; on a suite surface these are its cases in order.
    */
   looseCases: TestCase[];
@@ -46,7 +46,7 @@ export type CasesPanelProps = {
   isLastResultsLoading: boolean;
   suites: TestSuiteEntry[];
   canManage: boolean;
-  /** True when the whole project holds no test case at all. */
+  /** True when the whole project holds no scenario at all. */
   projectHasNoCases: boolean;
   allLabels: string[];
   activeLabels: string[];

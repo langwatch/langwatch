@@ -85,7 +85,7 @@ export function AgentTestingCaseEditorDrawer(
   const onSaved = useCallback(
     (saved: Scenario, options: { shouldRunAfterSave: boolean }) => {
       toaster.create({
-        title: scenarioId ? "Test case updated" : "Test case created",
+        title: scenarioId ? "Scenario updated" : "Scenario created",
         type: "success",
       });
       closeDrawer();

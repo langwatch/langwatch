@@ -40,12 +40,12 @@ export const listFoldersCommand = async (): Promise<CommandResult | void> => {
           Name: folder.name,
           ID: folder.id,
           Slug: folder.slug,
-          "Test cases": `${folder.scenarioIds.length}`,
+          "Scenarios": `${folder.scenarioIds.length}`,
         }));
 
         formatTable({
           data: tableData,
-          headers: ["Name", "ID", "Slug", "Test cases"],
+          headers: ["Name", "ID", "Slug", "Scenarios"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.green,
@@ -56,7 +56,7 @@ export const listFoldersCommand = async (): Promise<CommandResult | void> => {
         console.log();
         console.log(
           chalk.gray(
-            `File a test case into one with ${chalk.cyan("langwatch scenario update <id> --folder <folder>")}`,
+            `File a scenario into one with ${chalk.cyan("langwatch scenario update <id> --folder <folder>")}`,
           ),
         );
       },

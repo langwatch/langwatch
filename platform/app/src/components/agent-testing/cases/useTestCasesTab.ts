@@ -1,5 +1,5 @@
 /**
- * Everything the Test cases tab reads and writes, in one model.
+ * Everything the Scenarios tab reads and writes, in one model.
  *
  * The rail, the panel and the dialogs are views over this model, so each of
  * them can be read on its own and none of them holds a query of its own.

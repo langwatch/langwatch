@@ -212,15 +212,15 @@ describe("the run plan dialog", () => {
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario "A new run plan covers every test case" */
-    it("offers the four scopes and starts on all test cases", () => {
+    /** @scenario "A new run plan covers every scenario" */
+    it("offers the four scopes and starts on all scenarios", () => {
       render(<PlanModal />, { wrapper: Wrapper });
 
       for (const mode of ["all", "folders", "labels", "cases"]) {
         expect(screen.getByTestId(`plan-scope-${mode}`)).toBeInTheDocument();
       }
       expect(screen.getByTestId("plan-scope-all")).toBeChecked();
-      expect(screen.getByText("2 test cases will run.")).toBeInTheDocument();
+      expect(screen.getByText("2 scenarios will run.")).toBeInTheDocument();
     });
 
     /** @scenario "A plan can be scoped to chosen test suites" */
@@ -230,10 +230,10 @@ describe("the run plan dialog", () => {
 
       await user.click(screen.getByTestId("plan-scope-folders"));
       expect(screen.getByText("Checkout")).toBeInTheDocument();
-      expect(screen.getByText("0 test cases will run.")).toBeInTheDocument();
+      expect(screen.getByText("0 scenarios will run.")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("plan-scope-folder-folder_1"));
-      expect(screen.getByText("1 test case will run.")).toBeInTheDocument();
+      expect(screen.getByText("1 scenario will run.")).toBeInTheDocument();
     });
 
     /** @scenario "A plan can be scoped to chosen labels" */
@@ -242,13 +242,13 @@ describe("the run plan dialog", () => {
       render(<PlanModal />, { wrapper: Wrapper });
 
       await user.click(screen.getByTestId("plan-scope-labels"));
-      expect(screen.getByText("0 test cases will run.")).toBeInTheDocument();
+      expect(screen.getByText("0 scenarios will run.")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("plan-scope-label-refunds"));
-      expect(screen.getByText("1 test case will run.")).toBeInTheDocument();
+      expect(screen.getByText("1 scenario will run.")).toBeInTheDocument();
     });
 
-    /** @scenario "A plan can hold a hand-picked list of test cases" */
+    /** @scenario "A plan can hold a hand-picked list of scenarios" */
     it("reads the cases under their test suite and counts the ticked ones", async () => {
       const user = userEvent.setup();
       render(<PlanModal />, { wrapper: Wrapper });
@@ -256,13 +256,13 @@ describe("the run plan dialog", () => {
       await user.click(screen.getByTestId("plan-scope-cases"));
       expect(screen.getByText("Checkout")).toBeInTheDocument();
       expect(screen.getByText("No test suite")).toBeInTheDocument();
-      expect(screen.getByText("0 test cases will run.")).toBeInTheDocument();
+      expect(screen.getByText("0 scenarios will run.")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("plan-scope-case-scen_1"));
-      expect(screen.getByText("1 test case will run.")).toBeInTheDocument();
+      expect(screen.getByText("1 scenario will run.")).toBeInTheDocument();
     });
 
-    /** @scenario "A new run plan covers every test case" */
+    /** @scenario "A new run plan covers every scenario" */
     it("carries the scope into the write", async () => {
       const user = userEvent.setup();
       render(<PlanModal />, { wrapper: Wrapper });
@@ -356,9 +356,9 @@ describe("the run plan dialog", () => {
       expect(screen.getByText("Edit test suite")).toBeInTheDocument();
       const scope = screen.getByTestId("plan-fixed-scope");
       expect(scope).toHaveTextContent(
-        "Test cases from the Checkout test suite",
+        "Scenarios from the Checkout test suite",
       );
-      expect(scope).toHaveTextContent("2 cases");
+      expect(scope).toHaveTextContent("2 scenarios");
       expect(
         screen.queryByText("Angry refund request"),
       ).not.toBeInTheDocument();

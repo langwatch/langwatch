@@ -1723,14 +1723,14 @@ const presentations = {
   scenario_stale_version: {
     // Nothing was written: the save is refused before the update, so the copy
     // can promise the customer's own edit is still theirs to redo.
-    title: "This test case changed since you loaded it",
+    title: "This scenario changed since you loaded it",
     describe: () =>
       "Reload to pick up the latest version, then make your change again.",
   },
   scenario_version_not_found: {
     title: "That version is not available",
     describe: () =>
-      "It may have been removed. Open the history to see what this test case still has.",
+      "It may have been removed. Open the history to see what this scenario still has.",
   },
   // ---- billing ----
   billing_customer_email_required: {
@@ -2098,14 +2098,14 @@ const presentations = {
     describe: () => "Edit the plan to remove them.",
   },
   suite_scope_empty: {
-    title: "This run plan covers no test case",
+    title: "This run plan covers no scenario",
     describe: () =>
       "Its scope matches nothing right now. Widen it in the plan, then run again.",
   },
   suite_scope_not_allowed: {
     title: "A test suite takes no scope",
     describe: () =>
-      "It runs the test cases filed in it. File cases into it to change what it covers.",
+      "It runs the scenarios filed in it. File cases into it to change what it covers.",
   },
   suite_targets_required: {
     title: "Choose an agent to run against",

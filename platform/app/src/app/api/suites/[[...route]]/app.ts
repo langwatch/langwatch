@@ -33,7 +33,7 @@ const suiteTargetSchema = z.object({
  * a test suite, whose cases are the ones filed into it.
  */
 const scopeSchema = suiteScopeSchema.describe(
-  "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan.",
+  "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
 );
 
 const suiteResponseSchema = z.object({
@@ -77,7 +77,7 @@ function refuseFolderExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
       code: z.ZodIssueCode.custom,
       path: ["scope"],
       message:
-        "A test suite runs the test cases filed in it, so it takes no scope",
+        "A test suite runs the scenarios filed in it, so it takes no scope",
     });
   }
   if (body.scenarioIds.length > 0) {
@@ -576,7 +576,7 @@ secured.access(requires("scenarios:manage")).delete(
   "/:id",
   describeRoute({
     description:
-      "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
+      "Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.",
     responses: {
       ...baseResponses,
       200: {

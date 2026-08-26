@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Filing a test case into a test suite: where a new case lands, what the
+ * Filing a scenario into a test suite: where a new case lands, what the
  * editor offers, what archiving asks, and how a run plan picks cases.
  *
  * @see specs/scenarios/scenario-folder-assignment.feature
@@ -157,7 +157,7 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("the Test cases tab", () => {
+describe("the Scenarios tab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFoldersGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
@@ -192,29 +192,29 @@ describe("the Test cases tab", () => {
     };
   };
 
-  /** @scenario "A project with no test cases shows what to do first" */
-  it("says what a test case is and offers the first one", () => {
+  /** @scenario "A project with no scenarios shows what to do first" */
+  it("says what a scenario is and offers the first one", () => {
     mockScenariosGetAll.mockReturnValue({ data: [], isLoading: false });
     mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
     renderTab();
 
     const empty = screen.getByTestId("agent-testing-first-case-empty");
     expect(
-      within(empty).getByText("Write your first test case"),
+      within(empty).getByText("Write your first scenario"),
     ).toBeInTheDocument();
     expect(empty).toHaveTextContent(
-      /A test case is one situation you put your agent in/,
+      /A scenario is one situation you put your agent in/,
     );
     expect(
-      within(empty).getByRole("button", { name: "New test case" }),
+      within(empty).getByRole("button", { name: "New scenario" }),
     ).toBeInTheDocument();
     expect(caseEditor().open).toBe(false);
   });
 
-  /** @scenario "History opens from the row menu of a test case" */
+  /** @scenario "History opens from the row menu of a scenario" */
   it("opens the case editor with its history already open, from the row menu", async () => {
     const user = userEvent.setup();
-    // Loose so the row reads at the root of the All test cases surface.
+    // Loose so the row reads at the root of the All scenarios surface.
     mockScenariosGetAll.mockReturnValue({
       data: [scenarioRow({ folderId: null })],
       isLoading: false,
@@ -248,7 +248,7 @@ describe("the Test cases tab", () => {
       screen.getByRole("button", { name: "Actions for Refunds" }),
     );
     await user.click(
-      await screen.findByRole("menuitem", { name: "New test case" }),
+      await screen.findByRole("menuitem", { name: "New scenario" }),
     );
 
     expect(caseEditor()).toEqual({
@@ -399,7 +399,7 @@ describe("the case picker of a run plan", () => {
     ...overrides,
   });
 
-  /** @scenario "A custom run plan can select single test cases grouped by their folder" */
+  /** @scenario "A custom run plan can select single scenarios grouped by their folder" */
   it("lists the cases under their suite names and saves the ones picked", async () => {
     const user = userEvent.setup();
     const props = pickerProps({

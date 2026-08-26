@@ -1,5 +1,5 @@
 /**
- * Filing a test case into a test suite folder from the command line.
+ * Filing a scenario into a test suite folder from the command line.
  *
  * The folder is named by id or by name, and it is resolved through the suites
  * API before the case is written, so a folder that names nothing leaves no
@@ -91,7 +91,7 @@ const makeFolder = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("filing a test case into a folder from the command line", () => {
+describe("filing a scenario into a folder from the command line", () => {
   let mockScenarioCreate: ReturnType<typeof vi.fn>;
   let mockScenarioUpdate: ReturnType<typeof vi.fn>;
   let mockScenarioGetAll: ReturnType<typeof vi.fn>;

@@ -245,8 +245,8 @@ describe("createSuiteCommand()", () => {
   });
 
   describe("when the plan is given a scope", () => {
-    /** @scenario "A plan scoped to all test cases runs every active case" */
-    it("creates it with no test case named", async () => {
+    /** @scenario "A plan scoped to all scenarios runs every active case" */
+    it("creates it with no scenario named", async () => {
       mockCreate.mockResolvedValue(makeSuite({ scope: { mode: "all" } }));
 
       await createSuiteCommand("Everything", {

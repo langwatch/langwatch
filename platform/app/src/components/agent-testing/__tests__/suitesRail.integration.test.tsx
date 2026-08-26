@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The rail of the Test cases tab: All test cases, the test suites, the sets
+ * The rail of the Scenarios tab: All scenarios, the test suites, the sets
  * that run from code, and the period picker at its foot.
  *
  * @see specs/features/agent-testing/suites-rail.feature
@@ -87,8 +87,8 @@ async function openSuiteMenu(suiteName: string) {
 describe("the test suites rail", () => {
   afterEach(cleanup);
 
-  /** @scenario "The rail lists All test cases, then the test suites, then the external sets" */
-  it("lists All test cases, then the test suites, then the external sets", () => {
+  /** @scenario "The rail lists All scenarios, then the test suites, then the external sets" */
+  it("lists All scenarios, then the test suites, then the external sets", () => {
     renderRail({
       suites: [
         makeSuite(),
@@ -107,7 +107,7 @@ describe("the test suites rail", () => {
       .filter((id): id is string => !!id?.startsWith("suite-rail-item-"));
 
     expect(entries).toEqual([
-      "suite-rail-item-All test cases",
+      "suite-rail-item-All scenarios",
       "suite-rail-item-Refunds",
       "suite-rail-item-Checkout",
       "suite-rail-item-nightly-ci",
@@ -120,7 +120,7 @@ describe("the test suites rail", () => {
     }
   });
 
-  /** @scenario "The rail lists All test cases, then the test suites, then the external sets" */
+  /** @scenario "The rail lists All scenarios, then the test suites, then the external sets" */
   it("keeps the row menu beside the selection control, not inside it", () => {
     renderRail({
       suites: [makeSuite({ id: "suite_1", name: "Refunds", slug: "refunds" })],
@@ -180,7 +180,7 @@ describe("the test suites rail", () => {
       (item) => item.textContent,
     );
     expect(items).toEqual([
-      "New test case",
+      "New scenario",
       "Run suite",
       "Edit suite",
       "Open last run",
@@ -232,7 +232,7 @@ describe("the test suites rail", () => {
     expect(within(dialog).getByText("Refunds")).toBeInTheDocument();
     expect(
       within(dialog).getByText(
-        "The test cases in it are archived as well. Test runs are preserved.",
+        "The scenarios in it are archived as well. Test runs are preserved.",
       ),
     ).toBeInTheDocument();
 
@@ -406,7 +406,7 @@ function casesPanelProps(
 ): React.ComponentProps<typeof CasesPanel> {
   return {
     selection: { kind: "all" },
-    title: "All test cases",
+    title: "All scenarios",
     folderGroups: [],
     looseCases: [],
     externalCases: [],

@@ -51,7 +51,7 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
         {props.title}
       </Text>
       <Text fontSize="11.5px" color={FG_MUTED}>
-        {props.caseCount} {props.caseCount === 1 ? "case" : "cases"}
+        {props.caseCount} {props.caseCount === 1 ? "scenario" : "scenarios"}
       </Text>
       {props.isExternal && (
         <Badge
@@ -128,7 +128,7 @@ function CasesPanelActions({
       )}
       <SmallButton onClick={onNewTestCase}>
         <Plus size={13} />
-        New test case
+        New scenario
       </SmallButton>
       <SmallButton loading={isRunningSet} onClick={onRunSet}>
         <Play size={13} />

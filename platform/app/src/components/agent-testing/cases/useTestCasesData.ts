@@ -1,5 +1,5 @@
 /**
- * Everything the Test cases tab reads: the test suites, the cases, the sets
+ * Everything the Scenarios tab reads: the test suites, the cases, the sets
  * that run from code, the last result of every case, and the names of the
  * people who wrote them.
  *
@@ -173,7 +173,7 @@ export function useTestCasesData({
 }
 
 /**
- * The test cases of a set that runs from code. The set holds no case records,
+ * The scenarios of a set that runs from code. The set holds no case records,
  * so the names come from the runs it produced.
  */
 export function useExternalSetCases({

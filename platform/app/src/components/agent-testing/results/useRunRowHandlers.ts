@@ -1,6 +1,6 @@
 /**
  * What one result row reaches: the name of the target it ran against, the run
- * drawer, and the editor of the test case behind it.
+ * drawer, and the editor of the scenario behind it.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  */

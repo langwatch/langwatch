@@ -3,7 +3,7 @@
  * queue the run.
  *
  * Only the run is solid: it is the one thing the dialog is open for, and it
- * names how many test cases it starts.
+ * names how many scenarios it starts.
  *
  * @see specs/features/agent-testing/run-dialog.feature
  */
@@ -19,7 +19,7 @@ import type { RunDialogController } from "./useRunDialogSubmit";
 /** What the run control reads, given how many cases the subject covers. */
 export function runButtonLabel(caseCount: number | null): string {
   if (caseCount === null) return "Run";
-  return caseCount === 1 ? "Run 1 case" : `Run ${caseCount} cases`;
+  return caseCount === 1 ? "Run 1 scenario" : `Run ${caseCount} scenarios`;
 }
 
 export function RunDialogFooter({
@@ -33,7 +33,7 @@ export function RunDialogFooter({
   controller: RunDialogController;
   hasTarget: boolean;
   isRunBlocked: boolean;
-  /** How many test cases the run covers, or nothing when it is not known. */
+  /** How many scenarios the run covers, or nothing when it is not known. */
   caseCount: number | null;
   /** Why the run cannot start, when it cannot. Shown as the button tooltip. */
   blockedReason: string | null;

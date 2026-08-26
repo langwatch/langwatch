@@ -113,8 +113,8 @@ function MoveToSuiteDialog({
             <Text fontSize="12px" color={FG_MUTED}>
               Move{" "}
               {selectedCount === 1
-                ? "1 test case"
-                : `${selectedCount} test cases`}{" "}
+                ? "1 scenario"
+                : `${selectedCount} scenarios`}{" "}
               to
             </Text>
             <NativeSelect.Root size="sm">

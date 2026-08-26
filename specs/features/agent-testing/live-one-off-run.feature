@@ -1,10 +1,10 @@
-Feature: Running one test case keeps the person in place
-  As a person who just edited one test case
+Feature: Running one scenario keeps the person in place
+  As a person who just edited one scenario
   I want to run it and watch it without leaving the table
   So that I keep my place in the list and still see the conversation happen
 
   Background: what happens on Run.
-    Run on a test case row opens the run dialog. When the run is confirmed, the
+    Run on a scenario row opens the run dialog. When the run is confirmed, the
     page does not change address. The run detail drawer opens over the table
     and the conversation streams into it. When the conversation ends, the judge
     verdict appears in the same drawer.
@@ -16,7 +16,7 @@ Feature: Running one test case keeps the person in place
 
   @integration
   Scenario: Confirming a run from a case row does not change the address
-    Given the case table is open at All test cases
+    Given the case table is open at All scenarios
     When Run is confirmed on a case row
     Then the address stays where it was
     And the case table is still behind the drawer
@@ -36,7 +36,7 @@ Feature: Running one test case keeps the person in place
     When the run is confirmed
     Then the run detail drawer opens
     And it shows the run as queued
-    And it names the test case and the target
+    And it names the scenario and the target
 
   @integration
   Scenario: The conversation streams into the drawer while the run goes on
@@ -58,7 +58,7 @@ Feature: Running one test case keeps the person in place
     Given the run detail drawer is open on a finished one-off run
     When its header is read
     Then a single "Open Scenario" button is offered
-    And it opens the editor for that test case
+    And it opens the editor for that scenario
     And a rerun is started from the case editor through its "Save & Run" control
 
   @integration
@@ -108,5 +108,5 @@ Feature: Running one test case keeps the person in place
   @integration
   Scenario: The v1 page still sends the person to the run after a single run
     Given the Agent Testing release flag is off
-    When a single test case is run from the v1 page
+    When a single scenario is run from the v1 page
     Then the person is sent to the run, as they are today

@@ -1,5 +1,5 @@
 /**
- * What the run plan editor reads: the plan itself, and the test cases, agents,
+ * What the run plan editor reads: the plan itself, and the scenarios, agents,
  * prompts and test suites it can be assembled from.
  *
  * The form state is the shared suite form, so the editor keeps every field a

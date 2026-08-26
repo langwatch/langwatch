@@ -130,7 +130,7 @@ export type SuiteRunSummary = {
 
 /**
  * The latest result of one scenario inside a date window, for the last-result
- * cell of the test cases table. batchRunId and scenarioSetId address the run
+ * cell of the scenarios table. batchRunId and scenarioSetId address the run
  * it came from so the cell can link to it.
  */
 export type ScenarioLastResultSummary = {

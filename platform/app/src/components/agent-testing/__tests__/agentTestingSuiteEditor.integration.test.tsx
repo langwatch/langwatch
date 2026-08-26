@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The Agent Testing suite editor drawer: what tabs it draws, how the Test
- * cases tab reads, and how "Add test cases" files a case into the suite.
+ * cases tab reads, and how "Add scenarios" files a case into the suite.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  */
@@ -126,7 +126,7 @@ describe("the suite editor drawer", () => {
   describe("given a folder suite the drawer is opened on", () => {
     describe("when the drawer first renders", () => {
       /** @scenario "Edit suite opens the suite editor drawer with four tabs" */
-      it("draws four tabs: General, Test cases, Simulation models, Execution", () => {
+      it("draws four tabs: General, Scenarios, Simulation models, Execution", () => {
         openEditor();
         render(<AgentTestingSuiteEditorDrawer />, { wrapper: Wrapper });
 
@@ -134,7 +134,7 @@ describe("the suite editor drawer", () => {
           screen.getByTestId("suite-editor-tab-general"),
         ).toHaveTextContent("General");
         expect(screen.getByTestId("suite-editor-tab-cases")).toHaveTextContent(
-          "Test cases",
+          "Scenarios",
         );
         expect(screen.getByTestId("suite-editor-tab-models")).toHaveTextContent(
           "Simulation models",
@@ -145,8 +145,8 @@ describe("the suite editor drawer", () => {
       });
     });
 
-    describe("when the person opens the Test cases tab", () => {
-      /** @scenario "The Test cases tab lists the cases filed under the suite and offers add and remove controls" */
+    describe("when the person opens the Scenarios tab", () => {
+      /** @scenario "The Scenarios tab lists the cases filed under the suite and offers add and remove controls" */
       it("lists the filed cases and shows add and remove controls", async () => {
         const user = userEvent.setup();
         openEditor();
@@ -169,7 +169,7 @@ describe("the suite editor drawer", () => {
     });
 
     describe("when the person picks a case to add and confirms", () => {
-      /** @scenario "Add test cases opens a picker of cases not currently in the suite" */
+      /** @scenario "Add scenarios opens a picker of cases not currently in the suite" */
       it("opens a picker with the cases NOT in the suite and moves the chosen one", async () => {
         const user = userEvent.setup();
         openEditor();

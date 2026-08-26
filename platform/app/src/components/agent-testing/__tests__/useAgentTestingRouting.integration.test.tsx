@@ -52,7 +52,7 @@ describe("useAgentTestingRouting", () => {
   afterEach(cleanup);
 
   describe("given the page address", () => {
-    it("opens on the Test cases tab with every case", () => {
+    it("opens on the Scenarios tab with every case", () => {
       const { result } = renderHook(() => useAgentTestingRouting());
 
       expect(result.current.tab).toBe("cases");

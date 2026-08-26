@@ -1,5 +1,5 @@
 /**
- * The parts of the test case dialog: its heading, the four questions it asks,
+ * The parts of the scenario dialog: its heading, the four questions it asks,
  * the blocks its chips open, and the line of actions at its foot.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -61,7 +61,7 @@ export function CaseModalHeader({
       display="block"
     >
       <Drawer.Title fontSize="14px" fontWeight="semibold">
-        {isEditing ? "Edit test case" : "New test case"}
+        {isEditing ? "Edit scenario" : "New scenario"}
       </Drawer.Title>
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
@@ -423,7 +423,7 @@ function CustomizeSection({ editor }: { editor: CaseEditorState }) {
         />
       )}
       <CustomizeChips
-        title="Customize test case"
+        title="Customize scenario"
         chips={customize.chips}
         testId="customize-case-chips"
       />
@@ -462,7 +462,7 @@ function StaleVersionNotice({
       data-testid="scenario-stale-version"
     >
       <Text fontSize="13px" fontWeight="medium">
-        This test case changed since it was opened
+        This scenario changed since it was opened
       </Text>
       <Text fontSize="11.5px" color={FG_MUTED}>
         Somebody else saved{" "}

@@ -94,7 +94,7 @@ export function SuiteRailMenu({
             value="new-test-case"
             onChoose={() => onNewTestCase(suite.id)}
           >
-            New test case
+            New scenario
           </SuiteMenuItem>
         )}
         {canManage && (

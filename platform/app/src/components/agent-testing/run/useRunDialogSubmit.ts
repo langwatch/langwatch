@@ -80,7 +80,7 @@ export type RunDialogSubmitInput = {
   setMissingProvider: (missing: boolean) => void;
 };
 
-/** Whether the project has anything at all to run a test case against. */
+/** Whether the project has anything at all to run a scenario against. */
 function useHasAnyTarget(subject: RunDialogSubject | null) {
   const { project } = useOrganizationTeamProject();
   const { data: agents } = api.agents.getAll.useQuery(

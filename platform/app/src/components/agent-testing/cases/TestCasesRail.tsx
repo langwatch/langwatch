@@ -1,5 +1,5 @@
 /**
- * The suites rail of the Test cases tab, wired to the tab model.
+ * The suites rail of the Scenarios tab, wired to the tab model.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  */

@@ -1,5 +1,5 @@
 /**
- * The state and the writes of the test case editor.
+ * The state and the writes of the scenario editor.
  *
  * The editor is one dialog with one draft in it. It reads the stored case when
  * it opens on one, and it saves with the version it read, so a save over
@@ -188,7 +188,7 @@ function useCaseWrites({
       onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
     },
     onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create the test case" }),
+      showErrorToast({ error, fallbackTitle: "Couldn't create the scenario" }),
   });
 
   const updateMutation = api.scenarios.update.useMutation({
@@ -205,7 +205,7 @@ function useCaseWrites({
         setStaleVersion(typeof current === "number" ? current : 0);
         return;
       }
-      showErrorToast({ error, fallbackTitle: "Couldn't save the test case" });
+      showErrorToast({ error, fallbackTitle: "Couldn't save the scenario" });
     },
   });
 
@@ -245,9 +245,9 @@ function savePayload({
 /** Says what a save would refuse, or nothing when the draft is complete. */
 function useCaseProblem(draft: CaseDraft): string | null {
   return useMemo(() => {
-    if (!draft.title.trim()) return "A test case needs a title.";
+    if (!draft.title.trim()) return "A scenario needs a title.";
     if (criteriaOf(draft).length === 0)
-      return "A test case needs at least one criterion.";
+      return "A scenario needs at least one criterion.";
     return null;
   }, [draft]);
 }

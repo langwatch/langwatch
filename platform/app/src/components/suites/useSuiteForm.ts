@@ -80,7 +80,7 @@ export const planFormSchema = suiteFormSchema
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["scope"],
-        message: "This plan covers no test case yet",
+        message: "This plan covers no scenario yet",
       });
     }
   });

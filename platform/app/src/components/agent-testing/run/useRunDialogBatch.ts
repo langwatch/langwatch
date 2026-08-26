@@ -85,7 +85,7 @@ function useCaseRunScenario({
   });
 }
 
-/** A one-off run of a single test case, started from the dialog. */
+/** A one-off run of a single scenario, started from the dialog. */
 function useCaseRun(input: BatchRunInput) {
   const { target, projectId, noteInput, runParameters } = input;
   const { onRunStarted, onClose, setMissingProvider } = input;
@@ -174,7 +174,7 @@ function useQueueSuiteRun(input: BatchRunInput) {
   return { queueSuiteRun, isSuitePending: runSuite.isPending };
 }
 
-/** Queues a run of every test case, targets and all, in one request. */
+/** Queues a run of every scenario, targets and all, in one request. */
 function useQueueAllRun(input: BatchRunInput) {
   const runAll = api.suites.runAll.useMutation();
   const { projectId, target, suiteTargets, noteInput, runParameters } = input;

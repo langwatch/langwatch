@@ -170,7 +170,7 @@ Feature: The run dialog
     When its footer is read
     Then it holds "Cancel", "Save" and "Run"
     And Run is the only solid control
-    And Run names how many test cases it starts
+    And Run names how many scenarios it starts
     And Run carries no dropdown
 
   @integration
@@ -226,7 +226,7 @@ Feature: The run dialog
 
   @integration
   Scenario: The dialog closes and the person stays where they were
-    Given the run dialog is open from a test case row
+    Given the run dialog is open from a scenario row
     When the run is confirmed
     Then the dialog closes
     And the view behind it does not change address

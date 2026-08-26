@@ -1,5 +1,5 @@
 /**
- * Every run entry of the Test cases tab. Each one opens the run dialog; the
+ * Every run entry of the Scenarios tab. Each one opens the run dialog; the
  * dialog owns the target choice, the note, the overrides, and the run itself.
  *
  * @see specs/features/agent-testing/cases-table.feature

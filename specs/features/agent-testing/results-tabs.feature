@@ -30,7 +30,7 @@ Feature: The Results tab
     Given the Results tab is open on the list of run plans
     When the header of the list is read
     Then it offers "New run plan" beside the period picker
-    And the button reads as a small outlined action, like "New test case"
+    And the button reads as a small outlined action, like "New scenario"
     And choosing it opens the run plan editor
 
   @integration
@@ -104,18 +104,18 @@ Feature: The Results tab
     And the cell fills in once the case reaches its verdict
 
   @integration
-  Scenario: The row menu of a result opens the editor of the test case
+  Scenario: The row menu of a result opens the editor of the scenario
     Given a finished run of one case
     When the row menu of the result is opened
-    Then it offers "Edit test case"
-    And choosing it opens the editor of that test case
+    Then it offers "Edit scenario"
+    And choosing it opens the editor of that scenario
 
   @integration
-  Scenario: The row menu of a result runs the test case again on its own
+  Scenario: The row menu of a result runs the scenario again on its own
     Given a finished run of one case
     When the row menu of the result is opened
     Then it offers "Open the conversation"
-    And it offers "Rerun this test case"
+    And it offers "Rerun this scenario"
 
   @integration
   Scenario: A test suite is run from the header of its run plan

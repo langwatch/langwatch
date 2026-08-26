@@ -383,7 +383,7 @@ describe("Feature: Suites REST API", () => {
       expect(stored?.archivedAt).not.toBeNull();
     });
 
-    it("archives every test case filed in it", async () => {
+    it("archives every scenario filed in it", async () => {
       const { folder, cases } = await createFolderWithCases("Refunds", 2);
 
       await helpers.api.delete(`/api/suites/${folder.id}`);

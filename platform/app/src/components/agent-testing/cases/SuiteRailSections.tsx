@@ -1,5 +1,5 @@
 /**
- * The scrolling body of the suites rail: All test cases, the test suites of
+ * The scrolling body of the suites rail: All scenarios, the test suites of
  * the project, and the sets that run from code.
  *
  * No row carries a count or a time. How many cases a set holds reads once,
@@ -42,7 +42,7 @@ export function SuiteRailSections(props: SuiteRailSectionsProps) {
       paddingY={4}
     >
       <RailItem
-        label="All test cases"
+        label="All scenarios"
         icon={
           collapsed ? (
             <Icon as={ListChecks} boxSize="13px" color={FG_MUTED} />

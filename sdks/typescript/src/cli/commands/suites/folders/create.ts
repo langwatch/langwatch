@@ -6,7 +6,7 @@ import { failSpinner } from "../../../utils/spinnerError";
 import type { CommandResult } from "../../../utils/output";
 
 /**
- * Creates an empty test suite folder. Test cases join it afterwards, with
+ * Creates an empty test suite folder. Scenarios join it afterwards, with
  * `langwatch scenario update <id> --folder <folder>`.
  *
  * A folder and a run plan share one name space for slugs, so a name another
@@ -33,11 +33,11 @@ export const createFolderCommand = async (
         console.log();
         console.log(`  ${chalk.gray("ID:")}         ${chalk.green(folder.id)}`);
         console.log(`  ${chalk.gray("Slug:")}       ${chalk.yellow(folder.slug)}`);
-        console.log(`  ${chalk.gray("Test cases:")} ${folder.scenarioIds.length}`);
+        console.log(`  ${chalk.gray("Scenarios:")} ${folder.scenarioIds.length}`);
         console.log();
         console.log(
           chalk.gray(
-            `File a test case into it with ${chalk.cyan(`langwatch scenario update <id> --folder ${folder.id}`)}`,
+            `File a scenario into it with ${chalk.cyan(`langwatch scenario update <id> --folder ${folder.id}`)}`,
           ),
         );
       },

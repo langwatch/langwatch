@@ -122,7 +122,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
 
   // The plan detail already has a rail (RunsSidebar) baked in. The list view
   // has none, so it takes an invisible rail spacer of the same width so the
-  // content column lines up with the Test cases table.
+  // content column lines up with the Scenarios table.
   if (planSlug && selectedPlan) {
     return (
       <RunPlanDetail

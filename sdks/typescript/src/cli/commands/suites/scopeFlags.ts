@@ -33,7 +33,7 @@ export function hasScopeFlag(options: ScopeOptions): boolean {
  * value is resolved through the folder list, so a name reads as well as an id.
  *
  * Returns undefined when no scope flag was given, which leaves the plan
- * covering the test cases it names.
+ * covering the scenarios it names.
  *
  * @see specs/suites/run-plan-dynamic-scopes.feature
  */
@@ -80,8 +80,8 @@ export async function buildScope(
 
 /** How a stored scope reads on one line of the command output. */
 export function describeScope(scope: SuiteScope | null | undefined): string {
-  if (!scope || scope.mode === "cases") return "the test cases listed";
-  if (scope.mode === "all") return "all test cases";
+  if (!scope || scope.mode === "cases") return "the scenarios listed";
+  if (scope.mode === "all") return "all scenarios";
   if (scope.mode === "folders")
     return `${scope.folderIds.length} test suite(s)`;
   return `labels: ${scope.labels.join(", ")}`;

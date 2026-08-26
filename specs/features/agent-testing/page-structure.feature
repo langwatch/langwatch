@@ -1,6 +1,6 @@
 Feature: The Agent Testing page
   As a person who tests an agent
-  I want one page with the test cases and the results side by side in tabs
+  I want one page with the scenarios and the results side by side in tabs
   So that I do not move between several pages to do one job
 
   Background: the shape of the page.
@@ -45,9 +45,9 @@ Feature: The Agent Testing page
     And no Agent Testing item is shown
 
   @integration
-  Scenario: A person without permission to read test cases cannot open the page
+  Scenario: A person without permission to read scenarios cannot open the page
     Given the Agent Testing release flag is on
-    And a person without permission to read test cases
+    And a person without permission to read scenarios
     When the Agent Testing address is opened
     Then the page is refused
     And the flag alone does not grant access
@@ -59,7 +59,7 @@ Feature: The Agent Testing page
     Given the Agent Testing page is open
     When the header is read
     Then "Agent Testing" is on the far left
-    And the tabs "Test cases" and "Results" are in the middle
+    And the tabs "Scenarios" and "Results" are in the middle
     And the header spans the full width of the page
 
   @integration
@@ -76,12 +76,12 @@ Feature: The Agent Testing page
   Scenario: Each tab name carries how many rows it holds
     Given the Agent Testing page is open
     When the header is read
-    Then "Test cases" carries the number of test cases
+    Then "Scenarios" carries the number of scenarios
     And "Results" carries the number of run plans
 
   @integration
   Scenario: The header carries no action on either tab
-    Given the Agent Testing page is open on the Test cases tab
+    Given the Agent Testing page is open on the Scenarios tab
     Then the header offers no action
     When the Results tab is chosen
     Then the header still offers no action
@@ -91,7 +91,7 @@ Feature: The Agent Testing page
   @integration
   Scenario: The content is held to a column and centred on the page
     Given the Agent Testing page is open on a wide window
-    When the test cases and the results are read one after the other
+    When the scenarios and the results are read one after the other
     Then the content of each is held to one readable column
     And the column is centred on the whole page, not on the space beside the rail
     And the column does not move when the tab changes
@@ -123,8 +123,8 @@ Feature: The Agent Testing page
   # --- Empty project ---
 
   @integration
-  Scenario: A project with no test cases shows what to do first
-    Given a project with no test cases and no runs
+  Scenario: A project with no scenarios shows what to do first
+    Given a project with no scenarios and no runs
     When the Agent Testing page is opened
-    Then an empty state explains what a test case is
+    Then an empty state explains what a scenario is
     And it offers to create the first one

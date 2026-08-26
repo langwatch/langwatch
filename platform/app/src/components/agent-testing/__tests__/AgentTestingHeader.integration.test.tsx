@@ -48,7 +48,7 @@ describe("<AgentTestingHeader/>", () => {
     it("counts the cases and the run plans beside the tab names", () => {
       renderHeader({ casesCount: 12, plansCount: 3 });
 
-      expect(screen.getByRole("tab", { name: /Test cases/ })).toHaveTextContent(
+      expect(screen.getByRole("tab", { name: /Scenarios/ })).toHaveTextContent(
         "12",
       );
       expect(screen.getByRole("tab", { name: /Results/ })).toHaveTextContent(
@@ -57,11 +57,11 @@ describe("<AgentTestingHeader/>", () => {
     });
 
     /** @scenario "The header holds the title and the tabs on one line" */
-    it("offers the Test cases tab and the Results tab", () => {
+    it("offers the Scenarios tab and the Results tab", () => {
       renderHeader();
 
       const tabNames = screen.getAllByRole("tab").map((tab) => tab.textContent);
-      expect(tabNames).toEqual(["Test cases", "Results"]);
+      expect(tabNames).toEqual(["Scenarios", "Results"]);
     });
 
     it("marks the open tab", () => {
@@ -84,15 +84,15 @@ describe("<AgentTestingHeader/>", () => {
     });
   });
 
-  describe("given the Test cases tab is open", () => {
+  describe("given the Scenarios tab is open", () => {
     /** @scenario "The header carries no action on either tab" */
     it("offers no action of its own", () => {
       renderHeader({ tab: "cases" });
 
-      // New test case belongs to the panel header, beside the set it files
+      // New scenario belongs to the panel header, beside the set it files
       // into, so the page header carries nothing here.
       expect(
-        screen.queryByRole("button", { name: /New test case/ }),
+        screen.queryByRole("button", { name: /New scenario/ }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /New run plan/i }),

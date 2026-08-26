@@ -385,7 +385,7 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called without explicit setId", () => {
-      /** @scenario "A single test case run goes to the project internal run set" */
+      /** @scenario "A single scenario run goes to the project internal run set" */
       it("dispatches queueRun command before scheduling", async () => {
         await caller.run(defaultInput);
 
@@ -402,7 +402,7 @@ describe("simulationRunnerRouter.run", () => {
         );
       });
 
-      /** @scenario "A one-off batch carries the name of the test case that ran" */
+      /** @scenario "A one-off batch carries the name of the scenario that ran" */
       it("stamps the scenario name onto the queued run", async () => {
         await caller.run(defaultInput);
 
@@ -541,7 +541,7 @@ describe("simulationRunnerRouter.run", () => {
 
     describe("when the run carries a note", () => {
       /** @scenario "The note is written under the top-level note key of the run metadata" */
-      /** @scenario "A note on a single test case run is stored with that run" */
+      /** @scenario "A note on a single scenario run is stored with that run" */
       it("writes the note under the top-level note key of the run metadata", async () => {
         await caller.run({ ...defaultInput, note: "nightly regression" });
 

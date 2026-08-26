@@ -3,7 +3,7 @@
  *
  * Both tabs read as a rail on the left and a centred content column on the
  * right. The content column carries the same width and the same centring rule
- * across the two tabs, so the eye lines up when a person moves from Test cases
+ * across the two tabs, so the eye lines up when a person moves from Scenarios
  * to Results. When a tab has no real rail on the left, the layout still keeps
  * the same left offset with an invisible spacer of the same width, so the
  * content never shifts.
@@ -31,7 +31,7 @@ export type AgentTestingTabLayoutProps = {
 /**
  * The tab wrapper: a rail slot on the left, and the content column beside it.
  *
- * The two tabs pass their own rail (the suites rail on Test cases, the runs
+ * The two tabs pass their own rail (the suites rail on Scenarios, the runs
  * sidebar on a plan detail), or leave the slot empty and get an invisible
  * spacer that keeps the content column at the same left offset as the other
  * tab. Every content column of the page routes through this wrapper.

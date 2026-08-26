@@ -52520,7 +52520,7 @@
                             "type": "null"
                           }
                         ],
-                        "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                        "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                       },
                       "targets": {
                         "type": "array",
@@ -52800,7 +52800,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53045,7 +53045,7 @@
                         ]
                       }
                     ],
-                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                   },
                   "targets": {
                     "type": "array",
@@ -53209,7 +53209,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53504,7 +53504,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -53757,7 +53757,7 @@
                         ]
                       }
                     ],
-                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                   },
                   "scenarioIds": {
                     "type": "array",
@@ -53825,7 +53825,7 @@
       },
       "delete": {
         "operationId": "deleteApiSuitesById",
-        "description": "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
+        "description": "Archive (soft-delete) a suite. Archiving a folder also archives every scenario filed in it, in one transaction.",
         "responses": {
           "200": {
             "description": "Suite archived",
@@ -54081,7 +54081,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      "description": "What the run plan covers: all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The test case dialog of the Agent Testing page: what it asks, what its
+ * The scenario dialog of the Agent Testing page: what it asks, what its
  * footer holds, what its chips open, and what Save and Run does.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -177,7 +177,7 @@ function openDrawerAs(params: {
   mockDrawerOpenFor.current = "agentTestingCaseEditor";
 }
 
-describe("the test case dialog", () => {
+describe("the scenario dialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDrawerParams.current = {};
@@ -204,12 +204,12 @@ describe("the test case dialog", () => {
   };
 
   describe("when a new case is written", () => {
-    /** @scenario "New test case opens the case dialog straight away" */
+    /** @scenario "New scenario opens the case dialog straight away" */
     it("opens on the form itself, with no model-writing step first", async () => {
       openNew();
 
       const dialog = await screen.findByTestId("case-modal");
-      expect(await screen.findByText("New test case")).toBeInTheDocument();
+      expect(await screen.findByText("New scenario")).toBeInTheDocument();
       expect(screen.getByLabelText("Title")).toBeInTheDocument();
       expect(screen.getByLabelText("Test suite")).toBeInTheDocument();
       expect(screen.getByLabelText("Situation")).toBeInTheDocument();
@@ -240,7 +240,7 @@ describe("the test case dialog", () => {
       expect(screen.queryByTestId("case-models-block")).not.toBeInTheDocument();
 
       const chips = screen.getByTestId("customize-case-chips");
-      expect(chips).toHaveTextContent("Customize test case");
+      expect(chips).toHaveTextContent("Customize scenario");
       expect(
         within(chips).getByTestId("customize-chip-case-parameters"),
       ).toHaveTextContent("Add parameters");
@@ -365,7 +365,7 @@ describe("the test case dialog", () => {
         { wrapper: Wrapper },
       );
 
-      expect(await screen.findByText("Edit test case")).toBeInTheDocument();
+      expect(await screen.findByText("Edit scenario")).toBeInTheDocument();
       const history = screen.getByTestId("case-modal-history");
       expect(history).toHaveTextContent("v4 · History");
 

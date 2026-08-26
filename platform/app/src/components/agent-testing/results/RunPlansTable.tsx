@@ -2,7 +2,7 @@
  * The Test Runs list: every run plan of the project, what it covers, how many
  * cases it holds and how its last run went.
  *
- * The list is a grid inside one card, the way the Test cases table is drawn,
+ * The list is a grid inside one card, the way the Scenarios table is drawn,
  * so both tabs read as one surface. Its section header carries New run plan
  * and the period picker, the way the cases panel header carries its actions.
  *
@@ -97,7 +97,7 @@ export function RunPlansTable({
             </EmptyState.Indicator>
             <EmptyState.Title>No runs yet</EmptyState.Title>
             <EmptyState.Description>
-              Run a test suite or a single test case and the results land here.
+              Run a test suite or a single scenario and the results land here.
             </EmptyState.Description>
           </EmptyState.Content>
         </EmptyState.Root>

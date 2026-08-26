@@ -3,7 +3,7 @@
  * needs.
  *
  * A plan scoped to test suites or to labels is a rule rather than a list, so a
- * test case written tomorrow runs under it without the plan being opened
+ * scenario written tomorrow runs under it without the plan being opened
  * again. The line at the foot says how many cases the rule covers right now.
  *
  * @see specs/suites/run-plan-dynamic-scopes.feature
@@ -20,13 +20,13 @@ import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
 const SCOPE_CHOICES: { mode: SuiteScopeMode; label: string }[] = [
-  { mode: "all", label: "All test cases" },
+  { mode: "all", label: "All scenarios" },
   { mode: "folders", label: "Selected test suites" },
   { mode: "labels", label: "Selected labels" },
-  { mode: "cases", label: "Specific test cases" },
+  { mode: "cases", label: "Specific scenarios" },
 ];
 
-/** What the chosen rule needs picked. "All test cases" needs nothing. */
+/** What the chosen rule needs picked. "All scenarios" needs nothing. */
 function ScopeDetail({
   mode,
   editor,
@@ -115,7 +115,7 @@ function FolderChoices({ editor }: { editor: PlanEditorState }) {
   );
 }
 
-/** Every label a test case of the project carries, as a chip that turns on. */
+/** Every label a scenario of the project carries, as a chip that turns on. */
 function LabelChoices({ editor }: { editor: PlanEditorState }) {
   const { suiteForm } = editor;
   const chosen =
@@ -124,7 +124,7 @@ function LabelChoices({ editor }: { editor: PlanEditorState }) {
   if (suiteForm.allLabels.length === 0) {
     return (
       <Text fontSize="11.5px" color={FG_MUTED}>
-        No label on any test case yet.
+        No label on any scenario yet.
       </Text>
     );
   }
@@ -153,7 +153,7 @@ function LabelChoices({ editor }: { editor: PlanEditorState }) {
   );
 }
 
-/** The project's test cases, read under the test suite they are filed in. */
+/** The project's scenarios, read under the test suite they are filed in. */
 function CaseChoices({ editor }: { editor: PlanEditorState }) {
   const { suiteForm } = editor;
   const scenarios = suiteForm.filteredScenarios;
@@ -180,7 +180,7 @@ function CaseChoices({ editor }: { editor: PlanEditorState }) {
   if (groups.length === 0) {
     return (
       <Text fontSize="11.5px" color={FG_MUTED}>
-        No test case yet.
+        No scenario yet.
       </Text>
     );
   }
@@ -262,8 +262,8 @@ export function PlanScopeField({
       ))}
       <Text paddingTop={1} fontSize="11px" color={FG_MUTED}>
         {count === 1
-          ? "1 test case will run."
-          : `${count} test cases will run.`}
+          ? "1 scenario will run."
+          : `${count} scenarios will run.`}
       </Text>
     </VStack>
   );
