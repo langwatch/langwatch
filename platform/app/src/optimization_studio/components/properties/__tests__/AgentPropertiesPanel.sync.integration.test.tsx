@@ -55,15 +55,23 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("@langwatch/workflow-web", () => ({
-  useWorkflowStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      setNode: mockSetNode,
-      setEdges: vi.fn(),
-      deselectAllNodes: vi.fn(),
-      getWorkflow: () => ({ nodes: [], edges: [] }),
-    }),
-}));
+vi.mock("@langwatch/workflow-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
+
+  return {
+    ...actual,
+    useWorkflowStore: (selector: (state: unknown) => unknown) =>
+      selector({
+        setNode: mockSetNode,
+        setEdges: vi.fn(),
+        deselectAllNodes: vi.fn(),
+        getWorkflow: () => ({ nodes: [], edges: [] }),
+      }),
+    useRegisterDrawerFooter: (content: ReactNode) => {
+      footerHolder.content = content;
+    },
+  };
+});
 
 vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
@@ -107,12 +115,6 @@ vi.mock("../BasePropertiesPanel", () => ({
   BasePropertiesPanel: ({ children }: { children: ReactNode }) => (
     <div data-testid="base-properties-panel">{children}</div>
   ),
-}));
-
-vi.mock("../../drawers/useInsideDrawer", () => ({
-  useRegisterDrawerFooter: (content: ReactNode) => {
-    footerHolder.content = content;
-  },
 }));
 
 const { AgentPropertiesPanel } = await import("../AgentPropertiesPanel");
@@ -173,10 +175,7 @@ function nodeWithLastPatch(node: Node<AgentComponent>): Node<AgentComponent> {
   const patches = mockSetNode.mock.calls
     .map(([patch]) => patch as { id: string; data?: Partial<AgentComponent> })
     .filter((patch) => patch.id === node.id);
-  const data = patches.reduce(
-    (acc, patch) => ({ ...acc, ...(patch.data ?? {}) }),
-    node.data,
-  );
+  const data = patches.reduce((acc, patch) => ({ ...acc, ...patch.data }), node.data);
   return { ...node, data };
 }
 

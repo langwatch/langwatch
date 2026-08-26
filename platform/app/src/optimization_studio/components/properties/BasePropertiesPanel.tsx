@@ -23,7 +23,7 @@ import { toaster } from "../../../components/ui/toaster";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { DEFAULT_MODEL } from "../../../utils/constants";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useInsideDrawer, useWorkflowStore } from "@langwatch/workflow-web";
 import type {
   Component,
   ComponentType,
@@ -33,7 +33,6 @@ import type {
 } from "@langwatch/workflow-contract";
 import { nameToId, validateNodeName } from "@langwatch/workflow-contract";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { useInsideDrawer } from "../drawers/useInsideDrawer";
 import {
   ComponentExecutionButton,
   getNodeDisplayName,

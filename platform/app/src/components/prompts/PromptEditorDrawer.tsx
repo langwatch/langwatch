@@ -24,7 +24,7 @@ import {
 } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
+import { useRegisterDrawerFooter } from "@langwatch/workflow-web";
 import { PromptEditorFooter } from "~/prompts/components/PromptEditorFooter";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { VersionBadge } from "@langwatch/prompt-web";

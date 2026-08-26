@@ -1,11 +1,11 @@
 import { VStack } from "@chakra-ui/react";
+import { LLMConfigFormatUtils } from "@langwatch/workflow-web";
 import { useCallback, useMemo, useRef } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import type { Output, OutputType } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigOutputType } from "~/types";
-import { LLMConfigFormatUtils } from "./llm-config-format-utils";
 import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigField";
 
 /**

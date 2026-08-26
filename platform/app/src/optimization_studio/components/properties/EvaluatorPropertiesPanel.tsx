@@ -17,14 +17,13 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "../../../utils/api";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useRegisterDrawerFooter, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
 } from "@langwatch/workflow-web";
-import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 /**

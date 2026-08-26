@@ -31,9 +31,9 @@ import { api } from "../../utils/api";
 import { slugify } from "../../utils/slugify";
 import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useWorkflowStore } from "@langwatch/workflow-web";
+import { isExperimentQueryEnabled } from "@langwatch/workflow-web";
 import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
-import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OpenFullResultsButton } from "./OpenFullResultsButton";
 import { RunViaApiButton } from "./RunViaApiButton";
 

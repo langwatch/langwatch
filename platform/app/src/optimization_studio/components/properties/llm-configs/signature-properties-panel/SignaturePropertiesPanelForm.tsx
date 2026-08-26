@@ -14,6 +14,7 @@ import {
 } from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "@langwatch/workflow-web";
+import { computeMessageEdgeUpdate } from "@langwatch/workflow-web";
 import { type PromptConfigFormValues, usePromptConfigForm } from "~/prompts";
 import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
@@ -28,7 +29,6 @@ import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 import { buildAvailableSources } from "@langwatch/workflow-web";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
-import { computeMessageEdgeUpdate } from "./messageEdgeUtils";
 
 /**
  * Properties panel for the Signature node in the optimization studio.

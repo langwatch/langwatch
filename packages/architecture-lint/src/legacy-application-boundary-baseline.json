@@ -1458,9 +1458,6 @@
         "../../../server/evaluations/evaluators",
         "../../../server/evaluations/getEvaluator"
       ],
-      "platform/app/src/optimization_studio/components/properties/llm-configs/llm-config-format-utils.ts": [
-        "~/server/prompt-config/reasoningBoundary"
-      ],
       "platform/app/src/optimization_studio/components/properties/llm-configs/promptSourceSelect/PromptSourceHeader.tsx": [
         "~/server/prompt-config"
       ],

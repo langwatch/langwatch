@@ -26,6 +26,7 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@xyflow/react": "^12.11.1",

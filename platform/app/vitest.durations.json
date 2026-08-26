@@ -769,7 +769,6 @@
   "src/optimization_studio/hooks/__tests__/useEvaluationExecution.unit.test.ts": 76,
   "src/optimization_studio/hooks/__tests__/usePostEvent.unit.test.ts": 79,
   "src/optimization_studio/hooks/__tests__/useRunEvalution.modelGating.integration.test.tsx": 108,
-  "src/optimization_studio/hooks/workflowStoreCore.unit.test.ts": 53,
   "src/optimization_studio/server/lambda/__tests__/getProjectLambdaArn.test.ts": 1083,
   "src/optimization_studio/utils/__tests__/controlFlow.unit.test.ts": 53,
   "src/optimization_studio/utils/__tests__/datasetUtils.unit.test.ts": 46,

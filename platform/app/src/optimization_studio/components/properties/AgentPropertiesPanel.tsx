@@ -38,6 +38,7 @@ import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
+  useRegisterDrawerFooter,
 } from "@langwatch/workflow-web";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { api } from "~/utils/api";
@@ -55,7 +56,6 @@ import {
   buildInputMappings,
 } from "@langwatch/workflow-web";
 import { CodeEditorModal } from "../code/workflow-code-editor.transport";
-import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 /**

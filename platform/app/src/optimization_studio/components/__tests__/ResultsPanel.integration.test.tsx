@@ -12,20 +12,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const fakeStoreState = {
   workflow_id: "wf_1",
-  experiment_id: undefined,
-  state: { evaluation: undefined },
+  experiment_id: void 0,
+  state: { evaluation: void 0 },
   getWorkflow: () => ({ nodes: [], edges: [] }),
 };
 
-vi.mock("@langwatch/workflow-web", () => ({
-  useWorkflowStore: (selector: (s: typeof fakeStoreState) => unknown) =>
-    selector(fakeStoreState),
-}));
+vi.mock("@langwatch/workflow-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
+
+  return {
+    ...actual,
+    useWorkflowStore: (selector: (state: typeof fakeStoreState) => unknown) =>
+      selector(fakeStoreState),
+  };
+});
 
 // No project, so EvaluationResults short-circuits to its empty state. That
 // keeps this test focused on the panel's tab structure, not the run table.
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({ project: undefined }),
+  useOrganizationTeamProject: () => ({ project: void 0 }),
 }));
 
 vi.mock("~/optimization_studio/hooks/useRunEvalution", () => ({
@@ -34,14 +39,14 @@ vi.mock("~/optimization_studio/hooks/useRunEvalution", () => ({
 
 vi.mock("~/components/experiments/BatchEvaluationV2", () => ({
   useBatchEvaluationState: () => ({
-    selectedRun: undefined,
+    selectedRun: void 0,
     isFinished: true,
-    batchEvaluationRuns: { data: undefined, isLoading: false },
-    selectedRunId: undefined,
+    batchEvaluationRuns: { data: void 0, isLoading: false },
+    selectedRunId: void 0,
   }),
 }));
 
-const emptyQuery = { data: undefined, isLoading: false, isError: false };
+const emptyQuery = { data: void 0, isLoading: false, isError: false };
 vi.mock("~/utils/api", () => ({
   api: {
     experiments: {

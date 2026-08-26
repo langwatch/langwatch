@@ -1,7 +1,7 @@
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { InsideDrawerProvider, useWorkflowStore } from "@langwatch/workflow-web";
 import type {
   AgentComponent,
   Component,
@@ -20,7 +20,6 @@ import { PromptingTechniquePropertiesPanel } from "../properties/PromptingTechni
 import { RetrievePropertiesPanel } from "../properties/RetrievePropertiesPanel";
 import { SignaturePromptEditorBridge } from "./SignaturePromptEditorBridge";
 import { StudioDrawerWrapper } from "./StudioDrawerWrapper";
-import { InsideDrawerProvider } from "./useInsideDrawer";
 
 /**
  * Panel map for all node types. Every node type goes through

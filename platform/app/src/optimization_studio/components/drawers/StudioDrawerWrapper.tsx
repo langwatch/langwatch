@@ -11,13 +11,12 @@ import { HoverableBigText } from "~/components/HoverableBigText";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { DrawerFooterContext, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { ComponentExecutionButton, getNodeDisplayName } from "@langwatch/workflow-web";
-import { DrawerFooterContext } from "./useInsideDrawer";
 
 /**
  * Determines whether a node type supports the expand (Input/Output panels)

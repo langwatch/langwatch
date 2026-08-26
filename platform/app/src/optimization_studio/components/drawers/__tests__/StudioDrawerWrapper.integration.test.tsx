@@ -21,18 +21,23 @@ const mockDeleteNode = vi.fn();
 const mockDeselectAllNodes = vi.fn();
 const mockSetPropertiesExpanded = vi.fn();
 
-vi.mock("@langwatch/workflow-web", () => ({
-  useWorkflowStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      deselectAllNodes: mockDeselectAllNodes,
-      propertiesExpanded: false,
-      setPropertiesExpanded: mockSetPropertiesExpanded,
-      duplicateNode: mockDuplicateNode,
-      deleteNode: mockDeleteNode,
-    }),
-  ComponentExecutionButton: () => <div data-testid="exec-button" />,
-  getNodeDisplayName: (node: Node<Component>) => node.data.name ?? node.id,
-}));
+vi.mock("@langwatch/workflow-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
+
+  return {
+    ...actual,
+    useWorkflowStore: (selector: (state: unknown) => unknown) =>
+      selector({
+        deselectAllNodes: mockDeselectAllNodes,
+        propertiesExpanded: false,
+        setPropertiesExpanded: mockSetPropertiesExpanded,
+        duplicateNode: mockDuplicateNode,
+        deleteNode: mockDeleteNode,
+      }),
+    ComponentExecutionButton: () => <div data-testid="exec-button" />,
+    getNodeDisplayName: (node: Node<Component>) => node.data.name ?? node.id,
+  };
+});
 
 vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: unknown) => fn,
