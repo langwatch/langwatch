@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   gatedSourceTypeOptions,
   groupForMode,
+  isSourceTypeSelectable,
   SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
   SOURCE_TYPE_OPTIONS,
@@ -75,6 +76,42 @@ describe("given the ingestion-source catalog", () => {
     it("locks nothing", () => {
       const options = gatedSourceTypeOptions({ isEnterprise: true });
       expect(options.every((o) => !o.locked)).toBe(true);
+    });
+  });
+
+  describe("when a source type has been retired", () => {
+    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
+    it("keeps the retired OpenAI source in the list", () => {
+      const options = gatedSourceTypeOptions({ isEnterprise: true });
+
+      expect(options.map((o) => o.value)).toContain("openai_compliance");
+    });
+
+    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
+    it("marks it retired and refuses to let it be picked", () => {
+      const options = gatedSourceTypeOptions({ isEnterprise: true });
+      const retired = options.find((o) => o.value === "openai_compliance");
+
+      expect(retired?.deprecated).toBe(true);
+      // An enterprise plan locks nothing, so the plan gate alone would leave
+      // this selectable — being retired is a separate reason to be inert.
+      expect(retired?.locked).toBe(false);
+      expect(isSourceTypeSelectable(retired!)).toBe(false);
+    });
+
+    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
+    it("leaves every other type selectable on an enterprise plan", () => {
+      const options = gatedSourceTypeOptions({ isEnterprise: true });
+      const unselectable = options
+        .filter((o) => !isSourceTypeSelectable(o))
+        .map((o) => o.value);
+
+      expect(unselectable).toEqual(["openai_compliance"]);
+    });
+
+    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
+    it("offers the replacement that reads the same vendor", () => {
+      expect(SOURCE_TYPE_OPTIONS.map((o) => o.value)).toContain("openai_admin");
     });
   });
 

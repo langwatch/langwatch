@@ -144,8 +144,9 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "OpenAI Enterprise Compliance",
     mode: "s3",
     blurb:
-      "Pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API).",
+      "Retired. It looked for compliance files in an S3 bucket OpenAI does not write to, and could never be saved. Use OpenAI Admin API (spend) instead.",
     icon: <OpenAI />,
+    deprecated: true,
   },
   {
     value: "openai_admin",
@@ -249,6 +250,16 @@ export function routesConversations(sourceType: SourceType): boolean {
 export interface GatedSourceTypeOption extends SourceTypeOption {
   /** Locked types render in the menu but cannot be picked. */
   locked: boolean;
+}
+
+/**
+ * Whether the menu must render this option inert. Two different reasons —
+ * the org's plan, and the type being retired — that the menu answers
+ * identically. Kept as one function so no surface can honour one and forget
+ * the other.
+ */
+export function isSourceTypeSelectable(option: GatedSourceTypeOption): boolean {
+  return !option.locked && option.deprecated !== true;
 }
 
 /**

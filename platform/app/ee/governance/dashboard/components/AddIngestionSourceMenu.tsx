@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { HStack, Spacer, Text } from "@chakra-ui/react";
-import { Lock } from "lucide-react";
+import { Archive, Lock } from "lucide-react";
 // biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
 import React from "react";
 import { Menu } from "~/components/ui/menu";
@@ -10,6 +10,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import {
   gatedSourceTypeOptions,
   groupForMode,
+  isSourceTypeSelectable,
   SOURCE_GROUP_META,
   type SourceGroup,
   type SourceType,
@@ -23,9 +24,12 @@ import {
  * AddModelProviderMenu so the two "add a thing by vendor" surfaces feel like
  * one product.
  *
- * Plan-locked types render inert with the plan that unlocks them — they get
- * no click handler at all, so a locked type cannot be picked no matter what
- * the pointer does. `disabledReason` makes the whole trigger inert with the
+ * Plan-locked types render inert with the plan that unlocks them, and retired
+ * types render inert saying so — both get no click handler at all, so neither
+ * can be picked no matter what the pointer does. A retired type stays in the
+ * list rather than vanishing: this menu promises every supported type, and an
+ * admin hunting for a vendor should be told it was retired rather than left
+ * wondering. `disabledReason` makes the whole trigger inert with the
  * reason on hover (used when a non-enterprise org is at its source cap), and
  * mounts no menu, so adding can never open onto a list that leads nowhere.
  */
@@ -67,7 +71,7 @@ export function AddIngestionSourceMenu({
             {options
               .filter((option) => groupForMode(option.mode) === group)
               .map((option) =>
-                option.locked ? (
+                !isSourceTypeSelectable(option) ? (
                   <Menu.Item key={option.value} value={option.value} disabled>
                     <HStack gap={3} width="full">
                       <SourceTypeIconGlyph
@@ -77,8 +81,17 @@ export function AddIngestionSourceMenu({
                       <Text>{option.label}</Text>
                       <Spacer />
                       <HStack gap={1} color="fg.muted">
-                        <Lock size={12} />
-                        <Text fontSize="xs">Enterprise</Text>
+                        {option.deprecated ? (
+                          <>
+                            <Archive size={12} />
+                            <Text fontSize="xs">Retired</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={12} />
+                            <Text fontSize="xs">Enterprise</Text>
+                          </>
+                        )}
                       </HStack>
                     </HStack>
                   </Menu.Item>
