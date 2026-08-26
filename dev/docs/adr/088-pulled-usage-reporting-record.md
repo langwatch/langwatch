@@ -128,7 +128,7 @@ And the pattern for *ingestion* cost already exists: the Claude Code OTLP receiv
 | *(v8)* Copilot adapter id | `copilot_studio_dataverse` | new id; the shipped `copilot_studio` stays registered but leaves the picker |
 | *(v8)* Copilot source tables | `conversationtranscripts` (transcripts) + `bot` (agent identity) | no `msdyn_` prefix; Web API base `<environmentUrl>/api/data/v9.2` |
 | *(v8)* Copilot transcript→bot join column | `_bot_conversationtranscriptid_value` = `bot.botid` | **not** `_bot_value`, which exists nowhere in the captures |
-| *(v8)* Copilot model field | `bot.configuration.agentSettings.model.series` (observed `GPT56Reasoning`) | a series name, not a version or deployment id |
+| *(v8, withdrawn in v12)* Copilot model field | **none — the `bot` table has no model column** | v8 named `bot.configuration.agentSettings.model.series`; no query populates it. The trace claims nothing about a model, and `copilot_studio.agent_changed_since` (from `bot.modifiedon`) is the marker that ships instead |
 | *(v8)* Copilot per-turn author field | `from.aadObjectId` only | `from.id` is present on every activity, GUID-shaped, and is a **per-conversation channel id** — never an identity |
 | *(v8)* Copilot auth | OAuth2 `client_credentials`, scope `<environmentUrl>/.default` | app-only; first puller using this mode |
 | *(v8)* Copilot Dataverse role | `Service Reader`, id `494d392f-d3f4-42ba-af49-30c6f41e6093` | 561 read privileges + 2 SharePoint writes, to read 2 tables — breadth disclosed in setup copy |
@@ -212,7 +212,7 @@ And the pattern for *ingestion* cost already exists: the Claude Code OTLP receiv
 | *(v7)* Routed conversation writes into a customer project | reversible (null the column stops routing; written rows age out per retention) | large — customer-visible data, PII | automated — the destination-policy redaction test + the grants-no-access invariant test; routing off by default (column is null) |
 | *(v7)* Rendering mapping + `TurnSteps` filter | reversible | small | ship it; unit tests on the fixture set |
 | *(v7)* Redaction pass-through | reversible | large (PII) | automated — unit test pins the routing worker to `DEFAULT_PII_REDACTION_LEVEL` + destination tenant; it never computes a level |
-| *(v8)* Customer-supplied environment URL meets the customer's client secret | reversible (delete the source) | large — a credential leaves our network to a host we did not choose | **BLOCKED on the captain: Decision 18 was reopened by the red-team.** Minimum floor regardless of the answer: `https`-only in `validateConfig`, an explicit `followRedirects: false` at every fetch site (the inherited default follows 10 hops), one secret per source. Whether a `copilot_studio_dataverse` case is added to the existing `assertPullDestinationAllowed` suffix allowlist is the reopened question |
+| *(v8, answered in v10)* Customer-supplied environment URL meets the customer's client secret | reversible (delete the source) | large — a credential leaves our network to a host we did not choose | **Answered: the suffix allowlist.** `assertPullDestinationAllowed` carries a `copilot_studio_dataverse` case listing the Dataverse host suffixes, enforced on the write path exactly as Genie's is, so a bad host is refused when the source is saved and before any secret is sent. The floor holds alongside it: `https`-only in `validateConfig`, an explicit `followRedirects: false` at every fetch site (the inherited default follows 10 hops), one secret per source. No admin override |
 | *(v8)* `client_credentials` token acquisition + refresh (new auth mode) | reversible | large — a token cached across tenants would cross a customer boundary | automated — test that the token cache is keyed by source id and that a second source never receives the first's token |
 | *(v8)* Hiding `copilot_studio` from the picker via `deprecated: true` | reversible | small — the entry stays in the catalog, so the exhaustiveness guard and `SOURCE_TYPE_LABEL` are unaffected | ship it; the picker-absence + label-still-resolves pair is the pin (deleting the entry outright does not compile — see Decision 16) |
 | *(v8)* Splitting `genieTraceMapper` into shared assembly + per-source mappers | reversible | medium — Genie routing is live and must not change behaviour | automated, but **the harness has to be built first**: the existing Genie suite asserts field-by-field with no snapshot and never checks 5 of the 7 `databricks.genie.*` attributes, so it would pass a split that dropped them. Gate is: add whole-object assertions over the mapper's output for the existing fixtures **in a commit before the split**, then split in a commit that changes structure and no expectations |
@@ -257,7 +257,9 @@ event PulledUsageObserved {
 //
 // pullConfig (validated by zod BEFORE the IngestionSource row persists):
 //   adapter        "copilot_studio_dataverse"
-//   environmentUrl https URL, no redirects followed   // Decision 18: any host, scoped-secret boundary
+//   environmentUrl https URL, no redirects followed   // Decision 18 (v10): host-suffix
+//                  allowlist — .dynamics.com, .microsoftdynamics.us, .appsplatform.us,
+//                  .dynamics.cn — enforced at save time, no admin override
 //   credentialRef  -> existing ingestionCredentials entry (Entra clientId + secret, tenantId)
 //
 // Read path (Dataverse Web API, <environmentUrl>/api/data/v9.2):
@@ -277,7 +279,8 @@ event PulledUsageObserved {
 //   thread_id = hash(ingestion_source_id + convKey)
 //   attrs: langwatch.source="copilot_studio_dataverse"
 //          author = activity.from.aadObjectId (raw GUID, role 1 only)  // Decision 22
-//          agent model + model_observed_at(bot.modifiedon) + model_unreliable flag  // Decision 23
+//          agent_changed_since (bot.modifiedon later than the conversation)  // Decision 23, v12
+//          NO model attribute — the bot table has no model column
 //          design_mode flag                                            // Decision 24
 //   activity types: message -> span (role 0 agent / role 1 user)
 //                   event   -> Started/Completed pairs fold into step rows; rest dropped
@@ -325,7 +328,7 @@ event PulledUsageObserved {
 
 *(v8)* **Positive.** Decision 7's promise ("the second provider is only an adapter") is now tested rather than asserted: Copilot Studio adds one adapter, one mapper, and **zero new tables or columns**. The customer-facing app-registration ask shrinks to Dataverse only — no Microsoft Graph permission at all — because attribution stays raw-id and the agent identity comes from the same environment. The mapper split turns the Genie fixture suite into a regression harness for every future provider.
 
-*(v8)* **Negative — three of these are chosen costs, written down rather than mitigated away.** (a) **Our server sends the customer's client secret to whatever host they typed** (Decision 18); the boundary is that the secret is theirs, scoped to their environment, and per-source. (b) **To read 2 tables we ask the customer to grant a role that reads 561 and can write 2 SharePoint tables** (Decision 19); the custom-role solution file that fixes this does not exist. (c) **Two Copilot adapter ids exist**, one of which can never return a conversation and stays registered for already-configured rows (Decision 16). Beyond those: history is capped at 30 days by the provider's own delete job, and a customer who wants more must act before the data is gone; a conversation is invisible for ~30 minutes after it ends; the agent model can be wrong-but-marked; design-mode test chats count as billable traces under Decision 14(a); and Copilot authors render as bare directory GUIDs until ADR-101 ships — which v7 wrongly implied was already available machinery.
+*(v8, (a) revised in v10)* **Negative — three of these are chosen costs, written down rather than mitigated away.** (a) **A customer on a custom-domain environment cannot self-serve** (Decision 18, as re-locked in v10): the secret only ever goes to a host on the Dataverse suffix allowlist, refused at save time, so an environment outside it needs us to add the suffix and ship. This replaces v8's "sends the secret to whatever host they typed", which the allowlist closed. (b) **To read 2 tables we ask the customer to grant a role that reads 561 and can write 2 SharePoint tables** (Decision 19); the custom-role solution file that fixes this does not exist. (c) **Two Copilot adapter ids exist**, one of which can never return a conversation and stays registered for already-configured rows (Decision 16). Beyond those: history is capped at 30 days by the provider's own delete job, and a customer who wants more must act before the data is gone; a conversation is invisible for ~30 minutes after it ends; the agent model is not recorded at all, because the bot table has no model column (v12); design-mode test chats count as billable traces under Decision 14(a); and Copilot authors render as bare directory GUIDs until ADR-101 ships — which v7 wrongly implied was already available machinery.
 
 *(v8)* **Neutral.** The 212-activity capture is 96% non-conversation (`event`/`trace`); dropping that remainder explicitly is a mapping decision, not data loss. The Genie mapper's public behaviour is unchanged by the split — that is the gate on it.
 

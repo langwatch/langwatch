@@ -5,25 +5,30 @@
 #
 # The scenarios below are kept because rows configured on this source type
 # still exist and must keep rendering, and because the framework behaviour
-# they pin (cursor restart, 401 handling, one-click enablement) is still the
-# framework's contract. The source type is no longer offered in the picker.
+# they pin (cursor restart, 401 handling) is still the framework's contract.
+# The source type is no longer offered in the picker, so nothing here may
+# require creating one — see copilot-studio-dataverse.feature, which requires
+# its absence from the picker outright.
 
 Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAdapter)
   As a platform engineer who needs Copilot Studio audit-log ingestion working
   end-to-end without writing a custom adapter
   I want a reference implementation that uses HttpPollingPullerAdapter + a
   fixed config shape per Microsoft's audit-log API
-  So that admins enable "Copilot Studio" with one click in the UI + the
-  framework handles polling / pagination / event-mapping
+  So that a source configured against it keeps running + the framework
+  handles polling / pagination / event-mapping
 
   Background:
     Given the puller framework + HttpPollingPullerAdapter + S3PollingPullerAdapter are in place
 
-  Scenario: Admin enables Copilot Studio with one click
-    Given alice is an org ADMIN
-    When alice clicks "Add ingestion source" → "Microsoft Copilot Studio" → enters her tenant credentials → Save
-    Then a new IngestionSource row lands with `sourceType = "copilot_studio"` + `pullConfig = <auto-populated reference config>` + `pullSchedule = "*/15 * * * *"` (15 min default)
-    And the process outbox picks up the first scheduled run within ~15 min
+  # Replaces "Admin enables Copilot Studio with one click". Creating one is no
+  # longer possible and must not be: the type is out of the picker, and the
+  # Dataverse feature requires it absent. What still has to hold is that a row
+  # created before the retirement keeps being scheduled and read.
+  Scenario: A source configured before the retirement keeps running
+    Given an IngestionSource row already exists with `sourceType = "copilot_studio"` + `pullConfig = <reference config>` + `pullSchedule = "*/15 * * * *"`
+    Then the process outbox keeps picking up its scheduled runs
+    And the picker never offers "Microsoft Copilot Studio" as a new source
 
   Scenario: Reference config is locked + auditable
     Given the copilot_studio reference puller exists at `platform/app/ee/governance/services/pullers/copilotStudio.puller.ts`
