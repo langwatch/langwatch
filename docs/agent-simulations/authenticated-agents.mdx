@@ -343,9 +343,16 @@ The rows that start at the same moment all read an empty cache, so without a cla
 
 Use a name for the claim that is not the name of the entry. The claim is taken before the login, and the session can only be written after it.
 
-`CLAIM_TTL_SECONDS` is what a row waits for before it takes the login itself. Set it above the time your login takes. A row that takes the claim and then stops does not hold the others for good: the claim expires, the next row takes it, and that row does the work.
+Two settings control the wait, and they do different things:
 
-Set it too low and the claim stops arbitrating: a login that runs longer than the claim's lifetime lets a second row take the name and log in as well, and the last session written is the one the rows that follow read. Both sessions are valid, so the cost is extra logins, which is the result with no claim at all. The same applies when the cache itself cannot answer.
+| Setting | What it does |
+|---|---|
+| `CLAIM_TTL_SECONDS` | How long the claim holds the name. Set it above the time your login takes. |
+| `LOGIN_WAIT_TICKS` | How many seconds a waiting row gives the row that took the name before it logs in itself. Keep it above `CLAIM_TTL_SECONDS`. |
+
+A row that takes the claim and then stops does not hold the others for good. Its claim expires after `CLAIM_TTL_SECONDS`, the next tick of a waiting row takes the name, and that row does the work.
+
+Set `CLAIM_TTL_SECONDS` below your login time and the claim stops arbitrating: the name comes free while the first row is still logging in, so a second row takes it and logs in as well, and the last session written is the one the rows that follow read. Both sessions are valid, so the cost is extra logins, which is the result with no claim at all. The same applies when the cache itself cannot answer.
 
 ### Cache API
 
