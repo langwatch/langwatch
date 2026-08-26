@@ -21,7 +21,7 @@ describe("given an evaluator type", () => {
         getEvaluatorModelSettingFields(
           getEvaluatorDefinitions("ragas/faithfulness"),
         ),
-      ).toEqual({ model: true, embeddingsModel: false });
+      ).toEqual({ hasModel: true, hasEmbeddingsModel: false });
     });
   });
 
@@ -32,7 +32,7 @@ describe("given an evaluator type", () => {
         getEvaluatorModelSettingFields(
           getEvaluatorDefinitions("ragas/response_relevancy"),
         ),
-      ).toEqual({ model: true, embeddingsModel: true });
+      ).toEqual({ hasModel: true, hasEmbeddingsModel: true });
     });
   });
 
@@ -43,7 +43,7 @@ describe("given an evaluator type", () => {
         getEvaluatorModelSettingFields(
           getEvaluatorDefinitions("langevals/exact_match"),
         ),
-      ).toEqual({ model: false, embeddingsModel: false });
+      ).toEqual({ hasModel: false, hasEmbeddingsModel: false });
     });
   });
 
@@ -51,15 +51,15 @@ describe("given an evaluator type", () => {
     /** @scenario An unknown or custom evaluator asks for no model at all */
     it("needs no model", () => {
       expect(getEvaluatorModelSettingFields(undefined)).toEqual({
-        model: false,
-        embeddingsModel: false,
+        hasModel: false,
+        hasEmbeddingsModel: false,
       });
       expect(
         getEvaluatorModelSettingFields({
           name: "A workflow evaluator",
           requiredFields: ["input"],
         }),
-      ).toEqual({ model: false, embeddingsModel: false });
+      ).toEqual({ hasModel: false, hasEmbeddingsModel: false });
     });
   });
 });

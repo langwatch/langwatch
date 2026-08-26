@@ -71,13 +71,13 @@ export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
  */
 export const getEvaluatorModelSettingFields = <T extends EvaluatorTypes>(
   evaluator: EvaluatorDefinition<T> | CustomEvaluatorDefinition | undefined,
-): { model: boolean; embeddingsModel: boolean } => {
+): { hasModel: boolean; hasEmbeddingsModel: boolean } => {
   if (!evaluator || !("settings" in evaluator)) {
-    return { model: false, embeddingsModel: false };
+    return { hasModel: false, hasEmbeddingsModel: false };
   }
   const keys = Object.keys(evaluator.settings);
   return {
-    model: keys.includes("model"),
-    embeddingsModel: keys.includes("embeddings_model"),
+    hasModel: keys.includes("model"),
+    hasEmbeddingsModel: keys.includes("embeddings_model"),
   };
 };

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
@@ -12,7 +13,6 @@ import {
   getEvaluatorDefinitions,
   getEvaluatorModelSettingFields,
 } from "~/server/evaluations/getEvaluator";
-import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
@@ -207,12 +207,14 @@ export function registerEvaluatorRoutes(
       // field at all, on an organization that had set DEFAULT and FAST but no
       // EMBEDDINGS.
       //
-      // ModelNotConfiguredError still propagates for a role the type DOES use,
-      // so the global domain-error middleware surfaces the typed missing-model
-      // response: the "no global system fallback" contract bars falling back
-      // to a hardcoded OpenAI constant when nothing is configured. Only
-      // unrelated resolver-internal errors (DB, race) become null and let
-      // createWithDefaults render with placeholders.
+      // A handled resolver error still propagates for a role the type DOES
+      // use, so the global domain-error middleware surfaces the typed
+      // response: ModelNotConfiguredError when nothing is set, and
+      // ModelRestrictedForFeatureError when the only candidate is licensed for
+      // Langy alone. Both carry remediation the caller can act on, and the "no
+      // global system fallback" contract bars falling back to a hardcoded
+      // OpenAI constant instead. Only unrelated resolver-internal errors (DB,
+      // race) become null and let createWithDefaults render with placeholders.
       const evaluatorType = (data.config as Record<string, unknown>)
         .evaluatorType;
       const modelFields = getEvaluatorModelSettingFields(
@@ -220,22 +222,22 @@ export function registerEvaluatorRoutes(
           ? getEvaluatorDefinitions(evaluatorType)
           : undefined,
       );
-      const swallowNonMissingConfig = (err: unknown): null => {
-        if (err instanceof ModelNotConfiguredError) throw err;
+      const swallowUnhandledResolverFailure = (err: unknown): null => {
+        if (HandledError.isHandled(err)) throw err;
         return null;
       };
       const [resolvedDefault, resolvedEmbedding] = await Promise.all([
-        modelFields.model
+        modelFields.hasModel
           ? resolveModelForFeature("evaluator.create_default", {
               prisma,
               projectId: project.id,
-            }).catch(swallowNonMissingConfig)
+            }).catch(swallowUnhandledResolverFailure)
           : null,
-        modelFields.embeddingsModel
+        modelFields.hasEmbeddingsModel
           ? resolveModelForFeature("analytics.topic_clustering_embeddings", {
               prisma,
               projectId: project.id,
-            }).catch(swallowNonMissingConfig)
+            }).catch(swallowUnhandledResolverFailure)
           : null,
       ]);
 
