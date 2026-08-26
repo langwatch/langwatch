@@ -121,7 +121,7 @@ vi.mock("~/components/suites/ScenarioInputMappingSection", () => ({
 //
 // The drawer calls:
 //   api.agents.getById.useQuery   — load agent (with workflowId + config)
-//   api.workflow.getById.useQuery — load workflow (with currentVersion.dsl)
+//   workflowApi.workflow.getById.useQuery — load workflow (with currentVersion.dsl)
 //   api.agents.update.useMutation — save (not exercised here)
 //   api.useUtils()              — for cache invalidation after save
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ const MOCK_AGENT = {
   _count: undefined,
 };
 
-/** Mock workflow returned by api.workflow.getById. */
+/** Mock workflow returned by workflowApi.workflow.getById. */
 const MOCK_WORKFLOW = {
   id: "workflow-1",
   name: "Test Workflow",
@@ -210,16 +210,6 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    workflow: {
-      getById: {
-        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
-          if (options?.enabled === false) {
-            return { data: undefined, isLoading: false, error: null };
-          }
-          return { data: MOCK_WORKFLOW, isLoading: false, error: null };
-        },
-      },
-    },
     useUtils: () => ({
       agents: {
         getAll: { invalidate: vi.fn() },
@@ -229,6 +219,22 @@ vi.mock("~/utils/api", () => ({
         getById: { invalidate: vi.fn() },
       },
     }),
+  },
+}));
+
+vi.mock("~/utils/workflow-api", () => ({
+  workflowApi: {
+    workflow: {
+      getById: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          if (options?.enabled === false) {
+            return { data: undefined, isLoading: false, error: null };
+          }
+
+          return { data: MOCK_WORKFLOW, isLoading: false, error: null };
+        },
+      },
+    },
   },
 }));
 

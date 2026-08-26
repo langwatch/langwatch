@@ -2,6 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { TRPCProvider } from "../api";
+import { workflowApi } from "../workflow-api";
 
 /**
  * Mounts the REAL provider stack — tRPC client, links, QueryClient — with no
@@ -18,6 +19,25 @@ describe("TRPCProvider", () => {
         </TRPCProvider>,
       );
       expect(screen.getByText("provider-children")).toBeInTheDocument();
+    });
+
+    it("provides the portable workflow client", () => {
+      function WorkflowApiProbe() {
+        const query = workflowApi.workflow.engineMode.useQuery(
+          { projectId: "project_123" },
+          { enabled: false },
+        );
+
+        return <div>{query.fetchStatus}</div>;
+      }
+
+      render(
+        <TRPCProvider>
+          <WorkflowApiProbe />
+        </TRPCProvider>,
+      );
+
+      expect(screen.getByText("idle")).toBeInTheDocument();
     });
   });
 });

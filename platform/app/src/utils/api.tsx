@@ -11,19 +11,10 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import {
-  createTRPCClient,
-  createWSClient,
-  httpBatchLink,
-  httpLink,
-  loggerLink,
-  splitLink,
-  wsLink,
-} from "@trpc/client";
+import { createTRPCClient } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import { type ReactNode, useEffect, useState } from "react";
-import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
 import {
   showAiCallFailedToast,
@@ -36,7 +27,7 @@ import {
   subscribeToModelProvidersUpdated,
 } from "./modelProviderSync";
 import { shouldRetryQuery } from "./queryRetryPolicy";
-import { sseLink } from "./sseLink";
+import { createTRPCLinks } from "./trpc-transport";
 import {
   extractAiCallFailedInfo,
   extractLimitExceededInfo,
@@ -48,90 +39,7 @@ import {
   markAsHandledByMissingModelHandler,
   markAsHandledByProviderDisabledHandler,
 } from "./trpcError";
-
-const getBaseUrl = () => {
-  if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
-  if (process.env.BASE_HOST) return `https://${process.env.BASE_HOST}`; // SSR should use base host
-  return `http://localhost:${process.env.PORT ?? 5560}`; // dev SSR should use localhost
-};
-
-/**
- * Lazy singleton WS client for the tRPC WebSocket transport. The socket
- * opens on first access; call sites opt their procedure in by passing
- * `trpc: { context: { useWS: true } }` on the query/mutation.
- *
- * Why opt-in? Routing is a property of the call site — typically because
- * the operation fires often enough that one HTTP request per call would
- * saturate the browser's 6-connection HTTP/1.1 cap. Encoding that as a
- * context flag keeps the transport layer free of a hardcoded procedure
- * list and matches the existing `skipBatch` opt-in pattern below.
- */
-let cachedWSClient: ReturnType<typeof createWSClient> | null = null;
-function getOrCreateWSClient(): ReturnType<typeof createWSClient> | null {
-  if (typeof window === "undefined") return null;
-  if (cachedWSClient) return cachedWSClient;
-  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  cachedWSClient = createWSClient({
-    url: `${proto}//${window.location.host}/api/trpc-ws`,
-  });
-  return cachedWSClient;
-}
-
-function createTRPCLinks() {
-  const wsClient = getOrCreateWSClient();
-
-  // Inner HTTP layer: skipBatch context flag picks unbatched httpLink, else
-  // batched httpBatchLink. Same as before.
-  const httpRouting = splitLink({
-    condition(op) {
-      return op.context.skipBatch === true;
-    },
-    true: httpLink({
-      url: `${getBaseUrl()}/api/trpc`,
-      transformer: superjson,
-    }),
-    false: httpBatchLink({
-      url: `${getBaseUrl()}/api/trpc`,
-      maxURLLength: 4000,
-      transformer: superjson,
-    }),
-  });
-
-  // Mid layer: callers opt in to the WS transport per-call by setting
-  // `trpc: { context: { useWS: true } }` on a query/mutation. Anything
-  // without that flag falls through to HTTP.
-  const httpOrWsRouting = wsClient
-    ? splitLink({
-        condition(op) {
-          return op.context.useWS === true;
-        },
-        true: wsLink({ client: wsClient, transformer: superjson }),
-        false: httpRouting,
-      })
-    : httpRouting;
-
-  return [
-    loggerLink({
-      enabled: (opts) =>
-        process.env.NODE_ENV === "development" ||
-        (opts.direction === "down" && opts.result instanceof Error),
-    }),
-    // Top layer: subscriptions ride the existing SSE link; everything else
-    // goes through the WS-or-HTTP router below.
-    splitLink({
-      condition(op) {
-        return op.type === "subscription";
-      },
-      true: sseLink({
-        url: getBaseUrl(),
-        transformPath: (path) => `/api/sse/${path}`,
-        maxReconnectAttempts: 5,
-        reconnectDelay: 1000,
-      }),
-      false: httpOrWsRouting,
-    }),
-  ];
-}
+import { WorkflowApiProvider } from "./workflow-api";
 
 /**
  * Returns the `onSwapToAlternate` callback the provider-disabled toast
@@ -346,10 +254,12 @@ export function TRPCProvider({ children }: { children: ReactNode }) {
 
   return (
     <api.Provider client={trpcClientInstance} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <ModelProviderCrossTabSync />
-        {children}
-      </QueryClientProvider>
+      <WorkflowApiProvider queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <ModelProviderCrossTabSync />
+          {children}
+        </QueryClientProvider>
+      </WorkflowApiProvider>
     </api.Provider>
   );
 }

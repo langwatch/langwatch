@@ -1,13 +1,13 @@
 import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
+import { workflowApi } from "../../utils/workflow-api";
 
 export const useLoadWorkflow = () => {
   const router = useRouter();
   const workflowId =
     typeof router.query.workflow === "string" ? router.query.workflow : undefined;
   const { project } = useOrganizationTeamProject();
-  const workflow = api.workflow.getById.useQuery(
+  const workflow = workflowApi.workflow.getById.useQuery(
     { workflowId: workflowId ?? "", projectId: project?.id ?? "" },
     {
       enabled: !!project && !!workflowId,

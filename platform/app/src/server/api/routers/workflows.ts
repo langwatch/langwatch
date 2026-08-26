@@ -2,6 +2,11 @@ import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import { pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import {
+  workflowApiEngineModeInputSchema,
+  workflowApiGetByIdInputSchema,
+  workflowApiGetVersionsInputSchema,
+} from "@langwatch/platform-api-contract";
 import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
@@ -46,7 +51,7 @@ export const workflowRouter = createTRPCRouter({
   // procedure (rather than a UI constant) so the studio handlers and the
   // UI agree on one source of truth.
   engineMode: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(workflowApiEngineModeInputSchema)
     .permission("workflows:view")
     .query(() => {
       return {
@@ -346,7 +351,7 @@ export const workflowRouter = createTRPCRouter({
     }),
 
   getById: protectedProcedure
-    .input(z.object({ projectId: z.string(), workflowId: z.string() }))
+    .input(workflowApiGetByIdInputSchema)
     .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       let workflow;
@@ -378,13 +383,7 @@ export const workflowRouter = createTRPCRouter({
     }),
 
   getVersions: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        workflowId: z.string(),
-        returnDSL: z.union([z.boolean(), z.literal("previousVersion")]).optional(),
-      }),
-    )
+    .input(workflowApiGetVersionsInputSchema)
     .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       try {

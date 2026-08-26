@@ -36,6 +36,7 @@ import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contr
 import { type AgentWithFields, linkedWorkflowId } from "~/server/agents/agent-fields";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
+import { workflowApi } from "~/utils/workflow-api";
 
 export type AgentWorkflowEditorDrawerProps = {
   open?: boolean;
@@ -127,7 +128,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
   );
 
   // Fetch the linked workflow so we can derive its real inputs/outputs.
-  const workflowQuery = api.workflow.getById.useQuery(
+  const workflowQuery = workflowApi.workflow.getById.useQuery(
     { projectId: project?.id ?? "", workflowId: workflowId ?? "" },
     { enabled: !!workflowId && !!project?.id && isOpen },
   );

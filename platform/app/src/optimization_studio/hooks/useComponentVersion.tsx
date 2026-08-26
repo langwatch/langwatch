@@ -1,7 +1,7 @@
 import type { Node, NodeProps } from "@xyflow/react";
 
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
+import { workflowApi } from "../../utils/workflow-api";
 import type { Custom } from "@langwatch/workflow-contract";
 
 export const useComponentVersion = (node: NodeProps<Node<Custom>> | Node<Custom>) => {
@@ -13,7 +13,7 @@ export const useComponentVersion = (node: NodeProps<Node<Custom>> | Node<Custom>
 
   const componentsVersionId = node.data.version_id;
 
-  const getVersions = api.workflow.getVersions.useQuery(
+  const getVersions = workflowApi.workflow.getVersions.useQuery(
     {
       projectId: project?.id ?? "",
       workflowId: node.data.workflow_id ?? "",

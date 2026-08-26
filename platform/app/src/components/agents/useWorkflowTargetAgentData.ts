@@ -7,6 +7,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { linkedWorkflowId } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
+import { workflowApi } from "~/utils/workflow-api";
 
 /**
  * Derives the mapping-surface inputs (identifier + type) from a workflow's
@@ -54,7 +55,7 @@ export function useWorkflowTargetAgentData({
     [agentQuery.data],
   );
 
-  const workflowQuery = api.workflow.getById.useQuery(
+  const workflowQuery = workflowApi.workflow.getById.useQuery(
     { projectId: projectId ?? "", workflowId: workflowId ?? "" },
     { enabled: !!workflowId && !!projectId && isOpen },
   );

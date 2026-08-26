@@ -59,6 +59,11 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: agentQueryData, isLoading: false }),
       },
     },
+  },
+}));
+
+vi.mock("~/utils/workflow-api", () => ({
+  workflowApi: {
     workflow: {
       getById: {
         useQuery: () => ({ data: workflowQueryData, isLoading: false }),

@@ -20,6 +20,7 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { workflowApi } from "../../utils/workflow-api";
 import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
 import { hasDSLChanged, parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { NewVersionFields } from "./VersionToBeUsed";
@@ -318,7 +319,7 @@ export const useVersionState = ({
     }),
   );
 
-  const versions = api.workflow.getVersions.useQuery(
+  const versions = workflowApi.workflow.getVersions.useQuery(
     {
       projectId: project?.id ?? "",
       workflowId: workflowId ?? "",

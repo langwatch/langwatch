@@ -32,6 +32,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import { trackEvent } from "../../utils/tracking";
+import { workflowApi } from "../../utils/workflow-api";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
@@ -66,7 +67,7 @@ export function Optimize() {
   const { optimizationState } = useWorkflowStore(({ state }) => ({
     optimizationState: state.optimization,
   }));
-  const engineMode = api.workflow.engineMode.useQuery(
+  const engineMode = workflowApi.workflow.engineMode.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id, staleTime: 60_000 },
   );

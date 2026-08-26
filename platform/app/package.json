@@ -169,6 +169,7 @@
     "@langwatch/ops-web": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/organization-server": "workspace:*",
+    "@langwatch/platform-api-contract": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/presence-server": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

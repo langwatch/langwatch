@@ -135,16 +135,6 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    workflow: {
-      getById: {
-        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
-          if (options?.enabled === false) {
-            return { data: undefined, isLoading: false, error: null };
-          }
-          return { data: mocks.workflowData, isLoading: false, error: null };
-        },
-      },
-    },
     useUtils: () => ({
       agents: {
         getAll: { invalidate: vi.fn() },
@@ -154,6 +144,22 @@ vi.mock("~/utils/api", () => ({
         getById: { invalidate: vi.fn() },
       },
     }),
+  },
+}));
+
+vi.mock("~/utils/workflow-api", () => ({
+  workflowApi: {
+    workflow: {
+      getById: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          if (options?.enabled === false) {
+            return { data: undefined, isLoading: false, error: null };
+          }
+
+          return { data: mocks.workflowData, isLoading: false, error: null };
+        },
+      },
+    },
   },
 }));
 
