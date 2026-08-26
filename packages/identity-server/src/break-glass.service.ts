@@ -5,6 +5,7 @@ import {
   breakGlassIsLive,
   breakGlassWarningsDue,
   SsoBreakGlassLastWayInError,
+  SsoBreakGlassHolderIneligibleError,
 } from "@langwatch/identity";
 import type { SsoBreakGlassBindingRepository } from "./sso-connection.repository";
 import type {
@@ -50,6 +51,21 @@ export interface SsoBreakGlassServiceDeps {
   organizationHasActiveConnection: (args: {
     organizationId: string;
   }) => Promise<boolean>;
+  /**
+   * Whether this person could actually use the way in they are being given.
+   *
+   * The precondition activation enforces is "somebody can still get in if the
+   * identity provider fails". A binding naming a user who is not an
+   * administrator of this organization — a typo, or an id from somewhere
+   * else — satisfies `hasLiveBinding` and satisfies nothing real: the
+   * connection goes live, the provider misbehaves, and the door the check
+   * promised does not open for anyone. `breakGlassCandidates` already lists
+   * exactly who is eligible; this is the write path asking the same question.
+   */
+  holderIsEligible: (args: {
+    organizationId: string;
+    userId: string;
+  }) => Promise<boolean>;
   now?: () => number;
 }
 
@@ -77,6 +93,7 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
     grantedByUserId: string;
     expiresAtMs: number;
   }): Promise<BreakGlassBinding> {
+    await this.requireEligibleHolder({ organizationId, userId });
     const binding: BreakGlassBinding = {
       bindingId: this.deps.newBindingId(),
       organizationId,
@@ -121,6 +138,14 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
         `break-glass binding ${bindingId} is not one of organization ${organizationId}'s`,
       );
     }
+    // A renewal is a fresh decision of the same weight, and the holder may
+    // have stopped being an administrator since the original grant. Extending
+    // a door that no longer opens is the same empty precondition a bad grant
+    // is.
+    await this.requireEligibleHolder({
+      organizationId,
+      userId: replaced.userId,
+    });
     const now = this.now();
     const renewed: BreakGlassBinding = {
       bindingId: this.deps.newBindingId(),
@@ -139,6 +164,18 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
       supersededAtMs: now,
     });
     return { renewed, replaced };
+  }
+
+  /** Refuses a holder who could not use the way in they are being given. */
+  private async requireEligibleHolder({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    if (await this.deps.holderIsEligible({ organizationId, userId })) return;
+    throw new SsoBreakGlassHolderIneligibleError(userId);
   }
 
   /**

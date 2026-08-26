@@ -355,6 +355,7 @@ export const APP_ERROR_CODES = [
   "sso_activation_break_glass_missing",
   "sso_activation_domain_unproved",
   "sso_activation_test_sign_in_missing",
+  "sso_break_glass_holder_ineligible",
   "sso_break_glass_last_way_in",
   "sso_certificate_invalid",
   "sso_connection_activation_blocked",

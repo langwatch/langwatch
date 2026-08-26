@@ -332,6 +332,17 @@ export class JoinRequestsService {
     organizationId: string;
     domain: string;
   }): Promise<{ joinRequestId: string } | null> {
+    // THE COOL-DOWN APPLIES HERE TOO, and this is the path where it matters
+    // most. Everywhere else a request is made because a person clicked; here
+    // it is made because an account row appeared, which happens on a provider
+    // rotation, on an unlink, and on the account reconcile beside this. An
+    // administrator who explicitly denied somebody would have watched them
+    // reappear in the queue for reasons the person never chose.
+    //
+    // Answered as "nothing happened" rather than as a refusal: no caller is
+    // waiting for a reason, and the signature already allows it.
+    if (await this.isInCoolDown({ userId, organizationId })) return null;
+
     const joinRequestId = newJoinRequestId();
     const occurredAtMs = this.now();
     await this.deps.requests.requestJoin({
@@ -887,16 +898,37 @@ export class JoinRequestsService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
+    const remainingMs = await this.coolDownRemainingMs({
+      userId,
+      organizationId,
+    });
+    if (remainingMs === 0) return;
+    // The throttle code, not a rejection code: see the cool-down constant.
+    throw new JoinRequestThrottledError(Math.ceil(remainingMs / 1000));
+  }
+
+  /** The same question, for a caller with nobody to tell. */
+  private async isInCoolDown(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    return (await this.coolDownRemainingMs(args)) > 0;
+  }
+
+  private async coolDownRemainingMs({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<number> {
     const rejectedAt = await this.deps.reads.findLastRejectionAt({
       userId,
       organizationId,
     });
-    if (!rejectedAt) return;
+    if (!rejectedAt) return 0;
     const clearsAt = rejectedAt.getTime() + JOIN_REJECTION_COOLDOWN_MS;
-    const now = this.now();
-    if (now >= clearsAt) return;
-    // The throttle code, not a rejection code: see the cool-down constant.
-    throw new JoinRequestThrottledError(Math.ceil((clearsAt - now) / 1000));
+    return Math.max(0, clearsAt - this.now());
   }
 
   /**

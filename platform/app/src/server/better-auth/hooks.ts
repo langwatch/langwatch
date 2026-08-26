@@ -1,7 +1,11 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { normalizeDomain } from "@langwatch/identity";
+import {
+  arrivalPolicyFromLegacyJit,
+  normalizeDomain,
+  type SsoArrivalPolicy,
+} from "@langwatch/identity";
 import { looksLikeSsoConnectionId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -430,11 +434,16 @@ const arrivalDecisionFor = async ({
   if (!connection.verifiedDomains.includes(domain)) return null;
   if (connection.lapsedDomains.includes(domain)) return null;
 
-  // A connection registered before the question existed has no answer, and
-  // the answer is then whatever the legacy boolean already said — the same
-  // rule `ssoArrivalPolicy` states for every other reader.
+  // ASKED of the domain rather than re-derived here. A connection registered
+  // before the question existed has no answer, and the answer is then
+  // whatever the legacy boolean already said — a rule that exists once, in
+  // `arrivalPolicyFromLegacyJit`, precisely so the sign-in path and every
+  // screen that renders the answer cannot drift apart. This is the only
+  // reader for which the answer is an authorization decision, so it is the
+  // last one that should be keeping its own copy.
   const policy =
-    connection.arrivalPolicy ?? (connection.allowsJit ? "admit" : "refuse");
+    (connection.arrivalPolicy as SsoArrivalPolicy | null) ??
+    arrivalPolicyFromLegacyJit(connection.allowsJit);
   if (policy !== "admit" && policy !== "request") return null;
   return { policy, organizationId: connection.organizationId };
 };
@@ -480,6 +489,22 @@ export const admitSsoArrival = async ({
     });
     if (org) await joinSsoOrganization({ prisma, writer, user, org });
   } catch (err) {
+    // ORDINARY OUTCOMES ARE NOT INCIDENTS. A person who already has a request
+    // in the queue, or whose domain the join rules will not match, is a
+    // sentence about the world rather than something that went wrong — and a
+    // fresh account row for somebody already waiting is routine (a provider
+    // rotation, an unlink, the reconcile below). Logging those at `error`
+    // buried the line an administrator is actually told to grep for when
+    // their queue is empty.
+    const expected = new Set(["join_request_already_pending", "join_not_available"]);
+    const code = (err as { code?: unknown } | null)?.code;
+    if (typeof code === "string" && expected.has(code)) {
+      logger.info(
+        { code, userId: user.id, connectionId, domain },
+        "an arrival through a single sign-on connection was not queued",
+      );
+      return;
+    }
     logger.error(
       { err, userId: user.id, connectionId, domain },
       "an arrival through a single sign-on connection was not admitted (the sign-in still succeeded)",
@@ -804,12 +829,40 @@ export const afterAccountUpdate = async ({
   try {
     const user = await prisma.user.findUnique({
       where: { id: account.userId },
-      select: { id: true, email: true, pendingSsoSetup: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        pendingSsoSetup: true,
+      },
     });
-    if (!user?.email || !user.pendingSsoSetup) return;
+    if (!user?.email) return;
 
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
+
+    // ASKED ON EVERY SIGN-IN, not only the first.
+    //
+    // The arrival decision refuses a connection that is not yet ACTIVE, and
+    // this hook is the only one that runs on a RETURNING sign-in — the
+    // account row already exists, so `account.create.after` never fires
+    // again. Deciding arrivals only there meant everybody who signed in
+    // during setup was decided once, while the answer was still "not live",
+    // and never again: an account, no membership, no request, and an empty
+    // queue on the administrator's screen. That includes the administrator
+    // who performed the test sign-in activation refuses to go without.
+    //
+    // Idempotent, so asking every time costs a read: it returns early on an
+    // existing membership, and the join guard refuses a duplicate request.
+    await admitSsoArrival({
+      prisma,
+      writer: grantsLedgerWriter(),
+      user: { id: user.id, email: user.email, name: user.name ?? "" },
+      connectionId: account.providerId,
+      domain,
+    });
+
+    if (!user.pendingSsoSetup) return;
 
     const org = await prisma.organization.findUnique({
       where: { ssoDomain: domain },

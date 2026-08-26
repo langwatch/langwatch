@@ -240,6 +240,7 @@ export {
   PasskeyCommandRefusedError,
   SsoActivationArrivalsUndecidedError,
   SsoActivationBreakGlassMissingError,
+  SsoBreakGlassHolderIneligibleError,
   SsoBreakGlassLastWayInError,
   SsoActivationDomainUnprovedError,
   SsoActivationPreconditionError,

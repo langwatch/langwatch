@@ -296,6 +296,30 @@ export class SsoActivationArrivalsUndecidedError extends SsoActivationPreconditi
 }
 
 /**
+ * The person named could not use the way in they are being given.
+ *
+ * Break-glass exists so somebody can still get in when the identity provider
+ * fails, and activation refuses without a live binding on the strength of
+ * that. A binding naming somebody who is not an administrator of this
+ * organization satisfies the check and opens no door — the precondition
+ * passes and the thing it promised does not exist.
+ */
+export class SsoBreakGlassHolderIneligibleError extends SsoConnectionCommandRefusedError {
+  constructor(userId: string) {
+    super(
+      "sso_break_glass_holder_ineligible",
+      "sso_break_glass_holder_ineligible",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { userId },
+      },
+    );
+    this.name = "SsoBreakGlassHolderIneligibleError";
+  }
+}
+
+/**
  * Revoking this grant would leave a live connection with no way back in.
  * The one lever that exists for the identity provider failing must not be
  * removable while the identity provider is what decides sign-in — grant

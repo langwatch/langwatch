@@ -57,7 +57,20 @@ export function signInProviderForPath({
   }
   if ((PASSKEY_PATHS as readonly string[]).includes(path)) return "passkey";
   const callback = /^\/(?:oauth2\/)?callback\/([^/?#]+)/.exec(path);
-  return callback?.[1] ?? null;
+  if (callback?.[1]) return callback[1];
+  // THE SSO PLUGIN'S OWN CALLBACKS, which do not live under `/callback`.
+  //
+  // Missing these meant every session minted through a customer's identity
+  // provider recorded no `identifierId` and an empty `amr` — so an
+  // organization that turned its second-factor requirement on held every
+  // member who signed in through its OWN provider at a gate that provider's
+  // assertion could never clear, and per-identifier revocation could never
+  // reach a federated session. The captured group is the connection id,
+  // which is what `Identifier.provider` holds for these accounts.
+  const federated =
+    /^\/sso\/callback\/([^/?#]+)/.exec(path) ??
+    /^\/sso\/saml2\/sp\/acs\/([^/?#]+)/.exec(path);
+  return federated?.[1] ?? null;
 }
 
 /**
@@ -91,7 +104,10 @@ export function localFactorsForPath({
   }
   // A federated callback proves the protocol and nothing more. `oidc` names
   // a protocol, not a proof, so this satisfies no organization's requirement
-  // on its own - the provider's own assertion is what can.
+  // on its own - the provider's own assertion is what can. SAML's assertion
+  // arrives the same way and is recorded under the same name: what the
+  // organization's requirement reads is the provider's `amr`, and naming the
+  // binding here would make one protocol satisfy a rule the other could not.
   if (signInProviderForPath({ path })) return ["oidc"];
   return null;
 }

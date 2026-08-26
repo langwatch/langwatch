@@ -11,6 +11,7 @@
  */
 
 import { PlanTypes } from "@ee/billing/planTypes";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import {
@@ -537,6 +538,18 @@ export function ssoBreakGlass(): SsoBreakGlassService {
     organizationHasActiveConnection: async ({ organizationId }) =>
       (await prisma.ssoConnection.count({
         where: { organizationId, state: "ACTIVE" },
+      })) > 0,
+    // The same people `breakGlassCandidates` lists, asked on the write path.
+    // A grant naming anybody else satisfies activation's precondition and
+    // opens no door.
+    holderIsEligible: async ({ organizationId, userId }) =>
+      (await prisma.organizationUser.count({
+        where: {
+          organizationId,
+          userId,
+          disabledAt: null,
+          role: OrganizationUserRole.ADMIN,
+        },
       })) > 0,
   });
 }

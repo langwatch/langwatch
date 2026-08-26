@@ -74,6 +74,9 @@ beforeEach(async () => {
     // This suite is about activation reading bindings, never about revoking
     // them, so the revoke guard's one outside fact answers quietly.
     organizationHasActiveConnection: async () => false,
+    // Everybody this suite grants to is an administrator of the organization
+    // it grants in; the eligibility refusal has its own cases next door.
+    holderIsEligible: async () => true,
     now: () => clock,
   });
   const ledger: SsoConnectionLedger = {

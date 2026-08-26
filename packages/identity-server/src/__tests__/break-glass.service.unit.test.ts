@@ -25,6 +25,9 @@ let minted: number;
 let service: SsoBreakGlassService;
 /** What the revoke guard's one outside fact answers, per test. */
 let connectionActive = false;
+/** Who is NOT an administrator of the organization, per test. Empty by
+ *  default: a grant names somebody eligible unless a case says otherwise. */
+let ineligible = new Set<string>();
 
 beforeEach(() => {
   bindings = new InMemoryBreakGlassBindings();
@@ -32,12 +35,72 @@ beforeEach(() => {
   clock = T0;
   minted = 0;
   connectionActive = false;
+  ineligible = new Set<string>();
   service = new SsoBreakGlassService({
     bindings,
     notifier,
     newBindingId: () => `ssobg_${++minted}`,
     organizationHasActiveConnection: async () => connectionActive,
+    holderIsEligible: async ({ userId }) => !ineligible.has(userId),
     now: () => clock,
+  });
+});
+
+describe("granting a way in to somebody who could not use it", () => {
+  describe("when the holder is not an administrator of the organization", () => {
+    it("refuses the grant rather than writing a door that opens for nobody", async () => {
+      // Activation refuses without a live binding, on the strength of
+      // "somebody can still get in if the identity provider fails". A binding
+      // naming a typo, or an id from another organization, satisfies that
+      // check and opens nothing — the precondition passes and the thing it
+      // promised does not exist.
+      ineligible.add("user_stranger");
+
+      const refusal = await service
+        .grant({
+          organizationId: "org_acme",
+          userId: "user_stranger",
+          grantedByUserId: "user_ana",
+          expiresAtMs: T0 + 14 * DAY_MS,
+        })
+        .then(
+          () => {
+            throw new Error("the grant was expected to be refused");
+          },
+          (error: { code: string }) => error,
+        );
+
+      expect(refusal.code).toBe("sso_break_glass_holder_ineligible");
+      expect(bindings.rows.size).toBe(0);
+    });
+  });
+
+  describe("when the holder stopped being an administrator before a renewal", () => {
+    it("refuses to extend a door that no longer opens", async () => {
+      const granted = await service.grant({
+        organizationId: "org_acme",
+        userId: "user_ana",
+        grantedByUserId: "user_ana",
+        expiresAtMs: T0 + 14 * DAY_MS,
+      });
+      ineligible.add("user_ana");
+
+      const refusal = await service
+        .renew({
+          bindingId: granted.bindingId,
+          organizationId: "org_acme",
+          grantedByUserId: "user_ana",
+          expiresAtMs: T0 + 28 * DAY_MS,
+        })
+        .then(
+          () => {
+            throw new Error("the renewal was expected to be refused");
+          },
+          (error: { code: string }) => error,
+        );
+
+      expect(refusal.code).toBe("sso_break_glass_holder_ineligible");
+    });
   });
 });
 
