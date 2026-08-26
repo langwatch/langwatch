@@ -47,6 +47,14 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /** Dataverse's own page ceiling for this kind of read. */
 const PAGE_SIZE = 50;
 
+/**
+ * Safety cap so a server that keeps handing back a next-page link cannot keep
+ * one run going forever. The deadline and the abort signal are the real
+ * bounds, but both are optional on the run options and a `while (nextLink)`
+ * with neither is unbounded. The sibling adapters carry the same cap.
+ */
+const MAX_PAGES_PER_RUN = 50;
+
 /** Web API version this adapter's query shape is written against. */
 const API_VERSION = "v9.2";
 
@@ -77,17 +85,27 @@ const tokenResponseSchema = z.object({
   access_token: z.string().min(1),
 });
 
-/** The row fields the query asks for. Anything else Dataverse sends passes by. */
-const transcriptRowSchema = z.object({
-  conversationtranscriptid: z.string(),
-  name: z.string().nullable().optional(),
-  conversationstarttime: z.string().nullable().optional(),
-  createdon: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
-  metadata: z.string().nullable().optional(),
-  schematype: z.string().nullable().optional(),
-  schemaversion: z.string().nullable().optional(),
-});
+/**
+ * The row fields the query asks for. Anything else Dataverse sends passes by,
+ * which is what `.passthrough()` is doing rather than decoration: zod strips
+ * undeclared keys by default, and the stripped object is what gets stored as
+ * `raw_payload`. That field is contracted to hold what the source actually
+ * sent, so a mapping written later can be replayed against old rows instead of
+ * re-pulling them — and a field silently dropped at parse time is not there to
+ * replay. The `$expand`ed bot row rides along on the same object.
+ */
+const transcriptRowSchema = z
+  .object({
+    conversationtranscriptid: z.string(),
+    name: z.string().nullable().optional(),
+    conversationstarttime: z.string().nullable().optional(),
+    createdon: z.string().nullable().optional(),
+    content: z.string().nullable().optional(),
+    metadata: z.string().nullable().optional(),
+    schematype: z.string().nullable().optional(),
+    schemaversion: z.string().nullable().optional(),
+  })
+  .passthrough();
 
 const pageSchema = z.object({
   value: z.array(z.unknown()).default([]),
@@ -299,8 +317,10 @@ export class CopilotStudioDataversePuller
         now: Date.now(),
       });
       let last: Cursor | null = null;
+      let pageCount = 0;
 
-      while (url) {
+      while (url && pageCount < MAX_PAGES_PER_RUN) {
+        pageCount += 1;
         if (options.signal?.aborted) break;
         if (options.deadlineMs && Date.now() > options.deadlineMs) {
           // Stop cleanly and keep what this run already read. The next run
@@ -344,7 +364,27 @@ export class CopilotStudioDataversePuller
           });
         }
 
-        url = page["@odata.nextLink"] ?? null;
+        const nextLink = page["@odata.nextLink"] ?? null;
+        // The next page is a URL out of the response body, and the request
+        // that follows it carries the access token. `followRedirects: false`
+        // stops the server bouncing the credential somewhere else, and this
+        // is the same hop by another name — the host allowlist has to hold
+        // for every request that carries the secret, not only the first.
+        if (nextLink && !isDataverseEnvironmentOrigin(nextLink)) {
+          errorCount += 1;
+          logger.error(
+            "copilot studio dataverse: refusing a next-page link outside the environment host",
+          );
+          break;
+        }
+        url = nextLink;
+      }
+
+      if (url && pageCount >= MAX_PAGES_PER_RUN) {
+        logger.warn(
+          { pageCount },
+          "copilot studio dataverse hit the page cap; the next run resumes from the cursor",
+        );
       }
 
       // Only advance past rows this run actually read. A run that read

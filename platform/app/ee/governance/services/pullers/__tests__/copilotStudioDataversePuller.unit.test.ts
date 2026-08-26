@@ -117,6 +117,60 @@ describe("given a config naming an environment", () => {
   });
 });
 
+describe("given a response steering the next page somewhere else", () => {
+  it("refuses a next-page link outside the environment host", async () => {
+    const adapter = await newAdapter();
+    queueSignIn();
+    responseQueue.push({
+      status: 200,
+      body: {
+        value: [transcriptRow()],
+        "@odata.nextLink": "https://attacker.example/page2",
+      },
+    });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    // Two calls, not three: the sign-in and the first page. Following the
+    // third would have sent the access token to the attacker's host, which
+    // `followRedirects: false` stops on a redirect and nothing stopped here.
+    expect(capturedCalls).toHaveLength(2);
+    for (const call of capturedCalls) {
+      expect(call.url).not.toContain("attacker.example");
+    }
+    // The page that did arrive is kept — a bad link ahead is not a reason to
+    // throw away rows already read.
+    expect(result.events).toHaveLength(1);
+    expect(result.errorCount).toBe(1);
+  });
+
+  it("follows a next-page link that stays on the environment host", async () => {
+    const adapter = await newAdapter();
+    queueSignIn();
+    responseQueue.push({
+      status: 200,
+      body: {
+        value: [transcriptRow()],
+        "@odata.nextLink":
+          "https://org12345.crm.dynamics.com/api/data/v9.2/conversationtranscripts?$skiptoken=x",
+      },
+    });
+    responseQueue.push({ status: 200, body: { value: [] } });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(capturedCalls).toHaveLength(3);
+    expect(capturedCalls[2]!.url).toContain("$skiptoken=x");
+    expect(result.errorCount).toBe(0);
+  });
+});
+
 describe("given a run against an environment holding one conversation", () => {
   /** @scenario "The puller never reaches beyond the customer's environment" */
   it("reaches only the sign-in and the environment, never the directory", async () => {
@@ -149,6 +203,9 @@ describe("given a run against an environment holding one conversation", () => {
       adapter.validateConfig(CONFIG),
     );
 
+    // Asserted before the loop: a `for` over an empty list passes without
+    // checking anything, which is how a test like this stops being one.
+    expect(capturedCalls).toHaveLength(2);
     for (const call of capturedCalls) {
       expect(call.init?.followRedirects).toBe(false);
     }
