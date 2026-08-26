@@ -11,25 +11,20 @@
  * URL-encodes its own.
  */
 
-import { type AgentInput, AgentRole } from "@langwatch/scenario";
+import type { FieldMapping, ScenarioInput } from "../src";
 import { describe, expect, it } from "vitest";
-import type { FieldMapping } from "../../field-mapping";
 import {
   buildTemplateContext,
   renderBodyTemplate,
   renderHeaderTemplate,
   renderUrlTemplate,
   TemplateRenderError,
-} from "../http-template-engine";
+} from "../src/http-template-engine";
 
-function inputWith(content: string | unknown[]): AgentInput {
+function inputWith(content: string | unknown[]): ScenarioInput {
   return {
     threadId: "thread-1",
     messages: [{ role: "user", content: content as string }],
-    newMessages: [{ role: "user", content: content as string }],
-    requestedRole: AgentRole.AGENT,
-    scenarioState: {} as AgentInput["scenarioState"],
-    scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 }
 
@@ -39,7 +34,7 @@ function render({
   scenarioMappings,
 }: {
   template: string;
-  input: AgentInput;
+  input: ScenarioInput;
   scenarioMappings?: Record<string, FieldMapping>;
 }): string {
   return renderBodyTemplate({

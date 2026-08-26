@@ -2831,9 +2831,15 @@ importers:
 
   packages/features/scenario/contract:
     dependencies:
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
+      liquidjs:
+        specifier: ^10.27.1
+        version: 10.27.1
       zod:
         specifier: ^4.4.3
         version: 4.4.3

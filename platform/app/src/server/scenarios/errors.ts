@@ -2,7 +2,7 @@ import { HandledError, type HandledErrorOptions } from "@langwatch/handled-error
 
 import type { AppErrorCode } from "~/features/errors/logic/codes";
 import { remediation } from "~/server/app-layer/error-remediation";
-import type { ScenarioContentField } from "./execution/scenario-content-template";
+import type { ScenarioContentField } from "@langwatch/scenario-contract";
 
 /**
  * A run's target agent points at a `langwatch agent dev` tunnel that no

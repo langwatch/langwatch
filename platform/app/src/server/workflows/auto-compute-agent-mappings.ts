@@ -8,7 +8,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { getMappingSurfaceInputs } from "@langwatch/workflow-contract";
-import { computeBestMatchMappings } from "../scenarios/execution/resolve-field-mappings";
+import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 
 /** Minimal DSL shape needed for I/O extraction — avoids importing the full Workflow type. */
 interface WorkflowDSL {

@@ -1,12 +1,12 @@
-/**
- * Field mapping resolution for scenario execution.
- *
- * Resolves fieldMappings from TargetConfig into concrete string values
- * by extracting data from the AgentInput provided by the scenario runner.
- */
+/** Portable field mapping shared by scenario authoring and execution. */
 
-import type { AgentInput } from "@langwatch/scenario";
-import type { FieldMapping } from "../field-mapping";
+import type { FieldMapping } from "./field-mapping";
+
+/** The portable part of a scenario runner turn used by input mapping. */
+export type ScenarioInput = {
+  messages: ReadonlyArray<{ role: string; content: unknown }>;
+  threadId?: string;
+};
 
 /** Maps pre-rename field names to current names for backwards compatibility. */
 const LEGACY_FIELD_NAMES: Record<string, string> = {
@@ -15,25 +15,13 @@ const LEGACY_FIELD_NAMES: Record<string, string> = {
   thread_id: "threadId",
 };
 
-/**
- * Resolve a record of field mappings to concrete string values.
- *
- * Source resolution rules:
- * - `sourceId: "scenario"`, `path: ["input"]` — last user message content
- * - `sourceId: "scenario"`, `path: ["messages"]` — full messages array as JSON string
- * - `sourceId: "scenario"`, `path: ["threadId"]` — thread ID, empty string if absent
- * - `type: "value"` — the literal value string
- *
- * @param fieldMappings - Map of input identifier → mapping definition
- * @param agentInput - Runtime input provided by the scenario runner
- * @returns Map of input identifier → resolved string value
- */
+/** Resolves input mappings to the scalar values expected by agent adapters. */
 export function resolveFieldMappings({
   fieldMappings,
   agentInput,
 }: {
   fieldMappings: Record<string, FieldMapping>;
-  agentInput: AgentInput;
+  agentInput: ScenarioInput;
 }): Record<string, string> {
   const resolved: Record<string, string> = {};
 
@@ -47,12 +35,7 @@ export function resolveFieldMappings({
 /** Canonical scenario source fields a mapping can resolve to. */
 export type ScenarioSourceField = "input" | "messages" | "threadId";
 
-/**
- * The canonical scenario source field a mapping resolves to, or `null` for
- * static `value` mappings and unknown/unsupported sources. Callers use this to
- * decide JSON treatment: `messages` is a pre-serialized JSON array (inject
- * raw), everything else is a scalar string (must be JSON-escaped).
- */
+/** Returns the supported scenario source behind a mapping, when it has one. */
 export function sourceFieldOf(mapping: FieldMapping): ScenarioSourceField | null {
   if (mapping.type === "value" || mapping.sourceId !== "scenario") {
     return null;
@@ -67,13 +50,12 @@ function resolveMapping({
   agentInput,
 }: {
   mapping: FieldMapping;
-  agentInput: AgentInput;
+  agentInput: ScenarioInput;
 }): string {
   if (mapping.type === "value") {
     return mapping.value;
   }
 
-  // Source mapping — only "scenario" sourceId is supported currently
   if (mapping.sourceId !== "scenario") {
     return "";
   }
@@ -96,12 +78,26 @@ function resolveMapping({
   return "";
 }
 
-function extractLastUserMessage(agentInput: AgentInput): string {
-  const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
-  if (!lastUserMessage) return "";
-  return typeof lastUserMessage.content === "string"
-    ? lastUserMessage.content
-    : JSON.stringify(lastUserMessage.content);
+function extractLastUserMessage(agentInput: ScenarioInput): string {
+  let lastUserMessage: { role: string; content: unknown } | undefined;
+
+  for (let index = agentInput.messages.length - 1; index >= 0; index -= 1) {
+    const message = agentInput.messages[index];
+    if (message?.role === "user") {
+      lastUserMessage = message;
+      break;
+    }
+  }
+
+  if (!lastUserMessage) {
+    return "";
+  }
+
+  if (typeof lastUserMessage.content === "string") {
+    return lastUserMessage.content;
+  }
+
+  return JSON.stringify(lastUserMessage.content);
 }
 
 /**
@@ -139,18 +135,7 @@ const SCENARIO_FIELD_ALIASES: Record<string, string[]> = {
   ],
 };
 
-/**
- * Compute best-match field mappings by matching agent input identifiers
- * to scenario source fields.
- *
- * Matching rules:
- * - Exact or alias match (case-insensitive) → map to that source field
- * - No match and only one input → default to input
- * - No match and multiple inputs → leave unmapped
- *
- * @param inputs - Array of agent input definitions
- * @returns Mappings for inputs that matched, empty record if none matched
- */
+/** Matches input identifiers to known scenario fields and aliases. */
 export function computeBestMatchMappings({
   inputs,
 }: {
@@ -172,7 +157,6 @@ export function computeBestMatchMappings({
     }
   }
 
-  // If only one input and nothing matched, default to input
   if (inputs.length === 1 && Object.keys(result).length === 0 && inputs[0]) {
     result[inputs[0].identifier] = {
       type: "source",
@@ -189,10 +173,14 @@ function findMatchingField(
   usedFields: Set<string>,
 ): string | undefined {
   for (const [field, aliases] of Object.entries(SCENARIO_FIELD_ALIASES)) {
-    if (usedFields.has(field)) continue;
+    if (usedFields.has(field)) {
+      continue;
+    }
+
     if (aliases.some((alias) => alias === normalizedIdentifier)) {
       return field;
     }
   }
-  return undefined;
+
+  return void 0;
 }

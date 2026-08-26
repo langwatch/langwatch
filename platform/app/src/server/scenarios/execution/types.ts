@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { FieldMappingSchema } from "../field-mapping";
+import { FieldMappingSchema } from "@langwatch/scenario-contract";
 import { runParameterValuesSchema } from "../parameters";
 
 // ============================================================================
@@ -15,7 +15,7 @@ import { runParameterValuesSchema } from "../parameters";
 // (defined first so adapter schemas can reference them)
 // ============================================================================
 
-// FieldMappingSchema lives in ../field-mapping: it is the one thing here that
+// FieldMappingSchema lives in the scenario contract: it is the one thing here that
 // the suite schema and the studio DSL also need, and keeping it out means this
 // module has no importers outside the child's own code.
 

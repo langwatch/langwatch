@@ -22,8 +22,8 @@ import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
+import { resolveFieldMappings } from "@langwatch/scenario-contract";
 import type { RunParameterValues } from "../../parameters";
-import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
 
 /** Timeout for NLP service requests (2 minutes) — matches code adapter. */

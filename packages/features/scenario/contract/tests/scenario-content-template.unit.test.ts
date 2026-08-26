@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { renderScenarioContent } from "../scenario-content-template";
+import { renderScenarioContent } from "../src/scenario-content-template";
 
 describe("renderScenarioContent", () => {
   describe("given a scenario that declares no parameters", () => {

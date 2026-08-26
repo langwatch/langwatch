@@ -24,7 +24,7 @@ import {
   ScenarioSecretParameterInTextError,
   ScenarioSecretParameterMissingError,
 } from "./errors";
-import { renderScenarioContent } from "./execution/scenario-content-template";
+import { renderScenarioContent } from "@langwatch/scenario-contract";
 import {
   findUnknownParameterKeys,
   mergeRunParameters,

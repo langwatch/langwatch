@@ -8,7 +8,7 @@
  * This is an architectural guard, not a snapshot. It reads the real source
  * files, so a new import anywhere in the app fails it — which is the point. The
  * one thing outside the child that needed a piece of that file,
- * `FieldMappingSchema`, now lives in `../field-mapping`; anything else that
+ * `FieldMappingSchema`, now lives in the scenario contract; anything else that
  * finds itself reaching in should move there too rather than widening this.
  *
  * @see specs/scenarios/child-execution-contract.feature
@@ -20,7 +20,7 @@ import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import { suiteTargetSchema } from "../../suites/types";
 import { PromptConfigDataSchema } from "../execution/types";
-import { FieldMappingSchema } from "../field-mapping";
+import { FieldMappingSchema } from "@langwatch/scenario-contract";
 
 const SELF = fileURLToPath(import.meta.url);
 const SRC = path.resolve(path.dirname(SELF), "../../..");
@@ -71,7 +71,10 @@ describe("scenario child execution contract", () => {
     /** @scenario The shared field mapping schema carries no framework dependency */
     it("keeps the shared field mapping module on zod alone", () => {
       const source = fs.readFileSync(
-        path.join(SRC, "server", "scenarios", "field-mapping.ts"),
+        path.resolve(
+          SRC,
+          "../../../packages/features/scenario/contract/src/field-mapping.ts",
+        ),
         "utf8",
       );
 

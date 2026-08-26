@@ -22,7 +22,9 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "liquidjs": "^10.27.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

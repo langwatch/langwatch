@@ -9,18 +9,18 @@ import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
-import { JSONPath } from "jsonpath-plus";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { applyAuthentication } from "../../adapters/auth.strategies";
-import type { RunParameterValues } from "../../parameters";
-import { createChildProcessLogger } from "../child-logger";
 import {
   buildTemplateContext,
   mergePropagationHeaders,
   renderBodyTemplate,
   renderHeaderTemplate,
   renderUrlTemplate,
-} from "../http-template-engine";
+} from "@langwatch/scenario-contract";
+import { JSONPath } from "jsonpath-plus";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { applyAuthentication } from "../../adapters/auth.strategies";
+import type { RunParameterValues } from "../../parameters";
+import { createChildProcessLogger } from "../child-logger";
 import {
   fenceSecretRefs,
   preserveSecretRefs,

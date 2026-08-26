@@ -2,21 +2,16 @@
  * @vitest-environment node
  */
 
-import { type AgentInput, AgentRole } from "@langwatch/scenario";
+import type { FieldMapping, ScenarioInput } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import type { FieldMapping } from "../../field-mapping";
 import {
   computeBestMatchMappings,
   resolveFieldMappings,
-} from "../resolve-field-mappings";
+} from "../src/resolve-field-mappings";
 
-const makeAgentInput = (overrides: Partial<AgentInput> = {}): AgentInput => ({
+const makeAgentInput = (overrides: Partial<ScenarioInput> = {}): ScenarioInput => ({
   threadId: "thread-1",
   messages: [{ role: "user", content: "Hello world" }],
-  newMessages: [{ role: "user", content: "Hello world" }],
-  requestedRole: AgentRole.AGENT,
-  scenarioState: {} as AgentInput["scenarioState"],
-  scenarioConfig: {} as AgentInput["scenarioConfig"],
   ...overrides,
 });
 

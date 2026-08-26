@@ -48,8 +48,8 @@ import {
   getCodeFromConfig,
 } from "@langwatch/workflow-web";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
-import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 
 const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];

@@ -4,7 +4,7 @@
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TemplateRenderError } from "../../http-template-engine";
+import { TemplateRenderError } from "@langwatch/scenario-contract";
 import type { HttpAgentData } from "../../types";
 import { SerializedHttpAgentAdapter } from "../http-agent.adapter";
 

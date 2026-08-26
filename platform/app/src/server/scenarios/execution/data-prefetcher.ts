@@ -31,7 +31,7 @@ import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeat
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
 import { decryptRunSecretValues, type RunSecretCiphertext } from "../run-secret-values";
-import { renderScenarioContent } from "./scenario-content-template";
+import { renderScenarioContent } from "@langwatch/scenario-contract";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
@@ -41,7 +41,7 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
+import { type FieldMapping, FieldMappingSchema } from "@langwatch/scenario-contract";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
   AuthConfigSchema,

@@ -11,6 +11,7 @@ import {
   type HttpHeader,
   type HttpMethod,
 } from "@langwatch/agent-contract";
+import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
 import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
@@ -28,7 +29,6 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { explainExecutionStateError } from "~/optimization_studio/utils/executionStateError";
-import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 
 const inputMappingsSchema = z.record(z.string(), agentInputBindingSchema);

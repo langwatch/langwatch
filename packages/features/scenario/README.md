@@ -2,7 +2,8 @@
 
 `scenario` owns authored scenario definitions and portable scenario UI.
 
-- `contract` defines the tenant-scoped service contract and parameter schema.
+- `contract` defines the tenant-scoped service contract, parameter schema, input
+  mapping and template rendering.
 - `server` provides the process-owned service and private persistence adapter.
 - `web` provides the Scenario Library, onboarding, archive confirmation, selection
   state and target selector.

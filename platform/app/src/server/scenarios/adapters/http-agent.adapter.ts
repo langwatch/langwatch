@@ -5,14 +5,14 @@ import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
 import type { HttpComponentConfig } from "@langwatch/workflow-contract";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   buildTemplateContext,
   mergePropagationHeaders,
   renderBodyTemplate,
   renderHeaderTemplate,
   renderUrlTemplate,
-} from "../execution/http-template-engine";
+} from "@langwatch/scenario-contract";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { preserveSecretRefs } from "../execution/secret-references";
 import { applyAuthentication } from "./auth.strategies";
 

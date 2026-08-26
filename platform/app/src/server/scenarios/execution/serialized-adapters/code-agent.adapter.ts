@@ -16,8 +16,8 @@ import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
+import { resolveFieldMappings } from "@langwatch/scenario-contract";
 import type { RunParameterValues } from "../../parameters";
-import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 
 /** Timeout for NLP service requests (2 minutes) */

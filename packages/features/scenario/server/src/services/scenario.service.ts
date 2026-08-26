@@ -39,7 +39,9 @@ export class ScenarioService extends ScenarioServiceContract {
   async getById(input: ScenarioIdInput): Promise<Scenario> {
     const parsed = scenarioIdInputSchema.parse(input);
     const scenario = await this.options.repository.tryFindById(parsed);
-    if (!scenario) throw new ScenarioNotFoundError(parsed.id);
+    if (!scenario) {
+      throw new ScenarioNotFoundError(parsed.id);
+    }
     return scenario;
   }
 
@@ -75,7 +77,9 @@ export class ScenarioService extends ScenarioServiceContract {
       ...parsed,
       archivedAt: (this.options.now ?? (() => new Date()))(),
     });
-    if (!scenario) throw new ScenarioNotFoundError(parsed.id);
+    if (!scenario) {
+      throw new ScenarioNotFoundError(parsed.id);
+    }
     return scenario;
   }
 
@@ -94,8 +98,11 @@ export class ScenarioService extends ScenarioServiceContract {
     const failed: { id: string; error: string }[] = [];
     for (const [index, result] of results.entries()) {
       const id = parsed.ids[index]!;
-      if (result.status === "fulfilled") archived.push(id);
-      else failed.push({ id, error: String(result.reason) });
+      if (result.status === "fulfilled") {
+        archived.push(id);
+      } else {
+        failed.push({ id, error: String(result.reason) });
+      }
     }
     return { archived, failed };
   }

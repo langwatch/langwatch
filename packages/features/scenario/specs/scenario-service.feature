@@ -19,3 +19,8 @@ Feature: Scenario service boundary
     Given a scenario parameter is secret
     When its definition includes a default value
     Then validation rejects the definition
+
+  Scenario: Scenario input mapping is portable
+    Given an agent input mapping is used by authoring and execution
+    When either surface resolves it
+    Then both use the scenario contract's mapping rules

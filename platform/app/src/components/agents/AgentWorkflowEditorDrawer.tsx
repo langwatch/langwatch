@@ -33,8 +33,8 @@ import {
   parseStudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { type AgentWithFields, linkedWorkflowId } from "~/server/agents/agent-fields";
-import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 import { workflowApi } from "~/utils/workflow-api";
 
