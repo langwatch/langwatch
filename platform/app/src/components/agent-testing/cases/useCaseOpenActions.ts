@@ -17,7 +17,7 @@ export type CaseOpenActions = {
   openEditor: (testCase: TestCase) => void;
   openHistory: (testCase: TestCase) => void;
   openLastRun: (testCase: TestCase) => void;
-  /** A row click always opens the case editor. The last-result cell opens the run. */
+  /** A row click always opens the case editor. */
   onRowClick: (testCase: TestCase) => void;
 };
 

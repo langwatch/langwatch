@@ -237,8 +237,8 @@ describe("the test cases table", () => {
     expect(screen.getByTestId("case-row-Double charge")).toBeInTheDocument();
   });
 
-  /** @scenario "A folder row carries the last result of the whole suite" */
-  it("carries the pass summary of a whole suite on its heading", () => {
+  /** @scenario "A folder row shows only the folder name and case count" */
+  it("carries only the folder name and case count on a folder row", () => {
     const cases = [
       makeCase(),
       makeCase({ id: "case_2", name: "Late refund" }),
@@ -257,8 +257,11 @@ describe("the test cases table", () => {
     });
 
     const heading = screen.getByTestId("folder-header-row-Refunds");
-    expect(within(heading).getByText("100%")).toBeInTheDocument();
     expect(within(heading).getByLabelText("3 test cases")).toBeInTheDocument();
+    expect(within(heading).queryByText("100%")).not.toBeInTheDocument();
+    expect(
+      within(heading).queryByTestId("run-metrics-summary"),
+    ).not.toBeInTheDocument();
   });
 
   /** @scenario "A single suite view lists its rows without group headings" */
@@ -304,9 +307,8 @@ describe("the test cases table", () => {
     expect(critical.className).not.toEqual(billing.className);
   });
 
-  /** @scenario "The last result cell shows the verdict of the last run" */
-  it("shows the verdict of the last run and the run metrics on hover", async () => {
-    const user = userEvent.setup();
+  /** @scenario "The cases table shows the test case column and the row actions, and no last result" */
+  it("has no LAST RESULT column header and no per-row result cell", () => {
     renderPanel({
       folderGroups: [],
       looseCases: [makeCase()],
@@ -315,79 +317,15 @@ describe("the test cases table", () => {
       ]),
     });
 
-    expect(screen.getByText("Passed (3/3)")).toBeInTheDocument();
-
-    await user.hover(screen.getByText("Passed (3/3)"));
-    const tooltip = await screen.findByRole("tooltip");
-    expect(within(tooltip).getByText("6.3s · $0.004200")).toBeInTheDocument();
-  });
-
-  /** @scenario "A test case that never ran shows an empty last result" */
-  it("leaves the last result empty for a case that never ran and still offers Run", () => {
-    renderPanel({
-      folderGroups: [],
-      looseCases: [makeCase()],
-      lastResults: new Map(),
-    });
-
-    const row = screen.getByTestId("case-row-Double charge");
-    expect(within(row).getByTestId("last-result-empty")).toBeInTheDocument();
+    const table = screen.getByTestId("agent-testing-cases-table");
+    expect(within(table).queryByText(/last result/i)).not.toBeInTheDocument();
+    expect(within(table).queryByText("Passed (3/3)")).not.toBeInTheDocument();
     expect(
-      within(row).getByRole("button", { name: "Run Double charge" }),
-    ).toBeInTheDocument();
-  });
-
-  /** @scenario "Under a single suite the time and cost read beside the last result" */
-  it("reads the time and the cost beside the verdict under one suite", () => {
-    renderPanel({
-      selection: { kind: "suite", slug: "refunds" },
-      title: "Refunds",
-      folderGroups: [],
-      looseCases: [makeCase()],
-      lastResults: new Map([
-        ["case_1", makeResult({ durationInMs: 6300, totalCost: 0.0042 })],
-      ]),
-    });
-
-    const row = screen.getByTestId("case-row-Double charge");
-    expect(within(row).getByText("Passed (3/3)")).toBeInTheDocument();
-    expect(within(row).getByText("6.3s · $0.004200")).toBeInTheDocument();
-  });
-
-  /** @scenario "The last result cells fill in after the table is drawn" */
-  it("draws the rows first and fills the last result cells in after", () => {
-    const cases = [
-      makeCase(),
-      makeCase({ id: "case_2", name: "Late refund" }),
-      makeCase({ id: "case_3", name: "Partial refund" }),
-    ];
-    const { props, view } = renderPanel({
-      folderGroups: [],
-      looseCases: cases,
-      lastResults: new Map(),
-      isLastResultsLoading: true,
-    });
-
-    expect(screen.getByText("Double charge")).toBeInTheDocument();
-    expect(screen.getByText("Partial refund")).toBeInTheDocument();
-    expect(screen.queryByText("Passed (3/3)")).not.toBeInTheDocument();
-
-    view.rerender(
-      <CasesPanel
-        {...props}
-        isLastResultsLoading={false}
-        lastResults={
-          new Map(
-            cases.map((testCase) => [
-              testCase.id,
-              makeResult({ scenarioId: testCase.id }),
-            ]),
-          )
-        }
-      />,
-    );
-
-    expect(screen.getAllByText("Passed (3/3)")).toHaveLength(3);
+      within(table).queryByTestId("case-row-Double charge-last-result"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(table).queryByTestId("last-result-empty"),
+    ).not.toBeInTheDocument();
   });
 
   // --- Row actions ---
@@ -573,41 +511,6 @@ describe("the test cases table", () => {
     await user.click(screen.getByText("Double charge"));
 
     expect(props.onRowClick).toHaveBeenCalledWith(testCase);
-  });
-
-  /** @scenario "Clicking the last result cell opens the last run" */
-  it("opens the last run when the last result ghost button is clicked", async () => {
-    const user = userEvent.setup();
-    const testCase = makeCase();
-    const { props } = renderPanel({
-      folderGroups: [],
-      looseCases: [testCase],
-      lastResults: new Map([["case_1", makeResult()]]),
-    });
-
-    const cell = screen.getByRole("button", {
-      name: "Open the last run of Double charge",
-    });
-    await user.click(cell);
-
-    expect(props.onOpenLastRun).toHaveBeenCalledWith(testCase);
-    expect(props.onRowClick).not.toHaveBeenCalled();
-  });
-
-  /** @scenario "The last result cell has no button when there is no last run" */
-  it("renders the last result cell without a button when there is no last run", () => {
-    renderPanel({
-      folderGroups: [],
-      looseCases: [makeCase()],
-      lastResults: new Map(),
-    });
-
-    expect(
-      screen.queryByRole("button", {
-        name: "Open the last run of Double charge",
-      }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId("last-result-empty")).toBeInTheDocument();
   });
 
   /** @scenario "Clicking the Run button does not open the row" */

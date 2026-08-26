@@ -409,7 +409,9 @@ describe("starting a one-off run from the case table", () => {
     );
 
     expect(screen.getByTestId("agent-testing-cases-table")).toBeInTheDocument();
-    expect(screen.getByText("Passed (2/2)")).toBeInTheDocument();
+    // The cases table no longer carries a last result cell, so the fresh
+    // verdict lands on the summary line under the table.
+    expect(screen.getByTestId("cases-last-run-line")).toHaveTextContent("100%");
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 });

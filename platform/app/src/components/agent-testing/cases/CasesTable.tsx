@@ -1,16 +1,18 @@
 /**
- * The table of test cases: the name, the labels and the last result, with a
- * Run button and a row menu at the end of every row.
+ * The table of test cases: the name and the labels, with a Run button, an
+ * Edit button and a row menu at the end of every row.
  *
  * The table is a grid inside one card, not a ruled table: the columns line up
  * without a vertical rule between them, so a long list of cases reads as a
  * list of names rather than as a spreadsheet.
  *
+ * The table carries no last result: authoring stays here and results live on
+ * the Results tab. A person who wants the last run of a row reaches it from
+ * the row menu.
+ *
  * The All test cases surface reads like a code host root: the test suites sit
  * on top as folder rows, and the cases filed in no test suite sit below as
  * loose rows. A folder row opens its own surface; it does not expand in place.
- * Under one suite the rows are flat, and the time and the cost of the last
- * run read beside the verdict.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-folder-assignment.feature
@@ -28,38 +30,27 @@ import {
 } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { MoreVertical, Pencil } from "lucide-react";
-import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
-import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
 import { FolderHeaderRow } from "../shared/FolderHeaderRow";
-import { LastResultLabel } from "../shared/LastResultLabel";
-import { ResultMetricsInline } from "../shared/ResultMetricsInline";
 import { SmallButton } from "../shared/SmallButton";
 import { RunCaseButton } from "./RunCaseButton";
-import {
-  type CaseGroup,
-  criteriaOf,
-  summaryFromLastResults,
-  type TestCase,
-  type TestSuiteEntry,
-} from "./test-cases";
+import type { CaseGroup, TestCase, TestSuiteEntry } from "./test-cases";
 
 /** The last result of a case, as the aggregate answers it. */
 export type CaseLastResult = ScenarioLastResultSummary;
 
 /**
- * The columns of the table. Under one suite the last result column carries the
- * time and the cost as well, so it is wider there. When the table is in
- * selection mode a checkbox column is added at the start of every row.
+ * The columns of the table: the case name takes the free space, the row
+ * actions take what they need on the right. A checkbox column is added at
+ * the start of every row when the table is in selection mode.
  */
-const WIDE_COLUMNS = "minmax(0,1fr) 290px 112px";
-const NARROW_COLUMNS = "minmax(0,1fr) 170px 112px";
+const BASE_COLUMNS = "minmax(0,1fr) auto";
 const CHECKBOX_COLUMN = "24px";
 /** A set that runs from code has no controls, and a last run column instead. */
-const EXTERNAL_COLUMNS = "minmax(0,1fr) 290px 110px";
+const EXTERNAL_COLUMNS = "minmax(0,1fr) 110px";
 
 export type CasesTableProps = {
   /** The real test suites, drawn as folder rows on the All test cases surface. */
@@ -69,11 +60,8 @@ export type CasesTableProps = {
    * filed in no test suite, on a suite surface every case of that suite.
    */
   looseCases: TestCase[];
-  /** True on the All test cases surface, where columns fit a folder row. */
+  /** True on the All test cases surface, where folder rows are drawn. */
   isAllView: boolean;
-  lastResults: Map<string, CaseLastResult>;
-  /** True while the last-result cells are still on their way. */
-  isLastResultsLoading: boolean;
   /** The test suites a case can be moved into. */
   suites: TestSuiteEntry[];
   canManage: boolean;
@@ -81,6 +69,7 @@ export type CasesTableProps = {
   /** True when the table shows checkboxes for a bulk move-to-suite. */
   isSelectionMode: boolean;
   selectedIds: Set<string>;
+  hasLastRunByCase: (scenarioId: string) => boolean;
   onToggleSelected: (scenarioId: string) => void;
   /** Enters selection mode with this row pre-checked. */
   onStartMoveToSuite: (scenarioId: string) => void;
@@ -145,14 +134,13 @@ function TableHeaderRow({
 export function CasesTable({
   folderGroups,
   looseCases,
-  isAllView,
-  lastResults,
-  isLastResultsLoading,
+  isAllView: _isAllView,
   suites: _suites,
   canManage,
   runningCaseId,
   isSelectionMode,
   selectedIds,
+  hasLastRunByCase,
   onToggleSelected,
   onStartMoveToSuite,
   onSelectSuite,
@@ -164,19 +152,15 @@ export function CasesTable({
   onOpenLastRun,
   onArchive,
 }: CasesTableProps) {
-  const baseColumns = isAllView ? NARROW_COLUMNS : WIDE_COLUMNS;
   const templateColumns = isSelectionMode
-    ? `${CHECKBOX_COLUMN} ${baseColumns}`
-    : baseColumns;
-  const aggregateSpan = isSelectionMode ? 3 : 2;
-  const showMetricsInline = !isAllView;
+    ? `${CHECKBOX_COLUMN} ${BASE_COLUMNS}`
+    : BASE_COLUMNS;
 
   return (
     <TableCard data-testid="agent-testing-cases-table">
       <TableHeaderRow templateColumns={templateColumns}>
         {isSelectionMode && <Text as="span" />}
         <Text as="span">Test case</Text>
-        <Text as="span">Last result</Text>
         <Text as="span" />
       </TableHeaderRow>
 
@@ -186,12 +170,9 @@ export function CasesTable({
           name={group.name}
           caseCount={group.cases.length}
           templateColumns={templateColumns}
-          aggregateSpan={aggregateSpan}
           separated={index > 0}
           onClick={() => onSelectSuite(group.id)}
-        >
-          <GroupAggregate group={group} lastResults={lastResults} />
-        </FolderHeaderRow>
+        />
       ))}
       <Box
         css={{
@@ -206,11 +187,9 @@ export function CasesTable({
             key={testCase.id}
             testCase={testCase}
             templateColumns={templateColumns}
-            lastResult={lastResults.get(testCase.id)}
-            isLastResultsLoading={isLastResultsLoading}
-            showMetricsInline={showMetricsInline}
             canManage={canManage}
             isRunning={runningCaseId === testCase.id}
+            hasLastRun={hasLastRunByCase(testCase.id)}
             isSelectionMode={isSelectionMode}
             isSelected={selectedIds.has(testCase.id)}
             onToggleSelected={onToggleSelected}
@@ -229,31 +208,12 @@ export function CasesTable({
   );
 }
 
-/** How the last run of a whole group went, beside its name. */
-function GroupAggregate({
-  group,
-  lastResults,
-}: {
-  group: CaseGroup;
-  lastResults: Map<string, CaseLastResult>;
-}) {
-  const groupResults = group.cases
-    .map((testCase) => lastResults.get(testCase.id))
-    .filter((result): result is CaseLastResult => !!result);
-
-  if (groupResults.length === 0) return null;
-
-  return <RunMetricsSummary summary={summaryFromLastResults(groupResults)} />;
-}
-
 function CaseRow({
   testCase,
   templateColumns,
-  lastResult,
-  isLastResultsLoading,
-  showMetricsInline,
   canManage,
   isRunning,
+  hasLastRun,
   isSelectionMode,
   isSelected,
   onToggleSelected,
@@ -268,11 +228,9 @@ function CaseRow({
 }: {
   testCase: TestCase;
   templateColumns: string;
-  lastResult?: CaseLastResult;
-  isLastResultsLoading: boolean;
-  showMetricsInline: boolean;
   canManage: boolean;
   isRunning: boolean;
+  hasLastRun: boolean;
   isSelectionMode: boolean;
   isSelected: boolean;
   onToggleSelected: (scenarioId: string) => void;
@@ -337,19 +295,11 @@ function CaseRow({
         <TagList labels={testCase.labels} tone="pastel" />
       </HStack>
 
-      <LastResultCell
-        testCase={testCase}
-        lastResult={lastResult}
-        isLoading={isLastResultsLoading}
-        showMetricsInline={showMetricsInline}
-        onOpenLastRun={onOpenLastRun}
-      />
-
       <CaseRowActions
         testCase={testCase}
         canManage={canManage}
         isRunning={isRunning}
-        hasLastRun={!!lastResult}
+        hasLastRun={hasLastRun}
         onRunCase={onRunCase}
         onEdit={onEdit}
         onHistory={onHistory}
@@ -424,92 +374,6 @@ function CaseRowActions({
         onArchive={onArchive}
       />
     </HStack>
-  );
-}
-
-/**
- * What the last run of a case said. Empty while the results are on their way,
- * so the rows are drawn before the verdicts arrive.
- *
- * With a last run, the cell is a ghost button: clicking it opens the last run
- * and the click does not fall through to the row. Without a last run it reads
- * as plain text with no click target.
- *
- * Under one test suite the time and the cost read beside the verdict. In All
- * test cases the column is narrower, so they read on hover instead.
- */
-function LastResultCell({
-  testCase,
-  lastResult,
-  isLoading,
-  showMetricsInline,
-  onOpenLastRun,
-}: {
-  testCase: TestCase;
-  lastResult?: CaseLastResult;
-  isLoading: boolean;
-  showMetricsInline: boolean;
-  onOpenLastRun: (testCase: TestCase) => void;
-}) {
-  if (!lastResult) {
-    if (isLoading) return <Skeleton height="16px" width="90px" />;
-    return <Box data-testid="last-result-empty" />;
-  }
-
-  const label = (
-    <LastResultLabel
-      status={lastResult.status}
-      results={criteriaOf(lastResult)}
-    />
-  );
-  const metrics = (
-    <ResultMetricsInline
-      durationInMs={lastResult.durationInMs}
-      totalCost={lastResult.totalCost}
-    />
-  );
-  const hasMetrics =
-    typeof lastResult.durationInMs === "number" ||
-    typeof lastResult.totalCost === "number";
-
-  const content = showMetricsInline ? (
-    <HStack gap={2.5} minWidth={0}>
-      {label}
-      {metrics}
-    </HStack>
-  ) : (
-    <HStack gap={2.5} minWidth={0}>
-      {label}
-    </HStack>
-  );
-
-  const button = (
-    <Button
-      type="button"
-      size="sm"
-      variant="ghost"
-      height="24px"
-      paddingX={2}
-      minWidth={0}
-      justifyContent="flex-start"
-      borderRadius="md"
-      aria-label={`Open the last run of ${testCase.name}`}
-      data-testid={`case-row-${testCase.name}-last-result`}
-      onClick={(event) => {
-        event.stopPropagation();
-        onOpenLastRun(testCase);
-      }}
-    >
-      {content}
-    </Button>
-  );
-
-  if (showMetricsInline) return button;
-
-  return (
-    <Tooltip content={metrics} disabled={!hasMetrics}>
-      {button}
-    </Tooltip>
   );
 }
 
@@ -634,7 +498,6 @@ export function ExternalCasesTable({
     <TableCard data-testid="agent-testing-external-cases-table">
       <TableHeaderRow templateColumns={EXTERNAL_COLUMNS}>
         <Text as="span">Test case</Text>
-        <Text as="span" />
         <Text as="span" textAlign="right">
           Last run
         </Text>
@@ -667,7 +530,6 @@ export function ExternalCasesTable({
             <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
               {externalCase.name}
             </Text>
-            <Box />
             <Text
               fontSize="11px"
               color={FG_MUTED}

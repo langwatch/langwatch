@@ -1,20 +1,22 @@
 Feature: The test cases table
   As a person who owns a set of agent test cases
-  I want one table with my cases grouped by suite and their last result
-  So that I can see what passes and run anything from where I am
+  I want one table with my cases grouped by suite
+  So that I can author them and reach anything with a click
 
   Background: what a row shows.
-    A row shows the name of the test case, its labels as small pastel pills,
-    and its last result. A Run button and a row menu sit at the end of the row.
-    The row carries no author, no date and no version.
+    A row shows the name of the test case and its labels as small pastel
+    pills. A Run button, an Edit button and a row menu sit at the end of the
+    row. The row carries no author, no date and no version. The row carries
+    no last result: the table is authoring only, and the last run of a case
+    is reached from the row menu or on the Results tab.
 
     All test cases reads like a code host root. The test suites sit on top as
     folder rows in alphabetical order, and the cases filed in no test suite
     sit below as loose rows at the root. Under a single suite the rows are
     flat.
 
-    The whole table reads over the selected period. A summary line under the
-    table says when the set last ran and how it did.
+    A summary line under the table says when the whole set last ran and how
+    it did.
 
   # --- Grouping ---
 
@@ -27,10 +29,11 @@ Feature: The test cases table
     And no folder row expands the cases it holds
 
   @integration
-  Scenario: A folder row carries the last result of the whole suite
-    Given a test suite whose last run passed three of three cases
+  Scenario: A folder row shows only the folder name and case count
+    Given a test suite holding three cases
     When All test cases is opened
-    Then the folder row of that suite carries a pass summary reading three of three
+    Then the folder row of that suite reads only the folder name and how many cases it holds
+    And no result summary sits on the folder row
 
   @integration
   Scenario: Clicking a suite folder row opens that suite
@@ -62,38 +65,18 @@ Feature: The test cases table
   # --- Row content ---
 
   @integration
+  Scenario: The cases table shows the test case column and the row actions, and no last result
+    Given a test case whose last run passed
+    When the cases table is read
+    Then the header carries only a Test case column
+    And no row carries a last result cell
+
+  @integration
   Scenario: Labels are shown as small pastel pills beside the name
     Given a test case with the labels "critical" and "billing"
     When its row is read
     Then both labels are shown as pills beside the name
     And each label gets its own pill colour
-
-  @integration
-  Scenario: The last result cell shows the verdict of the last run
-    Given a test case whose last run passed
-    When its row is read
-    Then the last result cell shows that it passed
-    And hovering it shows the duration and the cost of that run
-
-  @integration
-  Scenario: A test case that never ran shows an empty last result
-    Given a test case with no run in the period
-    When its row is read
-    Then the last result cell is empty
-    And the row still offers Run
-
-  @integration
-  Scenario: Under a single suite the time and cost read beside the last result
-    Given a test suite is chosen in the rail
-    When a row with a finished run is read
-    Then the duration and the cost read in the same cell as the last result
-
-  @integration
-  Scenario: The last result cells fill in after the table is drawn
-    Given a project with many test cases
-    When the case table is opened
-    Then the rows are drawn at once
-    And the last result cells fill in as the results arrive
 
   # --- Row actions ---
 
@@ -167,19 +150,6 @@ Feature: The test cases table
     Given a test case with no run in the period
     When its row is clicked
     Then the case editor opens for that case
-
-  @integration
-  Scenario: Clicking the last result cell opens the last run
-    Given a test case whose last run finished
-    When the last result cell is clicked
-    Then the run detail drawer opens on that run
-    And the case editor does not open
-
-  @integration
-  Scenario: The last result cell has no button when there is no last run
-    Given a test case with no run in the period
-    When the last result cell is read
-    Then it reads as plain text with no click target
 
   # --- The case editor ---
 

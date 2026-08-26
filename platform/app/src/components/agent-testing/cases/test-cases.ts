@@ -201,14 +201,3 @@ export function lastRunAtOf(
   }
   return latest;
 }
-
-/** The criteria counts of a last result, in the shape LastResultLabel reads. */
-export function criteriaOf(result: ScenarioLastResultSummary): {
-  metCriteria: string[];
-  unmetCriteria: string[];
-} {
-  return {
-    metCriteria: new Array<string>(result.metCriteriaCount).fill(""),
-    unmetCriteria: new Array<string>(result.unmetCriteriaCount).fill(""),
-  };
-}

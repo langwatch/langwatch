@@ -88,6 +88,10 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
     clearSelection,
     handleMoveConfirm,
   } = useCaseSelection({ flatCases, props });
+  const hasLastRunByCase = useCallback(
+    (scenarioId: string) => props.lastResults.has(scenarioId),
+    [props.lastResults],
+  );
 
   if (props.isLoading) return <CasesTableSkeleton />;
 
@@ -118,13 +122,12 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         folderGroups={props.folderGroups}
         looseCases={props.looseCases}
         isAllView={props.selection.kind === "all"}
-        lastResults={props.lastResults}
-        isLastResultsLoading={props.isLastResultsLoading}
         suites={props.suites}
         canManage={props.canManage}
         runningCaseId={props.runningCaseId}
         isSelectionMode={isSelectionMode}
         selectedIds={selectedIds}
+        hasLastRunByCase={hasLastRunByCase}
         onToggleSelected={toggleSelected}
         onStartMoveToSuite={startMoveToSuite}
         onSelectSuite={props.onSelectSuite}
