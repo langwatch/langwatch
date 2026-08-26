@@ -1,12 +1,12 @@
 import { Badge, Box, Button, Flex, Text } from "@chakra-ui/react";
 import { ChevronDown, Shuffle } from "lucide-react";
 import { useState } from "react";
-import { api } from "~/utils/api";
-import { useFoundryProjectStore } from "./foundryProjectStore";
-import { usePresetStore } from "./presetStore";
-import { useTraceStore } from "./traceStore";
+import { useFoundryProjectStore } from "./foundry-project.store";
+import { usePresetStore } from "./preset.store";
+import { useTraceStore } from "./trace.store";
 import type { SpanConfig, TraceConfig } from "./types";
 import { shortId } from "./types";
+import { useFoundryPrompts } from "./use-foundry-prompts";
 
 function countSpans(spans: SpanConfig[]): number {
   return spans.reduce((acc, s) => acc + 1 + countSpans(s.children), 0);
@@ -67,10 +67,10 @@ export function PresetPicker() {
   const { builtIn, userPresets } = usePresetStore();
   const allPresets = [...builtIn, ...userPresets];
   const selectedProjectId = useFoundryProjectStore((s) => s.selectedProjectId);
-  const prompts = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: selectedProjectId! },
-    { enabled: !!selectedProjectId },
-  );
+  const prompts = useFoundryPrompts({
+    enabled: !!selectedProjectId,
+    projectId: selectedProjectId,
+  });
 
   function loadPreset(id: string) {
     const preset = allPresets.find((p) => p.id === id);
@@ -78,8 +78,8 @@ export function PresetPicker() {
 
     const config = structuredClone(preset.config);
 
-    if (id === "prompt-heavy" && prompts.data && prompts.data.length > 0) {
-      injectRealPrompts(config, prompts.data);
+    if (id === "prompt-heavy" && prompts.prompts && prompts.prompts.length > 0) {
+      injectRealPrompts(config, prompts.prompts);
     }
 
     setTrace(config);

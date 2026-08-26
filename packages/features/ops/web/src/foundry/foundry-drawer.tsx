@@ -11,19 +11,17 @@ import {
 } from "@chakra-ui/react";
 import { Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Drawer } from "~/components/ui/drawer";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useExecutionStore } from "./executionStore";
-import { useFoundryProjectStore } from "./foundryProjectStore";
-import { usePresetStore } from "./presetStore";
-import { getFoundryExecutor } from "./traceExecutor";
-import { useTraceStore } from "./traceStore";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { useExecutionStore } from "./execution.store";
+import { useFoundryProjectStore } from "./foundry-project.store";
+import { useFoundryTransport } from "./foundry-runtime";
+import { usePresetStore } from "./preset.store";
+import { getFoundryExecutor } from "./trace-executor";
+import { useTraceStore } from "./trace.store";
 import { SPAN_TYPE_ICONS, type SpanConfig } from "./types";
 
-export function FoundryDrawer() {
-  const { project } = useOrganizationTeamProject();
-  const { closeDrawer } = useDrawer();
+export function FoundryDrawer({ onClose }: { onClose: () => void }) {
+  const { currentProject: project } = useFoundryTransport();
   const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
   const apiKey = selectedApiKey ?? project?.apiKey;
   const trace = useTraceStore((s) => s.trace);
@@ -91,7 +89,7 @@ export function FoundryDrawer() {
   const selectedSpan = selectedSpanId ? findSpan(spans, selectedSpanId) : null;
 
   return (
-    <Drawer.Root open={true} placement="end" size="md" onOpenChange={() => closeDrawer()}>
+    <Drawer.Root open={true} placement="end" size="md" onOpenChange={() => onClose()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">

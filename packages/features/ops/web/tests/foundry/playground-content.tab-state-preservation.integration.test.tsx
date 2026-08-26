@@ -16,29 +16,32 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-// ConnectionSettings and ExecutionControls sit in the always-mounted left
-// sidebar and reach for the project and tRPC. Neither is under test.
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "test" },
-    organization: { id: "org-1" },
-  }),
-}));
+import {
+  FoundryRuntimeProvider,
+  type FoundryTransport,
+} from "../../src/foundry/foundry-runtime";
+import { PlaygroundContent } from "../../src/foundry/playground-content";
+import { createDefaultTrace, useTraceStore } from "../../src/foundry/trace.store";
 
-vi.mock("~/utils/api", () => ({
-  api: {
-    organization: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
-    },
-  },
-}));
+class ResizeObserverMock {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
 
-import { PlaygroundContent } from "../PlaygroundContent";
-import { createDefaultTrace, useTraceStore } from "../traceStore";
+Object.defineProperty(globalThis, "ResizeObserver", { value: ResizeObserverMock });
 
 const NEW_ATTRIBUTE_KEY = "my.pending.attribute";
+const transport: FoundryTransport = {
+  currentProject: {
+    id: "proj-1",
+    apiKey: "sk-lw-test",
+  },
+  projects: [],
+  loadPrompts: async () => [],
+};
 
 function renderPlaygroundWithSelectedSpan() {
   const trace = createDefaultTrace();
@@ -49,7 +52,9 @@ function renderPlaygroundWithSelectedSpan() {
 
   return render(
     <ChakraProvider value={defaultSystem}>
-      <PlaygroundContent />
+      <FoundryRuntimeProvider transport={transport}>
+        <PlaygroundContent />
+      </FoundryRuntimeProvider>
     </ChakraProvider>,
   );
 }
@@ -80,13 +85,13 @@ describe("PlaygroundContent tab state", () => {
         renderPlaygroundWithSelectedSpan();
 
         await userEvent.type(newAttributeKeyInput(), NEW_ATTRIBUTE_KEY);
-        expect(newAttributeKeyInput()).toHaveValue(NEW_ATTRIBUTE_KEY);
+        expect(newAttributeKeyInput().getAttribute("value")).toBe(NEW_ATTRIBUTE_KEY);
 
         await switchTo("Waterfall");
         await switchTo("Editor");
 
         await waitFor(() => {
-          expect(newAttributeKeyInput()).toHaveValue(NEW_ATTRIBUTE_KEY);
+          expect(newAttributeKeyInput().getAttribute("value")).toBe(NEW_ATTRIBUTE_KEY);
         });
       });
     });
@@ -128,7 +133,7 @@ describe("PlaygroundContent tab state", () => {
 
         // Pairs with the assertion above: without it, a Graph view that never
         // renders at all would read as lazyMount working.
-        expect(await screen.findByTestId("rf__wrapper")).toBeInTheDocument();
+        expect(await screen.findByTestId("rf__wrapper")).not.toBeNull();
       });
     });
   });

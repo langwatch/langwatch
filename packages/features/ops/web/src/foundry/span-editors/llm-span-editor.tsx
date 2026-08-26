@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Input, Text, Textarea } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
 import { LLM_MODELS } from "../models";
-import { useTraceStore } from "../traceStore";
+import { useTraceStore } from "../trace.store";
 import type { ChatMessage, LLMConfig, SpanConfig } from "../types";
 
 const ROLE_COLORS: Record<string, string> = {

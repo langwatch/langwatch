@@ -11,8 +11,8 @@ import {
 import { useCallback, useMemo } from "react";
 import "@xyflow/react/dist/style.css";
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { useColorMode } from "~/components/ui/color-mode";
-import { useTraceStore } from "../traceStore";
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { useTraceStore } from "../trace.store";
 import { SPAN_TYPE_COLORS, SPAN_TYPE_ICONS, type SpanConfig } from "../types";
 
 interface SpanNodeData {

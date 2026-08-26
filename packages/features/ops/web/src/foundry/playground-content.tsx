@@ -1,13 +1,13 @@
 import { Box, Flex, Grid, GridItem, Tabs, Text } from "@chakra-ui/react";
-import { ConnectionSettings } from "./ConnectionSettings";
-import { ExecutionControls } from "./ExecutionControls";
-import { SpanEditorPanel } from "./SpanEditorPanel";
-import { SpanTreePanel } from "./SpanTreePanel";
-import { TraceSettings } from "./TraceSettings";
-import { useTraceStore } from "./traceStore";
-import { GraphView } from "./views/GraphView";
-import { JsonView } from "./views/JsonView";
-import { WaterfallView } from "./views/WaterfallView";
+import { ConnectionSettings } from "./connection-settings";
+import { ExecutionControls } from "./execution-controls";
+import { SpanEditorPanel } from "./span-editor-panel";
+import { SpanTreePanel } from "./span-tree-panel";
+import { TraceSettings } from "./trace-settings";
+import { useTraceStore } from "./trace.store";
+import { GraphView } from "./views/graph-view";
+import { JsonView } from "./views/json-view";
+import { WaterfallView } from "./views/waterfall-view";
 
 export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
   const selectedSpanId = useTraceStore((s) => s.selectedSpanId);

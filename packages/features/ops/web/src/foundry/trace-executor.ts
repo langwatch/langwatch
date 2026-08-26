@@ -1,6 +1,6 @@
 import type { Context, Tracer } from "@opentelemetry/api";
 import { context, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
-import { createFoundryProvider } from "./otelBrowser";
+import { createFoundryProvider } from "./otel-browser";
 import type { SpanConfig, TraceConfig } from "./types";
 
 interface ExecutorOpts {

@@ -1,35 +1,14 @@
 import { Box, Flex, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { useFoundryProjectStore } from "./foundryProjectStore";
+import { useFoundryProjectStore } from "./foundry-project.store";
+import { useFoundryTransport } from "./foundry-runtime";
 
 export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
-  const { project: currentProject } = useOrganizationTeamProject();
-  const organizations = api.organization.getAll.useQuery(
-    { isDemo: false },
-    { staleTime: 60_000 },
-  );
+  const { currentProject, projects: allProjects } = useFoundryTransport();
   const [isOpen, setIsOpen] = useState(false);
 
   const { selectedProjectId, setSelectedProject } = useFoundryProjectStore();
-
-  const allProjects = useMemo(() => {
-    if (!organizations.data) return [];
-    return organizations.data.flatMap((org) =>
-      org.teams.flatMap((team) =>
-        team.projects.map((project) => ({
-          id: project.id,
-          name: project.name,
-          slug: project.slug,
-          apiKey: project.apiKey,
-          orgName: org.name,
-          teamName: team.name,
-        })),
-      ),
-    );
-  }, [organizations.data]);
 
   // Default to current project if nothing selected
   const selectedProject = selectedProjectId

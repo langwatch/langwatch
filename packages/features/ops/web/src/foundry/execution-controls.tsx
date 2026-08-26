@@ -1,11 +1,11 @@
 import { Box, Button, Flex, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useExecutionStore } from "./executionStore";
-import { useFoundryProjectStore } from "./foundryProjectStore";
-import { getFoundryExecutor } from "./traceExecutor";
-import { useTraceStore } from "./traceStore";
+import { useExecutionStore } from "./execution.store";
+import { useFoundryProjectStore } from "./foundry-project.store";
+import { useFoundryTransport } from "./foundry-runtime";
+import { getFoundryExecutor } from "./trace-executor";
+import { useTraceStore } from "./trace.store";
 
 export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   const {
@@ -19,7 +19,7 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
     updateLogEntry,
   } = useExecutionStore();
   const trace = useTraceStore((s) => s.trace);
-  const { project } = useOrganizationTeamProject();
+  const { currentProject: project } = useFoundryTransport();
   const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
   const apiKey = selectedApiKey ?? project?.apiKey;
 

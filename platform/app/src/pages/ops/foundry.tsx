@@ -1,13 +1,16 @@
 import { Box, Button, Center, Flex, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  GenerateConversationDialog,
+  GenerateTraceDialog,
+  PlaygroundContent,
+  PresetPicker,
+  useTraceStore,
+} from "@langwatch/ops-web";
 import { RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { GenerateConversationDialog } from "~/components/ops/foundry/GenerateConversationDialog";
-import { GenerateTraceDialog } from "~/components/ops/foundry/GenerateTraceDialog";
-import { PlaygroundContent } from "~/components/ops/foundry/PlaygroundContent";
-import { PresetPicker } from "~/components/ops/foundry/PresetPicker";
-import { useTraceStore } from "~/components/ops/foundry/traceStore";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
+import { FoundryTransport } from "~/features/ops/foundry-transport";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 const SPLASH_LINES = [
@@ -49,30 +52,32 @@ export default function OpsFoundryPage() {
 
   return (
     <OpsPageShell>
-      <DashboardLayout>
-        <PageLayout.Header>
-          <Flex align="center" justify="space-between" w="full">
-            <PageLayout.Heading>The Foundry</PageLayout.Heading>
-            <HStack gap={2}>
-              <GenerateConversationDialog />
-              <GenerateTraceDialog />
-              <PresetPicker />
-              <Button size="xs" variant="outline" onClick={resetTrace}>
-                <RotateCcw size={14} />
-                Reset
-              </Button>
-            </HStack>
-          </Flex>
-        </PageLayout.Header>
-        <Box
-          height="calc(100vh - 56px - 48px)"
-          w="full"
-          overflow="hidden"
-          borderTopLeftRadius="inherit"
-        >
-          {mounted ? <PlaygroundContent /> : <Splash />}
-        </Box>
-      </DashboardLayout>
+      <FoundryTransport includeProjects>
+        <DashboardLayout>
+          <PageLayout.Header>
+            <Flex align="center" justify="space-between" w="full">
+              <PageLayout.Heading>The Foundry</PageLayout.Heading>
+              <HStack gap={2}>
+                <GenerateConversationDialog />
+                <GenerateTraceDialog />
+                <PresetPicker />
+                <Button size="xs" variant="outline" onClick={resetTrace}>
+                  <RotateCcw size={14} />
+                  Reset
+                </Button>
+              </HStack>
+            </Flex>
+          </PageLayout.Header>
+          <Box
+            height="calc(100vh - 56px - 48px)"
+            w="full"
+            overflow="hidden"
+            borderTopLeftRadius="inherit"
+          >
+            {mounted ? <PlaygroundContent /> : <Splash />}
+          </Box>
+        </DashboardLayout>
+      </FoundryTransport>
     </OpsPageShell>
   );
 }

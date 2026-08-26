@@ -311,7 +311,7 @@ function makeRagSpan(): SpanConfig {
     children: [],
     attributes: {},
     rag: {
-      contexts: Array.from({ length: numContexts }, (_, i) => ({
+      contexts: Array.from({ length: numContexts }, () => ({
         document_id: `doc-${randInt(1, 200)}`,
         chunk_id: `chunk-${randInt(1, 50)}`,
         content: pick(RAG_CONTENTS),

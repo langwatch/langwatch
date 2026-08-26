@@ -6,14 +6,14 @@ import {
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { SimpleSlider } from "~/components/ui/slider";
-import { Switch } from "~/components/ui/switch";
-import { api } from "~/utils/api";
-import { useFoundryProjectStore } from "./foundryProjectStore";
-import type { GeneratorOptions, PromptRef } from "./traceGenerator";
-import { generateTrace } from "./traceGenerator";
-import { useTraceStore } from "./traceStore";
+} from "@langwatch/design-system/popover";
+import { SimpleSlider } from "@langwatch/design-system/slider";
+import { Switch } from "@langwatch/design-system/switch";
+import { useFoundryProjectStore } from "./foundry-project.store";
+import type { GeneratorOptions, PromptRef } from "./trace-generator";
+import { generateTrace } from "./trace-generator";
+import { useTraceStore } from "./trace.store";
+import { useFoundryPrompts } from "./use-foundry-prompts";
 
 const DEPTH_PRESETS = [
   { label: "Shallow", value: 4 },
@@ -32,26 +32,14 @@ export function GenerateTraceDialog() {
   const [useRealPrompts, setUseRealPrompts] = useState(false);
   const [includeEvents, setIncludeEvents] = useState(false);
 
-  const promptsQuery = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: selectedProjectId ?? "" },
-    {
-      enabled: isOpen && useRealPrompts && !!selectedProjectId,
-      staleTime: 60_000,
-    },
-  );
+  const promptsQuery = useFoundryPrompts({
+    enabled: isOpen && useRealPrompts,
+    projectId: selectedProjectId,
+  });
 
   function handleGenerate() {
     const prompts: PromptRef[] | undefined =
-      useRealPrompts && promptsQuery.data
-        ? promptsQuery.data.map((p) => ({
-            id: p.id,
-            version: p.version,
-            versionId: p.versionId,
-            handle: p.handle,
-            model: p.model,
-            inputs: p.inputs ?? [],
-          }))
-        : undefined;
+      useRealPrompts && promptsQuery.prompts ? promptsQuery.prompts : undefined;
 
     const options: GeneratorOptions = {
       targetSpanCount,
@@ -209,8 +197,8 @@ export function GenerateTraceDialog() {
                       : useRealPrompts
                         ? promptsQuery.isLoading
                           ? "Loading prompts…"
-                          : promptsQuery.data?.length
-                            ? `Sampling from ${promptsQuery.data.length} prompt${promptsQuery.data.length === 1 ? "" : "s"}`
+                          : promptsQuery.prompts?.length
+                            ? `Sampling from ${promptsQuery.prompts.length} prompt${promptsQuery.prompts.length === 1 ? "" : "s"}`
                             : "No prompts in this project"
                         : "Attach real prompt IDs to LLM spans"}
                   </Text>
@@ -232,7 +220,8 @@ export function GenerateTraceDialog() {
               onClick={handleGenerate}
               w="full"
               disabled={
-                useRealPrompts && (promptsQuery.isLoading || !promptsQuery.data?.length)
+                useRealPrompts &&
+                (promptsQuery.isLoading || !promptsQuery.prompts?.length)
               }
             >
               <Sparkles size={14} />

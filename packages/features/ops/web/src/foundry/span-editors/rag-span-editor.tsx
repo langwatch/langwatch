@@ -1,6 +1,6 @@
 import { Box, Button, Flex, Input, Text, Textarea } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
-import { useTraceStore } from "../traceStore";
+import { useTraceStore } from "../trace.store";
 import type { RAGContext, SpanConfig } from "../types";
 
 export function RAGSpanEditor({ span }: { span: SpanConfig }) {

@@ -36,10 +36,13 @@ result types, and `OpsService`; the server exposes its composition adapter while
 blob-store services/repositories remain private; the web package exposes
 `AdminClient`, shared impersonation and JSON-inspection presentation, the
 controlled Backoffice list shell, dashboard health/stat presentation, dashboard
-axis maths, and reusable blob controls. The application still owns the Hono
-route, tRPC procedures, page shells, and app-specific Backoffice and dashboard
-composition. Thin app adapters supply the app's SearchInput, handled-error
-renderer, page-header create action, and client-side router link.
+axis maths, reusable blob controls, and Foundry trace construction and browser
+emission. The application still owns the Hono route, tRPC procedures, page
+shells, and app-specific Backoffice and dashboard composition. Foundry receives
+the selected project and a named prompt-loading action from a thin app transport
+adapter; it imports neither app hooks nor tRPC. Thin app adapters supply the
+app's SearchInput, handled-error renderer, page-header create action, and
+client-side router link.
 
 ## Dependencies
 

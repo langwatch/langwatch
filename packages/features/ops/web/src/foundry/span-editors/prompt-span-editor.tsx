@@ -1,6 +1,6 @@
 import { Box, Button, Flex, Input, Text } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
-import { useTraceStore } from "../traceStore";
+import { useTraceStore } from "../trace.store";
 import type { PromptConfig, SpanConfig } from "../types";
 
 export function PromptSpanEditor({ span }: { span: SpanConfig }) {

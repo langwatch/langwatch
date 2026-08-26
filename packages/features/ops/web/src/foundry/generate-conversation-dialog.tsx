@@ -6,12 +6,12 @@ import {
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useExecutionStore } from "./executionStore";
-import { useFoundryProjectStore } from "./foundryProjectStore";
-import { generateConversation } from "./generateConversation";
-import { getFoundryExecutor } from "./traceExecutor";
+} from "@langwatch/design-system/popover";
+import { useExecutionStore } from "./execution.store";
+import { useFoundryProjectStore } from "./foundry-project.store";
+import { useFoundryTransport } from "./foundry-runtime";
+import { generateConversation } from "./generate-conversation";
+import { getFoundryExecutor } from "./trace-executor";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
 
@@ -21,7 +21,7 @@ export function GenerateConversationDialog() {
   const [staggerMs, setStaggerMs] = useState(150);
   const [isSending, setIsSending] = useState(false);
 
-  const { project } = useOrganizationTeamProject();
+  const { currentProject: project } = useFoundryTransport();
   const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
   const apiKey = selectedApiKey ?? project?.apiKey;
   const { addLogEntry, updateLogEntry } = useExecutionStore();

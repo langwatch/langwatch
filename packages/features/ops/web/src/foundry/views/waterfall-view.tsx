@@ -1,5 +1,5 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
-import { useTraceStore } from "../traceStore";
+import { useTraceStore } from "../trace.store";
 import { SPAN_TYPE_ICONS, type SpanConfig } from "../types";
 
 interface FlatSpan {

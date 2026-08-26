@@ -172,7 +172,7 @@ const WorkflowSelectorForEvaluatorDrawer = lazyDefault({
   key: "WorkflowSelectorForEvaluatorDrawer",
 });
 const FoundryDrawer = lazyDefault({
-  factory: () => import("./ops/foundry/FoundryDrawer"),
+  factory: () => import("~/features/ops/foundry-drawer.transport"),
   key: "FoundryDrawer",
 });
 const PullRequestDetailDrawer = lazyDefault({
