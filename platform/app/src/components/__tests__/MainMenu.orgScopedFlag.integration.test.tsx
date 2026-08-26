@@ -161,21 +161,17 @@ describe("<MainMenu /> with an organization-scoped rule on the release flag", ()
   });
 
   describe("given the flag is off by default and one rule names the organization", () => {
-    /** @scenario "A rule that names the organization lights up the main menu" */
-    it("shows the Agent Testing destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+    describe("when the main menu is read", () => {
+      /** @scenario "A rule that names the organization lights up the main menu" */
+      it("shows Agent Testing and drops the Simulations group it replaces", () => {
+        render(<MainMenu />, { wrapper: Wrapper });
 
-      expect(linkNamed("Agent Testing")).toHaveAttribute(
-        "href",
-        "/demo/agent-testing",
-      );
-    });
-
-    /** @scenario "A rule that names the organization lights up the main menu" */
-    it("drops the Simulations group the destination replaces", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
-
-      expect(linkNamed("Simulations")).toBeNull();
+        expect(linkNamed("Agent Testing")).toHaveAttribute(
+          "href",
+          "/demo/agent-testing",
+        );
+        expect(linkNamed("Simulations")).toBeNull();
+      });
     });
   });
 });

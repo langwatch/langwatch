@@ -75,9 +75,11 @@ export function AppHeaderUserMenu({
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
-      // The header renders on organization pages too, where no project
-      // exists, so the project is only stated when there is one.
-      projectId: project?.id ?? NOT_TARGETED,
+      // The landing destination is decided at the organization, and
+      // governance.resolveHome reads the flag with the project opted
+      // out. The menu link matches so a project-scoped rule cannot
+      // send a person to a page that resolves as unavailable.
+      projectId: NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },

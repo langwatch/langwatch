@@ -22,7 +22,13 @@ import type {
 
 const PRODUCT_FLAG = "release_ui_agent_testing_v2_enabled";
 
-function buildService(row: { enabled: boolean; rules: FeatureFlagRules }) {
+function buildService({
+  enabled,
+  rules,
+}: {
+  enabled: boolean;
+  rules: FeatureFlagRules;
+}) {
   const legacy: FeatureFlagServiceInterface = {
     isEnabled: vi.fn().mockResolvedValue(false),
   };
@@ -31,7 +37,7 @@ function buildService(row: { enabled: boolean; rules: FeatureFlagRules }) {
       _key: string,
       ctx: RuleEvaluationContext = {},
     ): Promise<boolean | null> {
-      return evaluateRules(row.rules, ctx) ?? row.enabled;
+      return evaluateRules(rules, ctx) ?? enabled;
     },
   };
   return new FeatureFlagService({

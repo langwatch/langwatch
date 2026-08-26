@@ -56,31 +56,29 @@ describe("Quick Search and the Agent Testing release flag", () => {
       state.agentTestingEnabled = true;
     });
 
-    /** @scenario "Quick Search offers Agent Testing while the flag is on" */
-    it("offers the Agent Testing page", () => {
-      expect(navigationIdsFor("agent testing")).toContain("nav-agent-testing");
-    });
+    describe("when a term reaches Quick Search", () => {
+      /** @scenario "Quick Search offers Agent Testing while the flag is on" */
+      it("offers Agent Testing and hides the Simulations entries it replaces", () => {
+        expect(navigationIdsFor("agent testing")).toContain(
+          "nav-agent-testing",
+        );
 
-    /** @scenario "Quick Search offers Agent Testing while the flag is on" */
-    it("offers neither Simulations nor Scenarios", () => {
-      const ids = navigationIdsFor("simulation");
-
-      expect(ids).not.toContain("nav-simulations");
-      expect(ids).not.toContain("nav-scenarios");
+        const simulationIds = navigationIdsFor("simulation");
+        expect(simulationIds).not.toContain("nav-simulations");
+        expect(simulationIds).not.toContain("nav-scenarios");
+      });
     });
   });
 
   describe("given the flag is off", () => {
-    /** @scenario "Quick Search keeps the Simulations entries while the flag is off" */
-    it("offers Simulations", () => {
-      expect(navigationIdsFor("simulations")).toContain("nav-simulations");
-    });
-
-    /** @scenario "Quick Search keeps the Simulations entries while the flag is off" */
-    it("offers no Agent Testing page", () => {
-      expect(navigationIdsFor("agent testing")).not.toContain(
-        "nav-agent-testing",
-      );
+    describe("when a term reaches Quick Search", () => {
+      /** @scenario "Quick Search keeps the Simulations entries while the flag is off" */
+      it("offers Simulations and hides Agent Testing", () => {
+        expect(navigationIdsFor("simulations")).toContain("nav-simulations");
+        expect(navigationIdsFor("agent testing")).not.toContain(
+          "nav-agent-testing",
+        );
+      });
     });
   });
 });

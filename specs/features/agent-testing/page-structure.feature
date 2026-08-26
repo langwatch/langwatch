@@ -51,8 +51,7 @@ Feature: The Agent Testing page
         the person who reads the menu
     When the main menu is read
     Then one item named "Agent Testing" is shown
-    And the rule matches because the menu states the organization it reads
-        the flag for
+    And the Simulations group is not shown
 
   @integration
   Scenario: Quick Search offers Agent Testing while the flag is on

@@ -258,7 +258,10 @@ export function AutomationDrawer({
     useFeatureFlag("release_webhook_automations", {
       projectId: project?.id,
       organizationId: organization?.id,
-      enabled: !!project,
+      // Both ids come from the same workspace query, and an
+      // organization-targeted rule cannot resolve until the
+      // organization is known.
+      enabled: !!project?.id && !!organization?.id,
     });
 
   const draft = useDraft();
