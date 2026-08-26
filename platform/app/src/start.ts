@@ -73,8 +73,8 @@ import { createLogger } from "@langwatch/observability";
 import type { Hono } from "hono";
 import { register } from "prom-client";
 import { createMcpHandler } from "./mcp/handler";
-import { createApp } from "./runtime/app";
 import type { AppRuntime } from "./runtime/app";
+import { createLegacyAppRuntime } from "./runtime/app";
 import { createApiRouter } from "./server/api-router";
 import { initializeInProcessApp, initializeWebApp } from "./server/app-layer/presets";
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
@@ -167,7 +167,7 @@ export const startApp = async (options: StartAppOptions) => {
   // scheduler wire up exactly as on a dedicated worker.
   const appRuntime =
     options.appRuntime ??
-    (await createApp({
+    (await createLegacyAppRuntime({
       composeApp: isInProcessWorkerModeEnabled
         ? initializeInProcessApp
         : initializeWebApp,

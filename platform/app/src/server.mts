@@ -47,13 +47,13 @@ void (async () => {
   const appBoot = new AppBoot({
     compose: async (config, resources) => {
       // Keep all env-reading legacy imports behind the explicit config phase.
-      const { createApp } = await import("./runtime/app");
+      const { createLegacyAppRuntime } = await import("./runtime/app");
       const { initializeInProcessApp, initializeWebApp } =
         await import("./server/app-layer/presets");
       const composeApp = config.workersInProcess
         ? initializeInProcessApp
         : initializeWebApp;
-      const appRuntime = await createApp({
+      const appRuntime = await createLegacyAppRuntime({
         composeApp,
         resources,
       });
