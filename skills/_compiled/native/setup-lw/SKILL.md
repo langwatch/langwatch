@@ -13,7 +13,7 @@ Get the CLI authenticated and talking to the right LangWatch project, then verif
 
 ## Step 1: Credentials
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. Check for LANGWATCH_ENDPOINT there too: if it is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
 
 For CI and agents, configure non-interactively, and never block on a browser. Have the runner inject the key from your secret store into `LANGWATCH_API_KEY`, which is what the CLI reads:
 

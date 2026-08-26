@@ -68,7 +68,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set in `.env` (self-hosted).
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ---
@@ -200,7 +200,7 @@ For Python, scenario tracing is configured via `scenario.configure(...)` combine
 
 For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill. Do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
-**Prerequisite:** Traces only reach LangWatch if the project's API key is set in the environment, and a self-hosted instance also needs its endpoint set. The `setup-lw` recipe covers both. If setup runs but no traces appear in the LangWatch UI, the key is missing.
+**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment, plus `LANGWATCH_ENDPOINT` for self-hosted. If setup runs but no traces appear in the LangWatch UI, the key is missing.
 
 **VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
