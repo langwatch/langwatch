@@ -290,10 +290,10 @@ The agent also treats a `401` as an expired session: it logs in again and retrie
 
 ### Behavior
 
-- A run logs in once; every later row reuses the session.
-- Rows that start at the same moment each see an empty cache and each log in. Both sessions are valid, last write wins. Keep the login idempotent, or lower parallelism.
-- Entries belong to the project, not one run, so a second run reuses the first run's session. Two concurrent runs that write the same name see last-write-wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
-- A failed read is a miss: the row logs in. A failed write does not fail the row.
+- Each run logs in only once. Every later row reads the stored session from the cache.
+- When rows start at the same time, each one can find the cache empty and log in. Both sessions are valid and the last write wins. Keep the login idempotent on the target, or lower the run's parallelism.
+- Entries belong to the project, not to a single run. A second run reuses the session the first run stored. If two concurrent runs write the same entry name, the last write wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
+- If a read fails, the row treats it as a miss and logs in. If a write fails, the row still succeeds; only the next row has to log in again.
 
 Source: [`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
 
