@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { IdentityFact } from "../facts";
 import { identityStreamsFor } from "../identifier-aggregate";
 import {
-  ACTOR,
   T0,
   USER,
   attached,
+  deadEnded,
   detached,
   erased,
   identifierStreamIds,
@@ -23,15 +22,7 @@ describe("identityStreamsFor", () => {
           attached({ identifierId: "idf_work" }),
           verified({ identifierId: "idf_work" }),
           detached({ identifierId: "idf_work" }),
-          {
-            type: "lw.identity.identifier_dead_ended",
-            occurredAt: T0,
-            data: {
-              identifierId: "idf_work",
-              reason: "verification_failed",
-              actor: ACTOR,
-            },
-          } satisfies IdentityFact,
+          deadEnded({ identifierId: "idf_work", occurredAt: T0 }),
         ];
         for (const fact of facts) {
           expect(identityStreamsFor({ fact, userId: USER })).toEqual([
