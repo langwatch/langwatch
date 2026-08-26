@@ -183,16 +183,23 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
     /** @scenario "A request we cannot attribute is answered and not recorded" */
     it("records nothing for a token nothing issued, because there is no anybody to record it for", async () => {
       mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
-      const before = await prisma.scimRequestLog.count();
+      // Across the whole table, not just this organization: the point is that
+      // the row lands nowhere, not that it lands somewhere else. `findMany` is
+      // how that is asked — it is the one action this model admits at platform
+      // scope, because the retention sweep needs it (see the tenancy config).
+      // An unscoped `count` is refused, and rightly.
+      const idsNow = async (): Promise<string[]> =>
+        (await prisma.scimRequestLog.findMany({ select: { id: true } }))
+          .map((row) => row.id)
+          .sort();
+      const before = await idsNow();
 
       const res = await app.request("/api/scim/v2/Users", {
         headers: { Authorization: "Bearer still-not-a-real-token" },
       });
 
       expect(res.status).toBe(401);
-      // Across the whole table, not just this organization: the point is that
-      // the row lands nowhere, not that it lands somewhere else.
-      expect(await prisma.scimRequestLog.count()).toBe(before);
+      expect(await idsNow()).toEqual(before);
     });
 
     /** @scenario "A request the directory makes is recorded with what we answered" */

@@ -499,7 +499,12 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the sessions carrying the legacy payload end
     And every ordinary session keeps working
     And the operators whose sessions ended can start impersonating again in one action
-    And from then on nothing writes or reads that payload, and the column is dropped
+    And from then on nothing writes or reads that payload
+    # Expand now, contract next release. Migrations run at container start, so
+    # dropping the column in the release that stops reading it would drop it
+    # while the previous release's pods still select it on every authenticated
+    # request — signing everybody out for the length of the rollout.
+    And the column itself stays for one release, and is dropped in the next
 
   # specs/auth/impersonation-banner.feature and
   # specs/ops/dejaview-impersonation-access.feature keep owning this

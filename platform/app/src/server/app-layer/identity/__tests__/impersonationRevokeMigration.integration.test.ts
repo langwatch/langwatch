@@ -45,17 +45,64 @@ const statementsIn = (sql: string): string[] =>
     .map((statement) => statement.trim().replace(/\s+/g, " "))
     .filter((statement) => statement.length > 0);
 
-// Restaged by `cmd/migrationorder` when this branch rebased — the ordering
-// tool renames the directory, and a name written out by hand here does not
-// follow it.
-const REVOKE = "20260825120003_revoke_legacy_impersonating_sessions";
-const DROP = "20260825120004_drop_session_impersonating";
+// Found by SUFFIX, never by timestamp. `cmd/migrationorder` renumbers this
+// branch on every rebase, and a name written out by hand does not follow it —
+// which is exactly how the previous spelling of this file went stale.
+const named = (suffix: string): string => {
+  const matches = migrationNames().filter((name) => name.endsWith(suffix));
+  if (matches.length !== 1) {
+    throw new Error(
+      `expected exactly one migration ending "${suffix}", found ${matches.length}: ${matches.join(", ")}`,
+    );
+  }
+  return matches[0]!;
+};
+
+const REVOKE_SUFFIX = "_revoke_legacy_impersonating_sessions";
+
+/**
+ * Every server source that names the legacy payload as a value — an object key
+ * a Prisma call could pass, or a property read off a row.
+ *
+ * The authz principal carries an unrelated boolean of the same name (whether
+ * THIS request is an impersonation, derived from the {actor, subject} claims),
+ * so those two modules are named rather than matched. Anything else naming it
+ * is reading a column that is about to stop existing.
+ */
+const AUTHZ_OWN_FLAG = [
+  "server/app-layer/authz/decision-record.ts",
+  "server/app-layer/authz/principal.ts",
+];
+
+const readersOfTheLegacyPayload = (): string[] => {
+  const roots = [resolve(process.cwd(), "src", "server")];
+  const found: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== "__tests__") walk(full);
+        continue;
+      }
+      if (!/\.tsx?$/.test(entry.name)) continue;
+      const relative = full.slice(resolve(process.cwd(), "src").length + 1);
+      if (AUTHZ_OWN_FLAG.includes(relative)) continue;
+      const source = readFileSync(full, "utf8")
+        // Comments still discuss the column, and should.
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/[^\n]*/g, "");
+      if (/(^|[.{,\s])impersonating\s*[:.]/.test(source)) found.push(relative);
+    }
+  };
+  for (const root of roots) walk(root);
+  return found.sort();
+};
 
 describe("given sessions carrying the legacy impersonation payload", () => {
   describe("when the deliverable is deployed", () => {
     /** @scenario "The one revoke at deploy is the impersonating sessions" */
     it("ends exactly the sessions carrying that payload", () => {
-      const statements = statementsIn(sqlOf(REVOKE));
+      const statements = statementsIn(sqlOf(named(REVOKE_SUFFIX)));
 
       expect(statements).toEqual([
         'DELETE FROM "Session" WHERE "impersonating" IS NOT NULL',
@@ -80,22 +127,30 @@ describe("given sessions carrying the legacy impersonation payload", () => {
       // or on a session having recorded nothing.
       expect(deletes).toEqual([
         {
-          name: REVOKE,
+          name: named(REVOKE_SUFFIX),
           statement: 'DELETE FROM "Session" WHERE "impersonating" IS NOT NULL',
         },
       ]);
     });
 
     /** @scenario "The one revoke at deploy is the impersonating sessions" */
-    it("drops the column only after the sessions holding one have gone", () => {
-      const names = migrationNames();
-      expect(names).toContain(REVOKE);
-      expect(names).toContain(DROP);
-      expect(names.indexOf(REVOKE)).toBeLessThan(names.indexOf(DROP));
+    it("leaves the column standing, because dropping it here signs everybody out", () => {
+      // Expand now, contract next release. `prisma migrate deploy` runs at
+      // container start, so a drop in THIS release runs while the previous
+      // release's pods are still selecting the column on every authenticated
+      // request. An earlier cut of this branch did drop it here; the restore
+      // migration exists to repair the developer databases that ran it.
+      const drops = migrationNames().flatMap((name) =>
+        statementsIn(sqlOf(name))
+          .filter((statement) =>
+            /ALTER TABLE "Session" DROP COLUMN "impersonating"/i.test(
+              statement,
+            ),
+          )
+          .map((statement) => ({ name, statement })),
+      );
 
-      expect(statementsIn(sqlOf(DROP))).toEqual([
-        'ALTER TABLE "Session" DROP COLUMN "impersonating"',
-      ]);
+      expect(drops).toEqual([]);
     });
 
     /** @scenario "The one revoke at deploy is the impersonating sessions" */
@@ -105,7 +160,9 @@ describe("given sessions carrying the legacy impersonation payload", () => {
       );
 
       expect(session).toBeDefined();
-      expect(session?.fields).not.toContain("impersonating");
+      // The column is still DECLARED, and deliberately so — see the scenario
+      // above. The claim here is the other half: nothing reaches for it.
+      expect(readersOfTheLegacyPayload()).toEqual([]);
       // What replaced it: the {actor, subject} claims the authz principal
       // speaks, plus the reason and the window.
       expect(session?.fields).toEqual(
