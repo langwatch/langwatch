@@ -119,7 +119,6 @@ import {
 import { LwqlKeyMapService } from "~/server/analytics/lwql/lwql-key-map.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
 import { resolveLangyCapabilityProgress } from "@langwatch/langy-server/streaming/langy-capability-progress";
 import { createAppLangyCredentialComposition } from "~/server/app-layer/langy/langy-credential-adapters";
@@ -212,7 +211,10 @@ import { RetroactiveUpdateService } from "../data-retention/retroactive/retroact
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { PostgresAutomationGraphDeliveryAdapter } from "@langwatch/automation-server";
 import { createAutomationGraphPorts } from "~/runtime/app/features/automation-graph-ports";
-import { createAutomationTestRuntime } from "@langwatch/automation-server/testing";
+import {
+  createAutomationTestFirePort,
+  createAutomationTestRuntime,
+} from "@langwatch/automation-server/testing";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
   ExperimentIdLookupClickHouseRepository,
@@ -248,7 +250,6 @@ import { stripUnsupportedLLMParamsFromWorkflow } from "../workflows/stripUnsuppo
 import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
 import { App, AppShutdownResources, getApp, globalForApp, initializeApp } from "./app";
 import { demoProjectId } from "./authz/demo-project";
-import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
@@ -291,6 +292,7 @@ import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter
 import { GithubCompositionAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
 import { AppDatasetRuntime } from "~/runtime/app/features/dataset";
+import { AppAutomationTestFireAdapter } from "~/runtime/app/features/automation-test-fire.adapter";
 import { AppPromptRuntime } from "~/runtime/app/features/prompt";
 import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
@@ -1014,15 +1016,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     redis,
     graph: graphPorts,
     clock: automationClock,
+    testFire: AppAutomationTestFireAdapter.create(),
   }).build();
-  const triggerTemplateDeps = {
-    baseHost: config.baseHost ?? env.BASE_HOST,
-    notifier: liveTriggerNotifier,
-  };
-  const triggerTemplates = {
-    testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
-      testFireTrigger(triggerTemplateDeps, input),
-  };
   const tokenizer = new TokenizerService(
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
@@ -2034,7 +2029,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     scenarios,
     suites,
     automation,
-    triggerTemplates,
     analytics: analyticsService,
     langWatchQL,
     dashboard: dashboardService,
@@ -2548,28 +2542,8 @@ export function createTestApp(
       database: testPrisma,
       redis: null,
       graph: createAutomationTestRuntime(),
+      testFire: createAutomationTestFirePort(),
     }).build(),
-    triggerTemplates: (() => {
-      const testDeps = {
-        baseHost: config.baseHost ?? env.BASE_HOST,
-        notifier: {
-          sendEmail: async () => {
-            /* test no-op */
-          },
-          sendSlack: async () => {
-            /* test no-op */
-          },
-          sendSlackBot: async () => {
-            /* test no-op */
-          },
-          sendWebhook: async () => ({ status: 200 }),
-        },
-      };
-      return {
-        testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
-          testFireTrigger(testDeps, input),
-      };
-    })(),
     simulations: testSimulations,
     simulationExports: ScenarioRunExportService.create(testSimulations),
     topics: testTopics,

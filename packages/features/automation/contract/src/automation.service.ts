@@ -16,7 +16,10 @@ import type {
   GraphTriggerSweepCandidate,
 } from "./graph-alert";
 import type { AutomationPersistCapBreach } from "./runaway";
+import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire";
 export abstract class AutomationService {
+  abstract validateTemplateDraft(input: TestFireTemplateDraft): void;
+  abstract testFire(input: TestFireInput): Promise<TestFireResult>;
   abstract evaluateGraphTrigger(input: {
     triggerId: string;
     projectId: string;

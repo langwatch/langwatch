@@ -6,7 +6,14 @@ import {
   extractReportFromTriggerRow,
   reportActionParamsSchema,
   type CreateTriggerCommand,
+  InvalidEmailRecipientError,
+  MissingAnnotatorError,
+  NotificationDeliveryError,
   type NotificationCadence,
+  ProjectNotFoundError,
+  type TestFireProjectIdentity,
+  type TestFireWebhookDestination,
+  TriggerFiltersRequiredError,
 } from "@langwatch/automation-contract";
 import { EMAIL_RX } from "@langwatch/automation-contract";
 import type { SlackActionParams } from "@langwatch/automation-contract";
@@ -24,13 +31,6 @@ import {
 } from "~/server/app-layer/automations/dispatch/persistCap";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import {
-  InvalidEmailRecipientError,
-  MissingAnnotatorError,
-  NotificationDeliveryError,
-  ProjectNotFoundError,
-  TriggerFiltersRequiredError,
-} from "~/server/app-layer/automations/errors";
-import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
   graphAlertActionParamsSchema,
@@ -47,11 +47,6 @@ import {
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import { buildReportTriggerData } from "~/server/app-layer/automations/report.builder";
-import {
-  type DraftProject,
-  type TestFireWebhookDestination,
-  validateTemplateDraft,
-} from "~/server/app-layer/automations/trigger-template.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { featureFlagService } from "~/server/featureFlag";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
@@ -222,7 +217,7 @@ async function resolveProjectIdentity(
   projects: {
     tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null>;
   },
-): Promise<DraftProject> {
+): Promise<TestFireProjectIdentity> {
   const project = await projects.tryGetSummaryById(projectId);
   if (!project) throw new ProjectNotFoundError(projectId);
   return { name: project.name, slug: project.slug };
@@ -916,7 +911,7 @@ export const automationRouter = createTRPCRouter({
         }
 
         const project = await resolveProjectIdentity(input.projectId, ctx.app.projects);
-        return await ctx.app.triggerTemplates.testFire({
+        return await ctx.app.automation.testFire({
           channel: input.channel,
           trigger: input.trigger,
           project,
@@ -966,7 +961,7 @@ export const automationRouter = createTRPCRouter({
       const isReport = !isGraphAlert && !!input.report;
       let parsedActionParams: Record<string, unknown> = {};
       try {
-        validateTemplateDraft(input.templates);
+        ctx.app.automation.validateTemplateDraft(input.templates);
         // The webhook channel ships dark (ADR-040 §7): gate the save route as
         // well as the picker, so the flag can't be bypassed via the API.
         if (input.action === TriggerAction.SEND_WEBHOOK) {

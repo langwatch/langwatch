@@ -65,3 +65,9 @@ Feature: Automation ownership
     When the drawer renders its variables and Monaco editors
     Then it uses the Automation web contracts and editor behaviour
     And application code retains only drawer and transport composition
+
+  Scenario: Test fire uses the automation service
+    Given an authenticated automation author and a template draft
+    When the author sends a test fire
+    Then the composed AutomationService validates and renders the draft
+    And provider delivery runs through the process-owned Automation delivery adapter

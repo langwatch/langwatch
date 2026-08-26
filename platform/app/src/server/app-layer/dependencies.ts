@@ -74,10 +74,6 @@ import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-
 import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import type { AutomationService } from "@langwatch/automation-contract";
-import type {
-  TestFireResult,
-  TestFireTriggerInput,
-} from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
@@ -342,12 +338,6 @@ export interface AppDependencies {
   scenarios: ScenarioService;
   suites: SuiteService;
   automation: AutomationService;
-  /** Wraps `testFireTrigger(deps, input)` with the composition-time
-   *  `{baseHost, notifier}` bag already bound — the router only needs
-   *  to pass the per-call input. */
-  triggerTemplates: {
-    testFire: (input: TestFireTriggerInput) => Promise<TestFireResult>;
-  };
   organizations: OrganizationService;
   projects: ProjectService;
   users: UserService;

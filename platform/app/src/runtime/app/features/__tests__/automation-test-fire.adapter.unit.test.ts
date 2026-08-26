@@ -1,0 +1,46 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { sendEmail } = vi.hoisted(() => ({
+  sendEmail: vi.fn(),
+}));
+
+vi.mock("~/server/mailer/emailSender", () => ({
+  computeDefaultFrom: () => "LangWatch Triggers <no-reply@langwatch.ai>",
+  sendEmail,
+}));
+
+vi.mock("~/server/app-layer/automations/delivery/slackWebApi", () => ({
+  postSlackChatMessage: vi.fn(),
+}));
+
+vi.mock("~/server/webhooks/sendWebhook", () => ({
+  assertWebhookDelivered: vi.fn(),
+  sendWebhook: vi.fn(),
+}));
+
+import { AppAutomationTestFireAdapter } from "../automation-test-fire.adapter";
+
+describe("AppAutomationTestFireAdapter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keeps test-fire recipients in bcc behind a trigger no-reply address", async () => {
+    const adapter = AppAutomationTestFireAdapter.create();
+
+    await adapter.sendEmail({
+      recipients: ["author@acme.test"],
+      subject: "test fire",
+      html: "<p>test</p>",
+    });
+
+    expect(sendEmail).toHaveBeenCalledWith({
+      to: expect.stringMatching(
+        /^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/,
+      ),
+      bcc: ["author@acme.test"],
+      subject: "test fire",
+      html: "<p>test</p>",
+    });
+  });
+});

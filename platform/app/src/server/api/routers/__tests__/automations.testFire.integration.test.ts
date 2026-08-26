@@ -82,10 +82,10 @@ describe("automationRouter.testFireTemplate", () => {
       slug: "acme",
     });
     previousApp = globalForApp.__langwatch_app;
-    globalForApp.__langwatch_app = createTestApp({
-      triggerTemplates: { testFire: mockTestFire } as any,
-      projects: { tryGetById: mockProjectGetById } as any,
-    });
+    const app = createTestApp();
+    vi.spyOn(app.automation, "testFire").mockImplementation(mockTestFire);
+    vi.spyOn(app.projects, "tryGetSummaryById").mockImplementation(mockProjectGetById);
+    globalForApp.__langwatch_app = app;
   });
 
   afterEach(() => {
@@ -121,7 +121,7 @@ describe("automationRouter.testFireTemplate", () => {
         // ADR-031 schema no longer reads. The router must strip them and
         // resolve the recipient from the session, never from the wire — this is
         // the open-relay regression guard.
-        await caller.testFireTemplate({
+        const hostileInput = {
           projectId: "proj_123",
           channel: "email",
           trigger: { name: "High latency", alertType: null },
@@ -130,7 +130,9 @@ describe("automationRouter.testFireTemplate", () => {
           recipients: [ATTACKER_EMAIL],
           members: [ATTACKER_EMAIL],
           to: ATTACKER_EMAIL,
-        } as any);
+        } as const;
+
+        await caller.testFireTemplate(hostileInput);
 
         expect(mockTestFire).toHaveBeenCalledTimes(1);
         const passed = mockTestFire.mock.calls[0]![0] as {

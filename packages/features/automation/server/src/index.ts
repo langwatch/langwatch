@@ -1,4 +1,4 @@
-export { PostgresAutomationAdapter } from "./adapters/postgres.automation.adapter";
+export { PostgresAutomationAdapter } from "./adapters/postgres-automation.adapter";
 export { PostgresAutomationGraphDeliveryAdapter } from "./adapters/postgres.automation-graph-delivery.adapter";
 export {
   AutomationEmailCapService,
@@ -21,6 +21,13 @@ export { AutomationGraphDeliveryPort } from "./ports/automation-graph-delivery.p
 export type { AutomationDatabase } from "./ports/automation-database.port";
 export { AutomationRunawayPort, type ClaimLease } from "./ports/automation-runaway.port";
 export { AutomationClock } from "./ports/automation-clock.port";
+export {
+  AutomationTestFirePort,
+  type TestFireEmail,
+  type TestFireSlackBot,
+  type TestFireSlackWebhook,
+  type TestFireWebhook,
+} from "./ports/automation-test-fire.port";
 export { SchedulerWake } from "./ports/scheduler-wake.port";
 export { UnsubscribeTokenVerifier } from "./ports/unsubscribe-token.port";
 export { ScheduledJobStore, type ScheduledJobRecord } from "./ports/scheduled-jobs.port";

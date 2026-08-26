@@ -26,6 +26,7 @@ import type { TriggerSummary } from "../trigger-summary";
 import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
 import {
   AppAutomationRuntime,
+  createAppAutomationTestFirePort,
   createAppAutomationTestGraphPorts,
 } from "~/runtime/app/features/automation";
 import type {
@@ -180,6 +181,7 @@ describe("Feature: runaway automation containment", () => {
       database: prisma,
       redis: null,
       graph: { ...graph, runaway: runawayRuntime },
+      testFire: createAppAutomationTestFirePort(),
     }).build();
 
     const update = triggers.update.bind(triggers);
@@ -381,9 +383,7 @@ describe("Feature: runaway automation containment", () => {
         const row = await storeTrigger({ filters: "{}" });
         projectTraces24h = 1_000_000;
         pauseFails = true;
-        await triggers.handlePersistCapBreach(
-          breach(summary(row, { filters: {} }), 150),
-        );
+        await triggers.handlePersistCapBreach(breach(summary(row, { filters: {} }), 150));
         expect(pauseAttempts).toBe(1);
         expect(
           await prisma.trigger.findUniqueOrThrow({
@@ -397,9 +397,7 @@ describe("Feature: runaway automation containment", () => {
         // runaway automation active until the UTC day rolled over.
         claimed.clear();
         pauseFails = false;
-        await triggers.handlePersistCapBreach(
-          breach(summary(row, { filters: {} }), 200),
-        );
+        await triggers.handlePersistCapBreach(breach(summary(row, { filters: {} }), 200));
 
         expect(pauseAttempts).toBe(2);
         const after = await prisma.trigger.findUniqueOrThrow({

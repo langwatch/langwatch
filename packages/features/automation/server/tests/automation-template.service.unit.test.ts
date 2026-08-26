@@ -1,33 +1,33 @@
 import {
+  AlertType,
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
   TEST_FIRE_NOTICE,
+  DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
+  TemplateValidationError,
+  TestFireUnavailableError,
+  type TestFireProjectIdentity,
+  type TestFireTriggerIdentity,
 } from "@langwatch/automation-contract";
-import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "@langwatch/automation-contract";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import graphAlertDetailedSource from "~/features/automations/providers/slack/templates/graph_alert_detailed.liquid?raw";
-import { AlertType } from "~/generated/prisma/client";
-import { TemplateValidationError, TestFireUnavailableError } from "../errors";
-import {
-  type DraftIdentity,
-  type DraftProject,
-  type TestFireTriggerInput,
-  type TriggerNotifier,
-  testFireTrigger,
-  validateTemplateDraft,
-} from "../trigger-template.service";
+import { AutomationTestFirePort } from "../src/ports/automation-test-fire.port";
+import { AutomationTemplateService } from "../src/services/automation-template.service";
 
 const BASE_HOST = "https://app.langwatch.ai";
 
-const PROJECT: DraftProject = { name: "Acme", slug: "acme" };
-const TRIGGER: DraftIdentity = {
+const PROJECT: TestFireProjectIdentity = { name: "Acme", slug: "acme" };
+const TRIGGER: TestFireTriggerIdentity = {
   name: "High latency",
   alertType: AlertType.WARNING,
 };
+const graphAlertDetailedSource = readFileSync(
+  new URL("./fixtures/graph-alert-detailed.liquid", import.meta.url),
+  "utf8",
+);
 
 function makeNotifier() {
   const sentEmails: Array<{
-    to: string;
-    bcc: string[];
+    recipients: string[];
     subject: string;
     html: string;
   }> = [];
@@ -46,7 +46,7 @@ function makeNotifier() {
   // The endpoint's answer a webhook test fire surfaces to the author; tests
   // override to exercise a non-2xx failure.
   let webhookStatus = 200;
-  const notifier: TriggerNotifier = {
+  const notifier: AutomationTestFirePort = {
     sendEmail: async (args) => {
       sentEmails.push(args);
     },
@@ -73,31 +73,36 @@ function makeNotifier() {
   };
 }
 
-function makeService(notifier: TriggerNotifier) {
-  const deps = { baseHost: BASE_HOST, notifier };
-  return {
-    testFire: (input: TestFireTriggerInput) => testFireTrigger(deps, input),
-  };
+function makeService(delivery: AutomationTestFirePort) {
+  return AutomationTemplateService.create({
+    baseHost: BASE_HOST,
+    delivery,
+  });
 }
 
 describe("validateTemplateDraft", () => {
   describe("when a Liquid template has invalid syntax", () => {
     it("throws a validation error targeting the offending field", () => {
       expect(() =>
-        validateTemplateDraft({ emailBodyTemplate: "{{ trigger.name" }),
+        makeService(makeNotifier().notifier).validate({
+          emailBodyTemplate: "{{ trigger.name",
+        }),
       ).toThrowError(TemplateValidationError);
       expect(() =>
-        validateTemplateDraft({ emailBodyTemplate: "{{ trigger.name" }),
+        makeService(makeNotifier().notifier).validate({
+          emailBodyTemplate: "{{ trigger.name",
+        }),
       ).toThrowError(expect.objectContaining({ field: "emailBodyTemplate" }));
     });
   });
 
   describe("when the Slack template type is not recognised", () => {
     it("throws a validation error targeting slackTemplateType", () => {
-      expect(() => validateTemplateDraft({ slackTemplateType: "carousel" })).toThrowError(
+      const service = makeService(makeNotifier().notifier);
+      expect(() => service.validate({ slackTemplateType: "carousel" })).toThrowError(
         TemplateValidationError,
       );
-      expect(() => validateTemplateDraft({ slackTemplateType: "carousel" })).toThrowError(
+      expect(() => service.validate({ slackTemplateType: "carousel" })).toThrowError(
         expect.objectContaining({ field: "slackTemplateType" }),
       );
     });
@@ -106,10 +111,14 @@ describe("validateTemplateDraft", () => {
   describe("when slackTemplate is set without a slackTemplateType", () => {
     it("throws a validation error targeting slackTemplateType", () => {
       expect(() =>
-        validateTemplateDraft({ slackTemplate: "Hi {{ project.name }}" }),
+        makeService(makeNotifier().notifier).validate({
+          slackTemplate: "Hi {{ project.name }}",
+        }),
       ).toThrowError(TemplateValidationError);
       expect(() =>
-        validateTemplateDraft({ slackTemplate: "Hi {{ project.name }}" }),
+        makeService(makeNotifier().notifier).validate({
+          slackTemplate: "Hi {{ project.name }}",
+        }),
       ).toThrowError(expect.objectContaining({ field: "slackTemplateType" }));
     });
   });
@@ -117,7 +126,7 @@ describe("validateTemplateDraft", () => {
   describe("when every provided template is valid", () => {
     it("passes silently", () => {
       expect(() =>
-        validateTemplateDraft({
+        makeService(makeNotifier().notifier).validate({
           emailSubjectTemplate: "({{ trigger.alertType }}) {{ project.name }}",
           emailBodyTemplate: "# {{ trigger.name }}",
           slackTemplateType: "string",
@@ -427,8 +436,7 @@ describe("testFireTrigger", () => {
 
         expect(result.recipientCount).toBe(2);
         expect(sentEmails).toHaveLength(1);
-        expect(sentEmails[0]!.to).toMatch(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@/);
-        expect(sentEmails[0]!.bcc).toEqual(["a@acme.test", "b@acme.test"]);
+        expect(sentEmails[0]!.recipients).toEqual(["a@acme.test", "b@acme.test"]);
         expect(sentEmails[0]!.subject).toContain(TEST_FIRE_EMAIL_SUBJECT_PREFIX);
         expect(sentEmails[0]!.html).toContain(TEST_FIRE_NOTICE);
       });

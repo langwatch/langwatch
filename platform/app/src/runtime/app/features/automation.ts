@@ -6,8 +6,12 @@ import {
   PostgresAutomationAdapter,
   SchedulerWake,
   UnsubscribeTokenVerifier,
+  type AutomationTestFirePort,
 } from "@langwatch/automation-server";
-import { createAutomationTestRuntime } from "@langwatch/automation-server/testing";
+import {
+  createAutomationTestFirePort as createTestFirePort,
+  createAutomationTestRuntime,
+} from "@langwatch/automation-server/testing";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { SchedulerService } from "~/server/app-layer/scheduler/scheduler.service";
@@ -85,6 +89,7 @@ export class AppAutomationRuntime {
     private readonly redis: SchedulerRedis,
     private readonly graph: AppAutomationGraphPorts,
     private readonly clock: AutomationClock,
+    private readonly testFire: AutomationTestFirePort,
   ) {}
 
   static create(options: {
@@ -92,12 +97,14 @@ export class AppAutomationRuntime {
     redis?: SchedulerRedis;
     graph: AppAutomationGraphPorts;
     clock?: AutomationClock;
+    testFire: AutomationTestFirePort;
   }): AppAutomationRuntime {
     return new AppAutomationRuntime(
       options.database,
       options.redis,
       options.graph,
       options.clock ?? new AppAutomationClock(),
+      options.testFire,
     );
   }
 
@@ -111,10 +118,15 @@ export class AppAutomationRuntime {
       verifier: new AppUnsubscribeTokenVerifier(),
       wake: new AppSchedulerWake(this.redis),
       ...this.graph,
+      testFire: this.testFire,
     }).build();
   }
 }
 
 export function createAppAutomationTestGraphPorts(): AppAutomationGraphPorts {
   return createAutomationTestRuntime();
+}
+
+export function createAppAutomationTestFirePort(): AutomationTestFirePort {
+  return createTestFirePort();
 }

@@ -22,6 +22,10 @@ lives in `automation-server`. The server package also owns persist-cap runaway
 containment as a claim-gated policy over injected pause, counting, notification,
 and telemetry ports. These are package slices, not second services.
 
+Template validation and test-fire rendering are operations on the same
+`AutomationService`. The app supplies one named delivery adapter for mail,
+Slack, and generic webhooks; transports do not receive a callback bag.
+
 Graph-trigger evaluation, heartbeat candidate selection, and runaway containment
 are operations on the same concrete `AutomationService`. Construction receives
 canonical Analytics/Project services plus explicit notifier, ClickHouse,

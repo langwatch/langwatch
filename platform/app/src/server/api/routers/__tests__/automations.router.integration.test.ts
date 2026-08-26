@@ -113,8 +113,11 @@ import {
   persistCapKey,
   resolvePersistDailyCap,
 } from "../../../app-layer/automations/dispatch/persistCap";
-import { AppAutomationRuntime } from "~/runtime/app/features/automation";
-import { createAutomationTestRuntime } from "@langwatch/automation-server/testing";
+import {
+  AppAutomationRuntime,
+  createAppAutomationTestFirePort,
+  createAppAutomationTestGraphPorts,
+} from "~/runtime/app/features/automation";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { automationRouter } from "../automations";
 
@@ -180,7 +183,8 @@ describe("automationRouter", () => {
     const automation = AppAutomationRuntime.create({
       database: mockPrismaClient as unknown as PrismaClient,
       redis: connection,
-      graph: createAutomationTestRuntime(),
+      graph: createAppAutomationTestGraphPorts(),
+      testFire: createAppAutomationTestFirePort(),
     }).build();
     Object.assign(automation, {
       invalidate: mockTriggersInvalidate,

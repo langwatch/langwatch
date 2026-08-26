@@ -147,7 +147,6 @@ export class App {
   readonly scenarios: AppDependencies["scenarios"];
   readonly suites: AppDependencies["suites"];
   readonly automation: AppDependencies["automation"];
-  readonly triggerTemplates: AppDependencies["triggerTemplates"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly users: AppDependencies["users"];
@@ -200,7 +199,6 @@ export class App {
     this.scenarios = deps.scenarios;
     this.suites = deps.suites;
     this.automation = deps.automation;
-    this.triggerTemplates = deps.triggerTemplates;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.users = deps.users;

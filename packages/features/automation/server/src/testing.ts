@@ -6,6 +6,7 @@ import {
   AutomationHeartbeatPort,
   AutomationRunawayPort,
   AutomationSlackBotTokenDecryptorPort,
+  AutomationTestFirePort,
 } from "./index";
 
 class TestNotifier extends AutomationGraphNotifierPort {
@@ -67,6 +68,19 @@ class TestRunaway extends AutomationRunawayPort {
   info() {}
 }
 
+class TestFireDelivery extends AutomationTestFirePort {
+  async sendEmail(): Promise<void> {}
+  async sendSlack(): Promise<void> {}
+  async sendSlackBot(): Promise<void> {}
+  async sendWebhook(): Promise<{ status: number }> {
+    return { status: 200 };
+  }
+}
+
+export function createAutomationTestFirePort(): AutomationTestFirePort {
+  return new TestFireDelivery();
+}
+
 /** Complete deterministic graph capability for service tests that do not
  * exercise analytics/provider delivery. */
 export function createAutomationTestRuntime() {
@@ -81,5 +95,6 @@ export function createAutomationTestRuntime() {
     dispatchErrors: new TestDispatchErrors(),
     heartbeat: new TestHeartbeat(),
     runaway: new TestRunaway(),
+    testFire: new TestFireDelivery(),
   };
 }

@@ -1,11 +1,11 @@
 import {
   WEBHOOK_HEADER_VALUE_KEPT,
+  InvalidActionParamsError,
   type WebhookActionParams,
 } from "@langwatch/automation-contract";
 import { TriggerAction } from "~/generated/prisma/client";
 import { WEBHOOK_PREVIOUS_SECRET_TTL_MS } from "~/server/webhooks/signature";
 import { decrypt, encrypt } from "~/utils/encryption";
-import { InvalidActionParamsError } from "../../errors";
 import type { PersistActionParamsArgs, ServerDef } from "../types";
 
 /**

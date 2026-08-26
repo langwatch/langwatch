@@ -608,11 +608,6 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/delivery/triggerNotifier.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/server/app-layer/automations/dispatch/confirmSettledMatch.ts",
       "kind": "legacy-implementation"
     },
@@ -634,11 +629,6 @@
     {
       "feature": "automation",
       "file": "platform/app/src/server/app-layer/automations/dispatch/triggerActionDispatch.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/errors.ts",
       "kind": "legacy-implementation"
     },
     {
@@ -689,11 +679,6 @@
     {
       "feature": "automation",
       "file": "platform/app/src/server/app-layer/automations/trigger-summary.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/trigger-template.service.ts",
       "kind": "legacy-implementation"
     },
     {

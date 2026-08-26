@@ -23,6 +23,7 @@ import type {
 import type { AutomationRunawayPort } from "../ports/automation-runaway.port";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import type { AutomationTestFirePort } from "../ports/automation-test-fire.port";
 
 /** Canonical process binding. The app supplies its already-created database
  * capability; this adapter never reaches for a global Prisma client. */
@@ -43,6 +44,7 @@ export class PostgresAutomationAdapter {
       dispatchErrors: AutomationDispatchErrorPort;
       heartbeat: AutomationHeartbeatPort;
       runaway: AutomationRunawayPort;
+      testFire: AutomationTestFirePort;
     },
   ) {}
 
@@ -61,6 +63,7 @@ export class PostgresAutomationAdapter {
     dispatchErrors: AutomationDispatchErrorPort;
     heartbeat: AutomationHeartbeatPort;
     runaway: AutomationRunawayPort;
+    testFire: AutomationTestFirePort;
   }): PostgresAutomationAdapter {
     return new PostgresAutomationAdapter(input);
   }
@@ -94,6 +97,7 @@ export class PostgresAutomationAdapter {
       dispatchErrors: this.input.dispatchErrors,
       heartbeat: this.input.heartbeat,
       runaway: this.input.runaway,
+      testFire: this.input.testFire,
     });
   }
 }

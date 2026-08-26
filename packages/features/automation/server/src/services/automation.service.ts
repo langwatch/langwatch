@@ -5,6 +5,8 @@ import {
   maskEmail,
   suppressEmailCommandSchema,
   type CreateTriggerCommand,
+  type CustomGraph,
+  type CustomGraphNameRef,
   type EmailSuppression,
   type ReportSchedule,
   type SuppressEmailCommand,
@@ -18,12 +20,11 @@ import {
   type GraphTriggerEvaluationResult,
   type GraphTriggerSweepCandidate,
   type AutomationPersistCapBreach,
-} from "@langwatch/automation-contract";
-import type {
-  CustomGraph,
-  CustomGraphNameRef,
-  WebhookDeliveryInput,
-  WebhookDeliveryRow,
+  type TestFireInput,
+  type TestFireResult,
+  type TestFireTemplateDraft,
+  type WebhookDeliveryInput,
+  type WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository";
 import { EmailSuppressionRepository } from "../repositories/email-suppression.repository";
@@ -46,11 +47,10 @@ import { AutomationRunawayPort } from "../ports/automation-runaway.port";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { AutomationGraphService } from "./automation-graph.service";
+import { AutomationTemplateService } from "./automation-template.service";
+import type { AutomationTestFirePort } from "../ports/automation-test-fire.port";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
-/** Canonical process service for all Automation behaviour: trigger lifecycle,
- * dispatch claims/history, and email suppression. It receives only private
- * Automation repositories and token/name capabilities. */
 export class AutomationService extends AutomationCapability {
   private readonly activeCache = new Map<
     string,
@@ -67,6 +67,7 @@ export class AutomationService extends AutomationCapability {
     private readonly customGraphs: CustomGraphRepository,
     private readonly webhookDeliveries: WebhookDeliveryRepository,
     private readonly graph: AutomationGraphService,
+    private readonly templates: AutomationTemplateService,
   ) {
     super();
   }
@@ -91,6 +92,7 @@ export class AutomationService extends AutomationCapability {
     dispatchErrors: AutomationDispatchErrorPort;
     heartbeat: AutomationHeartbeatPort;
     runaway: AutomationRunawayPort;
+    testFire: AutomationTestFirePort;
   }): AutomationService {
     const graph = AutomationGraphService.create({
       triggers: deps.triggers,
@@ -107,7 +109,11 @@ export class AutomationService extends AutomationCapability {
       clock: deps.clock,
       baseHost: deps.baseHost,
     });
-    const service = new AutomationService(
+    const templates = AutomationTemplateService.create({
+      baseHost: deps.baseHost,
+      delivery: deps.testFire,
+    });
+    return new AutomationService(
       deps.triggers,
       deps.history,
       deps.suppressions,
@@ -118,8 +124,16 @@ export class AutomationService extends AutomationCapability {
       deps.customGraphs,
       deps.webhookDeliveries,
       graph,
+      templates,
     );
-    return service;
+  }
+
+  validateTemplateDraft(input: TestFireTemplateDraft): void {
+    this.templates.validate(input);
+  }
+
+  testFire(input: TestFireInput): Promise<TestFireResult> {
+    return this.templates.testFire(input);
   }
 
   evaluateGraphTrigger(input: {

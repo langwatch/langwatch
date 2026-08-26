@@ -1,6 +1,10 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AppAutomationRuntime } from "~/runtime/app/features/automation";
+import {
+  AppAutomationRuntime,
+  createAppAutomationTestFirePort,
+  createAppAutomationTestGraphPorts,
+} from "~/runtime/app/features/automation";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
@@ -150,6 +154,8 @@ describe("the shared webhook delivery log", () => {
       const rows = await AppAutomationRuntime.create({
         database: prisma,
         redis: null,
+        graph: createAppAutomationTestGraphPorts(),
+        testFire: createAppAutomationTestFirePort(),
       })
         .build()
         .getRecentWebhookDeliveries({ projectId, triggerId, limit: 50 });
