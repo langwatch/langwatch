@@ -310,6 +310,7 @@ export class PrismaProjectRepository extends ProjectRepository {
         id: true,
         name: true,
         slug: true,
+        teamId: true,
         team: { select: { organizationId: true } },
       },
     });
@@ -318,6 +319,7 @@ export class PrismaProjectRepository extends ProjectRepository {
       id: project.id,
       name: project.name,
       slug: project.slug,
+      teamId: project.teamId,
       organizationId: project.team.organizationId,
     }));
   }

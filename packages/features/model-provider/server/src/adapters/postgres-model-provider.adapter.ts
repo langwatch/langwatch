@@ -1,33 +1,32 @@
 import type { ModelProviderService as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
+import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
+import type { AuthzService } from "@langwatch/authz-contract";
 import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
-  ModelProviderCredentialPolicy,
   CodexTokenRefresher,
-  ModelProviderOnboardingDefaults,
+  ModelProviderConnectionRateLimiter,
   ModelTranslationPort,
-  type ManagedProviderService,
-  type ModelProviderIdGenerator,
-  type ModelProviderAuthorization,
+  type ModelProviderIdService,
 } from "../ports/model-provider.port";
-import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository";
-import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository";
-import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
+import { PrismaModelCostRepository } from "../repositories/prisma/prisma-model-cost.repository";
+import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma-model-default.repository";
+import { PrismaModelProviderRepository } from "../repositories/prisma/prisma-model-provider.repository";
 import { ModelProviderService } from "../services/model-provider.service";
+import { ModelProviderKeysService } from "../services/model-provider-keys.service";
 
 export interface PostgresModelProviderAdapterOptions {
   database: object;
   projects: ProjectService;
+  organizations: OrganizationService;
   catalog: ModelProviderCatalog;
-  managedProviders?: ManagedProviderService;
-  translation?: ModelTranslationPort;
-  generateId?: ModelProviderIdGenerator;
-  authorization?: ModelProviderAuthorization;
+  translation: ModelTranslationPort;
+  ids: ModelProviderIdService;
+  authorization: AuthzService;
   credentials: ModelProviderCredentialCodec;
-  credentialPolicy: ModelProviderCredentialPolicy;
   codexTokenRefresher: CodexTokenRefresher;
-  onboardingDefaults?: ModelProviderOnboardingDefaults;
+  connectionRateLimiter: ModelProviderConnectionRateLimiter;
 }
 
 /** Composes the public Model Provider service with its private Postgres adapters. */
@@ -47,16 +46,16 @@ export class PostgresModelProviderAdapter {
         this.options.credentials,
       ),
       projects: this.options.projects,
-      credentialPolicy: this.options.credentialPolicy,
+      organizations: this.options.organizations,
+      credentialPolicy: ModelProviderKeysService.create(),
       codexTokenRefresher: this.options.codexTokenRefresher,
-      onboardingDefaults: this.options.onboardingDefaults,
+      connectionRateLimiter: this.options.connectionRateLimiter,
       defaults: PrismaModelDefaultRepository.create(this.options.database),
       costs: PrismaModelCostRepository.create(this.options.database),
       catalog: this.options.catalog,
-      managedProviders: this.options.managedProviders,
       authorization: this.options.authorization,
       translation: this.options.translation,
-      generateId: this.options.generateId,
+      ids: this.options.ids,
     });
   }
 }

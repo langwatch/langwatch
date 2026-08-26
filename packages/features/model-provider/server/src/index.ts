@@ -1,15 +1,14 @@
 export {
   PostgresModelProviderAdapter,
   type PostgresModelProviderAdapterOptions,
-} from "./adapters/postgres.model-provider.adapter";
+} from "./adapters/postgres-model-provider.adapter";
 export {
-  ManagedProviderService,
-  ModelProviderAuthorization,
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,
+  ModelProviderConnectionRateLimiter,
   CodexTokenRefresher,
-  ModelProviderOnboardingDefaults,
   ModelTranslationPort,
-  type ModelProviderIdGenerator,
+  ModelProviderIdService,
 } from "./ports/model-provider.port";
+export { ModelProviderKeysService } from "./services/model-provider-keys.service";

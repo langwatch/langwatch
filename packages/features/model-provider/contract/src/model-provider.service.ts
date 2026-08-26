@@ -17,6 +17,8 @@ import type {
   ModelProviderApiKeyValidation,
   ModelProviderApiKeyValidationInput,
   ModelProviderDeleteInput,
+  ModelProviderExecutionParameters,
+  ModelProviderExecutionPrepareInput,
   ModelProviderExecution,
   ModelProviderListOrganizationInput,
   ModelProviderListProjectInput,
@@ -53,6 +55,9 @@ export abstract class ModelProviderService {
   abstract getExecutionProviders(
     input: ModelProviderListProjectInput,
   ): Promise<Record<string, ModelProviderExecution>>;
+  abstract prepareExecution(
+    input: ModelProviderExecutionPrepareInput,
+  ): Promise<ModelProviderExecutionParameters>;
   abstract upsert(input: ModelProviderWriteInput): Promise<ModelProvider>;
   abstract delete(input: ModelProviderDeleteInput): Promise<void>;
   abstract validateApiKey(

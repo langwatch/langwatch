@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 export const MODEL_PROVIDER_FEATURE_ID = "model-provider" as const;
+export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
+export const ROUTING_HANDLE_MAX_LENGTH = 32;
+export const ROUTING_HANDLE_RULE = `A routing handle starts with a letter or a number, then uses only letters, numbers, hyphens and underscores, up to ${ROUTING_HANDLE_MAX_LENGTH} characters.`;
 export const MODEL_PROVIDER_SCOPE_TYPES = ["ORGANIZATION", "TEAM", "PROJECT"] as const;
 export const modelProviderScopeTypeSchema = z.enum(MODEL_PROVIDER_SCOPE_TYPES);
 export type ModelProviderScopeType = z.infer<typeof modelProviderScopeTypeSchema>;
@@ -77,6 +80,23 @@ export const modelProviderExecutionSchema = modelProviderSchema
   .strict();
 export type ModelProviderExecution = z.infer<typeof modelProviderExecutionSchema>;
 
+/** Input for the server-side LiteLLM/NLP execution parameter preparation. */
+export const modelProviderExecutionPrepareInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    model: z.string().min(1),
+  })
+  .strict();
+export type ModelProviderExecutionPrepareInput = z.infer<
+  typeof modelProviderExecutionPrepareInputSchema
+>;
+
+/** Portable key/value parameters consumed by LiteLLM-compatible runners. */
+export const modelProviderExecutionParametersSchema = z.record(z.string(), z.string());
+export type ModelProviderExecutionParameters = z.infer<
+  typeof modelProviderExecutionParametersSchema
+>;
+
 export const modelProviderTenantInputSchema = z
   .object({
     projectId: z.string().min(1).optional(),
@@ -91,6 +111,7 @@ export type ModelProviderTenantInput = z.infer<typeof modelProviderTenantInputSc
 export const modelProviderWriteInputSchema = modelProviderTenantInputSchema
   .extend({
     id: z.string().min(1).optional(),
+    actorId: z.string().min(1).optional(),
     provider: z.string().min(1),
     name: z.string().trim().min(1).max(128).optional(),
     enabled: z.boolean(),
@@ -102,12 +123,7 @@ export const modelProviderWriteInputSchema = modelProviderTenantInputSchema
       .array(z.object({ key: z.string(), value: z.string() }).strict())
       .nullable()
       .optional(),
-    routingHandle: z
-      .string()
-      .max(32)
-      .regex(/^[a-z0-9][a-z0-9_-]*$/)
-      .nullable()
-      .optional(),
+    routingHandle: z.string().max(32).nullable().optional(),
     scopes: z.array(modelProviderScopeSchema).min(1).optional(),
     rateLimitRpm: z.number().int().nonnegative().nullable().optional(),
     rateLimitTpm: z.number().int().nonnegative().nullable().optional(),
@@ -121,6 +137,7 @@ export type ModelProviderWriteInput = z.infer<typeof modelProviderWriteInputSche
 export const modelProviderDeleteInputSchema = modelProviderTenantInputSchema
   .extend({
     id: z.string().min(1).optional(),
+    actorId: z.string().min(1).optional(),
     provider: z.string().min(1),
   })
   .strict();
@@ -145,6 +162,7 @@ export type ModelProviderListOrganizationInput = z.infer<
 
 export const modelProviderTestConnectionInputSchema = modelProviderTenantInputSchema
   .extend({
+    actorId: z.string().min(1).optional(),
     modelProviderId: z.string().min(1),
   })
   .strict();

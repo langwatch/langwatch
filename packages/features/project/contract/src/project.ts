@@ -177,6 +177,7 @@ export const projectNameSchema = z
     id: z.string().min(1),
     name: z.string().min(1),
     slug: z.string().min(1),
+    teamId: z.string().min(1),
     organizationId: z.string().min(1),
   })
   .strict();

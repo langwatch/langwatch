@@ -1,8 +1,14 @@
-import { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  type ModelProvider as PrismaModelProvider,
+  type ModelProviderScope,
+  Prisma,
+  PrismaClient,
+} from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 import {
   modelProviderSchema,
   type Model,
+  type ModelDefaultScope,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
 import {
@@ -12,16 +18,12 @@ import {
 
 type Database = Pick<
   PrismaClient,
-  | "modelProvider"
-  | "project"
-  | "team"
-  | "organization"
-  | "gatewayChangeEvent"
-  | "$transaction"
+  "modelProvider" | "gatewayChangeEvent" | "$transaction"
 >;
 
 const recordSchema = z.record(z.string(), z.unknown());
 const stringRecordSchema = z.record(z.string(), z.string());
+const jsonValueSchema = z.json();
 const headerSchema = z.object({ key: z.string(), value: z.string() });
 const storedModelSchema = z.union([
   z.string(),
@@ -43,44 +45,32 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
   ) {
     super();
   }
+
   static create(
     database: object,
     credentials: ModelProviderCredentialCodec,
   ): PrismaModelProviderRepository {
-    return new PrismaModelProviderRepository(database as Database, credentials);
+    if (!isModelProviderDatabase(database)) {
+      throw new Error("Model Provider repository requires a Prisma database adapter");
+    }
+
+    return new PrismaModelProviderRepository(database, credentials);
   }
 
   async tryFindById(input: {
     id: string;
     organizationId?: string;
-    projectId?: string;
+    projectScopes?: ModelDefaultScope[];
   }): Promise<ModelProvider | null> {
-    const project = input.projectId
-      ? await this.database.project.findUnique({
-          where: { id: input.projectId },
-          select: {
-            teamId: true,
-            team: { select: { organizationId: true } },
-          },
-        })
-      : null;
-    if (input.projectId && !project) return null;
     const row = await this.database.modelProvider.findFirst({
       where: {
         id: input.id,
         ...(input.organizationId ? { organizationId: input.organizationId } : {}),
-        ...(input.projectId && project
+        ...(input.projectScopes
           ? {
               scopes: {
                 some: {
-                  OR: [
-                    { scopeType: "PROJECT", scopeId: input.projectId },
-                    { scopeType: "TEAM", scopeId: project.teamId },
-                    {
-                      scopeType: "ORGANIZATION",
-                      scopeId: project.team.organizationId,
-                    },
-                  ],
+                  OR: input.projectScopes,
                 },
               },
             }
@@ -93,23 +83,14 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
 
   async tryFindByProviderForProject(input: {
     provider: string;
-    projectId: string;
+    projectScopes: ModelDefaultScope[];
   }): Promise<ModelProvider | null> {
-    const project = await this.database.project.findUnique({
-      where: { id: input.projectId },
-      select: { teamId: true, team: { select: { organizationId: true } } },
-    });
-    if (!project) return null;
     const row = await this.database.modelProvider.findFirst({
       where: {
         provider: input.provider,
         scopes: {
           some: {
-            OR: [
-              { scopeType: "PROJECT", scopeId: input.projectId },
-              { scopeType: "TEAM", scopeId: project.teamId },
-              { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
-            ],
+            OR: input.projectScopes,
           },
         },
       },
@@ -119,21 +100,12 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
     return row ? toModelProvider(row, this.credentials) : null;
   }
 
-  async listForProject(projectId: string): Promise<ModelProvider[]> {
-    const project = await this.database.project.findUnique({
-      where: { id: projectId },
-      select: { teamId: true, team: { select: { organizationId: true } } },
-    });
-    if (!project) return [];
+  async listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]> {
     const rows = await this.database.modelProvider.findMany({
       where: {
         scopes: {
           some: {
-            OR: [
-              { scopeType: "PROJECT", scopeId: projectId },
-              { scopeType: "TEAM", scopeId: project.teamId },
-              { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
-            ],
+            OR: projectScopes,
           },
         },
       },
@@ -152,9 +124,7 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
     return rows.map((row) => toModelProvider(row, this.credentials));
   }
 
-  async create(
-    input: Omit<ModelProvider, "createdAt" | "updatedAt">,
-  ): Promise<ModelProvider> {
+  async create(input: ModelProvider): Promise<ModelProvider> {
     return this.database.$transaction(async (database) => {
       const row = await database.modelProvider.create({
         data: toCreateData(input, this.credentials),
@@ -165,9 +135,7 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
     });
   }
 
-  async update(
-    input: Omit<ModelProvider, "createdAt" | "updatedAt">,
-  ): Promise<ModelProvider> {
+  async update(input: ModelProvider): Promise<ModelProvider> {
     return this.database.$transaction(async (database) => {
       const row = await database.modelProvider.update({
         where: { id: input.id },
@@ -201,51 +169,23 @@ export class PrismaModelProviderRepository extends ModelProviderRepository {
     return row?.customKeys !== null && row?.customKeys !== undefined;
   }
 
-  async tryResolveOrganizationId(input: {
-    projectId?: string;
-    organizationId?: string;
-  }): Promise<string | null> {
-    if (input.organizationId) return input.organizationId;
-    if (!input.projectId) return null;
-    const project = await this.database.project.findUnique({
-      where: { id: input.projectId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    return project?.team.organizationId ?? null;
+  isRoutingHandleConflict(error: unknown): boolean {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+      return false;
+    }
+    if (error.code !== "P2002") {
+      return false;
+    }
+    return JSON.stringify(error.meta).toLowerCase().includes("routinghandle");
   }
-  async resolveOrganizationIdForScopes(
-    scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>,
-  ): Promise<string> {
-    if (scopes.length === 0) throw new Error("Provider scopes are required");
-    const organizations = await Promise.all(
-      scopes.map(async (scope) => {
-        if (scope.scopeType === "ORGANIZATION")
-          return (
-            await this.database.organization.findUnique({
-              where: { id: scope.scopeId },
-              select: { id: true },
-            })
-          )?.id;
-        if (scope.scopeType === "TEAM")
-          return (
-            await this.database.team.findUnique({
-              where: { id: scope.scopeId },
-              select: { organizationId: true },
-            })
-          )?.organizationId;
-        return (
-          await this.database.project.findUnique({
-            where: { id: scope.scopeId },
-            select: { team: { select: { organizationId: true } } },
-          })
-        )?.team.organizationId;
-      }),
-    );
-    const organizationId = organizations[0];
-    if (!organizationId || organizations.some((id) => id !== organizationId))
-      throw new Error("Provider scopes must belong to one organization");
-    return organizationId;
-  }
+}
+
+function isModelProviderDatabase(database: object): database is Database {
+  return (
+    "modelProvider" in database &&
+    "gatewayChangeEvent" in database &&
+    "$transaction" in database
+  );
 }
 
 async function appendProviderChanged(
@@ -264,9 +204,9 @@ async function appendProviderChanged(
 }
 
 function toCreateData(
-  input: Omit<ModelProvider, "createdAt" | "updatedAt">,
+  input: ModelProvider,
   credentials: ModelProviderCredentialCodec,
-) {
+): Prisma.ModelProviderCreateInput {
   return {
     id: input.id,
     organizationId: input.organizationId,
@@ -275,73 +215,103 @@ function toCreateData(
     enabled: input.enabled,
     routingHandle: input.routingHandle,
     customKeys:
-      input.customKeys === null ? Prisma.JsonNull : credentials.encode(input.customKeys),
-    customModels: input.customModels,
-    customEmbeddingsModels: input.customEmbeddingsModels,
-    extraHeaders: input.extraHeaders,
+      input.customKeys === null
+        ? Prisma.JsonNull
+        : toPrismaInputJson(credentials.encode(input.customKeys)),
+    customModels: toPrismaInputJson(input.customModels),
+    customEmbeddingsModels: toPrismaInputJson(input.customEmbeddingsModels),
+    extraHeaders: toPrismaInputJson(input.extraHeaders),
     rateLimitRpm: input.rateLimitRpm,
     rateLimitTpm: input.rateLimitTpm,
     rateLimitRpd: input.rateLimitRpd,
     fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-    providerConfig: input.providerConfig ?? Prisma.JsonNull,
+    providerConfig: input.providerConfig
+      ? toPrismaInputJson(input.providerConfig)
+      : Prisma.JsonNull,
     scopes: { create: input.scopes },
-  } as unknown as Parameters<Database["modelProvider"]["create"]>[0]["data"];
+  } satisfies Prisma.ModelProviderCreateInput;
 }
 
 function toUpdateData(
-  input: Omit<ModelProvider, "createdAt" | "updatedAt">,
+  input: ModelProvider,
   credentials: ModelProviderCredentialCodec,
-) {
+): Prisma.ModelProviderUpdateInput {
   return {
     name: input.name,
     provider: input.provider,
     enabled: input.enabled,
     routingHandle: input.routingHandle,
     customKeys:
-      input.customKeys === null ? Prisma.JsonNull : credentials.encode(input.customKeys),
-    customModels: input.customModels,
-    customEmbeddingsModels: input.customEmbeddingsModels,
-    extraHeaders: input.extraHeaders,
+      input.customKeys === null
+        ? Prisma.JsonNull
+        : toPrismaInputJson(credentials.encode(input.customKeys)),
+    customModels: toPrismaInputJson(input.customModels),
+    customEmbeddingsModels: toPrismaInputJson(input.customEmbeddingsModels),
+    extraHeaders: toPrismaInputJson(input.extraHeaders),
     rateLimitRpm: input.rateLimitRpm,
     rateLimitTpm: input.rateLimitTpm,
     rateLimitRpd: input.rateLimitRpd,
     fallbackPriorityGlobal: input.fallbackPriorityGlobal,
-    providerConfig: input.providerConfig ?? Prisma.JsonNull,
+    providerConfig: input.providerConfig
+      ? toPrismaInputJson(input.providerConfig)
+      : Prisma.JsonNull,
     scopes: { deleteMany: {}, create: input.scopes },
-  } as unknown as Parameters<Database["modelProvider"]["update"]>[0]["data"];
+  } satisfies Prisma.ModelProviderUpdateInput;
+}
+
+function toPrismaInputJson(value: unknown): Prisma.InputJsonValue {
+  return toNonNullPrismaJson(jsonValueSchema.parse(value));
+}
+
+function toNonNullPrismaJson(
+  value: z.infer<typeof jsonValueSchema>,
+): Prisma.InputJsonValue {
+  if (value === null) {
+    throw new Error("A Prisma JSON input must not be null at the top level");
+  }
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => (item === null ? null : toNonNullPrismaJson(item)));
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      item === null ? null : toNonNullPrismaJson(item),
+    ]),
+  );
 }
 
 function toModelProvider(
-  row: unknown,
+  row: PrismaModelProvider & { scopes: ModelProviderScope[] },
   credentials: ModelProviderCredentialCodec,
 ): ModelProvider {
-  const value = row as Record<string, unknown>;
-  const scopes = Array.isArray(value.scopes)
-    ? value.scopes.map((scope) => {
-        const item = scope as Record<string, unknown>;
-        return { scopeType: item.scopeType, scopeId: item.scopeId };
-      })
-    : [];
   return modelProviderSchema.parse({
-    id: value.id,
-    organizationId: value.organizationId,
-    provider: value.provider,
-    name: value.name,
-    enabled: value.enabled,
-    routingHandle: value.routingHandle ?? null,
-    scopes,
-    customKeys: credentials.decode(value.customKeys),
-    customModels: asModels(value.customModels, "chat"),
-    customEmbeddingsModels: asModels(value.customEmbeddingsModels, "embedding"),
-    extraHeaders: asHeaders(value.extraHeaders),
-    rateLimitRpm: value.rateLimitRpm ?? null,
-    rateLimitTpm: value.rateLimitTpm ?? null,
-    rateLimitRpd: value.rateLimitRpd ?? null,
-    fallbackPriorityGlobal: value.fallbackPriorityGlobal ?? null,
-    providerConfig: asRecord(value.providerConfig),
-    deploymentMapping: asStringRecord(value.deploymentMapping),
-    createdAt: value.createdAt,
-    updatedAt: value.updatedAt,
+    id: row.id,
+    organizationId: row.organizationId,
+    provider: row.provider,
+    name: row.name,
+    enabled: row.enabled,
+    routingHandle: row.routingHandle ?? null,
+    scopes: row.scopes.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
+    customKeys: credentials.tryDecode(row.customKeys),
+    customModels: asModels(row.customModels, "chat"),
+    customEmbeddingsModels: asModels(row.customEmbeddingsModels, "embedding"),
+    extraHeaders: asHeaders(row.extraHeaders),
+    rateLimitRpm: row.rateLimitRpm ?? null,
+    rateLimitTpm: row.rateLimitTpm ?? null,
+    rateLimitRpd: row.rateLimitRpd ?? null,
+    fallbackPriorityGlobal: row.fallbackPriorityGlobal ?? null,
+    providerConfig: asRecord(row.providerConfig),
+    deploymentMapping: asStringRecord(row.deploymentMapping),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   });
 }
 

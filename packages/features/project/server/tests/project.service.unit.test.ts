@@ -554,12 +554,14 @@ describe("ProjectService", () => {
         id: "project_1",
         name: "First",
         slug: "first",
+        teamId: "team_1",
         organizationId: "org",
       },
       {
         id: "project_2",
         name: "Second",
         slug: "second",
+        teamId: "team_2",
         organizationId: "org",
       },
     ]);
@@ -573,12 +575,14 @@ describe("ProjectService", () => {
         id: "project_1",
         name: "First",
         slug: "first",
+        teamId: "team_1",
         organizationId: "org",
       },
       {
         id: "project_2",
         name: "Second",
         slug: "second",
+        teamId: "team_2",
         organizationId: "org",
       },
     ]);

@@ -5,19 +5,24 @@ import {
   type ModelProvider,
   type ModelProviderApiKeyValidation,
   type CodexTokenKeys,
+  DEFAULT_AZURE_API_VERSION,
+  ModelProviderCredentialsUnreadableError,
 } from "@langwatch/model-provider-contract";
 import { ProjectService, projectWithTeamSchema } from "@langwatch/project-contract";
+import { OrganizationService } from "@langwatch/organization-contract";
+import { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderService } from "../src/services/model-provider.service";
 import {
-  ManagedProviderService,
   ModelCostRepository,
   ModelDefaultRepository,
   ModelProviderCatalog,
   ModelProviderCredentialPolicy,
   CodexTokenRefresher,
-  ModelProviderOnboardingDefaults,
+  ModelProviderConnectionRateLimiter,
+  ModelProviderIdService,
   ModelProviderRepository,
   ModelTranslationPort,
+  type ModelDefaultConfigSaveInput,
 } from "../src/ports/model-provider.port";
 
 const now = new Date();
@@ -47,9 +52,21 @@ function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
 
 class Providers extends ModelProviderRepository {
   rows = [provider()];
+  created: ModelProvider[] = [];
+  deleted: string[] = [];
+  storedCredentialIds = new Set<string>();
   updates: ModelProvider[] = [];
-  tryFindById(input: { id: string }): Promise<ModelProvider | null> {
-    return Promise.resolve(this.rows.find((row) => row.id === input.id) ?? null);
+  tryFindById(input: {
+    id: string;
+    organizationId?: string;
+  }): Promise<ModelProvider | null> {
+    return Promise.resolve(
+      this.rows.find(
+        (row) =>
+          row.id === input.id &&
+          (!input.organizationId || row.organizationId === input.organizationId),
+      ) ?? null,
+    );
   }
   tryFindByProviderForProject(input: {
     provider: string;
@@ -66,6 +83,7 @@ class Providers extends ModelProviderRepository {
   }
   create(input: ModelProvider): Promise<ModelProvider> {
     this.rows.push(input);
+    this.created.push(input);
     return Promise.resolve(input);
   }
   update(input: ModelProvider): Promise<ModelProvider> {
@@ -75,20 +93,13 @@ class Providers extends ModelProviderRepository {
   }
   delete(input: { id: string }): Promise<void> {
     this.rows = this.rows.filter((row) => row.id !== input.id);
+    this.deleted.push(input.id);
     return Promise.resolve();
-  }
-  tryResolveOrganizationId(input: {
-    projectId?: string;
-    organizationId?: string;
-  }): Promise<string | null> {
-    return Promise.resolve(input.organizationId ?? "org_1");
-  }
-  resolveOrganizationIdForScopes(): Promise<string> {
-    return Promise.resolve("org_1");
   }
   hasStoredCredentials(id: string): Promise<boolean> {
     return Promise.resolve(
-      this.rows.some((row) => row.id === id && row.customKeys !== null),
+      this.storedCredentialIds.has(id) ||
+        this.rows.some((row) => row.id === id && row.customKeys !== null),
     );
   }
 }
@@ -108,6 +119,148 @@ class CodexRefresher extends CodexTokenRefresher {
     this.calls += 1;
     if (this.failure) return Promise.reject(this.failure);
     return Promise.resolve(this.result);
+  }
+}
+class ConnectionRateLimiter extends ModelProviderConnectionRateLimiter {
+  calls = 0;
+  error: Error | null = null;
+
+  assertAvailable(): Promise<void> {
+    this.calls += 1;
+    if (this.error) {
+      return Promise.reject(this.error);
+    }
+    return Promise.resolve();
+  }
+}
+class Authorization extends AuthzService {
+  canWriteResult = true;
+  writes: Array<{ actorId: string; scopeType: string; scopeId: string }> = [];
+
+  check(): Promise<never> {
+    return this.notUsed();
+  }
+
+  checkDetailed(): Promise<never> {
+    return this.notUsed();
+  }
+
+  can(): Promise<never> {
+    return this.notUsed();
+  }
+
+  authorize(): Promise<never> {
+    return this.notUsed();
+  }
+
+  effectivePermissions(): Promise<never> {
+    return this.notUsed();
+  }
+
+  checkByIds(): Promise<never> {
+    return this.notUsed();
+  }
+
+  canAnyByIds(): Promise<never> {
+    return this.notUsed();
+  }
+
+  canBatchByIds(): Promise<never> {
+    return this.notUsed();
+  }
+
+  tryResolveScope(): Promise<never> {
+    return this.notUsed();
+  }
+
+  explainDecision(): Promise<never> {
+    return this.notUsed();
+  }
+
+  getDecision(input: { userId: string; scope: { tier: string; id: string } }): Promise<{
+    permitted: boolean;
+    organizationRole: null;
+  }> {
+    this.writes.push({
+      actorId: input.userId,
+      scopeType: input.scope.tier.toUpperCase(),
+      scopeId: input.scope.id,
+    });
+    return Promise.resolve({ permitted: this.canWriteResult, organizationRole: null });
+  }
+
+  getProjectAnyDecision(): Promise<never> {
+    return this.notUsed();
+  }
+
+  hasPermission(): Promise<never> {
+    return this.notUsed();
+  }
+
+  authorizePermission(): Promise<never> {
+    return this.notUsed();
+  }
+
+  authorizeProjectPermission(): Promise<never> {
+    return this.notUsed();
+  }
+
+  hasApiKeyPermission(): Promise<never> {
+    return this.notUsed();
+  }
+
+  getApiKeyProjectDecision(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listUserBindings(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listOrganizationBindings(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listUserAndGroupBindings(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listScopeBindings(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listGroupBindings(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listTeamMemberBindings(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listBindingsForSynthesis(): Promise<never> {
+    return this.notUsed();
+  }
+
+  listUserCreatedRoles(): Promise<never> {
+    return this.notUsed();
+  }
+
+  isOnEngine(): Promise<never> {
+    return this.notUsed();
+  }
+
+  tryGetEngineCutoverAt(): Promise<never> {
+    return this.notUsed();
+  }
+
+  private notUsed(): never {
+    throw new Error("This AuthzService test-double method is not used by this test.");
+  }
+}
+
+class Ids extends ModelProviderIdService {
+  generate(): string {
+    return "generated";
   }
 }
 
@@ -192,7 +345,7 @@ class Projects extends ProjectService {
   }
 
   tryGetWithTeam() {
-    return this.notUsed();
+    return Promise.resolve(project);
   }
 
   create() {
@@ -216,7 +369,19 @@ class Projects extends ProjectService {
   }
 
   listNamesByIds() {
-    return this.notUsed();
+    return Promise.resolve([
+      {
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        teamId: project.teamId,
+        organizationId: project.team.organizationId,
+      },
+    ]);
+  }
+
+  listIdsByOrganization() {
+    return Promise.resolve([project.id]);
   }
 
   listActiveByScopes() {
@@ -239,10 +404,6 @@ class Projects extends ProjectService {
     return this.notUsed();
   }
 
-  isFeatureEnabled() {
-    return this.notUsed();
-  }
-
   tryGetTraceSharingConfig() {
     return this.notUsed();
   }
@@ -250,27 +411,181 @@ class Projects extends ProjectService {
   resolveOrgAdmin() {
     return this.notUsed();
   }
+
+  resolveTraceDestination() {
+    return this.notUsed();
+  }
+
+  tryGetTraceDestination() {
+    return this.notUsed();
+  }
+
+  listTraceDestinations() {
+    return this.notUsed();
+  }
 }
+
+class Organizations extends OrganizationService {
+  private notUsed(): never {
+    throw new Error("Organization method is not used by this test");
+  }
+
+  getBillingProfile() {
+    return Promise.resolve({
+      id: "org_1",
+      name: "Organization",
+      billingCustomerId: null,
+    });
+  }
+
+  getTeamById() {
+    return Promise.resolve(project.team);
+  }
+
+  listTeams() {
+    return Promise.resolve({
+      data: [project.team],
+      pagination: { page: 1, limit: 1_000, total: 1 },
+    });
+  }
+
+  getOrganizationMembers() {
+    return this.notUsed();
+  }
+  isMember() {
+    return this.notUsed();
+  }
+  getOldestTeamId() {
+    return this.notUsed();
+  }
+  claimBillingCustomerId() {
+    return this.notUsed();
+  }
+  ensurePersonalWorkspace() {
+    return this.notUsed();
+  }
+  tryFindPersonalWorkspace() {
+    return this.notUsed();
+  }
+  getPersonalWorkspaceFeatures() {
+    return this.notUsed();
+  }
+  enableAllPersonalWorkspaceFeatures() {
+    return this.notUsed();
+  }
+  disableAllPersonalWorkspaceFeatures() {
+    return this.notUsed();
+  }
+  getTeam() {
+    return this.notUsed();
+  }
+  createTeam() {
+    return this.notUsed();
+  }
+  updateTeam() {
+    return this.notUsed();
+  }
+  archiveTeam() {
+    return this.notUsed();
+  }
+  addTeamMember() {
+    return this.notUsed();
+  }
+  removeTeamMember() {
+    return this.notUsed();
+  }
+  getTeamBySlugForMember() {
+    return this.notUsed();
+  }
+  getTeamWithMembers() {
+    return this.notUsed();
+  }
+  listTeamsWithMembers() {
+    return this.notUsed();
+  }
+  createTeamWithMembers() {
+    return this.notUsed();
+  }
+  updateTeamWithMembers() {
+    return this.notUsed();
+  }
+  listTeamAccess() {
+    return this.notUsed();
+  }
+  getGroup() {
+    return this.notUsed();
+  }
+  listGroups() {
+    return this.notUsed();
+  }
+  listGroupsForMember() {
+    return this.notUsed();
+  }
+  createGroup() {
+    return this.notUsed();
+  }
+  renameGroup() {
+    return this.notUsed();
+  }
+  deleteGroup() {
+    return this.notUsed();
+  }
+  addGroupMember() {
+    return this.notUsed();
+  }
+  removeGroupMember() {
+    return this.notUsed();
+  }
+  listGroupBindings() {
+    return this.notUsed();
+  }
+  addGroupBinding() {
+    return this.notUsed();
+  }
+  removeGroupBinding() {
+    return this.notUsed();
+  }
+  applyGroupEdits() {
+    return this.notUsed();
+  }
+}
+
 class Defaults extends ModelDefaultRepository {
   configs: ModelDefaultConfig[] = [];
   listForProject(): Promise<ModelDefaultConfig[]> {
     return Promise.resolve(this.configs);
   }
+  listForOrganization(): Promise<ModelDefaultConfig[]> {
+    return Promise.resolve(this.configs);
+  }
   tryGetById(id: string): Promise<ModelDefaultConfig | null> {
     return Promise.resolve(this.configs.find((config) => config.id === id) ?? null);
   }
-  save(input: ModelDefaultConfig): Promise<ModelDefaultConfig> {
-    this.configs.push(input);
-    return Promise.resolve(input);
+  tryFindByScope(
+    scope: ModelDefaultConfig["scopes"][number],
+  ): Promise<ModelDefaultConfig | null> {
+    return Promise.resolve(
+      this.configs.find((config) =>
+        config.scopes.some(
+          (item) => item.scopeType === scope.scopeType && item.scopeId === scope.scopeId,
+        ),
+      ) ?? null,
+    );
   }
-  set(): Promise<void> {
+  save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig> {
+    const saved = {
+      ...input,
+      createdAt: input.createdAt ?? now,
+      updatedAt: input.createdAt ?? now,
+    };
+    this.configs.push(saved);
+    return Promise.resolve(saved);
+  }
+  set(_input: { id: string }): Promise<void> {
     return Promise.resolve();
   }
   delete(): Promise<void> {
     return Promise.resolve();
-  }
-  tryResolve(): Promise<string | null> {
-    return Promise.resolve("gpt-4o");
   }
 }
 class Costs extends ModelCostRepository {
@@ -288,11 +603,9 @@ class Costs extends ModelCostRepository {
   delete(): Promise<void> {
     return Promise.resolve();
   }
-  tryResolveOrganizationId(): Promise<string | null> {
-    return Promise.resolve("org_1");
-  }
 }
 class Catalog extends ModelProviderCatalog {
+  connectionChecks: Array<{ provider: string; customKeys: Record<string, unknown> }> = [];
   exists(providerName: string): boolean {
     return providerName === "openai";
   }
@@ -302,13 +615,49 @@ class Catalog extends ModelProviderCatalog {
   validateApiKey(): Promise<ModelProviderApiKeyValidation> {
     return Promise.resolve({ valid: true });
   }
-  testConnection(): Promise<{ connected: boolean }> {
+  testConnection(
+    provider: string,
+    customKeys: Record<string, unknown>,
+  ): Promise<{ connected: boolean }> {
+    this.connectionChecks.push({ provider, customKeys });
     return Promise.resolve({ connected: true });
   }
-  tryMaskCredentials(
-    keys: Record<string, unknown> | null,
-  ): Record<string, unknown> | null {
-    return keys ? { apiKey: "••••" } : null;
+  tryGetExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null {
+    const value = input.customKeys?.[input.key];
+    return typeof value === "string" ? value : null;
+  }
+  tryGetStoredExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null {
+    const value = input.customKeys?.[input.key];
+    return typeof value === "string" ? value : null;
+  }
+  tryGetExecutionDefinition(_input: {
+    provider: string;
+  }): { apiKey: string; endpointKey: string | null } | null {
+    return { apiKey: "OPENAI_API_KEY", endpointKey: "OPENAI_BASE_URL" };
+  }
+}
+class DeprecatedCatalog extends Catalog {
+  exists(providerName: string): boolean {
+    return providerName === "gemini" || providerName === "google_agent_platform";
+  }
+
+  tryGetProviderDeprecation(providerName: string): { replacement?: string } | null {
+    return providerName === "google_agent_platform" ? { replacement: "gemini" } : null;
+  }
+}
+class RoutingCatalog extends Catalog {
+  tryNormalizeRoutingHandle(input: string | null): string | null {
+    return input?.trim().toLowerCase() || null;
+  }
+
+  tryGetRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
+    return handle === "openai" ? "reserved" : null;
   }
 }
 class PricingCatalog extends Catalog {
@@ -323,9 +672,48 @@ class PricingCatalog extends Catalog {
     ];
   }
 }
-class Managed extends ManagedProviderService {
-  isManagedProvider(): boolean {
-    return false;
+class ExecutionCatalog extends Catalog {
+  constructor(private readonly environment: Record<string, string> = {}) {
+    super();
+  }
+
+  tryGetExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null {
+    return this.tryGetStoredExecutionValue(input) ?? this.environment[input.key] ?? null;
+  }
+
+  tryGetExecutionDefinition(input: {
+    provider: string;
+  }): { apiKey: string; endpointKey: string | null } | null {
+    const definitions: Record<string, { apiKey: string; endpointKey: string | null }> = {
+      anthropic: { apiKey: "ANTHROPIC_API_KEY", endpointKey: "ANTHROPIC_BASE_URL" },
+      azure: { apiKey: "AZURE_OPENAI_API_KEY", endpointKey: "AZURE_OPENAI_ENDPOINT" },
+      bedrock: { apiKey: "AWS_ACCESS_KEY_ID", endpointKey: null },
+      gemini: { apiKey: "GEMINI_API_KEY", endpointKey: null },
+      openai: { apiKey: "OPENAI_API_KEY", endpointKey: "OPENAI_BASE_URL" },
+      vertex_ai: { apiKey: "VERTEXAI_API_KEY", endpointKey: null },
+    };
+    return definitions[input.provider] ?? null;
+  }
+}
+class ManagedCatalog extends Catalog {
+  input: {
+    parameters: Record<string, string>;
+    projectId: string;
+    model: string;
+    provider: string;
+  } | null = null;
+
+  prepareExecution(input: {
+    parameters: Record<string, string>;
+    projectId: string;
+    model: string;
+    provider: string;
+  }): Promise<Record<string, string>> {
+    this.input = input;
+    return Promise.resolve(input.parameters);
   }
 }
 class Translator extends ModelTranslationPort {
@@ -334,27 +722,40 @@ class Translator extends ModelTranslationPort {
   }
 }
 class CredentialPolicy extends ModelProviderCredentialPolicy {
-  normalize(_provider: string, value: Record<string, unknown> | null) {
+  tryNormalize(_provider: string, value: Record<string, unknown> | null) {
     return value;
   }
   merge(input: {
     incoming: Record<string, unknown> | null;
     stored: Record<string, unknown> | null;
   }) {
-    return Object.fromEntries(
+    const edited = Object.fromEntries(
       Object.entries(input.incoming ?? {}).map(([key, value]) => [
         key,
         value === "••••" ? input.stored?.[key] : value,
       ]),
     );
+    const preserved = Object.entries(input.stored ?? {}).filter(
+      ([key]) => key === "apiKey" && !(key in edited),
+    );
+
+    return { ...edited, ...Object.fromEntries(preserved) };
   }
-  mask(value: Record<string, unknown> | null) {
+  tryMask(value: Record<string, unknown> | null) {
     return value ? { ...value, apiKey: "••••" } : null;
   }
   hasUsableReplacement(value: Record<string, unknown> | null): boolean {
     return Object.values(value ?? {}).some(
-      (field) => typeof field === "string" && field.length > 0,
+      (field) => typeof field === "string" && field.length > 0 && field !== "••••",
     );
+  }
+  assertCredentialsCanBeSaved(input: {
+    storedCredentialsUnreadable: boolean;
+    incoming: Record<string, unknown> | null;
+  }): void {
+    if (input.storedCredentialsUnreadable && !this.hasUsableReplacement(input.incoming)) {
+      throw new ModelProviderCredentialsUnreadableError("openai");
+    }
   }
   mergeHeaders(input: {
     incoming: Array<{ key: string; value: string }>;
@@ -366,30 +767,46 @@ class CredentialPolicy extends ModelProviderCredentialPolicy {
     return value.map(({ key }) => ({ key, value: "••••" }));
   }
 }
-class OnboardingDefaults extends ModelProviderOnboardingDefaults {
-  seeded: Array<{ provider: string; scopes: ModelProvider["scopes"] }> = [];
-  seed(input: { provider: string; scopes: ModelProvider["scopes"] }) {
-    this.seeded.push(input);
-    return Promise.resolve();
+class HeaderCredentialPolicy extends CredentialPolicy {
+  mergeHeaders(input: {
+    incoming: Array<{ key: string; value: string }>;
+    stored: Array<{ key: string; value: string }>;
+  }): Array<{ key: string; value: string }> {
+    const incomingKeys = new Set(input.incoming.map(({ key }) => key));
+    return input.incoming.flatMap((header, index) => {
+      if (header.value !== "••••") return [header];
+
+      const storedByKey = input.stored.find(({ key }) => key === header.key);
+      if (storedByKey) return [{ key: header.key, value: storedByKey.value }];
+
+      const storedAtPosition = input.stored[index];
+      const canReusePosition =
+        storedAtPosition !== undefined && !incomingKeys.has(storedAtPosition.key);
+      return canReusePosition ? [{ key: header.key, value: storedAtPosition.value }] : [];
+    });
   }
 }
-
 function service(
   providers = new Providers(),
   catalog: ModelProviderCatalog = new Catalog(),
   codexTokenRefresher = new CodexRefresher(),
+  authorization: AuthzService = new Authorization(),
+  connectionRateLimiter = new ConnectionRateLimiter(),
+  credentialPolicy: ModelProviderCredentialPolicy = new CredentialPolicy(),
 ) {
   return ModelProviderService.create({
     repository: providers,
     projects: new Projects(),
-    credentialPolicy: new CredentialPolicy(),
+    organizations: new Organizations(),
+    credentialPolicy,
     codexTokenRefresher,
+    connectionRateLimiter,
     defaults: new Defaults(),
     costs: new Costs(),
     catalog,
-    managedProviders: new Managed(),
+    authorization,
     translation: new Translator(),
-    generateId: () => "generated",
+    ids: new Ids(),
   });
 }
 
@@ -403,10 +820,402 @@ describe("ModelProviderService", () => {
       service().upsert({ projectId: "project_1", provider: "unknown", enabled: true }),
     ).rejects.toMatchObject({ code: "model_provider_invalid" });
   });
-  it("resolves translation through the default-model repository and port", async () => {
+  it("refuses a new row for a deprecated provider but keeps stored rows editable", async () => {
+    const providers = new Providers();
+    providers.rows = [];
+    const modelProviders = service(providers, new DeprecatedCatalog());
+
     await expect(
-      service().translate({ projectId: "project_1", text: "hello" }),
+      modelProviders.upsert({
+        projectId: "project_1",
+        provider: "google_agent_platform",
+        enabled: true,
+      }),
+    ).rejects.toMatchObject({
+      code: "model_provider_deprecated",
+      meta: { provider: "google_agent_platform", replacement: "gemini" },
+    });
+    expect(providers.rows).toEqual([]);
+
+    providers.rows = [provider({ provider: "google_agent_platform" })];
+    await expect(
+      modelProviders.upsert({
+        id: "mp_1",
+        projectId: "project_1",
+        provider: "google_agent_platform",
+        enabled: false,
+      }),
+    ).resolves.toMatchObject({ id: "mp_1", enabled: false });
+  });
+  it("allows a new row for the provider that replaces a deprecated provider", async () => {
+    const providers = new Providers();
+    providers.rows = [];
+
+    await expect(
+      service(providers, new DeprecatedCatalog()).upsert({
+        projectId: "project_1",
+        provider: "gemini",
+        enabled: true,
+      }),
+    ).resolves.toMatchObject({ provider: "gemini" });
+    expect(providers.created).toHaveLength(1);
+  });
+  it("normalizes routing handles before persistence and rejects reserved names", async () => {
+    const providers = new Providers();
+    const modelProviders = service(providers, new RoutingCatalog());
+
+    await expect(
+      modelProviders.upsert({
+        id: "mp_1",
+        projectId: "project_1",
+        provider: "openai",
+        enabled: true,
+        routingHandle: "  Eu-West  ",
+      }),
+    ).resolves.toMatchObject({ routingHandle: "eu-west" });
+
+    await expect(
+      modelProviders.upsert({
+        id: "mp_1",
+        projectId: "project_1",
+        provider: "openai",
+        enabled: true,
+        routingHandle: "openai",
+      }),
+    ).rejects.toMatchObject({
+      code: "model_provider_routing_handle_invalid",
+      meta: { handle: "openai", problem: "reserved" },
+    });
+  });
+  it("tests only a stored, authorized provider and applies the connection-test budget", async () => {
+    const providers = new Providers();
+    const authorization = new Authorization();
+    const limiter = new ConnectionRateLimiter();
+    const modelProviders = service(
+      providers,
+      new Catalog(),
+      new CodexRefresher(),
+      authorization,
+      limiter,
+    );
+
+    await expect(
+      modelProviders.testConnection({
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+        actorId: "user_1",
+      }),
+    ).resolves.toEqual({ connected: true });
+    expect(limiter.calls).toBe(1);
+
+    authorization.canWriteResult = false;
+    await expect(
+      modelProviders.testConnection({
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+        actorId: "user_1",
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
+    expect(limiter.calls).toBe(1);
+
+    authorization.canWriteResult = true;
+    limiter.error = new Error("rate limited");
+    await expect(
+      modelProviders.testConnection({
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+        actorId: "user_1",
+      }),
+    ).rejects.toThrow("rate limited");
+  });
+  it("resolves translation through the default-model repository and port", async () => {
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "translation-default",
+        config: { FAST: "openai/gpt-5-mini" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: now,
+      },
+    ];
+    const catalog = new Catalog();
+    catalog.defaultFeatures = () => [
+      {
+        key: "translate.text",
+        role: "FAST",
+        displayName: "Inline translation",
+        description: "Translates user-supplied text into English.",
+      },
+    ];
+    const modelProviders = ModelProviderService.create({
+      repository: new Providers(),
+      projects: new Projects(),
+      organizations: new Organizations(),
+      credentialPolicy: new CredentialPolicy(),
+      codexTokenRefresher: new CodexRefresher(),
+      connectionRateLimiter: new ConnectionRateLimiter(),
+      defaults,
+      costs: new Costs(),
+      catalog,
+      authorization: new Authorization(),
+      translation: new Translator(),
+      ids: new Ids(),
+    });
+
+    await expect(
+      modelProviders.translate({ projectId: "project_1", text: "hello" }),
     ).resolves.toEqual({ translation: "translated" });
+  });
+  it("prepares model execution through the canonical service and managed seam", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        customKeys: {
+          OPENAI_API_KEY: "stored-openai-key",
+          OPENAI_BASE_URL: "https://models.example.test/v1",
+        },
+      }),
+    ];
+    const managed = new ManagedCatalog();
+    const modelProviders = ModelProviderService.create({
+      repository: providers,
+      projects: new Projects(),
+      organizations: new Organizations(),
+      credentialPolicy: new CredentialPolicy(),
+      codexTokenRefresher: new CodexRefresher(),
+      connectionRateLimiter: new ConnectionRateLimiter(),
+      defaults: new Defaults(),
+      costs: new Costs(),
+      catalog: managed,
+      authorization: new Authorization(),
+      translation: new Translator(),
+      ids: new Ids(),
+    });
+
+    await expect(
+      modelProviders.prepareExecution({
+        projectId: "project_1",
+        model: "openai/gpt-4o",
+      }),
+    ).resolves.toEqual({
+      model: "openai/gpt-4o",
+      api_key: "stored-openai-key",
+      api_base: "https://models.example.test/v1",
+    });
+    expect(managed.input).toMatchObject({
+      projectId: "project_1",
+      model: "openai/gpt-4o",
+      provider: "openai",
+    });
+  });
+  it("keeps the Codex execution refusal byte-for-byte", async () => {
+    await expect(
+      service().prepareExecution({
+        projectId: "project_1",
+        model: "openai_codex/gpt-5.6-terra",
+      }),
+    ).rejects.toThrow(
+      '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.',
+    );
+  });
+  it("uses the canonical Azure endpoint, version, deployment, and headers", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "azure",
+        customKeys: {
+          AZURE_OPENAI_API_KEY: "azure-key",
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          AZURE_OPENAI_API_VERSION: "2025-01-01-preview",
+        },
+        customModels: [{ id: "gpt-5.4", label: "GPT 5.4", type: "chat" }],
+        deploymentMapping: { "azure/gpt-5.4": "acme-gpt-5" },
+        extraHeaders: [{ key: "X-Customer", value: "acme" }],
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "azure/gpt-5.4",
+      }),
+    ).resolves.toEqual({
+      model: "azure/gpt-5.4",
+      api_key: "azure-key",
+      api_base: "https://acme.openai.azure.com",
+      api_version: "2025-01-01-preview",
+      deployment: "acme-gpt-5",
+      extra_headers: '{"X-Customer":"acme"}',
+    });
+  });
+  it("uses the direct Azure version default when no override is configured", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "azure",
+        customKeys: { AZURE_OPENAI_API_KEY: "azure-key" },
+        customModels: [{ id: "gpt-5.4", label: "GPT 5.4", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "azure/gpt-5.4",
+      }),
+    ).resolves.toMatchObject({
+      model: "azure/gpt-5.4",
+      api_version: DEFAULT_AZURE_API_VERSION,
+    });
+  });
+  it("uses Azure gateway mode when its base URL is configured", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "azure",
+        customKeys: {
+          AZURE_OPENAI_API_KEY: "azure-key",
+          AZURE_API_GATEWAY_BASE_URL: "https://gateway.example.test/azure",
+          AZURE_API_GATEWAY_VERSION: "2024-09-01",
+        },
+        customModels: [{ id: "gpt-5.4", label: "GPT 5.4", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "azure/gpt-5.4",
+      }),
+    ).resolves.toMatchObject({
+      api_base: "https://gateway.example.test/azure",
+      api_version: "2024-09-01",
+      use_azure_gateway: "true",
+    });
+  });
+  it("normalizes an mp-id model reference with the stored provider", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        id: "mp_azure_123",
+        provider: "azure",
+        customKeys: { AZURE_OPENAI_API_KEY: "azure-key" },
+        deploymentMapping: { "azure/my-gpt4-deployment": "azure-deployment" },
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "mp_azure_123/my-gpt4-deployment",
+      }),
+    ).resolves.toMatchObject({
+      model: "azure/my-gpt4-deployment",
+      deployment: "azure-deployment",
+    });
+  });
+  it("normalizes Anthropic's versioned model and base URL", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "anthropic",
+        customKeys: {
+          ANTHROPIC_API_KEY: "anthropic-key",
+          ANTHROPIC_BASE_URL: "https://api.anthropic.com/v1/",
+        },
+        customModels: [{ id: "claude-opus-4.5", label: "Claude Opus", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers, new ExecutionCatalog()).prepareExecution({
+        projectId: "project_1",
+        model: "anthropic/claude-opus-4.5",
+      }),
+    ).resolves.toMatchObject({
+      model: "anthropic/claude-opus-4-5",
+      api_base: "https://api.anthropic.com",
+    });
+  });
+  it("keeps Gemini Agent Platform values with their stored credential", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "gemini",
+        customKeys: {
+          GEMINI_API_KEY: "gemini-key",
+          GEMINI_PROJECT: "stored-project",
+          GEMINI_LOCATION: "europe-west4",
+        },
+        customModels: [{ id: "gemini-2.5-pro", label: "Gemini", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(
+        providers,
+        new ExecutionCatalog({
+          GEMINI_PROJECT: "environment-project",
+          GEMINI_LOCATION: "us-central1",
+        }),
+      ).prepareExecution({
+        projectId: "project_1",
+        model: "gemini/gemini-2.5-pro",
+      }),
+    ).resolves.toMatchObject({
+      api_key: "gemini-key",
+      project_id: "stored-project",
+      region: "europe-west4",
+    });
+  });
+  it("uses injected configuration when preparing a Vertex execution", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "vertex_ai",
+        customKeys: null,
+        customModels: [{ id: "gemini-2.5-pro", label: "Gemini", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(
+        providers,
+        new ExecutionCatalog({
+          VERTEXAI_API_KEY: "vertex-credential",
+          VERTEXAI_LOCATION: "europe-west4",
+          VERTEXAI_PROJECT: "vertex-project",
+        }),
+      ).prepareExecution({
+        projectId: "project_1",
+        model: "vertex_ai/gemini-2.5-pro",
+      }),
+    ).resolves.toEqual({
+      model: "vertex_ai/gemini-2.5-pro",
+      vertex_credentials: "vertex-credential",
+      vertex_project: "vertex-project",
+      vertex_location: "europe-west4",
+    });
+  });
+  it("keeps the Codex refusal for an explicit model-provider row", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        id: "mp_codexrow123",
+        provider: "openai_codex",
+        customKeys: { CODEX_ACCESS_TOKEN: "oauth-token" },
+      }),
+    ];
+
+    await expect(
+      service(providers).prepareExecution({
+        projectId: "project_1",
+        model: "mp_codexrow123/gpt-5.6-terra",
+      }),
+    ).rejects.toThrow(
+      '"mp_codexrow123/gpt-5.6-terra" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.',
+    );
   });
   it("uses the catalog-owned static rate cascade", () => {
     expect(
@@ -473,6 +1282,31 @@ describe("ModelProviderService", () => {
       }),
     ).resolves.toMatchObject({ id: "project-row" });
   });
+  it("does not let a disabled project row mask an enabled organization row", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        id: "organization-row",
+        enabled: true,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        customModels: [{ id: "deployment", label: "Deployment", type: "chat" }],
+      }),
+      provider({
+        id: "project-row",
+        enabled: false,
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        customModels: [{ id: "deployment", label: "Deployment", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers).tryFindRowServingModel({
+        projectId: "project_1",
+        provider: "openai",
+        model: "deployment",
+      }),
+    ).resolves.toMatchObject({ id: "organization-row" });
+  });
   it("returns raw execution providers with registry model metadata", async () => {
     class ExecutionCatalog extends Catalog {
       metadata() {
@@ -499,17 +1333,20 @@ describe("ModelProviderService", () => {
   it("seeds onboarding defaults after creating a provider", async () => {
     const providers = new Providers();
     providers.rows = [];
-    const onboardingDefaults = new OnboardingDefaults();
+    const defaults = new Defaults();
     const modelProviders = ModelProviderService.create({
       repository: providers,
       projects: new Projects(),
+      organizations: new Organizations(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
-      defaults: new Defaults(),
+      connectionRateLimiter: new ConnectionRateLimiter(),
+      defaults,
       costs: new Costs(),
       catalog: new Catalog(),
-      onboardingDefaults,
-      generateId: () => "generated",
+      authorization: new Authorization(),
+      translation: new Translator(),
+      ids: new Ids(),
     });
 
     await modelProviders.upsert({
@@ -518,12 +1355,49 @@ describe("ModelProviderService", () => {
       enabled: true,
     });
 
-    expect(onboardingDefaults.seeded).toEqual([
-      {
-        provider: "openai",
+    expect(defaults.configs).toEqual([
+      expect.objectContaining({
+        config: {
+          DEFAULT: "openai/latest",
+          FAST: "openai/latest-mini",
+          EMBEDDINGS: expect.stringMatching(/^openai\/text-embedding-/),
+        },
         scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
-      },
+      }),
     ]);
+  });
+
+  it("does not overwrite an existing onboarding default at the provider scope", async () => {
+    const providers = new Providers();
+    providers.rows = [];
+    const defaults = new Defaults();
+    defaults.configs = [
+      {
+        id: "existing",
+        config: { DEFAULT: "customer-choice" },
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        authorId: null,
+        createdAt: now,
+      },
+    ];
+
+    await ModelProviderService.create({
+      repository: providers,
+      projects: new Projects(),
+      organizations: new Organizations(),
+      credentialPolicy: new CredentialPolicy(),
+      codexTokenRefresher: new CodexRefresher(),
+      connectionRateLimiter: new ConnectionRateLimiter(),
+      defaults,
+      costs: new Costs(),
+      catalog: new Catalog(),
+      authorization: new Authorization(),
+      translation: new Translator(),
+      ids: new Ids(),
+    }).upsert({ projectId: "project_1", provider: "openai", enabled: true });
+
+    expect(defaults.configs).toHaveLength(1);
+    expect(defaults.configs[0]?.config).toEqual({ DEFAULT: "customer-choice" });
   });
 
   it("persists a Codex token rotation through the canonical repository", async () => {
@@ -656,5 +1530,350 @@ describe("ModelProviderService", () => {
       }),
     ).rejects.toBe(failure);
     expect(providers.updates).toHaveLength(0);
+  });
+
+  it("rejects an organization-scoped create before persisting when the actor lacks that scope", async () => {
+    const providers = new Providers();
+    providers.rows = [];
+    const authorization = new Authorization();
+    authorization.canWriteResult = false;
+
+    await expect(
+      service(providers, new Catalog(), new CodexRefresher(), authorization).upsert({
+        organizationId: "org_1",
+        actorId: "user_1",
+        provider: "openai",
+        enabled: true,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
+    expect(providers.created).toEqual([]);
+  });
+
+  it("authorizes every old and new scope before replacing a provider scope set", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+      }),
+    ];
+    const authorization = new Authorization();
+
+    await service(providers, new Catalog(), new CodexRefresher(), authorization).upsert({
+      id: "mp_1",
+      projectId: "project_1",
+      actorId: "user_1",
+      provider: "openai",
+      enabled: true,
+      scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+    });
+
+    expect(authorization.writes).toEqual([
+      { actorId: "user_1", scopeType: "ORGANIZATION", scopeId: "org_1" },
+      { actorId: "user_1", scopeType: "PROJECT", scopeId: "project_1" },
+    ]);
+    expect(providers.rows[0]?.scopes).toEqual([
+      { scopeType: "PROJECT", scopeId: "project_1" },
+    ]);
+  });
+
+  it("does not turn a missing id into a new provider row", async () => {
+    const providers = new Providers();
+    providers.rows = [];
+
+    await expect(
+      service(providers).upsert({
+        id: "missing",
+        projectId: "project_1",
+        provider: "openai",
+        enabled: true,
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_not_found" });
+    expect(providers.created).toEqual([]);
+  });
+
+  it("refuses a denied delete without mutating the stored provider", async () => {
+    const providers = new Providers();
+    const authorization = new Authorization();
+    authorization.canWriteResult = false;
+
+    await expect(
+      service(providers, new Catalog(), new CodexRefresher(), authorization).delete({
+        id: "mp_1",
+        projectId: "project_1",
+        actorId: "user_1",
+        provider: "openai",
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
+    expect(providers.rows).toHaveLength(1);
+    expect(providers.deleted).toEqual([]);
+  });
+
+  it("refuses unreadable stored credentials until a usable replacement is supplied", async () => {
+    const providers = new Providers();
+    providers.rows = [provider({ customKeys: null })];
+    providers.storedCredentialIds.add("mp_1");
+    const modelProviders = service(providers);
+
+    await expect(
+      modelProviders.upsert({
+        id: "mp_1",
+        projectId: "project_1",
+        provider: "openai",
+        enabled: true,
+        customKeys: { apiKey: "••••" },
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_credentials_unreadable" });
+    expect(providers.rows[0]?.customKeys).toBeNull();
+
+    await expect(
+      modelProviders.upsert({
+        id: "mp_1",
+        projectId: "project_1",
+        provider: "openai",
+        enabled: true,
+        customKeys: { apiKey: "replacement" },
+      }),
+    ).resolves.toMatchObject({ customKeys: { apiKey: "replacement" } });
+  });
+
+  it("keeps an omitted secret while accepting a replacement endpoint", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        customKeys: {
+          apiKey: "secret",
+          publicBaseUrl: "https://old.example.test",
+        },
+      }),
+    ];
+
+    await service(providers).upsert({
+      id: "mp_1",
+      projectId: "project_1",
+      provider: "openai",
+      enabled: true,
+      customKeys: { publicBaseUrl: "https://new.example.test" },
+    });
+
+    expect(providers.rows[0]?.customKeys).toEqual({
+      apiKey: "secret",
+      publicBaseUrl: "https://new.example.test",
+    });
+  });
+
+  it("uses stored credentials for a connection check and never request-supplied values", async () => {
+    const providers = new Providers();
+    providers.rows = [provider({ customKeys: { apiKey: "stored-secret" } })];
+    const catalog = new Catalog();
+    const authorization = new Authorization();
+
+    await service(providers, catalog, new CodexRefresher(), authorization).testConnection(
+      {
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+        actorId: "user_1",
+      },
+    );
+
+    expect(catalog.connectionChecks).toEqual([
+      { provider: "openai", customKeys: { apiKey: "stored-secret" } },
+    ]);
+  });
+
+  it("does not rate-limit a connection check that authorization rejects", async () => {
+    const authorization = new Authorization();
+    authorization.canWriteResult = false;
+    const limiter = new ConnectionRateLimiter();
+
+    await expect(
+      service(
+        new Providers(),
+        new Catalog(),
+        new CodexRefresher(),
+        authorization,
+        limiter,
+      ).testConnection({
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+        actorId: "user_1",
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
+    expect(limiter.calls).toBe(0);
+  });
+
+  it("does not test a provider row with no granted scope", async () => {
+    const providers = new Providers();
+    providers.rows = [provider({ scopes: [] })];
+    const catalog = new Catalog();
+
+    await expect(
+      service(providers, catalog).testConnection({
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_not_found" });
+    expect(catalog.connectionChecks).toEqual([]);
+  });
+
+  it("does not disclose a provider row from another organization during a connection check", async () => {
+    const providers = new Providers();
+    providers.rows = [provider({ organizationId: "other-organization" })];
+    const catalog = new Catalog();
+
+    await expect(
+      service(providers, catalog).testConnection({
+        modelProviderId: "mp_1",
+        organizationId: "org_1",
+      }),
+    ).rejects.toMatchObject({ code: "model_provider_not_found" });
+    expect(catalog.connectionChecks).toEqual([]);
+  });
+
+  it("selects the oldest matching row when visible rows have the same scope tier", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        id: "newer",
+        createdAt: new Date("2026-01-02"),
+        customModels: [{ id: "deployment", label: "Deployment", type: "chat" }],
+      }),
+      provider({
+        id: "older",
+        createdAt: new Date("2026-01-01"),
+        customModels: [{ id: "deployment", label: "Deployment", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers).tryFindRowServingModel({
+        projectId: "project_1",
+        provider: "openai",
+        model: "deployment",
+      }),
+    ).resolves.toMatchObject({ id: "older" });
+  });
+
+  it("selects an embeddings row only when that row advertises the embedding model", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        id: "chat-row",
+        customModels: [{ id: "gpt-4o", label: "Chat", type: "chat" }],
+      }),
+      provider({
+        id: "embedding-row",
+        customEmbeddingsModels: [
+          { id: "text-embedding-3-small", label: "Embedding", type: "embedding" },
+        ],
+      }),
+    ];
+
+    await expect(
+      service(providers).tryFindRowServingModel({
+        projectId: "project_1",
+        provider: "openai",
+        model: "text-embedding-3-small",
+      }),
+    ).resolves.toMatchObject({ id: "embedding-row" });
+  });
+
+  it("restores each masked header by name through the canonical save path", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        extraHeaders: [
+          { key: "Authorization", value: "Bearer stored" },
+          { key: "X-Tenant", value: "tenant-1" },
+        ],
+      }),
+    ];
+
+    await service(
+      providers,
+      new Catalog(),
+      new CodexRefresher(),
+      undefined,
+      new ConnectionRateLimiter(),
+      new HeaderCredentialPolicy(),
+    ).upsert({
+      id: "mp_1",
+      projectId: "project_1",
+      provider: "openai",
+      enabled: true,
+      extraHeaders: [
+        { key: "Authorization", value: "••••" },
+        { key: "X-Tenant", value: "••••" },
+      ],
+    });
+
+    expect(providers.rows[0]?.extraHeaders).toEqual([
+      { key: "Authorization", value: "Bearer stored" },
+      { key: "X-Tenant", value: "tenant-1" },
+    ]);
+  });
+
+  it("allows a renamed masked header to reuse only its unclaimed position", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        extraHeaders: [
+          { key: "Authorization", value: "Bearer stored" },
+          { key: "X-Tenant", value: "tenant-1" },
+        ],
+      }),
+    ];
+
+    await service(
+      providers,
+      new Catalog(),
+      new CodexRefresher(),
+      undefined,
+      new ConnectionRateLimiter(),
+      new HeaderCredentialPolicy(),
+    ).upsert({
+      id: "mp_1",
+      projectId: "project_1",
+      provider: "openai",
+      enabled: true,
+      extraHeaders: [
+        { key: "X-Auth", value: "••••" },
+        { key: "X-Tenant", value: "••••" },
+      ],
+    });
+
+    expect(providers.rows[0]?.extraHeaders).toEqual([
+      { key: "X-Auth", value: "Bearer stored" },
+      { key: "X-Tenant", value: "tenant-1" },
+    ]);
+  });
+
+  it("does not assign a claimed header secret to an unrelated masked header", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({ extraHeaders: [{ key: "Authorization", value: "Bearer stored" }] }),
+    ];
+
+    await service(
+      providers,
+      new Catalog(),
+      new CodexRefresher(),
+      undefined,
+      new ConnectionRateLimiter(),
+      new HeaderCredentialPolicy(),
+    ).upsert({
+      id: "mp_1",
+      projectId: "project_1",
+      provider: "openai",
+      enabled: true,
+      extraHeaders: [
+        { key: "X-New", value: "••••" },
+        { key: "Authorization", value: "••••" },
+      ],
+    });
+
+    expect(providers.rows[0]?.extraHeaders).toEqual([
+      { key: "Authorization", value: "Bearer stored" },
+    ]);
   });
 });

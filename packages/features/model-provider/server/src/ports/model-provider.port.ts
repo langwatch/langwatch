@@ -1,70 +1,74 @@
-import type {
-  ModelCost,
-  ModelCostRate,
-  ModelDefaultConfig,
-  ModelDefaultScope,
-  ModelProvider,
-  ModelProviderApiKeyValidation,
-  CodexTokenKeys,
-  ModelProviderSummary,
-  ModelDefaultFeature,
-  ModelProviderService,
+import {
+  CODING_ASSISTANT_SURFACES_ONLY_NEEDLE,
+  ModelDefaultValidationError,
+  allFeatures,
+  buildProviderOnboardingDefaultPlan,
+  expandLatestAlias,
+  featureByKey,
+  getProviderModelOptions,
+  getStaticModelCostRates,
+  isLatestAlias,
+  isModelAllowedAsRoleDefault,
+  isModelAllowedForFeature,
+  isModelRole,
+  normalizeRoutingHandle,
+  providerDeprecation,
+  routingHandleProblem,
+  tryGetModelProviderDefinition,
+  type ModelCost,
+  type ModelCostRate,
+  type ModelDefaultConfig,
+  type ModelDefaultScope,
+  type ModelProvider,
+  type ModelProviderApiKeyValidation,
+  type CodexTokenKeys,
+  type ModelProviderSummary,
+  type ModelDefaultFeature,
+  type ModelProviderService,
 } from "@langwatch/model-provider-contract";
+import type { AuthzService } from "@langwatch/authz-contract";
 
-export abstract class ModelProviderAuthorization {
-  abstract canRead(input: {
-    actorId: string;
-    scopeType: ModelDefaultScope["scopeType"];
-    scopeId: string;
-  }): Promise<boolean>;
-  abstract canWrite(input: {
-    actorId: string;
-    scopeType: ModelDefaultScope["scopeType"];
-    scopeId: string;
-  }): Promise<boolean>;
-}
+export type ModelProviderRecord = ModelProvider;
+export type ModelDefaultConfigSaveInput = {
+  id: string;
+  organizationId: string;
+  config: Record<string, string>;
+  scopes: ModelDefaultScope[];
+  authorId: string | null;
+  createdAt?: Date;
+};
+export type ModelCostRecord = ModelCost;
 
 /** Persistence owned by Model Provider. No caller receives this repository. */
 export abstract class ModelProviderRepository {
   abstract tryFindById(input: {
     id: string;
     organizationId?: string;
-    projectId?: string;
+    projectScopes?: ModelDefaultScope[];
   }): Promise<ModelProvider | null>;
   abstract tryFindByProviderForProject(input: {
     provider: string;
-    projectId: string;
+    projectScopes: ModelDefaultScope[];
   }): Promise<ModelProvider | null>;
-  abstract listForProject(projectId: string): Promise<ModelProvider[]>;
+  abstract listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]>;
   abstract listForOrganization(organizationId: string): Promise<ModelProvider[]>;
-  abstract create(
-    input: Omit<ModelProvider, "createdAt" | "updatedAt">,
-  ): Promise<ModelProvider>;
-  abstract update(
-    input: Omit<ModelProvider, "createdAt" | "updatedAt">,
-  ): Promise<ModelProvider>;
+  abstract create(input: ModelProviderRecord): Promise<ModelProvider>;
+  abstract update(input: ModelProviderRecord): Promise<ModelProvider>;
   abstract delete(input: {
     id: string;
     organizationId?: string;
     projectId?: string;
   }): Promise<void>;
-  abstract tryResolveOrganizationId(input: {
-    projectId?: string;
-    organizationId?: string;
-  }): Promise<string | null>;
-  abstract resolveOrganizationIdForScopes(scopes: ModelDefaultScope[]): Promise<string>;
   abstract hasStoredCredentials(id: string): Promise<boolean>;
-}
-
-/** Application-owned policy for the defaults created with a new provider. */
-export abstract class ModelProviderOnboardingDefaults {
-  abstract seed(input: { provider: string; scopes: ModelDefaultScope[] }): Promise<void>;
+  isRoutingHandleConflict(_error: unknown): boolean {
+    return false;
+  }
 }
 
 /** Credential encoding is supplied by the application boundary. */
 export abstract class ModelProviderCredentialCodec {
   abstract encode(value: Record<string, unknown> | null): unknown;
-  abstract decode(value: unknown): Record<string, unknown> | null;
+  abstract tryDecode(value: unknown): Record<string, unknown> | null;
 }
 
 /**
@@ -72,7 +76,7 @@ export abstract class ModelProviderCredentialCodec {
  * this policy validates writes, preserves masked values, and redacts reads.
  */
 export abstract class ModelProviderCredentialPolicy {
-  abstract normalize(
+  abstract tryNormalize(
     provider: string,
     value: Record<string, unknown> | null,
   ): Record<string, unknown> | null;
@@ -80,8 +84,14 @@ export abstract class ModelProviderCredentialPolicy {
     incoming: Record<string, unknown> | null;
     stored: Record<string, unknown> | null;
   }): Record<string, unknown>;
-  abstract mask(value: Record<string, unknown> | null): Record<string, unknown> | null;
+  abstract tryMask(value: Record<string, unknown> | null): Record<string, unknown> | null;
   abstract hasUsableReplacement(value: Record<string, unknown> | null): boolean;
+  abstract assertCredentialsCanBeSaved(input: {
+    provider: string;
+    incoming: Record<string, unknown> | null;
+    stored: Record<string, unknown> | null;
+    storedCredentialsUnreadable: boolean;
+  }): void;
   abstract mergeHeaders(input: {
     incoming: Array<{ key: string; value: string }>;
     stored: Array<{ key: string; value: string }>;
@@ -100,61 +110,41 @@ export abstract class CodexTokenRefresher {
   >;
 }
 
+export abstract class ModelProviderConnectionRateLimiter {
+  abstract assertAvailable(input: { organizationId: string }): Promise<void>;
+}
+
 export abstract class ModelDefaultRepository {
-  abstract listForProject(projectId: string): Promise<ModelDefaultConfig[]>;
+  abstract listForProject(
+    projectScopes: ModelDefaultScope[],
+  ): Promise<ModelDefaultConfig[]>;
   abstract tryGetById(id: string): Promise<ModelDefaultConfig | null>;
-  abstract save(
-    input: Omit<ModelDefaultConfig, "createdAt" | "updatedAt" | "organizationId"> & {
-      createdAt?: Date;
-    },
-  ): Promise<ModelDefaultConfig>;
+  abstract tryFindByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig | null>;
+  abstract save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig>;
   abstract set(input: {
+    id: string;
+    organizationId: string;
     scope: ModelDefaultScope;
     key: string;
     model: string | null;
     authorId: string | null;
   }): Promise<void>;
   abstract delete(id: string): Promise<void>;
-  abstract tryResolve(input: {
-    projectId: string;
-    featureKey: string;
-  }): Promise<string | null>;
-  async getProjectContext(_projectId: string): Promise<{
-    teamId: string | null;
-    organizationId: string | null;
-    organizationName: string | null;
-  }> {
-    throw new Error("Project was not found");
-  }
-  async listForOrganization(organizationId: string): Promise<ModelDefaultConfig[]> {
-    return this.listForProject(organizationId);
-  }
-  async listOrganizationScopes(_organizationId: string): Promise<{
-    organization: { id: string; name: string } | null;
-    teams: { id: string; name: string }[];
-    projects: { id: string; name: string; teamId: string }[];
-  }> {
-    return { organization: null, teams: [], projects: [] };
-  }
+  abstract listForOrganization(organizationId: string): Promise<ModelDefaultConfig[]>;
 }
 
 export abstract class ModelCostRepository {
-  abstract listForProject(projectId: string): Promise<ModelCost[]>;
+  abstract listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]>;
   abstract tryFindById(id: string): Promise<ModelCost | null>;
-  abstract save(
-    input: Omit<ModelCost, "createdAt" | "updatedAt"> & { createdAt?: Date },
-  ): Promise<ModelCost>;
+  abstract save(input: ModelCostRecord): Promise<ModelCost>;
   abstract delete(id: string): Promise<void>;
-  abstract tryResolveOrganizationId(input: {
-    projectId: string;
-    scopeType?: ModelDefaultScope["scopeType"];
-    scopeId?: string;
-  }): Promise<string | null>;
 }
 
 /** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */
 export abstract class ModelProviderCatalog {
-  abstract exists(provider: string): boolean;
+  exists(provider: string): boolean {
+    return tryGetModelProviderDefinition(provider) !== null;
+  }
   abstract systemProviders(input: {
     projectId?: string;
     organizationId?: string;
@@ -163,47 +153,143 @@ export abstract class ModelProviderCatalog {
     provider: string,
     customKeys: Record<string, unknown>,
   ): Promise<ModelProviderApiKeyValidation>;
-  abstract testConnection(
+  async testConnection(
     provider: string,
     customKeys: Record<string, unknown>,
-  ): Promise<{ connected: boolean }>;
-  abstract tryMaskCredentials(
-    customKeys: Record<string, unknown> | null,
-  ): Record<string, unknown> | null;
-  metadata(_provider: string): {
+  ): Promise<{ connected: boolean }> {
+    const result = await this.validateApiKey(provider, customKeys);
+    return { connected: result.valid };
+  }
+  metadata(provider: string): {
     models: string[];
     embeddingsModels: string[];
     disabledByDefault?: boolean;
   } {
-    return { models: [], embeddingsModels: [] };
+    const definition = tryGetModelProviderDefinition(provider);
+
+    return {
+      models: getProviderModelOptions(provider, "chat").map((model) => model.value),
+      embeddingsModels: getProviderModelOptions(provider, "embedding").map(
+        (model) => model.value,
+      ),
+      disabledByDefault: definition?.type === "safety",
+    };
   }
   defaultFeatures(): ModelDefaultFeature[] {
-    return [];
+    return allFeatures().map(({ key, role, displayName, description }) => ({
+      key,
+      role,
+      displayName,
+      description,
+    }));
   }
   /** Expand aliases and reject models that are not valid for a feature/role. */
-  tryNormalizeDefaultModel(_input: { key: string; model: string }): string | null {
-    return _input.model;
+  tryNormalizeDefaultModel(input: { key: string; model: string }): string | null {
+    const model = expandLatestAlias(input.model);
+    if (isLatestAlias(input.model) && model === input.model) {
+      return null;
+    }
+
+    const allowed = isModelRole(input.key)
+      ? isModelAllowedAsRoleDefault(model, input.key)
+      : Boolean(
+          featureByKey(input.key) &&
+          isModelAllowedForFeature({ modelId: model, featureKey: input.key }),
+        );
+
+    return allowed ? model : null;
   }
   /** Optional onboarding suggestion used when no configured default exists. */
-  inferredDefaultsForProvider(_provider: string): Record<string, string> {
-    return {};
-  }
-  /** Immutable platform registry rates; custom overrides are span attributes. */
-  staticCostRates(): readonly ModelCostRate[] {
-    return [];
-  }
-  sanitizeDefaultConfig(input: Record<string, unknown>): Record<string, string> {
+  inferredDefaultsForProvider(provider: string): Record<string, string> {
+    const plan = buildProviderOnboardingDefaultPlan(provider);
     return Object.fromEntries(
-      Object.entries(input).filter(
-        (entry): entry is [string, string] =>
-          typeof entry[1] === "string" && entry[1].length > 0,
+      Object.entries(plan).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
       ),
     );
   }
-}
+  /** Immutable platform registry rates; custom overrides are span attributes. */
+  staticCostRates(): readonly ModelCostRate[] {
+    return getStaticModelCostRates();
+  }
+  sanitizeDefaultConfig(input: Record<string, unknown>): Record<string, string> {
+    const valid = new Set<string>([
+      "DEFAULT",
+      "FAST",
+      "LANGY",
+      "EMBEDDINGS",
+      ...allFeatures().map((feature) => feature.key),
+    ]);
+    const clean: Record<string, string> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (!valid.has(key) || typeof value !== "string" || value.length === 0) {
+        continue;
+      }
 
-export abstract class ManagedProviderService {
-  abstract isManagedProvider(organizationId: string, provider: string): boolean;
+      const allowed = isModelRole(key)
+        ? isModelAllowedAsRoleDefault(value, key)
+        : Boolean(
+            featureByKey(key) &&
+            isModelAllowedForFeature({ modelId: value, featureKey: key }),
+          );
+      if (!allowed) {
+        throw new ModelDefaultValidationError(
+          `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
+        );
+      }
+
+      clean[key] = value;
+    }
+
+    return clean;
+  }
+  tryNormalizeRoutingHandle(input: string | null): string | null {
+    return normalizeRoutingHandle(input);
+  }
+  tryGetRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
+    return routingHandleProblem(handle);
+  }
+  tryGetProviderDeprecation(provider: string): { replacement?: string } | null {
+    const deprecation = providerDeprecation(provider);
+    return deprecation ? { replacement: deprecation.replacedBy } : null;
+  }
+  isManagedProvider(_organizationId: string, _provider: string): boolean {
+    return false;
+  }
+  prepareExecution(input: {
+    parameters: Record<string, string>;
+    projectId: string;
+    model: string;
+    provider: string;
+  }): Promise<Record<string, string>> {
+    return Promise.resolve(input.parameters);
+  }
+  /**
+   * Reads a provider execution value from its stored credentials or injected
+   * process configuration. The package never reaches into environment state.
+   */
+  abstract tryGetExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null;
+  tryGetStoredExecutionValue(input: {
+    customKeys: Record<string, unknown> | null;
+    key: string;
+  }): string | null {
+    const value = input.customKeys?.[input.key];
+    return typeof value === "string" && value.length > 0 ? value : null;
+  }
+  tryGetExecutionDefinition(input: {
+    provider: string;
+  }): { apiKey: string; endpointKey: string | null } | null {
+    const definition = tryGetModelProviderDefinition(input.provider);
+    return definition
+      ? {
+          apiKey: definition.apiKey,
+          endpointKey: definition.endpointKey ?? null,
+        }
+      : null;
+  }
 }
 
 export abstract class ModelTranslationPort {
@@ -215,4 +301,7 @@ export abstract class ModelTranslationPort {
   }): Promise<string>;
 }
 
-export type ModelProviderIdGenerator = () => string;
+/** Generates identifiers for records owned by Model Provider. */
+export abstract class ModelProviderIdService {
+  abstract generate(input: { type: "provider" | "default" | "cost" }): string;
+}
