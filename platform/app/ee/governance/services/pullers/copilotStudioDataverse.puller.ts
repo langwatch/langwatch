@@ -390,10 +390,25 @@ function refusesNextLink(params: {
   const { link, environmentUrl, walk } = params;
   if (!link || isSameDataverseEnvironment(link, environmentUrl)) return false;
   walk.errorCount += 1;
+  // The host, not the URL: the refused link carries a skip token and query
+  // shape that add nothing here, and the host is the whole of what an
+  // operator needs to tell an attack apart from an environment that pages on
+  // a second address of its own. Without it this stall looks like a
+  // permissions problem and gets debugged as one.
   logger.error(
-    "copilot studio dataverse: refusing a next-page link outside the environment host",
+    { refusedHost: hostOf(link), environmentHost: hostOf(environmentUrl) },
+    "copilot studio dataverse: refusing a next-page link that is not the configured environment",
   );
   return true;
+}
+
+/** A URL's host for logging, never throwing on one that will not parse. */
+function hostOf(value: string): string {
+  try {
+    return new URL(value).host;
+  } catch {
+    return "unparseable";
+  }
 }
 
 export class CopilotStudioDataversePuller
