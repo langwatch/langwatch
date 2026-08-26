@@ -194,14 +194,21 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # misconfiguration produces unnamed conversations and total silence.
 
   @integration
-  Scenario: The trace claims nothing about which model answered
+  Scenario: The trace names the product, never the model the agent was running
     Given the agent's settings have not changed since the conversation
     When the puller records the conversation
-    Then the trace claims nothing about which model answered
-    # Written expecting a model and revised on the evidence: the agent record
-    # in the environment carries a name, a language, an authentication mode
-    # and dates, and no model. There is nothing to read, so the trace says
-    # nothing rather than reporting a field no query can fill.
+    Then every turn names the product "microsoft/copilot-studio" as its model
+    And no attribute reports which model the agent was configured with
+    # Written expecting a real model and revised on the evidence: the agent
+    # record in the environment carries a name, a language, an authentication
+    # mode and dates, and no model. There is nothing to read, so the trace
+    # reports no model rather than a field no query can fill.
+    #
+    # Both halves are the requirement, and stating only the second would be
+    # wrong: a product label IS emitted, on purpose. Cost enrichment runs on
+    # every `llm` span and a routed conversation stays free only because that
+    # label resolves to no price row — so "the trace says nothing about a
+    # model" would license deleting the attribute that keeps it free.
 
   @integration
   Scenario: A conversation whose agent was edited afterwards is flagged

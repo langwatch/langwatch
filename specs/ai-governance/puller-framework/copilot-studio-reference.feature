@@ -24,11 +24,19 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
   # Replaces "Admin enables Copilot Studio with one click". Creating one is no
   # longer possible and must not be: the type is out of the picker, and the
   # Dataverse feature requires it absent. What still has to hold is that a row
-  # created before the retirement keeps being scheduled and read.
-  Scenario: A source configured before the retirement keeps running
-    Given an IngestionSource row already exists with `sourceType = "copilot_studio"` + `pullConfig = <reference config>` + `pullSchedule = "*/15 * * * *"`
-    Then the process outbox keeps picking up its scheduled runs
-    And the picker never offers "Microsoft Copilot Studio" as a new source
+  # created before the retirement is still dispatchable.
+  #
+  # Narrowed from "keeps running", which had no trigger and asserted an
+  # ongoing state nothing can observe at a point in time. The observable
+  # property is the one that actually breaks when an adapter is deleted: the
+  # registry still answers for this id, so a scheduled run resolves an adapter
+  # instead of failing with "unknown ingestion pull adapter". Picker absence
+  # is not restated here — copilot-studio-dataverse.feature owns it, and that
+  # copy is the one with a test bound to it.
+  Scenario: A source configured before the retirement still resolves an adapter
+    Given an IngestionSource row already exists with `sourceType = "copilot_studio"` + `pullConfig.adapter = "copilot_studio"`
+    When the worker dispatches its scheduled run
+    Then the registry resolves the retired adapter rather than refusing the run
 
   Scenario: Reference config is locked + auditable
     Given the copilot_studio reference puller exists at `platform/app/ee/governance/services/pullers/copilotStudio.puller.ts`

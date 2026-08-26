@@ -774,20 +774,30 @@ describe("given a tool call the agent ran", () => {
 });
 
 describe("given what the agent was running", () => {
-  /** @scenario "The trace claims nothing about which model answered" */
-  it("says nothing about a model, because the bot row carries none", () => {
-    const spans = spansOf([
+  /** @scenario "The trace names the product, never the model the agent was running" */
+  it("names the product and reports no configured model", () => {
+    const events = [
       copilotEvent(transcriptRow({ activities: CHAT }), {
         botModifiedOn: "2026-08-20T10:00:00Z",
       }),
-    ]);
-    const attrs = attrsOf(spans[0]!);
+    ];
+    const attrs = attrsOf(spansOf(events)[0]!);
     // The `bot` table has no model column — see BotFacts. Asserting the
     // absence rather than deleting the case: the previous version of this
     // test injected a `botModel` no query produces and passed on data
     // production cannot emit.
     expect(attrs["copilot_studio.agent_model"]).toBeUndefined();
     expect(attrs["copilot_studio.agent_changed_since"]).toBeUndefined();
+
+    // The other half, and it has to be here rather than only in the pricing
+    // test below. Read alone, the absences above say "the trace reports no
+    // model", which would license deleting the product label — and that label
+    // is what keeps a routed conversation out of the price table.
+    for (const turn of turnSpansOf(events)) {
+      expect(attrsOf(turn)["gen_ai.request.model"]).toBe(
+        "microsoft/copilot-studio",
+      );
+    }
   });
 
   /** @scenario "A conversation whose agent was edited afterwards is flagged" */
