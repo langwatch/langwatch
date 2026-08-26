@@ -20,23 +20,35 @@ import {
   PRODUCTION_STORAGE_METER_TABLES,
   RETENTION_MANAGED_TABLES,
 } from "@langwatch/data-retention-server/retention-tables";
+import {
+  createStorageMeterIntegrationHarness,
+  type StorageMeterIntegrationHarness,
+} from "@langwatch/data-retention-server/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { StorageMeterService } from "../storageMeter.service";
 
 let ch: ClickHouseClient;
-let meter: StorageMeterService;
+let meter: StorageMeterIntegrationHarness;
+
+const totalRowsSchema = z.array(
+  z
+    .object({
+      total: z.union([z.string(), z.number()]).nullable().optional(),
+    })
+    .strict(),
+);
 
 const tenantId = `${nanoid()}-project`;
 
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  meter = new StorageMeterService({
+  meter = createStorageMeterIntegrationHarness({
     resolveClickHouseClient: async () => ch,
   });
 }, 60_000);
@@ -61,7 +73,7 @@ describe("given the production-metered table list", () => {
           query_params: { tenantId },
           format: "JSONEachRow",
         });
-        const rows = (await result.json()) as Array<{ total: string }>;
+        const rows = totalRowsSchema.parse(await result.json());
 
         expect(Number(rows[0]?.total ?? 0)).toBe(0);
       },
@@ -82,7 +94,7 @@ describe("given the production-metered table list", () => {
         query_params: { tenantId },
         format: "JSONEachRow",
       });
-      const rows = (await result.json()) as Array<{ total: string }>;
+      const rows = totalRowsSchema.parse(await result.json());
 
       expect(Number(rows[0]?.total ?? 0)).toBe(0);
     });
@@ -90,9 +102,7 @@ describe("given the production-metered table list", () => {
 
   describe("when the service reports a breakdown", () => {
     it("returns every category without degrading a table to zero", async () => {
-      const breakdown = await meter.getStorageBreakdown({ tenantId });
-
-      expect(breakdown).toEqual({
+      await expect(meter.getStorageBreakdown({ tenantId })).resolves.toEqual({
         totalBytes: 0,
         byCategory: { traces: 0, scenarios: 0, experiments: 0 },
       });

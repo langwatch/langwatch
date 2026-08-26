@@ -1,10 +1,11 @@
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Session } from "~/server/auth";
 
 const rbacMocks = vi.hoisted(() => ({ batchScopePermissions: vi.fn() }));
 vi.mock("~/server/api/rbac", () => rbacMocks);
 
-import { StorageMeterService } from "../storageMeter.service";
-import { resolveScopeStorageUsage } from "../storageMeter.read";
+import { resolveScopeStorageUsage, type ReadCtx } from "../storage-meter.read";
 
 /**
  * The storage card must reflect the scope selector. `resolveScopeStorageUsage`
@@ -14,15 +15,39 @@ import { resolveScopeStorageUsage } from "../storageMeter.read";
  * already allowed to read.
  */
 describe("resolveScopeStorageUsage", () => {
-  const session = { user: { id: "user_alice" } } as any;
+  const session = {
+    user: { id: "user_alice" },
+    expires: "2099-01-01T00:00:00.000Z",
+  } satisfies Session;
   const prisma = {
     project: { findFirst: vi.fn(), findMany: vi.fn() },
-  } as any;
-  const ctx = { prisma, session };
-  const storageMeter = new StorageMeterService({ resolveClickHouseClient: null });
-  const getTotalStorageBytes = vi.spyOn(storageMeter, "getTotalStorageBytes");
+  };
+  const ctx = { prisma, session } as ReadCtx;
+  const dataRetention = {
+    getResolvedForProject: vi.fn(),
+    getRetentionDays: vi.fn(),
+    previewScopeRemoval: vi.fn(),
+    listOrganizationRules: vi.fn(),
+    tryGetPolicyById: vi.fn(),
+    setForScope: vi.fn(),
+    removeForScope: vi.fn(),
+    pin: vi.fn(),
+    unpin: vi.fn(),
+    autoPin: vi.fn(),
+    autoUnpin: vi.fn(),
+    isPinned: vi.fn(),
+    tryGetPin: vi.fn(),
+    listByProject: vi.fn(),
+    getPinnedTraceIds: vi.fn(),
+    triggerRetroactiveUpdate: vi.fn(),
+    getRetroactiveMutationProgress: vi.fn(),
+    killRetroactiveMutation: vi.fn(),
+    getTotalStorageBytes: vi.fn(),
+    getTotalStorageBytesForTenants: vi.fn(),
+  } satisfies DataRetentionService;
+  const getTotalStorageBytes = vi.spyOn(dataRetention, "getTotalStorageBytes");
   const getTotalStorageBytesForTenants = vi.spyOn(
-    storageMeter,
+    dataRetention,
     "getTotalStorageBytesForTenants",
   );
 
@@ -32,7 +57,7 @@ describe("resolveScopeStorageUsage", () => {
       team: { organizationId: "org_1" },
     });
     getTotalStorageBytesForTenants.mockImplementation(
-      async (ids: string[]) => ids.length * 100,
+      async ({ tenantIds }: { tenantIds: string[] }) => tenantIds.length * 100,
     );
   });
 
@@ -53,12 +78,14 @@ describe("resolveScopeStorageUsage", () => {
         ]),
       });
 
-      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
+      const result = await resolveScopeStorageUsage(ctx, dataRetention, {
         projectId: "proj_a",
         scope: { scopeType: "ORGANIZATION", scopeId: "org_1" },
       });
 
-      expect(getTotalStorageBytesForTenants).toHaveBeenCalledWith(["proj_a", "proj_c"]);
+      expect(getTotalStorageBytesForTenants).toHaveBeenCalledWith({
+        tenantIds: ["proj_a", "proj_c"],
+      });
       expect(result).toEqual({ totalBytes: 200, projectCount: 2 });
     });
 
@@ -69,7 +96,7 @@ describe("resolveScopeStorageUsage", () => {
         projects: new Map(),
       });
 
-      await resolveScopeStorageUsage(ctx, storageMeter, {
+      await resolveScopeStorageUsage(ctx, dataRetention, {
         projectId: "proj_a",
         scope: { scopeType: "ORGANIZATION", scopeId: "org_1" },
       });
@@ -99,7 +126,7 @@ describe("resolveScopeStorageUsage", () => {
         ]),
       });
 
-      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
+      const result = await resolveScopeStorageUsage(ctx, dataRetention, {
         projectId: "proj_b",
         scope: { scopeType: "TEAM", scopeId: "team_b" },
       });
@@ -120,7 +147,7 @@ describe("resolveScopeStorageUsage", () => {
       // org-constrained query returns nothing for a scopeId in another org
       prisma.project.findMany.mockResolvedValue([]);
 
-      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
+      const result = await resolveScopeStorageUsage(ctx, dataRetention, {
         projectId: "proj_a",
         scope: { scopeType: "PROJECT", scopeId: "proj_in_other_org" },
       });
@@ -136,7 +163,7 @@ describe("resolveScopeStorageUsage", () => {
       prisma.project.findFirst.mockResolvedValue({ team: null });
       getTotalStorageBytes.mockResolvedValue(512);
 
-      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
+      const result = await resolveScopeStorageUsage(ctx, dataRetention, {
         projectId: "proj_personal",
         scope: { scopeType: "PROJECT", scopeId: "proj_personal" },
       });

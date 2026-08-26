@@ -1,3 +1,4 @@
+import type { ClickHouseClient, QueryParams } from "@clickhouse/client";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
@@ -8,6 +9,9 @@ import type { DataRetentionDatabasePort } from "../ports/data-retention-database
 import { PrismaDataRetentionRepository } from "../repositories/prisma/prisma.data-retention.repository";
 import { PrismaPinnedTraceRepository } from "../repositories/prisma/prisma.pinned-trace.repository";
 import { DataRetentionService } from "../services/data-retention.service";
+import { StorageMeterService } from "../services/storage-meter.service";
+import type { StorageMeterClickHouseClient } from "../ports/storage-meter-clickhouse.port";
+import type { StorageMeterRedis } from "../stores/storage-meter-cache.store";
 import {
   ClickHouseRetroactiveRetentionAdapter,
   type TenantClickHouseClientResolver,
@@ -19,10 +23,21 @@ export class PrismaDataRetentionAdapter {
     projects: ProjectService;
     organizations: OrganizationService;
     defaultRetentionDays: number;
-    redis?: DataRetentionRedis | null;
+    redis?: (DataRetentionRedis & StorageMeterRedis) | null;
     cacheTtlMs?: number;
     resolveClickHouseClient?: TenantClickHouseClientResolver | null;
   }): DataRetentionService {
+    const resolveClickHouseClient = options.resolveClickHouseClient;
+    const storageMeter = StorageMeterService.create({
+      resolveClickHouseClient: resolveClickHouseClient
+        ? async (tenantId) => {
+            const client = await resolveClickHouseClient(tenantId);
+            return PrismaDataRetentionAdapter.adaptMeterClient(client);
+          }
+        : null,
+      redis: options.redis,
+    });
+
     return DataRetentionService.create({
       repository: PrismaDataRetentionRepository.create(options),
       projects: options.projects,
@@ -36,6 +51,18 @@ export class PrismaDataRetentionAdapter {
         redis: options.redis,
         ttlMs: options.cacheTtlMs ?? 60_000,
       }),
+      storageMeter,
     });
+  }
+
+  private static adaptMeterClient(
+    client: ClickHouseClient,
+  ): StorageMeterClickHouseClient {
+    return {
+      query: async (input: QueryParams) => {
+        const result = await client.query(input);
+        return { json: () => result.json<unknown>() };
+      },
+    };
   }
 }

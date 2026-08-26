@@ -1,4 +1,3 @@
-export { StorageMeterService } from "./metering/storageMeter.service";
 export {
   PRODUCTION_STORAGE_METER_TABLES,
   RETENTION_MANAGED_TABLES,

@@ -1,32 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
 import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-server/retention-tables";
-import { StorageMeterService } from "../storageMeter.service";
+import { StorageMeterService } from "../src/services/storage-meter.service";
+import type {
+  StorageMeterClickHouseClient,
+  StorageMeterQuery,
+} from "../src/ports/storage-meter-clickhouse.port";
 
-/**
- * The metering reads sum a lazily-recomputed MATERIALIZED byteSize(...) column
- * across heavy payload columns, which exceeded the ClickHouse per-query memory
- * limit for large tenants. Every metering query must carry the bounded-memory
- * settings (capped read streams) so the recompute stays within budget instead
- * of failing the read.
- */
 describe("StorageMeterService memory guard", () => {
   function makeService() {
     const query = vi.fn().mockResolvedValue({
       json: async () => [{ total: "42" }],
     });
-    const client = { query } as const;
-    const service = new StorageMeterService({
-      resolveClickHouseClient: async () => client as any,
+    const client = { query } satisfies StorageMeterClickHouseClient;
+    const service = StorageMeterService.create({
+      resolveClickHouseClient: async () => client,
     });
     return { service, query };
   }
 
   function assertGuarded(call: { clickhouse_settings?: Record<string, unknown> }) {
-    expect(call.clickhouse_settings).toBeDefined();
-    expect(call.clickhouse_settings!.max_threads).toBe(2);
-    // A coarse guardrail so a runaway byteSize recompute can't grind for a
-    // minute; a materialized read finishes in seconds, well under this.
-    expect(call.clickhouse_settings!.max_execution_time).toBe(45);
+    const settings = call.clickhouse_settings;
+    expect(settings).toBeDefined();
+    if (!settings) {
+      return;
+    }
+
+    expect(settings.max_threads).toBe(2);
+    expect(settings.max_execution_time).toBe(45);
   }
 
   describe("when computing the per-category storage breakdown", () => {
@@ -47,8 +47,9 @@ describe("StorageMeterService memory guard", () => {
           { total: query.includes("FROM langy_analytics_events") ? "17" : "0" },
         ],
       }));
-      const service = new StorageMeterService({
-        resolveClickHouseClient: async () => ({ query }) as any,
+      const service = StorageMeterService.create({
+        resolveClickHouseClient: async () =>
+          ({ query }) satisfies StorageMeterClickHouseClient,
       });
 
       const breakdown = await service.getStorageBreakdown({
@@ -84,13 +85,15 @@ describe("StorageMeterService memory guard", () => {
       const resolver = vi.fn(async (tenantId: string) => {
         if (failing.has(tenantId)) throw new Error("cluster unreachable");
         return {
-          query: vi.fn(async (arg: { query_params: { tenantId: string } }) => ({
-            json: async () => [{ total: String(totals[arg.query_params.tenantId] ?? 0) }],
+          query: vi.fn(async (arg: StorageMeterQuery) => ({
+            json: async () => [
+              { total: String(totals[String(arg.query_params.tenantId)] ?? 0) },
+            ],
           })),
-        } as any;
+        } satisfies StorageMeterClickHouseClient;
       });
       return {
-        service: new StorageMeterService({ resolveClickHouseClient: resolver }),
+        service: StorageMeterService.create({ resolveClickHouseClient: resolver }),
         resolver,
       };
     }
@@ -98,7 +101,9 @@ describe("StorageMeterService memory guard", () => {
     it("sums each tenant's total", async () => {
       const { service } = makeMultiTenantService({ a: 10, b: 20, c: 30 });
 
-      const total = await service.getTotalStorageBytesForTenants(["a", "b", "c"]);
+      const total = await service.getTotalStorageBytesForTenants({
+        tenantIds: ["a", "b", "c"],
+      });
 
       expect(total).toBe(60);
     });
@@ -106,7 +111,9 @@ describe("StorageMeterService memory guard", () => {
     it("counts each tenant once even if passed twice", async () => {
       const { service, resolver } = makeMultiTenantService({ a: 10, b: 20 });
 
-      const total = await service.getTotalStorageBytesForTenants(["a", "a", "b"]);
+      const total = await service.getTotalStorageBytesForTenants({
+        tenantIds: ["a", "a", "b"],
+      });
 
       expect(total).toBe(30);
       // 'a' resolved once despite appearing twice in the input
@@ -116,7 +123,7 @@ describe("StorageMeterService memory guard", () => {
     it("returns 0 for an empty tenant list without querying", async () => {
       const { service, resolver } = makeMultiTenantService({});
 
-      const total = await service.getTotalStorageBytesForTenants([]);
+      const total = await service.getTotalStorageBytesForTenants({ tenantIds: [] });
 
       expect(total).toBe(0);
       expect(resolver).not.toHaveBeenCalled();
@@ -125,7 +132,9 @@ describe("StorageMeterService memory guard", () => {
     it("degrades a failing tenant to 0 instead of failing the scope total", async () => {
       const { service } = makeMultiTenantService({ a: 10, b: 20, c: 30 }, new Set(["b"]));
 
-      const total = await service.getTotalStorageBytesForTenants(["a", "b", "c"]);
+      const total = await service.getTotalStorageBytesForTenants({
+        tenantIds: ["a", "b", "c"],
+      });
 
       expect(total).toBe(40);
     });
@@ -134,19 +143,17 @@ describe("StorageMeterService memory guard", () => {
   describe("given the stale-while-revalidate cache", () => {
     const FRESH_MS = 5 * 60 * 1000;
 
-    // A service whose clock we control and whose query returns the next value
-    // from `totals` on each call, so we can assert fresh/stale/refresh timing
-    // without waiting real time.
     function makeClockService(totals: number[]) {
       let t = 0;
       let call = 0;
       const query = vi.fn(async () => {
-        const total = totals[Math.min(call, totals.length - 1)]!;
+        const total = totals[Math.min(call, totals.length - 1)] ?? 0;
         call += 1;
         return { json: async () => [{ total: String(total) }] };
       });
-      const service = new StorageMeterService({
-        resolveClickHouseClient: async () => ({ query }) as any,
+      const service = StorageMeterService.create({
+        resolveClickHouseClient: async () =>
+          ({ query }) satisfies StorageMeterClickHouseClient,
         now: () => t,
       });
       return { service, query, advance: (ms: number) => (t += ms) };
@@ -212,9 +219,9 @@ describe("StorageMeterService memory guard", () => {
         const resolver = vi.fn(async () => {
           resolverCall += 1;
           if (resolverCall >= 2) throw new Error("cluster unreachable");
-          return { query } as any;
+          return { query } satisfies StorageMeterClickHouseClient;
         });
-        const service = new StorageMeterService({
+        const service = StorageMeterService.create({
           resolveClickHouseClient: resolver,
           now: () => t,
         });
@@ -243,9 +250,9 @@ describe("StorageMeterService memory guard", () => {
         const resolver = vi.fn(async () => {
           resolverCall += 1;
           if (resolverCall === 1) throw new Error("cluster unreachable");
-          return { query } as any;
+          return { query } satisfies StorageMeterClickHouseClient;
         });
-        const service = new StorageMeterService({
+        const service = StorageMeterService.create({
           resolveClickHouseClient: resolver,
           now: () => t,
         });
@@ -276,8 +283,8 @@ describe("StorageMeterService memory guard", () => {
           return { json: async () => [{ total: "10" }] };
         });
         const client = { query } as const;
-        const service = new StorageMeterService({
-          resolveClickHouseClient: async () => client as any,
+        const service = StorageMeterService.create({
+          resolveClickHouseClient: async () => client,
         });
 
         const total = await service.getTotalStorageBytes({

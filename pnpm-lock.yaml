@@ -1844,6 +1844,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract

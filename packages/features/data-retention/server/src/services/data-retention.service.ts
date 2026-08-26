@@ -33,6 +33,7 @@ import { DataRetentionRepository } from "../repositories/data-retention.reposito
 import { PinnedTraceRepository } from "../repositories/pinned-trace.repository";
 import { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository";
 import type { DataRetentionCacheStore } from "../stores/data-retention-cache.store";
+import { StorageMeterService } from "./storage-meter.service";
 
 export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
 
@@ -45,6 +46,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     pinRepository: PinnedTraceRepository;
     retroactiveRepository?: RetroactiveRetentionRepository | null;
     cache?: DataRetentionCacheStore;
+    storageMeter?: StorageMeterService;
   }): DataRetentionService {
     return new DataRetentionService(
       options.repository,
@@ -53,6 +55,8 @@ export class DataRetentionService extends DataRetentionServiceContract {
       platformDefaultRetentionDaysSchema.parse(options.defaultRetentionDays),
       options.pinRepository,
       options.retroactiveRepository ?? null,
+      options.storageMeter ??
+        StorageMeterService.create({ resolveClickHouseClient: null }),
       options.cache,
     );
   }
@@ -64,6 +68,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     private readonly defaultRetentionDays: number,
     private readonly pinRepository: PinnedTraceRepository,
     private readonly retroactiveRepository: RetroactiveRetentionRepository | null,
+    private readonly storageMeter: StorageMeterService,
     private readonly cache?: DataRetentionCacheStore,
   ) {
     super();
@@ -235,6 +240,14 @@ export class DataRetentionService extends DataRetentionServiceContract {
   async killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void> {
     const parsed = killRetroactiveMutationInputSchema.parse(input);
     await this.retroactiveRepository?.killMutation(parsed);
+  }
+
+  getTotalStorageBytes(input: { tenantId: string }): Promise<number> {
+    return this.storageMeter.getTotalStorageBytes(input);
+  }
+
+  getTotalStorageBytesForTenants(input: { tenantIds: string[] }): Promise<number> {
+    return this.storageMeter.getTotalStorageBytesForTenants(input);
   }
 
   private defaultRetention(): ResolvedRetention {

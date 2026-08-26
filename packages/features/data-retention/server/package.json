@@ -17,6 +17,10 @@
     "./retention-tables": {
       "types": "./src/adapters/clickhouse.retention-table.adapter.ts",
       "default": "./src/adapters/clickhouse.retention-table.adapter.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -27,6 +31,7 @@
   "dependencies": {
     "@clickhouse/client": "^1.23.0",
     "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "zod": "^4.4.3"

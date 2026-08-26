@@ -147,6 +147,16 @@ export type RetroactiveMutationProjectInput = z.infer<
   typeof retroactiveMutationProjectInputSchema
 >;
 
+export const storageMeterTenantInputSchema = z
+  .object({ tenantId: z.string().min(1) })
+  .strict();
+export type StorageMeterTenantInput = z.infer<typeof storageMeterTenantInputSchema>;
+
+export const storageMeterTenantsInputSchema = z
+  .object({ tenantIds: z.array(z.string().min(1)) })
+  .strict();
+export type StorageMeterTenantsInput = z.infer<typeof storageMeterTenantsInputSchema>;
+
 export const killRetroactiveMutationInputSchema = z
   .object({
     projectId: z.string().min(1),

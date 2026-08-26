@@ -61,7 +61,6 @@ import type { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/
 import type { GovernanceOcsfEventsClickHouseRepository } from "~/runtime/app/features/governance/governance-ocsf-events.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/features/governance/governance-trace-activity.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
-import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
@@ -373,7 +372,6 @@ export interface AppDependencies {
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
   dataRetention: DataRetentionDependencies;
-  storageMeter: StorageMeterService;
   share: ShareService;
   commands: AppCommands;
   ops: OpsDependencies;

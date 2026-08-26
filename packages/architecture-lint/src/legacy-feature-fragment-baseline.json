@@ -863,12 +863,7 @@
     },
     {
       "feature": "data-retention",
-      "file": "platform/app/src/server/data-retention/metering/storageMeter.read.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "data-retention",
-      "file": "platform/app/src/server/data-retention/metering/storageMeter.service.ts",
+      "file": "platform/app/src/server/data-retention/metering/storage-meter.read.ts",
       "kind": "legacy-implementation"
     },
     {

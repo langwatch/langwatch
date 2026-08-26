@@ -227,7 +227,6 @@ import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { PrismaDataRetentionAdapter } from "@langwatch/data-retention-server";
 import { AppEventingRetentionAdapter } from "~/runtime/app/features/eventing-retention.adapter";
 import { PostgresShareAdapter } from "@langwatch/share-server";
-import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { PostgresAutomationGraphDeliveryAdapter } from "@langwatch/automation-server";
 import { createAutomationGraphPorts } from "~/runtime/app/features/automation-graph-ports";
@@ -1061,9 +1060,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       })
     : undefined;
 
-  const storageMeterService = new StorageMeterService({
-    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
-  });
   const dataRetention: DataRetentionDependencies = dataRetentionService;
 
   const langyAdapter = PostgresLangyAdapter.create({ database: prisma });
@@ -2162,7 +2158,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     nurturing,
     usageLimits,
     dataRetention,
-    storageMeter: storageMeterService,
     share,
     commands,
     ops,
@@ -2463,7 +2458,6 @@ export function createTestApp(
     processStore: new PrismaProcessStore(testPrisma),
   }).build();
   const testDataRetention: DataRetentionDependencies = testDataRetentionService;
-  const testStorageMeter = new StorageMeterService({ resolveClickHouseClient: null });
   const testScim = PostgresScimAdapter.create({
     database: testPrisma,
     writer: testAuthz.grants,
@@ -2834,7 +2828,6 @@ export function createTestApp(
       },
     },
     dataRetention: testDataRetention,
-    storageMeter: testStorageMeter,
     share: testShare,
     _authzMigration: testAuthz.migration,
     ...overrides,

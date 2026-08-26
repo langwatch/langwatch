@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
-import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
+import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storage-meter.read";
 import {
   assertCanDisableRetention,
   assertCanWriteRetentionScope,
@@ -264,7 +264,7 @@ export const dataRetentionRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), scope: scopeInput }))
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      return resolveScopeStorageUsage(ctx, ctx.app.storageMeter, {
+      return resolveScopeStorageUsage(ctx, ctx.app.dataRetention, {
         projectId: input.projectId,
         scope: input.scope,
       });

@@ -2,7 +2,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { batchScopePermissions } from "~/server/api/rbac";
 import type { Session } from "~/server/auth";
 import type { ScopeTier } from "~/server/scopes/scope.types";
-import type { StorageMeterService } from "./storageMeter.service";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };
 
@@ -24,11 +24,11 @@ export type StorageScopeUsage = {
  * batched permission check — so a wider scope can never surface a project's
  * storage the caller couldn't otherwise see. Summing delegates to the metering
  * service's per-tenant path, which keeps the hardened ClickHouse settings and
- * the 5-minute cache (see storageMeter.service.ts).
+ * the 5-minute cache owned by the Data Retention service.
  */
 export async function resolveScopeStorageUsage(
   ctx: ReadCtx,
-  metering: StorageMeterService,
+  dataRetention: DataRetentionService,
   params: {
     projectId: string;
     scope: { scopeType: ScopeTier; scopeId: string };
@@ -45,7 +45,7 @@ export async function resolveScopeStorageUsage(
   // Personal-account project (no org): the scope can only be the project
   // itself, already authorized by the route's project:view guard.
   if (!organizationId) {
-    const totalBytes = await metering.getTotalStorageBytes({
+    const totalBytes = await dataRetention.getTotalStorageBytes({
       tenantId: projectId,
     });
     return { totalBytes, projectCount: 1 };
@@ -87,6 +87,8 @@ export async function resolveScopeStorageUsage(
     .map((p) => p.id)
     .filter((id) => projects.get(id) === true);
 
-  const totalBytes = await metering.getTotalStorageBytesForTenants(authorizedIds);
+  const totalBytes = await dataRetention.getTotalStorageBytesForTenants({
+    tenantIds: authorizedIds,
+  });
   return { totalBytes, projectCount: authorizedIds.length };
 }

@@ -20,9 +20,10 @@ retroactive retention mutations.
 The contract exports Zod 4 values, errors, and one `DataRetentionService`.
 The web package exports reusable transport-free settings presentation. App
 tRPC and pages remain compatibility composition until the physical app split.
-Metering and policy-authorisation adapters remain app migration debt. The
-feature server owns the ClickHouse table catalogue; legacy TTL and metering
-callers use its narrow compatibility export until those slices move.
+Metering is a private collaborator of the feature service. The app retains only
+the RBAC-aware scope read composition and its live ClickHouse integration
+harness until the physical app split. The feature server owns the ClickHouse
+table catalogue.
 
 ## Dependencies
 

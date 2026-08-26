@@ -9,6 +9,8 @@ import type {
   RetentionCategory,
   RetentionPolicy,
   ScopeAssignment,
+  StorageMeterTenantInput,
+  StorageMeterTenantsInput,
   UnpinTraceInput,
 } from "./data-retention";
 
@@ -77,4 +79,8 @@ export abstract class DataRetentionService {
     input: RetroactiveMutationProjectInput,
   ): Promise<RetroactiveMutationProgress[]>;
   abstract killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void>;
+  abstract getTotalStorageBytes(input: StorageMeterTenantInput): Promise<number>;
+  abstract getTotalStorageBytesForTenants(
+    input: StorageMeterTenantsInput,
+  ): Promise<number>;
 }
