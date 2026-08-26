@@ -247,6 +247,22 @@ Feature: The Results tab
     Then an empty state says there is no run in this period
     And it offers to widen the period
 
+  # --- Loading and gating ---
+
+  @integration
+  Scenario: A plan opened on a hard reload never flashes a not-found state
+    Given a URL that names a run plan the store has not read yet
+    When the Results tab loads
+    Then a skeleton reads while every plans query is still on its way
+    And the plans list never reads for the frame before the plan record arrives
+
+  @integration
+  Scenario: The plans list shows on its own once every plans query settles
+    Given a URL that names a plan and every plans query has answered empty
+    When the Results tab loads
+    Then the skeleton reads no more
+    And the empty "no runs yet" state reads on the tab
+
   # --- Stalled runs ---
 
   @integration

@@ -233,7 +233,12 @@ function SideBySideContent({ detail }: { detail: RunDetail }) {
       <Box style={{ overflowY: "auto" }} data-testid="wide-drawer-conversation">
         <ConversationSection detail={detail} />
       </Box>
-      <Box style={{ overflowY: "auto" }} data-testid="wide-drawer-results">
+      <Box
+        style={{ overflowY: "auto" }}
+        borderLeftWidth="1px"
+        borderColor="border.muted"
+        data-testid="wide-drawer-results"
+      >
         <ResultsSection detail={detail} isFirst />
         <Accordion.Root multiple defaultValue={["parameters"]}>
           <ParametersSection detail={detail} />

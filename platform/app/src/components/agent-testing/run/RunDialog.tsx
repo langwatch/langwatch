@@ -53,8 +53,35 @@ function isRunBlocked({
 }): boolean {
   if (controller.isBusy) return true;
   if (isNoteTooLong(form.note) || form.hasMissingSecrets) return true;
+  if (form.caseCount === 0) return true;
   if (form.target) return false;
   return subject?.kind === "case" || !controller.hasAnyTarget;
+}
+
+/**
+ * Why the run cannot start, in one sentence. Empty when the run can start, or
+ * when the block is one the field-level errors already speak to.
+ */
+function runBlockedReason({
+  subject,
+  form,
+  controller,
+}: {
+  subject: RunDialogSubject | null;
+  form: RunDialogForm;
+  controller: RunDialogController;
+}): string | null {
+  if (controller.isBusy) return null;
+  if (form.caseCount === 0) {
+    if (subject?.kind === "suite") {
+      return "This test suite holds no test case to run.";
+    }
+    return "The scope holds no test case to run.";
+  }
+  if (!form.target && (subject?.kind === "case" || !controller.hasAnyTarget)) {
+    return "Choose an agent to run against.";
+  }
+  return null;
 }
 
 export function RunDialog({
@@ -118,6 +145,7 @@ export function RunDialog({
           controller={controller}
           hasTarget={!!form.target}
           isRunBlocked={isRunBlocked({ subject, form, controller })}
+          blockedReason={runBlockedReason({ subject, form, controller })}
           caseCount={form.caseCount}
           onClose={onClose}
         />

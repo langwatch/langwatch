@@ -100,19 +100,19 @@ export function ScenarioRunActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content minWidth="200px">
-            {onOpenInTraces && (
-              <Menu.Item value="open-in-traces" onClick={onOpenInTraces}>
-                <HStack gap={2}>
-                  <Icon as={ListTree} boxSize={3.5} />
-                  <Text>View conversation in Trace Explorer</Text>
-                </HStack>
-              </Menu.Item>
-            )}
             {onOpenThread && (
               <Menu.Item value="open-thread" onClick={onOpenThread}>
                 <HStack gap={2}>
                   <Icon as={MessagesSquare} boxSize={3.5} />
-                  <Text>Open thread</Text>
+                  <Text>Open Traces</Text>
+                </HStack>
+              </Menu.Item>
+            )}
+            {onOpenInTraces && (
+              <Menu.Item value="open-in-traces" onClick={onOpenInTraces}>
+                <HStack gap={2}>
+                  <Icon as={ListTree} boxSize={3.5} />
+                  <Text>View in Traces Explorer</Text>
                 </HStack>
               </Menu.Item>
             )}

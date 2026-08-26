@@ -255,7 +255,7 @@ describe("the run plan dialog", () => {
 
       await user.click(screen.getByTestId("plan-scope-cases"));
       expect(screen.getByText("Checkout")).toBeInTheDocument();
-      expect(screen.getByText("Unfiled test cases")).toBeInTheDocument();
+      expect(screen.getByText("No test suite")).toBeInTheDocument();
       expect(screen.getByText("0 test cases will run.")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("plan-scope-case-scen_1"));

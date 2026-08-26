@@ -17,6 +17,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { RunDrawerContent } from "./RunDrawerContent";
 import { RunDrawerHeaderBand } from "./RunDrawerHeaderBand";
+import { RunDrawerLoadingBody } from "./RunDrawerLoadingBody";
 import { RunDrawerQueuedBody } from "./RunDrawerQueuedBody";
 import {
   type RunDrawerState,
@@ -36,6 +37,14 @@ function RunDrawerBody({
   const { detail, scenarioState } = state;
 
   if (!scenarioState) {
+    // While the tRPC query is on its way, the drawer must not read as
+    // "Queued": that is a valid scenario status, not a "we are still
+    // fetching" signal. Show the same skeleton the drawer would show for
+    // any loading section, and switch to the queued read only once the
+    // record confirms the run is really queued.
+    if (detail.isRunStateLoading && !detail.runStateError) {
+      return <RunDrawerLoadingBody />;
+    }
     return (
       <RunDrawerQueuedBody
         error={detail.runStateError}

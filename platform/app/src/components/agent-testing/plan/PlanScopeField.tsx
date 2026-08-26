@@ -131,22 +131,24 @@ function LabelChoices({ editor }: { editor: PlanEditorState }) {
 
   return (
     <HStack gap={1.5} flexWrap="wrap" data-testid="plan-scope-labels-list">
-      {suiteForm.allLabels.map((label) => (
-        <chakra.button
-          key={label}
-          type="button"
-          cursor="pointer"
-          borderRadius="full"
-          boxShadow={QUIET_BUTTON_SHADOW}
-          opacity={chosen.includes(label) ? 1 : 0.4}
-          _hover={{ opacity: chosen.includes(label) ? 1 : 0.7 }}
-          aria-pressed={chosen.includes(label)}
-          onClick={() => suiteForm.toggleScopeLabel(label)}
-          data-testid={`plan-scope-label-${label}`}
-        >
-          <TagPill label={label} tone="pastel" />
-        </chakra.button>
-      ))}
+      {suiteForm.allLabels.map((label) => {
+        const isChosen = chosen.includes(label);
+        return (
+          <chakra.button
+            key={label}
+            type="button"
+            cursor="pointer"
+            borderRadius="full"
+            boxShadow={QUIET_BUTTON_SHADOW}
+            _hover={{ opacity: isChosen ? 1 : 0.85 }}
+            aria-pressed={isChosen}
+            onClick={() => suiteForm.toggleScopeLabel(label)}
+            data-testid={`plan-scope-label-${label}`}
+          >
+            <TagPill label={label} tone={isChosen ? "pastel" : "neutral"} />
+          </chakra.button>
+        );
+      })}
     </HStack>
   );
 }
@@ -187,8 +189,12 @@ function CaseChoices({ editor }: { editor: PlanEditorState }) {
     <VStack
       align="stretch"
       gap={2}
-      maxHeight="160px"
+      maxHeight="200px"
       overflowY="auto"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      padding={2}
       data-testid="plan-scope-cases-list"
     >
       {groups.map((group) => (

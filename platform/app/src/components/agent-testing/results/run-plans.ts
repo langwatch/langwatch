@@ -77,7 +77,7 @@ export type RunPlan = {
 export function planScopeNote(kind: RunPlanKind): string {
   if (kind === "external") return "External set · runs from code";
   if (kind === "one-off") return "Single test cases, run one at a time";
-  return "Test suite";
+  return "Run plan";
 }
 
 /** The suite fields a run plan is built from. */

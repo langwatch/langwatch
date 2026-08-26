@@ -11,6 +11,7 @@
 import { Box, chakra } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
+import { Tooltip } from "~/components/ui/tooltip";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { RunDialogController } from "./useRunDialogSubmit";
@@ -26,6 +27,7 @@ export function RunDialogFooter({
   hasTarget,
   isRunBlocked,
   caseCount,
+  blockedReason,
   onClose,
 }: {
   controller: RunDialogController;
@@ -33,8 +35,32 @@ export function RunDialogFooter({
   isRunBlocked: boolean;
   /** How many test cases the run covers, or nothing when it is not known. */
   caseCount: number | null;
+  /** Why the run cannot start, when it cannot. Shown as the button tooltip. */
+  blockedReason: string | null;
   onClose: () => void;
 }) {
+  const runButton = (
+    <SmallButton
+      variant="solid"
+      colorPalette="blue"
+      background={undefined}
+      borderColor="transparent"
+      disabled={isRunBlocked}
+      loading={controller.isRunning}
+      onClick={() => void controller.run()}
+      // A disabled solid button must not brighten on hover: pointer-events
+      // stay off so the hover state cannot fire at all.
+      _disabled={{
+        cursor: "not-allowed",
+        opacity: 0.5,
+        pointerEvents: "none",
+      }}
+      data-testid="run-dialog-run"
+    >
+      <Play size={13} />
+      {runButtonLabel(caseCount)}
+    </SmallButton>
+  );
   return (
     <Dialog.Footer
       borderTopWidth="1px"
@@ -68,19 +94,18 @@ export function RunDialogFooter({
       >
         Save
       </SmallButton>
-      <SmallButton
-        variant="solid"
-        colorPalette="blue"
-        background={undefined}
-        borderColor="transparent"
-        disabled={isRunBlocked}
-        loading={controller.isRunning}
-        onClick={() => void controller.run()}
-        data-testid="run-dialog-run"
-      >
-        <Play size={13} />
-        {runButtonLabel(caseCount)}
-      </SmallButton>
+      {isRunBlocked && blockedReason ? (
+        <Tooltip content={blockedReason}>
+          {/* A disabled button never dispatches pointer events, which would
+              keep the tooltip from firing; wrap it in a span so the hover
+              still lands on something. */}
+          <Box as="span" display="inline-flex">
+            {runButton}
+          </Box>
+        </Tooltip>
+      ) : (
+        runButton
+      )}
     </Dialog.Footer>
   );
 }

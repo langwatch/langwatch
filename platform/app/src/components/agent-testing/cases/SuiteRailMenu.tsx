@@ -4,8 +4,8 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { Button } from "@chakra-ui/react";
-import { MoreVertical } from "lucide-react";
+import { Button, HStack, Icon } from "@chakra-ui/react";
+import { Archive, MoreVertical } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
 import type { TestSuiteEntry } from "./test-cases";
 
@@ -124,10 +124,13 @@ export function SuiteRailMenu({
         {canManage && (
           <SuiteMenuItem
             value="archive-suite"
-            color="orange.500"
+            color="red.600"
             onChoose={() => onArchiveSuite()}
           >
-            Archive suite
+            <HStack gap={2}>
+              <Icon as={Archive} boxSize={3.5} />
+              Archive suite
+            </HStack>
           </SuiteMenuItem>
         )}
       </Menu.Content>

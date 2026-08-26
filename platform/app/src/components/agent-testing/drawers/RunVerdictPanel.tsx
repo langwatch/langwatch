@@ -10,7 +10,9 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { CircleCheck, CircleX, Scale } from "lucide-react";
+import { CircleCheck, CircleX, Scale, XCircle } from "lucide-react";
+import { JsonHighlight } from "~/features/onboarding/components/sections/shared/JsonHighlight";
+import { safePrettyJson } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
 import { FG_MUTED } from "../shared/design";
 
 /** One criterion of the case, with what the judge decided about it. */
@@ -138,6 +140,69 @@ function VerdictRow({ verdict }: { verdict: RunVerdict }) {
   );
 }
 
+/**
+ * True when the reasoning payload is an error object rather than a paragraph.
+ *
+ * The judge fails at every layer under the same shape: an object with a
+ * `name` that ends in `Error` and, most of the time, a `message` and a
+ * `stack`. When the payload parses as one, the drawer must not read it as
+ * "the judge's reasoning"; it reads as the failure the run hit.
+ */
+function readReasoningError(
+  reasoning: string | null | undefined,
+): { name: string; pretty: string } | null {
+  if (!reasoning) return null;
+  const trimmed = reasoning.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "name" in parsed &&
+      typeof (parsed as { name?: unknown }).name === "string" &&
+      /error$/i.test((parsed as { name: string }).name)
+    ) {
+      return {
+        name: (parsed as { name: string }).name,
+        pretty: JSON.stringify(parsed, null, 2),
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The judge failure, drawn as a self-contained scrollable panel. The heading
+ * carries a red icon so the eye reads "this is the error", not "this is the
+ * judge's thought".
+ */
+function JudgeErrorPanel({ pretty }: { pretty: string }) {
+  return (
+    <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
+      <PanelHeading
+        icon={<XCircle size={13} color="var(--chakra-colors-red-fg)" />}
+      >
+        Judge reasoning
+      </PanelHeading>
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        background={{ base: "gray.900", _dark: "black" }}
+        color={{ base: "white", _dark: "gray.100" }}
+        maxHeight="320px"
+        overflow="auto"
+        data-testid="run-verdict-reasoning-error"
+      >
+        <JsonHighlight code={pretty} />
+      </Box>
+    </VStack>
+  );
+}
+
 export function RunVerdictPanel({
   verdicts,
   reasoning,
@@ -149,6 +214,8 @@ export function RunVerdictPanel({
   /** Why the run never reached a verdict, when that is what happened. */
   error?: string | null;
 }) {
+  const reasoningError = readReasoningError(reasoning);
+
   const body = (
     <VStack align="stretch" gap={2.5} marginTop={SPACE_ABOVE_CRITERIA}>
       {error ? (
@@ -183,15 +250,15 @@ export function RunVerdictPanel({
     >
       <PanelHeading icon={<Scale size={13} />}>Results</PanelHeading>
       {body}
-      {reasoning ? (
+      {reasoningError ? (
+        <JudgeErrorPanel pretty={reasoningError.pretty} />
+      ) : reasoning ? (
         <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
           <PanelHeading>Judge reasoning</PanelHeading>
           <Text
             fontSize="11.5px"
             color={FG_MUTED}
             lineHeight="short"
-            // The judge writes in paragraphs and lists, so the breaks it wrote
-            // are kept while the text still wraps to the column.
             whiteSpace="pre-wrap"
             wordBreak="break-word"
             data-testid="run-verdict-reasoning"
@@ -203,3 +270,9 @@ export function RunVerdictPanel({
     </VStack>
   );
 }
+
+/** Re-exported for tests. */
+export const __RUN_VERDICT_INTERNAL = {
+  readReasoningError,
+  safePrettyJson,
+};

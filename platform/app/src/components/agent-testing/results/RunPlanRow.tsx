@@ -9,7 +9,7 @@
  */
 
 import { Badge, Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
-import { Folder, FolderCode, MoreVertical, Zap } from "lucide-react";
+import { FolderCode, MoreVertical, ScrollText, Zap } from "lucide-react";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
@@ -29,7 +29,7 @@ function PlanIcon({ kind }: { kind: RunPlan["kind"] }) {
   const color = "var(--chakra-colors-fg-muted)";
   if (kind === "external") return <FolderCode size={14} color={color} />;
   if (kind === "one-off") return <Zap size={14} color={color} />;
-  return <Folder size={14} color={color} />;
+  return <ScrollText size={14} color={color} />;
 }
 
 function PlanBadge({ kind }: { kind: RunPlan["kind"] }) {

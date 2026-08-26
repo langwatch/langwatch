@@ -9,12 +9,13 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, Skeleton, VStack } from "@chakra-ui/react";
+import { Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect } from "react";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { PLAN_EDITOR_DRAWER } from "../plan/usePlanEditor";
+import { AgentTestingTabLayout } from "../shared/TabLayout";
 import { useNewRunPlanFlow } from "../useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
 import { useAgentTestingStore } from "../useAgentTestingStore";
@@ -95,25 +96,51 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
     );
   }
 
+  // When the URL names a plan, we must not fall through to the plans list —
+  // even for a frame. A false render on `!selectedPlan` while the queries are
+  // still on their way reads as "plan not found" for a split second before the
+  // real detail arrives. The empty branch is reserved for `!isLoading && !data`.
+  const isResolvingPlan = !!planSlug && !selectedPlan && isLoading;
+
+  // The plan detail already has a rail (RunsSidebar) baked in. The list view
+  // has none, so it takes an invisible rail spacer of the same width so the
+  // content column lines up with the Test cases table.
+  if (planSlug && selectedPlan) {
+    return (
+      <RunPlanDetail
+        plan={selectedPlan}
+        batchRunId={batchRunId}
+        onSelectRun={selectRun}
+        onBack={handleBack}
+        onEditPlan={handleEditPlan}
+        period={period}
+        periodMode={mode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+        isSseConnected={isSseConnected}
+      />
+    );
+  }
+
   return (
-    <Box width="full" height="full" data-testid="agent-testing-results-tab">
-      {planSlug && selectedPlan ? (
-        <RunPlanDetail
-          plan={selectedPlan}
-          batchRunId={batchRunId}
-          onSelectRun={selectRun}
-          onBack={handleBack}
-          onEditPlan={handleEditPlan}
-          period={period}
-          periodMode={mode}
-          setPeriod={setPeriod}
-          setRelativePeriod={setRelativePeriod}
-          isSseConnected={isSseConnected}
-        />
+    <AgentTestingTabLayout data-testid="agent-testing-results-tab">
+      {isResolvingPlan ? (
+        <VStack
+          align="stretch"
+          gap={2}
+          padding={6}
+          flex={1}
+          minWidth={0}
+          data-testid="agent-testing-run-plan-loading"
+        >
+          <Skeleton height="44px" />
+          <Skeleton height="44px" />
+          <Skeleton height="44px" />
+        </VStack>
       ) : (
         <RunPlansTable
           plans={plans}
-          isLoading={isLoading || (!!planSlug && !selectedPlan)}
+          isLoading={isLoading}
           hasAnyPlans={hasAnyPlans}
           period={period}
           periodMode={mode}
@@ -124,6 +151,6 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
           onNewRunPlan={handleNewRunPlan}
         />
       )}
-    </Box>
+    </AgentTestingTabLayout>
   );
 }

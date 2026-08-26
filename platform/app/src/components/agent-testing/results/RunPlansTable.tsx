@@ -25,10 +25,11 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
-import { ContentColumn } from "../shared/ContentColumn";
+import { CONTENT_COLUMN_GUTTER, ContentColumn } from "../shared/ContentColumn";
 import { FG_MUTED, TABLE_HEADER_BG } from "../shared/design";
 import { AgentTestingPeriodPicker, periodDays } from "../shared/PeriodPicker";
 import { SmallButton } from "../shared/SmallButton";
+import { AGENT_TESTING_RAIL_WIDTH } from "../shared/TabLayout";
 import { PLAN_COLUMNS, PlanRow } from "./RunPlanRow";
 import type { RunPlan } from "./run-plans";
 
@@ -60,7 +61,10 @@ export function RunPlansTable({
   const days = periodDays(period);
 
   return (
-    <ContentColumn data-testid="agent-testing-run-plans">
+    <ContentColumn
+      railWidth={AGENT_TESTING_RAIL_WIDTH + CONTENT_COLUMN_GUTTER}
+      data-testid="agent-testing-run-plans"
+    >
       <HStack gap={2} height="32px">
         <Text fontSize="14px" fontWeight="semibold" color="fg">
           Test Runs

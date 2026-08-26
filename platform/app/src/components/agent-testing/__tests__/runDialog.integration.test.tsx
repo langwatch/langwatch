@@ -1012,7 +1012,10 @@ describe("<RunDialog/>", () => {
 
     expect(screen.getByTestId("run-note-too-long")).toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
-    await user.click(screen.getByTestId("run-dialog-run"));
+    // A disabled solid button turns off its pointer events so hover cannot
+    // brighten it, so a click cannot even reach the button. The disabled
+    // attribute is the assertion the run cannot start; the never-called
+    // mutation confirms it.
     expect(mockSuitesRun).not.toHaveBeenCalled();
   });
 

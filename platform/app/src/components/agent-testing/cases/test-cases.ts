@@ -15,7 +15,7 @@ import type { SuiteTarget } from "~/server/suites/types";
 
 /** The group that holds every case filed in no test suite. */
 export const UNFILED_GROUP_ID = "__unfiled__" as const;
-export const UNFILED_GROUP_NAME = "Unfiled test cases";
+export const UNFILED_GROUP_NAME = "No test suite";
 
 /** A test case as the table reads it. */
 export type TestCase = {

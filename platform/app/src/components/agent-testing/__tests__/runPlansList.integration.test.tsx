@@ -238,7 +238,7 @@ describe("the Test Runs list", () => {
 
     const row = screen.getByTestId("run-plan-row-checkout");
     expect(within(row).getByText("100%")).toBeInTheDocument();
-    expect(within(row).getByText("Test suite")).toBeInTheDocument();
+    expect(within(row).getByText("Run plan")).toBeInTheDocument();
     expect(within(row).getByText("2h ago")).toBeInTheDocument();
   });
 

@@ -24,7 +24,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { format } from "date-fns";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Pencil } from "lucide-react";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
@@ -34,6 +34,7 @@ import { FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
 import { FolderHeaderRow } from "../shared/FolderHeaderRow";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { SmallButton } from "../shared/SmallButton";
 import { RunCaseButton } from "./RunCaseButton";
 import {
   type CaseGroup,
@@ -309,6 +310,18 @@ function CaseRow({
             onOpen={() => onRunCase(testCase)}
           />
         )}
+        {canManage && (
+          <SmallButton
+            aria-label={`Edit ${testCase.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(testCase);
+            }}
+          >
+            <Pencil size={13} />
+            Edit
+          </SmallButton>
+        )}
         <CaseRowActionsMenu
           testCase={testCase}
           suites={suites}
@@ -516,7 +529,7 @@ function CaseRowActionsMenu({
         {canManage && (
           <Menu.Item
             value="archive"
-            color="orange.500"
+            color="red.600"
             onClick={(event) => {
               stop(event);
               onArchive(testCase);

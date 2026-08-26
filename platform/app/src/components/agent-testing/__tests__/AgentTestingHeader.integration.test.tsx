@@ -106,13 +106,13 @@ describe("<AgentTestingHeader/>", () => {
     it("reads the name of the plan, with what the plan is beside it", () => {
       renderHeader({
         tab: "results",
-        openPlan: { name: "Checkout", note: "Test suite" },
+        openPlan: { name: "Checkout", note: "Run plan" },
       });
 
       const title = screen.getByRole("heading", { name: "Checkout" });
       expect(title).toBeInTheDocument();
       expect(screen.getByTestId("agent-testing-title-note")).toHaveTextContent(
-        "Test suite",
+        "Run plan",
       );
       expect(comesBefore(title, screen.getByRole("tablist"))).toBe(true);
       expect(
@@ -124,7 +124,7 @@ describe("<AgentTestingHeader/>", () => {
     it("reads Agent Testing again once the plan is left", () => {
       const view = renderHeader({
         tab: "results",
-        openPlan: { name: "Checkout", note: "Test suite" },
+        openPlan: { name: "Checkout", note: "Run plan" },
       });
 
       view.rerender(

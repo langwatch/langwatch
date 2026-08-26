@@ -230,10 +230,11 @@ function TestSection({
   // One destination replaces the Simulations group, and the two cannot both
   // be offered: they address the same runs through different routes, so a menu
   // holding both would give a person two links to the same work.
-  const { enabled: agentTestingEnabled } = useFeatureFlag(
-    "release_ui_agent_testing_v2_enabled",
-    { projectId: project?.id, enabled: !!project?.id },
-  );
+  const { enabled: agentTestingEnabled, isLoading: agentTestingFlagLoading } =
+    useFeatureFlag("release_ui_agent_testing_v2_enabled", {
+      projectId: project?.id,
+      enabled: !!project?.id,
+    });
 
   return (
     <SidebarSection
@@ -242,7 +243,7 @@ function TestSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      {agentTestingEnabled ? (
+      {agentTestingFlagLoading ? null : agentTestingEnabled ? (
         <PageMenuLink
           path={projectRoutes.agent_testing.path}
           icon={featureIcons.agent_testing.icon}

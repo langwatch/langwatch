@@ -64,20 +64,20 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
         </Badge>
       )}
       <Spacer />
-      {!props.isExternal && props.allLabels.length > 0 && (
-        <LabelFilterDropdown
-          allLabels={props.allLabels}
-          activeLabels={props.activeLabels}
-          onToggle={props.onToggleLabel}
-        />
-      )}
       {props.isExternal ? (
         <SmallButton onClick={props.onOpenExternalResults}>
           <ChevronRight size={13} />
           View results
         </SmallButton>
       ) : (
-        props.canManage && <CasesPanelActions {...props} />
+        props.canManage && (
+          <CasesPanelActions
+            {...props}
+            allLabels={props.allLabels}
+            activeLabels={props.activeLabels}
+            onToggleLabel={props.onToggleLabel}
+          />
+        )
       )}
     </HStack>
   );
@@ -90,9 +90,19 @@ function CasesPanelActions({
   onRunSet,
   onNewTestCase,
   onEditSuite,
+  allLabels,
+  activeLabels,
+  onToggleLabel,
 }: Pick<
   CasesPanelHeaderProps,
-  "selection" | "isRunningSet" | "onRunSet" | "onNewTestCase" | "onEditSuite"
+  | "selection"
+  | "isRunningSet"
+  | "onRunSet"
+  | "onNewTestCase"
+  | "onEditSuite"
+  | "allLabels"
+  | "activeLabels"
+  | "onToggleLabel"
 >) {
   const isSuite = selection.kind === "suite";
 
@@ -108,6 +118,13 @@ function CasesPanelActions({
           <Pencil size={13} />
           Edit suite
         </SmallButton>
+      )}
+      {allLabels.length > 0 && (
+        <LabelFilterDropdown
+          allLabels={allLabels}
+          activeLabels={activeLabels}
+          onToggle={onToggleLabel}
+        />
       )}
       <SmallButton onClick={onNewTestCase}>
         <Plus size={13} />
