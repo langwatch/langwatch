@@ -55,7 +55,7 @@ export const GENIE_PROVENANCE_SOURCE = "databricks_genie" as const;
  */
 export const GENIE_AGENT_MODEL = "databricks/genie" as const;
 
-/** The puller action this mapper understands. Aggregate pulls never route. */
+/** The action Genie's own profile counts as a conversation. */
 export const GENIE_QUERY_ACTION = "genie_query" as const;
 
 /**
@@ -472,7 +472,9 @@ function rootAttributesOf(
       JSON.stringify({ type: "chat_messages", value: [assistantMessage] }),
     ),
     // Agent identity, not a priced model (Decision 14(d) pins no price match).
-    // `KNOWN_AGENT_IDENTITIES` is what keeps that true now the value varies.
+    // Now that the value varies, `KNOWN_AGENT_IDENTITIES` is what keeps it
+    // true — at compile time only. Every profile is a code literal the
+    // compiler checks, so nothing re-checks this at runtime.
     stringAttr("gen_ai.request.model", frame.origin.profile.agentModel),
     stringAttr("databricks.genie.message_id", frame.messageId),
     stringAttr("databricks.genie.conversation_id", frame.conversationId),

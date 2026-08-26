@@ -33,6 +33,7 @@ import {
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+import type { SourceType } from "../activity-monitor/ingestionSource.service";
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
@@ -330,10 +331,38 @@ async function writePulledEvents({
 }
 
 /**
+ * The source types that carry conversations, and what each contributes to
+ * the ones it routes. A type absent from here routes nothing — which is the
+ * honest answer for a source that pulls totals rather than conversations.
+ *
+ * The composer keeps its own list (`routesConversations` in
+ * ingestionSourceCatalog.tsx) for deciding whether to offer the picker at
+ * all. The two are deliberately separate: that one shapes a form, this one
+ * decides what reaches a customer's project.
+ */
+// A Map, not an object literal: `sourceType` is a free-form column read back
+// from the database, and indexing an object with it answers "constructor",
+// "toString" or "__proto__" with a truthy prototype member. That would pass
+// the guard below with a profile whose `conversationAction` is undefined —
+// which an event carrying no action then matches, routing a fabricated span
+// into a customer's project. A Map has no prototype keys to inherit.
+//
+// Keys are declared `SourceType` so a misspelled entry fails the build, but the
+// map is held as `ReadonlyMap<string, …>` because the lookup value is the raw
+// database column: narrowing the lookup would only force a cast at the call.
+const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
+  string,
+  ConversationRoutingProfile
+> = new Map<SourceType, ConversationRoutingProfile>([
+  ["databricks_genie", GENIE_ROUTING_PROFILE],
+]);
+
+/**
  * ADR-088 v7 (Decisions 8–14): conversation-bearing pulled events additionally
  * flow through the standard trace door into the source's chosen destination
- * project. Aggregate pulls never route — only `genie_query` events are
- * conversations.
+ * project. Aggregate pulls never route, and neither does a source with no
+ * entry in `CONVERSATION_ROUTING_PROFILES`; a source that has one routes the
+ * events its own profile names as conversations.
  *
  * Tenancy + redaction (Decision 13): the destination project id is the tenant,
  * and the redaction level passed is the same `DEFAULT_PII_REDACTION_LEVEL`
@@ -362,27 +391,6 @@ async function writePulledEvents({
  * the run on those would stall the audit pull on the exact history the door
  * exists to let through.
  */
-/**
- * The source types that carry conversations, and what each contributes to
- * the ones it routes. A type absent from here routes nothing — which is the
- * honest answer for a source that pulls totals rather than conversations.
- *
- * The composer keeps its own list (`routesConversations` in
- * ingestionSourceCatalog.tsx) for deciding whether to offer the picker at
- * all. The two are deliberately separate: that one shapes a form, this one
- * decides what reaches a customer's project.
- */
-// A Map, not an object literal: `sourceType` is a free-form column read back
-// from the database, and indexing an object with it answers "constructor",
-// "toString" or "__proto__" with a truthy prototype member. That would pass
-// the guard below with a profile whose `conversationAction` is undefined —
-// which an event carrying no action then matches, routing a fabricated span
-// into a customer's project. A Map has no prototype keys to inherit.
-const CONVERSATION_ROUTING_PROFILES = new Map<
-  string,
-  ConversationRoutingProfile
->([["databricks_genie", GENIE_ROUTING_PROFILE]]);
-
 export async function routeConversationsToTraceDestination({
   events,
   source,

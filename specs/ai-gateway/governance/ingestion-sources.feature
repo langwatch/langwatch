@@ -270,12 +270,17 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Then only the Genie questions reach "Analytics"
 
     The shape a source routes by — which of its events are conversations,
-    the agent that answered, where they came from, and under what name the
-    conversation is recorded — is supplied per source rather than being
-    Genie's constants. Genie is the only source that supplies one today,
-    so no other source routes anything in production; what the scenario
-    below fixes is that the shape is the source's own and is never
-    inherited, which is what a second source will rely on when it arrives.
+    the agent that answered, where they came from, and the name of the batch
+    they arrive in — is supplied per source rather than being Genie's
+    constants. Genie is the only source that supplies one today, so no other
+    source routes anything in production; what the scenario below fixes is
+    that the shape is the source's own and is never inherited, which is what
+    a second source will rely on when it arrives.
+
+    Not everything is per-source yet: the individual conversation spans still
+    carry Genie's own names and labels whatever the source. That is invisible
+    while Genie is the only source routing, and it is what the second source
+    has to finish before its conversations can be told apart from Genie's.
 
     @unit
     Scenario: The conversation shape travels with the source, not with Genie
