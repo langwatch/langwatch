@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
-  CodingAgentProjectionPersistence,
+  CodingAgentProjectionPersistenceAdapter,
   CodingAgentRuntime,
 } from "@langwatch/coding-agent-server";
 import {
@@ -24,7 +24,7 @@ afterEach(async () => {
 async function runtime() {
   const endpoint = await TestClickHouseEndpoint.create();
   endpoints.push(endpoint);
-  const projections = CodingAgentProjectionPersistence.create({
+  const projections = CodingAgentProjectionPersistenceAdapter.create({
     clickHouse: endpoint,
     retention: { defaultTraceRetentionDays: 30 },
     clock: new TestClock(),

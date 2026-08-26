@@ -8,6 +8,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi } from "vitest";
+import { TestGithubService } from "~/test-utils/test-github.service";
 import {
   type CodingAgentProcessingPipelineDeps,
   createCodingAgentProcessingPipeline,
@@ -43,16 +44,14 @@ function contextFor(state: CodingAgentSessionState) {
 }
 
 /** The REAL pipeline registration — `build()` only stores references. */
-function registrationWith(requestBranchMapping: (params: never) => Promise<void>) {
+function registrationWith(github = TestGithubService.create()) {
   const store = {} as never;
   const deps = {
     codingAgentSessionStore: store,
     codingAgentTraceSessionAppendStore: store,
     sessionMetricSeriesAppendStore: store,
     codingAgentSessionEventsAppendStore: store,
-    pullRequestMappingHandler: createPullRequestMappingHandler({
-      requestBranchMapping: requestBranchMapping as never,
-    }),
+    github,
   } as unknown as CodingAgentProcessingPipelineDeps;
   return createCodingAgentProcessingPipeline(deps).foldSubscribers.get(
     "pullRequestMapping",
@@ -63,13 +62,12 @@ describe("pullRequestMapping subscriber", () => {
   describe("given a session whose repository host is not the instance's GitHub host", () => {
     /** @scenario "A repository on a host this instance cannot answer for never triggers a GitHub call" */
     it("requests no mapping", async () => {
-      const requestBranchMapping = vi.fn().mockResolvedValue(undefined);
-      const handler = createPullRequestMappingHandler({
-        requestBranchMapping,
-      });
+      const github = TestGithubService.create();
+      const requestBranchMapping = vi.spyOn(github, "requestBranchMapping");
+      const handler = createPullRequestMappingHandler(github);
       const state = foldState({ repositoryHost: "gitlab.example.com" });
 
-      expect(shouldMapPullRequests(state)).toBe(false);
+      expect(shouldMapPullRequests(state, github)).toBe(false);
       await handler(event, contextFor(state));
 
       expect(requestBranchMapping).not.toHaveBeenCalled();
@@ -78,13 +76,12 @@ describe("pullRequestMapping subscriber", () => {
 
   describe("given a session carrying a github.com repository and a branch", () => {
     it("requests the mapping for that branch", async () => {
-      const requestBranchMapping = vi.fn().mockResolvedValue(undefined);
-      const handler = createPullRequestMappingHandler({
-        requestBranchMapping,
-      });
+      const github = TestGithubService.create();
+      const requestBranchMapping = vi.spyOn(github, "requestBranchMapping");
+      const handler = createPullRequestMappingHandler(github);
       const state = foldState();
 
-      expect(shouldMapPullRequests(state)).toBe(true);
+      expect(shouldMapPullRequests(state, github)).toBe(true);
       await handler(event, contextFor(state));
 
       expect(requestBranchMapping).toHaveBeenCalledWith({
@@ -97,7 +94,8 @@ describe("pullRequestMapping subscriber", () => {
     });
 
     it("treats an unreported host as github.com", () => {
-      expect(shouldMapPullRequests(foldState({ repositoryHost: "" }))).toBe(true);
+      const github = TestGithubService.create();
+      expect(shouldMapPullRequests(foldState({ repositoryHost: "" }), github)).toBe(true);
     });
 
     // A session records whatever casing its git remote carries, and every
@@ -106,31 +104,31 @@ describe("pullRequestMapping subscriber", () => {
     // ever wrote, and the branch reads as having no pull request forever.
     /** @scenario "A session whose remote host casing differs still finds its pull request" */
     it("treats a differently cased github.com as github.com", () => {
-      expect(shouldMapPullRequests(foldState({ repositoryHost: "GitHub.com" }))).toBe(
-        true,
-      );
+      const github = TestGithubService.create();
+      expect(
+        shouldMapPullRequests(foldState({ repositoryHost: "GitHub.com" }), github),
+      ).toBe(true);
     });
   });
 
   describe("given a session with no git context", () => {
     it("requests no mapping", () => {
+      const github = TestGithubService.create();
       for (const missing of [
         { repositoryOwner: "" },
         { repositoryName: "" },
         { gitBranch: "" },
       ]) {
-        expect(shouldMapPullRequests(foldState(missing))).toBe(false);
+        expect(shouldMapPullRequests(foldState(missing), github)).toBe(false);
       }
     });
   });
 
   describe("when the mapping fails", () => {
     it("swallows the error so the queue does not retry against the same limit", async () => {
-      const handler = createPullRequestMappingHandler({
-        requestBranchMapping: vi
-          .fn()
-          .mockRejectedValue(new Error("GitHub rate limit reached")),
-      });
+      const github = TestGithubService.create();
+      github.mappingError = new Error("GitHub rate limit reached");
+      const handler = createPullRequestMappingHandler(github);
 
       await expect(handler(event, contextFor(foldState()))).resolves.toBeUndefined();
     });
@@ -138,7 +136,7 @@ describe("pullRequestMapping subscriber", () => {
 
   describe("given the queue options on its pipeline registration", () => {
     it("keys the job on the project, repository and branch", () => {
-      const registration = registrationWith(vi.fn());
+      const registration = registrationWith();
 
       const jobId = registration.options?.makeJobId?.({
         event,
@@ -166,7 +164,7 @@ describe("pullRequestMapping subscriber", () => {
      * subscriber to a GitHub-facing job per fold commit.
      */
     it("holds a real window so one branch's events collapse into one job", () => {
-      const options = registrationWith(vi.fn()).options;
+      const options = registrationWith().options;
 
       expect(options?.delay).toBeGreaterThan(0);
       expect(options?.deduplication).toBeDefined();
@@ -195,7 +193,7 @@ describe("pullRequestMapping subscriber", () => {
      * @scenario "Concurrent sessions on one branch ask GitHub once"
      */
     it("groups the job on the same branch its dedup id is keyed on", () => {
-      const registration = registrationWith(vi.fn());
+      const registration = registrationWith();
       const first = { event, foldState: foldState() };
       const second = {
         event: { ...event, aggregateId: "session-2" },
@@ -215,7 +213,7 @@ describe("pullRequestMapping subscriber", () => {
     });
 
     it("keeps a different branch in its own group", () => {
-      const registration = registrationWith(vi.fn());
+      const registration = registrationWith();
       const groupKey = registration.options?.groupKeyFn;
 
       expect(groupKey?.({ event, foldState: foldState() })).not.toBe(
@@ -245,7 +243,7 @@ describe("pullRequestMapping subscriber", () => {
      * @scenario "Concurrent sessions on one branch ask GitHub once"
      */
     it("holds the throttle past dispatch, for the window that already elapsed", () => {
-      const options = registrationWith(vi.fn()).options;
+      const options = registrationWith().options;
 
       expect(options?.deduplication?.shouldSurviveDispatch).toBe(true);
     });

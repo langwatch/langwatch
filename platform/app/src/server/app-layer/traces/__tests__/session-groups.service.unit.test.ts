@@ -14,13 +14,11 @@ import {
   decodeSessionGroupsCursor,
   encodeSessionGroupsCursor,
 } from "../session-groups.cursor";
-import type { PullRequestBranchKey } from "../session-groups.pull-request-link";
-import type {
-  CodingAgentSessionLookup,
-  SessionGroupCodingAgentDto,
-} from "../session-groups.service";
+import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
+import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { SessionGroupsService } from "../session-groups.service";
 import { teaserOf } from "../visibility-window.service";
+import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
 
 const TENANT = "project-1";
 
@@ -53,23 +51,16 @@ function makeRow(overrides: Partial<SessionGroupRow> = {}): SessionGroupRow {
  * The enrichment as the SESSION ROW carries it: a column nothing reported is
  * an empty string, and mapping those to null is the service's job.
  */
-function codingAgentRow(
-  over: Partial<SessionGroupCodingAgentDto> = {},
-): SessionGroupCodingAgentDto {
-  return {
-    modelCalls: 0,
-    compactions: 0,
-    peakContextTokens: 0,
-    subAgents: 0,
-    pullRequest: null,
+function codingAgentRow(overrides: Partial<CodingAgentSession> = {}): CodingAgentSession {
+  return codingAgentSessionFixture({
     repositoryHost: "",
     repositoryOwner: "",
     repositoryName: "",
     gitBranch: "",
     gitWorktree: "",
     title: "",
-    ...over,
-  };
+    ...overrides,
+  });
 }
 
 /** Git context as the DTO spells "nothing reported this". */
@@ -98,16 +89,12 @@ class FakeRepository implements SessionGroupsRepository {
   }
 }
 
-function lookupReturning(
-  bySessionId: Record<string, SessionGroupCodingAgentDto | null>,
-  calls: string[] = [],
-): CodingAgentSessionLookup {
-  return {
-    async tryGetBySessionId({ sessionId }) {
-      calls.push(sessionId);
-      return bySessionId[sessionId] ?? null;
-    },
-  };
+function lookupReturning(bySessionId: Record<string, CodingAgentSession | null>) {
+  const service = TestCodingAgentService.create();
+  for (const [sessionId, session] of Object.entries(bySessionId)) {
+    service.sessionsById.set(sessionId, session);
+  }
+  return service;
 }
 
 const CURSOR_SORT = {
@@ -159,23 +146,20 @@ describe("SessionGroupsService", () => {
   describe("given a page of rollup rows", () => {
     /** @scenario Coding agent enrichment attaches model calls and compactions */
     it("attaches coding-agent counters when a session row exists and leaves others null", async () => {
-      const calls: string[] = [];
+      const codingAgents = lookupReturning({
+        "session-a": codingAgentRow({
+          modelCalls: 41,
+          compactions: 2,
+          peakContextTokens: 180_000,
+          subAgents: 3,
+        }),
+      });
       const service = new SessionGroupsService({
         repository: new FakeRepository(
           [makeRow(), makeRow({ conversationId: "session-b" })],
           2,
         ),
-        codingAgentSessions: lookupReturning(
-          {
-            "session-a": codingAgentRow({
-              modelCalls: 41,
-              compactions: 2,
-              peakContextTokens: 180_000,
-              subAgents: 3,
-            }),
-          },
-          calls,
-        ),
+        codingAgentSessions: codingAgents,
       });
 
       const result = await service.getSessionGroups({
@@ -184,7 +168,9 @@ describe("SessionGroupsService", () => {
         pageSize: 10,
       });
 
-      expect(calls.sort()).toEqual(["session-a", "session-b"]);
+      expect(
+        codingAgents.sessionLookupInputs.map((input) => input.sessionId).sort(),
+      ).toEqual(["session-a", "session-b"]);
       expect(result.sessions[0]?.codingAgent).toEqual({
         modelCalls: 41,
         compactions: 2,
@@ -332,52 +318,30 @@ describe("SessionGroupsService", () => {
     });
   });
 
-  // A session stores whatever casing the git remote carries, and a host is
-  // case insensitive, so `GitHub.com` and `github.com` name one repository. The
-  // mapping is keyed on (host, repository), so a key that folds the repository
-  // half and not the host asks under a spelling no stored row carries, and the
-  // session shows no pull request at all.
-  describe("given a session whose remote spells the host differently from the mapping", () => {
-    /** @scenario "A session whose remote host casing differs still finds its pull request" */
-    it("still links it to its pull request", async () => {
-      const keysSeen: PullRequestBranchKey[] = [];
-      const service = new SessionGroupsService({
-        repository: new FakeRepository([makeRow()], 1),
-        codingAgentSessions: lookupReturning({
-          "session-a": codingAgentRow({
-            repositoryHost: "GitHub.com",
-            repositoryOwner: "ACME",
-            repositoryName: "Widgets",
-            gitBranch: "feat/linkage",
-          }),
+  describe("given Coding Agent links a session to a pull request", () => {
+    it("applies the canonical link to the session row", async () => {
+      const codingAgents = lookupReturning({
+        "session-a": codingAgentRow({
+          repositoryHost: "GitHub.com",
+          repositoryOwner: "ACME",
+          repositoryName: "Widgets",
+          gitBranch: "feat/linkage",
         }),
-        resolveOrganizationId: async () => "org-1",
-        pullRequests: {
-          // The mapping lookup as Postgres answers it: the stored repository is
-          // lowercased and every column of the key is matched exactly.
-          async findForBranches({ keys }) {
-            keysSeen.push(...keys);
-            const stored = {
-              repositoryHost: "github.com",
-              repositoryFullName: "acme/widgets",
-              headBranch: "feat/linkage",
-              prNumber: 7,
-              htmlUrl: "https://github.com/acme/widgets/pull/7",
-              title: "Link sessions to pull requests",
-              prCreatedAt: new Date(1_699_999_000_000),
-              prClosedAt: null,
-              prMergedAt: null,
-            };
-            return keys.some(
-              (key) =>
-                key.repositoryHost === stored.repositoryHost &&
-                key.repositoryFullName === stored.repositoryFullName &&
-                key.headBranch === stored.headBranch,
-            )
-              ? [stored]
-              : [];
+      });
+      codingAgents.tracePullRequestLinks = [
+        {
+          sessionId: "session-a",
+          pullRequest: {
+            number: 7,
+            htmlUrl: "https://github.com/acme/widgets/pull/7",
+            title: "Link sessions to pull requests",
           },
         },
+      ];
+      const service = new SessionGroupsService({
+        repository: new FakeRepository([makeRow()], 1),
+        codingAgentSessions: codingAgents,
+        resolveOrganizationId: async () => "org-1",
       });
 
       const result = await service.getSessionGroups({
@@ -386,13 +350,7 @@ describe("SessionGroupsService", () => {
         pageSize: 10,
       });
 
-      expect(keysSeen).toEqual([
-        {
-          repositoryHost: "github.com",
-          repositoryFullName: "acme/widgets",
-          headBranch: "feat/linkage",
-        },
-      ]);
+      expect(codingAgents.tracePullRequestInputs).toHaveLength(1);
       expect(result.sessions[0]?.codingAgent?.pullRequest).toEqual({
         number: 7,
         htmlUrl: "https://github.com/acme/widgets/pull/7",

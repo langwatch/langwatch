@@ -29,6 +29,10 @@ import {
   type TranscriptLogRecord,
 } from "./coding-agent-transcript";
 import { shouldFilterCodingAgentSpan } from "./telemetry/coding-agent-span-filter";
+import type {
+  CodingAgentTracePullRequestInput,
+  CodingAgentTracePullRequestLink,
+} from "./coding-agent-trace-pull-request";
 
 export type CodingAgentSpanFilterInput = {
   scopeName: string | null | undefined;
@@ -85,6 +89,10 @@ export abstract class CodingAgentService {
   abstract listForProject(
     input: CodingAgentSessionsListInput,
   ): Promise<CodingAgentSessionListRow[]>;
+
+  abstract linkTraceSessionsToPullRequests(
+    input: CodingAgentTracePullRequestInput,
+  ): Promise<CodingAgentTracePullRequestLink[]>;
 
   abstract getPullRequestUsage(
     input: CodingAgentPullRequestUsageInput,

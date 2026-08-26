@@ -3,21 +3,25 @@ import {
   defineEvents,
   definePipeline,
   type Event,
+  type ProcessStore,
 } from "@langwatch/eventing";
+import type { GithubService } from "@langwatch/github-contract";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
-  type GithubBranchRecheckDeps,
   type GithubBranchRecheckState,
   githubBranchRecheckSchema,
   githubBranchRecheckWake,
+} from "./process-manager/githubBranchRecheck.process";
+import {
   runGithubBranchRecheck,
   runGithubRetentionPrune,
-} from "./process-manager/githubBranchRecheck.process";
+} from "./intents/github-branch-recheck.intent";
 
 export interface GithubMaintenancePipelineDeps {
-  branchRecheck: GithubBranchRecheckDeps;
+  github: GithubService;
+  processStore: ProcessStore;
 }
 
 /**
@@ -54,16 +58,8 @@ export function createGithubMaintenancePipeline(deps: GithubMaintenancePipelineD
         .state<GithubBranchRecheckState>(GITHUB_BRANCH_RECHECK_INITIAL_STATE)
         // Both intents are declared before `onWake` because the wake emits
         // both: the builder only lets one be declared after it.
-        .intent(
-          "recheck",
-          githubBranchRecheckSchema,
-          runGithubBranchRecheck(deps.branchRecheck),
-        )
-        .intent(
-          "prune",
-          githubBranchRecheckSchema,
-          runGithubRetentionPrune(deps.branchRecheck),
-        )
+        .intent("recheck", githubBranchRecheckSchema, runGithubBranchRecheck(deps))
+        .intent("prune", githubBranchRecheckSchema, runGithubRetentionPrune(deps))
         .schedule({ everyMs: GITHUB_BRANCH_RECHECK_INTERVAL_MS })
         .onWake(githubBranchRecheckWake)
         // A pass is bounded at 50 branches and each one is a sequential GitHub

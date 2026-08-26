@@ -16,6 +16,8 @@ import {
   type CodingAgentSessionLookupInput,
   type CodingAgentSessionsListInput,
   type CodingAgentTraceSessionLookupInput,
+  type CodingAgentTracePullRequestInput,
+  type CodingAgentTracePullRequestLink,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
@@ -34,6 +36,7 @@ import { CodingAgentPullRequestReadService } from "./coding-agent-pull-request-r
 import { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service";
 import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service";
 import { CodingAgentSessionReadService } from "./coding-agent-session-read.service";
+import { CodingAgentTracePullRequestService } from "./coding-agent-trace-pull-request.service";
 
 export const MAX_SESSION_EVENTS_PAGE_SIZE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
 
@@ -67,6 +70,10 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       projects: options.projects,
       assignments,
     });
+    const tracePullRequests = CodingAgentTracePullRequestService.create({
+      github: options.github,
+      assignments,
+    });
     const pullRequestReads = CodingAgentPullRequestReadService.create({
       sessions: options.sessions,
       sessionEvents: options.sessionEvents,
@@ -90,6 +97,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       sessionReads,
       pullRequestReads,
       mappingBackfill,
+      tracePullRequests,
     });
   }
 
@@ -98,6 +106,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       sessionReads: CodingAgentSessionReadService;
       pullRequestReads: CodingAgentPullRequestReadService;
       mappingBackfill: CodingAgentPullRequestMappingBackfillService;
+      tracePullRequests: CodingAgentTracePullRequestService;
     },
   ) {
     super();
@@ -140,6 +149,12 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     input: CodingAgentSessionsListInput,
   ): Promise<CodingAgentSessionListRow[]> {
     return this.collaborators.pullRequestReads.listForProject(input);
+  }
+
+  linkTraceSessionsToPullRequests(
+    input: CodingAgentTracePullRequestInput,
+  ): Promise<CodingAgentTracePullRequestLink[]> {
+    return this.collaborators.tracePullRequests.link(input);
   }
 
   getPullRequestUsage(

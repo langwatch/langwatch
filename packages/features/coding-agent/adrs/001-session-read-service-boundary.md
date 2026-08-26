@@ -23,10 +23,10 @@ aggregation and bounded mapping backfill without becoming public capabilities.
 ### Public surfaces and transports
 
 The contract exports portable Zod schemas, values, errors, telemetry
-classification, transcript derivation and `CodingAgentService`. The server
-exports only process composition adapters, nominal ports and the named trace
-pull-request adapter. REST, tRPC, traces, eventing and GitHub setup remain
-application transports or composition and delegate to the composed service.
+classification, transcript derivation and `CodingAgentService`. Trace-session
+pull-request linkage is a method on that service, not another public adapter.
+REST, tRPC, traces, eventing and GitHub setup remain application transports or
+composition and delegate to the composed service.
 
 ### Dependencies
 
@@ -38,10 +38,11 @@ neither another feature's repository nor Enterprise implementation.
 ### Persistence
 
 The server package owns the four concrete ClickHouse repositories for session,
-trace-session, metric-series and session-event rows. The named projection
-persistence adapter is package-created, so application composition cannot
-inject or expose those repositories. Existing tables, retention and query
-semantics remain unchanged.
+trace-session, metric-series and session-event rows. The contract's projection
+persistence port is the separate process-lifecycle boundary used by eventing.
+Its server adapter is package-created, so application composition cannot inject
+or expose those repositories. Existing tables, retention and query semantics
+remain unchanged.
 
 ### Runtime and registration
 

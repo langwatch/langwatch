@@ -25,19 +25,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
-import { CodingAgentSessionService } from "~/server/app-layer/coding-agent/coding-agent-session.service";
-import { CodingAgentSessionsListService } from "~/server/app-layer/coding-agent/coding-agent-sessions-list.service";
-import { PullRequestUsageService } from "~/server/app-layer/coding-agent/pull-request-usage.service";
-import { NullCodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
-import { NullCodingAgentSessionEventsRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
-import { NullCodingAgentTraceSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
-import { NullSessionMetricSeriesRepository } from "~/server/app-layer/coding-agent/repositories/session-metric-series.repository";
-import { GithubInstallationsService } from "~/server/app-layer/github/github-installations.service";
-import { GithubAppTokenService } from "~/server/app-layer/github/githubAppToken";
-import { NullGithubInstallationsRepository } from "~/server/app-layer/github/repositories/github-installations.repository";
-import { PrismaGithubPullRequestsRepository } from "~/server/app-layer/github/repositories/github-pull-requests.prisma.repository";
 import { createTestApp } from "~/server/app-layer/presets";
-import { NullGithubPullRequestLookup } from "~/server/app-layer/traces/session-groups.pull-request-link";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -172,41 +160,7 @@ beforeAll(async () => {
     },
   });
 
-  // The route reads through the App, and the test preset's pull-request store
-  // is a null one, so a mapped pull request would still answer "not mapped".
-  // Only the mapping is real here: sessions stay null, which is what makes the
-  // answered rollup empty and its audit record say zero projects contributed.
-  const nullSessions = new NullCodingAgentSessionRepository();
-  const nullSessionEvents = new NullCodingAgentSessionEventsRepository();
-  const sessions = new CodingAgentSessionService({
-    sessions: nullSessions,
-    traceSessions: new NullCodingAgentTraceSessionRepository(),
-    metricSeries: new NullSessionMetricSeriesRepository(),
-    sessionEvents: nullSessionEvents,
-  });
-  globalForApp.__langwatch_app = createTestApp({
-    codingAgents: {
-      sessions,
-      // The REST surface under test never reads it; the App's shape does.
-      sessionsList: new CodingAgentSessionsListService({
-        sessions,
-        pullRequests: new NullGithubPullRequestLookup(),
-        resolveOrganizationId: async () => organization.id,
-      }),
-      pullRequestUsage: new PullRequestUsageService({
-        pullRequests: new PrismaGithubPullRequestsRepository(prisma),
-        sessions: nullSessions,
-        personalSessions: sessions,
-        sessionEvents: nullSessionEvents,
-        installations: new GithubInstallationsService(
-          new NullGithubInstallationsRepository(),
-          new GithubAppTokenService("", "", null),
-        ),
-        resolveOrganizationId: async () => organization.id,
-        isSourceNonBillable: async () => false,
-      }),
-    },
-  });
+  globalForApp.__langwatch_app = createTestApp();
 
   // Org-wide admin, so the caller genuinely holds `traces:view` on the other
   // user's workspace. The refusal has to come from ownership, not permission.

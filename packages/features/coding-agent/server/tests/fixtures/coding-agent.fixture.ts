@@ -1,5 +1,4 @@
 import {
-  codingAgentSessionSchema,
   codingAgentSessionEventRecordSchema,
   type CodingAgentSession,
   type CodingAgentSessionBranchRecord,
@@ -7,6 +6,10 @@ import {
   type CodingAgentSessionEventRecord,
   type CodingAgentTraceSessionRecord,
 } from "@langwatch/coding-agent-contract";
+import {
+  CODING_AGENT_TEST_NOW_MS,
+  codingAgentSessionFixture,
+} from "@langwatch/coding-agent-contract/testing";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createServer, type Server } from "node:http";
 import {
@@ -29,7 +32,7 @@ import {
   type SessionMetricTotal,
 } from "../../src/repositories/session-metric-series.repository";
 
-export const TEST_NOW_MS = Date.parse("2026-08-20T12:00:00.000Z");
+export const TEST_NOW_MS = CODING_AGENT_TEST_NOW_MS;
 
 type ClickHouseRequest = { url: string; body: string };
 
@@ -82,104 +85,7 @@ export class TestClickHouseEndpoint extends CodingAgentClickHousePort {
 }
 
 export function session(overrides: Partial<CodingAgentSession> = {}): CodingAgentSession {
-  return codingAgentSessionSchema.parse({
-    tenantId: "project-1",
-    sessionId: "session-1",
-    sessionKeySource: "provider",
-    version: "2026-07-21",
-    startedAtMs: TEST_NOW_MS - 60_000,
-    agent: "claude_code",
-    agentVersion: "",
-    traceIds: [],
-    finalRequestId: "",
-    userId: "user-1",
-    terminalType: "",
-    entrypoint: "",
-    parentSessionId: "",
-    isFork: false,
-    repositoryHost: "github.com",
-    repositoryOwner: "langwatch",
-    repositoryName: "langwatch",
-    gitBranch: "main",
-    gitBranches: [],
-    gitWorktree: "",
-    title: "",
-    titleSource: "",
-    modelCalls: 0,
-    toolCalls: 0,
-    subAgents: 0,
-    prompts: 0,
-    promptChars: 0,
-    responseChars: 0,
-    steps: [],
-    toolCounts: {},
-    toolDurationMs: {},
-    filesTouched: [],
-    skills: [],
-    subAgentTypes: [],
-    slashCommands: [],
-    models: [],
-    mcpServers: [],
-    mcpTools: [],
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-    costUsd: 0,
-    agentReportedCostUsd: 0,
-    modelCallMs: 0,
-    toolMs: 0,
-    ttftMsTotal: 0,
-    ttftSamples: 0,
-    blockedOnUserMs: 0,
-    activeTimeUserSec: 0,
-    activeTimeCliSec: 0,
-    toolResultBytes: 0,
-    toolInputBytes: 0,
-    compactions: 0,
-    compactionTokensBefore: 0,
-    compactionTokensAfter: 0,
-    compactionTriggers: {},
-    peakContextTokens: 0,
-    cacheRebuildCount: 0,
-    largestCacheRebuildTokens: 0,
-    failedTools: 0,
-    errorTypes: {},
-    apiErrors: 0,
-    rateLimited: 0,
-    rateLimitEvents: 0,
-    retriesExhausted: 0,
-    retryMs: 0,
-    attempts: 0,
-    refusals: 0,
-    refusalCategories: [],
-    internalErrors: 0,
-    toolsDenied: 0,
-    toolsAborted: 0,
-    permissionMode: "",
-    permissionChanges: 0,
-    hooksBlocked: 0,
-    hooksCancelled: 0,
-    hookMs: 0,
-    linesAdded: 0,
-    linesRemoved: 0,
-    commits: 0,
-    pullRequests: 0,
-    editsAccepted: 0,
-    editsRejected: 0,
-    languagesEdited: [],
-    atMentions: 0,
-    stopReason: "",
-    truncated: false,
-    subAgentIds: [],
-    stepStartedAt: [],
-    previousCallContextTokens: 0,
-    metricSeries: [],
-    createdAt: TEST_NOW_MS - 60_000,
-    updatedAt: TEST_NOW_MS - 1_000,
-    lastEventOccurredAt: TEST_NOW_MS - 1_000,
-    ...overrides,
-  });
+  return codingAgentSessionFixture(overrides);
 }
 
 export function branchSession(

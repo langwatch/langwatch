@@ -53,65 +53,12 @@ const codingAgentSessionEvents = [
   metricFactsContributedEventSchema,
 ] as const;
 
-/** Schema-snapshot version (calendar date). Bump when the derivation changes.
- *
- *  2026-08-23: the session's `CostUsd` became the computed figure — the
- *  call's own tokens priced against the model registry, the same formula and
- *  the same cache-write lifetime the trace pipeline applies to the identical
- *  span — and what the agent reports about its own bill moved to the new
- *  `AgentReportedCostUsd` (migration 00085). Rows stamped earlier carry the
- *  agent-reported number AS CostUsd and decode the new column as zero, so the
- *  bump refolds each session once: the replayed span contributions rebuild
- *  the computed cost, and the replayed api_request contributions land on the
- *  reported column where they belong.
- *
- *  2026-08-10: `GitBranches` (migration 00077) joined the projected row shape,
- *  the bounded first-seen set of every branch a session reported. A row stamped
- *  2026-08-02 decodes it as an empty array, which is exactly what a session
- *  that reported no branch at all decodes to, so the fold would carry on from
- *  empty and remember only the branches reported after the deploy. Unlike the
- *  git-context columns below, that stamp IS in the wild, so the bump is what
- *  refolds each session once and rebuilds the whole set from its stored
- *  contributions. The refold wave is the price of the backfill: the alternative
- *  is a population that answers "one branch" forever for every session that had
- *  already moved.
- *
- *  2026-08-02: the context-economics columns of migration 00074 joined the
- *  projected row shape: `RateLimitEvents` (reported rate-limit events, apart
- *  from the 429-inferred `RateLimited`), `CompactionTriggers` (compactions by
- *  trigger kind), and the spawn lineage `ParentSessionId` / `IsFork`. Rows
- *  stamped earlier decode without them, so the bump refolds each session once
- *  to backfill the counters from its stored contributions.
- *
- *  The same stamp also covers the git-context columns of migration 00075
- *  (`RepositoryHost` / `RepositoryOwner` / `RepositoryName`, `GitBranch`,
- *  `GitWorktree`, `Title`), deliberately rather than by omission: it has not
- *  been released, so no row in the wild carries it without them, and every
- *  one of the six is a String whose `DEFAULT ''` decodes as null, the honest
- *  "nothing reported this", which is also the answer for every agent with no
- *  companion emitter. A second stamp would buy a refold wave over the whole
- *  population to rediscover exactly that.
- *
- *  2026-07-28 — the logs-only double-count gate became symmetric: a logs-only
- *  agent's model calls and tool runs no longer fold from BOTH its log events
- *  and the equivalent spans. Rows stamped `2026-07-27` were folded by the
- *  one-sided gate, so a Cowork session that also exported spans counted every
- *  turn twice; rejecting that stamp is what rebuilds them.
- *
- *  What the bump does NOT do is re-label. A refold replays stored
- *  contributions, and each one carries the `agent` its dispatcher resolved at
- *  ingest (`contributionBaseSchema`); `withContributionIdentity` is
- *  first-writer-wins over that replay, so it reproduces the original label
- *  exactly. Sessions whose first contribution was written before the registry
- *  could detect Cowork therefore keep `claude_code` until they are re-ingested
- *  — no refold moves them. The `2026-07-27` population is unaffected by that
- *  limit: its contributions were already written with the Cowork label, which
- *  is why refolding them fixes the counting.
- *
- *  2026-07-27 — the read-back columns of migrations 00053 (`SubAgentIds`,
- *  `PreviousCallContextTokens`, `StepStartedAt`, `MetricSeries`,
- *  `LastEventOccurredAt`) and 00054 (`AppliedEventIds`) joined the projected row
- *  shape. That shape change is exactly what this stamp records (ADR-021/022). */
+/**
+ * Schema-snapshot version. Bump when replay must rebuild persisted state.
+ * This version moves reported cost to `AgentReportedCostUsd` and recomputes
+ * `CostUsd` from stored span contributions (migration 00085). Older schema
+ * transitions live with migrations 00053, 00054, 00074, 00075, and 00077.
+ */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-23";
 
 /** The cost-drift counters' label set, off one contribution's facts. */
@@ -228,44 +175,11 @@ export class CodingAgentSessionFoldProjection
   protected readonly events = codingAgentSessionEvents;
 
   /**
-   * The store reads its own last committed state back (ADR-066): the row now
-   * round-trips the full working state, so `get()` returns it and, in steady
-   * state, nothing on the delivery path reads `event_log`.
-   *
-   * `refoldOnStoreMiss: true` — a schema-gated TRANSITIONAL net, not the old
-   * continuity mechanism. A row written before the 00053/00054 read-back columns
-   * existed decodes every one of them as a column default it cannot tell apart
-   * from a real value, so the store reports a miss and this option rebuilds that
-   * aggregate from `event_log` — once. The rebuild is rewritten at the current
-   * version, so the row hits from then on and the whole population self-heals
-   * with no backfill migration. In steady state `store.get()` hits and nothing
-   * refolds. Without the gate a stale row would collapse the metric-fed totals
-   * to whatever series arrived next, reset the sub-agent count to one, scramble
-   * the step sequence into arrival order, and blind the cache-rebuild detector
-   * for one model call.
-   *
-   * The gate is deliberately NOT "current stamp only": 00053 and 00054 shipped
-   * without bumping the version, so the pre-bump stamp covers rows on both sides
-   * of the column change and the store uses the `LastEventOccurredAt` checkpoint
-   * to tell them apart. Rejecting the whole stamp would refold a large live
-   * population for nothing — see `CodingAgentSessionStore.getWithApplied`.
-   * `es_fold_refold_on_miss_total{projection_name="codingAgentSession"}` is what
-   * says when this net has stopped firing and can come out.
-   *
-   * `coalesceMaxBatch` — see `CODING_AGENT_SESSION_COALESCE_MAX_BATCH`.
-   *
-   * `refoldOnOutOfOrder` is off because the derivation is order-insensitive:
-   * accumulators commute (sums, counters, min/max, bounded first-seen sets),
-   * steps are inserted by their own `startedAtMs`, and the metric overlay
-   * replaces per series. A late event folds onto the loaded state in place; no
-   * history replay derives anything. (See the 2026-07-23 outage: unbounded
-   * refolds starved ClickHouse merges into a platform-wide `TOO_MANY_PARTS`.)
-   *
-   * `readWindow` bounds the read-back to a partition-pruned window around the
-   * folded event's business time. The width covers the drift between an
-   * event's occurredAt and the row's StartedAt (the partition column) — a
-   * session resumed later than that still reads back correctly because the
-   * executor retries a windowed miss without the window.
+   * Read back committed state per ADR-066. A schema-gated miss refolds once;
+   * steady-state delivery never reads `event_log`. Out-of-order refolds stay
+   * off because accumulators commute and steps order by their own time. The
+   * window prunes StartedAt partitions, with an unbounded retry on a miss.
+   * See `CodingAgentSessionStore.getWithApplied` for the legacy checkpoint.
    */
   override options: FoldProjectionOptions = {
     refoldOnStoreMiss: true,

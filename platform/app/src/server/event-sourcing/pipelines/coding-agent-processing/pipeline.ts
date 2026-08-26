@@ -4,9 +4,9 @@ import {
   defineEvents,
   definePipeline,
   type FoldProjectionStore,
-  type TriggerContext,
   throttledWindow,
 } from "@langwatch/eventing";
+import type { GithubService } from "@langwatch/github-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
@@ -33,6 +33,7 @@ import {
 } from "./schemas/constants";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
 import {
+  createPullRequestMappingHandler,
   PULL_REQUEST_MAPPING_WINDOW_MS,
   pullRequestMappingGroupKey,
   pullRequestMappingJobId,
@@ -51,48 +52,20 @@ export interface CodingAgentProcessingPipelineDeps {
    * session's branch has hosted. Absent where there is no GitHub connection to
    * ask (the test app), in which case the pipeline mounts no subscriber at all.
    */
-  pullRequestMappingHandler?: (
-    event: CodingAgentProcessingEvent,
-    context: TriggerContext<CodingAgentSessionState>,
-  ) => Promise<void>;
+  github?: GithubService;
 }
 
 /**
- * The coding-agent pipeline (ADR-056).
- *
- * Aggregate: `coding_agent_session` — aggregateId is the tenant-scoped
- * provider session key (`session.id` / `gen_ai.conversation.id`, normalized),
- * or the trace id when the telemetry carried no session key.
- *
- * Write surface — one contribution command per OTLP signal, dispatched by
- * subscribers mounted on the source pipelines (the durable cross-pipeline
- * bridge ADR-055 established):
- * - contributeSpanFacts:   span ingestion → tool/model-call facts
- * - contributeLogFacts:    log-processing → the lifted scalar vocabulary
- * - contributeMetricFacts: metric-processing → converged per-series totals
- *
- * Projections:
- * - codingAgentSession (fold) → `coding_agent_sessions`, one row per session
- * - codingAgentTraceSessions (map) → `coding_agent_trace_sessions`, the
- *   (TenantId, TraceId) → SessionId seam the trace drawer resolves through
- * - sessionMetricSeries (map) → `session_metric_series`, the converged
- *   per-series totals (replace, never increment — ADR-056 §5)
- * - codingAgentSessionEvents (map) → `coding_agent_session_events`, one row
- *   per session event (model call, compaction, rate limit, tool run, …),
- *   the per-call sequence the session fold's converged totals erase
- *
- * Consumption is subscribers + projections, plus one subscriber on the session
- * fold: pullRequestMapping, which asks the organization's GitHub connection
- * about the session's branch once the row is committed — a genuine side
- * effect that earns the queue hop. Recording on the project that a session
- * ran at all is NOT a subscriber: the fold store stamps it inline after a commit
- * (`codingAgentSessionSeen.touch.ts`), the same seam-level throttled write the
- * gateway spend pipeline uses for virtual-key lastUsedAt. Commands default to
- * per-aggregate grouping, so one session's contributions apply in order.
+ * The session-keyed coding-agent pipeline from ADR-056. Source subscribers
+ * contribute bounded span, log, and metric facts; projections persist the
+ * session fold, trace map, converged metric series, and ordered session events.
+ * GitHub mapping is the only post-fold effect. Session-seen stamping remains
+ * an inline, throttled store concern.
  */
 export function createCodingAgentProcessingPipeline(
   deps: CodingAgentProcessingPipelineDeps,
 ) {
+  const github = deps.github;
   const builder = definePipeline<CodingAgentProcessingEvent>({
     name: "coding_agent_processing",
     aggregate: defineAggregate({
@@ -144,11 +117,11 @@ export function createCodingAgentProcessingPipeline(
     });
 
   return (
-    deps.pullRequestMappingHandler
+    github
       ? builder.withProjectionSubscriber("pullRequestMapping", {
           fold: "codingAgentSession",
           runIn: ["worker"],
-          when: (_event, context) => shouldMapPullRequests(context.state),
+          when: (_event, context) => shouldMapPullRequests(context.state, github),
           groupKeyFn: (event, state) =>
             pullRequestMappingGroupKey({
               tenantId: event.tenantId,
@@ -179,7 +152,7 @@ export function createCodingAgentProcessingPipeline(
             windowMs: PULL_REQUEST_MAPPING_WINDOW_MS,
             shouldSurviveDispatch: true,
           }),
-          handler: (event, context) => deps.pullRequestMappingHandler!(event, context),
+          handler: createPullRequestMappingHandler(github),
         })
       : builder
   ).build();

@@ -3,23 +3,23 @@
  * log-processing actually stores (attributes flattened as JSON).
  *
  * @see specs/coding-agent/session-aggregate.feature
- * @see specs/coding-agent/session-git-context.feature
+ * @see packages/features/coding-agent/specs/session-git-context.feature
  */
 
 import { createTenantId } from "@langwatch/eventing";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
+import { AppTraceRuntime } from "~/runtime/app/features/trace";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../../log-processing/schemas/events";
 import type { ContributeLogFactsCommandData } from "../../schemas/commands";
 import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
-} from "../../services/coding-agent-normalization";
+} from "@langwatch/coding-agent-contract";
 import { createCodingAgentLogFactsDispatchSubscriber } from "../codingAgentLogFactsDispatch.subscriber";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
-const traceCanonicalisation = TraceCanonicalisationService.create();
+const traceCanonicalisation = AppTraceRuntime.createCanonicalisation();
 
 function canonicalLogEvent({
   attributes,

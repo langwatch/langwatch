@@ -1,5 +1,5 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
@@ -45,7 +45,7 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
  */
 export class CodingAgentSessionStore implements FoldProjectionStore<CodingAgentSessionState> {
   constructor(
-    private readonly repo: CodingAgentSessionRepository,
+    private readonly persistence: CodingAgentProjectionPersistence,
     private readonly hooks: {
       /**
        * Called after a commit with the distinct tenants whose sessions were
@@ -64,7 +64,7 @@ export class CodingAgentSessionStore implements FoldProjectionStore<CodingAgentS
   ): Promise<void> {
     if (!hasPersistableSignal(state)) return;
     const entry = this.toRow(state, context);
-    await this.repo.upsert(entry.row, entry.retentionDays, entry.appliedEventIds);
+    await this.persistence.storeSession(entry);
     this.reportSessionsStored([String(context.tenantId)]);
   }
 
@@ -81,16 +81,7 @@ export class CodingAgentSessionStore implements FoldProjectionStore<CodingAgentS
     const tenantIds = [
       ...new Set(persistable.map(({ context }) => String(context.tenantId))),
     ];
-    if (this.repo.upsertBatch) {
-      await this.repo.upsertBatch(rows);
-      this.reportSessionsStored(tenantIds);
-      return;
-    }
-    await Promise.all(
-      rows.map(({ row, retentionDays, appliedEventIds }) =>
-        this.repo.upsert(row, retentionDays, appliedEventIds),
-      ),
-    );
+    await this.persistence.storeSessionBatch(rows);
     this.reportSessionsStored(tenantIds);
   }
 
@@ -127,66 +118,12 @@ export class CodingAgentSessionStore implements FoldProjectionStore<CodingAgentS
   }
 
   /**
-   * Read the session's last committed state back together with the
-   * applied-event-id watermark persisted next to it (ADR-066) — the
-   * CH-fallthrough side of the read path: `RedisCachedFoldStore` serves the warm
-   * cache and only calls this on a miss. The row round-trips the full working
-   * state — counters, ordered steps (with their start times), the sub-agent
-   * dedup set, the previous-call context size, and the converged metric units —
-   * plus the watermark, so a retry that reaches a cold cache can still recognise
-   * a batch it already committed. It never replays `event_log`; that is the
-   * offline rebuild path, not this one.
-   *
-   * Those columns are only trustworthy on a row written after migration 00053
-   * applied. On an older row every one of them decodes as a ClickHouse default
-   * indistinguishable from a real value — an empty `MetricSeries` makes the next
-   * metric contribution recompute lines/commits/PRs/edit-decisions/active-time
-   * from that one series alone and collapse everything already converged, an
-   * empty `SubAgentIds` makes the next sub-agent span reset `subAgents` to 1, an
-   * empty `StepStartedAt` starts every decoded step at 0 so later steps can only
-   * be appended in arrival order, and a zeroed `PreviousCallContextTokens` reads
-   * as "first call ever" so the next model call's cache rebuild is never
-   * detected. Such a row is reported as a MISS (null state, empty watermark —
-   * the same answer as "no row"), which the fold's `refoldOnStoreMiss` rebuilds
-   * from `event_log` once; the rewrite carries the current version and every
-   * later read hits. Transitional by construction: it stops firing as soon as
-   * the session is rewritten, and for the population as a whole once retention
-   * has aged the pre-00053 rows out.
-   *
-   * The DISCRIMINATOR is not the version alone. Migrations 00053 and 00054
-   * shipped their read-back columns WITHOUT bumping the stamp, so
-   * `2026-07-21` spans both sides of the change: rows written since those
-   * deployed carry it with every read-back column fully populated, and rejecting
-   * them would refold a large, live population from full `event_log` history for
-   * nothing — a regression against the behaviour this store replaces, on the
-   * very aggregate class behind the 2026-07-23 outage.
-   *
-   * `LastEventOccurredAt` separates the two halves by construction rather than
-   * by observation. It arrived in 00053, `init()`s to 0
-   * (`AbstractFoldProjection.init`), and is only ever `max(prev, occurredAt)`
-   * where the contribution schemas declare `occurredAt` a POSITIVE integer
-   * (`coding-agent-processing/schemas/contributions.ts`). So it is strictly
-   * positive on every row written by a build that had the column, and exactly 0
-   * on every row that predates it (the column's `DEFAULT 0`). A row is therefore
-   * decodable when it carries the current stamp, or the pre-bump stamp together
-   * with a non-zero checkpoint. The failure direction is safe: a session whose
-   * events were somehow all unhandled would read 0 and simply refold.
-   *
-   * That reasoning depends on the checkpoint being decoded as UTC — see
-   * `CodingAgentSessionClickHouseRepository`, which parses ClickHouse's
-   * zone-less DateTime64 through `parseClickHouseDateTimeMs`. Read as local
-   * time, a pre-00053 row's `1970-01-01 00:00:00.000` is positive anywhere west
-   * of UTC and the gate would accept exactly the rows it exists to reject.
-   *
-   * `context.readWindow` — computed by the executor from the fold's declared
-   * `options.readWindow` — prunes the read to a window of partitions around the
-   * event being folded; it is passed through verbatim. On an ABSENT windowed
-   * miss the EXECUTOR retries without the window, so a row outside it is still
-   * found; this store neither widens the window nor implements a fallback
-   * itself. A row that was FOUND and refused by the version gate is reported as
-   * `miss: "undecodable"`, and the executor deliberately does not retry it — a
-   * wider scope only finds the same row and refuses it again, so the retry was
-   * an unpruned scan per event per stale aggregate that could never succeed.
+   * Cold-cache reads carry the state and delivery watermark together. Rows from
+   * before migration 00053 lack essential read-back columns and must be an
+   * `undecodable` miss so one refold rebuilds them; an absent windowed row is
+   * the only miss the executor retries without the window. The pre-bump stamp
+   * is accepted only with positive `LastEventOccurredAt`, whose UTC-decoded
+   * default distinguishes old rows from a populated checkpoint.
    */
   async getWithApplied(
     aggregateId: string,
@@ -196,7 +133,7 @@ export class CodingAgentSessionStore implements FoldProjectionStore<CodingAgentS
     appliedEventIds: string[];
     miss?: "absent" | "undecodable";
   }> {
-    const found = await this.repo.findBySessionIdWithApplied({
+    const found = await this.persistence.loadSessionWithApplied({
       tenantId: String(context.tenantId),
       sessionId: aggregateId,
       window: context.readWindow,

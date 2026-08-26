@@ -1,7 +1,11 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { TraceService } from "@langwatch/trace-contract";
+import type {
+  TraceCanonicalisationService as TraceCanonicalisationServiceContract,
+  TraceService,
+} from "@langwatch/trace-contract";
 import {
   ClickHouseTraceAdapter,
+  TraceCanonicalisationService,
   type TraceQueryFieldValuesPort,
   type TraceClickHouseResolver,
 } from "@langwatch/trace-server";
@@ -22,6 +26,10 @@ export class AppTraceRuntime {
 
   static createNull(modelProviders: ModelProviderService): TraceService {
     return ClickHouseTraceAdapter.createNull(modelProviders);
+  }
+
+  static createCanonicalisation(): TraceCanonicalisationServiceContract {
+    return TraceCanonicalisationService.create();
   }
 
   build(): TraceService {

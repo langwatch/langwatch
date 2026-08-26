@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
@@ -15,7 +16,6 @@ import {
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -71,6 +71,8 @@ export interface TraceRequestCollectionResult {
 }
 
 export interface TraceRequestCollectionDeps {
+  codingAgents: CodingAgentService;
+  codingAgentSpanFilterEnabled: boolean;
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
   /**
@@ -332,8 +334,8 @@ export class TraceRequestCollectionService {
     // OTLP is untouched. Opt out globally with the kill-switch env var. Runs
     // before the dedup gate so a filtered span never takes a processing lock.
     if (
-      process.env.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER !== "true" &&
-      shouldFilterCodingAgentSpan({
+      this.deps.codingAgentSpanFilterEnabled &&
+      this.deps.codingAgents.shouldFilterSpan({
         scopeName: scope?.name,
         spanName: spanParseResult.data.name,
         attributeKeys: spanParseResult.data.attributes.map((a) => a.key),

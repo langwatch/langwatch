@@ -8,7 +8,7 @@ import {
   detectCodingAgent,
   isCodingAgentMetricName,
   resolveConversationKey,
-} from "../services/coding-agent-normalization";
+} from "@langwatch/coding-agent-contract";
 
 const logger = createLogger("langwatch:coding-agent:metric-facts-dispatch");
 

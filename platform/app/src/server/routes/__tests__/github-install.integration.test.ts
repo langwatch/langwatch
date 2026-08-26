@@ -21,6 +21,8 @@
 import { createHmac } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { App } from "~/server/app-layer/app";
+import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
+import { TestGithubService } from "~/test-utils/test-github.service";
 
 const { TEST_SIGNING_KEY } = vi.hoisted(() => {
   return { TEST_SIGNING_KEY: "x".repeat(64) };
@@ -39,6 +41,7 @@ const getServerAuthSession = vi.fn();
 const isOrganizationMember = vi.fn();
 const probeOrganizationPermission = vi.fn();
 const recordInstallation = vi.fn();
+const backfillPullRequestMappings = vi.fn();
 const handleWebhookEvent = vi.fn();
 const applyPullRequestEvent = vi.fn();
 const auditLog = vi.fn();
@@ -62,27 +65,50 @@ vi.mock(import("~/server/app-layer/permissions/imperative"), async (importOrigin
   probeOrganizationPermission: ((...args: unknown[]) =>
     probeOrganizationPermission(...args)) as never,
 }));
-const githubService = {
-  getAppConfig: () => appConfig,
-  getWebBase: () => "https://github.com",
-  getAppInstallUrl: () => "https://github.com/apps/langwatch-langy/installations/new",
-  getInstallStateTtlMs: () => 10 * 60 * 1000,
-  registerInstallNonce: vi.fn(async () => false),
-  tryConsumeInstallNonce: vi.fn(async () => true),
-  signInstallState: (payload: Record<string, unknown>) => signState(payload),
-  tryVerifyInstallState: (token: string | null | undefined) => verifyState(token),
-  popupResponseHtml: (login: string) => `<p>github-connected @${login}</p>`,
-  popupErrorHtml: (message: string) => `<p>github-error ${message}</p>`,
-  tryParsePullRequestEvent: (payload: unknown) => parsePullRequestEvent(payload),
-  isOrganizationMember: (...args: unknown[]) => isOrganizationMember(...args),
-  recordInstallation: (...args: unknown[]) => recordInstallation(...args),
-  handleWebhookEvent: (...args: unknown[]) => handleWebhookEvent(...args),
-  applyPullRequestEvent: (...args: unknown[]) => applyPullRequestEvent(...args),
-} as const;
+const githubService = TestGithubService.create();
+const codingAgents = TestCodingAgentService.create();
 
-const routeApp = { github: githubService } as unknown as App;
+vi.spyOn(githubService, "getAppConfig").mockImplementation(() => appConfig);
+vi.spyOn(githubService, "getWebBase").mockReturnValue("https://github.com");
+vi.spyOn(githubService, "getAppInstallUrl").mockReturnValue(
+  "https://github.com/apps/langwatch-langy/installations/new",
+);
+vi.spyOn(githubService, "getInstallStateTtlMs").mockReturnValue(10 * 60 * 1000);
+vi.spyOn(githubService, "registerInstallNonce").mockResolvedValue(false);
+vi.spyOn(githubService, "tryConsumeInstallNonce").mockResolvedValue(true);
+vi.spyOn(githubService, "signInstallState").mockImplementation(signState);
+vi.spyOn(githubService, "tryVerifyInstallState").mockImplementation(verifyState);
+vi.spyOn(githubService, "popupResponseHtml").mockImplementation(
+  (login) => `<p>github-connected @${login}</p>`,
+);
+vi.spyOn(githubService, "popupErrorHtml").mockImplementation(
+  (message) => `<p>github-error ${message}</p>`,
+);
+vi.spyOn(githubService, "tryParsePullRequestEvent").mockImplementation(
+  parsePullRequestEvent,
+);
+vi.spyOn(githubService, "isOrganizationMember").mockImplementation((input) =>
+  isOrganizationMember(input),
+);
+vi.spyOn(githubService, "recordInstallation").mockImplementation((input) =>
+  recordInstallation(input),
+);
+vi.spyOn(githubService, "handleWebhookEvent").mockImplementation((input) =>
+  handleWebhookEvent(input),
+);
+vi.spyOn(githubService, "applyPullRequestEvent").mockImplementation((event) =>
+  applyPullRequestEvent(event),
+);
+vi.spyOn(codingAgents, "backfillPullRequestMappings").mockImplementation((input) =>
+  backfillPullRequestMappings(input),
+);
 
-function signState(payload: Record<string, unknown>): string {
+const routeApp = {
+  github: githubService,
+  codingAgents,
+} as unknown as App;
+
+function signState(payload: object): string {
   const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
   const sig = createHmac("sha256", TEST_SIGNING_KEY).update(body).digest("base64url");
   return `${body}.${sig}`;
@@ -160,6 +186,7 @@ beforeEach(() => {
   isOrganizationMember.mockResolvedValue(true);
   probeOrganizationPermission.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
+  backfillPullRequestMappings.mockResolvedValue(undefined);
   applyPullRequestEvent.mockResolvedValue(true);
   isEnabled.mockResolvedValue(true);
 });
@@ -254,12 +281,29 @@ describe("GET /api/github/setup", () => {
         installationId: "555",
         organizationId: "org1",
       });
+      expect(backfillPullRequestMappings).toHaveBeenCalledWith({
+        organizationId: "org1",
+      });
       expect(auditLog).toHaveBeenCalledWith(
         expect.objectContaining({ action: "github.connection.install" }),
       );
       const html = await res.text();
       expect(html).toContain("github-connected");
       expect(html).toContain("@acme");
+    });
+
+    it("does not delay a completed installation when the backfill fails", async () => {
+      backfillPullRequestMappings.mockRejectedValueOnce(new Error("temporary failure"));
+      const state = await makeState({ mode: "popup" });
+
+      const res = await request(
+        `http://localhost/api/github/setup?installation_id=555&state=${encodeURIComponent(state)}`,
+      );
+
+      expect(res.status).toBe(200);
+      expect(backfillPullRequestMappings).toHaveBeenCalledWith({
+        organizationId: "org1",
+      });
     });
 
     it("302s back to the safe returnTo (redirect)", async () => {

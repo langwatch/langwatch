@@ -20,6 +20,7 @@
 import { GroupStagingScripts } from "@langwatch/group-queue/operational";
 import type { Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { TestGithubService } from "~/test-utils/test-github.service";
 import {
   startTestContainers,
   stopTestContainers,
@@ -30,7 +31,6 @@ import {
 } from "../../pipeline";
 import type { CodingAgentSessionState } from "../../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../../schemas/events";
-import { createPullRequestMappingHandler } from "../pullRequestMapping.subscriber";
 
 const QUEUE_NAME = "{test/prmap-throttle}";
 const TENANT_ID = "project-throttle";
@@ -66,9 +66,7 @@ const subscriber = createCodingAgentProcessingPipeline({
   codingAgentTraceSessionAppendStore: store,
   sessionMetricSeriesAppendStore: store,
   codingAgentSessionEventsAppendStore: store,
-  pullRequestMappingHandler: createPullRequestMappingHandler({
-    requestBranchMapping: async () => undefined,
-  }),
+  github: TestGithubService.create(),
 } as unknown as CodingAgentProcessingPipelineDeps).foldSubscribers.get(
   "pullRequestMapping",
 )!.definition;

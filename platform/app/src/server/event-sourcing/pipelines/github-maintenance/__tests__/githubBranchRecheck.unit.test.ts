@@ -8,16 +8,20 @@
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
+import { TestGithubService } from "~/test-utils/test-github.service";
 
 import { createGithubMaintenancePipeline } from "../pipeline";
+import {
+  runGithubBranchRecheck,
+  runGithubRetentionPrune,
+} from "../intents/github-branch-recheck.intent";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
   GITHUB_RETENTION_PRUNE_INTERVAL_MS,
   githubBranchRecheckWake,
-  runGithubBranchRecheck,
-  runGithubRetentionPrune,
 } from "../process-manager/githubBranchRecheck.process";
 
 const wakeContext = (at: number) => ({
@@ -35,11 +39,12 @@ const wakeContext = (at: number) => ({
   },
 });
 
-const noopDeps = {
-  recheck: async () => 0,
-  prune: async () => ({ branchChecks: 0, pullRequests: 0 }),
-  deleteDispatchedBefore: async () => 0,
-};
+function createDeps() {
+  return {
+    github: TestGithubService.create(),
+    processStore: new InMemoryProcessStore(),
+  };
+}
 
 describe("githubBranchRecheck process", () => {
   describe("given the schedule fires", () => {
@@ -101,7 +106,7 @@ describe("githubBranchRecheck process", () => {
         wakeContext(at) as never,
       );
 
-      expect(evolution.intents?.map((intent) => (intent as any).type)).toEqual([
+      expect(evolution.intents?.map((intent) => intent.type)).toEqual([
         "recheck",
         "prune",
       ]);
@@ -121,9 +126,10 @@ describe("githubBranchRecheck process", () => {
   describe("given branches are due", () => {
     describe("when the recheck intent runs", () => {
       it("runs exactly one pass", async () => {
-        const recheck = vi.fn(async () => 4);
+        const deps = createDeps();
+        const recheck = vi.spyOn(deps.github, "recheckDueBranches").mockResolvedValue(4);
 
-        await runGithubBranchRecheck({ ...noopDeps, recheck })();
+        await runGithubBranchRecheck(deps)();
 
         expect(recheck).toHaveBeenCalledOnce();
       });
@@ -133,18 +139,18 @@ describe("githubBranchRecheck process", () => {
   describe("given rows past the activity horizon", () => {
     describe("when the prune intent runs", () => {
       it("prunes them and its own bookkeeping rows", async () => {
-        const prune = vi.fn(async () => ({
+        const deps = createDeps();
+        const prune = vi.spyOn(deps.github, "pruneStaleBranchLinkage").mockResolvedValue({
           branchChecks: 12,
-          pullRequests: 3,
-        }));
-        const deleteDispatchedBefore = vi.fn(async () => 0);
+        });
+        const deleteDispatchedBefore = vi.spyOn(
+          deps.processStore,
+          "deleteDispatchedBefore",
+        );
 
-        await runGithubRetentionPrune({
-          ...noopDeps,
-          prune,
-          deleteDispatchedBefore,
-          now: () => 10_000_000,
-        })();
+        vi.spyOn(Date, "now").mockReturnValue(10_000_000);
+
+        await runGithubRetentionPrune(deps)();
 
         expect(prune).toHaveBeenCalledOnce();
         expect(deleteDispatchedBefore).toHaveBeenCalledWith({
@@ -154,20 +160,15 @@ describe("githubBranchRecheck process", () => {
       });
 
       it("still counts the prune as done when its own retention fails", async () => {
-        const prune = vi.fn(async () => ({
+        const deps = createDeps();
+        const prune = vi.spyOn(deps.github, "pruneStaleBranchLinkage").mockResolvedValue({
           branchChecks: 1,
-          pullRequests: 0,
-        }));
+        });
+        vi.spyOn(deps.processStore, "deleteDispatchedBefore").mockRejectedValue(
+          new Error("pg down"),
+        );
 
-        await expect(
-          runGithubRetentionPrune({
-            ...noopDeps,
-            prune,
-            deleteDispatchedBefore: async () => {
-              throw new Error("pg down");
-            },
-          })(),
-        ).resolves.toBeUndefined();
+        await expect(runGithubRetentionPrune(deps)()).resolves.toBeUndefined();
 
         expect(prune).toHaveBeenCalledOnce();
       });
@@ -179,7 +180,7 @@ describe("githubBranchRecheck process", () => {
       /** @scenario "The recheck sweep runs once per fleet, not once per replica" */
       it("registers the sweep as a scheduled process and appends no events", () => {
         const pipeline = createGithubMaintenancePipeline({
-          branchRecheck: noopDeps,
+          ...createDeps(),
         });
 
         const pm = pipeline.processManagers.get(GITHUB_BRANCH_RECHECK_PROCESS_NAME);

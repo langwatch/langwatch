@@ -25,7 +25,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { buildEntryTimeline } from "~/features/traces-v2/components/TraceDrawer/terminalView/terminalSession";
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import {
   createInitState,
   createSpanReceivedEvent,
@@ -36,7 +36,8 @@ import { TraceAnalyticsRollupMapProjection } from "~/server/event-sourcing/pipel
 import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { mapNormalizedSpanToSpan } from "~/server/traces/mappers/span.mapper";
-import { buildCodingAgentTranscript } from "../coding-agent-transcript.derivation";
+import { buildCodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import { AppTraceRuntime } from "~/runtime/app/features/trace";
 import {
   mapSpanSummaryRow,
   type SpanSummaryQueryRow,
@@ -78,6 +79,7 @@ const SHORT_LIVED_USD = 0.126069;
  * millionth of a dollar rather than bit for bit.
  */
 const CENTS_OF_A_CENT = 6;
+const traceCanonicalisation = AppTraceRuntime.createCanonicalisation();
 
 function claudeCallEvent(extra: Record<string, string | number> = {}): SpanReceivedEvent {
   return createSpanReceivedEvent({
@@ -98,6 +100,7 @@ const noopAppendStore = { append: async () => {}, bulkAppend: async () => {} };
 /** The trace header, and the trace list's cost column. */
 function traceSummaryCost(extra: CallExtra = {}): number | null {
   return new TraceSummaryFoldProjection({
+    traceCanonicalisation,
     store: noopFoldStore,
   }).handleTraceSpanReceived(claudeCallEvent(extra), createInitState()).totalCost;
 }
@@ -105,6 +108,7 @@ function traceSummaryCost(extra: CallExtra = {}): number | null {
 /** The analytics fold, which answers cost-over-time when the rollup cannot. */
 function traceAnalyticsCost(extra: CallExtra = {}): number | null {
   const projection = new TraceAnalyticsFoldProjection({
+    traceCanonicalisation,
     store: noopFoldStore,
   });
   return projection.handleTraceSpanReceived(claudeCallEvent(extra), projection.init())
@@ -114,6 +118,7 @@ function traceAnalyticsCost(extra: CallExtra = {}): number | null {
 /** The per-minute rollup the analytics graphs read by default. */
 function analyticsRollupCost(extra: CallExtra = {}): number {
   return new TraceAnalyticsRollupMapProjection({
+    traceCanonicalisation,
     store: noopAppendStore as never,
   }).mapTraceSpanReceived(claudeCallEvent(extra)).costSum;
 }
@@ -121,6 +126,7 @@ function analyticsRollupCost(extra: CallExtra = {}): number {
 /** `stored_spans.Cost`: the waterfall's per-span figure, and the CSV export's. */
 function storedSpanCost(extra: CallExtra = {}): number | null {
   return new SpanStorageMapProjection({
+    traceCanonicalisation,
     store: noopAppendStore as never,
   }).mapTraceSpanReceived(claudeCallEvent(extra)).cost;
 }
@@ -132,6 +138,7 @@ function storedSpanCost(extra: CallExtra = {}): number | null {
  */
 function recomputedSummaryRowCost(extra: CallExtra = {}): number | null {
   const attrs = new SpanStorageMapProjection({
+    traceCanonicalisation,
     store: noopAppendStore as never,
   }).mapTraceSpanReceived(claudeCallEvent(extra)).spanAttributes;
   const attr = (key: string): string => String(attrs[key] ?? "");
@@ -177,6 +184,7 @@ function recomputedSummaryRowCost(extra: CallExtra = {}): number | null {
  */
 function terminalFooterCost(extra: CallExtra = {}): number {
   const stored = new SpanStorageMapProjection({
+    traceCanonicalisation,
     store: noopAppendStore as never,
   }).mapTraceSpanReceived(claudeCallEvent(extra));
   const span = mapNormalizedSpanToSpan(stored);

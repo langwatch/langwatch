@@ -5,7 +5,7 @@ import {
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
   LOGS_ONLY_AGENT_IDS,
   WRAPPER_TOOL_NAMES_BY_AGENT_ID,
-} from "../agents";
+} from "@langwatch/coding-agent-contract";
 import {
   detectCodingAgent,
   normalizeEventName,
@@ -14,7 +14,7 @@ import {
   SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
-} from "./coding-agent-normalization";
+} from "@langwatch/coding-agent-contract";
 import type {
   CodingAgentSessionData,
   MetricSeriesFact,
@@ -23,34 +23,10 @@ import type {
 } from "./coding-agent-session.types";
 
 /**
- * Derive a coding-agent SESSION from its contributions (ADR-056,
- * specs/coding-agent/session-aggregate.feature).
- *
- * The signals split the story:
- *
- *   spans   — the structure, the timings, the tokens, the finish reason
- *   logs    — the cost, the denials, the errors, the compactions, the hooks
- *   metrics — what actually came OUT of it: lines changed, commits, PRs, and
- *             the time a human spent
- *
- * Read only the spans and you cannot see a tool the user DENIED (it never ran,
- * so it has no span). Read only the logs and you cannot see how long anything
- * took. Read neither and you cannot see that the session produced two commits.
- *
- * Unlike PR #5708's trace-keyed fold, this derivation never sees a raw span
- * or a raw log record: the source pipelines' dispatchers gate, normalize and
- * lift, and what arrives here is a contribution's scalar facts. The gates
- * therefore live with the dispatchers; everything here is application.
- *
- * AGENT-GENERIC in shape; span coverage is per adapter. Every coding agent
- * has a finish reason, tools, sub-agents, an approval mode, retries,
- * compaction: the columns are generic, and what differs is only WHERE each
- * fact is read from, which lives in the {@link CLAUDE} and {@link CODEX}
- * adapters below. Telemetry from the other agents the vocabulary layer
- * recognises flows through the gates but produces no span-fed session facts
- * until its adapter is written — do not point product claims at them.
- *
- * PURE, LIGHT and BOUNDED — see `coding-agent-session.types.ts`.
+ * Pure, bounded session derivation over lifted scalar contributions (ADR-056).
+ * Spans supply structure and timing, logs decisions and lifecycle, and metrics
+ * outcomes. Source subscribers own admission and normalisation; agent-specific
+ * span extraction remains in the adapters below.
  */
 
 /** Ordered steps we keep. Enough for the shape of any session to survive. */

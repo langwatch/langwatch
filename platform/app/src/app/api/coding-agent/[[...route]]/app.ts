@@ -1,11 +1,13 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { ValidationError } from "@langwatch/handled-error";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
+import {
+  MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
+  type CodingAgentSessionCursor,
+} from "@langwatch/coding-agent-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
-import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
-import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import { resolveCallerProjectScope } from "~/server/organizations/resolveCallerProjectScope";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -18,7 +20,7 @@ patchZodOpenapi();
 // Rejected here so an over-large `limit` is refused outright rather than
 // silently answered with a narrower page; the service clamps to the same
 // ceiling for every other caller.
-const MAX_PAGE = MAX_SESSION_EVENTS_PAGE_SIZE;
+const MAX_PAGE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
 const DEFAULT_PAGE = 500;
 
 const EVENT_KINDS = [
@@ -178,7 +180,7 @@ secured.access(requires("traces:view")).get(
       throw new ValidationError("from and to must be supplied together");
     }
 
-    const { events, nextCursor } = await c.app.codingAgents.sessions.getSessionEvents({
+    const { events, nextCursor } = await c.app.codingAgents.getSessionEvents({
       projectId: project.id,
       sessionId,
       kinds,
@@ -234,13 +236,13 @@ const eventsQuerySchema = z.object({
     }),
 });
 
-function encodeCursor(cursor: SessionEventsCursor): string {
+function encodeCursor(cursor: CodingAgentSessionCursor): string {
   return Buffer.from(
     JSON.stringify({ t: cursor.timeUnixMs, r: cursor.recordId }),
   ).toString("base64url");
 }
 
-function decodeCursor(raw: string): SessionEventsCursor | null {
+function decodeCursor(raw: string): CodingAgentSessionCursor | null {
   try {
     const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as {
       t?: unknown;
@@ -424,7 +426,7 @@ secured.access(requires("traces:view")).get(
       organizationId,
     });
 
-    const usage = await c.app.codingAgents.pullRequestUsage.getPullRequestUsage({
+    const usage = await c.app.codingAgents.getPullRequestUsage({
       organizationId,
       repositoryHost: query.data.host,
       repositoryFullName: query.data.repository,

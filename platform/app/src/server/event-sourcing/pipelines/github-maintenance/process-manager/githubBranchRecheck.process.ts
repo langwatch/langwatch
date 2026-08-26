@@ -1,8 +1,5 @@
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-
-const logger = createLogger("langwatch:github:branch-recheck");
 
 export const GITHUB_BRANCH_RECHECK_PROCESS_NAME = "githubBranchRecheck";
 
@@ -27,12 +24,6 @@ export const GITHUB_BRANCH_RECHECK_INTERVAL_MS = 10 * 60 * 1000;
  */
 export const GITHUB_RETENTION_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Outbox rows this process writes are pure bookkeeping (one or two per tick),
- * pruned on the schedule the high-frequency recurring processes use.
- */
-const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
-
 export const githubBranchRecheckSchema = z.object({
   scheduledFor: z.number().int(),
 });
@@ -46,18 +37,6 @@ export const GITHUB_BRANCH_RECHECK_INITIAL_STATE: GithubBranchRecheckState = {
   lastRecheckAt: null,
   lastPruneAt: null,
 };
-
-export interface GithubBranchRecheckDeps {
-  /** One sweep pass; returns how many branches were rechecked. */
-  recheck: () => Promise<number>;
-  /** Deletes the bookkeeping past the activity horizon; returns what it removed. */
-  prune: () => Promise<{ branchChecks: number }>;
-  deleteDispatchedBefore: (params: {
-    processName: string;
-    before: number;
-  }) => Promise<number>;
-  now?: () => number;
-}
 
 type GithubBranchRecheckIntents = {
   recheck: IntentSpec<typeof githubBranchRecheckSchema>;
@@ -95,37 +74,3 @@ export const githubBranchRecheckWake: WakeHandler<
     ],
   };
 };
-
-export function runGithubBranchRecheck(deps: GithubBranchRecheckDeps) {
-  return async (): Promise<void> => {
-    const rechecked = await deps.recheck();
-    if (rechecked > 0) {
-      logger.info({ rechecked }, "branch recheck tick complete");
-    }
-  };
-}
-
-export function runGithubRetentionPrune(deps: GithubBranchRecheckDeps) {
-  return async (): Promise<void> => {
-    const startedAt = (deps.now ?? Date.now)();
-    const { branchChecks } = await deps.prune();
-    if (branchChecks > 0) {
-      logger.info(
-        { branchChecks },
-        "GitHub branch bookkeeping pruned past the activity horizon",
-      );
-    }
-
-    try {
-      await deps.deleteDispatchedBefore({
-        processName: GITHUB_BRANCH_RECHECK_PROCESS_NAME,
-        before: startedAt - OUTBOX_ROW_RETENTION_MS,
-      });
-    } catch (error) {
-      logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
-        "GitHub branch recheck outbox retention failed",
-      );
-    }
-  };
-}

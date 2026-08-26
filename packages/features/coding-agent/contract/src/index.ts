@@ -1,5 +1,7 @@
 export * from "./coding-agent";
 export * from "./coding-agent.service";
+export * from "./coding-agent-trace-pull-request";
+export * from "./coding-agent-projection-persistence";
 export * from "./telemetry";
 export * from "./telemetry/coding-agent-normalization";
 // Temporary test/pure-derivation compatibility exports; production app paths

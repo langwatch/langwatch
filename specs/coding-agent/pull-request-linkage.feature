@@ -1,15 +1,14 @@
 # Pull request linkage, sessions mapped to GitHub pull requests and priced
 #
 # Implementation:
-#   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts   (branch-to-PR mapping + negative cache)
-#   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
+#   packages/features/github/server/src/services/github-pull-request-mapping.service.ts (branch-to-PR mapping + negative cache)
+#   packages/features/github/server/src/adapters/github-pull-request-event.adapter.ts   (the pull_request webhook payload, validated)
 #   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
-#   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
+#   packages/features/github/server/src/services/github-pull-request-status.service.ts  (live status, Redis-cached, never the queue)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
-#   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
-#   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
+#   packages/features/coding-agent/server/src/services/coding-agent-pull-request-assignment.service.ts (session-to-PR tenure rule)
+#   packages/features/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts      (org-first usage rollup)
+#   packages/features/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts (per-model totals)
 #   platform/app/src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
 #   platform/app/src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
 #   platform/app/src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)

@@ -8,14 +8,7 @@ import {
   encodeSessionGroupsCursor,
   keysetCursorFor,
 } from "./session-groups.cursor";
-import {
-  branchKeysOf,
-  type GithubPullRequestLookup,
-  linkableSessions,
-  linkPullRequestsToSessions,
-  NullGithubPullRequestLookup,
-  type SessionGroupPullRequestDto,
-} from "./session-groups.pull-request-link";
+import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import { teaserOf } from "./visibility-window.service";
 
 /**
@@ -133,6 +126,12 @@ export interface SessionGroupsResult {
   nextCursor: string | null;
 }
 
+export interface SessionGroupPullRequestDto {
+  number: number;
+  htmlUrl: string;
+  title: string;
+}
+
 interface SessionGroupsParams {
   tenantId: string;
   timeRange: { from: number; to: number; live?: boolean };
@@ -146,19 +145,6 @@ interface SessionGroupsParams {
    * get their input/output previews teaser-redacted, like the trace list.
    */
   visibilityCutoffMs?: number | null;
-}
-
-/**
- * The narrow slice of {@link CodingAgentSessionService} this read needs.
- * Structural on purpose: the full session row satisfies it, and tests can
- * hand in a plain object.
- */
-export interface CodingAgentSessionLookup {
-  tryGetBySessionId(args: {
-    projectId: string;
-    sessionId: string;
-    startedAtMs?: number;
-  }): Promise<Omit<SessionGroupCodingAgentDto, "pullRequest"> | null>;
 }
 
 export function mapSessionGroupRowToDto({
@@ -194,8 +180,7 @@ export function mapSessionGroupRowToDto({
 
 export class SessionGroupsService {
   private readonly repository: SessionGroupsRepository;
-  private readonly codingAgentSessions: CodingAgentSessionLookup;
-  private readonly pullRequests: GithubPullRequestLookup;
+  private readonly codingAgentSessions: CodingAgentService;
   /**
    * The lens is project-scoped but pull requests are org-scoped, so the join
    * needs the owning organization. Returns undefined for an orphan project,
@@ -208,17 +193,14 @@ export class SessionGroupsService {
   constructor({
     repository,
     codingAgentSessions,
-    pullRequests = new NullGithubPullRequestLookup(),
     resolveOrganizationId = async () => undefined,
   }: {
     repository: SessionGroupsRepository;
-    codingAgentSessions: CodingAgentSessionLookup;
-    pullRequests?: GithubPullRequestLookup;
+    codingAgentSessions: CodingAgentService;
     resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
   }) {
     this.repository = repository;
     this.codingAgentSessions = codingAgentSessions;
-    this.pullRequests = pullRequests;
     this.resolveOrganizationId = resolveOrganizationId;
   }
 
@@ -353,20 +335,37 @@ export class SessionGroupsService {
     rows: SessionGroupRow[];
     enrichments: (SessionGroupCodingAgentDto | null)[];
   }): Promise<void> {
-    const linkable = linkableSessions({ rows, enrichments });
-    if (linkable.length === 0) return;
-
     try {
       const organizationId = await this.resolveOrganizationId(tenantId);
       if (!organizationId) return;
 
-      const pullRequests = await this.pullRequests.findForBranches({
+      const links = await this.codingAgentSessions.linkTraceSessionsToPullRequests({
         organizationId,
-        keys: branchKeysOf(linkable),
-      });
-      if (pullRequests.length === 0) return;
+        sessions: rows.map((row, index) => {
+          const codingAgent = enrichments[index];
 
-      linkPullRequestsToSessions({ linkable, pullRequests });
+          return {
+            sessionId: row.conversationId,
+            startedAtMs: row.startedAtMs,
+            repositoryHost: codingAgent?.repositoryHost ?? null,
+            repositoryOwner: codingAgent?.repositoryOwner ?? null,
+            repositoryName: codingAgent?.repositoryName ?? null,
+            gitBranch: codingAgent?.gitBranch ?? null,
+          };
+        }),
+      });
+
+      const pullRequestBySessionId = new Map(
+        links.map((link) => [link.sessionId, link.pullRequest]),
+      );
+
+      rows.forEach((row, index) => {
+        const pullRequest = pullRequestBySessionId.get(row.conversationId);
+        const codingAgent = enrichments[index];
+        if (pullRequest && codingAgent) {
+          codingAgent.pullRequest = pullRequest;
+        }
+      });
     } catch {
       // Unlinked is a correct answer; a failed join must not take the list down.
     }

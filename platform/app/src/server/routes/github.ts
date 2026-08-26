@@ -29,6 +29,7 @@ import { auditLog } from "~/runtime/app/features/audit-log";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type {
   GithubInstallStatePayload,
@@ -102,7 +103,7 @@ const POPUP_CSP =
   "form-action 'none'; " +
   "frame-ancestors 'none'";
 
-function popupHtml(c: Context, body: string, status: number): Response {
+function popupHtml(c: Context, body: string, status: ContentfulStatusCode): Response {
   c.header("Content-Security-Policy", POPUP_CSP);
   c.header("X-Frame-Options", "DENY");
   return c.html(body, status);
@@ -118,7 +119,7 @@ function setupError({
   c: Context;
   state: GithubInstallStatePayload | null;
   errorMessage: string;
-  status: number;
+  status: ContentfulStatusCode;
 }): Response {
   if (state && state.mode === "redirect") {
     const returnTo = safeReturnTo(state.returnTo);
@@ -229,6 +230,15 @@ async function handleSetup(c: Context): Promise<Response> {
       ? popupHtml(c, service.popupErrorHtml(publicMsg), 502)
       : c.redirect(withGithubError(returnTo, publicMsg), 302);
   }
+
+  void c.app.codingAgents
+    .backfillPullRequestMappings({ organizationId: state.organizationId })
+    .catch((error: unknown) => {
+      logger.warn(
+        { error, organizationId: state.organizationId, installationId },
+        "GitHub installation pull-request backfill failed",
+      );
+    });
 
   await recordInstallAudit({ state, installationId, accountLogin });
 

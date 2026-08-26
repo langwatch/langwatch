@@ -3,21 +3,14 @@ import type {
   BulkAppendContext,
   ProjectionStoreContext,
 } from "@langwatch/eventing";
-import type { CodingAgentSessionEventsRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
-import type { CodingAgentTraceSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
-import type { SessionMetricSeriesRepository } from "~/server/app-layer/coding-agent/repositories/session-metric-series.repository";
+import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { CodingAgentSessionEventRecord } from "./codingAgentSessionEvents.mapProjection";
 import type { CodingAgentTraceSessionRecord } from "./codingAgentTraceSessions.mapProjection";
 import type { SessionMetricSeriesRecord } from "./sessionMetricSeries.mapProjection";
 
-/** A repository that writes a batch of records under one retention stamp. */
-interface RetentionAwareEnsurePort<TRecord> {
-  ensure(records: TRecord[], retentionDays: number): Promise<void>;
-}
-
 /**
- * Appends records through a repository's retention-stamped `ensure`.
+ * Appends records through Coding Agent's named projection-persistence adapter.
  *
  * Every coding-agent map projection writes the same way: one `ensure` per
  * batch, stamped with the tenant's trace retention and falling back to the
@@ -25,8 +18,11 @@ interface RetentionAwareEnsurePort<TRecord> {
  * so that fallback is load-bearing, and holding it in one place is what keeps
  * a change to it from having to be repeated once per store.
  */
-class EnsureAppendStore<TRecord> implements AppendStore<TRecord> {
-  constructor(private readonly repository: RetentionAwareEnsurePort<TRecord>) {}
+abstract class CodingAgentAppendStore<TRecord> implements AppendStore<TRecord> {
+  protected abstract appendRecords(
+    records: TRecord[],
+    retentionDays: number,
+  ): Promise<void>;
 
   async append(record: TRecord, context: ProjectionStoreContext): Promise<void> {
     await this.bulkAppend([record], context);
@@ -37,27 +33,48 @@ class EnsureAppendStore<TRecord> implements AppendStore<TRecord> {
     context: ProjectionStoreContext | BulkAppendContext,
   ): Promise<void> {
     if (records.length === 0) return;
-    await this.repository.ensure(
+    await this.appendRecords(
       records,
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     );
   }
 }
 
-export class CodingAgentTraceSessionAppendStore extends EnsureAppendStore<CodingAgentTraceSessionRecord> {
-  constructor(repository: CodingAgentTraceSessionRepository) {
-    super(repository);
+export class CodingAgentTraceSessionAppendStore extends CodingAgentAppendStore<CodingAgentTraceSessionRecord> {
+  constructor(private readonly persistence: CodingAgentProjectionPersistence) {
+    super();
+  }
+
+  protected appendRecords(
+    records: CodingAgentTraceSessionRecord[],
+    retentionDays: number,
+  ): Promise<void> {
+    return this.persistence.appendTraceSessions(records, retentionDays);
   }
 }
 
-export class CodingAgentSessionEventsAppendStore extends EnsureAppendStore<CodingAgentSessionEventRecord> {
-  constructor(repository: CodingAgentSessionEventsRepository) {
-    super(repository);
+export class CodingAgentSessionEventsAppendStore extends CodingAgentAppendStore<CodingAgentSessionEventRecord> {
+  constructor(private readonly persistence: CodingAgentProjectionPersistence) {
+    super();
+  }
+
+  protected appendRecords(
+    records: CodingAgentSessionEventRecord[],
+    retentionDays: number,
+  ): Promise<void> {
+    return this.persistence.appendSessionEvents(records, retentionDays);
   }
 }
 
-export class SessionMetricSeriesAppendStore extends EnsureAppendStore<SessionMetricSeriesRecord> {
-  constructor(repository: SessionMetricSeriesRepository) {
-    super(repository);
+export class SessionMetricSeriesAppendStore extends CodingAgentAppendStore<SessionMetricSeriesRecord> {
+  constructor(private readonly persistence: CodingAgentProjectionPersistence) {
+    super();
+  }
+
+  protected appendRecords(
+    records: SessionMetricSeriesRecord[],
+    retentionDays: number,
+  ): Promise<void> {
+    return this.persistence.appendMetricSeries(records, retentionDays);
   }
 }

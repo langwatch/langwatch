@@ -7,6 +7,7 @@
     "paths": {
       "zod": ["../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"],
       "@langwatch/coding-agent-contract": ["../contract/src/index.ts"],
+      "@langwatch/coding-agent-contract/testing": ["../contract/src/testing.ts"],
       "@langwatch/github-contract": ["../../github/contract/src/index.ts"],
       "@langwatch/project-contract": ["../../project/contract/src/index.ts"]
     },

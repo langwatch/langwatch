@@ -25,56 +25,17 @@ import {
   CODING_AGENT_CONTRIBUTION_KEYS,
   detectCodingAgent,
   resolveSpanConversationKey,
-} from "../services/coding-agent-normalization";
+} from "@langwatch/coding-agent-contract";
 import { isCodingAgentSessionSpan } from "../services/coding-agent-session.derivation";
 
 const logger = createLogger("langwatch:coding-agent-processing:span-facts-dispatch");
 
 /**
- * The span→session dispatcher (ADR-056 §2): a subscriber on trace-processing's
- * stored `span_received` events that lifts a coding-agent span's facts and
- * contributes them to its session.
- *
- * Payload-cost shape (ADR-069):
- *
- *   - `enqueue.filter` runs the RAW span-name gate at the fan-out seam, so a
- *     span from any other trace never mints a job. Every span in the project
- *     flows past that predicate; one set lookup keeps an ordinary chat trace's
- *     cost at zero. Origin gating is exactly this predicate — no gate subscriber
- *     (ADR-056 §3).
- *   - A `span_facts_lifted` job carries a bounded derivation: the facts, already
- *     lifted, on the job itself. The handler contributes them directly. Nothing
- *     is read back, so nothing races. **This is the shape this build STAGES**
- *     (R2 — see the deploy-order note below).
- *   - A `span_referenced` claim-check carries the span's identity, not its
- *     payload, and the handler reads the canonical span back from the span
- *     store. That read races the sibling spanStorage write, which is the
- *     failure the derivation shape exists to remove: on 2026-08-05 it parked 22
- *     per-trace groups in `:blocked`, and on 2026-08-10 the same class blocked
- *     88 groups while the error rate rose ~10x. This build no longer stages it;
- *     the handler keeps resolving it so references already in Redis drain.
- *   - A full `span_received` job still processes exactly as before references
- *     existed: jobs staged by a previous release, and matched events the seam
- *     could not lift, carry the whole event, and the handler normalizes
- *     inline in its own lane.
- *
- * **Deploy order (ADR-069).** The CONSUMER half shipped in #6621 and has been
- * live for a full release, so this build is the PRODUCER flip: it stages
- * `span_facts_lifted`, which every worker already knows how to read. Anything a
- * build cannot read at all throws instead of returning, so the next crossing of
- * this boundary fails as a retry rather than as a silent loss.
- *
- * **Why the flip is the fix, not a tuning knob.** The claim-check's retry budget
- * is finite (25 attempts, ~2h27m). The spanStorage map projection it reads from
- * is sharded into 128 lanes per tenant and coalesces 256 spans per dispatch
- * (`spanStorageGroupKey.ts`), while this subscriber keys one group PER TRACE.
- * A tenant with heavy coding-agent traffic therefore mints thousands of
- * per-trace groups that contend with those 128 lanes for the same per-tenant
- * in-flight soft cap — so the harder the tenant pushes, the later its spans
- * land, and the more claim-checks burn attempts against a store that has not
- * caught up. Every failed attempt re-queues, which adds contention, which
- * delays the write further. Removing the read-back breaks that loop at its
- * source; no cap or backoff tuning does.
+ * Dispatches admitted coding-agent spans as bounded session facts (ADR-056/069).
+ * The enqueue filter prevents unrelated spans from creating jobs. New jobs
+ * carry lifted facts and need no racing store read. Legacy `span_referenced`
+ * and full `span_received` payloads remain readable so queued work from earlier
+ * releases can drain safely.
  */
 export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   traceCanonicalisation: TraceCanonicalisationService;

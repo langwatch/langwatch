@@ -1,8 +1,8 @@
 # The organization GitHub connection, one GitHub App installation per org
 #
 # Implementation:
-#   platform/app/src/server/app-layer/github/github-installations.service.ts (record/list/mint, webhook handling)
-#   platform/app/src/server/app-layer/github/githubAppToken.ts               (app JWT, installation tokens, GitHub API client)
+#   packages/features/github/server/src/services/github-installations.service.ts (record/list/mint, webhook handling)
+#   packages/features/github/server/src/adapters/github-app-token.adapter.ts     (app JWT, installation tokens, GitHub API client)
 #   platform/app/src/server/routes/github.ts                                 (install / setup / webhook routes + legacy aliases)
 #   platform/app/src/server/api/routers/github.ts                            (connection status, repos, disconnect, live PR status)
 #   platform/app/src/pages/settings/integrations.tsx                         (the settings surface)

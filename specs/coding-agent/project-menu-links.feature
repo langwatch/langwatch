@@ -5,7 +5,7 @@
 #   packages/features/project/server/src/services/project.service.ts                                               (the throttled touch methods)
 #   packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch.ts (the fold-commit stamp)
-#   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts                                (the pull-request trigger)
+#   packages/features/github/server/src/services/github-pull-request-mapping.service.ts                          (the pull-request trigger)
 #   platform/app/src/components/sidebar/codingAgentActivity.ts                                                     (the recency rule)
 #   platform/app/src/components/MainMenu.tsx                                                                       (the two destinations)
 #   platform/app/src/pages/[project]/sessions.tsx                                                                  (the project Sessions page)

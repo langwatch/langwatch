@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldFilterCodingAgentSpan } from "../coding-agent-span-filter";
+import { shouldFilterCodingAgentSpan } from "@langwatch/coding-agent-contract";
 
 describe("shouldFilterCodingAgentSpan", () => {
   describe("given a codex_cli_rs span", () => {

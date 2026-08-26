@@ -1,45 +1,33 @@
-import {
-  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
-  type CodingAgentSessionRow,
-} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { codingAgentSessionSchema, type CodingAgentSession } from "./coding-agent";
 
-/**
- * A `coding_agent_sessions` row at rest: every column present, every counter
- * zero, so a test names only the handful of fields its scenario is about.
- *
- * The fold builds these from events; the pull-request suites need them seeded
- * directly, because what they exercise starts AFTER the row is committed.
- */
-export function codingAgentSessionRow(
-  over: Partial<CodingAgentSessionRow> & {
-    tenantId: string;
-    sessionId: string;
-  },
-): CodingAgentSessionRow {
-  const now = Date.now();
-  return {
+export const CODING_AGENT_TEST_NOW_MS = Date.parse("2026-08-20T12:00:00.000Z");
+
+export function codingAgentSessionFixture(
+  overrides: Partial<CodingAgentSession> = {},
+): CodingAgentSession {
+  return codingAgentSessionSchema.parse({
+    tenantId: "project-1",
+    sessionId: "session-1",
     sessionKeySource: "provider",
-    version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
-    startedAtMs: now,
-
+    version: "2026-07-21",
+    startedAtMs: CODING_AGENT_TEST_NOW_MS - 60_000,
     agent: "claude_code",
-    agentVersion: "2.0.0",
+    agentVersion: "",
     traceIds: [],
     finalRequestId: "",
-    userId: "",
+    userId: "user-1",
     terminalType: "",
-    entrypoint: "cli",
+    entrypoint: "",
     parentSessionId: "",
     isFork: false,
-    repositoryHost: "",
-    repositoryOwner: "",
-    repositoryName: "",
-    gitBranch: "",
+    repositoryHost: "github.com",
+    repositoryOwner: "langwatch",
+    repositoryName: "langwatch",
+    gitBranch: "main",
     gitBranches: [],
     gitWorktree: "",
     title: "",
     titleSource: "",
-
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,
@@ -47,7 +35,6 @@ export function codingAgentSessionRow(
     promptChars: 0,
     responseChars: 0,
     steps: [],
-
     toolCounts: {},
     toolDurationMs: {},
     filesTouched: [],
@@ -57,14 +44,12 @@ export function codingAgentSessionRow(
     models: [],
     mcpServers: [],
     mcpTools: [],
-
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
     agentReportedCostUsd: 0,
-
     modelCallMs: 0,
     toolMs: 0,
     ttftMsTotal: 0,
@@ -72,7 +57,6 @@ export function codingAgentSessionRow(
     blockedOnUserMs: 0,
     activeTimeUserSec: 0,
     activeTimeCliSec: 0,
-
     toolResultBytes: 0,
     toolInputBytes: 0,
     compactions: 0,
@@ -82,7 +66,6 @@ export function codingAgentSessionRow(
     peakContextTokens: 0,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
-
     failedTools: 0,
     errorTypes: {},
     apiErrors: 0,
@@ -94,15 +77,13 @@ export function codingAgentSessionRow(
     refusals: 0,
     refusalCategories: [],
     internalErrors: 0,
-
     toolsDenied: 0,
     toolsAborted: 0,
-    permissionMode: "default",
+    permissionMode: "",
     permissionChanges: 0,
     hooksBlocked: 0,
     hooksCancelled: 0,
     hookMs: 0,
-
     linesAdded: 0,
     linesRemoved: 0,
     commits: 0,
@@ -111,18 +92,15 @@ export function codingAgentSessionRow(
     editsRejected: 0,
     languagesEdited: [],
     atMentions: 0,
-
-    stopReason: "end_turn",
+    stopReason: "",
     truncated: false,
-
     subAgentIds: [],
     stepStartedAt: [],
     previousCallContextTokens: 0,
     metricSeries: [],
-    createdAt: now,
-    updatedAt: now,
-    lastEventOccurredAt: now,
-
-    ...over,
-  };
+    createdAt: CODING_AGENT_TEST_NOW_MS - 60_000,
+    updatedAt: CODING_AGENT_TEST_NOW_MS - 1_000,
+    lastEventOccurredAt: CODING_AGENT_TEST_NOW_MS - 1_000,
+    ...overrides,
+  });
 }

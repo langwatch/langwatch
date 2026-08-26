@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { contentAttrKeys, logContentKeys } from "../coding-agent-log-content";
+import { contentAttrKeys, logContentKeys } from "@langwatch/coding-agent-contract";
 
 function categoryOf(eventName: string, key: string): string | undefined {
   return logContentKeys(eventName).find((entry) => entry.key === key)?.category;
@@ -149,10 +149,19 @@ const KNOWN_METADATA_ATTRS: ReadonlySet<string> = new Set([
 
 describe("the derivation cannot read a content attribute the table misses", () => {
   it("classifies every log attribute the transcript derivation reads", () => {
-    const derivation = readFileSync(
-      join(__dirname, "..", "coding-agent-transcript.derivation.ts"),
-      "utf8",
-    );
+    const services = [
+      "coding-agent-transcript-log.ts",
+      "coding-agent-transcript-note.ts",
+      "coding-agent-transcript-state.ts",
+    ];
+    const derivation = services
+      .map((file) =>
+        readFileSync(
+          join(process.cwd(), "../../packages/features/coding-agent/contract/src", file),
+          "utf8",
+        ),
+      )
+      .join("\n");
     // `readString(attrs, "x")` / `readNumber(attrs, "x")` — the only way the
     // derivation reaches a log attribute by name.
     const read = [

@@ -1,12 +1,6 @@
 import type { TriggerContext } from "@langwatch/eventing";
+import type { GithubService } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
-import { GithubCompositionAdapter } from "@langwatch/github-server";
-import { env } from "~/env.mjs";
-
-const isMappableGithubHost = (host: string) =>
-  GithubCompositionAdapter.isMappableGithubHost(host, {
-    host: env.GITHUB_LANGY_HOST,
-  });
 import type { CodingAgentSessionState } from "../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../schemas/events";
 
@@ -32,16 +26,11 @@ const logger = createLogger("langwatch:coding-agent-processing:pull-request-mapp
  */
 export const PULL_REQUEST_MAPPING_WINDOW_MS = 30 * 1000;
 
-/** What the subscriber needs from the mapping service. */
-export interface PullRequestMappingSubscriberDeps {
-  requestBranchMapping(params: {
-    tenantId: string;
-    repositoryHost: string;
-    repositoryOwner: string;
-    repositoryName: string;
-    headBranch: string;
-  }): Promise<void>;
-}
+type PullRequestMappingState = {
+  repositoryOwner: string | null;
+  repositoryName: string | null;
+  gitBranch: string | null;
+};
 
 /**
  * Pure hot-path guard. Most sessions carry no git context at all (only agents
@@ -51,22 +40,22 @@ export interface PullRequestMappingSubscriberDeps {
  * pure queue traffic.
  */
 export function shouldMapPullRequests(
-  state: Pick<
-    CodingAgentSessionState,
-    "repositoryHost" | "repositoryOwner" | "repositoryName" | "gitBranch"
-  >,
+  input: {
+    repositoryHost?: string | null;
+    repositoryOwner?: string | null;
+    repositoryName?: string | null;
+    gitBranch?: string | null;
+  },
+  github: GithubService,
 ): boolean {
-  // The same host rule the mapping service applies, read from the one place
-  // that knows which GitHub this instance is bound to. Applying it here as well
-  // is what keeps a job off the queue that the service would only drop.
-  if (!isMappableGithubHost(state.repositoryHost ?? "")) return false;
+  if (!github.canMapRepositoryHost(input.repositoryHost ?? "")) return false;
   return Boolean(
-    state.repositoryOwner &&
-    state.repositoryName &&
-    state.gitBranch &&
-    state.repositoryOwner.length > 0 &&
-    state.repositoryName.length > 0 &&
-    state.gitBranch.length > 0,
+    input.repositoryOwner &&
+    input.repositoryName &&
+    input.gitBranch &&
+    input.repositoryOwner.length > 0 &&
+    input.repositoryName.length > 0 &&
+    input.gitBranch.length > 0,
   );
 }
 
@@ -98,10 +87,7 @@ export function pullRequestMappingJobId({
   state,
 }: {
   tenantId: string;
-  state: Pick<
-    CodingAgentSessionState,
-    "repositoryOwner" | "repositoryName" | "gitBranch"
-  >;
+  state: PullRequestMappingState;
 }): string {
   const repository = `${state.repositoryOwner}/${state.repositoryName}`.toLowerCase();
   return `prmap:${tenantId}:${repository}:${state.gitBranch}`;
@@ -138,10 +124,7 @@ export function pullRequestMappingGroupKey({
   state,
 }: {
   tenantId: string;
-  state: Pick<
-    CodingAgentSessionState,
-    "repositoryOwner" | "repositoryName" | "gitBranch"
-  >;
+  state: PullRequestMappingState;
 }): string {
   return pullRequestMappingJobId({ tenantId, state });
 }
@@ -158,17 +141,28 @@ export function pullRequestMappingGroupKey({
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 export function createPullRequestMappingHandler(
-  deps: PullRequestMappingSubscriberDeps,
+  github: GithubService,
 ): (
   event: CodingAgentProcessingEvent,
   context: TriggerContext<CodingAgentSessionState>,
 ) => Promise<void> {
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
-    if (!shouldMapPullRequests(foldState)) return;
+    if (
+      !shouldMapPullRequests(
+        {
+          repositoryHost: foldState.repositoryHost ?? "",
+          repositoryOwner: foldState.repositoryOwner ?? "",
+          repositoryName: foldState.repositoryName ?? "",
+          gitBranch: foldState.gitBranch ?? "",
+        },
+        github,
+      )
+    )
+      return;
 
     try {
-      await deps.requestBranchMapping({
+      await github.requestBranchMapping({
         tenantId,
         repositoryHost: foldState.repositoryHost ?? "",
         repositoryOwner: foldState.repositoryOwner!,

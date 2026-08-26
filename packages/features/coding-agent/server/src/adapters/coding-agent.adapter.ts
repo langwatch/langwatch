@@ -1,9 +1,10 @@
-import type {
-  CodingAgentService,
-  CodingAgentSession,
-  CodingAgentSessionEventRecord,
-  CodingAgentSessionMetricSeriesRecord,
-  CodingAgentTraceSessionRecord,
+import {
+  CodingAgentProjectionPersistence,
+  type CodingAgentService,
+  type CodingAgentSession,
+  type CodingAgentSessionEventRecord,
+  type CodingAgentSessionMetricSeriesRecord,
+  type CodingAgentTraceSessionRecord,
 } from "@langwatch/coding-agent-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -59,17 +60,19 @@ const projectionClocks = new WeakMap<
  * an application lifecycle boundary, while ordinary callers use only
  * CodingAgentService.
  */
-export class CodingAgentProjectionPersistence {
+export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjectionPersistence {
   private constructor(
     private readonly repositories: CodingAgentRepositories,
     private readonly clock: CodingAgentClockPort,
-  ) {}
+  ) {
+    super();
+  }
 
   static create(
     options: CodingAgentProjectionPersistenceOptions,
-  ): CodingAgentProjectionPersistence {
+  ): CodingAgentProjectionPersistenceAdapter {
     const clock = options.clock ?? SystemCodingAgentClock.create();
-    const persistence = new CodingAgentProjectionPersistence(
+    const persistence = new CodingAgentProjectionPersistenceAdapter(
       createRepositories({ ...options, clock }),
       clock,
     );
@@ -98,14 +101,6 @@ export class CodingAgentProjectionPersistence {
     }>,
   ): Promise<void> {
     return this.repositories.sessions.upsertBatch(rows);
-  }
-
-  loadSession(input: {
-    tenantId: string;
-    sessionId: string;
-    window?: { fromMs: number; toMs: number };
-  }): Promise<CodingAgentSession | null> {
-    return this.repositories.sessions.tryFindBySessionId(input);
   }
 
   loadSessionWithApplied(input: {

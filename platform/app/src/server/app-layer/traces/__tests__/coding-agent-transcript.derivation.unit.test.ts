@@ -7,11 +7,11 @@
  * refused never runs, so the logs are the only place it exists.
  */
 import { describe, expect, it } from "vitest";
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import {
   buildCodingAgentTranscript,
   type TranscriptLogRecord,
-} from "../coding-agent-transcript.derivation";
+} from "@langwatch/coding-agent-contract";
+import type { SpanDetail } from "@langwatch/trace-contract";
 
 function toolSpan({
   name,

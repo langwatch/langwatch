@@ -266,4 +266,57 @@ describe("Coding Agent sessions list", () => {
 
     expect(github.branchLookupInputs).toEqual([]);
   });
+
+  it("links trace sessions through the canonical service", async () => {
+    const github = new TestGithubService();
+    github.pullRequests = [
+      pullRequest({
+        repositoryHost: "github.com",
+        repositoryFullName: "acme/widgets",
+        headBranch: "feat/linkage",
+        prNumber: 7,
+        htmlUrl: "https://github.com/acme/widgets/pull/7",
+        title: "Link sessions to pull requests",
+        prCreatedAt: new Date(TEST_NOW_MS - HOUR_MS),
+      }),
+    ];
+    const service = serviceWith({ sessions: new TestSessions(), github });
+
+    const links = await service.linkTraceSessionsToPullRequests({
+      organizationId: "organization-1",
+      sessions: [
+        {
+          sessionId: "session-a",
+          startedAtMs: TEST_NOW_MS,
+          repositoryHost: "GitHub.com",
+          repositoryOwner: "ACME",
+          repositoryName: "Widgets",
+          gitBranch: "feat/linkage",
+        },
+      ],
+    });
+
+    expect(github.branchLookupInputs).toEqual([
+      {
+        organizationId: "organization-1",
+        keys: [
+          {
+            repositoryHost: "github.com",
+            repositoryFullName: "acme/widgets",
+            headBranch: "feat/linkage",
+          },
+        ],
+      },
+    ]);
+    expect(links).toEqual([
+      {
+        sessionId: "session-a",
+        pullRequest: {
+          number: 7,
+          htmlUrl: "https://github.com/acme/widgets/pull/7",
+          title: "Link sessions to pull requests",
+        },
+      },
+    ]);
+  });
 });

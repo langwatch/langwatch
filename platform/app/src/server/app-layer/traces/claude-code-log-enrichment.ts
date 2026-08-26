@@ -22,7 +22,10 @@
  * read paths call: it gates, reads the logs, and never fails the read.
  */
 import type { Logger } from "pino";
-import { contentAttrKeys } from "@langwatch/coding-agent-contract";
+import {
+  contentAttrKeys,
+  type CodingAgentService,
+} from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
 import type { Span } from "~/server/tracer/types";
@@ -73,8 +76,10 @@ const RESULT_SIZE_ATTR = "tool_result_size_bytes";
 function readContentBody(
   eventName: string,
   attrs: Record<string, string>,
+  codingAgents?: CodingAgentService,
 ): string | null {
-  for (const key of contentAttrKeys(eventName)) {
+  for (const key of codingAgents?.contentAttrKeys(eventName) ??
+    contentAttrKeys(eventName)) {
     const value = nonEmptyOrNull(attrs[key]);
     if (value !== null) return value;
   }
@@ -217,6 +222,7 @@ export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
  */
 export function mapLogRowsToClaudeContentLogs(
   rows: StoredLogRecordRow[],
+  codingAgents?: CodingAgentService,
 ): ClaudeContentLog[] {
   return rows.map((row) => {
     const attrs = row.attributes;
@@ -227,7 +233,7 @@ export function mapLogRowsToClaudeContentLogs(
       requestId: nonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
       querySource: nonEmptyOrNull(attrs[QUERY_SOURCE_ATTR]),
       timeUnixMs: row.timeUnixMs,
-      body: readContentBody(eventName, attrs),
+      body: readContentBody(eventName, attrs, codingAgents),
       // Parsed out of the raw body once, at ingest, so the read path can skip
       // re-parsing it. Absent on records ingested before that existed, which is
       // why every consumer keeps its parse as a fallback.
@@ -248,17 +254,19 @@ export function enrichSpansWithClaudeLogContent({
   spans,
   logRows,
   traceCanonicalisation,
+  codingAgents,
 }: {
   spans: Span[];
   logRows: StoredLogRecordRow[];
   traceCanonicalisation: TraceCanonicalisationService;
+  codingAgents?: CodingAgentService;
 }): Span[] {
   if (spans.length === 0) return spans;
 
   const withInteractionInputs = enrichClaudeInteractionInputs(spans);
   if (logRows.length === 0) return withInteractionInputs;
 
-  const logs = mapLogRowsToClaudeContentLogs(logRows);
+  const logs = mapLogRowsToClaudeContentLogs(logRows, codingAgents);
   const refs = mapSpansToClaudeRefs(withInteractionInputs);
   const enrichmentBySpanId = computeClaudeSpanEnrichment({
     spans: refs,
@@ -358,6 +366,7 @@ export async function enrichCodingAgentSpansFromLogs({
   occurredAtMs,
   logger,
   traceCanonicalisation,
+  codingAgents,
 }: {
   logRecords: LogRecordStorageService;
   tenantId: string;
@@ -367,6 +376,7 @@ export async function enrichCodingAgentSpansFromLogs({
   occurredAtMs?: number;
   logger?: Logger;
   traceCanonicalisation: TraceCanonicalisationService;
+  codingAgents?: CodingAgentService;
 }): Promise<Span[]> {
   if (!hasCodingAgentJoinableSpans(spans)) return spans;
 
@@ -376,6 +386,7 @@ export async function enrichCodingAgentSpansFromLogs({
       spans,
       logRows,
       traceCanonicalisation,
+      codingAgents,
     });
   } catch (error) {
     logger?.warn(
@@ -421,12 +432,14 @@ export function enrichSingleSpanWithClaudeLogContent({
   modelCallRefs,
   logRows,
   traceCanonicalisation,
+  codingAgents,
 }: {
   span: Span;
   /** All model-call refs for the trace, [] when the span has no request_id. */
   modelCallRefs: ClaudeSpanRef[];
   logRows: StoredLogRecordRow[];
   traceCanonicalisation: TraceCanonicalisationService;
+  codingAgents?: CodingAgentService;
 }): Span {
   const isModelCall = readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
 
@@ -434,6 +447,7 @@ export function enrichSingleSpanWithClaudeLogContent({
     spans: [span],
     logRows,
     traceCanonicalisation,
+    codingAgents,
   });
   let next = enriched!;
 
@@ -450,7 +464,7 @@ export function enrichSingleSpanWithClaudeLogContent({
     if (modelCallRefs.length > 0 && logRows.length > 0) {
       const enrichment = computeClaudeSpanEnrichment({
         spans: modelCallRefs,
-        logs: mapLogRowsToClaudeContentLogs(logRows),
+        logs: mapLogRowsToClaudeContentLogs(logRows, codingAgents),
         traceCanonicalisation,
       }).get(span.span_id);
       if (enrichment) {
