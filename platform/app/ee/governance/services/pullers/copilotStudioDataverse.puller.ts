@@ -56,6 +56,14 @@ const PAGE_SIZE = 50;
  */
 const MAX_PAGES_PER_RUN = 50;
 
+/**
+ * How many agents one run will name. A tenant holds tens of them, not
+ * thousands, so this is a ceiling rather than a page size and the run does not
+ * follow a second page of them — it says so in the log instead, because the
+ * cost of going over is conversations with no agent name, not a failed run.
+ */
+const MAX_BOTS = 500;
+
 /** Web API version this adapter's query shape is written against. */
 const API_VERSION = "v9.2";
 
@@ -93,7 +101,12 @@ const tokenResponseSchema = z.object({
  * `raw_payload`. That field is contracted to hold what the source actually
  * sent, so a mapping written later can be replayed against old rows instead of
  * re-pulling them — and a field silently dropped at parse time is not there to
- * replay. The `$expand`ed bot row rides along on the same object.
+ * replay.
+ *
+ * `_bot_conversationtranscriptid_value` is the agent this conversation belongs
+ * to, as a plain lookup id. It is the only trustworthy link to the `bot` table:
+ * the row's own `metadata` carries a `BotId`, and that one is a different value
+ * that joins to nothing.
  */
 const transcriptRowSchema = z
   .object({
@@ -105,8 +118,32 @@ const transcriptRowSchema = z
     metadata: z.string().nullable().optional(),
     schematype: z.string().nullable().optional(),
     schemaversion: z.string().nullable().optional(),
+    _bot_conversationtranscriptid_value: z.string().nullable().optional(),
   })
   .passthrough();
+
+/**
+ * One row of the `bot` table, read once per run to put a name on each
+ * conversation.
+ */
+const botRowSchema = z
+  .object({
+    botid: z.string(),
+    name: z.string().nullable().optional(),
+    modifiedon: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+const botsPageSchema = z.object({
+  value: z.array(z.unknown()).default([]),
+  "@odata.nextLink": z.string().optional(),
+});
+
+/** What the run knows about one agent, keyed by its lookup id. */
+interface BotRecord {
+  botName?: string;
+  botModifiedOn?: string;
+}
 
 const pageSchema = z.object({
   value: z.array(z.unknown()).default([]),
@@ -251,29 +288,45 @@ function buildFirstPageUrl(params: {
   const query: [string, string][] = [
     [
       "$select",
-      "conversationtranscriptid,name,conversationstarttime,createdon,content,metadata,schematype,schemaversion",
+      "conversationtranscriptid,name,conversationstarttime,createdon,content," +
+        "metadata,schematype,schemaversion,_bot_conversationtranscriptid_value",
     ],
     ["$filter", filters.join(" and ")],
     ["$orderby", "createdon asc,conversationtranscriptid asc"],
     ["$top", String(PAGE_SIZE)],
-    // The agent's name and current settings ride along on the row rather than
-    // costing a second read per conversation.
-    ["$expand", "bot_conversationtranscriptid($select=name,modifiedon)"],
+    // No `$expand` here. The agent arrives as the raw lookup id and the run
+    // reads the `bot` table once to put a name on it. Asking Dataverse to join
+    // would save that read, but it means naming a navigation property, and the
+    // reads proven against a real environment all take the lookup column and
+    // join it themselves.
   ];
   return `${base}?${query
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join("&")}`;
 }
 
-function botFactsOf(row: Record<string, unknown>): Record<string, string> {
-  const bot = row.bot_conversationtranscriptid;
-  if (!bot || typeof bot !== "object") return {};
-  const record = bot as Record<string, unknown>;
+/**
+ * Dataverse writes lookup ids in one case and there is no promise both sides of
+ * a join agree on it, so the key is folded before it is stored or read. A miss
+ * here is silent — a conversation with no agent name — which is exactly the
+ * kind of fault that survives a review.
+ */
+function botKey(id: string): string {
+  return id.toLowerCase();
+}
+
+function botFactsOf(params: {
+  row: z.infer<typeof transcriptRowSchema>;
+  bots: Map<string, BotRecord>;
+}): Record<string, string> {
+  const { row, bots } = params;
+  const id = row._bot_conversationtranscriptid_value;
+  if (!id) return {};
+  const record = bots.get(botKey(id));
+  if (!record) return {};
   const facts: Record<string, string> = {};
-  if (typeof record.name === "string") facts.botName = record.name;
-  if (typeof record.modifiedon === "string") {
-    facts.botModifiedOn = record.modifiedon;
-  }
+  if (record.botName) facts.botName = record.botName;
+  if (record.botModifiedOn) facts.botModifiedOn = record.botModifiedOn;
   return facts;
 }
 
@@ -301,13 +354,14 @@ interface TranscriptWalk {
 function readTranscriptRow(params: {
   raw: object;
   previous: Cursor | null;
+  bots: Map<string, BotRecord>;
 }): { event: NormalizedPullEvent; cursor: Cursor } | null {
-  const { raw, previous } = params;
+  const { raw, previous, bots } = params;
   const parsed = transcriptRowSchema.safeParse(raw);
   if (!parsed.success) return null;
 
   const row = parsed.data;
-  const facts = botFactsOf(raw as Record<string, unknown>);
+  const facts = botFactsOf({ row, bots });
   // A row with no `createdon` keeps the previous row's, so the cursor never
   // goes backwards and never lands on an empty timestamp that the next run's
   // filter would read as "everything".
@@ -340,11 +394,12 @@ function readTranscriptRow(params: {
 function readPageRows(params: {
   page: z.infer<typeof pageSchema>;
   walk: TranscriptWalk;
+  bots: Map<string, BotRecord>;
 }): void {
-  const { page, walk } = params;
+  const { page, walk, bots } = params;
   for (const raw of page.value) {
     if (!raw || typeof raw !== "object") continue;
-    const read = readTranscriptRow({ raw, previous: walk.last });
+    const read = readTranscriptRow({ raw, previous: walk.last, bots });
     if (!read) {
       // A row shaped unlike the rest is counted, not fatal: one bad row must
       // not cost the whole window.
@@ -402,6 +457,16 @@ function refusesNextLink(params: {
   return true;
 }
 
+/** The headers every read of this environment carries. */
+function dataverseHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+    "OData-MaxVersion": "4.0",
+    "OData-Version": "4.0",
+  };
+}
+
 /** A URL's host for logging, never throwing on one that will not parse. */
 function hostOf(value: string): string {
   try {
@@ -441,7 +506,12 @@ export class CopilotStudioDataversePuller
         environmentUrl: config.environmentUrl,
         signal: options.signal,
       });
-      await this.walkTranscriptPages({ walk, options, config, token });
+      const bots = await this.fetchBots({
+        environmentUrl: config.environmentUrl,
+        token,
+        signal: options.signal,
+      });
+      await this.walkTranscriptPages({ walk, options, config, token, bots });
     } catch (error) {
       walk.errorCount += 1;
       logger.error(
@@ -479,8 +549,9 @@ export class CopilotStudioDataversePuller
     options: PullRunOptions;
     config: CopilotStudioDataverseConfig;
     token: string;
+    bots: Map<string, BotRecord>;
   }): Promise<void> {
-    const { walk, options, config, token } = params;
+    const { walk, options, config, token, bots } = params;
 
     let url: string | null = buildFirstPageUrl({
       environmentUrl: config.environmentUrl,
@@ -495,7 +566,7 @@ export class CopilotStudioDataversePuller
       if (runIsOver(options)) break;
 
       const page = await this.fetchPage({ url, token, signal: options.signal });
-      readPageRows({ page, walk });
+      readPageRows({ page, walk, bots });
 
       const nextLink = page["@odata.nextLink"] ?? null;
       if (
@@ -518,6 +589,73 @@ export class CopilotStudioDataversePuller
     }
   }
 
+  /**
+   * The agents in this environment, keyed by lookup id.
+   *
+   * A conversation carries its agent as an id and nothing else, so without this
+   * every event would be attributed to a GUID. It is one read for the whole
+   * run, not one per conversation.
+   *
+   * It never throws and never counts an error. A name is a nicety and the
+   * transcripts are the point; worse, an error here would be indistinguishable
+   * from a bad transcript row downstream, where a non-zero count makes the
+   * worker discard the run's events and leave the cursor where it was. A
+   * failure to name the agents would then stop the source from moving at all.
+   */
+  private async fetchBots(params: {
+    environmentUrl: string;
+    token: string;
+    signal?: AbortSignal;
+  }): Promise<Map<string, BotRecord>> {
+    const { environmentUrl, token, signal } = params;
+    const bots = new Map<string, BotRecord>();
+    const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/bots`;
+    const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
+
+    try {
+      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const response = await ssrfSafeFetch(`${base}?${query}`, {
+        method: "GET",
+        headers: dataverseHeaders(token),
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+        // Same reasoning as the transcript read: this request carries the
+        // token, and a redirect would hand it to whoever answers.
+        followRedirects: false,
+      });
+      if (!response.ok) {
+        logger.warn(
+          { status: response.status },
+          "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
+        );
+        return bots;
+      }
+
+      const page = botsPageSchema.parse(await response.json());
+      for (const raw of page.value) {
+        const parsed = botRowSchema.safeParse(raw);
+        if (!parsed.success) continue;
+        const row = parsed.data;
+        bots.set(botKey(row.botid), {
+          botName: row.name ?? undefined,
+          botModifiedOn: row.modifiedon ?? undefined,
+        });
+      }
+
+      if (page["@odata.nextLink"]) {
+        logger.warn(
+          { read: bots.size },
+          "copilot studio dataverse: more agents than one read returns; conversations belonging to the rest get no name",
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
+      );
+    }
+    return bots;
+  }
+
   private async fetchPage(params: {
     url: string;
     token: string;
@@ -527,12 +665,7 @@ export class CopilotStudioDataversePuller
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await ssrfSafeFetch(url, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "OData-MaxVersion": "4.0",
-        "OData-Version": "4.0",
-      },
+      headers: dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // The header above carries the token minted from the customer's secret.
       // The helper follows up to ten redirects by default and re-sends

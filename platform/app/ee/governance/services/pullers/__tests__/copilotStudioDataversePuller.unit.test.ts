@@ -37,18 +37,29 @@ const CONFIG = {
   botIds: [],
 };
 
+const BOT_ID = "cc7bc3b3-dfd8-4bd9-b637-eac033f399e2";
+
 function transcriptRow(overrides: Record<string, unknown> = {}) {
   return {
     conversationtranscriptid: "row-1",
     name: "b957a08c-0000-4000-8000-000000000001_dacfd251-bot",
     conversationstarttime: "2026-08-25T19:14:34Z",
     createdon: "2026-08-25T19:44:43Z",
+    // `metadata.BotId` is deliberately not `BOT_ID`. On a real row those two
+    // differ, and only the lookup column joins to the agent — a fixture that
+    // made them equal would let a mix-up pass.
     metadata: JSON.stringify({ BotId: "dacfd251-bot", BatchId: 0 }),
     content: JSON.stringify({ activities: [] }),
-    bot_conversationtranscriptid: {
-      name: "engineering-agent",
-      modifiedon: "2026-08-20T10:00:00Z",
-    },
+    _bot_conversationtranscriptid_value: BOT_ID,
+    ...overrides,
+  };
+}
+
+function botRow(overrides: Record<string, unknown> = {}) {
+  return {
+    botid: BOT_ID,
+    name: "engineering-agent",
+    modifiedon: "2026-08-20T10:00:00Z",
     ...overrides,
   };
 }
@@ -82,8 +93,29 @@ async function newAdapter() {
   return new CopilotStudioDataversePuller();
 }
 
-function queueSignIn() {
+/**
+ * The two reads every run makes before it asks for a transcript: the sign-in,
+ * then the agent list it joins names from. Queued together because no run
+ * reaches a transcript without both, so a test that queues one and not the
+ * other is testing a sequence that cannot happen.
+ */
+function queueSignInAndBots(bots: unknown[] = [botRow()]) {
   responseQueue.push({ status: 200, body: { access_token: "token-xyz" } });
+  responseQueue.push({ status: 200, body: { value: bots } });
+}
+
+/**
+ * The first read of the transcript table, found by what it asks for rather
+ * than by its position in the queue. Counting calls means every test breaks
+ * the day the run makes one more of them, and a test that breaks for that
+ * reason teaches nobody anything.
+ */
+function transcriptCall() {
+  const call = capturedCalls.find((c) =>
+    c.url.includes("/conversationtranscripts"),
+  );
+  if (!call) throw new Error("test bug: the run never read the transcripts");
+  return call;
 }
 
 describe("given a config naming an environment", () => {
@@ -120,7 +152,7 @@ describe("given a config naming an environment", () => {
 describe("given a response steering the next page somewhere else", () => {
   it("refuses a next-page link outside the environment host", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({
       status: 200,
       body: {
@@ -134,10 +166,10 @@ describe("given a response steering the next page somewhere else", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    // Two calls, not three: the sign-in and the first page. Following the
-    // third would have sent the access token to the attacker's host, which
+    // Three calls, not four: the sign-in, the agent list and the first page.
+    // A fourth would have sent the access token to the attacker's host, which
     // `followRedirects: false` stops on a redirect and nothing stopped here.
-    expect(capturedCalls).toHaveLength(2);
+    expect(capturedCalls).toHaveLength(3);
     for (const call of capturedCalls) {
       expect(call.url).not.toContain("attacker.example");
     }
@@ -150,7 +182,7 @@ describe("given a response steering the next page somewhere else", () => {
   /** @scenario "A next page cannot move the token to another tenant" */
   it("refuses a next-page link to a different Dataverse environment", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({
       status: 200,
       body: {
@@ -167,9 +199,9 @@ describe("given a response steering the next page somewhere else", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    // The sign-in and the first page, and nothing after: the request that
-    // would have followed this link carries the bearer token.
-    expect(capturedCalls).toHaveLength(2);
+    // The sign-in, the agent list and the first page, and nothing after: the
+    // request that would have followed this link carries the bearer token.
+    expect(capturedCalls).toHaveLength(3);
     for (const call of capturedCalls) {
       expect(call.url).not.toContain("org99999");
     }
@@ -179,7 +211,7 @@ describe("given a response steering the next page somewhere else", () => {
 
   it("follows a next-page link that stays on the environment host", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({
       status: 200,
       body: {
@@ -195,8 +227,8 @@ describe("given a response steering the next page somewhere else", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    expect(capturedCalls).toHaveLength(3);
-    expect(capturedCalls[2]!.url).toContain("$skiptoken=x");
+    expect(capturedCalls).toHaveLength(4);
+    expect(capturedCalls.at(-1)!.url).toContain("$skiptoken=x");
     expect(result.errorCount).toBe(0);
   });
 });
@@ -205,7 +237,7 @@ describe("given a run against an environment holding one conversation", () => {
   /** @scenario "The puller never reaches beyond the customer's environment" */
   it("reaches only the sign-in and the environment, never the directory", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
 
     await adapter.runOnce(
@@ -213,19 +245,19 @@ describe("given a run against an environment holding one conversation", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    expect(capturedCalls).toHaveLength(2);
+    expect(capturedCalls).toHaveLength(3);
     for (const call of capturedCalls) {
       expect(call.url).not.toContain("graph.microsoft.com");
     }
     expect(capturedCalls[0]!.url).toContain("login.microsoftonline.com");
-    expect(capturedCalls[1]!.url).toContain(ENVIRONMENT_URL);
-    expect(capturedCalls[1]!.url).toContain("conversationtranscripts");
+    expect(transcriptCall().url).toContain(ENVIRONMENT_URL);
+    expect(transcriptCall().url).toContain("conversationtranscripts");
   });
 
   /** @scenario "A redirect never carries the credentials onward" */
   it("opts out of redirects on every call that carries a credential", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
 
     await adapter.runOnce(
@@ -235,7 +267,7 @@ describe("given a run against an environment holding one conversation", () => {
 
     // Asserted before the loop: a `for` over an empty list passes without
     // checking anything, which is how a test like this stops being one.
-    expect(capturedCalls).toHaveLength(2);
+    expect(capturedCalls).toHaveLength(3);
     for (const call of capturedCalls) {
       expect(call.init?.followRedirects).toBe(false);
     }
@@ -243,7 +275,7 @@ describe("given a run against an environment holding one conversation", () => {
 
   it("hands each row on with the agent's name and last-changed time", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
 
     const result = await adapter.runOnce(
@@ -263,9 +295,9 @@ describe("given a run against an environment holding one conversation", () => {
     expect(result.events[0]!.actor).toBe("");
   });
 
-  it("asks only for the last thirty days on a first run", async () => {
+  it("asks for the agent as a lookup id rather than asking Dataverse to join", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [] } });
 
     await adapter.runOnce(
@@ -273,7 +305,82 @@ describe("given a run against an environment holding one conversation", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    const query = decodeURIComponent(capturedCalls[1]!.url);
+    const query = decodeURIComponent(transcriptCall().url);
+    expect(query).toContain("_bot_conversationtranscriptid_value");
+    // An `$expand` here has to name a navigation property, and naming one that
+    // the environment does not have is answered with a 400 on the very first
+    // page — every run, for every customer, with the reads that were proven
+    // against a real environment all avoiding it.
+    expect(query).not.toContain("$expand");
+  });
+
+  /** @scenario "A conversation is named from the agent table, not from its own metadata" */
+  it("ignores the bot id in the row's metadata when naming the agent", async () => {
+    const adapter = await newAdapter();
+    // The agent list holds the id the row's `metadata` claims, and not the one
+    // in the lookup column. Joining on the wrong field would find this and put
+    // a confident, wrong name on the conversation.
+    queueSignInAndBots([botRow({ botid: "dacfd251-bot", name: "wrong-agent" })]);
+    responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]!.extra?.botName).toBeUndefined();
+    expect(result.events[0]!.target).toBe("");
+  });
+
+  it("matches the agent whatever case the two sides spell the id in", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots([botRow({ botid: BOT_ID.toUpperCase() })]);
+    responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.events[0]!.extra).toMatchObject({
+      botName: "engineering-agent",
+    });
+  });
+
+  /** @scenario "A run that cannot read the agent list still delivers its conversations" */
+  it("keeps the conversations when the agent list cannot be read", async () => {
+    const adapter = await newAdapter();
+    responseQueue.push({ status: 200, body: { access_token: "token-xyz" } });
+    responseQueue.push({ status: 403, body: { error: "no" } });
+    responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    // Nameless, but delivered, and above all not counted as an error. A
+    // non-zero count makes the worker throw the run's events away and leave
+    // the cursor where it was, so counting this would mean a source that can
+    // never read the agent list is a source that never moves at all.
+    expect(result.errorCount).toBe(0);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]!.extra?.botName).toBeUndefined();
+    expect(result.cursor).not.toBe(null);
+  });
+
+  it("asks only for the last thirty days on a first run", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({ status: 200, body: { value: [] } });
+
+    await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    const query = decodeURIComponent(transcriptCall().url);
     const since = /createdon ge ([^ &]+)/.exec(query)?.[1];
     const days = (Date.now() - Date.parse(since!)) / 86_400_000;
     // Microsoft deletes transcripts on a schedule about a month out, so
@@ -286,7 +393,7 @@ describe("given a run against an environment holding one conversation", () => {
 describe("given a cursor from a previous run", () => {
   it("resumes from it and excludes the row it already read", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [] } });
 
     await adapter.runOnce(
@@ -300,7 +407,7 @@ describe("given a cursor from a previous run", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    const query = decodeURIComponent(capturedCalls[1]!.url);
+    const query = decodeURIComponent(transcriptCall().url);
     expect(query).toContain("createdon ge 2026-08-25T19:44:43Z");
     // `ge` plus an explicit exclusion, not `gt`: rows written in the same
     // instant would otherwise be skipped.
@@ -314,7 +421,7 @@ describe("given a cursor from a previous run", () => {
    */
   it("percent-encodes the spaces in the filter rather than sending plus signs", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [] } });
 
     await adapter.runOnce(
@@ -322,14 +429,14 @@ describe("given a cursor from a previous run", () => {
       adapter.validateConfig(CONFIG),
     );
 
-    const filter = /\$filter=([^&]*)/.exec(capturedCalls[1]!.url)?.[1] ?? "";
+    const filter = /\$filter=([^&]*)/.exec(transcriptCall().url)?.[1] ?? "";
     expect(filter).toContain("%20");
     expect(filter).not.toContain("+");
   });
 
   it("advances the cursor to the last row it actually read", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({
       status: 200,
       body: {
@@ -356,7 +463,7 @@ describe("given a cursor from a previous run", () => {
 
   it("leaves the cursor alone when the run found nothing", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 200, body: { value: [] } });
 
     const cursor = JSON.stringify({
@@ -386,7 +493,7 @@ describe("given the pull goes wrong", () => {
 
   it("does not advance the cursor when the environment refuses the read", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({ status: 403, body: {} });
 
     const cursor = JSON.stringify({
@@ -424,7 +531,7 @@ describe("given the pull goes wrong", () => {
 
   it("counts a row it cannot read without losing the rest of the page", async () => {
     const adapter = await newAdapter();
-    queueSignIn();
+    queueSignInAndBots();
     responseQueue.push({
       status: 200,
       body: { value: [{ nothing: "useful" }, transcriptRow()] },

@@ -164,6 +164,28 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
 
   # --- What the agent was running ---
 
+  @unit
+  Scenario: A conversation is named from the agent table, not from its own metadata
+    Given a conversation whose stored metadata carries one agent id
+    And whose agent lookup carries a different one
+    When the puller puts a name on the conversation
+    Then the name is the one belonging to the lookup
+    And no name is attached when the lookup matches no agent
+    # The two ids on a row genuinely differ. The one in the metadata is an
+    # internal runtime value that joins to nothing, so reading it would not
+    # fail loudly — it would attach a confident and wrong agent name.
+
+  @unit
+  Scenario: A run that cannot read the agent list still delivers its conversations
+    Given the environment refuses the read of the agent list
+    When the puller runs
+    Then the conversations are delivered without an agent name
+    And the run does not report an error
+    # A name is a nicety; the conversations are the point. Reporting an error
+    # would cost far more than the name: a run that reports one has its events
+    # discarded and its cursor left where it was, so an environment that never
+    # allows the agent list would be a source that never moves at all.
+
   @integration
   Scenario: The agent's model is recorded when it can be trusted
     Given the agent's settings have not changed since the conversation
