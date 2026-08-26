@@ -546,36 +546,14 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       }
     | { ok: false }
   > {
-    let body: unknown;
-    let usedKeyGrouping = keyGrouping;
+    let fetched: { body: unknown; keyGrouping: boolean } | null;
     try {
-      const first = await this.fetchPage({
+      fetched = await this.fetchWithKeyGroupingFallback({
         startingAt,
         page,
-        keyGrouping: usedKeyGrouping,
+        keyGrouping,
         options,
       });
-      if (first.ok) {
-        body = first.body;
-      } else {
-        // Only at the head of a window. Mid-window the page token is already
-        // bound to the group-by that minted it, so there is nothing to retry
-        // the same token against.
-        if (!usedKeyGrouping || page !== null) return { ok: false };
-        logger.warn(
-          { adapter: this.id, startingAt },
-          "openai refuses to group this window by api key; re-reading it without that dimension so the window and the person on each row survive",
-        );
-        usedKeyGrouping = false;
-        const retried = await this.fetchPage({
-          startingAt,
-          page,
-          keyGrouping: usedKeyGrouping,
-          options,
-        });
-        if (!retried.ok) return { ok: false };
-        body = retried.body;
-      }
     } catch (error) {
       logger.error(
         {
@@ -586,8 +564,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       );
       return { ok: false };
     }
+    if (fetched === null) return { ok: false };
+    const usedKeyGrouping = fetched.keyGrouping;
 
-    const parsed = pageSchema.parse(body);
+    const parsed = pageSchema.parse(fetched.body);
     // `has_more` with no token to follow it is a contract violation, and the
     // one shape that must NOT be treated as drained. Reading it as drained
     // would advance the watermark past pages never fetched and the next run
@@ -617,6 +597,47 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       watermark: newest,
       keyGrouping: usedKeyGrouping,
     };
+  }
+
+  /**
+   * One page's body, and the group-by it was actually read with. Null when the
+   * provider refused and there is nothing left to try.
+   *
+   * The fallback only fires at the head of a window. Mid-window the page token
+   * is already bound to the group-by that minted it, so re-asking the same
+   * token with one dimension fewer would be refused for a different reason.
+   */
+  private async fetchWithKeyGroupingFallback({
+    startingAt,
+    page,
+    keyGrouping,
+    options,
+  }: {
+    startingAt: string;
+    page: string | null;
+    keyGrouping: boolean;
+    options: PullRunOptions;
+  }): Promise<{ body: unknown; keyGrouping: boolean } | null> {
+    const first = await this.fetchPage({
+      startingAt,
+      page,
+      keyGrouping,
+      options,
+    });
+    if (first.ok) return { body: first.body, keyGrouping };
+    if (!keyGrouping || page !== null) return null;
+
+    logger.warn(
+      { adapter: this.id, startingAt },
+      "openai refuses to group this window by api key; re-reading it without that dimension so the window and the person on each row survive",
+    );
+    const retried = await this.fetchPage({
+      startingAt,
+      page,
+      keyGrouping: false,
+      options,
+    });
+    return retried.ok ? { body: retried.body, keyGrouping: false } : null;
   }
 
   /**

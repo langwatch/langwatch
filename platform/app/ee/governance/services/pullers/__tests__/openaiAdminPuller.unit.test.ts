@@ -110,9 +110,7 @@ function page({
   hasMore?: boolean;
 } = {}) {
   return {
-    data: [
-      { start_time: startTime, end_time: startTime + 86400, results },
-    ],
+    data: [{ start_time: startTime, end_time: startTime + 86400, results }],
     has_more: hasMore,
     next_page: nextPage,
   };
@@ -143,7 +141,11 @@ describe("given an OpenAI Admin cost source", () => {
     it("keeps every digit of a sub-cent figure through to the record", async () => {
       fetchMock.mockResolvedValue(
         jsonResponse(
-          page({ results: [costRow({ amount: { value: 0.0000001234, currency: "usd" } })] }),
+          page({
+            results: [
+              costRow({ amount: { value: 0.0000001234, currency: "usd" } }),
+            ],
+          }),
         ),
       );
 
@@ -258,7 +260,9 @@ describe("given an OpenAI Admin cost source", () => {
 
       fetchMock.mockResolvedValue(
         jsonResponse(
-          page({ results: [costRow({ amount: { value: 9.99, currency: "usd" } })] }),
+          page({
+            results: [costRow({ amount: { value: 9.99, currency: "usd" } })],
+          }),
         ),
       );
       const second = await puller.runOnce(RUN_OPTIONS, CONFIG);
@@ -524,7 +528,8 @@ describe("given an OpenAI Admin cost source", () => {
       const stale = JSON.stringify({
         startingAt: "2026-07-15T00:00:00.000Z",
         page: "page_from_before",
-        query: "cost:1d:project_id,line_item,user_id,api_key_id:2026-06-01T00:00:00.000Z",
+        query:
+          "cost:1d:project_id,line_item,user_id,api_key_id:2026-06-01T00:00:00.000Z",
         watermark: null,
         keyGrouping: true,
       });
@@ -543,7 +548,8 @@ describe("given an OpenAI Admin cost source", () => {
       const mature = JSON.stringify({
         startingAt: BUCKET_START_ISO,
         page: null,
-        query: "cost:1d:project_id,line_item,user_id,api_key_id:2026-07-01T00:00:00.000Z",
+        query:
+          "cost:1d:project_id,line_item,user_id,api_key_id:2026-07-01T00:00:00.000Z",
         watermark: null,
         keyGrouping: true,
       });
@@ -582,7 +588,10 @@ describe("given an OpenAI Admin cost source", () => {
 
     it("refuses a configuration the adapter cannot run", () => {
       expect(() =>
-        new OpenAiAdminPuller().validateConfig({ adapter: "openai_admin", report: "usage" }),
+        new OpenAiAdminPuller().validateConfig({
+          adapter: "openai_admin",
+          report: "usage",
+        }),
       ).toThrow(ZodError);
     });
 
