@@ -336,9 +336,11 @@ function CaseRow({
       </HStack>
 
       <LastResultCell
+        testCase={testCase}
         lastResult={lastResult}
         isLoading={isLastResultsLoading}
         showMetricsInline={showMetricsInline}
+        onOpenLastRun={onOpenLastRun}
       />
 
       <CaseRowActions
@@ -427,17 +429,25 @@ function CaseRowActions({
  * What the last run of a case said. Empty while the results are on their way,
  * so the rows are drawn before the verdicts arrive.
  *
+ * With a last run, the cell is a ghost button: clicking it opens the last run
+ * and the click does not fall through to the row. Without a last run it reads
+ * as plain text with no click target.
+ *
  * Under one test suite the time and the cost read beside the verdict. In All
  * test cases the column is narrower, so they read on hover instead.
  */
 function LastResultCell({
+  testCase,
   lastResult,
   isLoading,
   showMetricsInline,
+  onOpenLastRun,
 }: {
+  testCase: TestCase;
   lastResult?: CaseLastResult;
   isLoading: boolean;
   showMetricsInline: boolean;
+  onOpenLastRun: (testCase: TestCase) => void;
 }) {
   if (!lastResult) {
     if (isLoading) return <Skeleton height="16px" width="90px" />;
@@ -460,20 +470,43 @@ function LastResultCell({
     typeof lastResult.durationInMs === "number" ||
     typeof lastResult.totalCost === "number";
 
-  if (showMetricsInline) {
-    return (
-      <HStack gap={2.5} minWidth={0}>
-        {label}
-        {metrics}
-      </HStack>
-    );
-  }
+  const content = showMetricsInline ? (
+    <HStack gap={2.5} minWidth={0}>
+      {label}
+      {metrics}
+    </HStack>
+  ) : (
+    <HStack gap={2.5} minWidth={0}>
+      {label}
+    </HStack>
+  );
+
+  const button = (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      height="24px"
+      paddingX={2}
+      minWidth={0}
+      justifyContent="flex-start"
+      borderRadius="md"
+      aria-label={`Open the last run of ${testCase.name}`}
+      data-testid={`case-row-${testCase.name}-last-result`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpenLastRun(testCase);
+      }}
+    >
+      {content}
+    </Button>
+  );
+
+  if (showMetricsInline) return button;
 
   return (
     <Tooltip content={metrics} disabled={!hasMetrics}>
-      <HStack gap={2.5} minWidth={0}>
-        {label}
-      </HStack>
+      {button}
     </Tooltip>
   );
 }

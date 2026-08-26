@@ -132,16 +132,30 @@ Feature: The test cases table
   # --- Row click ---
 
   @integration
-  Scenario: Clicking a row with a last run opens that run
+  Scenario: Clicking a row opens the case editor
     Given a test case whose last run finished
     When its row is clicked
-    Then the run detail drawer opens on that run
+    Then the case editor opens for that case
+    And the run detail drawer does not open
 
   @integration
-  Scenario: Clicking a row with no last run opens the editor
+  Scenario: Clicking a row with no last run opens the case editor
     Given a test case with no run in the period
     When its row is clicked
     Then the case editor opens for that case
+
+  @integration
+  Scenario: Clicking the last result cell opens the last run
+    Given a test case whose last run finished
+    When the last result cell is clicked
+    Then the run detail drawer opens on that run
+    And the case editor does not open
+
+  @integration
+  Scenario: The last result cell has no button when there is no last run
+    Given a test case with no run in the period
+    When the last result cell is read
+    Then it reads as plain text with no click target
 
   # --- The case editor ---
 

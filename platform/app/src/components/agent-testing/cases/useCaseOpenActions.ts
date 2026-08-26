@@ -17,7 +17,7 @@ export type CaseOpenActions = {
   openEditor: (testCase: TestCase) => void;
   openHistory: (testCase: TestCase) => void;
   openLastRun: (testCase: TestCase) => void;
-  /** A row opens its last run when it has one, and the editor otherwise. */
+  /** A row click always opens the case editor. The last-result cell opens the run. */
   onRowClick: (testCase: TestCase) => void;
 };
 
@@ -57,15 +57,15 @@ export function useCaseOpenActions(
     [lastResults, openLiveRun],
   );
 
+  // A row click opens the case editor pre-scoped to the folder it sits in, so
+  // a new derivative of the case would file under the same suite.
   const onRowClick = useCallback(
-    (testCase: TestCase) => {
-      if (lastResults.has(testCase.id)) {
-        openLastRun(testCase);
-        return;
-      }
-      openEditor(testCase);
-    },
-    [lastResults, openLastRun, openEditor],
+    (testCase: TestCase) =>
+      openDrawer(CASE_EDITOR_DRAWER, {
+        scenarioId: testCase.id,
+        folderId: testCase.folderId ?? undefined,
+      }),
+    [openDrawer],
   );
 
   return { openEditor, openHistory, openLastRun, onRowClick };

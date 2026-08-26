@@ -488,8 +488,8 @@ describe("the test cases table", () => {
 
   // --- Row click ---
 
-  /** @scenario "Clicking a row with a last run opens that run" */
-  it("opens the last run when a row with one is clicked", async () => {
+  /** @scenario "Clicking a row opens the case editor" */
+  it("opens the case editor when the row is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
@@ -500,10 +500,11 @@ describe("the test cases table", () => {
     await user.click(screen.getByText("Double charge"));
 
     expect(props.onRowClick).toHaveBeenCalledWith(testCase);
+    expect(props.onOpenLastRun).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Clicking a row with no last run opens the editor" */
-  it("opens the editor when a row with no last run is clicked", async () => {
+  /** @scenario "Clicking a row with no last run opens the case editor" */
+  it("opens the case editor when a row with no last run is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
@@ -513,11 +514,43 @@ describe("the test cases table", () => {
 
     await user.click(screen.getByText("Double charge"));
 
-    // TestCasesTab reads the same last-result map: with nothing in it the row
-    // click opens the case editor rather than a run.
     expect(props.onRowClick).toHaveBeenCalledWith(testCase);
   });
 
+  /** @scenario "Clicking the last result cell opens the last run" */
+  it("opens the last run when the last result ghost button is clicked", async () => {
+    const user = userEvent.setup();
+    const testCase = makeCase();
+    const { props } = renderPanel({
+      groups: groupCasesByFolder({ cases: [testCase], suites: [REFUNDS] }),
+      lastResults: new Map([["case_1", makeResult()]]),
+    });
+
+    const cell = screen.getByRole("button", {
+      name: "Open the last run of Double charge",
+    });
+    await user.click(cell);
+
+    expect(props.onOpenLastRun).toHaveBeenCalledWith(testCase);
+    expect(props.onRowClick).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The last result cell has no button when there is no last run" */
+  it("renders the last result cell without a button when there is no last run", () => {
+    renderPanel({
+      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      lastResults: new Map(),
+    });
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Open the last run of Double charge",
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("last-result-empty")).toBeInTheDocument();
+  });
+
+  /** @scenario "Clicking the Run button does not open the row" */
   it("hands the Run button to the run dialog and not to the row", async () => {
     const user = userEvent.setup();
     const { props } = renderPanel({
