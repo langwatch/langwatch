@@ -20,21 +20,30 @@ import {
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   type GrandfatherConnectionCommandData,
   grandfatherConnectionCommandDataSchema,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  type RecordDomainProofPresentCommandData,
   type RegisterConnectionCommandData,
   type RejectDomainClaimCommandData,
   type RequestTeardownCommandData,
   type RequestVerificationCommandData,
   type ResumeConnectionCommandData,
+  recordDomainProofAbsentCommandDataSchema,
+  recordDomainProofPresentCommandDataSchema,
   registerConnectionCommandDataSchema,
   rejectDomainClaimCommandDataSchema,
   requestTeardownCommandDataSchema,
   requestVerificationCommandDataSchema,
   resumeConnectionCommandDataSchema,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  type SetArrivalPolicyCommandData,
+  setArrivalPolicyCommandDataSchema,
   type SsoConnectionCommand,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SuspendConnectionCommandData,
@@ -222,6 +231,31 @@ export const CompleteTeardownCommand = connectionCommand({
   verb: "completeTeardown",
 });
 export type CompleteTeardownPayload = CompleteTeardownCommandData;
+
+export const SetArrivalPolicyCommand = connectionCommand({
+  type: SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  schema: setArrivalPolicyCommandDataSchema,
+  description: "Choose what happens to a person this connection has never seen",
+  verb: "setArrivalPolicy",
+});
+export type SetArrivalPolicyPayload = SetArrivalPolicyCommandData;
+
+export const RecordDomainProofAbsentCommand = connectionCommand({
+  type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  schema: recordDomainProofAbsentCommandDataSchema,
+  description: "Record that a re-check found a domain's ownership proof gone",
+  verb: "recordDomainProofAbsent",
+});
+export type RecordDomainProofAbsentPayload = RecordDomainProofAbsentCommandData;
+
+export const RecordDomainProofPresentCommand = connectionCommand({
+  type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  schema: recordDomainProofPresentCommandDataSchema,
+  description: "Record that a re-check found a domain's ownership proof back",
+  verb: "recordDomainProofPresent",
+});
+export type RecordDomainProofPresentPayload =
+  RecordDomainProofPresentCommandData;
 
 export const GrandfatherConnectionCommand = connectionCommand({
   type: GRANDFATHER_CONNECTION_COMMAND_TYPE,

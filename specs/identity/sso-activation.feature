@@ -167,6 +167,16 @@ Feature: Going live with your own identity provider, without asking us
     Then the decision is recorded
     And it is no longer waiting to be decided
 
+  # TWICE NOW a verb was added to the ledger without a carrier on the queue,
+  # and the customer's save 500'd as an unknown error. The two lists live in
+  # two files on purpose (the ledger must not import the pipeline), so the
+  # agreement is pinned by a test instead of a type.
+  @unit
+  Scenario: Every verb the ledger can stage is one the pipeline will carry
+    Given the list of commands the connection ledger stages by name
+    Then the pipeline declares a sender for every one of them
+    And declares no sender the ledger cannot reach
+
   @unit
   Scenario: An arrival on a connection that asks keeps the account and waits
     Given a connection whose answer is that arrivals wait for approval

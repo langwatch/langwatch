@@ -14,11 +14,14 @@ import {
   CompleteTeardownCommand,
   DiscardConnectionCommand,
   GrandfatherConnectionCommand,
+  RecordDomainProofAbsentCommand,
+  RecordDomainProofPresentCommand,
   RegisterConnectionCommand,
   RejectDomainClaimCommand,
   RequestTeardownCommand,
   RequestVerificationCommand,
   ResumeConnectionCommand,
+  SetArrivalPolicyCommand,
   SuspendConnectionCommand,
   VerifyDomainCommand,
   WithdrawDomainCommand,
@@ -54,7 +57,7 @@ import type { SsoConnectionEvent } from "./schemas/events";
  * class, so a list says that, and adding a verb is one line in one place
  * instead of five in two.
  */
-const CONNECTION_COMMANDS = [
+export const CONNECTION_COMMANDS = [
   ["registerConnection", RegisterConnectionCommand],
   ["claimDomain", ClaimDomainCommand],
   ["approveDomainClaim", ApproveDomainClaimCommand],
@@ -69,6 +72,9 @@ const CONNECTION_COMMANDS = [
   ["resumeConnection", ResumeConnectionCommand],
   ["requestTeardown", RequestTeardownCommand],
   ["completeTeardown", CompleteTeardownCommand],
+  ["setArrivalPolicy", SetArrivalPolicyCommand],
+  ["recordDomainProofAbsent", RecordDomainProofAbsentCommand],
+  ["recordDomainProofPresent", RecordDomainProofPresentCommand],
   ["grandfatherConnection", GrandfatherConnectionCommand],
 ] as const;
 

@@ -74,7 +74,9 @@ export type SsoConnectionStagedSender = {
   send(data: unknown): Promise<unknown>;
 };
 
-const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
+/** Exported for the wiring pin only: the pipeline must carry every one of
+ *  these names, and the test that says so cannot read a private const. */
+export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
   [REGISTER_CONNECTION_COMMAND_TYPE]: "registerConnection",
   [CLAIM_DOMAIN_COMMAND_TYPE]: "claimDomain",
   [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: "approveDomainClaim",
