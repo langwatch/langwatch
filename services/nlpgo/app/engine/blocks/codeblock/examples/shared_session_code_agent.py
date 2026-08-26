@@ -2,10 +2,11 @@
 #
 # Rows are isolated, so each one starts cold and a login on every row is the
 # default result. This agent keeps one session in the project's agent cache and
-# reads it back at the start of every row, so only the rows that start at the
-# same moment log in. A row that finds the target no longer accepts the stored
-# session logs in again and stores the new one, so a session the target ends
-# early costs one login rather than the run.
+# reads it back at the start of every row. The rows that start at the same
+# moment all read an empty cache, so one of them takes a claim and logs in
+# while the rest wait for what it stores. A row that finds the target no longer
+# accepts the stored session logs in again and stores the new one, so a session
+# the target ends early costs one login rather than the run.
 #
 # The platform gives the sandbox its own LangWatch credential, so there is no
 # setup call to write and no LangWatch secret to create. The runner injects
@@ -14,13 +15,17 @@
 # returned.
 
 import sys
+import time
 
 import langwatch
 import requests
 
 SESSION_ENTRY_NAME = "ACME_SESSION"  # the cache entry that holds the session
-SESSION_TTL_SECONDS = 15 * 60  # what the target system promises
+LOGIN_CLAIM_NAME = "ACME_LOGIN_CLAIM"  # the name one row takes to log in
+SESSION_TTL_SECONDS = 15 * 60  # the lifetime the target system returns
 REFRESH_MARGIN_SECONDS = 60  # store it for less, so it is never sent stale
+CLAIM_TTL_SECONDS = 15  # a row that stops before it stores frees the name
+LOGIN_WAIT_TICKS = 20  # how long a row waits for the row that took the name
 REFUSED = object()  # the target would not accept the session this row sent
 
 
@@ -30,7 +35,7 @@ class Code:
         if reply is REFUSED:
             # The stored session is no longer one the target accepts. A target
             # ends a session whenever it likes: a restart, an operator closing
-            # it, a password change. The lifetime it promised is the most this
+            # it, a password change. The lifetime it returned is the most this
             # agent can assume, never a guarantee. So log in again and send
             # this row once more, which also stores the new session for the
             # rows that follow.
@@ -59,15 +64,50 @@ class Code:
 
 def get_session():
     """Return a session token. This is the one line each row calls."""
-    try:
-        stored = langwatch.cache.get(SESSION_ENTRY_NAME)
-    except Exception:  # noqa: BLE001 - a cache that cannot answer is a miss
-        report("could not be read", "this row logs in")
-        stored = None
+    stored = read_session()
     if stored:
         return stored
 
+    # A claim writes only when the name is free, so of the rows that read the
+    # empty cache together exactly one takes it and logs in. The rows that did
+    # not take it wait for the session that row stores, and claim again on
+    # every tick: a row that stops before it stores frees the name, and the
+    # next tick is where another row picks the work up.
+    for _ in range(LOGIN_WAIT_TICKS):
+        if take_the_login():
+            return renew_session()
+        time.sleep(1)
+        stored = read_session()
+        if stored:
+            return stored
+
+    # No row stored a session inside the window. This row logs in on its own,
+    # which is the result every row gets with no claim at all.
+    report("was not stored in time", "this row logs in")
     return renew_session()
+
+
+def read_session():
+    """Read the stored session. A cache that cannot answer reads as a miss."""
+    try:
+        return langwatch.cache.get(SESSION_ENTRY_NAME)
+    except Exception:  # noqa: BLE001 - a cache that cannot answer is a miss
+        report("could not be read", "this row logs in")
+        return None
+
+
+def take_the_login():
+    """Answer whether this row is the one that logs in.
+
+    A cache that cannot answer means every row logs in, which is the result
+    with no claim at all, so the row goes on rather than stopping.
+    """
+    try:
+        return langwatch.cache.claim(
+            LOGIN_CLAIM_NAME, "taken", ttl_seconds=CLAIM_TTL_SECONDS
+        )
+    except Exception:  # noqa: BLE001 - the row must still answer
+        return True
 
 
 def renew_session():
@@ -95,9 +135,9 @@ def login():
 
 def store_session(session):
     """Store the session for the rows that follow, for a little less than the
-    target system promises. A failure here does not fail the row: this row
-    holds a working session already, and the only cost is that the next row
-    logs in again."""
+    lifetime the target system returned. A failure here does not fail the row:
+    this row holds a working session already, and the only cost is that the
+    next row logs in again."""
     try:
         langwatch.cache.set(
             SESSION_ENTRY_NAME,

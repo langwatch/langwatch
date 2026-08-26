@@ -151,16 +151,23 @@ func TestSharedSessionCodeAgent_RowReadsASessionStoredAfterItStarted(t *testing.
 	assert.Equal(t, "session-written-after-the-snapshot", stubs.apiSessions[0])
 }
 
-// @scenario "Rows that race each other log in at most once each"
-func TestSharedSessionCodeAgent_RacingRowsLogInAtMostOnceEach(t *testing.T) {
+// @scenario "Rows that start together log in once between them"
+//
+// Before the claim this was the one bound this suite could not tighten: every
+// row of the first wave read the empty cache and logged in, so the assertion
+// could only say "between one and one per row". The claim is what turns it
+// into a number.
+func TestSharedSessionCodeAgent_RowsThatStartTogetherLogInOnce(t *testing.T) {
+	const rows = 4
+
 	stubs := newSharedSessionStubs(t, "p4ssw0rd")
 	code := loadSharedSessionExample(t)
 
 	executor := sharedSessionExec(t, stubs.cacheServer.URL)
-	results := make([]*codeblock.Result, 2)
-	errs := make([]error, 2)
+	results := make([]*codeblock.Result, rows)
+	errs := make([]error, rows)
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(rows)
 	for i := range results {
 		go func(index int) {
 			defer wg.Done()
@@ -175,13 +182,51 @@ func TestSharedSessionCodeAgent_RacingRowsLogInAtMostOnceEach(t *testing.T) {
 		require.Nil(t, results[i].Error, "row %d: %+v", i, results[i].Error)
 		assert.Equal(t, "hello from the protected api", results[i].Outputs["output"])
 	}
-	// Both rows read the cache first. Whether the second one finds a session
-	// depends on how far the first got, so the count is bounded rather than
-	// fixed: never more than one login per row, and never zero.
-	assert.Equal(t, 2, stubs.cacheReadCount())
-	assert.LessOrEqual(t, stubs.loginCount(), 2, "no row logs in twice")
-	assert.GreaterOrEqual(t, stubs.loginCount(), 1, "an empty cache means at least one login")
+
+	assert.Equal(t, 1, stubs.loginCount(),
+		"one row takes the claim and logs in; the rest read what it stored")
+	assert.Equal(t, 1, stubs.claimsTaken(),
+		"the claim is taken exactly once, however many rows ask for it")
+	assert.Len(t, stubs.writes(), 1, "one login means one session written")
 	assert.NotEmpty(t, stubs.storedSession(), "the session was written")
+
+	// Every row answered from the one session, not from one of its own.
+	require.Len(t, stubs.apiSessions, rows)
+	for _, presented := range stubs.apiSessions {
+		assert.Equal(t, "session-1", presented)
+	}
+}
+
+// @scenario "A row logs in itself when the row that took the login stores nothing"
+//
+// A claim that is never followed by a write would otherwise hold every other
+// row until its own lifetime passed and then leave them with nothing. The
+// claim expires, the next tick takes it, and that row does the work, so the
+// worst case is the result every row gets with no claim at all.
+func TestSharedSessionCodeAgent_RowLogsInWhenTheClaimHolderStoresNothing(t *testing.T) {
+	stubs := newSharedSessionStubs(t, "p4ssw0rd")
+	// Held by a row that stops before it stores a session. Two asks rather
+	// than the example's own lifetime, so the test observes the recovery
+	// instead of waiting out the full window.
+	stubs.holdLoginFor(2)
+
+	res, err := sharedSessionExec(t, stubs.cacheServer.URL).
+		Execute(context.Background(), stubs.rowRequest(loadSharedSessionExample(t)))
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected success, got %+v", res.Error)
+
+	assert.Equal(t, 1, stubs.loginCount(),
+		"the row takes the name once it is free and logs in")
+	assert.Equal(t, "session-1", stubs.storedSession())
+	assert.Equal(t, "hello from the protected api", res.Outputs["output"])
+
+	// It waited rather than logging in at once, which is what makes this the
+	// recovery path and not simply an empty cache.
+	claims := stubs.claims()
+	require.Len(t, claims, 3, "two asks found the name taken, the third took it")
+	assert.False(t, claims[0].Claimed, "the first ask found the name taken")
+	assert.False(t, claims[1].Claimed, "so did the second")
+	assert.True(t, claims[2].Claimed, "the third took it, and that row logged in")
 }
 
 // @scenario "A rejected login names the failure and keeps the password out of it"

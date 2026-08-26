@@ -68,15 +68,27 @@ Feature: A code agent logs in once for a whole run
       # The read happens while the row runs, not when the row is prepared.
 
     @integration
-    Scenario: Rows that race each other log in at most once each
+    Scenario: Rows that start together log in once between them
       Given the cache holds no session
-      When two rows start at the same moment
-      Then neither row logs in twice
-      And at least one row logs in
-      And a session is stored
-      # No lock prevents the first wave from racing. Both sessions are valid and
-      # the last write wins, so the login has to be idempotent on the target
-      # system, or the run's parallelism has to be lowered.
+      When four rows start at the same moment
+      Then exactly one row logs in
+      And the claim is taken exactly once
+      And every row answers with the session that row stored
+      # The rows of the first wave all read the empty cache, so before the
+      # claim they all logged in. The claim is what makes this a number: it
+      # writes only when the name is free, so one row does the work and the
+      # rows beside it read what it stored.
+
+    @integration
+    Scenario: A row logs in itself when the row that took the login stores nothing
+      Given another row took the login and stored no session
+      When the row runs
+      Then the row waits rather than logging in at once
+      And the row takes the login once that claim's lifetime passes
+      And the row logs in and stores the session
+      # A claim that no write follows must not hold the rows beside it for
+      # good. The claim expires, the next row takes it, and the worst case is
+      # the result every row gets with no claim at all.
 
   Rule: A cache that does not answer costs a login, never a row
 

@@ -81,28 +81,35 @@ export class TtlCache<T> {
    * `ttlMs` overrides the cache's own lifetime for this entry only, the same
    * way `set` takes one, so a caller that knows how long its value stays good
    * says so on the call that writes it.
+   *
+   * This is the one method that does NOT fall back to memory on a Redis
+   * error. Every other method degrades to a per-process answer that is at
+   * worst stale; a claim that degrades that way hands `true` to one caller
+   * per process and produces exactly the several winners it exists to
+   * prevent. So a configured Redis that cannot answer raises, and the caller
+   * decides: the agent cache's own caller treats it as "nothing arbitrated
+   * this, so do the work", which is the result with no claim at all.
+   *
+   * With no Redis configured the memory map IS the cache, the same as it is
+   * for `get` and `set`, and a claim inside one process is atomic.
    */
   async claim(key: string, value: T, ttlMs?: number): Promise<boolean> {
     const lifetimeMs = ttlMs ?? this.ttlMs;
 
     const r = this.redis;
     if (r) {
-      try {
-        const result = await r.set(
-          `${this.prefix}${key}`,
-          JSON.stringify(value),
-          "EX",
-          Math.ceil(lifetimeMs / 1000),
-          "NX",
-        );
-        if (result === "OK") {
-          this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
-          return true;
-        }
-        return false;
-      } catch {
-        // Redis failed, fall through to memory
+      const result = await r.set(
+        `${this.prefix}${key}`,
+        JSON.stringify(value),
+        "EX",
+        Math.ceil(lifetimeMs / 1000),
+        "NX",
+      );
+      if (result === "OK") {
+        this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
+        return true;
       }
+      return false;
     }
 
     if (this.memoryGet(key) !== undefined) return false;

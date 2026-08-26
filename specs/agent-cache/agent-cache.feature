@@ -173,6 +173,17 @@ Feature: The agent cache
       Then exactly one response says the name was taken
       And a read answers the value that caller sent
 
+    # A read and a write degrade to a per-process answer when the store
+    # cannot answer, and the worst that costs is a stale read. A claim that
+    # degraded the same way would name one winner per process, which is the
+    # one outcome it exists to prevent.
+    @unit
+    Scenario: A claim the store cannot answer raises rather than naming a winner
+      Given a store that cannot answer
+      When the caller claims a name
+      Then the call is refused
+      And the caller is never told it took the name
+
     @unit
     Scenario: The SDK answers a lost claim with false
       Given the project already holds an entry named ACME_SESSION
