@@ -1,4 +1,5 @@
 import {
+  type SsoArrivalPolicy,
   type SsoConnectionCommand,
   type SsoConnectionFactInput,
   type SsoSelfServeContext,
@@ -268,6 +269,16 @@ function wayBackIn({ expiresAtMs = T0 + 30 * DAY } = {}): void {
   ];
 }
 
+/** The fourth precondition: somebody has said who the connection admits. */
+async function arrivalsDecided(policy: SsoArrivalPolicy = "admit") {
+  await selfServe.setArrivals({
+    organizationId: ORG,
+    connectionId,
+    policy,
+    actor: ANA,
+  });
+}
+
 describe("going live with your own identity provider", () => {
   describe("given what proves the connection carries a person", () => {
     /** @scenario "A sign-in through the connection is what records the test" */
@@ -307,6 +318,7 @@ describe("going live with your own identity provider", () => {
       await proveDomain();
       signedInThroughIt();
       wayBackIn();
+      await arrivalsDecided();
     });
 
     /** @scenario "Going live with all three preconditions met turns the connection on" */
@@ -426,6 +438,77 @@ describe("going live with your own identity provider", () => {
 
       expect(codeOf(error)).toBe("sso_activation_break_glass_missing");
       expect((await held())?.state).not.toBe("ACTIVE");
+    });
+
+    /** @scenario Saying nothing is not an answer, and going live says so */
+    it("refuses a connection nobody has said who it admits, by name", async () => {
+      await proveDomain();
+      signedInThroughIt();
+      wayBackIn();
+
+      const error = await selfServe
+        .activate({ organizationId: ORG, connectionId, actor: ANA })
+        .then(refused, (caught: unknown) => caught);
+
+      // `allowsJit` defaulted to false and the journey never mentioned it, so
+      // every connection forbade provisioning and a person signing in through
+      // their own organization's provider was handed a workspace of their own.
+      // Nobody chose that. Turning it on without deciding is choosing by not
+      // choosing, and this is what interrupts it.
+      expect(codeOf(error)).toBe("sso_activation_arrivals_undecided");
+      expect((await held())?.state).not.toBe("ACTIVE");
+    });
+
+    /** @scenario Any of the three answers unblocks it, because the gate is deciding */
+    it("lets it through once somebody has said, whichever answer they gave", async () => {
+      await proveDomain();
+      signedInThroughIt();
+      wayBackIn();
+      // "Turn everybody away" is a decision too, and the gate is on the
+      // deciding rather than on any particular answer.
+      await arrivalsDecided("refuse");
+
+      await selfServe.activate({ organizationId: ORG, connectionId, actor: ANA });
+
+      expect((await held())?.state).toBe("ACTIVE");
+    });
+
+    /** @scenario A connection registered before the question keeps what it did */
+    it("answers with what allowsJit already said where nobody has spoken", async () => {
+      await proveDomain();
+
+      const setup = await selfServe.getSetup({ organizationId: ORG });
+
+      // Registered with `allowsJit: false`, and no policy fact: the answer is
+      // the behaviour it already had, and the journey still says nobody chose
+      // it. Nothing about a history written before the question replays
+      // differently.
+      expect(setup.connection?.arrivalPolicy).toBe("refuse");
+      expect(setup.goLive?.arrivalsDecided).toBe(false);
+    });
+
+    /** @scenario Saying it out loud is a fact even where the behaviour is the same */
+    it("records the decision even when it matches what it was already doing", async () => {
+      await proveDomain();
+      const before = committed.length;
+
+      await arrivalsDecided("refuse");
+
+      // A connection that turns arrivals away because nobody was asked and
+      // one that turns them away because an administrator chose to are the
+      // same behaviour and very different states.
+      expect(committed.length).toBe(before + 1);
+      expect(
+        (await selfServe.getSetup({ organizationId: ORG })).goLive
+          ?.arrivalsDecided,
+      ).toBe(true);
+
+      // And restating it now costs nothing, because somebody has said. The
+      // guard states no fact and the service never reaches the ledger, so a
+      // screen that saves without changing anything writes no history at all.
+      const afterDeciding = committed.length;
+      await arrivalsDecided("refuse");
+      expect(committed.length).toBe(afterDeciding);
     });
 
     /** @scenario "A way back in that has expired is not one" */

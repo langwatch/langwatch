@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ssoArrivalPolicySchema,
   ssoConnectionSourceSchema,
   ssoConnectionTypeSchema,
   ssoDomainClaimAuthoritySchema,
@@ -65,6 +66,16 @@ export const REQUEST_TEARDOWN_COMMAND_TYPE =
 export const COMPLETE_TEARDOWN_COMMAND_TYPE =
   "lw.identity.complete_teardown" as const;
 /**
+ * Who this connection admits, said out loud (ADR-117 §3).
+ *
+ * A verb of its own rather than a field on `register`, because it is asked
+ * after a domain is proved — the answer "anybody on a domain you proved"
+ * means nothing until there is one — and because it is a decision an
+ * organization revisits without re-registering anything.
+ */
+export const SET_ARRIVAL_POLICY_COMMAND_TYPE =
+  "lw.identity.set_arrival_policy" as const;
+/**
  * The one command that STATES HISTORY rather than commanding a change: the
  * grandfather migration's, which records what an organization's `ssoDomain`
  * and `ssoProvider` strings have been doing all along as the history a
@@ -92,6 +103,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   RESUME_CONNECTION_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
 ] as const;
 export type SsoConnectionCommandType =
@@ -305,6 +317,13 @@ export type CompleteTeardownCommandData = z.infer<
  * `source` is fixed rather than defaulted here: nothing else may state a
  * grandfathered fact, and nothing grandfathered may be stated any other way.
  */
+export const setArrivalPolicyCommandDataSchema = commandDataSchema({
+  policy: ssoArrivalPolicySchema,
+});
+export type SetArrivalPolicyCommandData = z.infer<
+  typeof setArrivalPolicyCommandDataSchema
+>;
+
 export const grandfatherConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
@@ -373,6 +392,10 @@ export type SsoConnectionCommand =
   | {
       type: typeof COMPLETE_TEARDOWN_COMMAND_TYPE;
       data: CompleteTeardownCommandData;
+    }
+  | {
+      type: typeof SET_ARRIVAL_POLICY_COMMAND_TYPE;
+      data: SetArrivalPolicyCommandData;
     }
   | {
       type: typeof GRANDFATHER_CONNECTION_COMMAND_TYPE;

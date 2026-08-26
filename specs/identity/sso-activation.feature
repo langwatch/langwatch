@@ -116,6 +116,65 @@ Feature: Going live with your own identity provider, without asking us
     in the browser that finishes it
 
   # ---------------------------------------------------------------------
+  # Who the connection lets in
+  # ---------------------------------------------------------------------
+
+  # THE QUESTION NOBODY WAS ASKED. `allowsJit` defaulted to false and the
+  # journey never mentioned it, so every connection in the database forbade
+  # provisioning — and a person signing in through their own organization's
+  # identity provider was authenticated and then handed a brand new workspace
+  # of their own. That is the opposite of what registering a connection means,
+  # and nobody chose it: it was a default nobody surfaced.
+  #
+  # It is asked after the domain proof, because the widest answer is "anybody
+  # on a domain you proved" and that means nothing until one is. What bounds
+  # that answer is ROUTING, not the setting: an address only ever reaches a
+  # connection whose domain that connection proved.
+
+  @integration
+  Scenario: The journey asks who the connection lets in
+    Given a connection whose domain is proved
+    When the administrator reaches the step after the way back in
+    Then they are offered three answers: the arrivals join, they wait for
+    approval, or they are turned away
+    And the widest answer says it rests on the domain proof
+
+  @unit
+  Scenario: Saying nothing is not an answer, and going live says so
+    Given every other precondition is met and nobody has said who it admits
+    When the administrator turns the connection on
+    Then it is refused with code sso_activation_arrivals_undecided
+    And the connection is not on
+
+  @unit
+  Scenario: Any of the three answers unblocks it, because the gate is deciding
+    Given every other precondition is met
+    When the administrator says the connection turns arrivals away
+    Then turning it on is no longer refused
+    And arrivals are turned away
+
+  @unit
+  Scenario: A connection registered before the question keeps what it did
+    Given a connection whose history carries no answer
+    When anything asks who it admits
+    Then it answers with what allowsJit already said
+    And nothing about its behaviour changed
+
+  @unit
+  Scenario: Saying it out loud is a fact even where the behaviour is the same
+    Given a connection nobody has answered for, which turns arrivals away
+    When the administrator chooses to turn arrivals away
+    Then the decision is recorded
+    And it is no longer waiting to be decided
+
+  @unit
+  Scenario: An arrival on a connection that asks keeps the account and waits
+    Given a connection whose answer is that arrivals wait for approval
+    When somebody it has never seen signs in through it
+    Then they keep the account the sign-in created
+    But they are not a member until an administrator answers
+
+  # ---------------------------------------------------------------------
   # A way back in
   # ---------------------------------------------------------------------
 

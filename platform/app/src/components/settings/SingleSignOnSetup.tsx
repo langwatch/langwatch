@@ -22,6 +22,7 @@ import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { IdentityChip } from "../access/IdentityRow";
+import { ArrivalsSection } from "./singleSignOn/ArrivalsSection";
 import { BreakGlassSection } from "./singleSignOn/BreakGlassSection";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
@@ -34,6 +35,19 @@ import {
 import { ServiceProviderDetails } from "./singleSignOn/ServiceProviderDetails";
 import { SetupStep, SetupSteps } from "./singleSignOn/SetupStep";
 import { TestSignInSection } from "./singleSignOn/TestSignInSection";
+
+/**
+ * The one line a finished arrivals step keeps when it closes.
+ *
+ * The step's whole point is that somebody decided, so the answer they gave is
+ * what the closed step has to say — a tick alone would hide the very fact the
+ * step exists to establish.
+ */
+const ARRIVALS_SUMMARY = {
+  admit: "They join, on a domain you proved",
+  request: "They wait for you to approve them",
+  refuse: "Only people already here",
+} as const;
 
 /**
  * Setting enterprise single sign-on up yourself, all the way to live (D05
@@ -157,6 +171,7 @@ function ConnectedJourney({
     domainProved: goLive?.domainProved ?? false,
     testSignInDone: goLive?.testSignIn.done ?? false,
     breakGlassInPlace: goLive?.breakGlass.inPlace ?? false,
+    arrivalsDecided: goLive?.arrivalsDecided ?? false,
     activated: goLive?.activated ?? false,
   });
 
@@ -230,6 +245,20 @@ function ConnectedJourney({
 
         <SetupStep
           number={5}
+          title="Say who it lets in"
+          state={progress.arrivals}
+          summary={ARRIVALS_SUMMARY[connection.arrivalPolicy]}
+        >
+          <ArrivalsSection
+            organizationId={organizationId}
+            connectionId={connection.connectionId}
+            canManage={canManage}
+            policy={connection.arrivalPolicy}
+          />
+        </SetupStep>
+
+        <SetupStep
+          number={6}
           title="Turn it on"
           state={progress.goLive}
           note={progress.goLiveBlockedBecause ?? undefined}

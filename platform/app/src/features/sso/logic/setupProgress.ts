@@ -33,6 +33,8 @@ export interface SetupProgress {
   domain: SetupStepState;
   testSignIn: SetupStepState;
   breakGlass: SetupStepState;
+  /** Whether somebody has said who the connection admits (ADR-117 §3). */
+  arrivals: SetupStepState;
   goLive: SetupStepState;
   /** Why turning it on is not available yet, or null when it is. */
   goLiveBlockedBecause: string | null;
@@ -42,11 +44,13 @@ export function setupProgressFor({
   domainProved,
   testSignInDone,
   breakGlassInPlace,
+  arrivalsDecided,
   activated,
 }: {
   domainProved: boolean;
   testSignInDone: boolean;
   breakGlassInPlace: boolean;
+  arrivalsDecided: boolean;
   activated: boolean;
 }): SetupProgress {
   // Registering happened, or none of this would be on screen.
@@ -59,6 +63,10 @@ export function setupProgressFor({
     domainProved ? null : "a proved domain",
     testSignInDone ? null : "a sign-in that worked",
     breakGlassInPlace ? null : "somebody who can still get in without it",
+    // The fourth, and the only one that is a DECISION rather than a thing
+    // that had to happen. Turning a connection on without saying what it
+    // does with somebody it has never seen is choosing by not choosing.
+    arrivalsDecided ? null : "a decision about who it lets in",
   ].filter((entry): entry is string => entry !== null);
 
   const goLiveBlockedBecause =
@@ -74,6 +82,7 @@ export function setupProgressFor({
     ["domain", domainProved],
     ["testSignIn", testSignInDone],
     ["breakGlass", breakGlassInPlace],
+    ["arrivals", arrivalsDecided],
   ];
   const current = order.find(([, done]) => !done)?.[0] ?? null;
 
@@ -85,6 +94,7 @@ export function setupProgressFor({
     domain: stateFor("domain", domainProved),
     testSignIn: stateFor("testSignIn", testSignInDone),
     breakGlass: stateFor("breakGlass", breakGlassInPlace),
+    arrivals: stateFor("arrivals", arrivalsDecided),
     goLive: activated
       ? "done"
       : goLiveBlockedBecause !== null

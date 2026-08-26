@@ -69,6 +69,7 @@ vi.mock("../../../utils/api", () => {
         proveDomain: idle(),
         checkDomainRecord: idle(),
         checkDomainFile: idle(),
+        setArrivals: idle(),
         claimDomain: idle(),
         removeDomain: idle(),
         activate: mutation(activateMock),
@@ -125,6 +126,7 @@ function setupWith({
     domainProved: boolean;
     testSignIn: { done: boolean; atMs: number | null };
     breakGlass: { inPlace: boolean; liveCount: number };
+    arrivalsDecided: boolean;
     ready: boolean;
     activated: boolean;
     routingSwitchedOn: boolean;
@@ -141,6 +143,7 @@ function setupWith({
       type: "oidc",
       providerId: "Okta",
       issuer: "https://login.acme.okta.com",
+      arrivalPolicy: "admit" as const,
       verifiedDomains,
       domainProofs: verifiedDomains.map((domain) => ({
         domain,
@@ -159,6 +162,7 @@ const NOTHING_DONE = {
   domainProved: false,
   testSignIn: { done: false, atMs: null },
   breakGlass: { inPlace: false, liveCount: 0 },
+  arrivalsDecided: false,
   ready: false,
   activated: false,
   routingSwitchedOn: false,
@@ -168,6 +172,7 @@ const EVERYTHING_DONE = {
   domainProved: true,
   testSignIn: { done: true, atMs: 1_756_000_000_000 },
   breakGlass: { inPlace: true, liveCount: 1 },
+  arrivalsDecided: true,
   ready: true,
   activated: false,
   routingSwitchedOn: false,

@@ -94,6 +94,45 @@ export const SSO_VERIFICATION_METHODS = [
 export const ssoVerificationMethodSchema = z.enum(SSO_VERIFICATION_METHODS);
 export type SsoVerificationMethod = z.infer<typeof ssoVerificationMethodSchema>;
 
+/**
+ * What happens to somebody who signs in through this connection and is not a
+ * member yet (ADR-117 §3).
+ *
+ * THREE ANSWERS AND NO FOURTH:
+ *
+ *   admit   — they join. Bounded, and not by this setting: routing only ever
+ *             sends an address to a connection whose domain that connection
+ *             PROVED, so "anybody who reaches this" already means "anybody on
+ *             a domain you proved and configured a provider for".
+ *   request — they exist, and they wait. An administrator answers, the same
+ *             way they answer any other request to join (D12).
+ *   refuse  — the sign-in is turned away. The connection carries the people
+ *             already here and nobody else.
+ *
+ * IT IS ASKED, NEVER ASSUMED. Registering a connection is a strong statement
+ * of intent and it is still not this one: an organization that federates
+ * sign-in has not thereby said that everybody their provider knows about
+ * belongs here. Defaulting it either way picks somebody's security posture
+ * for them, and the default that was picked — `allowsJit: false`, never
+ * surfaced — meant a person signing in through their own organization's
+ * connection was authenticated and then handed a workspace of their own.
+ */
+export const SSO_ARRIVAL_POLICIES = ["admit", "request", "refuse"] as const;
+export const ssoArrivalPolicySchema = z.enum(SSO_ARRIVAL_POLICIES);
+export type SsoArrivalPolicy = z.infer<typeof ssoArrivalPolicySchema>;
+
+/**
+ * The policy a connection with no policy fact is on.
+ *
+ * Derived rather than stored, so every history written before this existed
+ * folds to exactly the behaviour it already had: `allowsJit` was the whole
+ * answer then, and it is the whole answer for those rows now. Nothing
+ * replays differently.
+ */
+export function arrivalPolicyFromLegacyJit(allowsJit: boolean): SsoArrivalPolicy {
+  return allowsJit ? "admit" : "refuse";
+}
+
 export const SSO_VERIFICATION_CEREMONY_METHODS = [
   "dns-txt",
   "license-token",
@@ -266,6 +305,10 @@ export const TEARDOWN_REQUESTED_EVENT_TYPE =
   "lw.identity.teardown_requested" as const;
 export const CONNECTION_TORN_DOWN_EVENT_TYPE =
   "lw.identity.connection_torn_down" as const;
+/** Who this connection admits, stated. Additive on purpose: a history
+ *  without one folds to what `allowsJit` already said. */
+export const CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE =
+  "lw.identity.connection_arrival_policy_set" as const;
 
 export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -285,6 +328,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_RESUMED_EVENT_TYPE,
   TEARDOWN_REQUESTED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
+  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
 ] as const;
 export type SsoConnectionEventType =
   (typeof SSO_CONNECTION_EVENT_TYPES)[number];
@@ -504,6 +548,13 @@ export const connectionTornDownPayloadSchema = z.object({
   ...sourced,
 });
 
+export const connectionArrivalPolicySetPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  policy: ssoArrivalPolicySchema,
+  actor: identityActorSchema,
+  ...sourced,
+});
+
 /**
  * A connection fact as a command decides it. The framework envelope
  * (aggregate, tenant, ids, idempotency key) and `occurredAt` are stamped by
@@ -577,6 +628,10 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(CONNECTION_TORN_DOWN_EVENT_TYPE),
     data: connectionTornDownPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE),
+    data: connectionArrivalPolicySetPayloadSchema,
   }),
 ]);
 export type SsoConnectionFactInput = z.infer<
@@ -693,6 +748,14 @@ export interface SsoConnectionState {
   } | null;
   idpMetadata: SsoIdpMetadata;
   allowsJit: boolean;
+  /**
+   * Who this connection admits, once somebody has said.
+   *
+   * Null means nobody has, and the answer is then whatever `allowsJit`
+   * already said — which is how every history written before this existed
+   * folds to exactly the behaviour it already had.
+   */
+  arrivalPolicy: SsoArrivalPolicy | null;
   source: SsoConnectionSource;
   testLoginAccountId: string | null;
   /** Why ops last rejected a claim, with the domain it was about. Kept so a
@@ -731,6 +794,7 @@ export function emptySsoConnection({
     pendingVerification: null,
     idpMetadata: EMPTY_IDP,
     allowsJit: false,
+    arrivalPolicy: null,
     source: "self-serve",
     testLoginAccountId: null,
     rejection: null,
@@ -1084,7 +1148,27 @@ export function reduceSsoConnection({
       };
     case CONNECTION_TORN_DOWN_EVENT_TYPE:
       return { ...touched, state: "TORN_DOWN", tearDownAfterMs: null };
+    case CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE:
+      // `allowsJit` is kept in step so nothing reading the old field has to
+      // learn the new one. It is a derived copy, never a second source of
+      // truth: `arrivalPolicy` is what a reader asks, through
+      // `ssoArrivalPolicy` below.
+      return {
+        ...touched,
+        arrivalPolicy: fact.data.policy,
+        allowsJit: fact.data.policy === "admit",
+      };
   }
+}
+
+/**
+ * Who this connection admits, whether or not anybody has said.
+ *
+ * The one place that decides it, so a history from before the policy existed
+ * and one written this morning answer the same question the same way.
+ */
+export function ssoArrivalPolicy(state: SsoConnectionState): SsoArrivalPolicy {
+  return state.arrivalPolicy ?? arrivalPolicyFromLegacyJit(state.allowsJit);
 }
 
 // ---- claims and ceremonies, read ------------------------------------------

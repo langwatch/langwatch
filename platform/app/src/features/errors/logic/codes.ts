@@ -349,6 +349,7 @@ export const APP_ERROR_CODES = [
   "share_read_rate_limited",
   "span_not_found",
   "spend_source_unavailable",
+  "sso_activation_arrivals_undecided",
   "sso_activation_break_glass_missing",
   "sso_activation_domain_unproved",
   "sso_activation_test_sign_in_missing",

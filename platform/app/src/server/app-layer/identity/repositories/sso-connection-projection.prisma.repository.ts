@@ -1,4 +1,5 @@
 import type {
+  SsoArrivalPolicy,
   SsoConnectionLifecycleState,
   SsoConnectionSource,
   SsoConnectionState,
@@ -112,6 +113,7 @@ export class PrismaSsoConnectionProjectionRepository
       pendingVerification: state.pendingVerification ?? undefined,
       idpMetadata: state.idpMetadata,
       allowsJit: state.allowsJit,
+      arrivalPolicy: state.arrivalPolicy,
       source: state.source,
       testLoginAccountId: state.testLoginAccountId,
       rejection: state.rejection ?? undefined,
@@ -220,6 +222,9 @@ export function rowToConnection(row: SsoConnection): SsoConnectionState {
       : null,
     idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
     allowsJit: row.allowsJit,
+    // NULL is an answer here — "nobody has said" — and `ssoArrivalPolicy`
+    // turns it into the one `allowsJit` already gave.
+    arrivalPolicy: (row.arrivalPolicy as SsoArrivalPolicy | null) ?? null,
     source: row.source as SsoConnectionSource,
     testLoginAccountId: row.testLoginAccountId,
     rejection: row.rejection

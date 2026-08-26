@@ -55,6 +55,7 @@ const apiDouble = {
       renewBreakGlass: mutationDouble(),
       revokeBreakGlass: mutationDouble(),
       checkDomainFile: mutationDouble(),
+      setArrivals: mutationDouble(),
       discardConnection: mutationDouble(),
       removeConnection: mutationDouble(),
       breakGlassBindings: {
@@ -143,6 +144,7 @@ const GO_LIVE = {
   domainProved: true,
   testSignIn: { done: true, atMs: 1_700_000_000_000 },
   breakGlass: { inPlace: true, liveCount: 1 },
+  arrivalsDecided: true,
   ready: true,
   activated: true,
   routingSwitchedOn: true,
@@ -163,6 +165,7 @@ function liveSetup(overrides: Record<string, unknown> = {}) {
       type: "oidc",
       providerId: "okta",
       issuer: "https://login.acme.okta.com",
+      arrivalPolicy: "admit" as const,
       verifiedDomains: ["acme.com"],
       domainProofs: [
         { domain: "acme.com", proofState: "VERIFIED", graceEndsAtMs: null },

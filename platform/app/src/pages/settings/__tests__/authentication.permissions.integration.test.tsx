@@ -44,6 +44,7 @@ const apiDouble = {
       renewBreakGlass: mutationDouble(),
       revokeBreakGlass: mutationDouble(),
       checkDomainFile: mutationDouble(),
+      setArrivals: mutationDouble(),
       discardConnection: mutationDouble(),
       removeConnection: mutationDouble(),
       breakGlassBindings: {
@@ -104,6 +105,7 @@ const SETUP = {
     type: "oidc",
     providerId: "okta",
     issuer: "https://login.acme.okta.com",
+    arrivalPolicy: "admit" as const,
     verifiedDomains: [],
     domainProofs: [],
   },
@@ -123,6 +125,7 @@ const SETUP = {
     domainProved: false,
     testSignIn: { done: false, atMs: null },
     breakGlass: { inPlace: false, liveCount: 0 },
+    arrivalsDecided: false,
     ready: false,
     activated: false,
     routingSwitchedOn: false,

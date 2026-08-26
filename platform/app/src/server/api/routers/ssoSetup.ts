@@ -1,4 +1,5 @@
 import { auditLog } from "@ee/audit-log/auditLog";
+import { ssoArrivalPolicySchema } from "@langwatch/identity";
 import { ssoIdpRegistrationSchema } from "@langwatch/identity-server";
 import { z } from "zod";
 import {
@@ -222,6 +223,26 @@ export const ssoSetupRouter = createTRPCRouter({
       return ssoSelfServe().activate({
         organizationId: input.organizationId,
         connectionId: input.connectionId,
+        actor,
+      });
+    }),
+
+  /**
+   * Who this connection admits (ADR-117 §3).
+   *
+   * The whole input is audited, policy included: which of the three answers
+   * an organization is on is the fact somebody asking "why did a stranger
+   * turn up in our member list at 03:14" needs, and there is nothing in it
+   * they must not see.
+   */
+  setArrivals: enterpriseSsoProcedure
+    .input(connectionInput.extend({ policy: ssoArrivalPolicySchema }))
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({ ctx, action: "setArrivals", args: input });
+      return ssoSelfServe().setArrivals({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        policy: input.policy,
         actor,
       });
     }),

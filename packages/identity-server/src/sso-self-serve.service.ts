@@ -7,12 +7,15 @@ import {
   SSO_DNS_PROOF_TTL_MS,
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
+  ssoArrivalPolicy,
+  type SsoArrivalPolicy,
   type SsoConnectionState,
   type SsoConnectionType,
   type SsoDomainClaim,
   type SsoDomainProofState,
   type SsoSelfServeAvailability,
   type SsoSelfServeContext,
+  SsoActivationArrivalsUndecidedError,
   SsoActivationBreakGlassMissingError,
   SsoActivationDomainUnprovedError,
   SsoActivationTestSignInMissingError,
@@ -330,6 +333,18 @@ export interface SelfServeGoLiveView {
   domainProved: boolean;
   testSignIn: { done: boolean; atMs: number | null };
   breakGlass: { inPlace: boolean; liveCount: number };
+  /**
+   * Whether anybody has said what this connection does with somebody who
+   * signs in through it and is not a member yet (ADR-117 §3).
+   *
+   * A PRECONDITION OF GOING LIVE, because the alternative is what shipped:
+   * `allowsJit` defaulted to false, the journey never mentioned it, and a
+   * person signing in through their own organization's identity provider was
+   * authenticated and then handed a brand new workspace of their own. Nobody
+   * chose that. Turning a connection on without deciding what it admits is
+   * choosing by not choosing, and this is the step that stops it.
+   */
+  arrivalsDecided: boolean;
   /** Every precondition met. Not the same as `activated`. */
   ready: boolean;
   activated: boolean;
@@ -380,6 +395,14 @@ export interface SelfServeSetupView {
     type: SsoConnectionType;
     providerId: string;
     issuer: string | null;
+    /**
+     * What happens to somebody who signs in through it and is not a member
+     * yet. Always an answer, never null: a connection that predates the
+     * setting is on whatever `allowsJit` already said, and a screen that had
+     * to know the difference would be a screen showing "not set" for a
+     * behaviour that is very much set.
+     */
+    arrivalPolicy: SsoArrivalPolicy;
     verifiedDomains: string[];
     /** One entry per proved domain: what proved it is elsewhere, this is
      *  whether that evidence is still there. */
@@ -463,6 +486,7 @@ export class SsoSelfServeService {
             type: state.type,
             providerId: state.idpMetadata.providerId,
             issuer: state.idpMetadata.issuer,
+            arrivalPolicy: ssoArrivalPolicy(state),
             verifiedDomains: state.verifiedDomains,
             domainProofs: state.domainVerifications.map((proof) => ({
               domain: proof.domain,
@@ -531,6 +555,11 @@ export class SsoSelfServeService {
       this.deps.routing.routesOffConnection({ organizationId }),
     ]);
     const domainProved = connection.verifiedDomains.length > 0;
+    // Somebody has SAID, which is not the same as the connection having an
+    // answer — it always has one. A connection that predates the question is
+    // on `refuse` and nobody chose it, and that is precisely the state this
+    // precondition exists to interrupt.
+    const arrivalsDecided = connection.arrivalPolicy !== null;
     return {
       domainProved,
       testSignIn: {
@@ -541,7 +570,12 @@ export class SsoSelfServeService {
         inPlace: liveBindings.length > 0,
         liveCount: liveBindings.length,
       },
-      ready: domainProved && testSignIn !== null && liveBindings.length > 0,
+      arrivalsDecided,
+      ready:
+        domainProved &&
+        testSignIn !== null &&
+        liveBindings.length > 0 &&
+        arrivalsDecided,
       activated: connection.state === "ACTIVE",
       routingSwitchedOn,
     };
@@ -597,6 +631,15 @@ export class SsoSelfServeService {
         `organization ${organizationId}: no live way in without the identity provider`,
       );
     }
+    // THE QUESTION THAT USED NOT TO BE ASKED. Turning a connection on without
+    // saying what it does with somebody it has never seen is choosing by not
+    // choosing, and the choice that got made by default — turn them away, and
+    // hand them a workspace of their own — is the one nobody would pick.
+    if (state.arrivalPolicy === null) {
+      throw new SsoActivationArrivalsUndecidedError(
+        `connection ${connectionId}: nobody has said who it admits`,
+      );
+    }
 
     await this.deps.connections().activateConnection({
       ...this.command({ organizationId, connectionId, actor }),
@@ -605,6 +648,41 @@ export class SsoSelfServeService {
       testLoginAccountId: testSignIn.accountId,
     });
     return { alreadyLive: false };
+  }
+
+  /**
+   * Who this connection admits (ADR-117 §3).
+   *
+   * ASKED AFTER THE PROOF, never at registration: "anybody on a domain you
+   * proved" is not an answer anybody can give before there is one, and an
+   * organization revisits the decision without re-registering anything. The
+   * guard holds the states it may be commanded from.
+   *
+   * Restating the policy already in force costs no event, so a screen that
+   * saves without changing anything writes no history.
+   */
+  async setArrivals({
+    organizationId,
+    connectionId,
+    policy,
+    actor,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    policy: SsoArrivalPolicy;
+    actor: SelfServeActor;
+  }): Promise<void> {
+    await this.requireAvailable({ organizationId });
+    const state = await this.requireConnection({ connectionId });
+    if (state.organizationId !== organizationId) {
+      throw new SsoDomainProofNotFoundError(
+        `connection ${connectionId} is not organization ${organizationId}'s`,
+      );
+    }
+    await this.deps.connections().setArrivalPolicy({
+      ...this.command({ organizationId, connectionId, actor }),
+      policy,
+    });
   }
 
   /**

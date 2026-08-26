@@ -45,8 +45,15 @@ export interface CallbackAssertion {
   email: string | null;
   /** Whether the IdP asserts that address as verified. */
   emailVerified: boolean;
-  /** Whether this connection may provision someone it has never seen. */
-  allowsJit: boolean;
+  /**
+   * What this connection does with somebody it has never seen: admit them,
+   * make them wait for an administrator, or turn them away (ADR-117 §3).
+   *
+   * Bounded by routing rather than by this field: an address only ever
+   * reaches a connection whose domain that connection PROVED, so `admit`
+   * means "anybody on a domain you proved", never "anybody at all".
+   */
+  arrivalPolicy: SsoArrivalPolicy;
 }
 
 /** A user the asserted address matched, and the evidence they carry. */
@@ -92,12 +99,20 @@ export interface SignInCallbackDirectoryPort {
     normalizedEmail: string;
   }): Promise<void>;
 
-  /** Just-in-time provisioning, where the connection allows it. */
+  /**
+   * Just-in-time provisioning, where the connection allows it.
+   *
+   * `membership` says what the account arrives as: a member of the
+   * connection's organization, or an account with a request to join it
+   * standing. The account itself is identical — the difference is one row
+   * and who has to act next.
+   */
   provisionUser(input: {
     connectionId: string | null;
     provider: IdentifierProvider;
     subject: string;
     normalizedEmail: string;
+    membership: "join" | "request";
   }): Promise<{ userId: string }>;
 }
 
@@ -127,7 +142,14 @@ export interface CallbackAuditRecord {
 export type CallbackLinkOutcome =
   | { kind: "signed_in"; userId: string; linked: false }
   | { kind: "linked"; userId: string; linked: true }
-  | { kind: "provisioned"; userId: string; linked: true };
+  | { kind: "provisioned"; userId: string; linked: true }
+  /**
+   * They exist and they are waiting. The account is real — they signed in,
+   * and refusing to remember that would make them do it again for nothing —
+   * but they are not a member until somebody answers. The caller lands them
+   * wherever a person with no organization lands, with a request already in.
+   */
+  | { kind: "awaiting_approval"; userId: string; linked: true };
 
 export interface SignInCallbackLinkingDeps {
   directory: SignInCallbackDirectoryPort;
@@ -300,11 +322,25 @@ export class SignInCallbackLinkingService {
     });
   }
 
+  /**
+   * Somebody the connection has never seen, and what it does about them.
+   *
+   * The account is created in two of the three cases, and it is the same
+   * account either way: signing in successfully and being told to do it again
+   * later is not a thing to put a person through, and an administrator
+   * answering a request needs somebody to answer ABOUT. What differs is
+   * whether they are a member when they land.
+   *
+   * An assertion with no address at all is refused whatever the policy says.
+   * Every downstream question — which domain admitted them, who to tell, what
+   * to show an administrator deciding — is asked of the address, and there is
+   * no answer to give without one.
+   */
   private async provision(
     assertion: CallbackAssertion,
     normalizedEmail: string | null,
   ): Promise<CallbackLinkOutcome> {
-    if (!assertion.allowsJit || !normalizedEmail) {
+    if (assertion.arrivalPolicy === "refuse" || !normalizedEmail) {
       throw new IdentityJitDisabledError();
     }
     const { userId } = await this.directory.provisionUser({
@@ -312,7 +348,12 @@ export class SignInCallbackLinkingService {
       provider: assertion.provider,
       subject: assertion.subject,
       normalizedEmail,
+      // A membership, or an account and a request for one. The directory
+      // knows how to make both; this decides which was asked for.
+      membership: assertion.arrivalPolicy === "admit" ? "join" : "request",
     });
-    return { kind: "provisioned", userId, linked: true };
+    return assertion.arrivalPolicy === "admit"
+      ? { kind: "provisioned", userId, linked: true }
+      : { kind: "awaiting_approval", userId, linked: true };
   }
 }

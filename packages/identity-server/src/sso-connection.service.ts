@@ -38,6 +38,9 @@ import {
   requestVerificationCommandDataSchema,
   type ResumeConnectionCommandData,
   resumeConnectionCommandDataSchema,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  type SetArrivalPolicyCommandData,
+  setArrivalPolicyCommandDataSchema,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SsoConnectionCommand,
   type SsoConnectionFact,
@@ -223,6 +226,17 @@ export class SsoConnectionService {
     return this.commit(
       { type: RESUME_CONNECTION_COMMAND_TYPE, data },
       await this.guards.resumeConnection(data),
+    );
+  }
+
+  /** Who this connection admits (ADR-117 §3). */
+  async setArrivalPolicy(
+    input: SetArrivalPolicyCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = setArrivalPolicyCommandDataSchema.parse(input);
+    return this.commit(
+      { type: SET_ARRIVAL_POLICY_COMMAND_TYPE, data },
+      await this.guards.setArrivalPolicy(data),
     );
   }
 

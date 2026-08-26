@@ -2052,6 +2052,11 @@ const presentations = {
     describe: () =>
       "Before single sign-on decides who gets in, one person needs to be able to sign in with a password in case the identity provider stops working. Grant a way back in, then try again.",
   },
+  sso_activation_arrivals_undecided: {
+    title: "Say who this connection lets in",
+    describe: () =>
+      "Somebody signs in through your identity provider and you have never seen them before — they can join, they can wait for you to approve them, or they can be turned away. Choose one, then turn the connection on.",
+  },
   sso_connection_string_edit_retired: {
     title: "Single sign-on is configured on the connection now",
     describe: () =>

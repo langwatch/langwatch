@@ -278,6 +278,24 @@ export class SsoActivationBreakGlassMissingError extends SsoActivationPreconditi
 }
 
 /**
+ * Nobody has said what this connection does with somebody it has never seen.
+ *
+ * A precondition rather than a default, because the default that shipped —
+ * turn them away, and hand them a workspace of their own — is the one nobody
+ * would pick, and it got picked by never being asked.
+ */
+export class SsoActivationArrivalsUndecidedError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super(
+      "sso_activation_arrivals_undecided",
+      "sso_activation_arrivals_undecided",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoActivationArrivalsUndecidedError";
+  }
+}
+
+/**
  * Revoking this grant would leave a live connection with no way back in.
  * The one lever that exists for the identity provider failing must not be
  * removable while the identity provider is what decides sign-in — grant

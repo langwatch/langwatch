@@ -42,6 +42,9 @@ import {
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  type SetArrivalPolicyCommandData,
   type RegisterConnectionCommandData,
   type RejectDomainClaimCommandData,
   type RequestTeardownCommandData,
@@ -160,6 +163,14 @@ const ALLOWED_FROM: Record<
   [RESUME_CONNECTION_COMMAND_TYPE]: ["SUSPENDED"],
   [REQUEST_TEARDOWN_COMMAND_TYPE]: ["ACTIVE", "SUSPENDED"],
   [COMPLETE_TEARDOWN_COMMAND_TYPE]: ["TEARDOWN_PENDING"],
+  // From VERIFIED, because "anybody on a domain you proved" is not an answer
+  // anybody can give before there is one — the journey asks it at the step
+  // after the proof lands. And from every state the connection can rest in
+  // afterwards, because who a live connection admits is a decision an
+  // organization revisits without re-registering anything. Not from
+  // TEARDOWN_PENDING: a connection on its way out admits nobody, and saying
+  // otherwise would be a setting that does nothing.
+  [SET_ARRIVAL_POLICY_COMMAND_TYPE]: ["VERIFIED", "ACTIVE", "SUSPENDED"],
 };
 
 export interface SsoConnectionGuardsDeps {
@@ -852,6 +863,43 @@ export class SsoConnectionGuards {
         data: {
           connectionId: data.connectionId,
           reason: data.reason,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * Who this connection admits, stated (ADR-117 §3).
+   *
+   * NO PRECONDITION BEYOND THE STATE, and deliberately none about domains:
+   * `admit` is bounded by routing, not by this verb. An address only ever
+   * reaches a connection whose domain that connection PROVED, so "anybody
+   * who reaches this" already means "anybody on a domain you proved". A
+   * second check here would be the same rule enforced twice, in a place that
+   * could drift from the one that actually decides.
+   *
+   * Restating a policy somebody already SAID costs no event, so a screen that
+   * saves without changing anything writes no history. Saying one where
+   * nobody has always writes, even where the answer matches the one the
+   * connection was already behaving as: the fact IS somebody having decided,
+   * and going live rests on that rather than on the behaviour. A connection
+   * that turns arrivals away because nobody was asked and one that turns them
+   * away because an administrator chose to are the same behaviour and very
+   * different states, and only one of them is ready to be switched on.
+   */
+  async setArrivalPolicy(
+    data: SetArrivalPolicyCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(data, SET_ARRIVAL_POLICY_COMMAND_TYPE);
+    if (state.arrivalPolicy === data.policy) return [];
+    return [
+      {
+        type: CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          policy: data.policy,
           actor: data.actor,
           source: data.source,
         },
