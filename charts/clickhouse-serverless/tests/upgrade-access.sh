@@ -657,17 +657,31 @@ p1_3_seed() {
   ch_query "$pod0" "CREATE NAMED COLLECTION IF NOT EXISTS up_probe_collection AS k = 'v'"
   pass "P1.3 five entity classes seeded on ${pod0}"
 
-  ac "P1.3" "baseline capture — must be non-empty (AC1, AC8)"
+  ac "P1.3" "baseline capture — must be non-empty on the seed pod (AC1, AC8)"
   capture_entities "${RUN_DIR}/baseline" "baseline@${OLD_TAG}"
   local cls verdict
+  BASELINE_VERDICTS=""
   for cls in $CLASSES; do
     verdict="$(classify_capture "${RUN_DIR}/baseline" "$cls")"
     echo -e "${CYAN}[MEASURED P1.3]${NC} baseline verdict for class '${cls}': ${verdict}"
-    if [[ "$verdict" != "present-on-all" ]]; then
-      ac_fail "baseline for entity class '${cls}' is '${verdict}' — the baseline must be non-empty on every pod BEFORE the upgrade, or AC8's before/after diff means nothing"
+    BASELINE_VERDICTS+="${cls}=${verdict}"$'\n'
+    # The gate here is "seeding worked", NOT "already replicated". The old build
+    # renders no <user_directories> of its own, so every replica keeps a private
+    # local_directory and a plain-SQL entity created on the seed pod is pod-local
+    # by construction. That pre-upgrade divergence is the before-state this
+    # experiment exists to characterise — gating on present-on-all would make
+    # P1.3 unsatisfiable against the old tag at REPLICAS>1 and the whole ladder
+    # unrunnable. AC8's post-upgrade bar is UNCHANGED: present on EVERY pod, any
+    # divergence a FAIL, asserted in p1_4_upgrade.
+    if ! grep -q "$(probe_marker "$cls")" "${RUN_DIR}/baseline/${pod0}.${cls}" 2>/dev/null; then
+      ac_fail "baseline for entity class '${cls}' is absent on the seed pod ${pod0} (distribution verdict '${verdict}') — seeding itself failed, so every downstream assertion would be measuring nothing"
     fi
   done
-  pass "P1.3 baseline non-empty for all five classes on all ${REPLICAS} pods"
+  pass "P1.3 baseline non-empty on seed pod ${pod0} for all five classes"
+
+  ac "P1.3" "baseline distribution across replicas — old-binary before-state (recorded, not gated)"
+  printf '%s' "$BASELINE_VERDICTS" | sed 's/^/    | /'
+  printf '%s' "$BASELINE_VERDICTS" > "${RUN_DIR}/baseline-verdicts.txt"
 
   ac "AC18" "capture clusterSecret before the upgrade"
   measure "clusterSecret before upgrade" \
