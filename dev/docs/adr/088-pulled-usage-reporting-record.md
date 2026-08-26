@@ -358,6 +358,20 @@ event PulledUsageObserved {
 - **v4 (2026-08-06) — mechanism refinement (still Accepted).** Folded the implementation surface map + a CodeRabbit review. **Decision 3's mechanism corrected:** non-enforcement is *structural*, not a scope flag — pulled rows use a dedicated writer (`insertPulledUsageRows`) under constant `Scope="pulled"` + a synthetic budget id, are surfaced by a dedicated scope-filtered read (mirroring the principal *read*, not its write), and are excluded from the spend-rollup MV; `GatewayBudgetScopeType` is **not** extended. The `Scope='principal'`-as-non-enforcing analogy was imprecise and is corrected. **Decision 5's ordering fixed:** latest-by-`observedAt` (monotonic pull time), not bucket `occurredAt` (unchanged across a same-period restatement). Field naming unified to `costNanoUsd`/`rateVersion`, with `rateVersion` null for `provider_reported`. Owner alignment promoted to an explicit pre-implementation gate, **satisfied**. Doc-lint nits (fenced-block language, wording) fixed. Decision *intent* unchanged. Captain: *(decision owner)*.
 - **v3 (2026-08-06) — Accepted / locked.** The decision owner chose to lock the *direction* now. Implementation still gates on the owner-alignment open item: the pipeline-owner conversation happens before any code, and if it reveals the shipped `eventCount`-only shape is a deliberate step this ADR should extend, that becomes a v4 revision — not a quiet edit. Captain: *(decision owner)*.
 
+## Implementation entry point *(v10)*
+
+Captain: Sergio Esteban. Branch `feat/copilot-studio-dataverse-puller`, stacked on PR #7570 — no rebase past it. **No new migration**: Decisions 15–26 add zero tables and zero columns, and `copilot_studio` already exists in `00028_add_trace_source_type.sql`, so a migration appearing in this PR means something has gone wrong with the plan.
+
+Commit order is forced by the gates, not by preference:
+
+1. **Whole-object assertions over the existing Genie fixtures** — expectations only, no production change. This has to land *first*, because the split's gate is "byte-identical output" and today's suite cannot see five of the seven provider attributes.
+2. **Split `genieTraceMapper` into shared assembly + `genieTraceMapper`** — structure only, zero expectation changes. The seeding *contract* moves; the Genie field list stays Genie's.
+3. **`assertPullDestinationAllowed` gains the `copilot_studio_dataverse` case**, plus `followRedirects: false` at the adapter's fetch sites. Security floor before the first byte leaves the network.
+4. **`ingestionSourceCatalog.tsx`: `deprecated: true` on `copilot_studio`, picker filters on it.** Entry stays; exhaustiveness guard and `SOURCE_TYPE_LABEL` keep working.
+5. **The Dataverse adapter and its mapper**, against fixtures built from the two live captures plus the hand-built multi-batch case.
+
+First test to write, before any adapter code: **the batch-merge fixture** — two rows sharing a `name`, `BatchId` 0 and 1, asserting one trace. It is the only invariant here that no live capture can confirm, and it is the one that fails silently in production if it is wrong.
+
 ## References
 
 - Shipped pull pipeline: `platform/app/ee/event-sourcing/pipelines/ingestion-pull-processing/` · effect `ee/governance/services/pullers/pullerWorker.ts`
