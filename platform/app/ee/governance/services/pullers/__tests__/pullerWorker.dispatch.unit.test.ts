@@ -211,7 +211,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
     });
   });
 
-  describe("config the adapter refuses", () => {
+  describe("when the adapter refuses the config", () => {
     it("fails before dispatching, so no request is made against a half-read config", async () => {
       const { url: _dropped, ...withoutUrl } = HTTP_POLLING_CONFIG;
       sourceFindUnique.mockResolvedValueOnce({

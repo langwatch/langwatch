@@ -721,6 +721,56 @@ describe("given a tool call the agent ran", () => {
     expect(attrsOf(tool!).full_command).toContain("search-before-answer");
     expect(tool!.startTimeUnixNano).toBe(String(1_787_685_286_000 * 1_000_000));
   });
+
+  /**
+   * A call is attached to the turn it falls inside, and one that predates
+   * every turn attaches to the first rather than being dropped — so a tool
+   * span can begin before the earliest turn and end after the latest. The
+   * conversation span has to cover them: a parent that does not contain its
+   * children renders as a trace with spans hanging outside it.
+   */
+  it("covers a tool call that starts before the first turn and ends after the last", () => {
+    const firstTurnMs = 1_787_685_274_483;
+    const lastTurnMs = 1_787_685_290_000;
+    const spans = spansOf([
+      copilotEvent(
+        transcriptRow({
+          activities: [
+            ...CHAT,
+            toolCall({
+              id: "f7777777-7777-4777-8777-777777777777",
+              ms: firstTurnMs - 5_000,
+              status: "Started",
+              callId: "call-early",
+            }),
+            toolCall({
+              id: "f8888888-8888-4888-8888-888888888888",
+              ms: lastTurnMs + 5_000,
+              status: "Completed",
+              callId: "call-early",
+              filledParameters: null,
+            }),
+          ],
+        }),
+      ),
+    ]);
+
+    const root = spans.find(
+      (s: { name: string }) => s.name === COPILOT_CONVERSATION_SPAN_NAME,
+    );
+    expect(root).toBeDefined();
+
+    const children = spans.filter((s) => s.spanId !== root?.spanId);
+    expect(children.length).toBeGreaterThan(0);
+    for (const child of children) {
+      expect(Number(child.startTimeUnixNano)).toBeGreaterThanOrEqual(
+        Number(root!.startTimeUnixNano),
+      );
+      expect(Number(child.endTimeUnixNano)).toBeLessThanOrEqual(
+        Number(root!.endTimeUnixNano),
+      );
+    }
+  });
 });
 
 describe("given what the agent was running", () => {

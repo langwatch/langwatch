@@ -916,6 +916,19 @@ function conversationSpan(params: {
   threadId: string;
   skipped: number;
   conversationEndMs: number;
+  /**
+   * The span's own bounds, which are NOT the conversation's.
+   *
+   * `conversationEndMs` answers "when did this conversation happen", and is
+   * what decides whether the agent was edited afterwards — a question about
+   * turns. These two answer "what time range does this span have to cover",
+   * and a tool call hanging under a turn can start before the first turn or
+   * end after the last, so they take the extremes across every span emitted
+   * under this one. A parent that does not contain its children is a trace
+   * the explorer renders wrong.
+   */
+  spanStartMs: number;
+  spanEndMs: number;
 }): OtlpJsonSpan {
   const {
     origin,
@@ -926,6 +939,8 @@ function conversationSpan(params: {
     threadId,
     skipped,
     conversationEndMs,
+    spanStartMs,
+    spanEndMs,
   } = params;
 
   const firstQuestion = turns.find((turn) => turn.question !== null)?.question;
@@ -965,8 +980,8 @@ function conversationSpan(params: {
     spanId,
     name: COPILOT_CONVERSATION_SPAN_NAME,
     kind: 1,
-    startTimeUnixNano: msToNano(turns[0]!.startMs),
-    endTimeUnixNano: msToNano(conversationEndMs),
+    startTimeUnixNano: msToNano(spanStartMs),
+    endTimeUnixNano: msToNano(spanEndMs),
     attributes,
     status: { code: 1 },
   };
@@ -982,6 +997,109 @@ function conversationSpan(params: {
  * source of some other kind that acquired a destination would have its rows
  * rendered as things people said.
  */
+/**
+ * Every span one conversation contributes: the chain span its turns hang
+ * under, one span per turn, and one per tool call.
+ *
+ * Empty when the group produced no turns — a row of pure bookkeeping routes
+ * nothing rather than routing an empty conversation.
+ */
+function conversationSpans(params: {
+  origin: RoutingOrigin;
+  group: ConversationGroup;
+}): OtlpJsonSpan[] {
+  const { origin, group } = params;
+  const { turns, skipped } = turnsOf(group.activities);
+  if (turns.length === 0) return [];
+
+  const seeds: ConversationSeeds = {
+    // A Copilot trace is the whole conversation, so the conversation key
+    // alone names it — unlike Genie, where a trace is one question.
+    trace: [group.key],
+    thread: [group.key],
+    span: [group.key],
+  };
+  const identity = deriveConversationIdentity(origin, seeds);
+  const conversationEndMs = turns.reduce(
+    (latest, turn) => Math.max(latest, turn.endMs),
+    turns[0]!.startMs,
+  );
+
+  // Read before the root span is built, because the root has to cover them: a
+  // call hanging under a turn can start before the first turn began or run
+  // past the last one's end.
+  const calls = toolCallsOf(group.activities);
+  const spanStartMs = calls.reduce(
+    (earliest, call) => Math.min(earliest, call.startMs),
+    turns[0]!.startMs,
+  );
+  const spanEndMs = calls.reduce(
+    (latest, call) => Math.max(latest, call.endMs),
+    conversationEndMs,
+  );
+
+  const spans: OtlpJsonSpan[] = [
+    conversationSpan({
+      origin,
+      group,
+      turns,
+      traceId: identity.traceId,
+      spanId: identity.rootSpanId,
+      threadId: identity.threadId,
+      skipped,
+      conversationEndMs,
+      spanStartMs,
+      spanEndMs,
+    }),
+  ];
+
+  for (const turn of turns) {
+    spans.push(
+      turnSpan({
+        origin,
+        group,
+        turn,
+        traceId: identity.traceId,
+        parentSpanId: identity.rootSpanId,
+        threadId: identity.threadId,
+        spanSeed: identity.spanSeed,
+        skipped,
+        conversationEndMs,
+      }),
+    );
+  }
+
+  spans.push(...toolSpansOf({ origin, calls, turns, identity }));
+
+  return spans;
+}
+
+/**
+ * One span per tool call, each hanging off the turn it falls inside by time.
+ * A call that predates every turn hangs off the first one rather than being
+ * dropped.
+ */
+function toolSpansOf(params: {
+  origin: RoutingOrigin;
+  calls: ToolCall[];
+  turns: Turn[];
+  identity: ReturnType<typeof deriveConversationIdentity>;
+}): OtlpJsonSpan[] {
+  const { origin, calls, turns, identity } = params;
+  return calls.map((call) => {
+    const parent =
+      [...turns].reverse().find((turn) => turn.startMs <= call.startMs) ??
+      turns[0]!;
+    return toolSpan({
+      origin,
+      call,
+      traceId: identity.traceId,
+      parentSpanId: hashId(`${identity.spanSeed}:${parent.seedActivityId}`, 16),
+      spanSeed: identity.spanSeed,
+    });
+  });
+}
+
 export function mapCopilotEventsToTraceRequest({
   events,
   origin,
@@ -993,75 +1111,10 @@ export function mapCopilotEventsToTraceRequest({
   const conversationEvents = (wanted ? events : []).filter(
     (event) => !!event.action && event.action === wanted,
   );
-  const spans: OtlpJsonSpan[] = [];
 
-  for (const group of groupTranscriptRows(conversationEvents)) {
-    const { turns, skipped } = turnsOf(group.activities);
-    if (turns.length === 0) continue;
-
-    const seeds: ConversationSeeds = {
-      // A Copilot trace is the whole conversation, so the conversation key
-      // alone names it — unlike Genie, where a trace is one question.
-      trace: [group.key],
-      thread: [group.key],
-      span: [group.key],
-    };
-    const identity = deriveConversationIdentity(origin, seeds);
-    const conversationEndMs = turns.reduce(
-      (latest, turn) => Math.max(latest, turn.endMs),
-      turns[0]!.startMs,
-    );
-
-    spans.push(
-      conversationSpan({
-        origin,
-        group,
-        turns,
-        traceId: identity.traceId,
-        spanId: identity.rootSpanId,
-        threadId: identity.threadId,
-        skipped,
-        conversationEndMs,
-      }),
-    );
-
-    for (const turn of turns) {
-      spans.push(
-        turnSpan({
-          origin,
-          group,
-          turn,
-          traceId: identity.traceId,
-          parentSpanId: identity.rootSpanId,
-          threadId: identity.threadId,
-          spanSeed: identity.spanSeed,
-          skipped,
-          conversationEndMs,
-        }),
-      );
-    }
-
-    // Tool calls hang off the turn they fall inside, by time. A call that
-    // predates every turn hangs off the first one rather than being dropped.
-    const calls = toolCallsOf(group.activities);
-    for (const call of calls) {
-      const parent =
-        [...turns].reverse().find((turn) => turn.startMs <= call.startMs) ??
-        turns[0]!;
-      spans.push(
-        toolSpan({
-          origin,
-          call,
-          traceId: identity.traceId,
-          parentSpanId: hashId(
-            `${identity.spanSeed}:${parent.seedActivityId}`,
-            16,
-          ),
-          spanSeed: identity.spanSeed,
-        }),
-      );
-    }
-  }
+  const spans = groupTranscriptRows(conversationEvents).flatMap((group) =>
+    conversationSpans({ origin, group }),
+  );
 
   return assembleTraceRequest(spans, origin.profile);
 }
