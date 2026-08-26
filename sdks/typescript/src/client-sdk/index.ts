@@ -53,6 +53,7 @@ export { AnnotationsApiService, AnnotationsApiError } from "./services/annotatio
 export { DashboardsApiService, DashboardsApiError } from "./services/dashboards/dashboards-api.service";
 export { ModelProvidersApiService, ModelProvidersApiError } from "./services/model-providers/model-providers-api.service";
 export { AnalyticsApiService, AnalyticsApiError } from "./services/analytics/analytics-api.service";
+export { QueryApiService, QueryApiError } from "./services/query/query-api.service";
 export { TriggersApiService, TriggersApiError } from "./services/triggers";
 export { GraphsApiService, GraphsApiError } from "./services/graphs";
 export { SimulationRunsApiService, SimulationRunsApiError } from "./services/simulation-runs";
@@ -93,6 +94,7 @@ import { AnnotationsApiService } from "./services/annotations/annotations-api.se
 import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
 import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
 import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
+import { QueryApiService } from "./services/query/query-api.service";
 import { TriggersApiService } from "./services/triggers";
 import { GraphsApiService } from "./services/graphs";
 import { SimulationRunsApiService } from "./services/simulation-runs";
@@ -169,6 +171,8 @@ export class LangWatch {
   readonly dashboards: DashboardsApiService;
   readonly modelProviders: ModelProvidersApiService;
   readonly analytics: AnalyticsApiService;
+  /** The raw LangWatchQL door — run a governed SELECT or discover the analytics schema directly, outside a saved chart. */
+  readonly query: QueryApiService;
   readonly triggers: TriggersApiService;
   readonly graphs: GraphsApiService;
   readonly simulationRuns: SimulationRunsApiService;
@@ -228,6 +232,7 @@ export class LangWatch {
     this.dashboards = new DashboardsApiService(this.config);
     this.modelProviders = new ModelProvidersApiService(this.config);
     this.analytics = new AnalyticsApiService(this.config);
+    this.query = new QueryApiService(this.config);
     this.triggers = new TriggersApiService(this.config);
     this.graphs = new GraphsApiService(this.config);
     this.simulationRuns = new SimulationRunsApiService(this.config);
