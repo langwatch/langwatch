@@ -833,6 +833,23 @@ export function discoverFeatureFiles(
 const ANNOTATION_RE =
   /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
+/**
+ * Does a test call follow this annotation, ignoring whatever comment
+ * scaffolding sits between the two?
+ *
+ * `ANNOTATION_RE` stops at the end of the tag's own line, so for the natural
+ * JSDoc form the scan starts INSIDE the comment and has to walk out of it
+ * before it can reach the test call: a continuation line (`* and here is why`),
+ * a closing delimiter sitting alone on its own line, or a second `@scenario`
+ * below the first. None were handled, so every one of them fell through to
+ * the final branch and the annotation was dropped in silence — the scenario it
+ * was written to bind then read as unbound, or was quietly absorbed by a legacy
+ * list. A dropped tag is now also reported (see `BindingScan.dropped`).
+ *
+ * Skipping a whole continuation line loses nothing when it carries another
+ * `@scenario`: the regex finds that one independently and proximity is checked
+ * for it on its own terms.
+ */
 function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
@@ -840,6 +857,19 @@ function isFollowedByTestCall(src: string, start: number): boolean {
     const ch = src[i];
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
       i++;
+      continue;
+    }
+    if (ch === "*") {
+      // The `*/` closing the JSDoc the tag lives in — step over it.
+      if (src[i + 1] === "/") {
+        i += 2;
+        continue;
+      }
+      // An ordinary continuation line. Skip the rest of it; a `*/` ending that
+      // same line is picked up on the next pass.
+      const nl = src.indexOf("\n", i);
+      if (nl === -1) return false;
+      i = nl + 1;
       continue;
     }
     if (ch === "/" && src[i + 1] === "*") {
@@ -855,14 +885,34 @@ function isFollowedByTestCall(src: string, start: number): boolean {
       continue;
     }
     const rest = src.slice(i);
-    const m = rest.match(/^(?:it|test)(?:\.[a-zA-Z]+)?\s*\(/);
+    // `describe(` counts too: a block can be the unit of coverage for one
+    // scenario, and tagging the block instead of each `it` inside it is a form
+    // people already write.
+    const m = rest.match(/^(?:it|test|describe)(?:\.[a-zA-Z]+)?\s*\(/);
     return m !== null;
   }
   return false;
 }
 
-function collectAllBindings(testRoots: string[]): CollectedBinding[] {
+/**
+ * The annotations found across the TypeScript test roots, split by whether the
+ * proximity check accepted them.
+ *
+ * `dropped` exists because a rejected annotation used to leave no trace: the
+ * author saw a tag, the check saw nothing, and the disagreement surfaced only
+ * as an unbound scenario elsewhere in the report — or as nothing at all when a
+ * legacy list happened to cover the file. Naming the rejections is what makes
+ * the next one of these visible instead of silent.
+ */
+export interface BindingScan {
+  bindings: CollectedBinding[];
+  /** `@scenario` tags with no test call after them. Reported, never fatal. */
+  dropped: CollectedBinding[];
+}
+
+export function collectAllBindings(testRoots: string[]): BindingScan {
   const bindings: CollectedBinding[] = [];
+  const dropped: CollectedBinding[] = [];
   const files: string[] = [];
   for (const r of testRoots) {
     files.push(
@@ -877,16 +927,20 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
     while ((m = ANNOTATION_RE.exec(src)) !== null) {
       const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
       if (!title) continue;
-      if (!isFollowedByTestCall(src, m.index + m[0].length)) continue;
       const line = src.slice(0, m.index).split("\n").length;
-      bindings.push({
+      const found = {
         title,
         ref: { file: relative(REPO_ROOT, file), line },
-      });
+      };
+      if (isFollowedByTestCall(src, m.index + m[0].length)) {
+        bindings.push(found);
+      } else {
+        dropped.push(found);
+      }
     }
   }
 
-  return bindings;
+  return { bindings, dropped };
 }
 
 /**
@@ -1484,6 +1538,26 @@ function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
   }
 }
 
+/**
+ * Annotations that never became bindings because no test call follows them.
+ *
+ * A warning rather than a failure, deliberately. The `@scenario` token appears
+ * in prose that teaches the convention as well as in real tags, and a check
+ * that fails on its own documentation is a check people route around. What a
+ * real one costs is already charged elsewhere — its scenario reports unbound —
+ * so this list exists to name the cause rather than to add a second penalty.
+ */
+function printDroppedAnnotations(dropped: UnknownAnnotation[]): void {
+  if (dropped.length === 0) return;
+  console.log(
+    `\n${dropped.length} @scenario annotation(s) bound nothing — no it()/test()/describe() call follows them:`,
+  );
+  for (const a of dropped) {
+    console.log(`  ~ @scenario ${a.title}`);
+    console.log(`    ${a.ref.file}:${a.ref.line}`);
+  }
+}
+
 function validateExemptionList({
   name,
   entries,
@@ -1535,6 +1609,13 @@ interface ParityAnalysis {
   staleLegacy: LegacyReport[];
   staleInert: string[];
   unknownAnnotations: UnknownAnnotation[];
+  /**
+   * `@scenario` tags the proximity check could not attach to a test. Printed,
+   * never fatal: the token also appears in prose that documents the convention,
+   * and failing on that would make the check refuse its own documentation. The
+   * cost of a real one is already paid elsewhere — the scenario reports unbound.
+   */
+  droppedAnnotations: UnknownAnnotation[];
   listErrors: string[];
 }
 
@@ -1553,8 +1634,9 @@ function analyzeParity(): ParityAnalysis {
     }),
   ];
 
+  const typescriptScan = collectAllBindings(DEFAULT_TEST_ROOTS);
   const bindings = [
-    ...collectAllBindings(DEFAULT_TEST_ROOTS),
+    ...typescriptScan.bindings,
     ...collectBatsBindings(DEFAULT_BATS_TEST_ROOTS),
     ...collectShellBindings(DEFAULT_SHELL_TEST_ROOTS),
     ...collectGoBindings(DEFAULT_GO_TEST_ROOTS),
@@ -1607,6 +1689,10 @@ function analyzeParity(): ParityAnalysis {
       (f) => allFeatures.includes(f) && !inertFeatures.has(f),
     ),
     unknownAnnotations,
+    droppedAnnotations: typescriptScan.dropped.map((b) => ({
+      title: b.title,
+      ref: b.ref,
+    })),
     listErrors,
   };
 }
@@ -1623,6 +1709,7 @@ function printParityReport(a: ParityAnalysis): void {
   printInertSummary(a.exemptInert);
   printNewInert(a.newInert);
   printUnknownAnnotations(a.unknownAnnotations);
+  printDroppedAnnotations(a.droppedAnnotations);
 }
 
 /**
@@ -1696,6 +1783,7 @@ function main(): void {
           enforced: analysis.enforced,
           legacy: analysis.legacy,
           unknownAnnotations: analysis.unknownAnnotations,
+          droppedAnnotations: analysis.droppedAnnotations,
           listErrors: analysis.listErrors,
           staleLegacy: analysis.staleLegacy.map((r) => r.feature),
           inert: analysis.exemptInert,
