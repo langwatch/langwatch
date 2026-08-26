@@ -7,9 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-let mockHasOpsAccess = false;
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ pathname: "/[project]" }),
@@ -31,10 +29,6 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: (flag: string) => ({
     enabled: flag !== "release_ui_agent_testing_v2_enabled",
   }),
-}));
-
-vi.mock("~/hooks/useOpsPermission", () => ({
-  useOpsPermission: () => ({ hasAccess: mockHasOpsAccess }),
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
@@ -84,7 +78,7 @@ vi.mock("~/components/sidebar/ThemeToggle", () => ({
   ThemeToggle: () => null,
 }));
 
-import { MainMenu } from "../MainMenu";
+import { MainMenuSections } from "../MainMenu";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -93,40 +87,15 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const visibleLinkLabels = () =>
   screen.getAllByRole("link").map((link) => link.textContent);
 
-describe("<MainMenu /> navigation", () => {
-  beforeEach(() => {
-    mockHasOpsAccess = false;
-  });
-
+describe("<MainMenuSections showExpanded /> navigation", () => {
   afterEach(() => {
     cleanup();
     localStorage.clear();
   });
 
-  describe("when the reader has ops access and the pin flag is on", () => {
-    /** @scenario The current chrome keeps its ops section unchanged */
-    it("keeps the Ops section in the current chrome", () => {
-      // `useFeatureFlag` is mocked on, which is the pin the legacy Ops
-      // section reads. The new modes ignore it; this one must not.
-      mockHasOpsAccess = true;
-      render(<MainMenu />, { wrapper: Wrapper });
-
-      expect(screen.getByText("Ops")).toBeInTheDocument();
-      expect(visibleLinkLabels()).toEqual(
-        expect.arrayContaining([
-          "Dashboard",
-          "Event Sourcing",
-          "The Foundry",
-          "Feature Flags",
-          "Migrations",
-        ]),
-      );
-    });
-  });
-
   /** @scenario Organize the existing destinations around the product lifecycle */
   it("uses the approved section names and destination order", () => {
-    render(<MainMenu />, { wrapper: Wrapper });
+    render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
     const sectionControls = screen
       .getAllByRole("button", { name: /^(Collapse|Expand) / })
@@ -136,7 +105,6 @@ describe("<MainMenu /> navigation", () => {
       "Collapse Observe",
       "Collapse Test",
       "Expand Build",
-      "Expand Govern",
     ]);
 
     expect(visibleLinkLabels()).toEqual([
@@ -147,13 +115,12 @@ describe("<MainMenu /> navigation", () => {
       "Simulations",
       "Experiments",
       "Annotations",
-      "Settings",
     ]);
   });
 
   /** @scenario "The sidebar no longer offers the legacy Traces page" */
   it("offers Trace Explorer as the only traces destination", () => {
-    render(<MainMenu />, { wrapper: Wrapper });
+    render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
     const tracesLabels = visibleLinkLabels().filter((label) =>
       /trace/i.test(label ?? ""),
@@ -165,7 +132,7 @@ describe("<MainMenu /> navigation", () => {
   /** @scenario Use sensible section defaults without a saved preference */
   it("reveals the Build destinations in their existing order", async () => {
     const user = userEvent.setup();
-    render(<MainMenu />, { wrapper: Wrapper });
+    render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
     expect(screen.queryByRole("link", { name: "Prompts" })).toBeNull();
 

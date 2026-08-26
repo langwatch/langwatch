@@ -483,21 +483,6 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("when the device is in legacy mode", () => {
-    /** @scenario Legacy mode keeps the current settings chrome */
-    it("keeps the current settings navigation", () => {
-      useNavigationModeStore.setState({ storedMode: "legacy" });
-      renderSettings();
-
-      expect(
-        screen.getByRole("link", { name: "General Settings" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Quick Search" }),
-      ).not.toBeInTheDocument();
-    });
-  });
-
   describe("when the reader has ops access and is an admin", () => {
     /** @scenario The settings menu holds the ops groups at the bottom */
     it("puts OPS and BACKOFFICE last", () => {
@@ -515,12 +500,9 @@ describe("the settings shell in a new navigation mode", () => {
     });
   });
 
-  describe("when the pin flag and the environment variable are both off", () => {
-    /** @scenario The settings menu shows ops without the pin flag or the environment variable */
-    it("still shows the OPS group away from an ops page", () => {
-      // `usePublicEnv` names no SHOW_OPS_IN_MAIN_SIDEBAR and the address
-      // is a settings page, so the two conditions the legacy sidebar
-      // needs are both absent here.
+  describe("when the reader has ops access", () => {
+    /** @scenario The settings menu holds the ops groups at the bottom */
+    it("shows the OPS group away from an ops page", () => {
       mockHasOpsAccess = true;
       renderSettings();
 

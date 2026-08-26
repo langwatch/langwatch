@@ -113,7 +113,7 @@ vi.mock("~/components/sidebar/ThemeToggle", () => ({
   ThemeToggle: () => null,
 }));
 
-import { MainMenu } from "../MainMenu";
+import { MainMenuSections } from "../MainMenu";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -122,7 +122,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const linkNamed = (label: string) =>
   screen.queryByRole("link", { name: label });
 
-describe("<MainMenu /> Agent Testing destination", () => {
+describe("<MainMenuSections showExpanded /> Agent Testing destination", () => {
   beforeEach(() => {
     state.agentTestingEnabled = false;
     state.path = "/demo";
@@ -140,7 +140,7 @@ describe("<MainMenu /> Agent Testing destination", () => {
 
     /** @scenario "With the flag on the main menu shows one Agent Testing item" */
     it("shows one Agent Testing destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Agent Testing")).toHaveAttribute(
         "href",
@@ -150,7 +150,7 @@ describe("<MainMenu /> Agent Testing destination", () => {
 
     /** @scenario "With the flag on the main menu shows one Agent Testing item" */
     it("drops the Simulations group", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Simulations")).toBeNull();
       expect(linkNamed("Scenarios")).toBeNull();
@@ -161,7 +161,7 @@ describe("<MainMenu /> Agent Testing destination", () => {
   describe("given the Agent Testing release flag is off", () => {
     /** @scenario "With the flag off the main menu is unchanged" */
     it("keeps the Simulations group with its two destinations", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Simulations")).toBeInTheDocument();
       expect(linkNamed("Scenarios")).toHaveAttribute(
@@ -173,7 +173,7 @@ describe("<MainMenu /> Agent Testing destination", () => {
 
     /** @scenario "With the flag off the main menu is unchanged" */
     it("shows no Agent Testing destination", () => {
-      render(<MainMenu />, { wrapper: Wrapper });
+      render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
       expect(linkNamed("Agent Testing")).toBeNull();
     });

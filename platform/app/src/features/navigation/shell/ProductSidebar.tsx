@@ -117,7 +117,7 @@ function SidebarBottomBlock({
           showLabel={showExpanded}
         />
       )}
-      <SupportMenu showLabel={showExpanded} chatPlacement="in-menu" />
+      <SupportMenu showLabel={showExpanded} />
       <ThemeToggle showLabel={showExpanded} />
     </VStack>
   );
@@ -258,10 +258,7 @@ function ProductSidebarBody({
   }
   if (surface === "me") {
     return (
-      <PersonalSidebarLinks
-        showExpanded={showExpanded}
-        shouldIncludeGovernSection={false}
-      />
+      <PersonalSidebarLinks showExpanded={showExpanded} />
     );
   }
   if (surface === "gateway") {
@@ -275,11 +272,7 @@ function ProductSidebarBody({
     );
   }
   return (
-    <MainMenuSections
-      showExpanded={showExpanded}
-      shouldIncludeGovernSection={false}
-      shouldIncludeOpsSection={false}
-    />
+    <MainMenuSections showExpanded={showExpanded} />
   );
 }
 

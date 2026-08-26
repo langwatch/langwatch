@@ -46,22 +46,10 @@ Feature: Organization primary intent decides the "/" landing
       When the home resolver runs
       Then the destination is a project home
 
-    @unit
-    Scenario: Last-visited stickiness does not override the organization intent
-      Given the user's organization has the agent-governance intent
-      And the user last visited a project home
-      When the "/" destination is resolved end to end, including the client redirect layer
-      Then the user lands on the personal usage page
-      # Guards red-team F8: the client wrapper must pass an intent-decided
-      # destination through untouched instead of re-applying stickiness.
-
-    @unit
-    Scenario: The resolver tells the client when intent decided the destination
-      Given the user's organization has an intent set
-      When the home resolver responds
-      Then the response marks the destination as intent-decided
-      And the client redirect layer returns the server destination unchanged when it is marked
-      And a user-set explicit pin is still reported through its own existing field, not the new marker
+  # The client-side landing shim was removed. The "/" resolution now uses
+  # the device's per-organization product memory ahead of the server
+  # resolver (specs/navigation/navigation-v2-landing.feature). The
+  # explicit user pin still wins.
 
   Rule: a kill-switched governance organization never lands on a gated 404
 

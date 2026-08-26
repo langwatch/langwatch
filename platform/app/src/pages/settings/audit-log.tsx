@@ -20,7 +20,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { useRouter } from "~/utils/compat/next-router";
-import { ProjectSelector } from "../../components/DashboardLayout";
+import { ProjectSelector } from "../../components/ProjectSelector";
 import { NavigationFooter } from "../../components/NavigationFooter";
 import {
   PeriodSelector,

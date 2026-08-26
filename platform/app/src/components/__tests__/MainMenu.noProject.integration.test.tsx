@@ -74,7 +74,7 @@ vi.mock("~/components/sidebar/UsageIndicator", () => ({
   UsageIndicator: () => null,
 }));
 
-import { MainMenu } from "../MainMenu";
+import { MainMenuSections } from "../MainMenu";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <MemoryRouter>
@@ -82,7 +82,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   </MemoryRouter>
 );
 
-const renderMenu = () => render(<MainMenu />, { wrapper: Wrapper });
+const renderMenu = () => render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
 /** The grouped destinations only mount once their group is open. */
 const expandSimulations = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -96,7 +96,7 @@ const anchorHrefs = () =>
     anchor.getAttribute("href"),
   );
 
-describe("<MainMenu />", () => {
+describe("<MainMenuSections showExpanded />", () => {
   afterEach(() => {
     cleanup();
     localStorage.clear();
@@ -134,16 +134,6 @@ describe("<MainMenu />", () => {
       expect(
         await screen.findByText("Create a project first to open Analytics."),
       ).toBeTruthy();
-    });
-
-    /** @scenario "Destinations that do not need a project keep working" */
-    it("keeps the destinations that do not need a project working", () => {
-      renderMenu();
-
-      expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
-        "href",
-        "/settings",
-      );
     });
 
     it("renders the grouped destinations without duplicate React keys", async () => {

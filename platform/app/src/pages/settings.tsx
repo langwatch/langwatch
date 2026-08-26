@@ -18,7 +18,7 @@ import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { OrganizationIntent, Project } from "~/generated/prisma/client";
-import { ProjectSelector } from "../components/DashboardLayout";
+import { ProjectSelector } from "../components/ProjectSelector";
 import SettingsLayout from "../components/SettingsLayout";
 import { DepartmentPicker } from "../components/settings/DepartmentPicker";
 import { useDepartmentColumn } from "../components/settings/useDepartmentColumn";
