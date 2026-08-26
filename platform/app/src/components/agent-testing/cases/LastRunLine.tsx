@@ -15,6 +15,7 @@ import {
   type CaseGroup,
   lastRunAtOf,
   summaryFromLastResults,
+  type TestCase,
 } from "./test-cases";
 
 /** What the line reads for the All test cases view. */
@@ -24,17 +25,21 @@ export const SUITE_LAST_RUN_LABEL = "Last run on";
 
 export type LastRunLineProps = {
   selection: AgentTestingSelection;
-  groups: CaseGroup[];
+  folderGroups: CaseGroup[];
+  looseCases: TestCase[];
   lastResults: Map<string, CaseLastResult>;
 };
 
 export function LastRunLine({
   selection,
-  groups,
+  folderGroups,
+  looseCases,
   lastResults,
 }: LastRunLineProps) {
-  const results = groups
-    .flatMap((group) => group.cases)
+  const results = [
+    ...folderGroups.flatMap((group) => group.cases),
+    ...looseCases,
+  ]
     .map((testCase) => lastResults.get(testCase.id))
     .filter((result): result is CaseLastResult => !!result);
 

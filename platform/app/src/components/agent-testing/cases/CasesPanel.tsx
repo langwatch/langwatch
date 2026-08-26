@@ -32,7 +32,13 @@ export type CasesPanelProps = {
   selection: AgentTestingSelection;
   /** The name of the selected set, as the header reads it. */
   title: string;
-  groups: CaseGroup[];
+  /** The real test suites, as folder rows on the All test cases surface. */
+  folderGroups: CaseGroup[];
+  /**
+   * Cases at the root of the surface: on All test cases these are the ones
+   * filed in no test suite; on a suite surface these are its cases in order.
+   */
+  looseCases: TestCase[];
   /** The cases of an external set, when one is selected. */
   externalCases: ExternalCaseRow[];
   isLoading: boolean;
@@ -69,7 +75,10 @@ export function CasesPanel(props: CasesPanelProps) {
   const isExternal = props.selection.kind === "external";
   const caseCount = isExternal
     ? props.externalCases.length
-    : props.groups.reduce((total, group) => total + group.cases.length, 0);
+    : props.folderGroups.reduce(
+        (total, group) => total + group.cases.length,
+        0,
+      ) + props.looseCases.length;
 
   return (
     <ContentColumn

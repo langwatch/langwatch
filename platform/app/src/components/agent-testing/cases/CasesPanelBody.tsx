@@ -28,8 +28,8 @@ export type CasesPanelBodyProps = CasesPanelProps & {
   caseCount: number;
 };
 
-function flattenGroupCases(props: CasesPanelBodyProps): TestCase[] {
-  return props.groups.flatMap((group) => group.cases);
+function selectableCases(props: CasesPanelBodyProps): TestCase[] {
+  return props.looseCases;
 }
 
 function useCaseSelection({
@@ -79,7 +79,7 @@ function useCaseSelection({
 }
 
 export function CasesPanelBody(props: CasesPanelBodyProps) {
-  const flatCases = useMemo(() => flattenGroupCases(props), [props]);
+  const flatCases = useMemo(() => selectableCases(props), [props]);
   const {
     selectedIds,
     isSelectionMode,
@@ -115,8 +115,9 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
   return (
     <>
       <CasesTable
-        groups={props.groups}
-        showGroupHeadings={props.selection.kind === "all"}
+        folderGroups={props.folderGroups}
+        looseCases={props.looseCases}
+        isAllView={props.selection.kind === "all"}
         lastResults={props.lastResults}
         isLastResultsLoading={props.isLastResultsLoading}
         suites={props.suites}
@@ -137,7 +138,8 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
       />
       <LastRunLine
         selection={props.selection}
-        groups={props.groups}
+        folderGroups={props.folderGroups}
+        looseCases={props.looseCases}
         lastResults={props.lastResults}
       />
       <MoveToSuiteSelectionBar

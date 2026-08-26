@@ -49,7 +49,7 @@ Feature: Filing a test case into a test suite
   Scenario: Unfiling a case moves it to the unfiled group
     Given a case filed in "Refunds"
     When the case is unfiled
-    Then the row moves to the unfiled group
+    Then the row moves to the loose cases at the root
     And the case is still listed in All test cases
 
   @integration
@@ -63,12 +63,11 @@ Feature: Filing a test case into a test suite
   # --- Display of an unfiled case ---
 
   @integration
-  Scenario: The unfiled group is shown last and reads as unfiled
-    Given the project has two test suites and three unfiled cases
+  Scenario: All test cases lists the loose cases below the folder rows
+    Given the project has two test suites and three cases with no test suite
     When the All test cases view is opened
-    Then the suite groups come first
-    And the last group is named for unfiled cases
-    And it lists the three cases
+    Then the suite folder rows come first
+    And the three loose cases read as their own rows below
 
   @integration
   Scenario: An unfiled case runs on its own and lands in One-off runs

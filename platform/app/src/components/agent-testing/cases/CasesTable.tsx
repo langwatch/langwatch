@@ -6,9 +6,11 @@
  * without a vertical rule between them, so a long list of cases reads as a
  * list of names rather than as a spreadsheet.
  *
- * In All test cases the rows sit under their test suite, unfiled cases last.
- * Under one suite the rows are flat, and the time and the cost of the last run
- * read beside the verdict.
+ * The All test cases surface reads like a code host root: the test suites sit
+ * on top as folder rows, and the cases filed in no test suite sit below as
+ * loose rows. A folder row opens its own surface; it does not expand in place.
+ * Under one suite the rows are flat, and the time and the cost of the last
+ * run read beside the verdict.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-folder-assignment.feature
@@ -43,7 +45,6 @@ import {
   summaryFromLastResults,
   type TestCase,
   type TestSuiteEntry,
-  UNFILED_GROUP_ID,
 } from "./test-cases";
 
 /** The last result of a case, as the aggregate answers it. */
@@ -61,9 +62,15 @@ const CHECKBOX_COLUMN = "24px";
 const EXTERNAL_COLUMNS = "minmax(0,1fr) 290px 110px";
 
 export type CasesTableProps = {
-  groups: CaseGroup[];
-  /** True in All test cases, where each suite heads its own rows. */
-  showGroupHeadings: boolean;
+  /** The real test suites, drawn as folder rows on the All test cases surface. */
+  folderGroups: CaseGroup[];
+  /**
+   * The cases that sit at the root of the surface: on All test cases the ones
+   * filed in no test suite, on a suite surface every case of that suite.
+   */
+  looseCases: TestCase[];
+  /** True on the All test cases surface, where columns fit a folder row. */
+  isAllView: boolean;
   lastResults: Map<string, CaseLastResult>;
   /** True while the last-result cells are still on their way. */
   isLastResultsLoading: boolean;
@@ -136,8 +143,9 @@ function TableHeaderRow({
 }
 
 export function CasesTable({
-  groups,
-  showGroupHeadings,
+  folderGroups,
+  looseCases,
+  isAllView,
   lastResults,
   isLastResultsLoading,
   suites: _suites,
@@ -156,11 +164,12 @@ export function CasesTable({
   onOpenLastRun,
   onArchive,
 }: CasesTableProps) {
-  const baseColumns = showGroupHeadings ? NARROW_COLUMNS : WIDE_COLUMNS;
+  const baseColumns = isAllView ? NARROW_COLUMNS : WIDE_COLUMNS;
   const templateColumns = isSelectionMode
     ? `${CHECKBOX_COLUMN} ${baseColumns}`
     : baseColumns;
   const aggregateSpan = isSelectionMode ? 3 : 2;
+  const showMetricsInline = !isAllView;
 
   return (
     <TableCard data-testid="agent-testing-cases-table">
@@ -171,58 +180,51 @@ export function CasesTable({
         <Text as="span" />
       </TableHeaderRow>
 
-      {groups.map((group, index) => (
-        <Box key={group.id}>
-          {showGroupHeadings && (
-            <FolderHeaderRow
-              name={group.name}
-              caseCount={group.cases.length}
-              templateColumns={templateColumns}
-              aggregateSpan={aggregateSpan}
-              separated={index > 0}
-              onClick={
-                group.id === UNFILED_GROUP_ID
-                  ? undefined
-                  : () => onSelectSuite(group.id)
-              }
-            >
-              <GroupAggregate group={group} lastResults={lastResults} />
-            </FolderHeaderRow>
-          )}
-          <Box
-            css={{
-              "& > * + *": {
-                borderTopWidth: "1px",
-                borderTopColor: "var(--chakra-colors-border-muted)",
-              },
-            }}
-          >
-            {group.cases.map((testCase) => (
-              <CaseRow
-                key={testCase.id}
-                testCase={testCase}
-                templateColumns={templateColumns}
-                lastResult={lastResults.get(testCase.id)}
-                isLastResultsLoading={isLastResultsLoading}
-                showMetricsInline={!showGroupHeadings}
-                canManage={canManage}
-                isRunning={runningCaseId === testCase.id}
-                isSelectionMode={isSelectionMode}
-                isSelected={selectedIds.has(testCase.id)}
-                onToggleSelected={onToggleSelected}
-                onStartMoveToSuite={onStartMoveToSuite}
-                onRowClick={onRowClick}
-                onRunCase={onRunCase}
-                onEdit={onEdit}
-                onHistory={onHistory}
-                onDuplicate={onDuplicate}
-                onOpenLastRun={onOpenLastRun}
-                onArchive={onArchive}
-              />
-            ))}
-          </Box>
-        </Box>
+      {folderGroups.map((group, index) => (
+        <FolderHeaderRow
+          key={group.id}
+          name={group.name}
+          caseCount={group.cases.length}
+          templateColumns={templateColumns}
+          aggregateSpan={aggregateSpan}
+          separated={index > 0}
+          onClick={() => onSelectSuite(group.id)}
+        >
+          <GroupAggregate group={group} lastResults={lastResults} />
+        </FolderHeaderRow>
       ))}
+      <Box
+        css={{
+          "& > * + *": {
+            borderTopWidth: "1px",
+            borderTopColor: "var(--chakra-colors-border-muted)",
+          },
+        }}
+      >
+        {looseCases.map((testCase) => (
+          <CaseRow
+            key={testCase.id}
+            testCase={testCase}
+            templateColumns={templateColumns}
+            lastResult={lastResults.get(testCase.id)}
+            isLastResultsLoading={isLastResultsLoading}
+            showMetricsInline={showMetricsInline}
+            canManage={canManage}
+            isRunning={runningCaseId === testCase.id}
+            isSelectionMode={isSelectionMode}
+            isSelected={selectedIds.has(testCase.id)}
+            onToggleSelected={onToggleSelected}
+            onStartMoveToSuite={onStartMoveToSuite}
+            onRowClick={onRowClick}
+            onRunCase={onRunCase}
+            onEdit={onEdit}
+            onHistory={onHistory}
+            onDuplicate={onDuplicate}
+            onOpenLastRun={onOpenLastRun}
+            onArchive={onArchive}
+          />
+        ))}
+      </Box>
     </TableCard>
   );
 }

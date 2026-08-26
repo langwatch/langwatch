@@ -15,11 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { computeRelativeWindow } from "~/components/PeriodSelector";
 import { CasesPanel } from "../cases/CasesPanel";
 import { SuiteRail } from "../cases/SuiteRail";
-import {
-  groupCasesByFolder,
-  type TestCase,
-  type TestSuiteEntry,
-} from "../cases/test-cases";
+import type { TestCase, TestSuiteEntry } from "../cases/test-cases";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
@@ -318,7 +314,8 @@ describe("the test suites rail", () => {
         {...casesPanelProps({
           selection: { kind: "suite", slug: "refunds" },
           title: "Refunds",
-          groups: [{ id: "suite_1", name: "Refunds", cases: [refundsCase] }],
+          folderGroups: [],
+          looseCases: [refundsCase],
         })}
       />,
       { wrapper: Wrapper },
@@ -410,7 +407,8 @@ function casesPanelProps(
   return {
     selection: { kind: "all" },
     title: "All test cases",
-    groups: groupCasesByFolder({ cases: [], suites: [] }),
+    folderGroups: [],
+    looseCases: [],
     externalCases: [],
     isLoading: false,
     lastResults: new Map(),

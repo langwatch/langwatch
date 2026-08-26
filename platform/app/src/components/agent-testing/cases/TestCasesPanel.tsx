@@ -13,7 +13,9 @@ import type { TestCasesTabModel } from "./useTestCasesTab";
 
 /** The name of the selected set, as the panel header reads it. */
 function panelTitle({ base, view }: TestCasesTabModel): string {
-  if (base.selection.kind === "all") return "All test cases";
+  if (base.selection.kind === "all") {
+    return view.folderGroups.length > 0 ? "Test suites" : "All test cases";
+  }
   if (base.selection.kind === "suite") {
     return view.selectedSuite?.name ?? "Test suite";
   }
@@ -29,7 +31,8 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
     <CasesPanel
       selection={base.selection}
       title={panelTitle(model)}
-      groups={view.groups}
+      folderGroups={view.folderGroups}
+      looseCases={view.looseCases}
       externalCases={view.externalCases}
       isLoading={isExternal ? view.isExternalLoading : data.isLoading}
       lastResults={data.lastResults}

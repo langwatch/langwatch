@@ -11,6 +11,7 @@ import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import type { ExternalCaseRow } from "./CasesPanel";
 import {
   type CaseGroup,
+  type CasesRoot,
   filterCasesByLabels,
   groupCasesByFolder,
   type TestCase,
@@ -33,7 +34,7 @@ function useCaseGroups({
   selection,
   selectedSuite,
   activeLabels,
-}: CaseGroupsOptions): CaseGroup[] {
+}: CaseGroupsOptions): CasesRoot {
   const visibleCases = useMemo(() => {
     const scoped =
       selection.kind === "suite"
@@ -45,21 +46,16 @@ function useCaseGroups({
   return useMemo(
     () =>
       selection.kind === "suite"
-        ? [
-            {
-              id: selectedSuite?.id ?? "",
-              name: selectedSuite?.name ?? "",
-              cases: visibleCases,
-            },
-          ]
+        ? { folderGroups: [], looseCases: visibleCases }
         : groupCasesByFolder({ cases: visibleCases, suites }),
-    [selection, selectedSuite, visibleCases, suites],
+    [selection, visibleCases, suites],
   );
 }
 
 export type TestCasesView = {
   selectedSuite: TestSuiteEntry | null;
-  groups: CaseGroup[];
+  folderGroups: CaseGroup[];
+  looseCases: TestCase[];
   /** The id of the selected external set, or the empty string. */
   externalSetId: string;
   externalCases: ExternalCaseRow[];
@@ -94,7 +90,7 @@ export function useTestCasesView({
     return suites.find((suite) => suite.slug === selection.slug) ?? null;
   }, [selection, suites]);
 
-  const groups = useCaseGroups({
+  const { folderGroups, looseCases } = useCaseGroups({
     cases,
     suites,
     selection,
@@ -112,7 +108,8 @@ export function useTestCasesView({
 
   return {
     selectedSuite,
-    groups,
+    folderGroups,
+    looseCases,
     externalSetId,
     externalCases,
     isExternalLoading,

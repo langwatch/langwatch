@@ -13,10 +13,6 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import type { SuiteTarget } from "~/server/suites/types";
 
-/** The group that holds every case filed in no test suite. */
-export const UNFILED_GROUP_ID = "__unfiled__" as const;
-export const UNFILED_GROUP_NAME = "No test suite";
-
 /** A test case as the table reads it. */
 export type TestCase = {
   id: string;
@@ -51,10 +47,19 @@ export type ExternalSetEntry = {
 
 /** One group of rows under one heading. */
 export type CaseGroup = {
-  /** The folder id, or UNFILED_GROUP_ID for the unfiled group. */
+  /** The folder id of the real test suite. */
   id: string;
   name: string;
   cases: TestCase[];
+};
+
+/**
+ * The rows of the All test cases surface: the real test suites as folder rows
+ * on top, and the cases filed in no test suite as loose rows at the root.
+ */
+export type CasesRoot = {
+  folderGroups: CaseGroup[];
+  looseCases: TestCase[];
 };
 
 /** The cases that carry at least one of the chosen labels. */
@@ -99,10 +104,13 @@ function bucketCasesByFolder(cases: TestCase[]): {
 }
 
 /**
- * The rows of the All test cases view, grouped under their test suite.
+ * The rows of the All test cases surface, as a GitHub repo root reads: the
+ * real test suites as folder rows on top, and the cases filed in no test
+ * suite as loose rows at the root.
  *
  * A suite that holds none of the listed cases is left out, so a label filter
- * hides the headings it empties. The unfiled cases are always the last group.
+ * hides the headings it empties. Cases that name a folder the rail no longer
+ * lists read as loose, so nothing drops off the table.
  */
 export function groupCasesByFolder({
   cases,
@@ -110,31 +118,26 @@ export function groupCasesByFolder({
 }: {
   cases: TestCase[];
   suites: TestSuiteEntry[];
-}): CaseGroup[] {
+}): CasesRoot {
   const { byFolder, unfiled } = bucketCasesByFolder(cases);
 
-  const groups: CaseGroup[] = [];
+  const folderGroups: CaseGroup[] = [];
   for (const suite of suites) {
     const held = byFolder.get(suite.id);
     if (!held || held.length === 0) continue;
-    groups.push({ id: suite.id, name: suite.name, cases: held });
+    folderGroups.push({ id: suite.id, name: suite.name, cases: held });
     byFolder.delete(suite.id);
   }
 
-  // A case can name a folder the rail does not list, for example one that was
-  // archived while the page was open. Those cases read as unfiled rather than
-  // disappearing from the table.
-  for (const orphans of byFolder.values()) unfiled.push(...orphans);
+  // A case can name a folder the rail does not list, for example one that
+  // was archived while the page was open. Those cases read as loose rather
+  // than dropping off the table.
+  const looseCases = [...unfiled];
+  for (const orphans of byFolder.values()) looseCases.push(...orphans);
 
-  if (unfiled.length > 0) {
-    groups.push({
-      id: UNFILED_GROUP_ID,
-      name: UNFILED_GROUP_NAME,
-      cases: unfiled,
-    });
-  }
+  folderGroups.sort((a, b) => a.name.localeCompare(b.name));
 
-  return groups;
+  return { folderGroups, looseCases };
 }
 
 const PASSED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([

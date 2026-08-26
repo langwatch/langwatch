@@ -8,8 +8,10 @@ Feature: The test cases table
     and its last result. A Run button and a row menu sit at the end of the row.
     The row carries no author, no date and no version.
 
-    In All test cases the rows are grouped under their test suite name, with
-    the unfiled cases last. Under a single suite the rows are flat.
+    All test cases reads like a code host root. The test suites sit on top as
+    folder rows in alphabetical order, and the cases filed in no test suite
+    sit below as loose rows at the root. Under a single suite the rows are
+    flat.
 
     The whole table reads over the selected period. A summary line under the
     table says when the set last ran and how it did.
@@ -17,17 +19,39 @@ Feature: The test cases table
   # --- Grouping ---
 
   @integration
-  Scenario: All test cases groups the rows under their test suite
-    Given two test suites holding cases, and two unfiled cases
+  Scenario: All test cases lists the test suites on top and the loose cases below
+    Given two test suites holding cases, and three cases with no test suite
     When All test cases is opened
-    Then each suite name heads a group of its own rows
-    And the unfiled cases are in the last group
+    Then the test suites read as folder rows on top in alphabetical order
+    And the loose cases read as their own rows below the folder rows
+    And no folder row expands the cases it holds
 
   @integration
-  Scenario: A group heading carries the last result of the whole suite
+  Scenario: A folder row carries the last result of the whole suite
     Given a test suite whose last run passed three of three cases
     When All test cases is opened
-    Then the heading of that suite carries a pass summary reading three of three
+    Then the folder row of that suite carries a pass summary reading three of three
+
+  @integration
+  Scenario: Clicking a suite folder row opens that suite
+    Given the All test cases surface with two test suites
+    When one of the folder rows is clicked
+    Then that suite's surface opens
+
+  @integration
+  Scenario: The panel title reads Test suites when at least one suite exists
+    Given the All test cases surface with at least one test suite
+    When the panel header is read
+    Then the title reads "Test suites"
+    And the count that follows reads the total of every case, folder and loose
+
+  @integration
+  Scenario: Zero suites renders no folder rows and no Test suites section header
+    Given a project with no test suites and a few loose cases
+    When All test cases is opened
+    Then no folder row is rendered
+    And no "Test suites" section header is rendered
+    And the loose cases read as their own rows
 
   @integration
   Scenario: A single suite view lists its rows without group headings
@@ -228,7 +252,7 @@ Feature: The test cases table
     Given cases with the labels "critical", "billing" and "edge"
     When "critical" is chosen in the label filter
     Then only the cases with that label are listed
-    And the group headings that hold none of them are hidden
+    And the folder rows that hold none of them are hidden
 
   # --- The summary line ---
 

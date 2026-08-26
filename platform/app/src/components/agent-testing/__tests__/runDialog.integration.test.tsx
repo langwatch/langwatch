@@ -1111,6 +1111,22 @@ describe("run entries on the Test cases tab", () => {
   /** @scenario "Clicking the Run button does not open the row" */
   it("opens the run dialog from the row Run button, not the run drawer", async () => {
     const user = userEvent.setup();
+    // Loose so the row reads at the root of the All test cases surface.
+    mockScenariosGetAll.mockReturnValue({
+      data: [
+        {
+          id: "case_1",
+          name: "Double charge",
+          labels: [],
+          folderId: null,
+          parameters: null,
+          createdAt: new Date("2026-07-06T12:00:00.000Z"),
+          lastUpdatedById: null,
+          version: 1,
+        },
+      ],
+      isLoading: false,
+    });
     render(<TestCasesTab />, { wrapper: Wrapper });
 
     await user.click(screen.getByRole("button", { name: "Run Double charge" }));

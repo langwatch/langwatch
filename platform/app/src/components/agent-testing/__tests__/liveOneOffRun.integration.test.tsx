@@ -234,7 +234,8 @@ function scenarioRow(overrides: Record<string, unknown> = {}) {
     id: "case_1",
     name: "Angry refund request",
     labels: [],
-    folderId: REFUNDS.id,
+    // Loose so the row reads at the root of the All test cases surface.
+    folderId: null,
     parameters: null,
     createdAt: new Date("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
@@ -319,6 +320,11 @@ describe("starting a one-off run from the case table", () => {
   it("keeps the suite selected in the rail after a run from inside it", async () => {
     const user = userEvent.setup();
     mockRouterState.asPath = "/test-project/agent-testing/suites/refunds";
+    // Filed under Refunds so the row reads inside that suite.
+    mockScenariosGetAll.mockReturnValue({
+      data: [scenarioRow({ folderId: REFUNDS.id })],
+      isLoading: false,
+    });
     render(<TestCasesTab />, { wrapper: Wrapper });
 
     await confirmRowRun(user);

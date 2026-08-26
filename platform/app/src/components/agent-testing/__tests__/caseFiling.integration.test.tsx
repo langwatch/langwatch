@@ -214,6 +214,11 @@ describe("the Test cases tab", () => {
   /** @scenario "History opens from the row menu of a test case" */
   it("opens the case editor with its history already open, from the row menu", async () => {
     const user = userEvent.setup();
+    // Loose so the row reads at the root of the All test cases surface.
+    mockScenariosGetAll.mockReturnValue({
+      data: [scenarioRow({ folderId: null })],
+      isLoading: false,
+    });
     renderTab();
 
     await user.click(
@@ -275,6 +280,10 @@ describe("the Test cases tab", () => {
   /** @scenario "Archive asks for confirmation and names the case" */
   it("names the case in the archive dialog and archives it on confirm", async () => {
     const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue({
+      data: [scenarioRow({ folderId: null })],
+      isLoading: false,
+    });
     renderTab();
 
     await user.click(

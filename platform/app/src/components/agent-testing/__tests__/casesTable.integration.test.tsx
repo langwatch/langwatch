@@ -19,7 +19,6 @@ import {
   groupCasesByFolder,
   type TestCase,
   type TestSuiteEntry,
-  UNFILED_GROUP_NAME,
 } from "../cases/test-cases";
 
 vi.mock("~/utils/api", () => ({
@@ -90,7 +89,8 @@ function panelProps(
   return {
     selection: { kind: "all" },
     title: "All test cases",
-    groups: [],
+    folderGroups: [],
+    looseCases: [],
     externalCases: [],
     isLoading: false,
     lastResults: new Map(),
@@ -147,9 +147,9 @@ describe("the test cases table", () => {
 
   // --- Grouping ---
 
-  /** @scenario "All test cases groups the rows under their test suite" */
-  /** @scenario "The unfiled group is shown last and reads as unfiled" */
-  it("groups the rows under their test suite and keeps the unfiled ones last", () => {
+  /** @scenario "All test cases lists the test suites on top and the loose cases below" */
+  /** @scenario "All test cases lists the loose cases below the folder rows" */
+  it("lists the suites as folder rows on top and the loose cases below", () => {
     const cases = [
       makeCase(),
       makeCase({ id: "case_2", name: "Late refund" }),
@@ -164,22 +164,80 @@ describe("the test cases table", () => {
     ];
 
     renderPanel({
-      groups: groupCasesByFolder({ cases, suites: [REFUNDS, CHECKOUT] }),
+      ...groupCasesByFolder({ cases, suites: [REFUNDS, CHECKOUT] }),
     });
 
+    // Folders on top, in alphabetical order, with no expanded case rows.
     expect(groupHeadings()).toEqual([
-      "folder-header-row-Refunds",
       "folder-header-row-Checkout",
-      `folder-header-row-${UNFILED_GROUP_NAME}`,
+      "folder-header-row-Refunds",
     ]);
     expect(
-      within(
-        screen.getByTestId(`folder-header-row-${UNFILED_GROUP_NAME}`),
-      ).getByLabelText("3 test cases"),
-    ).toBeInTheDocument();
+      screen.queryByTestId("folder-header-row-No test suite"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("case-row-Double charge"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("case-row-Card declined"),
+    ).not.toBeInTheDocument();
+
+    // Loose cases render as their own rows at the root, in the order given.
+    const rowIds = Array.from(
+      document.querySelectorAll('[data-testid^="case-row-"]'),
+    ).map((row) => row.getAttribute("data-testid"));
+    expect(rowIds).toEqual([
+      "case-row-Stray one",
+      "case-row-Stray two",
+      "case-row-Stray three",
+    ]);
   });
 
-  /** @scenario "A group heading carries the last result of the whole suite" */
+  /** @scenario "Clicking a suite folder row opens that suite" */
+  it("navigates to the suite when its folder row is clicked", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPanel({
+      ...groupCasesByFolder({
+        cases: [makeCase(), makeCase({ id: "case_2", name: "Late refund" })],
+        suites: [REFUNDS, CHECKOUT],
+      }),
+    });
+
+    await user.click(screen.getByTestId("folder-header-row-Refunds"));
+
+    expect(props.onSelectSuite).toHaveBeenCalledWith(REFUNDS.id);
+  });
+
+  /** @scenario "The panel title reads Test suites when at least one suite exists" */
+  it("reads Test suites in the panel header when at least one suite exists", () => {
+    renderPanel({
+      title: "Test suites",
+      folderGroups: [],
+      looseCases: [makeCase(), makeCase({ id: "case_2", folderId: null })],
+    });
+
+    expect(screen.getByText("Test suites")).toBeInTheDocument();
+    expect(screen.getByText("2 cases")).toBeInTheDocument();
+  });
+
+  /** @scenario "Zero suites renders no folder rows and no Test suites section header" */
+  it("renders only loose case rows and no Test suites header when zero suites", () => {
+    renderPanel({
+      title: "All test cases",
+      ...groupCasesByFolder({
+        cases: [makeCase({ folderId: null })],
+        suites: [],
+      }),
+    });
+
+    expect(
+      document.querySelector('[data-testid^="folder-header-row-"]'),
+    ).toBeNull();
+    expect(screen.queryByText("Test suites")).not.toBeInTheDocument();
+    expect(screen.getByTestId("case-row-Double charge")).toBeInTheDocument();
+  });
+
+  /** @scenario "A folder row carries the last result of the whole suite" */
   it("carries the pass summary of a whole suite on its heading", () => {
     const cases = [
       makeCase(),
@@ -194,7 +252,7 @@ describe("the test cases table", () => {
     );
 
     renderPanel({
-      groups: groupCasesByFolder({ cases, suites: [REFUNDS] }),
+      ...groupCasesByFolder({ cases, suites: [REFUNDS] }),
       lastResults,
     });
 
@@ -214,7 +272,8 @@ describe("the test cases table", () => {
     renderPanel({
       selection: { kind: "suite", slug: "refunds" },
       title: "Refunds",
-      groups: [{ id: REFUNDS.id, name: REFUNDS.name, cases }],
+      folderGroups: [],
+      looseCases: cases,
     });
 
     expect(
@@ -230,13 +289,8 @@ describe("the test cases table", () => {
   /** @scenario "Labels are shown as small pastel pills beside the name" */
   it("shows the labels as pastel pills beside the name", () => {
     renderPanel({
-      groups: [
-        {
-          id: REFUNDS.id,
-          name: REFUNDS.name,
-          cases: [makeCase({ labels: ["critical", "billing"] })],
-        },
-      ],
+      folderGroups: [],
+      looseCases: [makeCase({ labels: ["critical", "billing"] })],
       selection: { kind: "suite", slug: "refunds" },
     });
 
@@ -254,7 +308,8 @@ describe("the test cases table", () => {
   it("shows the verdict of the last run and the run metrics on hover", async () => {
     const user = userEvent.setup();
     renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map([
         ["case_1", makeResult({ durationInMs: 6300, totalCost: 0.0042 })],
       ]),
@@ -270,7 +325,8 @@ describe("the test cases table", () => {
   /** @scenario "A test case that never ran shows an empty last result" */
   it("leaves the last result empty for a case that never ran and still offers Run", () => {
     renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map(),
     });
 
@@ -286,7 +342,8 @@ describe("the test cases table", () => {
     renderPanel({
       selection: { kind: "suite", slug: "refunds" },
       title: "Refunds",
-      groups: [{ id: REFUNDS.id, name: REFUNDS.name, cases: [makeCase()] }],
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map([
         ["case_1", makeResult({ durationInMs: 6300, totalCost: 0.0042 })],
       ]),
@@ -305,7 +362,8 @@ describe("the test cases table", () => {
       makeCase({ id: "case_3", name: "Partial refund" }),
     ];
     const { props, view } = renderPanel({
-      groups: groupCasesByFolder({ cases, suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: cases,
       lastResults: new Map(),
       isLastResultsLoading: true,
     });
@@ -337,7 +395,8 @@ describe("the test cases table", () => {
   /** @scenario "Every row carries an outlined Run button with the word Run" */
   it("carries an outlined Run button on every row", () => {
     renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
     });
 
     const runButton = screen.getByRole("button", { name: "Run Double charge" });
@@ -348,7 +407,8 @@ describe("the test cases table", () => {
   /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order" */
   it("offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order", async () => {
     renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map([["case_1", makeResult()]]),
     });
     await openRowMenu("Double charge");
@@ -369,7 +429,8 @@ describe("the test cases table", () => {
   /** @scenario "Open last run is not offered for a case that never ran" */
   it("does not offer Open last run for a case that never ran", async () => {
     renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map(),
     });
     await openRowMenu("Double charge");
@@ -387,7 +448,10 @@ describe("the test cases table", () => {
   it("puts the copy of a duplicated case in the same suite", async () => {
     const original = makeCase({ labels: ["critical"] });
     const { props, view } = renderPanel({
-      groups: groupCasesByFolder({ cases: [original], suites: [REFUNDS] }),
+      selection: { kind: "suite", slug: "refunds" },
+      title: "Refunds",
+      folderGroups: [],
+      looseCases: [original],
     });
     const user = await openRowMenu("Double charge");
 
@@ -403,17 +467,9 @@ describe("the test cases table", () => {
       labels: ["critical"],
     });
     view.rerender(
-      <CasesPanel
-        {...props}
-        groups={groupCasesByFolder({
-          cases: [original, copy],
-          suites: [REFUNDS],
-        })}
-      />,
+      <CasesPanel {...props} folderGroups={[]} looseCases={[original, copy]} />,
     );
 
-    const heading = screen.getByTestId("folder-header-row-Refunds");
-    expect(within(heading).getByLabelText("2 test cases")).toBeInTheDocument();
     const copyRow = screen.getByTestId("case-row-Double charge (copy)");
     expect(
       within(copyRow).getByTestId("tag-pill-critical"),
@@ -424,10 +480,10 @@ describe("the test cases table", () => {
   it("starts checkbox selection with the clicked row pre-checked from the row menu", async () => {
     const filed = makeCase();
     renderPanel({
-      groups: groupCasesByFolder({
-        cases: [filed],
-        suites: [REFUNDS, CHECKOUT],
-      }),
+      selection: { kind: "suite", slug: "refunds" },
+      title: "Refunds",
+      folderGroups: [],
+      looseCases: [filed],
     });
     const user = await openRowMenu("Double charge");
 
@@ -447,10 +503,10 @@ describe("the test cases table", () => {
   it("moves the selection to another suite from the action bar", async () => {
     const filed = makeCase();
     const { props } = renderPanel({
-      groups: groupCasesByFolder({
-        cases: [filed],
-        suites: [REFUNDS, CHECKOUT],
-      }),
+      selection: { kind: "suite", slug: "refunds" },
+      title: "Refunds",
+      folderGroups: [],
+      looseCases: [filed],
     });
     const user = await openRowMenu("Double charge");
 
@@ -470,10 +526,10 @@ describe("the test cases table", () => {
   it("unfiles the selection when No test suite is picked in the dialog", async () => {
     const filed = makeCase();
     const { props } = renderPanel({
-      groups: groupCasesByFolder({
-        cases: [filed],
-        suites: [REFUNDS, CHECKOUT],
-      }),
+      selection: { kind: "suite", slug: "refunds" },
+      title: "Refunds",
+      folderGroups: [],
+      looseCases: [filed],
     });
     const user = await openRowMenu("Double charge");
 
@@ -493,7 +549,8 @@ describe("the test cases table", () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
-      groups: groupCasesByFolder({ cases: [testCase], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [testCase],
       lastResults: new Map([["case_1", makeResult()]]),
     });
 
@@ -508,7 +565,8 @@ describe("the test cases table", () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
-      groups: groupCasesByFolder({ cases: [testCase], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [testCase],
       lastResults: new Map(),
     });
 
@@ -522,7 +580,8 @@ describe("the test cases table", () => {
     const user = userEvent.setup();
     const testCase = makeCase();
     const { props } = renderPanel({
-      groups: groupCasesByFolder({ cases: [testCase], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [testCase],
       lastResults: new Map([["case_1", makeResult()]]),
     });
 
@@ -538,7 +597,8 @@ describe("the test cases table", () => {
   /** @scenario "The last result cell has no button when there is no last run" */
   it("renders the last result cell without a button when there is no last run", () => {
     renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map(),
     });
 
@@ -554,7 +614,8 @@ describe("the test cases table", () => {
   it("hands the Run button to the run dialog and not to the row", async () => {
     const user = userEvent.setup();
     const { props } = renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map([["case_1", makeResult()]]),
     });
 
@@ -567,9 +628,10 @@ describe("the test cases table", () => {
   // --- Filtering ---
 
   /** @scenario "The label filter narrows the table to one label" */
-  it("narrows the table to one label and hides the headings it empties", async () => {
+  it("narrows the table to one label and hides the folder rows it empties", async () => {
     const user = userEvent.setup();
-    const critical = makeCase({ labels: ["critical"] });
+    // One loose case and two filed cases, one per suite.
+    const critical = makeCase({ labels: ["critical"], folderId: null });
     const billing = makeCase({
       id: "case_2",
       name: "Late refund",
@@ -583,7 +645,7 @@ describe("the test cases table", () => {
     });
 
     const { props, view } = renderPanel({
-      groups: groupCasesByFolder({
+      ...groupCasesByFolder({
         cases: [critical, billing, edge],
         suites: [REFUNDS, CHECKOUT],
       }),
@@ -599,7 +661,7 @@ describe("the test cases table", () => {
       <CasesPanel
         {...props}
         activeLabels={["critical"]}
-        groups={groupCasesByFolder({
+        {...groupCasesByFolder({
           cases: [critical],
           suites: [REFUNDS, CHECKOUT],
         })}
@@ -611,6 +673,9 @@ describe("the test cases table", () => {
     expect(
       screen.queryByTestId("folder-header-row-Checkout"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("folder-header-row-Refunds"),
+    ).not.toBeInTheDocument();
   });
 
   // --- The summary line ---
@@ -620,7 +685,8 @@ describe("the test cases table", () => {
     renderPanel({
       selection: { kind: "suite", slug: "refunds" },
       title: "Refunds",
-      groups: [{ id: REFUNDS.id, name: REFUNDS.name, cases: [makeCase()] }],
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map([["case_1", makeResult()]]),
     });
 
@@ -640,7 +706,8 @@ describe("the test cases table", () => {
   /** @scenario "All test cases reads Last full run at" */
   it("reads Last full run at in the All test cases view", () => {
     renderPanel({
-      groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
+      folderGroups: [],
+      looseCases: [makeCase()],
       lastResults: new Map([["case_1", makeResult()]]),
     });
 
