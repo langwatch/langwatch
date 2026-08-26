@@ -42,6 +42,15 @@ const { serviceRef } = vi.hoisted(() => ({
   serviceRef: { current: null as unknown },
 }));
 
+// The route is a mutation, so tRPC's audit middleware records it — and that
+// record is the one thing on this path that opens a socket. Standing it in is
+// what keeps the file honest about needing no datastore; without it the suite
+// passes only where a developer happens to have a database running, and fails
+// in the lane it declares.
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(async () => undefined),
+}));
+
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   accountIdentifiers: () => serviceRef.current,
   verificationCeremony: () => {

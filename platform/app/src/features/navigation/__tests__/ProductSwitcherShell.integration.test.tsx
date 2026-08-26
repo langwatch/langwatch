@@ -284,13 +284,20 @@ vi.mock("~/utils/api", () => ({
     // The shell also mounts the join-your-team notice.
     joinRequests: {
       offer: { useQuery: () => ({ data: undefined }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
       dismissOffer: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
     useUtils: () => ({
       user: { secureAccountNudge: { invalidate: vi.fn() } },
-      joinRequests: { offer: { invalidate: vi.fn() } },
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
     }),
     auth: {
       myAddressConfirmation: { useQuery: () => ({ data: undefined }) },

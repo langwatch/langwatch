@@ -54,6 +54,13 @@ vi.mock("~/utils/auth-client", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The setup flow behind the gate asks whether this person signs in with a
+    // password before it decides to ask for one. Undefined is "not known yet",
+    // which the flow reads as holding one — no password field either way, so
+    // the gate's own claims are unaffected.
+    user: {
+      hasPassword: { useQuery: () => ({ data: undefined }) },
+    },
     twoStepVerification: {
       standing: {
         useQuery: () => {

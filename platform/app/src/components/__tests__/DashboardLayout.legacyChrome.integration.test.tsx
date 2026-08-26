@@ -151,6 +151,10 @@ vi.mock("~/utils/api", () => ({
     // navigation, not about what interrupts it.
     joinRequests: {
       offer: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
       dismissOffer: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
@@ -179,7 +183,10 @@ vi.mock("~/utils/api", () => ({
     },
     // The notices above invalidate their own reads after answering.
     useUtils: () => ({
-      joinRequests: { offer: { invalidate: vi.fn() } },
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
       user: { secureAccountNudge: { invalidate: vi.fn() } },
     }),
   },

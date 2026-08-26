@@ -209,6 +209,10 @@ vi.mock("~/utils/api", () => ({
     },
     joinRequests: {
       offer: { useQuery: () => ({ data: undefined }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
       // The menu's own "somebody is waiting" badge asks this on every settings
       // page, so a mock that names it not takes the whole menu down.
       pending: { useQuery: () => ({ data: undefined }) },
@@ -218,7 +222,10 @@ vi.mock("~/utils/api", () => ({
     },
     useUtils: () => ({
       user: { secureAccountNudge: { invalidate: vi.fn() } },
-      joinRequests: { offer: { invalidate: vi.fn() } },
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
     }),
     governance: {
       recordWorkspaceView: {
