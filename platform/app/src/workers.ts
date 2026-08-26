@@ -42,15 +42,15 @@ void (async () => {
     compose: async (_config, resources) => {
       // These imports are intentionally inside compose: config validation has
       // completed before the App composition or worker transport evaluate.
-      const { createWorker } = await import("./runtime/worker");
-      const { startWorkers } = await import("./server/workers/startWorkers");
-      const { initializeWorkerApp } = (await import("./server/app-layer/presets")) as {
-        initializeWorkerApp: () => import("./server/app-layer/app").App;
-      };
+      const { WorkerRuntime } = await import("@langwatch/worker/runtime");
+      const { createLegacyWorkerPorts } =
+        await import("./runtime/worker/legacy-worker.adapter");
+      const { initializeWorkerApp } = await import("./server/app-layer/presets");
+      const app = initializeWorkerApp();
+      const ports = createLegacyWorkerPorts(app);
 
-      const runtime = await createWorker({
-        composeApp: initializeWorkerApp,
-        startWorker: (app) => startWorkers({ shouldStartMetricsServer: true, app }),
+      const runtime = WorkerRuntime.create({
+        ...ports,
         resources,
         ownsResources: false,
       });

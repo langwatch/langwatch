@@ -1,6 +1,6 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
 import type { AppRuntime } from "../app";
-import type { WorkerRuntime } from "../worker";
+import type { WorkerRuntime } from "@langwatch/worker/runtime";
 
 export type CombinedRuntime = {
   app: AppRuntime;

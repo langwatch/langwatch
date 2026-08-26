@@ -201,6 +201,7 @@
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/user-server": "workspace:*",
+    "@langwatch/worker": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-server": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",

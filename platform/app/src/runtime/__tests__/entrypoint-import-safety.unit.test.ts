@@ -31,4 +31,12 @@ describe("executable import boundaries", () => {
     expect(start).not.toMatch(/if \(!options\.appRuntime\).*appRuntime\.start/);
     expect(server).not.toContain("await appRuntime.start();");
   });
+
+  it("constructs workers through the external runtime seam", () => {
+    const workers = source("workers.ts");
+
+    expect(workers).toContain('await import("@langwatch/worker/runtime")');
+    expect(workers).toContain('await import("./runtime/worker/legacy-worker.adapter")');
+    expect(workers).not.toContain('await import("./runtime/worker")');
+  });
 });
