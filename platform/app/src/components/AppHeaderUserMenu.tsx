@@ -32,7 +32,6 @@ const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
   "icon-rail": "Icon rail",
 };
 
-/** The order the modes are offered in. */
 const NAVIGATION_MODES = Object.keys(
   NAVIGATION_MODE_LABELS,
 ) as NavigationMode[];

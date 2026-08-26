@@ -16,6 +16,121 @@ import { ProjectAvatar } from "./ProjectAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 
+interface ProjectGroup {
+  organization: FullyLoadedOrganization;
+  team: FullyLoadedOrganization["teams"][number];
+  projects: Project[];
+}
+
+const sortByName = (a: { name: string }, b: { name: string }) => {
+  const first = a.name.toLowerCase();
+  const second = b.name.toLowerCase();
+  if (first < second) return -1;
+  if (first > second) return 1;
+  return 0;
+};
+
+/**
+ * Build the sorted `{organization, team, projects}` groups from the query
+ * data. `sort()` copies so the source arrays from `useOrganizationTeamProject`
+ * stay in the order every other consumer sees.
+ */
+function buildProjectGroups(
+  organizations: FullyLoadedOrganization[],
+): ProjectGroup[] {
+  return [...organizations].sort(sortByName).flatMap((organization) =>
+    organization.teams.flatMap((team) => ({
+      organization,
+      team,
+      projects: [...team.projects].sort(sortByName),
+    })),
+  );
+}
+
+/**
+ * Groups the current user can see: they are an admin of the organization,
+ * or a direct member of the team.
+ */
+function useVisibleProjectGroups(groups: ProjectGroup[]): ProjectGroup[] {
+  const { data: session } = useRequiredSession();
+  const userId = session?.user.id;
+
+  return groups.filter((projectGroup) => {
+    // Org admins created via RoleBinding-only flow have no TeamUser row
+    // but still have full access. Resolve the current user's organization
+    // role explicitly rather than relying on members[0] being pre-filtered.
+    const currentUserOrgRole = projectGroup.organization.members.find(
+      (m) => m.userId === userId,
+    )?.role;
+    return (
+      currentUserOrgRole === OrganizationUserRole.ADMIN ||
+      (projectGroup.team.members?.some((member) => member.userId === userId) ??
+        false)
+    );
+  });
+}
+
+function ProjectGroupSection({
+  projectGroup,
+  currentProjectSlug,
+  routePathname,
+}: {
+  projectGroup: ProjectGroup;
+  currentProjectSlug: string;
+  routePathname: string;
+}) {
+  const groupTitle =
+    projectGroup.team.name !== projectGroup.organization.name
+      ? `${projectGroup.organization.name} - ${projectGroup.team.name}`
+      : projectGroup.organization.name;
+
+  return (
+    <Menu.ItemGroup key={projectGroup.team.id} title={groupTitle}>
+      {projectGroup.projects.map((project_) => (
+        <Menu.Item
+          key={project_.id}
+          value={project_.id}
+          fontSize="14px"
+          asChild
+        >
+          <Link
+            key={project_.id}
+            href={buildProjectSwitchHref({
+              routePattern: routePathname,
+              resolvedPathname: window.location.pathname,
+              currentProjectSlug,
+              targetSlug: project_.slug,
+              homeFallback: "returnTo",
+            })}
+            onClick={() => {
+              const currentPath = window.location.pathname;
+              const hasProjectInPath = currentPath.includes(currentProjectSlug);
+              if (!hasProjectInPath) {
+                localStorage.setItem(
+                  "selectedProjectSlug",
+                  JSON.stringify(project_.slug),
+                );
+              }
+            }}
+            _hover={{
+              textDecoration: "none",
+            }}
+          >
+            <HStack gap={2}>
+              <ProjectAvatar name={project_.name} />
+              <Text>{project_.name}</Text>
+            </HStack>
+          </Link>
+        </Menu.Item>
+      ))}
+      <AddProjectButton
+        team={projectGroup.team}
+        organization={projectGroup.organization}
+      />
+    </Menu.ItemGroup>
+  );
+}
+
 /**
  * A standalone project dropdown for pages that sit outside the
  * navigation shells' scope but still need to switch projects, such as
@@ -29,22 +144,9 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   project: Project;
 }) {
   const router = useRouter();
-  const { data: session } = useRequiredSession();
   const [open, setOpen] = useState(false);
-
-  const sortByName = (a: { name: string }, b: { name: string }) =>
-    a.name.toLowerCase() < b.name.toLowerCase()
-      ? -1
-      : a.name.toLowerCase() > b.name.toLowerCase()
-        ? 1
-        : 0;
-
-  const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
-    organization.teams.flatMap((team) => ({
-      organization,
-      team,
-      projects: team.projects.sort(sortByName),
-    })),
+  const visibleGroups = useVisibleProjectGroups(
+    buildProjectGroups(organizations),
   );
 
   return (
@@ -74,79 +176,14 @@ export const ProjectSelector = React.memo(function ProjectSelector({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content>
-              {projectGroups
-                .filter((projectGroup) => {
-                  // Org admins created via RoleBinding-only flow have no TeamUser row
-                  // but still have full access. Resolve the current user's
-                  // organization role explicitly rather than relying on
-                  // members[0] being pre-filtered.
-                  const currentUserOrgRole =
-                    projectGroup.organization.members.find(
-                      (m) => m.userId === session?.user.id,
-                    )?.role;
-                  return (
-                    currentUserOrgRole === OrganizationUserRole.ADMIN ||
-                    (projectGroup.team.members?.some(
-                      (member) => member.userId === session?.user.id,
-                    ) ??
-                      false)
-                  );
-                })
-                .map((projectGroup) => (
-                  <Menu.ItemGroup
-                    key={projectGroup.team.id}
-                    title={
-                      projectGroup.organization.name +
-                      (projectGroup.team.name !== projectGroup.organization.name
-                        ? " - " + projectGroup.team.name
-                        : "")
-                    }
-                  >
-                    {projectGroup.projects.map((project_) => (
-                      <Menu.Item
-                        key={project_.id}
-                        value={project_.id}
-                        fontSize="14px"
-                        asChild
-                      >
-                        <Link
-                          key={project_.id}
-                          href={buildProjectSwitchHref({
-                            routePattern: router.pathname,
-                            resolvedPathname: window.location.pathname,
-                            currentProjectSlug: project.slug,
-                            targetSlug: project_.slug,
-                            homeFallback: "returnTo",
-                          })}
-                          onClick={() => {
-                            const currentPath = window.location.pathname;
-                            const hasProjectInPath = currentPath.includes(
-                              project.slug,
-                            );
-                            if (!hasProjectInPath) {
-                              localStorage.setItem(
-                                "selectedProjectSlug",
-                                JSON.stringify(project_.slug),
-                              );
-                            }
-                          }}
-                          _hover={{
-                            textDecoration: "none",
-                          }}
-                        >
-                          <HStack gap={2}>
-                            <ProjectAvatar name={project_.name} />
-                            <Text>{project_.name}</Text>
-                          </HStack>
-                        </Link>
-                      </Menu.Item>
-                    ))}
-                    <AddProjectButton
-                      team={projectGroup.team}
-                      organization={projectGroup.organization}
-                    />
-                  </Menu.ItemGroup>
-                ))}
+              {visibleGroups.map((projectGroup) => (
+                <ProjectGroupSection
+                  key={projectGroup.team.id}
+                  projectGroup={projectGroup}
+                  currentProjectSlug={project.slug}
+                  routePathname={router.pathname}
+                />
+              ))}
             </Menu.Content>
           )}
         </Box>

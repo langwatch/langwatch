@@ -48,8 +48,11 @@ Feature: Organization primary intent decides the "/" landing
 
   # The client-side landing shim was removed. The "/" resolution now uses
   # the device's per-organization product memory ahead of the server
-  # resolver (specs/navigation/navigation-v2-landing.feature). The
-  # explicit user pin still wins.
+  # resolver (specs/navigation/navigation-v2-landing.feature). For an
+  # organization that carries an intent, the intent still wins over both
+  # the memory and any user pin (see the rule above). Explicit user pins
+  # only come into play for intent-less organizations, on the legacy
+  # resolver path.
 
   Rule: a kill-switched governance organization never lands on a gated 404
 

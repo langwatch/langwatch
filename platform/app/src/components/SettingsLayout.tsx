@@ -1,5 +1,5 @@
 import { Container } from "@chakra-ui/react";
-import { type PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 
 /**

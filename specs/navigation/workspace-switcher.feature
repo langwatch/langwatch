@@ -118,7 +118,7 @@ Feature: Workspace switcher
     Given I belong to more than one organization
     And I open an organization-scoped route
     When I pick another organization from the switcher
-    Then the app writes the chosen organization id to selectedOrganizationId
+    Then the chosen organization becomes the current organization
     And the browser opens "/settings"
 
   # -------------------------------------------------------------------------

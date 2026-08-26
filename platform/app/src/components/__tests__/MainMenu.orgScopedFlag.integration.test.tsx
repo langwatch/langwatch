@@ -151,7 +151,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const linkNamed = (label: string) =>
+const linkNamed = ({ label }: { label: string }) =>
   screen.queryByRole("link", { name: label });
 
 describe("<MainMenuSections /> with an organization-scoped rule on the release flag", () => {
@@ -166,11 +166,11 @@ describe("<MainMenuSections /> with an organization-scoped rule on the release f
       it("shows Agent Testing and drops the Simulations group it replaces", () => {
         render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
-        expect(linkNamed("Agent Testing")).toHaveAttribute(
+        expect(linkNamed({ label: "Agent Testing" })).toHaveAttribute(
           "href",
           "/demo/agent-testing",
         );
-        expect(linkNamed("Simulations")).toBeNull();
+        expect(linkNamed({ label: "Simulations" })).toBeNull();
       });
     });
   });

@@ -87,7 +87,7 @@ const OTHER_ORG = {
   ],
 };
 
-function seedStorage(key: string, value: string) {
+function seedStorage({ key, value }: { key: string; value: string }) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
@@ -101,7 +101,7 @@ beforeEach(() => {
     isRefetching: false,
   });
   // Pin the ambient org to the empty one.
-  seedStorage("selectedOrganizationId", "org-empty");
+  seedStorage({ key: "selectedOrganizationId", value: "org-empty" });
 });
 
 afterEach(() => {

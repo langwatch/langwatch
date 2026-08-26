@@ -73,7 +73,7 @@ afterEach(() => {
 });
 
 describe("AppHeaderUserMenu", () => {
-  describe("the navigation-mode picker", () => {
+  describe("when the reader opens the navigation-mode picker", () => {
     /** @scenario The avatar menu offers the two navigation modes */
     it("shows the current mode and offers Product switcher and Icon rail", async () => {
       const user = userEvent.setup();
