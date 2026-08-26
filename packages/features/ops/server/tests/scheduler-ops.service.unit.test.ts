@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectService } from "@langwatch/project-contract";
+import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import {
   NoopSchedulerWakeService,
   SchedulerAuditSink,
-  SLOT_STALE_AFTER_MS,
   type ScheduledJobRecord,
 } from "../src";
 import type { SchedulerOpsRepository } from "../src";

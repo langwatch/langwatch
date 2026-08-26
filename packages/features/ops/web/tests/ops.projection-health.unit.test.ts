@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PipelineNode } from "@langwatch/ops-contract";
-import { joinProjectionHealth, type ProjectionMeta } from "../projectionHealth";
+import { joinProjectionHealth, type ProjectionMeta } from "../src/ops.projection-health";
 
 const META: ProjectionMeta = {
   projectionName: "traceSummary",

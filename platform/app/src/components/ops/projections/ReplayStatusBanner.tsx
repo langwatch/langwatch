@@ -1,5 +1,5 @@
 import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
-import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
+import { parseActiveProjections } from "@langwatch/ops-web";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { api } from "~/utils/api";

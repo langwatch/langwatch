@@ -4,6 +4,7 @@ import type {
   SchedulerAuditEntryView,
   SchedulerControlAction,
 } from "@langwatch/ops-contract";
+import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import {
   ScheduleAlreadyInFlightError,
   ScheduleInactiveError,
@@ -18,7 +19,6 @@ import type {
   ScheduledJobRecord,
 } from "../ports/scheduler-ops.repository";
 import { SchedulerWakeService } from "../ports/scheduler-wake.service";
-import { SLOT_STALE_AFTER_MS } from "./scheduler-control.constants";
 
 const logger = createLogger("langwatch:ops:scheduler");
 

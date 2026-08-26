@@ -1,6 +1,6 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/ops-web";
-import type { SchedulerHeaderCounts } from "./schedulerStatus";
+import type { SchedulerHeaderCounts } from "@langwatch/ops-web";
 
 /**
  * What needs attention, and whether the calendar loop itself is the problem.

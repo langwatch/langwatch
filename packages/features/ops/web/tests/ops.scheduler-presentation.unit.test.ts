@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SLOT_STALE_AFTER_MS } from "~/shared/ops/schedulerControl";
+import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import {
   canRunNow,
   compareForAttention,
@@ -10,7 +10,7 @@ import {
   needsAttention,
   type SchedulerJobLike,
   summarize,
-} from "../schedulerStatus";
+} from "../src/ops.scheduler-presentation";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z").getTime();
 const at = (offsetMs: number) => new Date(NOW + offsetMs).toISOString();

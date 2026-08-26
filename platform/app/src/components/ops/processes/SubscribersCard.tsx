@@ -4,7 +4,7 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
-import { joinSubscriberHealth, type SubscriberHealthRow } from "./subscriberHealth";
+import { joinSubscriberHealth, type SubscriberHealthRow } from "@langwatch/ops-web";
 
 function EventTypesCell({ eventTypes }: { eventTypes: readonly string[] }) {
   const shown = eventTypes.slice(0, 2);

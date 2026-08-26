@@ -26,7 +26,7 @@ import type {
 } from "~/server/app-layer/ops/repositories/replay.repository";
 import { api } from "~/utils/api";
 import { CowboyAnimation } from "./CowboyAnimation";
-import { parseActiveProjections } from "./parseActiveProjections";
+import { parseActiveProjections } from "@langwatch/ops-web";
 
 const MESH_PULSE_CSS = `
   @keyframes meshPulse {

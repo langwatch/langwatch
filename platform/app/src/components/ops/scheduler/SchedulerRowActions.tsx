@@ -5,7 +5,7 @@ import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { canRunNow, type SchedulerJobStatus } from "./schedulerStatus";
+import { canRunNow, type SchedulerJobStatus } from "@langwatch/ops-web";
 
 type PendingAction = "pause" | "resume" | "clear" | "run" | null;
 

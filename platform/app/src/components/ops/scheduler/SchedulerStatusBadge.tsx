@@ -1,6 +1,6 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
 import { formatDurationMs } from "@langwatch/ops-web";
-import type { SchedulerJobStatus } from "./schedulerStatus";
+import type { SchedulerJobStatus } from "@langwatch/ops-web";
 
 const PRESENTATION: Record<SchedulerJobStatus, { label: string; palette: string }> = {
   overdue: { label: "Overdue", palette: "red" },

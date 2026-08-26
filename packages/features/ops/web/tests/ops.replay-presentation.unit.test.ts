@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseActiveProjections } from "./parseActiveProjections";
+import { parseActiveProjections } from "../src/ops.replay-presentation";
 
 describe("parseActiveProjections", () => {
   describe("given a single projection name", () => {

@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
+import { parseActiveProjections } from "@langwatch/ops-web";
 import { formatDuration } from "@langwatch/ops-web";
 import { PHASE_ICONS, PHASE_LABELS, PhaseTimeline } from "@langwatch/ops-web";
 import {

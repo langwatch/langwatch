@@ -1,5 +1,6 @@
 import type { ProcessRef, ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type { ProcessFleetSummary } from "@langwatch/ops-contract";
 import { getProcessManagerMetadata } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type { ProcessAuditEntryView, ProcessAuditSink } from "./process-audit.repository";
 import type {
@@ -21,20 +22,6 @@ import type {
  */
 export const OVERDUE_WAKE_MS = 60 * 1000;
 export const OVERDUE_PENDING_MS = 5 * 60 * 1000;
-
-/** One process name's fleet row: registry identity + live trouble counts. */
-export interface ProcessFleetSummary {
-  processName: string;
-  pipelineName: string;
-  /** Fixed-interval singleton (one `__global__` instance) vs per-aggregate. */
-  scheduled: boolean;
-  instances: number;
-  overdueWakes: number;
-  pendingMessages: number;
-  overduePending: number;
-  lapsedLeases: number;
-  deadMessages: number;
-}
 
 export interface ProcessInstanceDetail {
   ref: ProcessRef;

@@ -1,3 +1,6 @@
+/** A claimed slot must be untouched this long before an operator may clear it. */
+export const SLOT_STALE_AFTER_MS = 15 * 60_000;
+
 export interface OpsScheduledJob {
   id: string;
   projectId: string;

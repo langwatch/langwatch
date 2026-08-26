@@ -47,4 +47,3 @@ export {
   type OpsWorkerHandle,
   type UsageStatsWorkerConfig,
 } from "./ports/ops-worker.port";
-export * from "./services/scheduler-control.constants";

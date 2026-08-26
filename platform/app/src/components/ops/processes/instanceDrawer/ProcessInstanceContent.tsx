@@ -4,7 +4,7 @@ import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer
 import type { ProcessInstanceDetail } from "~/server/app-layer/ops/manager-explorer.service";
 import type { ProcessOutboxMessageView } from "~/server/app-layer/ops/repositories/process-ops.repository";
 import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";
-import { describeNextWake } from "../processFleet";
+import { describeNextWake } from "@langwatch/ops-web";
 import { OutboxMessageCard } from "./OutboxMessageCard";
 
 const NO_PINNED_KEYS: ReadonlySet<string> = new Set();

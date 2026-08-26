@@ -4,7 +4,7 @@ import {
   joinSubscriberHealth,
   type SubscriberMeta,
   subscriberPauseKey,
-} from "../subscriberHealth";
+} from "../src/ops.subscriber-health";
 
 const META: SubscriberMeta = {
   subscriberName: "graphTriggerActivity",

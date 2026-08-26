@@ -17,7 +17,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { ProcessInstanceRow } from "~/server/app-layer/ops/repositories/process-ops.repository";
 import { api } from "~/utils/api";
-import { describeNextWake } from "./processFleet";
+import { describeNextWake } from "@langwatch/ops-web";
 
 const PAGE_SIZE = 25;
 

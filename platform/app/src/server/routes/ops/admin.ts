@@ -82,7 +82,7 @@ secured
 async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
   const session = await getServerAuthSession({ req: c.req.raw });
   const user = session?.user.impersonator ?? session?.user;
-  const ops = c.var.langwatchApp.ops;
+  const ops = c.app.ops;
 
   if (!session || !user || !ops.isAdmin(user)) {
     throw new AdminSurfaceHiddenError();
@@ -132,7 +132,7 @@ async function handleImpersonate(c: AdminContext, method: "POST" | "DELETE") {
 secured.access(adminAuth).post("/admin/:resource", async (c: AdminContext) => {
   const session = await getServerAuthSession({ req: c.req.raw });
   const user = session?.user.impersonator ?? session?.user;
-  const ops = c.var.langwatchApp.ops;
+  const ops = c.app.ops;
   if (!session || !user || !ops.isAdmin(user)) {
     throw new AdminSurfaceHiddenError();
   }

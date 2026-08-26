@@ -24,7 +24,7 @@ import {
   isSlotStale,
   latenessMs,
   summarize,
-} from "./schedulerStatus";
+} from "@langwatch/ops-web";
 
 /**
  * The scheduler surface, page-independent: scheduled work across every
