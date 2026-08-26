@@ -184,6 +184,13 @@ describe("ClickHouse routing via env vars", () => {
     await clearCustomClientCache();
     clearTenantOrgCache();
 
+    // Memberships name both an organization and a user, so they have to go
+    // before either does; nothing cascades here.
+    if (createdOrgIds.length > 0) {
+      await prisma.organizationUser.deleteMany({
+        where: { organizationId: { in: createdOrgIds } },
+      });
+    }
     if (createdProjectIds.length > 0) {
       await prisma.project.deleteMany({
         where: { id: { in: createdProjectIds } },
@@ -379,10 +386,13 @@ describe("ClickHouse routing via env vars", () => {
         "../clickhouseClient"
       );
 
-      const { organizationId } = await createTestOrgWithProject({
-        namespace: "private-member",
-        organizationId: PRIVATE_ORG_ID,
-      });
+      const { organizationId, teamId, projectId } =
+        await createTestOrgWithProject({
+          namespace: "private-member",
+          organizationId: PRIVATE_ORG_ID,
+        });
+      createdProjectIds.push(projectId);
+      createdTeamIds.push(teamId);
       createdOrgIds.push(organizationId);
 
       const user = await prisma.user.create({
