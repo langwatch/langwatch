@@ -29,60 +29,62 @@ import { assertAdapterUnchanged } from "@ee/governance/services/activity-monitor
 import { describe, expect, it } from "vitest";
 
 describe("given an edit to a source that already holds a credential", () => {
-  it("refuses to repoint a Databricks source at a generic HTTP puller", () => {
-    expect(() =>
-      assertAdapterUnchanged({
-        stored: { adapter: "databricks_genie" },
-        incoming: {
-          adapter: "http_polling",
-          // A real workspace URL, present only to satisfy the destination
-          // check. The adapter beside it is what would actually run.
-          workspaceUrl: "https://real.cloud.databricks.com",
-          url: "https://attacker.example/collect",
-          authMode: "bearer",
-        },
-      }),
-    ).toThrow(/fixed when the source is created/);
-  });
+  describe("when the update is checked against the stored adapter", () => {
+    it("refuses to repoint a Databricks source at a generic HTTP puller", () => {
+      expect(() =>
+        assertAdapterUnchanged({
+          stored: { adapter: "databricks_genie" },
+          incoming: {
+            adapter: "http_polling",
+            // A real workspace URL, present only to satisfy the destination
+            // check. The adapter beside it is what would actually run.
+            workspaceUrl: "https://real.cloud.databricks.com",
+            url: "https://attacker.example/collect",
+            authMode: "bearer",
+          },
+        }),
+      ).toThrow(/fixed when the source is created/);
+    });
 
-  it("says which adapter the source is on, so the refusal is actionable", () => {
-    expect(() =>
-      assertAdapterUnchanged({
-        stored: { adapter: "databricks_genie" },
-        incoming: { adapter: "http_polling" },
-      }),
-    ).toThrow(/databricks_genie/);
-  });
+    it("says which adapter the source is on, so the refusal is actionable", () => {
+      expect(() =>
+        assertAdapterUnchanged({
+          stored: { adapter: "databricks_genie" },
+          incoming: { adapter: "http_polling" },
+        }),
+      ).toThrow(/databricks_genie/);
+    });
 
-  it("allows an edit that leaves the adapter alone", () => {
-    expect(() =>
-      assertAdapterUnchanged({
-        stored: { adapter: "copilot_studio_dataverse" },
-        incoming: {
-          adapter: "copilot_studio_dataverse",
-          environmentUrl: "https://org.crm.dynamics.com",
-        },
-      }),
-    ).not.toThrow();
-  });
+    it("allows an edit that leaves the adapter alone", () => {
+      expect(() =>
+        assertAdapterUnchanged({
+          stored: { adapter: "copilot_studio_dataverse" },
+          incoming: {
+            adapter: "copilot_studio_dataverse",
+            environmentUrl: "https://org.crm.dynamics.com",
+          },
+        }),
+      ).not.toThrow();
+    });
 
-  it("treats an absent adapter as unchanged, because the form never sends it", () => {
-    // The composer renders no adapter field, so every ordinary edit arrives
-    // without one. Refusing those would break the edit drawer outright.
-    expect(() =>
-      assertAdapterUnchanged({
-        stored: { adapter: "copilot_studio_dataverse" },
-        incoming: { environmentUrl: "https://org.crm.dynamics.com" },
-      }),
-    ).not.toThrow();
-  });
+    it("treats an absent adapter as unchanged, because the form never sends it", () => {
+      // The composer renders no adapter field, so every ordinary edit arrives
+      // without one. Refusing those would break the edit drawer outright.
+      expect(() =>
+        assertAdapterUnchanged({
+          stored: { adapter: "copilot_studio_dataverse" },
+          incoming: { environmentUrl: "https://org.crm.dynamics.com" },
+        }),
+      ).not.toThrow();
+    });
 
-  it("has nothing to protect on a source that stores no adapter", () => {
-    expect(() =>
-      assertAdapterUnchanged({
-        stored: {},
-        incoming: { adapter: "http_polling" },
-      }),
-    ).not.toThrow();
+    it("has nothing to protect on a source that stores no adapter", () => {
+      expect(() =>
+        assertAdapterUnchanged({
+          stored: {},
+          incoming: { adapter: "http_polling" },
+        }),
+      ).not.toThrow();
+    });
   });
 });

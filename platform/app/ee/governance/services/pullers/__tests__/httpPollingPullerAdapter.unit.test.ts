@@ -121,7 +121,7 @@ describe("HttpPollingPullerAdapter", () => {
     });
   });
 
-  describe("credential handling on the wire", () => {
+  describe("given a request that carries the source's credential", () => {
     /**
      * The request headers carry the source's decrypted upstream secret, and
      * `ssrfSafeFetch` follows up to ten redirects by default — re-sending
