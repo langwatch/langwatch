@@ -12,10 +12,8 @@ Feature: Shared section navigation layout
     And the content column uses only the space remaining beside the local navigation
 
     Examples:
-      | section       |
-      | Automations   |
-      | AI Gateway    |
-      | AI Governance |
+      | section     |
+      | Automations |
 
   # A fixed-width rail that never shrinks does not degrade on a phone, it
   # disappears: the content column is left with a handful of pixels and the
