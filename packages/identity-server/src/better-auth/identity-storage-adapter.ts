@@ -651,17 +651,35 @@ function identityCustomAdapter({
      *   widened account key is how one IdP's subject resolves another IdP's
      *   user.
      */
+    /*
+     * IT HANDS BACK A MUTABLE ARRAY, and that is not a detail. It takes a
+     * `readonly` list because it does not write to what it is given, and it
+     * used to hand the same list straight back on the two paths that change
+     * nothing — so `readonly` travelled out with it, into a binding
+     * better-auth types as mutable. Seven assignments failed to typecheck for
+     * a variance that says nothing about this function's behaviour.
+     *
+     * Copying on those two paths costs one shallow copy on a lookup that has
+     * already decided to do nothing, and it means every caller gets the same
+     * shape whichever branch answered.
+     *
+     * IT ALSO TAKES A LIST RATHER THAN A MAYBE-LIST. Handing it `undefined`
+     * only ever got `undefined` straight back, which is not a translation and
+     * put an `undefined` in the return type that four of the seven callers —
+     * the ones better-auth guarantees a `where` to — then had to talk their
+     * way out of. The two callers that genuinely hold an optional one skip
+     * the call instead, which is what "there is nothing to translate" means.
+     */
     const legacyAccountWhere = async (
       model: string,
-      where: readonly CleanedWhere[] | undefined,
-    ): Promise<readonly CleanedWhere[] | undefined | null> => {
-      if (where === undefined) return where;
+      where: readonly CleanedWhere[],
+    ): Promise<CleanedWhere[] | null> => {
       const canonicalNameOf = (clause: CleanedWhere): string =>
         getDefaultFieldName({ model, field: clause.field });
       const issuerClause = where.find(
         (clause) => canonicalNameOf(clause) === "issuer",
       );
-      if (issuerClause === undefined) return where;
+      if (issuerClause === undefined) return [...where];
       const issuer = issuerClause.value;
       if (
         (issuerClause.operator?.toLowerCase() ?? "eq") !== "eq" ||
@@ -851,9 +869,14 @@ function identityCustomAdapter({
               .slice(0, limit)
               .map((row) => toStorageKeys(model, { ...row })) as never;
           }
-          const translated = await legacyAccountWhere(model, where);
-          if (translated === null) return [] as never;
-          legacyWhere = translated;
+          // A findMany with no `where` asks for every account row, and there
+          // is nothing in "everything" to translate — the issuer clause the
+          // translation exists for is exactly what is absent.
+          if (where !== undefined) {
+            const translated = await legacyAccountWhere(model, where);
+            if (translated === null) return [] as never;
+            legacyWhere = translated;
+          }
         }
         const found = await legacy.findMany<Row>({
           model,
@@ -878,6 +901,9 @@ function identityCustomAdapter({
         if (modelOf(model) === "account") {
           const rows = await routeAccount({ model, operation: "count", where });
           if (rows !== null) return rows.length;
+          // Counting every account row has no issuer clause to translate, so
+          // it goes to the legacy engine exactly as it arrived.
+          if (where === undefined) return legacy.count({ model });
           const translated = await legacyAccountWhere(model, where);
           if (translated === null) return 0;
           return legacy.count({ model, where: translated });
