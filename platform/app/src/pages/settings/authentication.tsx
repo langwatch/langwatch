@@ -1,13 +1,18 @@
 import { VStack } from "@chakra-ui/react";
-import SettingsLayout from "../../components/SettingsLayout";
 import { AuthenticationSettings } from "../../components/settings/AuthenticationSettings";
+import { AuthenticationLayout } from "../../components/settings/authentication/AuthenticationLayout";
 import { SettingsPageHeader } from "../../components/settings/SettingsPageHeader";
+import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 /**
  * Authentication: how everyone in the organization signs in, and how their
  * accounts arrive (D05, D08, ADR-124).
+ *
+ * The overview of it. The identity provider's own journey and the connectors
+ * that provision people are their own routes, on the rail beside this — see
+ * `AuthenticationLayout` for why.
  *
  * Guarded on `sso:view` rather than on `organization:manage`: an
  * administrator who has not been given the single sign-on permissions is not
@@ -22,11 +27,7 @@ function AuthenticationPage() {
   if (!organization) return <SettingsLayout />;
 
   return (
-    <SettingsLayout>
-      {/* No padding and no width cap of its own: `SettingsLayout` already
-          wraps every settings page in a padded, capped container, so the ones
-          this page added indented it inside an indent and made it narrower
-          than the three pages beside it. */}
+    <AuthenticationLayout>
       <VStack align="stretch" gap={6} width="full">
         <SettingsPageHeader
           title="Authentication"
@@ -34,7 +35,7 @@ function AuthenticationPage() {
         />
         <AuthenticationSettings organizationId={organization.id} />
       </VStack>
-    </SettingsLayout>
+    </AuthenticationLayout>
   );
 }
 

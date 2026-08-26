@@ -178,26 +178,16 @@ describe("given the directory page", () => {
       expect(screen.queryByTestId("two-step-requirement-card")).toBeNull();
     });
 
-    /** @scenario The protocol keeps its name in the body copy */
-    it("is called Directory, and still says SCIM for the reader who searched for it", () => {
-      const { container } = renderPage("/settings/directory?tab=provisioning");
-
-      expect(
-        screen.getByRole("heading", { name: "Directory" }),
-      ).toBeInTheDocument();
-      // The protocol is what an IT administrator searched for. It survives in
-      // the words on the page even though the navigation entry does not.
-      expect(container.textContent).toContain("SCIM");
-    });
-
     /** @scenario The tabs are four subjects drawn one way */
-    it("offers people, teams, groups and provisioning as four tabs", () => {
+    it("offers people, teams and groups as three tabs", () => {
       renderPage();
 
       expect(tab("People")).toBeInTheDocument();
       expect(tab("Teams")).toBeInTheDocument();
       expect(tab("Groups")).toBeInTheDocument();
-      expect(tab("Provisioning")).toBeInTheDocument();
+      // Provisioning moved to Authentication: whether a connector is syncing
+      // is about how people ARRIVE, and this page answers who arrived.
+      expect(noTab("Provisioning")).toBeNull();
     });
 
     /** @scenario A tab that names a count names it the same way as its siblings */
@@ -211,16 +201,13 @@ describe("given the directory page", () => {
     });
   });
 
-  describe("when the address names the provisioning tab", () => {
+  describe("when the address names a tab that has moved away", () => {
     /** @scenario The old directory sync address forwards onto the page it became */
-    it("opens on the provisioning, which carries the connection detail", () => {
-      const { container } = renderPage("/settings/directory?tab=provisioning");
+    it("opens on the people rather than an empty tab", () => {
+      renderPage("/settings/directory?tab=provisioning");
 
-      expect(tab("Provisioning")).toHaveAttribute("aria-selected", "true");
-      expect(screen.getByTestId("reconciliation-panel")).toBeInTheDocument();
-      expect(container.textContent).toContain(
-        "Where your identity provider sends it",
-      );
+      expect(tab("People")).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByTestId("reconciliation-panel")).toBeNull();
     });
   });
 
@@ -246,42 +233,25 @@ describe("given the directory page", () => {
 
   describe("when the reader may see the sync but not manage the organization", () => {
     /** @scenario A reader who may not read groups is told nothing they cannot have */
-    it("offers only the provisioning tab rather than ones that refuse them", () => {
+    it("refuses the page rather than offering tabs that would all be empty", () => {
       state.permissions = new Set(["sso:view"]);
       renderPage();
 
+      // Every tab reads membership now that provisioning has moved, so there
+      // is no half of this page such a reader can have.
       expect(noTab("Groups")).toBeNull();
       expect(noTab("People")).toBeNull();
       expect(noTab("Teams")).toBeNull();
-      expect(tab("Provisioning")).toBeInTheDocument();
-    });
-
-    it("keeps the groups tab shut even when the address asks for it", () => {
-      state.permissions = new Set(["sso:view"]);
-      renderPage("/settings/directory?tab=groups");
-
-      expect(screen.queryByTestId("groups-section")).toBeNull();
-      expect(tab("Provisioning")).toHaveAttribute("aria-selected", "true");
-    });
-
-    /** @scenario A reader who may not read membership is not shown a roster */
-    it("leaves out the roster, which reads the membership they may not have", () => {
-      state.permissions = new Set(["sso:view"]);
-      renderPage();
-
-      expect(screen.queryByTestId("directory-managed-members")).toBeNull();
-      // The half of the page they may read is still there.
-      expect(screen.getByTestId("reconciliation-panel")).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Directory" })).toBeNull();
     });
   });
 
   describe("when the reader may manage the organization but not see the sync", () => {
-    it("keeps the page open on the half they came for", () => {
+    it("keeps the tabs and drops only the band that reads the sync", () => {
       state.permissions = new Set(["organization:manage"]);
       renderPage("/settings/directory?tab=groups");
 
       expect(screen.getByTestId("groups-section")).toBeInTheDocument();
-      expect(noTab("Provisioning")).toBeNull();
       // The status band reads the sync, which this reader may not.
       expect(screen.queryByTestId("directory-summary")).toBeNull();
     });

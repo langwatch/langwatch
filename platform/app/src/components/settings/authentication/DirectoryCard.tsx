@@ -1,5 +1,5 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Settings2 } from "lucide-react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import { formatRelativeTime } from "~/components/me/relativeTime";
 import { Link } from "~/components/ui/link";
@@ -81,21 +81,32 @@ export function DirectoryCard({
       // Offering "see provisioned members" to somebody with no provisioned
       // members is an invitation to an empty table.
       actions={
-        nothingHasArrived ? (
-          <Link href="/settings/directory?tab=provisioning">
-            <Button size="sm" variant="solid" colorPalette="orange">
-              Issue a token
-              <ArrowRight size={14} />
+        <>
+          {nothingHasArrived ? (
+            <Link href="/settings/authentication/connectors">
+              <Button size="sm" variant="solid" colorPalette="orange">
+                Issue a token
+                <ArrowRight size={14} />
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/settings/directory">
+              <Button size="sm" variant="outline">
+                See who it manages
+                <ArrowRight size={14} />
+              </Button>
+            </Link>
+          )}
+          {/* The connectors themselves: their state, what they could not
+              apply, the address and the token. This card reads; that page
+              is where a connector is set up and taken down. */}
+          <Link href="/settings/authentication/connectors">
+            <Button size="sm" variant="ghost">
+              <Settings2 size={14} />
+              Edit
             </Button>
           </Link>
-        ) : (
-          <Link href="/settings/directory">
-            <Button size="sm" variant="outline">
-              See who it manages
-              <ArrowRight size={14} />
-            </Button>
-          </Link>
-        )
+        </>
       }
     >
       {/* ROWS OF NOTHING ARE NOT A STATUS. Until a provider has pushed once,

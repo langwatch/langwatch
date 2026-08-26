@@ -384,7 +384,7 @@ describe("the organization's authentication page", () => {
       expect(within(card).getByText(/SAML/)).toBeTruthy();
       expect(
         within(card)
-          .getByText(/service provider metadata/i)
+          .getByText(/^Metadata$/)
           .closest("a"),
       ).toHaveAttribute("href", SERVICE_PROVIDER.metadataUrl);
     });
@@ -422,26 +422,21 @@ describe("the organization's authentication page", () => {
     });
 
     /** @scenario "Managing a live connection stays on the same page" */
-    it("unfolds the setup journey under the cards rather than replacing them", async () => {
-      const user = userEvent.setup();
+    it("only reads, and sends the rest of it to its own page", async () => {
       await open();
 
-      expect(screen.queryByText(/prove a domain is yours/i)).toBeNull();
-
-      await user.click(
-        screen.getByRole("button", {
-          name: /manage or turn off this connection/i,
-        }),
-      );
-
-      expect(screen.getByText(/prove a domain is yours/i)).toBeTruthy();
-      // THE CARDS STAY. Replacing them made one navigation entry into two
-      // pages and took the overview away from the reader who pressed it.
-      expect(screen.getByTestId("single-sign-on-card")).toBeTruthy();
-
-      await user.click(screen.getByRole("button", { name: /done managing/i }));
+      // THE JOURNEY IS A ROUTE NOW. It used to share this address and swap
+      // places with the overview, so one navigation entry was two screens and
+      // pressing "manage" took the cards away from the reader who pressed it.
       expect(screen.queryByText(/prove a domain is yours/i)).toBeNull();
       expect(screen.getByTestId("single-sign-on-card")).toBeTruthy();
+
+      const card = screen.getByTestId("single-sign-on-card");
+      expect(
+        within(card)
+          .getByText(/^Edit$/)
+          .closest("a"),
+      ).toHaveAttribute("href", "/settings/authentication/provider");
     });
   });
 
@@ -516,36 +511,45 @@ describe("the organization's authentication page", () => {
         /claim domain/i,
         /test sign-in/i,
         /go live/i,
-        /manage or turn off this connection/i,
+        /^set it up$/i,
       ]) {
         expect(
           screen.queryByRole("button", { name: refusedControl }),
         ).toBeNull();
       }
-      expect(screen.queryAllByRole("textbox")).toEqual([]);
       // Nothing about a connection that does not exist.
       expect(screen.queryByTestId("single-sign-on-card")).toBeNull();
       expect(screen.queryByTestId("authentication-domain-chip")).toBeNull();
+      // The preview card still says what one would do, because a reader who
+      // cannot start yet still came to find out how their people sign in.
+      expect(screen.getByTestId("single-sign-on-preview-card")).toBeTruthy();
     });
   });
 
   describe("given an organization that has never registered an identity provider", () => {
     /** @scenario "An organization with no connection gets the journey" */
-    it("opens on the first step of setting one up, not on an empty overview", async () => {
+    it("says what one would do, and offers the way to set it up", async () => {
       mockGetSetup.mockReturnValue({
         data: liveSetup({ connection: null, goLive: null, claims: [] }),
         isLoading: false,
       });
       await open();
 
-      expect(screen.getByText(/connect your identity provider/i)).toBeTruthy();
-      expect(screen.queryByTestId("single-sign-on-card")).toBeNull();
-      expect(screen.queryByTestId("directory-card")).toBeNull();
+      const card = screen.getByTestId("single-sign-on-preview-card");
+      expect(within(card).getByText("Not set up")).toBeTruthy();
+      expect(
+        within(card)
+          .getByText(/set it up/i)
+          .closest("a"),
+      ).toHaveAttribute("href", "/settings/authentication/provider");
+      // The directory card stays: what provisions people today is a true
+      // thing to say to somebody with no connection.
+      expect(screen.getByTestId("directory-card")).toBeTruthy();
     });
   });
 
   describe("given a connection that is not live yet", () => {
-    it("stays on the journey, since there is nothing to overview", async () => {
+    it("says where it got to, and offers the way to carry on", async () => {
       mockGetSetup.mockReturnValue({
         data: liveSetup({
           connection: { ...liveSetup().connection, state: "VERIFIED" },
@@ -555,8 +559,14 @@ describe("the organization's authentication page", () => {
       });
       await open();
 
-      expect(screen.queryByTestId("single-sign-on-card")).toBeNull();
-      expect(screen.getByText(/prove a domain is yours/i)).toBeTruthy();
+      const card = screen.getByTestId("single-sign-on-preview-card");
+      // Its own words for where it stands, not a lifecycle state.
+      expect(within(card).getByText("Ready to turn on")).toBeTruthy();
+      expect(
+        within(card)
+          .getByText(/carry on setting it up/i)
+          .closest("a"),
+      ).toHaveAttribute("href", "/settings/authentication/provider");
     });
   });
 });

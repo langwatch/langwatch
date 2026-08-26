@@ -477,7 +477,7 @@ export const navigationCommands: Command[] = [
     id: "nav-settings-provisioning",
     label: "Provisioning",
     description:
-      "Settings → Directory → Provisioning — SCIM sync and its tokens",
+      "Settings → Authentication → Connectors — SCIM sync and its tokens",
     icon: Users,
     category: "navigation",
     keywords: [
@@ -488,7 +488,7 @@ export const navigationCommands: Command[] = [
       "deprovision",
       "identity provider",
     ],
-    path: "/settings/directory?tab=provisioning",
+    path: "/settings/authentication/connectors",
   },
   {
     id: "nav-settings-access",

@@ -421,11 +421,14 @@ describe("the directory provisioning page", () => {
         ],
         isLoading: false,
       });
-      const { default: DirectoryPage } = await import("../directory");
+      const { default: ConnectorsPage } = await import(
+        "../authentication/connectors"
+      );
 
-      // The tokens are a tab of the Directory page now, so the address names
-      // it — the same address the tab writes when a reader opens it.
-      draw(<DirectoryPage />, "/settings/directory?tab=tokens");
+      // The tokens live with the connectors they authorise, on
+      // Authentication — whether a connector is syncing and what credential
+      // it syncs with are both about how people ARRIVE.
+      draw(<ConnectorsPage />, "/settings/authentication/connectors");
 
       // The panel reads normally — the connection appears both in the panel
       // and in the token listing's connection column.
@@ -438,9 +441,11 @@ describe("the directory provisioning page", () => {
 
     it("offers the controls to somebody who may manage it", async () => {
       readerHolding(["sso:view", "sso:manage"]);
-      const { default: DirectoryPage } = await import("../directory");
+      const { default: ConnectorsPage } = await import(
+        "../authentication/connectors"
+      );
 
-      draw(<DirectoryPage />, "/settings/directory?tab=tokens");
+      draw(<ConnectorsPage />, "/settings/authentication/connectors");
 
       expect(screen.getByRole("button", { name: /issue token/i })).toBeTruthy();
     });

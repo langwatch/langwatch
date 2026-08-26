@@ -1,6 +1,6 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import type { SelfServeSetupView } from "@langwatch/identity-server";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings2 } from "lucide-react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import { Link } from "~/components/ui/link";
 import { TestSignInFailureNotice } from "~/features/sso/components/TestSignInFailureNotice";
@@ -100,7 +100,19 @@ export function SingleSignOnCard({
             <Link href={serviceProvider.metadataUrl} isExternal>
               <Button size="sm" variant="ghost">
                 <ExternalLink size={14} />
-                Service provider metadata
+                Metadata
+              </Button>
+            </Link>
+          )}
+          {/* WHERE THE REST OF IT IS. This card reads; claiming another
+              domain, granting a way back in, changing who it admits and
+              taking it down are the journey, which is a page rather than a
+              mode of this one. */}
+          {canManage && (
+            <Link href="/settings/authentication/provider">
+              <Button size="sm" variant="ghost">
+                <Settings2 size={14} />
+                Edit
               </Button>
             </Link>
           )}
