@@ -23,6 +23,7 @@ interface FetchCall {
 
 let capturedCalls: FetchCall[] = [];
 let responseQueue: Array<{ status: number; body: unknown }> = [];
+let warnings: string[] = [];
 
 const ENVIRONMENT_URL = "https://org12345.crm.dynamics.com";
 const CREDENTIALS = {
@@ -67,6 +68,20 @@ function botRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   capturedCalls = [];
   responseQueue = [];
+  warnings = [];
+  // The logger is captured because one of this adapter's promises is a
+  // diagnostic one: the misconfiguration it has to survive is also the one it
+  // has to name, and a warning nobody asserts is a warning that can be
+  // deleted without a single test noticing.
+  vi.doMock("@langwatch/observability", async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    createLogger: () => ({
+      warn: (...args: unknown[]) => warnings.push(args.map(String).join(" ")),
+      error: () => undefined,
+      info: () => undefined,
+      debug: () => undefined,
+    }),
+  }));
   vi.doMock("~/utils/ssrfProtection", () => ({
     RedirectRefusedError,
     ssrfSafeFetch: async (url: string, init?: RequestInit) => {
@@ -315,22 +330,44 @@ describe("given a run against an environment holding one conversation", () => {
   });
 
   /** @scenario "A conversation is named from the agent table, not from its own metadata" */
-  it("ignores the bot id in the row's metadata when naming the agent", async () => {
+  it("names a conversation from its agent lookup and never from its metadata", async () => {
     const adapter = await newAdapter();
-    // The agent list holds the id the row's `metadata` claims, and not the one
-    // in the lookup column. Joining on the wrong field would find this and put
-    // a confident, wrong name on the conversation.
-    queueSignInAndBots([botRow({ botid: "dacfd251-bot", name: "wrong-agent" })]);
-    responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+    // The agent list holds two agents: the one the lookup column points at,
+    // and one carrying the id the row's `metadata` claims. Joining on the
+    // wrong field would find the second and put a confident, wrong name on
+    // the conversation instead of leaving it unnamed.
+    queueSignInAndBots([
+      botRow(),
+      botRow({ botid: "dacfd251-bot", name: "wrong-agent" }),
+    ]);
+    responseQueue.push({
+      status: 200,
+      body: {
+        value: [
+          transcriptRow(),
+          transcriptRow({
+            conversationtranscriptid: "row-2",
+            _bot_conversationtranscriptid_value:
+              "00000000-0000-4000-8000-00000000dead",
+          }),
+        ],
+      },
+    });
 
     const result = await adapter.runOnce(
       { cursor: null, credentials: CREDENTIALS },
       adapter.validateConfig(CONFIG),
     );
 
-    expect(result.events).toHaveLength(1);
-    expect(result.events[0]!.extra?.botName).toBeUndefined();
-    expect(result.events[0]!.target).toBe("");
+    expect(result.events).toHaveLength(2);
+    // Matched by the lookup: named.
+    expect(result.events[0]!.extra).toMatchObject({
+      botName: "engineering-agent",
+    });
+    // Its metadata still says `dacfd251-bot`, and an agent by that id is
+    // sitting in the list — so a name here at all would be the bug.
+    expect(result.events[1]!.extra?.botName).toBeUndefined();
+    expect(result.events[1]!.target).toBe("");
   });
 
   it("matches the agent whatever case the two sides spell the id in", async () => {
@@ -368,6 +405,28 @@ describe("given a run against an environment holding one conversation", () => {
     expect(result.events).toHaveLength(1);
     expect(result.events[0]!.extra?.botName).toBeUndefined();
     expect(result.cursor).not.toBe(null);
+  });
+
+  /** @scenario "A run that cannot read the agent list still delivers its conversations" */
+  it("says so when the environment answers the agent list with no agents", async () => {
+    const adapter = await newAdapter();
+    // Not a refusal. A credential that reads the agent table at the wrong
+    // depth is answered with success and an empty list, because the
+    // application user owns none of the rows. That is the same answer a
+    // tenant with no agents gives, and it is the likelier of the two here:
+    // these conversations were written by an agent.
+    queueSignInAndBots([]);
+    responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.errorCount).toBe(0);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]!.extra?.botName).toBeUndefined();
+    expect(warnings.join("\n")).toContain("no agents at all");
   });
 
   it("asks only for the last thirty days on a first run", async () => {

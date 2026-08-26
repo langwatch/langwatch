@@ -177,14 +177,21 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
 
   @unit
   Scenario: A run that cannot read the agent list still delivers its conversations
-    Given the environment refuses the read of the agent list
+    Given the puller does not get the agent list, whether refused or answered empty
     When the puller runs
     Then the conversations are delivered without an agent name
     And the run does not report an error
+    And an environment reporting no agents at all is called out
     # A name is a nicety; the conversations are the point. Reporting an error
     # would cost far more than the name: a run that reports one has its events
     # discarded and its cursor left where it was, so an environment that never
     # allows the agent list would be a source that never moves at all.
+    #
+    # A refusal is the loud case and the rarer one. A credential that reads the
+    # agent table at the wrong depth is answered with success and no rows,
+    # because the application user owns none of them, and that is identical to
+    # a tenant with no agents. Hence the third step: without it the common
+    # misconfiguration produces unnamed conversations and total silence.
 
   @integration
   Scenario: The agent's model is recorded when it can be trusted

@@ -647,6 +647,18 @@ export class CopilotStudioDataversePuller
           "copilot studio dataverse: more agents than one read returns; conversations belonging to the rest get no name",
         );
       }
+
+      // An empty list is the shape a misconfigured role arrives in, and it is
+      // the quiet one. A role that reads the agent table at the wrong depth is
+      // answered with 200 and no rows rather than a refusal, because the
+      // application user owns none of them — indistinguishable from a tenant
+      // that genuinely has no agents, except that a run reading conversations
+      // written by an agent has just been told there are none.
+      if (bots.size === 0) {
+        logger.warn(
+          "copilot studio dataverse: the environment reports no agents at all; if conversations are arriving unnamed the credential most likely reads the agent table at the wrong depth",
+        );
+      }
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : String(error) },
