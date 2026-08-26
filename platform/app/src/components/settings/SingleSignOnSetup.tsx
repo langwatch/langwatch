@@ -16,6 +16,10 @@ import {
   connectionProtocolName,
   connectionStatusChipFor,
 } from "~/features/sso/logic/connectionStatus";
+import {
+  arrivalAnswerLabel,
+  SSO_ANSWER_BY_POLICY,
+} from "~/features/sso/logic/arrivals";
 import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -39,18 +43,6 @@ import { ServiceProviderDetails } from "./singleSignOn/ServiceProviderDetails";
 import { SetupStep, SetupSteps } from "./singleSignOn/SetupStep";
 import { TestSignInSection } from "./singleSignOn/TestSignInSection";
 
-/**
- * The one line a finished arrivals step keeps when it closes.
- *
- * The step's whole point is that somebody decided, so the answer they gave is
- * what the closed step has to say — a tick alone would hide the very fact the
- * step exists to establish.
- */
-const ARRIVALS_SUMMARY = {
-  admit: "They join, on a domain you verified",
-  request: "They ask, and you approve them",
-  refuse: "Only people already here",
-} as const;
 
 /**
  * Setting enterprise single sign-on up yourself, all the way to live (D05
@@ -254,11 +246,17 @@ function ConnectedJourney({
           />
         </SetupStep>
 
+        {/* The closed step keeps the answer somebody gave — a tick alone
+            would hide the very fact the step exists to establish — and it
+            keeps it in the shared vocabulary, so the summary here is the
+            label on the radio and the row on the overview, word for word. */}
         <SetupStep
           number={5}
           title="Say who it lets in"
           state={progress.arrivals}
-          summary={ARRIVALS_SUMMARY[connection.arrivalPolicy]}
+          summary={arrivalAnswerLabel(
+            SSO_ANSWER_BY_POLICY[connection.arrivalPolicy],
+          )}
         >
           <ArrivalsSection
             organizationId={organizationId}

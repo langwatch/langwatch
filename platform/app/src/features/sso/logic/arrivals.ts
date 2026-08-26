@@ -26,6 +26,8 @@
  * endorsement is the caller's and only the connection's card passes it.
  */
 
+import type { SsoArrivalPolicy } from "@langwatch/identity";
+
 /**
  * An answer, in neither setting's vocabulary.
  *
@@ -43,7 +45,10 @@ export const ARRIVAL_ANSWERS: readonly ArrivalAnswer[] = [
 
 export interface ArrivalAnswerCopy {
   label: string;
-  /** What the answer means. The same sentence wherever it is asked. */
+  /** What the answer means ON THE CONNECTION DOOR. The labels are the shared
+   *  vocabulary; the help describes mechanics, and the join policy's
+   *  mechanics differ (no account carried over, a domain box of its own), so
+   *  that card writes its own help under the shared labels. */
   help: string;
 }
 
@@ -70,3 +75,24 @@ export const ARRIVAL_COPY: Record<ArrivalAnswer, ArrivalAnswerCopy> = {
 export function arrivalAnswerLabel(answer: ArrivalAnswer): string {
   return ARRIVAL_COPY[answer].label;
 }
+
+/**
+ * The CONNECTION door's own enum, against the shared answers.
+ *
+ * This mapping lives here rather than in each card because three surfaces
+ * read it — the arrivals step, the journey's closed-step summary, and the
+ * overview's read-only row — and they are all the same door. The join
+ * policy's `DomainJoinSetting` mapping stays in its own card: a module that
+ * knew both enums would be the place they eventually get confused.
+ */
+export const SSO_POLICY_BY_ANSWER: Record<ArrivalAnswer, SsoArrivalPolicy> = {
+  closed: "refuse",
+  approve: "request",
+  open: "admit",
+};
+
+export const SSO_ANSWER_BY_POLICY: Record<SsoArrivalPolicy, ArrivalAnswer> = {
+  refuse: "closed",
+  request: "approve",
+  admit: "open",
+};

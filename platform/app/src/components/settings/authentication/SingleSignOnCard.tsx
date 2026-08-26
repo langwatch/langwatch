@@ -6,6 +6,10 @@ import { Link } from "~/components/ui/link";
 import { TestSignInFailureNotice } from "~/features/sso/components/TestSignInFailureNotice";
 import { useTestSignIn } from "~/features/sso/hooks/useTestSignIn";
 import {
+  arrivalAnswerLabel,
+  SSO_ANSWER_BY_POLICY,
+} from "~/features/sso/logic/arrivals";
+import {
   connectionProtocolName,
   connectionStatusChipFor,
 } from "~/features/sso/logic/connectionStatus";
@@ -128,12 +132,13 @@ export function SingleSignOnCard({
           the provider that refused, not in a corner for eight seconds. */}
       {failure && <TestSignInFailureNotice failure={failure} />}
 
-      {/* THREE ROWS, AND SHORT ONES. An overview card is read at a glance and
+      {/* FOUR ROWS, AND SHORT ONES. An overview card is read at a glance and
           is the wrong place for everything true about a connection: five rows
           with sentence-long labels wrapped onto two lines each and turned a
           card somebody scans into a card somebody has to read. What survives
           is who does the signing in, whether anybody is actually being sent
-          through them, and which domains it covers.
+          through them, what happens to somebody it has never seen, and which
+          domains it covers.
 
           What went: the issuer, a monospace URL nobody compares from here; the
           last test and the ways back in, which are preconditions of going live
@@ -155,6 +160,20 @@ export function SingleSignOnCard({
           tone={goLive?.routingSwitchedOn ? "good" : "warning"}
           data-testid="sso-routing-chip"
         />
+      </OverviewDetail>
+
+      {/* READ HERE, CHANGED IN THE JOURNEY. The overview used to offer the
+          whole three-answer control beside the journey's, which is one
+          question asked in two places with two saves. What survives is the
+          fact — which answer is in force — and the value walks the reader to
+          the one place it is decided. */}
+      <OverviewDetail label="New arrivals">
+        <Link
+          href="/settings/authentication/provider"
+          data-testid="sso-arrivals-value"
+        >
+          {arrivalAnswerLabel(SSO_ANSWER_BY_POLICY[connection.arrivalPolicy])}
+        </Link>
       </OverviewDetail>
 
       <OverviewDetail label="Verified domains">

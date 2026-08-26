@@ -13,6 +13,11 @@ import { Lock } from "lucide-react";
 import { useState } from "react";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
+import {
+  ARRIVAL_ANSWERS,
+  type ArrivalAnswer,
+  arrivalAnswerLabel,
+} from "~/features/sso/logic/arrivals";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEnterpriseLock } from "./useEnterpriseLock";
 
@@ -41,33 +46,34 @@ import { useEnterpriseLock } from "./useEnterpriseLock";
  *
  * ONE QUESTION, TWO DOORS, ONE VOCABULARY. The single sign-on journey asks
  * the same three answers of the people who arrive THROUGH a connection
- * (ADR-117 §3), so the options wear the same words in both places — a reader
- * who has answered one recognises the other. The automatic option still
- * names its own cost, now in the help line beside the shared label: somebody
- * walking in with nobody in the loop is a thing an administrator should
- * agree to on purpose.
+ * (ADR-117 §3), so the answers' order and labels come from the shared module
+ * rather than being retyped here — retyped, they drifted once already. The
+ * help lines are this door's own: no account is carried over on this door,
+ * and the automatic option still names its own cost beside the shared label,
+ * because somebody walking in with nobody in the loop is a thing an
+ * administrator should agree to on purpose.
  */
+const SETTING_BY_ANSWER: Record<ArrivalAnswer, DomainJoinSetting> = {
+  closed: "off",
+  approve: "request",
+  open: "auto",
+};
+
+const HELP_BY_ANSWER: Record<ArrivalAnswer, string> = {
+  closed: "Invitations still work.",
+  approve: "On a verified address at your domain.",
+  open: "Nobody approves each person — you are emailed each time.",
+};
+
 const OPTIONS: Array<{
   value: DomainJoinSetting;
   label: string;
   help: string;
-}> = [
-  {
-    value: "off",
-    label: "Only people already here",
-    help: "Invitations still work.",
-  },
-  {
-    value: "request",
-    label: "They ask, you approve",
-    help: "On a verified address at your domain.",
-  },
-  {
-    value: "auto",
-    label: "They join, on a domain you verified",
-    help: "Nobody approves each person — you are emailed each time.",
-  },
-];
+}> = ARRIVAL_ANSWERS.map((answer) => ({
+  value: SETTING_BY_ANSWER[answer],
+  label: arrivalAnswerLabel(answer),
+  help: HELP_BY_ANSWER[answer],
+}));
 
 export function JoinPolicyCard({
   domainJoin,

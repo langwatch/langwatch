@@ -12,6 +12,7 @@ import {
   ARRIVAL_ANSWERS,
   ARRIVAL_COPY,
   type ArrivalAnswer,
+  SSO_POLICY_BY_ANSWER,
 } from "~/features/sso/logic/arrivals";
 import { api } from "~/utils/api";
 import { InlineRefusal } from "./refusals";
@@ -42,27 +43,6 @@ import { InlineRefusal } from "./refusals";
  * one should recognise the other. What differs is the door, and each control
  * says which one it is and where the other lives.
  */
-/**
- * This setting's own enum, against the shared answers.
- *
- * The mapping is here rather than in the shared module because neither door
- * should be typed in terms of the other: `admit` and `auto` are the same
- * answer to the same question and they are still two different settings, and
- * a shared module that knew both enums would be the place they eventually
- * get confused.
- */
-const POLICY_BY_ANSWER: Record<ArrivalAnswer, SsoArrivalPolicy> = {
-  closed: "refuse",
-  approve: "request",
-  open: "admit",
-};
-
-const ANSWER_BY_POLICY: Record<SsoArrivalPolicy, ArrivalAnswer> = {
-  refuse: "closed",
-  request: "approve",
-  admit: "open",
-};
-
 /**
  * The answer this door recommends, said as a mark rather than by position.
  *
@@ -112,7 +92,7 @@ export function ArrivalsSection({
       >
         <VStack align="stretch" gap={3}>
           {ARRIVAL_ANSWERS.map((answer) => {
-            const value = POLICY_BY_ANSWER[answer];
+            const value = SSO_POLICY_BY_ANSWER[answer];
             const copy = ARRIVAL_COPY[answer];
             return (
               <RadioGroup.Item
