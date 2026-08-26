@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import { formatTimestamp, hashEventTypeColor } from "./deja-view.fragment";
 import type { EventResult } from "./deja-view.types";
@@ -15,7 +15,7 @@ export function EventTimeline({
   eventTypes: string[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const activeRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (activeRef.current && scrollRef.current) {
@@ -89,9 +89,13 @@ export function EventTimeline({
             const color = hashEventTypeColor(event.eventType);
 
             return (
-              <Box
+              <Button
+                type="button"
                 key={event.eventId}
-                ref={isCurrent ? activeRef : undefined}
+                ref={isCurrent ? activeRef : void 0}
+                variant="plain"
+                padding={0}
+                minWidth="36px"
                 width="36px"
                 height="28px"
                 borderRadius="sm"
@@ -110,11 +114,13 @@ export function EventTimeline({
                   bg: isCurrent ? `${color}.500` : `${color}.500/40`,
                 }}
                 onClick={() => onSelectEvent(idx)}
+                aria-label={`Select event ${idx + 1}: ${event.eventType}`}
+                aria-current={isCurrent ? "step" : void 0}
                 title={`${event.eventType} - ${formatTimestamp(event.eventTimestamp)}`}
                 flexShrink={0}
               >
                 {idx + 1}
-              </Box>
+              </Button>
             );
           })}
         </HStack>

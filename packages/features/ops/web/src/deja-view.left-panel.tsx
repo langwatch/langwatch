@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Circle } from "lucide-react";
 
 export function LeftPanel({
@@ -58,15 +58,22 @@ export function LeftPanel({
           projections.map((proj) => {
             const isSelected = selectedProjection === proj.projectionName;
             return (
-              <Box
+              <Button
                 key={proj.projectionName}
+                type="button"
+                variant="plain"
+                width="full"
+                height="auto"
                 paddingX={3}
                 paddingY={2}
+                justifyContent="flex-start"
+                borderRadius={0}
                 cursor="pointer"
                 bg={isSelected ? "bg.emphasized" : "transparent"}
                 _hover={{ bg: isSelected ? "bg.emphasized" : "bg.muted" }}
                 borderBottom="1px solid"
                 borderBottomColor="border"
+                aria-pressed={isSelected}
                 onClick={() =>
                   onSelectProjection(isSelected ? null : proj.projectionName)
                 }
@@ -82,7 +89,7 @@ export function LeftPanel({
                     </Text>
                   </VStack>
                 </HStack>
-              </Box>
+              </Button>
             );
           })
         )}

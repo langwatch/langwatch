@@ -1,8 +1,12 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { Keyboard } from "lucide-react";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import type { ReactNode } from "react";
 
-export function KeyboardHints() {
+export function DejaViewKeyboardHints({
+  renderKey,
+}: {
+  renderKey: (label: string) => ReactNode;
+}) {
   return (
     <HStack
       paddingX={4}
@@ -20,21 +24,21 @@ export function KeyboardHints() {
         </Text>
       </HStack>
       <HStack gap={1}>
-        <Kbd>←</Kbd>
-        <Kbd>h</Kbd>
+        {renderKey("←")}
+        {renderKey("h")}
         <Text textStyle="xs" color="fg.muted">
           prev
         </Text>
       </HStack>
       <HStack gap={1}>
-        <Kbd>→</Kbd>
-        <Kbd>l</Kbd>
+        {renderKey("→")}
+        {renderKey("l")}
         <Text textStyle="xs" color="fg.muted">
           next
         </Text>
       </HStack>
       <HStack gap={1}>
-        <Kbd>e</Kbd>
+        {renderKey("e")}
         <Text textStyle="xs" color="fg.muted">
           toggle event panel
         </Text>

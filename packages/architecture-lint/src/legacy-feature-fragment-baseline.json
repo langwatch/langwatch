@@ -3263,11 +3263,6 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/dejaview/CenterPanel.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/dejaview/DejaViewContent.tsx",
       "kind": "page-shell"
     },
@@ -3293,22 +3288,12 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/dejaview/KeyboardHints.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/dejaview/LeftPanel.tsx",
       "kind": "page-shell"
     },
     {
       "feature": "ops",
       "file": "platform/app/src/components/ops/dejaview/ManagerCard.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/dejaview/ManagerPanel.tsx",
       "kind": "page-shell"
     },
     {

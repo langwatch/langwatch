@@ -55,6 +55,7 @@ export function SearchHeader({
         flexShrink={0}
       />
       <Button
+        aria-label="Search aggregates"
         size="sm"
         variant="outline"
         onClick={onSearch}

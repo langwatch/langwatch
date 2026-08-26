@@ -1,21 +1,19 @@
 import { Badge, Box, Button, Center, HStack, Spinner, Text } from "@chakra-ui/react";
-import {
-  EventDetail,
-  hashEventTypeColor,
-  JsonViewer,
-  type EventResult,
-} from "@langwatch/ops-web";
-import { api } from "~/utils/api";
+import { EventDetail } from "./deja-view.event-detail";
+import { hashEventTypeColor } from "./deja-view.fragment";
+import { JsonViewer } from "./json-viewer";
+import type { EventResult } from "./deja-view.types";
 
-export function CenterPanel({
+export function DejaViewCenterPanel({
   currentEvent,
   previousEvent,
   eventCursor,
   selectedProjection,
   showDiff,
   onToggleDiff,
-  aggregateId,
-  tenantId,
+  projectionState,
+  previousProjectionState,
+  projectionStateLoading,
 }: {
   currentEvent: EventResult | null;
   previousEvent: EventResult | null;
@@ -23,38 +21,10 @@ export function CenterPanel({
   selectedProjection: string | null;
   showDiff: boolean;
   onToggleDiff: () => void;
-  aggregateId: string;
-  tenantId: string;
+  projectionState: unknown;
+  previousProjectionState: unknown;
+  projectionStateLoading: boolean;
 }) {
-  const projectionStateQuery = api.ops.computeProjectionState.useQuery(
-    {
-      aggregateId,
-      tenantId,
-      projectionName: selectedProjection ?? "",
-      eventIndex: eventCursor,
-    },
-    {
-      enabled: !!selectedProjection && !!aggregateId && !!tenantId,
-    },
-  );
-
-  const prevProjectionStateQuery = api.ops.computeProjectionState.useQuery(
-    {
-      aggregateId,
-      tenantId,
-      projectionName: selectedProjection ?? "",
-      eventIndex: Math.max(0, eventCursor - 1),
-    },
-    {
-      enabled:
-        !!selectedProjection &&
-        !!aggregateId &&
-        !!tenantId &&
-        showDiff &&
-        eventCursor > 0,
-    },
-  );
-
   if (!currentEvent) {
     return (
       <Box
@@ -73,9 +43,6 @@ export function CenterPanel({
   }
 
   if (selectedProjection) {
-    const state = projectionStateQuery.data?.state;
-    const prevState = showDiff ? prevProjectionStateQuery.data?.state : undefined;
-
     return (
       <Box
         flex={1}
@@ -110,14 +77,14 @@ export function CenterPanel({
           </Button>
         </HStack>
         <Box flex={1} padding={4} overflow="auto">
-          {projectionStateQuery.isLoading ? (
+          {projectionStateLoading ? (
             <Center paddingY={8}>
               <Spinner size="sm" />
             </Center>
-          ) : state != null ? (
+          ) : projectionState != null ? (
             <JsonViewer
-              data={state}
-              previousData={showDiff && prevState != null ? prevState : undefined}
+              data={projectionState}
+              previousData={showDiff ? previousProjectionState : void 0}
               maxHeight="calc(100vh - 300px)"
             />
           ) : (

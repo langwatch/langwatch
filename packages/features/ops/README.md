@@ -6,7 +6,7 @@ deployment, not Enterprise-only code.
 - `contract/`: portable Zod DTOs, errors, operator result types, and `OpsService`.
 - `server/`: process-owned services and private Prisma/Redis adapters.
 - `web/`: browser-safe clients, formatters, JSON inspection, reusable operator
-  controls, and the Foundry trace editor/emitter.
+  controls, the controlled DejaView workspace, and the Foundry trace editor/emitter.
 
 The app still owns transport registration, auth/session lookup, and process
 composition. Ops snapshots are read, written, and streamed through the single
@@ -27,3 +27,6 @@ at that transport edge.
 The Foundry page and drawer compose their selected project and prompt-loading
 transport hook in the app. The Ops web package owns the editor, presets, trace
 generation, browser-side OTel emission, and presentation state.
+The DejaView page follows the same boundary: the app supplies tRPC results and
+handled-error rendering, while the web package owns URL-fragment state,
+keyboard navigation, and the complete search/replay presentation.

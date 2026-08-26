@@ -36,9 +36,13 @@ result types, and `OpsService`; the server exposes its composition adapter while
 blob-store services/repositories remain private; the web package exposes
 `AdminClient`, shared impersonation and JSON-inspection presentation, the
 controlled Backoffice list shell, dashboard health/stat presentation, dashboard
-axis maths, reusable blob controls, and Foundry trace construction and browser
-emission. The application still owns the Hono route, tRPC procedures, page
-shells, and app-specific Backoffice and dashboard composition. Foundry receives
+axis maths, reusable blob controls, the controlled DejaView workspace, and
+Foundry trace construction and browser emission. The application still owns the
+Hono route, tRPC procedures, page shells, and app-specific Backoffice and
+dashboard composition. DejaView receives
+its tRPC results and handled-error renderers through a controlled web surface;
+URL-fragment state, keyboard navigation, and replay presentation stay in the
+web package. Foundry receives
 the selected project and a named prompt-loading action from a thin app transport
 adapter; it imports neither app hooks nor tRPC. Thin app adapters supply the
 app's SearchInput, handled-error renderer, page-header create action, and
