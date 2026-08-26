@@ -130,7 +130,11 @@ export class ScimGroupService {
     connectionId?: string | null;
     excludeMembers?: boolean;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId, connectionId });
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -207,7 +211,11 @@ export class ScimGroupService {
     connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId, connectionId });
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -267,7 +275,11 @@ export class ScimGroupService {
     connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId, connectionId });
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 

@@ -225,8 +225,7 @@ export function rowToConnection(row: SsoConnection): SsoConnectionState {
       : null,
     idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
     arrivalPolicy: row.arrivalPolicy as SsoArrivalPolicy,
-    arrivalPolicyDecidedAtMs:
-      row.arrivalPolicyDecidedAt?.getTime() ?? null,
+    arrivalPolicyDecidedAtMs: row.arrivalPolicyDecidedAt?.getTime() ?? null,
     source: row.source as SsoConnectionSource,
     testLoginAccountId: row.testLoginAccountId,
     rejection: row.rejection

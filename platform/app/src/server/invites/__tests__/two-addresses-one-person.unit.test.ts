@@ -1,10 +1,7 @@
 /** @vitest-environment node */
 
 import { describe, expect, it } from "vitest";
-import {
-  matchInviteToAcceptor,
-  maskInvitedAddress,
-} from "../invite.service";
+import { maskInvitedAddress, matchInviteToAcceptor } from "../invite.service";
 
 /**
  * "I signed up with my personal address, then registered my company and

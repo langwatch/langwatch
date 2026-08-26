@@ -23,15 +23,21 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { offerRef, mineRef, dismissMock, requestMock, invalidateOffer, invalidateMine } =
-  vi.hoisted(() => ({
-    offerRef: { current: { data: undefined as unknown, isPending: false } },
-    mineRef: { current: { data: [] as unknown[], isPending: false } },
-    dismissMock: vi.fn(),
-    requestMock: vi.fn(),
-    invalidateOffer: vi.fn(),
-    invalidateMine: vi.fn(),
-  }));
+const {
+  offerRef,
+  mineRef,
+  dismissMock,
+  requestMock,
+  invalidateOffer,
+  invalidateMine,
+} = vi.hoisted(() => ({
+  offerRef: { current: { data: undefined as unknown, isPending: false } },
+  mineRef: { current: { data: [] as unknown[], isPending: false } },
+  dismissMock: vi.fn(),
+  requestMock: vi.fn(),
+  invalidateOffer: vi.fn(),
+  invalidateMine: vi.fn(),
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -98,14 +104,18 @@ describe("given an existing account whose domain matches an organization", () =>
       // A dialog, so it is over the page rather than a row of it — and one
       // the page behind cannot be operated through.
       expect(takeover).toHaveAttribute("role", "dialog");
-      expect(screen.getByRole("button", { name: /Ask to join Acme/ })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Ask to join Acme/ }),
+      ).toBeInTheDocument();
     });
 
     /** @scenario An existing user is offered their colleagues once, and can dismiss it */
     it("asks in place, so nothing navigates and nothing is created", async () => {
       renderTakeover();
 
-      await userEvent.click(screen.getByRole("button", { name: /Ask to join Acme/ }));
+      await userEvent.click(
+        screen.getByRole("button", { name: /Ask to join Acme/ }),
+      );
 
       expect(requestMock).toHaveBeenCalledTimes(1);
       expect(requestMock.mock.calls[0]?.[0]).toEqual({
@@ -117,9 +127,7 @@ describe("given an existing account whose domain matches an organization", () =>
     it("keeps a way past that is one press and is remembered", async () => {
       renderTakeover();
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /Not now/ }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /Not now/ }));
 
       // The domain is taken server-side from the caller's own verified
       // address, so there is nothing here to point at somebody else's.
@@ -196,7 +204,11 @@ describe("given a domain no organization is open to", () => {
       offerRef.current = {
         data: {
           outcome: "auto",
-          organization: { organizationId: "org_acme", name: "Acme", colleagueCount: 10 },
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
+          },
         },
         isPending: false,
       };

@@ -71,8 +71,7 @@ const memberships = (email: string) =>
     where: { organizationId: ORG, user: { email } },
   });
 
-const userFor = (email: string) =>
-  prisma.user.findFirst({ where: { email } });
+const userFor = (email: string) => prisma.user.findFirst({ where: { email } });
 
 /**
  * Put the connection on one of the three answers. The push must not care,
@@ -109,7 +108,9 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await prisma.scimExternalId.deleteMany({ where: { connectionId: CONNECTION } });
+  await prisma.scimExternalId.deleteMany({
+    where: { connectionId: CONNECTION },
+  });
   await prisma.roleBinding.deleteMany({ where: { organizationId: ORG } });
   await prisma.organizationUser.deleteMany({ where: { organizationId: ORG } });
   await prisma.user.deleteMany({ where: { email: { contains: ns } } });
@@ -119,29 +120,30 @@ afterAll(async () => {
 });
 
 describe("given a directory pushing somebody who has no account here", () => {
-  describe.each(["admit", "request", "refuse"] as const)(
-    "when the connection's arrival policy is '%s'",
-    (policy) => {
-      /** @scenario "A directory push provisions whatever the sign-in door would do" */
-      it("makes the account and the membership, because the administrator already decided", async () => {
-        const email = `new-${policy}-${ns}@acme.test`;
-        await connectionAdmitting(policy);
+  describe.each([
+    "admit",
+    "request",
+    "refuse",
+  ] as const)("when the connection's arrival policy is '%s'", (policy) => {
+    /** @scenario "A directory push provisions whatever the sign-in door would do" */
+    it("makes the account and the membership, because the administrator already decided", async () => {
+      const email = `new-${policy}-${ns}@acme.test`;
+      await connectionAdmitting(policy);
 
-        const result = await scim().createUser({
-          request: push(email, `ext-new-${policy}`),
-          organizationId: ORG,
-          connectionId: CONNECTION,
-        });
-
-        expect(isError(result)).toBe(false);
-        expect(await userFor(email)).not.toBeNull();
-        // Even on `refuse`. The policy governs the SIGN-IN door: somebody
-        // who turns up at it unannounced. A push is the customer's own
-        // directory saying this person belongs, which is not a question.
-        expect(await memberships(email)).toHaveLength(1);
+      const result = await scim().createUser({
+        request: push(email, `ext-new-${policy}`),
+        organizationId: ORG,
+        connectionId: CONNECTION,
       });
-    },
-  );
+
+      expect(isError(result)).toBe(false);
+      expect(await userFor(email)).not.toBeNull();
+      // Even on `refuse`. The policy governs the SIGN-IN door: somebody
+      // who turns up at it unannounced. A push is the customer's own
+      // directory saying this person belongs, which is not a question.
+      expect(await memberships(email)).toHaveLength(1);
+    });
+  });
 });
 
 describe("given a directory pushing somebody who already has an account", () => {
@@ -288,7 +290,11 @@ describe("given somebody the directory removed", () => {
   describe("when the directory removes somebody it never pushed", () => {
     it("answers not-found rather than removing anything", async () => {
       const stranger = await prisma.user.create({
-        data: { id: `u-stranger-${ns}`, email: `stranger-${ns}@acme.test`, name: "Nobody" },
+        data: {
+          id: `u-stranger-${ns}`,
+          email: `stranger-${ns}@acme.test`,
+          name: "Nobody",
+        },
       });
 
       expect(

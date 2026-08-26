@@ -30,11 +30,17 @@ import { chromium } from "playwright";
 
 const BASE = process.env.SHOT_BASE_URL ?? "http://localhost:5560";
 const EMAIL = process.env.SHOT_EMAIL ?? "sam@acme.test";
-const PASSWORD = process.env.SHOT_PASSWORD;
+const PASSWORD = requiredEnv("SHOT_PASSWORD");
 const OUT = process.env.SHOT_OUT_DIR ?? "/tmp/join-screenshots";
 
-if (!PASSWORD) {
-  throw new Error("SHOT_PASSWORD is required");
+/** Reads a variable the run cannot proceed without, as a string rather than a
+ *  maybe-string: a module-level guard does not narrow inside main(). */
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
 }
 
 async function main(): Promise<void> {

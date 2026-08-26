@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import crypto from "crypto";
+import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
-import { env } from "~/env.mjs";
 import {
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,

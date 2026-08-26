@@ -162,8 +162,13 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
 const FILE_MAX_REDIRECTS = 5;
 
 function isRedirectStatus(status: number): boolean {
-  return status === 301 || status === 302 || status === 303 ||
-    status === 307 || status === 308;
+  return (
+    status === 301 ||
+    status === 302 ||
+    status === 303 ||
+    status === 307 ||
+    status === 308
+  );
 }
 
 /**

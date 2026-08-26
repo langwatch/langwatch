@@ -283,7 +283,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Without this the screen that answers it degraded to an unknown error, and
   // nobody could see a request they had made.
   JoinRequest: {
-    extraBound: ({ clause }) => typeof clauseField(clause, "userId") === "string",
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "userId") === "string",
   },
   // One row per SCIM request a customer's directory made (ADR-126). It
   // carries `organizationId`, and the surface that reads it is an

@@ -21,19 +21,20 @@ import type {
   SsoTestSignInLookup,
 } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { lookup, Resolver } from "dns/promises";
+import { Resolver } from "dns/promises";
 import { env } from "~/env.mjs";
 import {
   OrganizationUserRole,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import { NOT_TARGETED } from "~/server/featureFlag";
 import type { FeatureFlagService } from "~/server/featureFlag/featureFlag.service";
 import { buildAccessSettingsUrl } from "~/server/invites/invite-link";
-import { errorCodeOf } from "./sso-domain-file-lookup";
 import {
   sendSsoDomainProofLapsedEmail,
   sendSsoDomainProofWaveringEmail,
 } from "~/server/mailer/ssoDomainProofEmails";
+import { errorCodeOf } from "./sso-domain-file-lookup";
 
 const logger = createLogger("langwatch:identity:sso-self-serve");
 
@@ -136,6 +137,9 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
         deployment === "hosted"
           ? await this.deps.featureFlags.isEnabled("self_serve_sso", {
               organizationId,
+              // An organization-level flag: no project is in scope here, and
+              // NOT_TARGETED is what says so rather than an absent id.
+              projectId: NOT_TARGETED,
               distinctId: organizationId,
             })
           : false,
@@ -284,8 +288,6 @@ export class DnsDomainProofLookup implements SsoDomainProofLookup {
     }
   }
 }
-
-
 
 /**
  * Which domains a sweep re-reads (ADR-123).

@@ -102,10 +102,7 @@ describe("given recorded requests either side of the retention window", () => {
     it("drops what has aged out and leaves the rest", async () => {
       const expired = [{ id: "req_1" }, { id: "req_2" }, { id: "req_3" }];
       const { service, deleteMany, findMany } = serviceWith({
-        findMany: vi
-          .fn()
-          .mockResolvedValueOnce(expired)
-          .mockResolvedValue([]),
+        findMany: vi.fn().mockResolvedValueOnce(expired).mockResolvedValue([]),
         deleteMany: vi.fn().mockResolvedValue({ count: 3 }),
       });
 

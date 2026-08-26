@@ -9,7 +9,9 @@ import {
   type IdentityFactInputOf,
   type IdentityFactOf,
   type IdentityHeads,
+  LINK_CONFIRMED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
+  LINK_REJECTED_EVENT_TYPE,
   PRIMARY_CHANGED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
 } from "./facts";
@@ -93,6 +95,10 @@ export function identityStreamsFor({
         ...identifierStreams(fact.data.erasedIdentifierIds),
       ];
     case LINK_PROPOSED_EVENT_TYPE:
+    case LINK_CONFIRMED_EVENT_TYPE:
+    case LINK_REJECTED_EVENT_TYPE:
+      // Person-level: a proposal and its decision name a proposal, never an
+      // identifier, so there is no identifier stream to state them on.
       return [{ kind: "person", userId }];
   }
 }
@@ -141,8 +147,12 @@ export function reduceIdentifier({
     case USER_ERASED_EVENT_TYPE:
       return foldErased({ head });
     case LINK_PROPOSED_EVENT_TYPE:
+    case LINK_CONFIRMED_EVENT_TYPE:
+    case LINK_REJECTED_EVENT_TYPE:
       // A proposal changes no head, on purpose: it states that a link was NOT
-      // made and needs a human.
+      // made and needs a human. Its decision changes none either — a
+      // confirmation attaches through the ordinary ceremony, which states its
+      // own fact.
       return head;
   }
 }

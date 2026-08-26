@@ -1,10 +1,7 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import {
-  normalizeDomain,
-  type SsoArrivalPolicy,
-} from "@langwatch/identity";
+import { normalizeDomain, type SsoArrivalPolicy } from "@langwatch/identity";
 import { looksLikeSsoConnectionId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -489,7 +486,10 @@ export const admitSsoArrival = async ({
     // rotation, an unlink, the reconcile below). Logging those at `error`
     // buried the line an administrator is actually told to grep for when
     // their queue is empty.
-    const expected = new Set(["join_request_already_pending", "join_not_available"]);
+    const expected = new Set([
+      "join_request_already_pending",
+      "join_not_available",
+    ]);
     const code = (err as { code?: unknown } | null)?.code;
     if (typeof code === "string" && expected.has(code)) {
       logger.info(

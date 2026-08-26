@@ -26,10 +26,10 @@ import {
 } from "~/generated/prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { assertLegacySsoStringWriteAllowed } from "~/server/app-layer/identity/legacy-sso-string-writes";
+import { identityEmail } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
-import { identityEmail } from "~/server/app-layer/identity/runtime";
 import { UserService } from "~/server/users/user.service";
 import { adminSurfaceHidden } from "../adminSurfaceHidden";
 import {

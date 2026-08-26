@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-const requestFromSsoArrival = vi.fn().mockResolvedValue({ joinRequestId: "jr_1" });
+const requestFromSsoArrival = vi
+  .fn()
+  .mockResolvedValue({ joinRequestId: "jr_1" });
 
 // The composition root builds a live Prisma client at module load, which a
 // unit test has no business starting. The seam under test is what it CALLS.
@@ -64,7 +66,10 @@ const prismaWith = ({
   return {
     prisma: {
       ssoConnection: { findUnique },
-      organizationUser: { findFirst: vi.fn().mockResolvedValue(member), create },
+      organizationUser: {
+        findFirst: vi.fn().mockResolvedValue(member),
+        create,
+      },
       organization: {
         findUnique: vi.fn().mockResolvedValue({ id: "org_acme", name: "Acme" }),
       },

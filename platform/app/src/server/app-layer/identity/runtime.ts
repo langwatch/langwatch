@@ -11,7 +11,6 @@
  */
 
 import { PlanTypes } from "@ee/billing/planTypes";
-import { OrganizationUserRole } from "~/generated/prisma/client";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import {
@@ -53,6 +52,7 @@ import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory } from "better-auth/adapters";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { env } from "~/env.mjs";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { prisma } from "../../db";
 import { featureFlagService } from "../../featureFlag";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
@@ -128,7 +128,6 @@ import {
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
 import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
-import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
   IdTokenProviderAssertions,
@@ -148,6 +147,7 @@ import {
 import { SignUpVerificationService } from "./signup-verification.service";
 import { buildSignUpVerificationUrl } from "./signup-verification-link";
 import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
+import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { HttpSsoIssuerDiscovery } from "./sso-issuer-discovery";
 import { ssoMethodIsConfiguredWith } from "./sso-method-configured";
 import {
@@ -178,8 +178,6 @@ export {
   deploymentIsFederationCapable,
   resolveSignInMethodPolicy,
 } from "./signin-method-policy";
-
-import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);

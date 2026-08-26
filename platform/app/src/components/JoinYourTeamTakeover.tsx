@@ -1,4 +1,5 @@
-import { Box, Button, Dialog, Portal, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { Dialog } from "~/components/ui/dialog";
 import { AuthPrimaryButton } from "~/features/auth/components/AuthPrimaryButton";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
@@ -136,7 +137,7 @@ export function JoinYourTeamTakeover({
         // and it is already what you have — so it needs no button here.
         <AuthPrimaryButton
           key={organization.organizationId}
-          loading={askToJoin.isPending}
+          isBusy={askToJoin.isPending}
           onClick={() => ask(organization.organizationId)}
         >
           Ask to join {organization.name}
@@ -180,43 +181,38 @@ function Takeover({
       // Nothing to call: the screen closes by being answered.
       onOpenChange={() => void 0}
     >
-      <Portal>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content data-testid={testId} bg="bg" borderRadius={0}>
-            <Dialog.Body
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              padding={6}
-            >
-              <VStack width="full" maxWidth="420px" align="stretch" gap="18px">
-                <Box>
-                  <Dialog.Title
-                    fontSize="22px"
-                    fontWeight={600}
-                    letterSpacing="-0.01em"
-                    textAlign="center"
-                  >
-                    {title}
-                  </Dialog.Title>
-                  {intro !== undefined && (
-                    <Text
-                      fontSize="14px"
-                      color="fg.muted"
-                      textAlign="center"
-                      paddingTop="6px"
-                    >
-                      {intro}
-                    </Text>
-                  )}
-                </Box>
-                {children}
-              </VStack>
-            </Dialog.Body>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
+      <Dialog.Content data-testid={testId} bg="bg" borderRadius={0}>
+        <Dialog.Body
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          padding={6}
+        >
+          <VStack width="full" maxWidth="420px" align="stretch" gap="18px">
+            <Box>
+              <Dialog.Title
+                fontSize="22px"
+                fontWeight={600}
+                letterSpacing="-0.01em"
+                textAlign="center"
+              >
+                {title}
+              </Dialog.Title>
+              {intro !== undefined && (
+                <Text
+                  fontSize="14px"
+                  color="fg.muted"
+                  textAlign="center"
+                  paddingTop="6px"
+                >
+                  {intro}
+                </Text>
+              )}
+            </Box>
+            {children}
+          </VStack>
+        </Dialog.Body>
+      </Dialog.Content>
     </Dialog.Root>
   );
 }

@@ -220,6 +220,12 @@ const RESOURCE_COPY = {
     blurb: "The metered record of what was spent, and by whom.",
     area: "AI gateway",
   },
+  agentCache: {
+    label: "Agent cache",
+    blurb:
+      "What an agent keeps mid-run, so a step it already paid for happens once.",
+    area: "Building",
+  },
   langy: {
     label: "Assistant",
     blurb: "The in-product assistant and its conversations.",
