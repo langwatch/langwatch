@@ -477,3 +477,50 @@ func TestWrittenErrorsKeepAnExplicitFault(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	assert.Equal(t, "customer", body.Error.Fault)
 }
+
+// The seam between the two planes, asserted end to end on the bytes rather than
+// on either side's idea of them: what writeError puts on the wire is what
+// readHandledError.fromCanonicalEnvelope reads, and what the customer then sees
+// rendered. Every field below is load-bearing somewhere in that chain —
+// `tips` and `docs_url` become the remediation list and the docs link, `fault`
+// picks the log level and the headline, and `meta.provider` / `meta.model` are
+// what let the copy say "Google Vertex AI" and name the model instead of
+// "this provider".
+//
+// @scenario "A terminal provider failure tells the caller how to fix it"
+func TestWrittenErrorsCarryRemediationForTheClientToRender(t *testing.T) {
+	w, _ := observedWriteErrorResponse(t, context.Background(),
+		herr.New(context.Background(), domain.ErrProviderCredentialInvalid, herr.M{
+			"message":  "The credentials configured for this model provider were not accepted.",
+			"provider": "vertex",
+			"model":    "gemini-2.5-flash",
+		}))
+
+	var body struct {
+		Error struct {
+			Code    string         `json:"code"`
+			Message string         `json:"message"`
+			Fault   string         `json:"fault"`
+			Tips    []string       `json:"tips"`
+			DocsURL string         `json:"docs_url"`
+			Meta    map[string]any `json:"meta"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+
+	assert.Equal(t, "provider_credential_invalid", body.Error.Code)
+	assert.Equal(t, "customer", body.Error.Fault)
+	assert.Equal(t, "https://docs.langwatch.ai/ai-gateway/providers/vertex", body.Error.DocsURL,
+		"a Vertex failure links Vertex's own setup page")
+	assert.Contains(t, strings.Join(body.Error.Tips, "\n"), "service-account JSON document",
+		"the reader is told what a Vertex credential actually is")
+	assert.LessOrEqual(t, len(body.Error.Tips), 4,
+		"the client truncates past MAX_TIPS, so anything beyond it is written to be discarded")
+
+	assert.Equal(t, "vertex", body.Error.Meta["provider"])
+	assert.Equal(t, "gemini-2.5-flash", body.Error.Meta["model"])
+	for _, promoted := range []string{"tips", "docs_url", "fault"} {
+		assert.NotContainsf(t, body.Error.Meta, promoted,
+			"%s is promoted to a first-class field and must not also sit in meta", promoted)
+	}
+}
