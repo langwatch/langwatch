@@ -323,3 +323,59 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     When "okta-primary" pushes people into "acme"
     Then membership lands the way it did before the flip
     And the tokens keep working throughout
+
+  # ── What a push does about the person on the other end ─────────────────
+  #
+  # The arrival matrix: every combination of "do they already have an
+  # account here" and "are they already a member", plus what a removal
+  # leaves behind and what a re-push does. The directory has already made
+  # the access decision, so a push does not ask the joining policy that a
+  # self-serve arrival would - which is exactly why the matrix is written
+  # down rather than left to be inferred.
+  #
+  # OPEN, and deliberately not stated as behaviour below: adoption today
+  # matches on the User.email column alone, so it will adopt an account
+  # holding an address nobody ever proved. The scenario says "adopts rather
+  # than duplicates", which is right in every case; whether the account must
+  # have PROVED the address first is the open question, and the answer
+  # narrows the match rather than changing the shape.
+
+  @integration
+  Scenario: A directory push provisions whatever the sign-in door would do
+    Given "okta-primary" pushes somebody who has no account here
+    Then the account is created and the membership lands
+    And the joining policy is not consulted, because the administrator already decided
+
+  @integration
+  Scenario: A directory adopts a member who already had an account
+    Given somebody already has an account but no membership in "acme"
+    When "okta-primary" pushes them
+    Then their existing account gains the membership
+    And no second account is created for the same address
+
+  @integration
+  Scenario: A directory push that changes nothing changes nothing
+    Given somebody the directory has already pushed into "acme"
+    When the same push arrives again
+    Then it is refused with status 409
+    And they still hold exactly one membership
+
+  @integration
+  Scenario: A directory push follows the person, not the address
+    Given somebody provisioned through "okta-primary"
+    When the directory pushes them again under a changed address
+    Then the directory's own identifier is what resolves them
+    And no account is created for the new address
+
+  @integration
+  Scenario: A removed person the directory pushes again comes back
+    Given somebody the directory removed from "acme"
+    When the directory pushes them again
+    Then the membership is restored
+    And they still hold exactly one account
+
+  @integration
+  Scenario: A removal leaves nothing behind in the organization
+    Given somebody the directory removed from "acme"
+    Then they hold no membership and no role binding there
+    And their account itself survives, because it is theirs and not the organization's
