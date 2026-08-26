@@ -32,6 +32,7 @@ import {
   rpcIdOf,
   rpcResultBody,
 } from "../[[...route]]/rpc";
+import { app as queryApp } from "../[[...route]]/app";
 import { queryRpcRequestSchema } from "../[[...route]]/schemas";
 
 /** A context stub carrying only what the envelope builders read off it. */
@@ -213,6 +214,76 @@ describe("given the id is read back off the request context", () => {
   /** A body-shaped id is not a legal JSON-RPC id and must not be echoed. */
   it("refuses a non-scalar id rather than echoing it", () => {
     expect(rpcIdOf(contextWith({ rpcId: { nested: true } }))).toBeUndefined();
+  });
+});
+
+/**
+ * The door is shut to an anonymous caller.
+ *
+ * A regression suite for a real hole: the route was first declared with
+ * `handlerManagedAuth`, which applies NO middleware — it is a declaration that
+ * the HANDLER authenticates. The handler never did. It read the project off a
+ * context nothing had populated, so every anonymous call reached the dispatch
+ * table and died on `project.id` of `undefined`: a 500 where a 401 belonged,
+ * and `analytics:view` enforced nowhere.
+ *
+ * Driven through the real mounted app rather than a stub, because the hole was
+ * that a declared policy installed nothing — and only the assembled app can
+ * tell you what was actually installed. A stub would have reproduced the
+ * mistake rather than caught it.
+ *
+ * These need no database: the refusal happens before any lookup.
+ */
+describe("given a caller presents no credential", () => {
+  const call = async (method: string) => {
+    const response = await queryApp.request("/api/v1/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method }),
+    });
+    return {
+      status: response.status,
+      body: (await response.json()) as Record<string, any>,
+    };
+  };
+
+  it.each(["query.run", "query.schema"])(
+    "refuses %s with 401 rather than reaching the handler",
+    async (method) => {
+      const { status, body } = await call(method);
+
+      expect(
+        status,
+        "a 500 here means the door opened and the handler crashed on an absent project",
+      ).toBe(401);
+      expect(body.error?.code).toBe("missing_credentials");
+    },
+  );
+
+  /**
+   * The refusal must not double as a directory. If a known method and a
+   * nonsense one answer differently, the method name becomes an oracle an
+   * anonymous caller can use to map the surface.
+   */
+  it("answers a known and an unknown method identically", async () => {
+    const known = await call("query.schema");
+    const unknown = await call("query.this-does-not-exist");
+
+    expect(unknown.status).toBe(known.status);
+    expect(unknown.body.error?.code).toBe(known.body.error?.code);
+  });
+
+  /**
+   * Pins the seam the endpoint description promises: auth answers with
+   * `c.json` beneath the family's error handler, so it never throws and
+   * `onError` never wraps it. Integrators are told to branch on the status
+   * before reading `error.code`, and this is what keeps that true.
+   */
+  it("answers the bare canonical envelope, not a JSON-RPC one", async () => {
+    const { body } = await call("query.run");
+
+    expect(body.jsonrpc).toBeUndefined();
+    expect(body.error?.type).toBe("unauthenticated");
   });
 });
 

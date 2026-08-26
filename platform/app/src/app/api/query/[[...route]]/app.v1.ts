@@ -40,17 +40,15 @@
  * the single-project slice: it reads the project off the credential, the same
  * way every other API-key read path does.
  *
- * The policy is {@link handlerManagedAuth} rather than a route-level
- * `requires("analytics:view")`. On a project-scoped app the route-level form
- * would be correct and simpler; it is avoided here because the cross-project
- * fan-out this family is designed to grow into mounts on an *organization*
- * app, where `requires(...)` resolves at organization scope and one org-wide
- * grant would reach every project in the organization. Declaring the
- * permission on the policy keeps `analytics:view` discoverable to the
- * authorization audits while the handler stays the thing that enforces it.
+ * The policy is {@link apiKeyPermission} with `analytics:view` — a real
+ * route-level chain, which authenticates the credential and applies the
+ * API-key ceiling before any of this file's code runs. See {@link queryAccess}
+ * for why the handler-managed form that stood here first was a mistake.
  *
- * Auth runs BEFORE dispatch, so an unauthenticated caller learns nothing about
- * which methods exist — the method name is not a probe for the key's validity.
+ * Because the gate is middleware, an unauthenticated caller is refused before
+ * dispatch and learns nothing about which methods exist: a known method and a
+ * nonsense one answer identically, so the method name is not a probe for a
+ * key's validity.
  *
  * @see ~/server/analytics/lwql — the service and everything under it
  * @see ./rpc — the protocol layer: codes, ids, envelopes
@@ -68,7 +66,7 @@ import {
 } from "~/server/analytics/lwql";
 import {
   type createProjectApp,
-  handlerManagedAuth,
+  apiKeyPermission,
 } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
@@ -109,25 +107,30 @@ const QUERY_TAGS = ["Query"];
 const QUERY_PERMISSION = "analytics:view" as const;
 
 /**
- * Why the permission is enforced in the handler rather than on the route.
+ * The gate: `analytics:view` through the API-key ceiling.
  *
- * Stated once, because it is the reviewable justification the route registry
- * surfaces and the reason a reader should not "simplify" this to
- * `requires(...)`.
+ * `apiKeyPermission` rather than `requires`, because this is a public
+ * API-key surface — the ceiling is what makes a scoped key answer
+ * `effective = ApiKey ∩ user` instead of inheriting the whole of its owner's
+ * access.
+ *
+ * This was briefly `handlerManagedAuth`, on the theory that the family would
+ * grow a cross-project fan-out and that a route-level gate would resolve at
+ * the wrong scope. That reasoning was wrong twice over. `handlerManagedAuth`
+ * applies NO middleware — it is a declaration that the HANDLER authenticates,
+ * a contract this handler never honoured, so the door stood open and every
+ * anonymous call died on `project.id` of `undefined` as a 500 rather than a
+ * 401. And the scope worry does not apply here: this route is mounted on a
+ * project app, where the permission resolves against the project the
+ * credential names. The fan-out, when it lands, is a different app on a
+ * different mount, and it can choose its own gate then.
+ *
+ * The rule this leaves behind: reach for `handlerManagedAuth` only when the
+ * credential genuinely cannot be expressed as a policy chain — the way the
+ * dataset family's signed upload sessions cannot. A plain API key can.
  */
-const HANDLER_MANAGED_REASON =
-  "analytics:view is enforced in-handler against the project on the credential. " +
-  "The route-level form is avoided deliberately: this family is designed to " +
-  "grow a cross-project fan-out on an organization app, where requires() " +
-  "resolves at organization scope and a single org-wide grant would reach " +
-  "every project in the organization.";
-
 function queryAccess() {
-  return handlerManagedAuth({
-    reason: HANDLER_MANAGED_REASON,
-    permissions: [QUERY_PERMISSION],
-    credential: "apiKey",
-  });
+  return apiKeyPermission(QUERY_PERMISSION);
 }
 
 /** The project the credential resolved to, plus its redaction protections. */

@@ -405,7 +405,12 @@ describe("given the /api/v1/query JSON-RPC family", () => {
      */
     /** @scenario "A LangWatchQL view returns only the calling tenant's rows" */
     it("each gets only its own tenant's rows from the exact same path", async () => {
-      expect(rpcPath).not.toMatch(/[a-zA-Z0-9_-]{10,}/);
+      // The point of the shared path: neither tenant is named in the URL, so
+      // the credential is the only selector. Asserted against the real ids
+      // rather than a shape heuristic — a heuristic here would pass against a
+      // path that happened to look right while naming a tenant.
+      expect(rpcPath).not.toContain(projectA.id);
+      expect(rpcPath).not.toContain(projectB.id);
 
       for (const [caller, other] of [
         [projectA, projectB],
@@ -490,8 +495,12 @@ describe("given the /api/v1/query JSON-RPC family", () => {
         body.jsonrpc,
         "auth refusals are documented as unwrapped — update the endpoint description if this changed",
       ).toBeUndefined();
-      // Still the canonical shape, so one parser reads it.
-      expect(body.error?.code).toBeTruthy();
+      // Still the canonical shape, so one parser reads it. Asserted against
+      // the string taxonomy at the TOP level — unwrapped, there is no
+      // `error.data` to descend into, and a numeric code here would mean the
+      // body had been wrapped after all.
+      expect(body.error?.code).toBe("missing_credentials");
+      expect(typeof body.error?.code).toBe("string");
     });
 
     it("does not let an unauthenticated caller probe which methods exist", async () => {
