@@ -1,4 +1,61 @@
-import type { TraceSummaryData } from "../types";
+/**
+ * Projected fields required by the trace-list read and mapper. This is
+ * deliberately separate from the ingest fold state: the list query owns a
+ * read-only projection of `trace_summaries` and never exposes Prisma or raw
+ * ClickHouse rows.
+ */
+export interface TraceListSummary {
+  traceId: string;
+  spanCount: number;
+  totalDurationMs: number;
+  computedIOSchemaVersion: string;
+  computedInput: string | null;
+  computedOutput: string | null;
+  timeToFirstTokenMs: number | null;
+  timeToLastTokenMs: number | null;
+  tokensPerSecond: number | null;
+  containsErrorStatus: boolean;
+  containsOKStatus: boolean;
+  errorMessage: string | null;
+  models: string[];
+  totalCost: number | null;
+  nonBilledCost: number | null;
+  tokensEstimated: boolean;
+  totalPromptTokenCount: number | null;
+  totalCompletionTokenCount: number | null;
+  outputFromRootSpan: boolean;
+  outputSpanEndTimeMs: number;
+  blockedByGuardrail: boolean;
+  rootSpanType: string | null;
+  containsAi: boolean;
+  containsPrompt: boolean;
+  selectedPromptId: string | null;
+  selectedPromptSpanId: string | null;
+  selectedPromptStartTimeMs: number | null;
+  lastUsedPromptId: string | null;
+  lastUsedPromptVersionNumber: number | null;
+  lastUsedPromptVersionId: string | null;
+  lastUsedPromptSpanId: string | null;
+  lastUsedPromptStartTimeMs: number | null;
+  topicId: string | null;
+  subTopicId: string | null;
+  annotationIds: string[];
+  sizeBytes?: number;
+  attributes: Record<string, string>;
+  traceName: string;
+  storageAnchorMs?: number;
+  occurredAt: number;
+  createdAt: number;
+  updatedAt: number;
+  LastEventOccurredAt: number;
+  redactedByVisibilityWindow?: boolean;
+}
+
+export interface TraceListFacetQuery {
+  sql: string;
+  params: Record<string, unknown>;
+  settings?: Record<string, string>;
+}
 
 export type TraceListSortColumn =
   | "OccurredAt"
@@ -41,7 +98,7 @@ export interface TraceListQuery {
 }
 
 export interface TraceListPage {
-  rows: TraceSummaryData[];
+  rows: TraceListSummary[];
   totalHits: number;
 }
 
@@ -98,7 +155,7 @@ export interface BatchedFacetResult {
   ranges: Record<string, { min: number; max: number }>;
 }
 
-export interface TraceListRepository {
+export interface TraceListReadPort {
   findAll(query: TraceListQuery): Promise<TraceListPage>;
 
   findFacetCounts(params: {
@@ -142,7 +199,7 @@ export interface TraceListRepository {
 
   findCategoricalFacetRaw(params: {
     tenantId: string;
-    query: { sql: string; params: Record<string, unknown> };
+    query: TraceListFacetQuery;
   }): Promise<CategoricalFacetResult>;
 
   findRangeStatsForTable(params: {
@@ -198,38 +255,5 @@ export interface TraceListRepository {
   }): Promise<CategoricalFacetResult>;
 }
 
-export class NullTraceListRepository implements TraceListRepository {
-  async findAll(): Promise<TraceListPage> {
-    return { rows: [], totalHits: 0 };
-  }
-  async findFacetCounts(): Promise<FacetCountResult> {
-    return { values: {} };
-  }
-  async findRangeStats(): Promise<{ min: number; max: number }> {
-    return { min: 0, max: 0 };
-  }
-  async findCount(): Promise<number> {
-    return 0;
-  }
-  async findDistinctValues(): Promise<string[]> {
-    return [];
-  }
-  async findCategoricalFacet(): Promise<CategoricalFacetResult> {
-    return { values: [], totalDistinct: 0 };
-  }
-  async findCategoricalFacetRaw(): Promise<CategoricalFacetResult> {
-    return { values: [], totalDistinct: 0 };
-  }
-  async findRangeStatsForTable(): Promise<{ min: number; max: number }> {
-    return { min: 0, max: 0 };
-  }
-  async findDiscreteValues(): Promise<DiscreteFacetResult> {
-    return { values: [], distinctCount: 0 };
-  }
-  async findBatchedFacets(): Promise<BatchedFacetResult> {
-    return { categoricals: {}, ranges: {} };
-  }
-  async findAttributeValues(): Promise<CategoricalFacetResult> {
-    return { values: [], totalDistinct: 0 };
-  }
-}
+/** Compatibility name for composition adapters; callers depend on the port. */
+export type TraceListRepository = TraceListReadPort;

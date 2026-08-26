@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveTraceStatus } from "../derive-trace-status";
+import { deriveTraceStatus } from "../src/derive-trace-status";
 
 describe("deriveTraceStatus", () => {
   describe("given a span flipped containsErrorStatus", () => {

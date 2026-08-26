@@ -1,11 +1,11 @@
 import {
   deriveTraceOrigin,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
-} from "./derive-trace-origin";
+} from "@langwatch/trace-contract";
 import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
-} from "./derive-trace-status";
+} from "@langwatch/trace-contract";
 import {
   EVALUATOR_FACET,
   EVENT_ATTRIBUTE_KEYS_FACET,

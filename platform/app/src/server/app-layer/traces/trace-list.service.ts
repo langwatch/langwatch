@@ -5,6 +5,22 @@ import type {
   EvaluationSummary,
 } from "@langwatch/evaluation-contract";
 import { resolveNonBilledCost } from "@langwatch/trace-contract";
+import {
+  deriveTraceOrigin,
+  deriveTraceStatus,
+  deriveTraceTimestamp,
+  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+} from "@langwatch/trace-contract";
+import type {
+  BatchedFacetResult,
+  CategoricalFacetResult,
+  DiscreteFacetResult,
+  TraceListCursor,
+  TraceListReadPort,
+  TraceListSort,
+  TraceListSortColumn,
+} from "@langwatch/trace-contract";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import {
@@ -13,15 +29,6 @@ import {
   RESERVED_OUTPUT_MEDIA_REFS,
   type TraceMediaRef,
 } from "~/shared/traces/media-refs";
-import {
-  deriveTraceOrigin,
-  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
-} from "./derive-trace-origin";
-import {
-  deriveTraceStatus,
-  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
-} from "./derive-trace-status";
-import { deriveTraceTimestamp } from "./derive-trace-timestamp";
 import { PageTooDeepError } from "./errors";
 import type {
   ExpressionCategoricalDef,
@@ -30,15 +37,6 @@ import type {
   RangeFacetDef,
 } from "./facet-registry";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
-import type {
-  BatchedFacetResult,
-  CategoricalFacetResult,
-  DiscreteFacetResult,
-  TraceListCursor,
-  TraceListRepository,
-  TraceListSort,
-  TraceListSortColumn,
-} from "./repositories/trace-list.repository";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
 
@@ -485,7 +483,7 @@ const SUGGEST_COLUMN_MAP: Record<string, string> = {
 
 export class TraceListService {
   constructor(
-    private readonly repository: TraceListRepository,
+    private readonly repository: TraceListReadPort,
     private readonly evaluations: EvaluationService,
     private readonly topicService: TopicService,
   ) {}

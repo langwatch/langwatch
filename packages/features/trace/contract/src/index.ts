@@ -1,4 +1,7 @@
 export * from "./cost-attribution";
+export * from "./derive-trace-origin";
+export * from "./derive-trace-status";
+export * from "./derive-trace-timestamp";
 export * from "./trace";
 export * from "./trace-view.contract";
 export * from "./trace-canonicalisation";
@@ -14,3 +17,4 @@ export * from "./trace-query-parser";
 export * from "./trace-query.contract";
 export * from "./trace.queries";
 export * from "./trace.service";
+export * from "./trace-list.repository";

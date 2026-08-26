@@ -3,6 +3,7 @@ import {
   conversationContextSchema,
   spanDetailSchema,
   spanLangwatchSignalsSchema,
+  traceListItemSchema,
   traceHeaderSchema,
   traceResourceInfoSchema,
 } from "../src";
@@ -42,6 +43,26 @@ describe("trace view contract", () => {
       lastUsedPromptVersionId: null,
       lastUsedPromptSpanId: null,
     });
+  });
+
+  it("keeps the list cost split in the public DTO", () => {
+    const item = traceListItemSchema.parse({
+      traceId: "trace-1",
+      timestamp: 1,
+      name: "trace",
+      serviceName: "service",
+      durationMs: 2,
+      totalCost: 0.2,
+      nonBilledCost: 0.05,
+      totalTokens: 3,
+      models: [],
+      status: "ok",
+      input: null,
+      output: null,
+      origin: "application",
+    });
+
+    expect(item.nonBilledCost).toBe(0.05);
   });
 
   it("keeps privacy, arbitrary detail values, and resource scope nullability", () => {

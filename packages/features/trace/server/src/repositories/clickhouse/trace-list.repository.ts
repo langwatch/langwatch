@@ -1,19 +1,59 @@
 import { EventUtils } from "@langwatch/eventing";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { FacetQuery } from "../facet-registry";
-import type { TraceSummaryData } from "../types";
-import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
-import type {
-  BatchedFacetResult,
-  CategoricalFacetResult,
-  DiscreteFacetResult,
-  FacetCountResult,
-  FacetTableName,
-  TraceListPage,
-  TraceListQuery,
-  TraceListRepository,
-} from "./trace-list.repository";
+import type { TraceClickHouseResolver } from "../../ports/clickhouse.port";
+import {
+  type TraceListFacetQuery,
+  type TraceListPage,
+  type TraceListQuery,
+  type TraceListRepository,
+  type TraceListSummary,
+  type BatchedFacetResult,
+  type CategoricalFacetResult,
+  type DiscreteFacetResult,
+  type FacetCountResult,
+  type FacetTableName,
+} from "@langwatch/trace-contract";
+
+interface TraceSummaryFieldsBase {
+  TraceId: string;
+  TenantId: string;
+  OccurredAt: number;
+  CreatedAt: number;
+  UpdatedAt: number;
+  ComputedIOSchemaVersion: string;
+  ComputedInput: string | null;
+  ComputedOutput: string | null;
+  TimeToFirstTokenMs: number | null;
+  TimeToLastTokenMs: number | null;
+  TotalDurationMs: number;
+  TokensPerSecond: number | null;
+  SpanCount: number;
+  ContainsErrorStatus: number;
+  ContainsOKStatus: number;
+  ErrorMessage: string | null;
+  Models: string[];
+  TotalCost: number | null;
+  NonBilledCost: number | null;
+  TokensEstimated: boolean;
+  TotalPromptTokenCount: number | null;
+  TotalCompletionTokenCount: number | null;
+  OutputFromRootSpan: number;
+  OutputSpanEndTimeMs: number;
+  BlockedByGuardrail: number;
+  RootSpanType: string | null;
+  ContainsAi: number;
+  TraceName: string;
+  ContainsPrompt: number;
+  SelectedPromptId: string | null;
+  SelectedPromptSpanId: string | null;
+  LastUsedPromptId: string | null;
+  LastUsedPromptVersionNumber: number | null;
+  LastUsedPromptVersionId: string | null;
+  LastUsedPromptSpanId: string | null;
+  TopicId: string | null;
+  SubTopicId: string | null;
+  AnnotationIds: string[];
+  SizeBytes?: number;
+}
 
 const TABLE_NAME = "trace_summaries" as const;
 
@@ -24,6 +64,11 @@ const TABLE_NAME = "trace_summaries" as const;
  * boundary is never pruned. Matches the `withPartitionHint` margin.
  */
 const SINCE_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
+const PRE_STORAGE_ANCHOR_VERSION = "2026-05-07";
+
+function isStorageAnchoredVersion(version: string | undefined): boolean {
+  return (version ?? "") > PRE_STORAGE_ANCHOR_VERSION;
+}
 
 interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   // The list mapper only reads a fixed set of keys out of `Attributes`.
@@ -126,7 +171,11 @@ function buildWhereClauseForTable(
 }
 
 export class TraceListClickHouseRepository implements TraceListRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private constructor(private readonly resolveClient: TraceClickHouseResolver) {}
+
+  static create(resolveClient: TraceClickHouseResolver): TraceListClickHouseRepository {
+    return new TraceListClickHouseRepository(resolveClient);
+  }
 
   async findAll(query: TraceListQuery): Promise<TraceListPage> {
     EventUtils.validateTenantId(
@@ -691,7 +740,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   async findCategoricalFacetRaw(params: {
     tenantId: string;
-    query: FacetQuery;
+    query: TraceListFacetQuery;
   }): Promise<CategoricalFacetResult> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
@@ -994,7 +1043,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return mapFacetRows(rows);
   }
 
-  private toTraceSummaryData(row: ClickHouseSummaryRow): TraceSummaryData {
+  private toTraceSummaryData(row: ClickHouseSummaryRow): TraceListSummary {
     return {
       traceId: row.TraceId,
       spanCount: row.SpanCount,

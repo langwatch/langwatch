@@ -18,11 +18,11 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import type { TraceListQuery, TraceListReadPort } from "@langwatch/trace-contract";
+import { AppTraceRuntime } from "~/runtime/app/features/trace";
 import { FACET_REGISTRY } from "../../facet-registry";
 import { translateFilterToClickHouse } from "../../filter-to-clickhouse";
 import { boundedSubquery } from "../../filter-to-clickhouse/subqueries";
-import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
-import type { TraceListQuery } from "../trace-list.repository";
 
 const tenantId = `test-trace-list-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
@@ -33,7 +33,7 @@ const HEAVY_INPUT = "i".repeat(8000);
 const HEAVY_OUTPUT = "o".repeat(8000); // ~16KB of payload per trace
 
 let ch: ClickHouseClient;
-let repo: TraceListClickHouseRepository;
+let repo: TraceListReadPort;
 
 function traceIdFor(i: number): string {
   return `tr-${String(i).padStart(4, "0")}`;
@@ -154,7 +154,7 @@ function baseQuery(): TraceListQuery {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new TraceListClickHouseRepository(async () => ch);
+  repo = AppTraceRuntime.createListRepository(async () => ch);
 
   const rows = Array.from({ length: TOTAL_TRACES }, (_, i) => makeTraceSummaryRow(i));
   await insertRows(rows);

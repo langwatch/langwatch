@@ -10,13 +10,14 @@ const traceMediaRefSchema = z.object({
   mimeType: z.string().optional(),
 });
 
-const traceListItemSchema = z.object({
+export const traceListItemSchema = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
   serviceName: z.string(),
   durationMs: z.number(),
   totalCost: z.number(),
+  nonBilledCost: z.number().default(0),
   totalTokens: z.number(),
   inputTokens: z.number().nullable().optional(),
   outputTokens: z.number().nullable().optional(),

@@ -1,6 +1,9 @@
-import type { TraceSummaryData } from "./types";
-
 export type DerivedTraceStatus = "ok" | "error" | "warning";
+
+export type TraceStatusSummary = {
+  containsErrorStatus: boolean;
+  blockedByGuardrail: boolean;
+};
 
 /**
  * ClickHouse expression that produces the same value `deriveTraceStatus`
@@ -32,10 +35,14 @@ export const TRACE_STATUS_CLICKHOUSE_EXPRESSION =
  * ran but the outcome is qualified — currently just guardrail blocks.
  * Future signals (rate limits, partial responses) plug in here.
  */
-export function deriveTraceStatus(
-  summary: Pick<TraceSummaryData, "containsErrorStatus" | "blockedByGuardrail">,
-): DerivedTraceStatus {
-  if (summary.containsErrorStatus) return "error";
-  if (summary.blockedByGuardrail) return "warning";
+export function deriveTraceStatus(summary: TraceStatusSummary): DerivedTraceStatus {
+  if (summary.containsErrorStatus) {
+    return "error";
+  }
+
+  if (summary.blockedByGuardrail) {
+    return "warning";
+  }
+
   return "ok";
 }
