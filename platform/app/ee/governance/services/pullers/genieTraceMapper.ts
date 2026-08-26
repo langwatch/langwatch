@@ -378,26 +378,35 @@ function rootAttributesOf(
   const reasoning = flattenThoughts(attachments);
   if (reasoning) assistantMessage.reasoning_content = reasoning;
   return [
-    stringAttr("langwatch.span.type", "llm"),
-    stringAttr("langwatch.thread.id", frame.threadId),
-    stringAttr(
-      "langwatch.input",
-      JSON.stringify({
+    stringAttr({ key: "langwatch.span.type", value: "llm" }),
+    stringAttr({ key: "langwatch.thread.id", value: frame.threadId }),
+    stringAttr({
+      key: "langwatch.input",
+      value: JSON.stringify({
         type: "chat_messages",
         value: [{ role: "user", content: question }],
       }),
-    ),
-    stringAttr(
-      "langwatch.output",
-      JSON.stringify({ type: "chat_messages", value: [assistantMessage] }),
-    ),
+    }),
+    stringAttr({
+      key: "langwatch.output",
+      value: JSON.stringify({
+        type: "chat_messages",
+        value: [assistantMessage],
+      }),
+    }),
     // Agent identity, not a priced model (Decision 14(d) pins no price match).
     // Now that the value varies, `KNOWN_AGENT_IDENTITIES` is what keeps it
     // true — at compile time only. Every profile is a code literal the
     // compiler checks, so nothing re-checks this at runtime.
-    stringAttr("gen_ai.request.model", frame.origin.profile.agentModel),
-    stringAttr("databricks.genie.message_id", frame.messageId),
-    stringAttr("databricks.genie.conversation_id", frame.conversationId),
+    stringAttr({
+      key: "gen_ai.request.model",
+      value: frame.origin.profile.agentModel,
+    }),
+    stringAttr({ key: "databricks.genie.message_id", value: frame.messageId }),
+    stringAttr({
+      key: "databricks.genie.conversation_id",
+      value: frame.conversationId,
+    }),
     ...originAttrs(frame.origin),
     ...optionalRootAttributes(event, frame),
   ];
@@ -415,18 +424,26 @@ function optionalRootAttributes(
     frame.payload.user_id != null
       ? String(frame.payload.user_id)
       : extraString(event, "actorUserId");
-  if (rawUserId) attributes.push(stringAttr("langwatch.user.id", rawUserId));
+  if (rawUserId)
+    attributes.push(stringAttr({ key: "langwatch.user.id", value: rawUserId }));
   if (frame.status) {
-    attributes.push(stringAttr("databricks.genie.status", frame.status));
+    attributes.push(
+      stringAttr({ key: "databricks.genie.status", value: frame.status }),
+    );
   }
   if (frame.regenCount > 0) {
     attributes.push(
-      intAttr("databricks.genie.auto_regenerate_count", frame.regenCount),
+      intAttr({
+        key: "databricks.genie.auto_regenerate_count",
+        value: frame.regenCount,
+      }),
     );
   }
   const spaceId = extraString(event, "spaceId");
   if (spaceId) {
-    attributes.push(stringAttr("databricks.genie.space_id", spaceId));
+    attributes.push(
+      stringAttr({ key: "databricks.genie.space_id", value: spaceId }),
+    );
   }
   const statementIds = queryAttachmentsOf(attachments)
     .map((attachment) => attachment.query?.statement_id)
@@ -435,10 +452,10 @@ function optionalRootAttributes(
     // ALL statement ids (Decision 12): the display-time join key to the
     // warehouse spend ledger — a multi-statement answer never undercounts.
     attributes.push(
-      stringAttr(
-        "databricks.genie.statement_ids",
-        JSON.stringify(statementIds),
-      ),
+      stringAttr({
+        key: "databricks.genie.statement_ids",
+        value: JSON.stringify(statementIds),
+      }),
     );
   }
   const vizPointers = attachments
@@ -447,10 +464,10 @@ function optionalRootAttributes(
   if (vizPointers.length > 0) {
     // A pointer, not chart data — stored, never rendered (Decision 12).
     attributes.push(
-      stringAttr(
-        "databricks.genie.viz_query_attachment_ids",
-        JSON.stringify(vizPointers),
-      ),
+      stringAttr({
+        key: "databricks.genie.viz_query_attachment_ids",
+        value: JSON.stringify(vizPointers),
+      }),
     );
   }
   // `suggested_questions` are deliberately never read: Genie's offered
@@ -481,14 +498,19 @@ function queryStepSpan(
   // A JSON blob under `langwatch.params` gets dot-flattened at the trace door
   // and lands at `params.langwatch.params.*`, where no reader looks.
   const stepAttrs = [
-    stringAttr("tool_name", attachment.query?.description || "SQL query"),
-    stringAttr("full_command", attachment.query?.query ?? ""),
+    stringAttr({
+      key: "tool_name",
+      value: attachment.query?.description || "SQL query",
+    }),
+    stringAttr({ key: "full_command", value: attachment.query?.query ?? "" }),
   ];
   if (attachment.query?.statement_id) {
-    stepAttrs.push(stringAttr("statement_id", attachment.query.statement_id));
+    stepAttrs.push(
+      stringAttr({ key: "statement_id", value: attachment.query.statement_id }),
+    );
   }
   if (typeof rowCount === "number") {
-    stepAttrs.push(intAttr("row_count", rowCount));
+    stepAttrs.push(intAttr({ key: "row_count", value: rowCount }));
   }
   return {
     traceId: frame.traceId,
@@ -499,7 +521,7 @@ function queryStepSpan(
     startTimeUnixNano: msToNano(frame.startMs),
     endTimeUnixNano: msToNano(frame.endMs),
     attributes: [
-      stringAttr("langwatch.span.type", "tool"),
+      stringAttr({ key: "langwatch.span.type", value: "tool" }),
       ...stepAttrs,
       ...originAttrs(frame.origin),
     ],

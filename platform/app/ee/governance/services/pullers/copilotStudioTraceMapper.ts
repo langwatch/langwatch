@@ -741,31 +741,50 @@ function conversationAttrs(params: {
 }): OtlpJsonAttr[] {
   const { origin, group, endMs, skipped, threadId } = params;
   const attrs: OtlpJsonAttr[] = [
-    stringAttr("langwatch.thread.id", threadId),
+    stringAttr({ key: "langwatch.thread.id", value: threadId }),
     ...originAttrs(origin),
   ];
   if (group.bot.botName) {
-    attrs.push(stringAttr("copilot_studio.agent_name", group.bot.botName));
+    attrs.push(
+      stringAttr({
+        key: "copilot_studio.agent_name",
+        value: group.bot.botName,
+      }),
+    );
   }
   if (agentChangedSince(group.bot, endMs)) {
-    attrs.push(stringAttr("copilot_studio.agent_changed_since", "true"));
+    attrs.push(
+      stringAttr({ key: "copilot_studio.agent_changed_since", value: "true" }),
+    );
   }
   if (group.batches.length > 0) {
     attrs.push(
-      stringAttr("copilot_studio.transcript_batches", group.batches.join(",")),
+      stringAttr({
+        key: "copilot_studio.transcript_batches",
+        value: group.batches.join(","),
+      }),
     );
   }
   if (group.isIncomplete) {
-    attrs.push(stringAttr("copilot_studio.conversation_incomplete", "true"));
+    attrs.push(
+      stringAttr({
+        key: "copilot_studio.conversation_incomplete",
+        value: "true",
+      }),
+    );
   }
   if (group.isDesignMode) {
     // The conversation happened while someone was building the agent rather
     // than using it. Recorded and labelled instead of filtered, because the
     // person testing their agent is exactly who wants to read the transcript.
-    attrs.push(stringAttr("copilot_studio.design_mode", "true"));
+    attrs.push(
+      stringAttr({ key: "copilot_studio.design_mode", value: "true" }),
+    );
   }
   if (skipped > 0) {
-    attrs.push(intAttr("copilot_studio.activities_skipped", skipped));
+    attrs.push(
+      intAttr({ key: "copilot_studio.activities_skipped", value: skipped }),
+    );
   }
   return attrs;
 }
@@ -793,7 +812,7 @@ function turnSpan(params: {
     conversationEndMs,
   } = params;
   const attrs: OtlpJsonAttr[] = [
-    stringAttr("langwatch.span.type", "llm"),
+    stringAttr({ key: "langwatch.span.type", value: "llm" }),
     ...conversationAttrs({
       origin,
       group,
@@ -801,21 +820,34 @@ function turnSpan(params: {
       skipped,
       threadId,
     }),
-    stringAttr("gen_ai.request.model", origin.profile.agentModel),
+    stringAttr({
+      key: "gen_ai.request.model",
+      value: origin.profile.agentModel,
+    }),
   ];
   if (turn.question !== null) {
-    attrs.push(stringAttr("langwatch.input", chatValue("user", turn.question)));
+    attrs.push(
+      stringAttr({
+        key: "langwatch.input",
+        value: chatValue("user", turn.question),
+      }),
+    );
   }
   if (turn.answer !== null) {
     attrs.push(
-      stringAttr("langwatch.output", chatValue("assistant", turn.answer)),
+      stringAttr({
+        key: "langwatch.output",
+        value: chatValue("assistant", turn.answer),
+      }),
     );
   }
   if (turn.authorAadObjectId) {
     // The raw directory identifier, never resolved to a name at pull time.
     // Resolving it would mean asking for a directory permission this source
     // otherwise does not need.
-    attrs.push(stringAttr("langwatch.user.id", turn.authorAadObjectId));
+    attrs.push(
+      stringAttr({ key: "langwatch.user.id", value: turn.authorAadObjectId }),
+    );
   }
   return {
     traceId,
@@ -839,18 +871,20 @@ function toolSpan(params: {
 }): OtlpJsonSpan {
   const { origin, call, traceId, parentSpanId, spanSeed } = params;
   const attrs: OtlpJsonAttr[] = [
-    stringAttr("langwatch.span.type", "tool"),
-    stringAttr("tool_name", call.name),
+    stringAttr({ key: "langwatch.span.type", value: "tool" }),
+    stringAttr({ key: "tool_name", value: call.name }),
     ...originAttrs(origin),
   ];
   if (call.arguments) {
-    attrs.push(stringAttr("full_command", call.arguments));
+    attrs.push(stringAttr({ key: "full_command", value: call.arguments }));
   }
   if (!call.isFinished) {
     // The tool started and never reported finishing. Common enough that the
     // validation script calls it normal, so it renders marked rather than
     // being held back or dropped.
-    attrs.push(stringAttr("copilot_studio.tool_call_unfinished", "true"));
+    attrs.push(
+      stringAttr({ key: "copilot_studio.tool_call_unfinished", value: "true" }),
+    );
   }
   return {
     traceId,
@@ -900,7 +934,7 @@ function conversationSpan(params: {
     .find((turn) => turn.answer !== null)?.answer;
 
   const attributes: OtlpJsonAttr[] = [
-    stringAttr("langwatch.span.type", "chain"),
+    stringAttr({ key: "langwatch.span.type", value: "chain" }),
     ...conversationAttrs({
       origin,
       group,
@@ -911,12 +945,18 @@ function conversationSpan(params: {
   ];
   if (firstQuestion) {
     attributes.push(
-      stringAttr("langwatch.input", chatValue("user", firstQuestion)),
+      stringAttr({
+        key: "langwatch.input",
+        value: chatValue("user", firstQuestion),
+      }),
     );
   }
   if (lastAnswer) {
     attributes.push(
-      stringAttr("langwatch.output", chatValue("assistant", lastAnswer)),
+      stringAttr({
+        key: "langwatch.output",
+        value: chatValue("assistant", lastAnswer),
+      }),
     );
   }
 

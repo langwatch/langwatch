@@ -35,6 +35,8 @@
 
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createHash } from "crypto";
+import type { z } from "zod";
+import type { spanSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { PROVENANCE_ATTR_SOURCE } from "../ingestKeyProvenance.utils";
 
 /**
@@ -100,24 +102,43 @@ export type OtlpJsonAttr = {
   value: { stringValue?: string; intValue?: number };
 };
 
-export function stringAttr(key: string, value: string): OtlpJsonAttr {
-  return { key, value: { stringValue: value } };
+/**
+ * Named rather than positional because both halves are strings. Given two
+ * positional arguments, a transposed call compiles and emits a
+ * plausible-looking attribute with its key and value the wrong way round —
+ * which no assertion catches unless it happens to pin that exact attribute,
+ * and the Genie suite pins two of its seven.
+ */
+export function stringAttr(params: {
+  key: string;
+  value: string;
+}): OtlpJsonAttr {
+  return { key: params.key, value: { stringValue: params.value } };
 }
 
-export function intAttr(key: string, value: number): OtlpJsonAttr {
-  return { key, value: { intValue: value } };
+export function intAttr(params: { key: string; value: number }): OtlpJsonAttr {
+  return { key: params.key, value: { intValue: params.value } };
 }
 
 export function originAttrs(origin: RoutingOrigin): OtlpJsonAttr[] {
   return [
-    stringAttr("langwatch.origin.kind", "ingestion_source"),
-    stringAttr("langwatch.ingestion_source.id", origin.ingestionSourceId),
-    stringAttr(
-      "langwatch.ingestion_source.organization_id",
-      origin.organizationId,
-    ),
-    stringAttr("langwatch.ingestion_source.source_type", origin.sourceType),
-    stringAttr(PROVENANCE_ATTR_SOURCE, origin.profile.provenanceSource),
+    stringAttr({ key: "langwatch.origin.kind", value: "ingestion_source" }),
+    stringAttr({
+      key: "langwatch.ingestion_source.id",
+      value: origin.ingestionSourceId,
+    }),
+    stringAttr({
+      key: "langwatch.ingestion_source.organization_id",
+      value: origin.organizationId,
+    }),
+    stringAttr({
+      key: "langwatch.ingestion_source.source_type",
+      value: origin.sourceType,
+    }),
+    stringAttr({
+      key: PROVENANCE_ATTR_SOURCE,
+      value: origin.profile.provenanceSource,
+    }),
   ];
 }
 
@@ -187,11 +208,18 @@ export function deriveConversationIdentity(
   };
 }
 
-// The OTLP span shape assembled here is validated downstream by `spanSchema`
-// (schemas/otlp.ts); typing as the transformer interface would force
-// protobuf-flavored fields (Uint8Array ids) the JSON path doesn't use.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type OtlpJsonSpan = any;
+/**
+ * One span as the mappers build it, taken from the schema that validates it
+ * downstream (`spanSchema`, schemas/otlp.ts) rather than from the transformer
+ * interface — that one demands protobuf-flavoured fields (`Uint8Array` ids)
+ * the JSON path never uses.
+ *
+ * `z.input`, not `z.infer`: several of the schema's fields carry `.default()`,
+ * so the parsed OUTPUT has `events`, `links`, `status` and the `dropped*`
+ * counts as required. A mapper writes the input side, where those are the
+ * optional fields they actually are.
+ */
+export type OtlpJsonSpan = z.input<typeof spanSchema>;
 
 /**
  * Wrap a source's spans for export. Returns null when nothing routed, which
