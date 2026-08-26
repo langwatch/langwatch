@@ -221,6 +221,45 @@ function ObserveSection({
   );
 }
 
+function SimulationsFallbackGroup({
+  showExpanded,
+  project,
+  pathname,
+}: ProjectSectionProps) {
+  return (
+    <CollapsibleMenuGroup
+      icon={featureIcons.simulations.icon}
+      label={projectRoutes.simulations.title}
+      project={project}
+      showLabel={showExpanded}
+      children={[
+        {
+          icon: featureIcons.scenarios.icon,
+          label: projectRoutes.scenarios.title,
+          ...projectScopedDestination({
+            path: projectRoutes.scenarios.path,
+            label: projectRoutes.scenarios.title,
+            project,
+          }),
+          isActive: pathname.includes("/simulations/scenarios"),
+        },
+        {
+          icon: featureIcons.simulation_runs.icon,
+          label: projectRoutes.simulation_runs.title,
+          ...projectScopedDestination({
+            path: projectRoutes.simulation_runs.path,
+            label: projectRoutes.simulation_runs.title,
+            project,
+          }),
+          isActive:
+            pathname.includes("/simulations") &&
+            !pathname.includes("/simulations/scenarios"),
+        },
+      ]}
+    />
+  );
+}
+
 function TestSection({
   showExpanded,
   project,
@@ -253,35 +292,10 @@ function TestSection({
           showLabel={showExpanded}
         />
       ) : (
-        <CollapsibleMenuGroup
-          icon={featureIcons.simulations.icon}
-          label={projectRoutes.simulations.title}
+        <SimulationsFallbackGroup
+          showExpanded={showExpanded}
           project={project}
-          showLabel={showExpanded}
-          children={[
-            {
-              icon: featureIcons.scenarios.icon,
-              label: projectRoutes.scenarios.title,
-              ...projectScopedDestination({
-                path: projectRoutes.scenarios.path,
-                label: projectRoutes.scenarios.title,
-                project,
-              }),
-              isActive: pathname.includes("/simulations/scenarios"),
-            },
-            {
-              icon: featureIcons.simulation_runs.icon,
-              label: projectRoutes.simulation_runs.title,
-              ...projectScopedDestination({
-                path: projectRoutes.simulation_runs.path,
-                label: projectRoutes.simulation_runs.title,
-                project,
-              }),
-              isActive:
-                pathname.includes("/simulations") &&
-                !pathname.includes("/simulations/scenarios"),
-            },
-          ]}
+          pathname={pathname}
         />
       )}
 

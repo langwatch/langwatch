@@ -51,6 +51,33 @@ function usePlanAsPageTitle(plan: RunPlan | null) {
   }, [name, note, setOpenPlanTitle]);
 }
 
+function TabSkeleton({
+  padding = 6,
+  rows = 2,
+  testId,
+  flex,
+}: {
+  padding?: number;
+  rows?: number;
+  testId?: string;
+  flex?: number;
+}) {
+  return (
+    <VStack
+      align="stretch"
+      gap={2}
+      padding={padding}
+      flex={flex}
+      minWidth={flex !== undefined ? 0 : undefined}
+      data-testid={testId}
+    >
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} height="44px" />
+      ))}
+    </VStack>
+  );
+}
+
 export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -83,24 +110,8 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const handleBack = useCallback(() => selectPlan(null), [selectPlan]);
 
   if (!isReady) {
-    return (
-      <VStack
-        align="stretch"
-        gap={2}
-        padding={6}
-        data-testid="agent-testing-results-tab"
-      >
-        <Skeleton height="44px" />
-        <Skeleton height="44px" />
-      </VStack>
-    );
+    return <TabSkeleton testId="agent-testing-results-tab" />;
   }
-
-  // When the URL names a plan, we must not fall through to the plans list —
-  // even for a frame. A false render on `!selectedPlan` while the queries are
-  // still on their way reads as "plan not found" for a split second before the
-  // real detail arrives. The empty branch is reserved for `!isLoading && !data`.
-  const isResolvingPlan = !!planSlug && !selectedPlan && isLoading;
 
   // The plan detail already has a rail (RunsSidebar) baked in. The list view
   // has none, so it takes an invisible rail spacer of the same width so the
@@ -123,32 +134,80 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   }
 
   return (
+    <ResultsListView
+      planSlug={planSlug}
+      selectedPlan={selectedPlan}
+      plans={plans}
+      isLoading={isLoading}
+      hasAnyPlans={hasAnyPlans}
+      period={period}
+      periodMode={mode}
+      setPeriod={setPeriod}
+      setRelativePeriod={setRelativePeriod}
+      onSelectPlan={selectPlan}
+      onEditPlan={handleEditPlan}
+      onNewRunPlan={handleNewRunPlan}
+    />
+  );
+}
+
+type ResultsListViewProps = {
+  planSlug: string | null;
+  selectedPlan: RunPlan | null;
+  plans: RunPlan[];
+  isLoading: boolean;
+  hasAnyPlans: boolean;
+  period: React.ComponentProps<typeof RunPlansTable>["period"];
+  periodMode: React.ComponentProps<typeof RunPlansTable>["periodMode"];
+  setPeriod: React.ComponentProps<typeof RunPlansTable>["setPeriod"];
+  setRelativePeriod: React.ComponentProps<
+    typeof RunPlansTable
+  >["setRelativePeriod"];
+  onSelectPlan: React.ComponentProps<typeof RunPlansTable>["onSelectPlan"];
+  onEditPlan: (suiteId: string) => void;
+  onNewRunPlan: () => void;
+};
+
+function ResultsListView({
+  planSlug,
+  selectedPlan,
+  plans,
+  isLoading,
+  hasAnyPlans,
+  period,
+  periodMode,
+  setPeriod,
+  setRelativePeriod,
+  onSelectPlan,
+  onEditPlan,
+  onNewRunPlan,
+}: ResultsListViewProps) {
+  // When the URL names a plan, we must not fall through to the plans list —
+  // even for a frame. A false render on `!selectedPlan` while the queries are
+  // still on their way reads as "plan not found" for a split second before the
+  // real detail arrives. The empty branch is reserved for `!isLoading && !data`.
+  const isResolvingPlan = !!planSlug && !selectedPlan && isLoading;
+
+  return (
     <AgentTestingTabLayout data-testid="agent-testing-results-tab">
       {isResolvingPlan ? (
-        <VStack
-          align="stretch"
-          gap={2}
-          padding={6}
+        <TabSkeleton
+          rows={3}
           flex={1}
-          minWidth={0}
-          data-testid="agent-testing-run-plan-loading"
-        >
-          <Skeleton height="44px" />
-          <Skeleton height="44px" />
-          <Skeleton height="44px" />
-        </VStack>
+          testId="agent-testing-run-plan-loading"
+        />
       ) : (
         <RunPlansTable
           plans={plans}
           isLoading={isLoading}
           hasAnyPlans={hasAnyPlans}
           period={period}
-          periodMode={mode}
+          periodMode={periodMode}
           setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
-          onSelectPlan={selectPlan}
-          onEditPlan={handleEditPlan}
-          onNewRunPlan={handleNewRunPlan}
+          onSelectPlan={onSelectPlan}
+          onEditPlan={onEditPlan}
+          onNewRunPlan={onNewRunPlan}
         />
       )}
     </AgentTestingTabLayout>
