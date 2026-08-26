@@ -1,7 +1,7 @@
 import { Box, chakra, HStack, Input, Text } from "@chakra-ui/react";
 import { CornerDownLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { LangyMark, LangyMarkGradientDefs } from "~/features/langy/components/LangyMark";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web";
 
 const LANGY_INPUT_RADIUS = "18px";
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";

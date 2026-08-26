@@ -1,7 +1,7 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
+import { langyThinkingShimmerStyles } from "@langwatch/langy-web";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
 
 const MotionText = motion.create(Box);
 

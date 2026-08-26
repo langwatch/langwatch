@@ -8,10 +8,10 @@
  * scrollback.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, render, screen } from "@testing-library/react";
-import type { UIMessage } from "ai";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LangyThinkingLine } from "../components/LangyThinkingLine";
+import type { ThinkingMessage } from "../../src/behaviour/langy-thinking-line";
+import { LangyThinkingLine } from "../../src/components/langy-thinking-line";
 
 const REASONING_TEXT =
   "The p95 spike is confined to one window. Checking whether the slow traces share anything.";
@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.useFakeTimers();
 });
 afterEach(() => {
+  cleanup();
   vi.useRealTimers();
 });
 
@@ -62,6 +63,11 @@ describe("LangyThinkingLine", () => {
 
   describe("given a running tool carries a long line", () => {
     it("keeps the whole skill summary on one clamped status line", () => {
+      const describe = vi.fn(() => ({
+        title: "Using the GitHub skill",
+        detail: "Open a real pull request",
+      }));
+
       // The exact overflow case: the github skill's line is its title plus its
       // full summary — "Using the GitHub skill — Open a real pull request …" —
       // which used to run off the panel's right edge. It must still surface in
@@ -73,12 +79,10 @@ describe("LangyThinkingLine", () => {
             messages={
               [
                 {
-                  id: "u1",
                   role: "user",
                   parts: [{ type: "text", text: "open a PR" }],
                 },
                 {
-                  id: "a1",
                   role: "assistant",
                   parts: [
                     {
@@ -88,14 +92,19 @@ describe("LangyThinkingLine", () => {
                     },
                   ],
                 },
-              ] as unknown as UIMessage[]
+              ] satisfies ThinkingMessage[]
             }
+            toolNarrator={{ describe }}
           />
         </ChakraProvider>,
       );
       const status = screen.getByRole("status");
       expect(status.textContent).toContain("Using the GitHub skill");
       expect(status.textContent).toContain("Open a real pull request");
+      expect(describe).toHaveBeenCalledWith({
+        name: "skill",
+        toolInput: { name: "github" },
+      });
       expect(screen.queryByRole("button")).toBeNull();
     });
   });

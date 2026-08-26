@@ -1,7 +1,7 @@
 import { chakra } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef } from "react";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { useReducedMotion } from "../hooks/use-reduced-motion";
 
 const MotionSpan = motion.create(chakra.span);
 

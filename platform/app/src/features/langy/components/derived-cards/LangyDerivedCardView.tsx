@@ -31,13 +31,13 @@ import type {
 } from "@langwatch/langy-contract";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
+import { StreamingStatCard } from "@langwatch/langy-web";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
 } from "../../logic/traceExplorerLink";
 import { TimeseriesPlot } from "../capabilities/LangyTimeseriesCard";
 import { LangySpaAnchor } from "../LangySpaAnchor";
-import { StreamingStatCard } from "../StreamingStatCard";
 import { LangyChoicesCard } from "./LangyChoicesCard";
 import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
 

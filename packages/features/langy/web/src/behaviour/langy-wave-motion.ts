@@ -3,51 +3,13 @@ import {
   hasTokens,
   runningTool,
   type ThinkingMessage,
-} from "./langyThinkingLine";
+} from "./langy-thinking-line";
 
 /**
- * The fold's motion vocabulary — what the Langy panel's decorative fold says
- * with its movement, and how.
- *
- * ── THE RULE ────────────────────────────────────────────────────────────────
- *
- * The fold moves with LANGY'S OWN BEHAVIOUR, never with the user's cursor. It
- * used to lean toward the pointer with a spring-loaded shove — which looked
- * alive for a minute and then read as a distraction reacting to the wrong
- * things. Now its motion is a quiet status channel: each activity state has a
- * distinct, LOW-amplitude character, so a change in motion carries information
- * (Langy started thinking, Langy is writing) instead of demanding attention.
- *
- * Spec: specs/langy/langy-panel-fold-motion.feature
- *
- * ── THE VOCABULARY ──────────────────────────────────────────────────────────
- *
- *   idle       almost still — a slowed version of the gentle resting wind.
- *              This is the permanent look of a settled panel.
- *   waiting    a turn was sent but nothing is on the wire yet. Barely above
- *              idle; the WAKE RIPPLE (a one-shot pass down the rope, fired on
- *              the idle→working transition) is what marks the send.
- *   thinking   reasoning is streaming — a slow deep swell: more amplitude on
- *              the long wavelength, almost no flutter, slow drift. Clearly
- *              calmer than streaming.
- *   streaming  tokens are arriving — the liveliest state: faster travelling
- *              wind with more flutter. Still subtle.
- *   tool       a tool is running — a slow rhythmic pulse: the amplitude
- *              breathes on a steady period, distinct from writing.
- *   settling   the turn failed or is quietly recovering — ease toward
- *              stillness; a failure must never look frantic.
- *
- * Activity is derived from the SAME provable wire signals as the thinking line
- * (`langyThinkingLine.ts`): the tool stream, streamed prose, live reasoning.
- * The fold therefore never claims work that isn't happening.
- *
- * ── NO POPS ─────────────────────────────────────────────────────────────────
- *
- * States can flip fast (tool→stream→tool). The renderer never jumps between
- * parameter sets: it holds ONE smoothed parameter vector and eases it toward
- * the active state's targets every frame (`stepWaveMotion`). Energy falls
- * slower than it rises, so the end of a turn eases back to idle over a couple
- * of seconds rather than snapping.
+ * Maps observable Langy activity to low-amplitude fold motion. The fold never
+ * follows the pointer or claims unobserved work. Each state has a distinct
+ * target and `stepWaveMotion` eases one shared vector between them, with a
+ * slower fall than rise so fast state changes do not pop.
  */
 
 export type LangyWaveActivity =

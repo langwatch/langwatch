@@ -1,7 +1,7 @@
 /** Quiet loading state for inspecting existing data rather than taking an action. */
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { motion } from "motion/react";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { useReducedMotion } from "../hooks/use-reduced-motion";
 
 const MotionBox = motion.create(Box);
 

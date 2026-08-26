@@ -1798,6 +1798,11 @@
     },
     {
       "feature": "langy",
+      "file": "platform/app/src/features/langy/adapters/langy-tool-narrator.adapter.ts",
+      "kind": "infrastructure-adapter"
+    },
+    {
+      "feature": "langy",
       "file": "platform/app/src/features/langy/components/AnimatedConversationTitle.tsx",
       "kind": "page-shell"
     },
@@ -2028,27 +2033,12 @@
     },
     {
       "feature": "langy",
-      "file": "platform/app/src/features/langy/components/LangyInterruptedNote.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
       "file": "platform/app/src/features/langy/components/LangyMakeDefaultDialog.tsx",
       "kind": "page-shell"
     },
     {
       "feature": "langy",
-      "file": "platform/app/src/features/langy/components/LangyMark.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
       "file": "platform/app/src/features/langy/components/LangyModelPill.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
-      "file": "platform/app/src/features/langy/components/LangyObservationState.tsx",
       "kind": "page-shell"
     },
     {
@@ -2073,27 +2063,12 @@
     },
     {
       "feature": "langy",
-      "file": "platform/app/src/features/langy/components/langyShimmer.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
       "file": "platform/app/src/features/langy/components/LangySkillChip.tsx",
       "kind": "page-shell"
     },
     {
       "feature": "langy",
       "file": "platform/app/src/features/langy/components/LangySpaAnchor.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
-      "file": "platform/app/src/features/langy/components/LangyThinkingLine.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
-      "file": "platform/app/src/features/langy/components/langyThinkingVerbs.ts",
       "kind": "page-shell"
     },
     {
@@ -2108,11 +2083,6 @@
     },
     {
       "feature": "langy",
-      "file": "platform/app/src/features/langy/components/LangyWave.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
       "file": "platform/app/src/features/langy/components/MessageContent.tsx",
       "kind": "page-shell"
     },
@@ -2123,27 +2093,7 @@
     },
     {
       "feature": "langy",
-      "file": "platform/app/src/features/langy/components/NumberTicker.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
       "file": "platform/app/src/features/langy/components/RecentChatsView.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
-      "file": "platform/app/src/features/langy/components/StreamingStatCard.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
-      "file": "platform/app/src/features/langy/components/StreamingStatusLine.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "langy",
-      "file": "platform/app/src/features/langy/components/StreamingText.tsx",
       "kind": "page-shell"
     },
     {
@@ -2458,11 +2408,6 @@
     },
     {
       "feature": "langy",
-      "file": "platform/app/src/features/langy/logic/langyThinkingLine.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "langy",
       "file": "platform/app/src/features/langy/logic/langyTimeTravel.ts",
       "kind": "legacy-implementation"
     },
@@ -2479,11 +2424,6 @@
     {
       "feature": "langy",
       "file": "platform/app/src/features/langy/logic/langyToolNarration.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "langy",
-      "file": "platform/app/src/features/langy/logic/langyWaveMotion.ts",
       "kind": "legacy-implementation"
     },
     {

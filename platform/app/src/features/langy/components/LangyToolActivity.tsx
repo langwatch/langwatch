@@ -40,6 +40,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { type CapabilityCommand, commandOfToolCall } from "@langwatch/langy-web";
+import { LangyInterruptedNote, langyThinkingShimmerStyles } from "@langwatch/langy-web";
 import {
   isPlanToolPart,
   isQuestionToolPart,
@@ -64,10 +65,8 @@ import {
   LangyCapabilityRenderer,
   toolResultForCapability,
 } from "./capabilities/LangyCapabilityRenderer";
-import { LangyInterruptedNote } from "./LangyInterruptedNote";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyToolErrorCard } from "./LangyToolErrorCard";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }

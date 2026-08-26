@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { partitionStreamingText } from "../components/StreamingText";
+import { partitionStreamingText } from "../../src/components/streaming-text";
 
 describe("partitionStreamingText", () => {
   it("keeps a long answer's animated DOM bounded while preserving every character", () => {

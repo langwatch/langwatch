@@ -10,6 +10,7 @@ import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
+import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "@langwatch/langy-web";
 import { isInternalHref, Markdown } from "~/components/Markdown";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
@@ -40,7 +41,6 @@ import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
-import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
 import { LangyPlanCard } from "./LangyPlanCard";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 

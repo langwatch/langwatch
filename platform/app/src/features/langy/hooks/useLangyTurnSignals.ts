@@ -1,19 +1,7 @@
-import { type LangyProgressSample, useLangyStore } from "../stores/langyStore";
+import type { LangyProgressSample, LangyTurnMetric } from "@langwatch/langy-web";
+import { useLangyStore } from "../stores/langyStore";
 
-export interface LangyTurnMetric {
-  /** Value to roll to; the statcard rolls it up from 0 on first paint. */
-  value: number;
-  /** Short caption under the number, e.g. "traces", "pass rate". */
-  label: string;
-  /** Optional unit appended after the number, e.g. "%". */
-  suffix?: string;
-  /**
-   * Full formatter, when a suffix cannot express the value — currency needs a
-   * PREFIX, and a cost rendered as a bare `0.433` says nothing about what it
-   * is. Wins over `suffix` when both are set.
-   */
-  format?: (value: number) => string;
-}
+export type { LangyTurnMetric } from "@langwatch/langy-web";
 
 export interface LangyTurnSignals {
   /** From `status_reported` — e.g. "Analysing 1,204 traces". */

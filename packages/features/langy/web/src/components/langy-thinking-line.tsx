@@ -1,50 +1,24 @@
 import { Box, HStack } from "@chakra-ui/react";
-import type { UIMessage } from "ai";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVerb";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyThinkingTone } from "../logic/langyThinkingLine";
-import { langyThinkingLine } from "../logic/langyThinkingLine";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
-import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
-import { STATUS_LINE_ROW, StatusOrb } from "./StreamingStatusLine";
+import type {
+  LangyThinkingTone,
+  LangyToolNarrator,
+  ThinkingMessage,
+} from "../behaviour/langy-thinking-line";
+import { langyThinkingLine } from "../behaviour/langy-thinking-line";
+import { useCyclingVerb } from "../hooks/use-cycling-verb";
+import { useReducedMotion } from "../hooks/use-reduced-motion";
+import { langyThinkingShimmerStyles } from "../values/langy-shimmer";
+import { LANGY_THINKING_VERBS } from "../values/langy-thinking-verbs";
+import { STATUS_LINE_ROW, StatusOrb } from "./streaming-status-line";
 
 const MotionText = motion.create(Box);
 
 /**
- * The line Langy shows while a turn is in flight — and it may only say TRUE
- * things.
- *
- * It used to cycle whimsical verbs on a 3.6s timer for as long as a turn was
- * open, regardless of whether anything was happening. On a turn whose worker
- * never spawned, that meant ninety-seven seconds of "Writing a TODO list…",
- * "Calling one more tool…", "Reading the whole file…" while NOTHING was running
- * and not one token had arrived. A dead turn read as a healthy one, and "Langy
- * is slow" was diagnosed for a whole session before anyone noticed the turn had
- * never started at all.
- *
- * So the line is now derived from what is provably on the wire
- * (`logic/langyThinkingLine.ts`):
- *
- *   - a tool is running   → say which, from the tool stream's own command;
- *   - tokens are arriving → render NOTHING: the streaming answer is on screen
- *                           and speaks for itself;
- *   - reasoning is flowing → "Thinking…", plainly;
- *   - nothing at all      → say we are still starting, and ESCALATE. Cycling
- *                           implies progress, so it stops. A stuck turn ends up
- *                           looking stuck, which is the whole point.
- *
- * The shimmer stays: it signals "alive", not "achieving".
- *
- * REASONING IS A SIGNAL HERE, NEVER A SURFACE. `hasLiveReasoning` is the only
- * thing this component is told about the model's thinking, and it uses it for
- * exactly one purpose: to say "Thinking…" instead of falsely escalating toward
- * "stuck" on a turn that is provably working. The reasoning TEXT is deliberately
- * not rendered anywhere in the panel — it used to ride this line as a fading
- * glimpse with an expandable scrollback, and it is gone. The store still
- * accumulates it (it drives the fold's `thinking` motion); the UI simply does
- * not show the model's private thinking to the user.
+ * Renders only status proved by live turn signals. Reasoning is an activity
+ * signal, never displayed content; tokens already speak through the answer;
+ * silence escalates honestly. The shimmer signals life rather than progress.
  */
 
 /** Double the shared 1800ms default — a 0.28s crossfade needs time to settle. */
@@ -56,8 +30,9 @@ export function LangyThinkingLine({
   messages,
   hasLiveReasoning = false,
   workerReady = false,
+  toolNarrator,
 }: {
-  messages: UIMessage[];
+  messages: ThinkingMessage[];
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts, so without this signal a reasoning-but-no-prose
@@ -71,6 +46,7 @@ export function LangyThinkingLine({
    * `logic/langyThinkingLine`.
    */
   workerReady?: boolean;
+  toolNarrator?: LangyToolNarrator;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -88,6 +64,7 @@ export function LangyThinkingLine({
     elapsedMs,
     hasLiveReasoning,
     workerReady,
+    toolNarrator,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

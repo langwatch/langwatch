@@ -1,12 +1,11 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyTurnMetric } from "../hooks/useLangyTurnSignals";
-import type { LangyProgressSample } from "../stores/langyStore";
-import { LangyObserverGlyph } from "./LangyObservationState";
-import { NumberTicker } from "./NumberTicker";
-import { StreamingStatCard } from "./StreamingStatCard";
+import { useReducedMotion } from "../hooks/use-reduced-motion";
+import type { LangyProgressSample, LangyTurnMetric } from "../values/langy-turn";
+import { LangyObserverGlyph } from "./langy-observation-state";
+import { NumberTicker } from "./number-ticker";
+import { StreamingStatCard } from "./streaming-stat-card";
 
 const MotionBox = motion.create(Box);
 

@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef } from "react";
 import {
   isErrorTransition,
   isSuccessTransition,
@@ -15,39 +15,13 @@ import {
   WAVE_PULSE_PERIOD_S,
   WAVE_RIPPLE_TRAVEL_S,
   WAVE_SHAKE_DURATION_S,
-} from "../logic/langyWaveMotion";
+} from "../behaviour/langy-wave-motion";
 
 /**
- * The living fold behind the panel — one rope, two looks, both layouts.
- *
- * A vertical rope is sampled down the panel and animated every frame. Its
- * motion is driven ENTIRELY by Langy's own activity (`activity` prop, derived
- * in the panel from the live turn's wire signals — see
- * `logic/langyWaveMotion.ts` and specs/langy/langy-panel-fold-motion.feature).
- * It never reacts to the cursor: the old pointer physics (a gaussian bulge at
- * cursor height, a spring-loaded swing away from approach) looked alive for a
- * minute and then read as a distraction reacting to the wrong things.
- *
- * The vocabulary, in one line each: idle drifts almost still; a sent message
- * fires one gentle ripple down the rope; thinking is a slow deep swell;
- * streaming is a livelier travelling wind; a running tool breathes on a steady
- * pulse; a failure settles toward stillness. Transitions ease through a single
- * smoothed parameter vector, so rapid state flips never pop, and a finished
- * turn takes a couple of seconds to come back to rest.
- *
- * On TOP of that ambient motion sit GESTURES — the fold's personality, quiet at
- * rest and expressive only when something happens (see `logic/langyWaveMotion.ts`):
- * while a STATUS LABEL is up on the conversation, a warm pulse runs down the seam
- * like light down a fibre; a FAILED turn shivers once (a brief nervous shake); a
- * turn that SUCCEEDS wags happily down the rope and eases out. The shake and wag
- * are decaying one-shots; the fibre glitter is a level that tracks the status.
- *
- * The rope is the seam of a soft two-tone brand fold. A warm layer is clipped
- * to its right, a cool layer shows through on its left, and a luminous seam is
- * stroked along the divide. The clip-path and seam are driven from the rAF
- * loop; the layers are decorative and inert to the pointer. The whole thing
- * only mounts while the panel is open (`active`), so the loop never runs
- * behind a closed panel. Reduced motion draws one resting S-curve and stops.
+ * Draws the panel fold from Langy's activity, never pointer movement. Ambient
+ * states ease through one motion vector; success, failure and status gestures
+ * are bounded overlays. The animation runs only while active, and reduced
+ * motion renders a static resting curve.
  */
 
 // Points sampled down the rope. More points = a smoother curve at more cost per
@@ -199,7 +173,7 @@ export function LangyWave({
   reduceMotion,
 }: {
   /** The panel element the rope is sized from. */
-  containerRef: React.RefObject<HTMLElement | null>;
+  containerRef: RefObject<HTMLElement | null>;
   /** Only true while the panel is open (and the effect isn't "plain"). */
   active: boolean;
   /** What Langy is doing right now — the ONLY thing that drives the motion. */

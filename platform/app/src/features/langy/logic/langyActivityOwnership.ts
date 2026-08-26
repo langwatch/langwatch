@@ -1,4 +1,4 @@
-import type { LangyProgressSample } from "../stores/langyStore";
+import type { LangyProgressSample } from "@langwatch/langy-web";
 
 /**
  * One piece of work gets one visible progress owner.

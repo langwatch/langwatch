@@ -2,7 +2,7 @@
   "name": "@langwatch/langy-web",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe Langy contract and transport helpers.",
+  "description": "Browser-safe Langy behaviour and reusable presentation.",
   "files": [
     "src"
   ],
@@ -21,11 +21,19 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
     "@langwatch/langy-contract": "workspace:*",
+    "@emotion/react": "^11.14.0",
+    "motion": "^12.42.2",
+    "react": "^19.2.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@testing-library/react": "^16.3.2",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "jsdom": "^30.0.1"
   }
 }

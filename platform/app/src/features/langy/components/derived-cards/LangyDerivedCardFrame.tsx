@@ -29,7 +29,7 @@ import type { ReactNode } from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { langyThinkingShimmerStyles } from "../langyShimmer";
+import { langyThinkingShimmerStyles } from "@langwatch/langy-web";
 
 /** The provenance line, and the longer answer behind it. */
 const MADE_BY_LANGY_LABEL = "Made by Langy";

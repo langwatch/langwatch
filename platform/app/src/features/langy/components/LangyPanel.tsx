@@ -8,6 +8,37 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  APP_HEADER_HEIGHT,
+  currentTurnAssistant,
+  deriveWaveActivity,
+  FLOATING_PANEL_CSS_WIDTH,
+  FLOATING_PANEL_INSET,
+  FLOATING_PEEK_NEAR_PX,
+  hasTokens,
+  LANGY_DODGE_STAGGER_MS,
+  LANGY_TRANSITION,
+  LangyMark,
+  LangyMarkGradientDefs,
+  type LangyPeekPhase,
+  LangyThinkingLine,
+  LangyWave,
+  langyChoicesTimeline,
+  langyRestingFloorPx,
+  navigateDedupKey,
+  PANEL_LAYOUT_TRANSITION,
+  PANEL_ROOT_ATTR,
+  resolveFloatingPanelWidth,
+  resolveLangyStopTarget,
+  resolvePeekTranslate,
+  reserveNavigate,
+  runningTool,
+  shouldRehydrateEngineFromDurable,
+  SIDEBAR_PANEL_WIDTH,
+  SIDEBAR_PEEK_NEAR_PX,
+  settledTool,
+  StreamingStatusLine,
+} from "@langwatch/langy-web";
+import {
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoiceSelection,
   type LangyDerivedCard,
@@ -77,13 +108,11 @@ import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
-import { PANEL_ROOT_ATTR, shouldRehydrateEngineFromDurable } from "@langwatch/langy-web";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
 } from "../logic/langyChatTransport";
-import { langyChoicesTimeline } from "@langwatch/langy-web";
 import { mergeContextChips } from "../logic/langyContextChips";
 import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
@@ -101,33 +130,8 @@ import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
 } from "../logic/langyMakeDefaultOffer";
-import { navigateDedupKey, reserveNavigate } from "@langwatch/langy-web";
-import {
-  APP_HEADER_HEIGHT,
-  FLOATING_PANEL_CSS_WIDTH,
-  FLOATING_PANEL_INSET,
-  LANGY_DODGE_STAGGER_MS,
-  LANGY_TRANSITION,
-  langyRestingFloorPx,
-  PANEL_LAYOUT_TRANSITION,
-  resolveFloatingPanelWidth,
-  SIDEBAR_PANEL_WIDTH,
-} from "@langwatch/langy-web";
-import {
-  FLOATING_PEEK_NEAR_PX,
-  type LangyPeekPhase,
-  resolvePeekTranslate,
-  SIDEBAR_PEEK_NEAR_PX,
-} from "@langwatch/langy-web";
-import { resolveLangyStopTarget } from "@langwatch/langy-web";
-import {
-  currentTurnAssistant,
-  hasTokens,
-  runningTool,
-  settledTool,
-} from "../logic/langyThinkingLine";
+import { langyToolNarrator } from "../adapters/langy-tool-narrator.adapter";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
-import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
 import {
@@ -147,18 +151,14 @@ import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMakeDefaultDialog } from "./LangyMakeDefaultDialog";
-import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
-import { LangyThinkingLine } from "./LangyThinkingLine";
 import { toPendingCapabilities } from "./LangyToolActivity";
-import { LangyWave } from "./LangyWave";
 import {
   type LangyProposal,
   MessageContent,
   type ProposalHandlers,
 } from "./MessageContent";
 import { RecentChatsView } from "./RecentChatsView";
-import { StreamingStatusLine } from "./StreamingStatusLine";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
 import "../langyTheme.css";
@@ -2866,6 +2866,7 @@ function LangyPanel({
                                 <LangyThinkingLine
                                   messages={displayMessages}
                                   hasLiveReasoning={!!displaySignals.reasoning}
+                                  toolNarrator={langyToolNarrator}
                                   // The panel-open warm proved this
                                   // conversation's worker alive, so the first
                                   // message reads "Thinking…" instead of the

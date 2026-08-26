@@ -1,6 +1,6 @@
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { useEffect } from "react";
-import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { useReducedMotion } from "../hooks/use-reduced-motion";
 
 /**
  * A spring number ticker. On first paint it rolls up from 0 to `value`; on

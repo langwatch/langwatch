@@ -14,9 +14,12 @@ import {
   seedLangyTurnProjection,
   type TurnPhaseState,
 } from "@langwatch/langy-contract";
+import type { LangyProgressSample } from "@langwatch/langy-web";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
+
+export type { LangyProgressSample } from "@langwatch/langy-web";
 
 /**
  * Single client/UI-state store for the Langy panel (ADR-046 frontend).
@@ -175,14 +178,6 @@ export type LangyPanelEffect = "fold" | "plain";
  * batch size/duration it lets the status line interpolate between real X/Y
  * samples without making timing part of durable conversation state.
  */
-export interface LangyProgressSample {
-  current: number;
-  total: number;
-  batchItems?: number;
-  batchDurationMs?: number;
-  receivedAtMs: number;
-}
-
 interface LangyState extends TurnPhaseState {
   // Panel visibility. `false` is MINIMISED, not gone: the panel sinks to its
   // edge peek (the panel itself slides down — a sliver of its header at the bottom in

@@ -26,8 +26,8 @@ import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangyPlan, LangyPlanItem, LangyPlanItemStatus } from "@langwatch/langy-web";
+import { langyThinkingShimmerStyles } from "@langwatch/langy-web";
 import { LangyActivityParts } from "./LangyToolActivity";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }

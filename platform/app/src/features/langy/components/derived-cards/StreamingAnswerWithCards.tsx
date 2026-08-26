@@ -26,10 +26,10 @@ import {
   type LangyDerivedCardPreview,
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
+import { StreamingText } from "@langwatch/langy-web";
 import { useMemo, useRef } from "react";
 
 import { LangyCardBoundary } from "../LangyCardBoundary";
-import { StreamingText } from "../StreamingText";
 import { LangyDerivedCardView } from "./LangyDerivedCardView";
 
 /** Cheap heuristic gate: fence-less streams never pay for the line scan. */

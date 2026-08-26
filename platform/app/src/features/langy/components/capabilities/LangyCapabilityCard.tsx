@@ -45,9 +45,9 @@ import {
 import type { ReactNode } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { toRelativeSameOriginHref } from "@langwatch/langy-contract";
+import { langyThinkingShimmerStyles } from "@langwatch/langy-web";
 import { useSpaLinkClick } from "../../logic/spaLink";
 import { LangySpaAnchor } from "../LangySpaAnchor";
-import { langyThinkingShimmerStyles } from "../langyShimmer";
 import type { CapabilityIconName, CapabilitySurface } from "./capabilityCatalog";
 import {
   buildSurfaceHref,

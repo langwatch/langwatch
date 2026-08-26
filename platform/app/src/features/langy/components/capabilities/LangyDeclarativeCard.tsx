@@ -19,9 +19,8 @@
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy-contract";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
+import { StreamingStatCard, type LangyTurnMetric } from "@langwatch/langy-web";
 import { type CapabilityData, useCapabilityData } from "../../hooks/useCapabilityData";
-import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
-import { StreamingStatCard } from "../StreamingStatCard";
 import {
   buildResourceHref,
   buildSurfaceHref,

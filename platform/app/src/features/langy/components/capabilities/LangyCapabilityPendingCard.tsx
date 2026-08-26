@@ -26,11 +26,13 @@ import {
   formatLangyPreviewCount,
   formatLangyProgressCount,
 } from "../../logic/langyActivityOwnership";
-import type { CapabilityCommand } from "@langwatch/langy-web";
-import type { LangyProgressSample } from "../../stores/langyStore";
-import { LangyInterruptedNote } from "../LangyInterruptedNote";
-import { langyThinkingShimmerStyles } from "../langyShimmer";
-import { useProjectedProgress } from "../StreamingStatusLine";
+import {
+  type CapabilityCommand,
+  type LangyProgressSample,
+  LangyInterruptedNote,
+  langyThinkingShimmerStyles,
+  useProjectedProgress,
+} from "@langwatch/langy-web";
 import type { CapabilitySurface } from "./capabilityCatalog";
 import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 

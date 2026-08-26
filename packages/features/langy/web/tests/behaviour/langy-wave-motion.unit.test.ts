@@ -21,7 +21,7 @@ import {
   restingWaveMotion,
   stepWaveMotion,
   WAVE_MOTION_TARGETS,
-} from "../logic/langyWaveMotion";
+} from "../../src/behaviour/langy-wave-motion";
 
 const assistant = (parts: unknown[]) => ({
   role: "assistant",

@@ -14,13 +14,13 @@
  * These tests are the guarantee that it cannot happen again.
  */
 import { describe, expect, it } from "vitest";
-import { LANGY_THINKING_VERBS } from "../components/langyThinkingVerbs";
+import { LANGY_THINKING_VERBS } from "../../src/values/langy-thinking-verbs";
 import {
   langyThinkingLine,
   THINKING_SLOW_MS,
   THINKING_STILL_STARTING_MS,
   THINKING_STUCK_MS,
-} from "../logic/langyThinkingLine";
+} from "../../src/behaviour/langy-thinking-line";
 
 const assistant = (parts: unknown[]) => ({
   role: "assistant",

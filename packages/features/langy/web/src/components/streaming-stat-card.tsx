@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import type { LangyTurnMetric } from "../hooks/useLangyTurnSignals";
-import { NumberTicker } from "./NumberTicker";
+import type { LangyTurnMetric } from "../values/langy-turn";
+import { NumberTicker } from "./number-ticker";
 
 /**
  * Compact metrics card for a live turn — e.g. "1,204 traces · 94% pass rate".

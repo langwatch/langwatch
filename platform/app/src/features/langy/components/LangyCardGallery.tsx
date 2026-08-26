@@ -23,6 +23,7 @@
  * on, made visible).
  */
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { StreamingStatusLine } from "@langwatch/langy-web";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
 import { LangyCard } from "~/features/asaplangy";
@@ -40,7 +41,6 @@ import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyToolActivity } from "./LangyToolActivity";
 import { type LangyProposal, ProposalCard } from "./MessageContent";
-import { StreamingStatusLine } from "./StreamingStatusLine";
 
 /** A settled tool call, shaped exactly as the stream delivers one. */
 function call(name: string, output: unknown, input: unknown = {}) {

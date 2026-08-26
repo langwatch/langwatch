@@ -8,9 +8,9 @@ and the Langy event-sourcing pipeline.
   `LangyService`.
 - `server/` contains the implementation, private repositories, eventing, and
   Redis-backed feedback cadence.
-- `web/` contains browser-safe client helpers and deterministic controlled
-  presentation behaviour. App routes, transport hooks, and React composition
-  remain in `platform/app`.
+- `web/` contains browser-safe helpers, deterministic behaviour, and reusable
+  controlled presentation. App pages/routes, state, and transport hooks remain
+  in `platform/app`.
 - `specs/` and `adrs/` record the current behavioural and architectural facts.
 
 The process builds one `LangyService` through `PostgresLangyAdapter` and

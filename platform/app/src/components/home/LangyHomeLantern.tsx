@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { LuArrowRight } from "react-icons/lu";
 import { Composer } from "~/features/langy/components/Composer";
 import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGhost";
-import { LangyMark } from "~/features/langy/components/LangyMark";
+import { LangyMark } from "@langwatch/langy-web";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useComposerMorph } from "~/features/langy/hooks/useComposerMorph";
 import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";

@@ -4,41 +4,57 @@
 
 **Behavioural contract:** [Langy service capability](../specs/langy.feature)
 
+## Context
+
+Langy behaviour was spread across the app, server paths and feature packages,
+with callers able to reach subordinate implementations.
+
 ## Decision
 
-The `langy` feature owns conversations, turns, messages, credentials, relay
-frames, feedback cadence, and its event-sourcing pipeline. It exposes one
-portable `LangyService` contract. The server package implements that contract
-with private repositories and services; the application does not construct or
-reach through subordinate Langy services.
+The singular `langy` feature owns conversations, turns, messages, credentials,
+relay frames, feedback cadence, eventing and reusable browser presentation. It
+exposes one portable `LangyService`.
 
-`PostgresLangyAdapter` is the server composition seam. It constructs the
-private persistence graph once and returns the contract service. The process
-composition root builds one instance and injects it into transports and workers.
+## Public surfaces and transports
 
-The feedback prompt is part of `LangyService` through `shouldAskFeedback` and
-`markFeedbackShown`. Its Redis record, parser, constants, and implementation
-are private to `@langwatch/langy-server`. Redis reads fail closed; writes are
-best effort. The current cadence remains: no prompt before two assistant
-answers, a three-day quiet period, a long-conversation exception, and a
-30-day Redis TTL.
+tRPC names, HTTP paths, relay frames, worker endpoints and response shapes do
+not change. The web package owns controlled presentation; app pages, state,
+routing and transport hooks remain composition.
 
-The contract and server package do not import application aliases, Hono,
-React, or global Prisma. The web package contains deterministic browser
-behaviour with controlled values only; routes, React composition, and transport
-hooks stay in the application. Configuration and technology adapters are
-supplied at the process boundary. No request constructs a service or resolves
-one through `getApp`.
+## Dependencies
 
-## Compatibility
+The concrete service receives its private collaborators. Presentation that
+needs app metadata receives a small named port, not a context bag.
 
-tRPC procedures, HTTP paths, relay frames, worker endpoints, and response
-shapes remain unchanged. Transports validate contract values and delegate to
-the flat `LangyService` methods.
+## Persistence
+
+Postgres repositories and Redis feedback records are private to the server.
+Redis reads fail closed and writes are best effort. Feedback remains disabled
+before two assistant answers, quiet for three days, exceptional for long
+conversations, and retained for 30 days.
+
+## Runtime and registration
+
+`PostgresLangyAdapter` builds the private graph. Each process composes one
+service and injects it into transports and workers; requests never construct
+or locate it globally.
+
+## Environment and configuration
+
+Configuration and technology adapters enter at process composition. Contract,
+server and web packages do not read app environment modules.
+
+## Errors
+
+Contract errors cross transports through the existing mappings. Optional Redis
+feedback storage does not make the main Langy path fail.
+
+## Contracts and validation
+
+Portable contract schemas define transport and relay values. Transports parse
+those values and call flat `LangyService` methods.
 
 ## Consequences
 
-There is one discoverable Langy capability and one lifecycle. Persistence and
-Redis details remain replaceable and private, while the feature contract can
-be used by the app, public/internal APIs, workers, and browser client without
-duplicating ownership.
+There is one discoverable service and lifecycle. Server persistence stays
+private, while reusable browser behaviour no longer lives in app feature code.

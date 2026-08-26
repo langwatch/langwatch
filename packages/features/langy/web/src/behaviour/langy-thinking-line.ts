@@ -1,41 +1,10 @@
-import { describeToolCall, effectiveToolName } from "./langyToolLabel";
+import { parseLangwatchCommand } from "@langwatch/langy-contract";
 
 /**
- * What the thinking line is allowed to SAY.
- *
- * ── THE BUG THIS EXISTS TO KILL ────────────────────────────────────────────
- *
- * The line used to cycle `LANGY_THINKING_VERBS` on a 3.6s timer whenever a turn
- * was in flight, regardless of whether anything was happening. So a turn whose
- * worker never spawned — nothing running, not one token — spent ninety-seven
- * seconds announcing "Writing a TODO list…", "Calling one more tool…", "Reading
- * the whole file…" before dying.
- *
- * Every one of those is a CLAIM ABOUT WORK, and every one of them was false. It
- * is not a cosmetic problem: it made a dead turn read as a healthy one, to the
- * point that a stuck spawn was diagnosed as "Langy is slow" for a whole session.
- * The product was PERFORMING progress it was not making.
- *
- * ── THE RULE ───────────────────────────────────────────────────────────────
- *
- * The line may only say things that are TRUE at the moment it says them.
- *
- *   1. A tool is running    → say what it is. We know: it is on the tool stream.
- *   2. Tokens are arriving  → say NOTHING. The streaming answer is on screen
- *                              and speaks for itself; a line under it reads
- *                              as still waiting for the visible reply.
- *   3. Reasoning is arriving → "Thinking…". The model IS working — live
- *                              reasoning deltas are on the wire — so it must
- *                              never read as a startup wait.
- *   4. None of those        → we are waiting for a worker that has not started.
- *                              Say so, plainly, and let it ESCALATE with time. A
- *                              turn that is stuck must eventually look stuck.
- *
- * Whimsy survives, because whimsy was never the problem — a joke about the
- * model's character ("Bribing the GPUs", "Blaming the NS") claims nothing about
- * the work. It is allowed ONLY while the model is genuinely working, and only
- * from the non-claiming pool. Cycling itself implies progress, so it never runs
- * while we are waiting.
+ * Derives an honest status from observable turn signals. A running tool is
+ * named, visible tokens need no extra line, live reasoning says “Thinking…”,
+ * and silence escalates from waiting to stuck. Whimsical cycling is permitted
+ * only while work is provably active because cycling itself implies progress.
  */
 
 /** What the line is describing, so the caller can pick its treatment. */
@@ -47,7 +16,7 @@ export type LangyThinkingTone =
   /** Long enough with nothing that the honest word is "stuck". */
   | "stuck";
 
-export interface LangyThinkingLine {
+export interface LangyThinkingLineState {
   /** The line to render. Always true at the moment it is produced. */
   text: string;
   tone: LangyThinkingTone;
@@ -64,6 +33,33 @@ interface ToolPart {
   type?: string;
   state?: string;
   input?: unknown;
+}
+
+export interface LangyToolNarrator {
+  describe(input: { name: string; toolInput: unknown }): {
+    title: string;
+    detail?: string;
+  };
+}
+
+function defaultToolNarrator({ name, toolInput }: { name: string; toolInput: unknown }): {
+  title: string;
+  detail?: string;
+} {
+  const input = toolInput && typeof toolInput === "object" ? toolInput : undefined;
+  const command = input && "command" in input ? input.command : undefined;
+
+  if (typeof command === "string") {
+    const parsed = parseLangwatchCommand(command);
+    if (parsed) {
+      return {
+        title: `${parsed.verb[0]?.toUpperCase() ?? ""}${parsed.verb.slice(1)}ing ${parsed.resource}`,
+        detail: command,
+      };
+    }
+  }
+
+  return { title: name.replace(/[_.-]+/g, " ") };
 }
 
 /**
@@ -156,7 +152,7 @@ function silenceEscalation({
 }: {
   elapsedMs: number;
   stuckText: string;
-}): LangyThinkingLine | undefined {
+}): LangyThinkingLineState | undefined {
   if (elapsedMs >= THINKING_STUCK_MS) {
     return { text: stuckText, tone: "stuck", allowWhimsy: false };
   }
@@ -184,7 +180,7 @@ function waitingLine({
   messages: ThinkingMessage[];
   elapsedMs: number;
   workerReady: boolean;
-}): LangyThinkingLine {
+}): LangyThinkingLineState {
   // A FOLLOW-UP IS WAITING — or a first message whose worker a panel-open warm
   // already PROVED alive (`workerReady`). Either way the model is working, not
   // booting; the manager's own "Thinking…" status lands moments later and
@@ -237,6 +233,7 @@ export function langyThinkingLine({
   elapsedMs,
   hasLiveReasoning = false,
   workerReady = false,
+  toolNarrator,
 }: {
   messages: ThinkingMessage[];
   /** Time since the turn was sent. */
@@ -257,18 +254,17 @@ export function langyThinkingLine({
    * the line moments later, the same recovery a follow-up relies on.
    */
   workerReady?: boolean;
-}): LangyThinkingLine | null {
+  toolNarrator?: LangyToolNarrator;
+}): LangyThinkingLineState | null {
   const last = currentTurnAssistant(messages);
 
   // 1. A TOOL IS RUNNING. We know exactly what it is — it is on the tool stream,
   //    with its command in the input. Say the true thing.
   const tool = runningTool(last);
   if (tool?.type) {
-    const rawName = tool.type.slice("tool-".length);
-    const { title, detail } = describeToolCall({
-      name: effectiveToolName(rawName, tool.input),
-      input: tool.input,
-    });
+    const name = tool.type.slice("tool-".length);
+    const narrator = toolNarrator?.describe ?? defaultToolNarrator;
+    const { title, detail } = narrator({ name, toolInput: tool.input });
     return {
       text: detail ? `${title} — ${detail}` : title,
       tone: "working",

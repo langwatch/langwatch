@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // `~/features/errors` barrel, which would put it in an import cycle with the
 // toaster. `components/ui/toaster.tsx` reaches for it the same way.
 import { ErrorActions } from "~/features/errors/components/ErrorActions";
-import { LangyMark, LangyMarkGradientDefs } from "~/features/langy/components/LangyMark";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web";
 import "~/features/langy/langyTheme.css";
 import { CARD } from "~/features/asaplangy";
 import { classifyGenerationError } from "../scenarios/utils/classifyGenerationError";
