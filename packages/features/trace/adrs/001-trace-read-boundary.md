@@ -85,6 +85,10 @@ the trace/log/coding-agent readers.
 The browser package contains only display behaviour and cannot fetch,
 authorize, compose, or reshape a trace response. It also owns the
 transport-neutral loaded-row find behaviour and the flame-graph presentation.
+The transcript stack (content parsing, turn grouping, role presentation,
+reasoning/tool cards, and the virtualized conversation list) is likewise
+browser-safe and reusable. The app supplies only the media, terminal, and
+anchored-comment render ports needed by its concrete drawer.
 The app supplies loaded span rows, selection callbacks, its Kbd skin, and
 shortcut composition; a small `TraceFlameSpan` input keeps the response schema
 out of the web package. Those paths move only

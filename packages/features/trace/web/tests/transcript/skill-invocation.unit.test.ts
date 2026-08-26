@@ -5,7 +5,7 @@ import {
   isSkillToolName,
   skillInvocationFromToolUse,
   skillSlugFromInput,
-} from "../skillInvocation";
+} from "../../src/transcript/skill-invocation";
 
 describe("skillInvocation", () => {
   describe("isSkillToolName", () => {

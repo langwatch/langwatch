@@ -40,5 +40,10 @@ viewport/tree behaviour. The app keeps thin compatibility adapters while
 page composition, authentication, data fetching, and every trace transport
 response remain in the app.
 
+The browser package also owns the reusable transcript parser and presentation
+stack: turn grouping, role visuals, reasoning/tool cards, and virtualization.
+App-owned media, terminal, and anchored-comment widgets enter through named
+render ports; the transcript never fetches or authorizes.
+
 See [ADR-001](./adrs/001-trace-read-boundary.md) and the
 [read contract](./specs/trace-read-service.feature).

@@ -5,8 +5,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
-import { ToolPairCard } from "../ToolBlocks";
+import { ToolPairCard } from "../../src/transcript/tool-blocks";
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);

@@ -16,7 +16,7 @@ export const KNOWN_CHAT_ROLES: ReadonlySet<string> = new Set([
   "developer",
 ]);
 
-export interface ChatMessage {
+interface AttributeChatMessage {
   role: string;
   content: string;
 }
@@ -185,8 +185,8 @@ export function stringifyForCopy(value: unknown): string {
   }
 }
 
-export function normaliseChat(items: unknown[]): ChatMessage[] {
-  const out: ChatMessage[] = [];
+export function normaliseChat(items: unknown[]): AttributeChatMessage[] {
+  const out: AttributeChatMessage[] = [];
   for (const item of items) {
     const parsed = chatMessageSchema.safeParse(item);
     if (!parsed.success) {

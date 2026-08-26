@@ -6,6 +6,7 @@ import {
   useAnchoredAnnotations,
 } from "../../../hooks/useAnchoredAnnotations";
 import { AnchorCommentButton } from "../anchoredComments/AnchorCommentButton";
+import { TranscriptRenderProvider } from "@langwatch/trace-web";
 
 interface MessageCommentScopeValue {
   /** The trace a comment left on a message in this transcript is about. */
@@ -36,7 +37,9 @@ export function MessageCommentScope({
   traceId?: string;
   children: ReactNode;
 }) {
-  if (!traceId) return <>{children}</>;
+  if (!traceId) {
+    return <TranscriptRenderProvider>{children}</TranscriptRenderProvider>;
+  }
   return <ScopeProvider traceId={traceId}>{children}</ScopeProvider>;
 }
 
@@ -48,7 +51,13 @@ function ScopeProvider({ traceId, children }: { traceId: string; children: React
   );
   return (
     <MessageCommentContext.Provider value={value}>
-      {children}
+      <TranscriptRenderProvider
+        renderCommentAction={(blockKey) => (
+          <MessageCommentButton scope={value} blockKey={blockKey} />
+        )}
+      >
+        {children}
+      </TranscriptRenderProvider>
     </MessageCommentContext.Provider>
   );
 }

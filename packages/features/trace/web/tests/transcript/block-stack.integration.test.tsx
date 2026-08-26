@@ -4,8 +4,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { BlockStack } from "../BlockStack";
-import type { ContentBlock } from "../types";
+import "@testing-library/jest-dom/vitest";
+import { BlockStack } from "../../src/transcript/block-stack";
+import type { ContentBlock } from "../../src/transcript/types";
 
 afterEach(cleanup);
 

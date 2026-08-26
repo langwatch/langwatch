@@ -21,6 +21,9 @@ import {
   VIRTUALIZE_AT,
 } from "./transcript";
 import { MessageCommentScope } from "./transcript/messageComments";
+import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
+import { TerminalOutput } from "@langwatch/coding-agent-web";
+import { TranscriptRenderProvider } from "@langwatch/trace-web";
 import {
   type MarkdownSubmode,
   useIOViewerState,
@@ -408,24 +411,31 @@ export const IOViewer = memo(function IOViewer({
                 {/* A message inside the transcript is a part of the trace a
                     comment can point at, and the transcript components are
                     handed messages rather than the trace they came out of. */}
-                <MessageCommentScope traceId={traceId}>
-                  <IOViewerBody
-                    format={format}
-                    isChat={isChat}
-                    canJson={canJson}
-                    prettyJsonContent={prettyJsonContent}
-                    markdownBody={markdownBody}
-                    markdownSubmode={markdownSubmode}
-                    conversationTurns={conversationTurns}
-                    chatLayout={chatLayout}
-                    inlineBlocks={inlineBlocks}
-                    hasInlineRichContent={hasInlineRichContent}
-                    displayContent={displayContent}
-                    isLong={isLong}
-                    expanded={expanded}
-                    mode={mode}
-                  />
-                </MessageCommentScope>
+                <TranscriptRenderProvider
+                  renderMediaPart={(part) => <TraceMediaPart part={part} />}
+                  renderTerminalOutput={(text, isError) => (
+                    <TerminalOutput text={text} isError={isError} />
+                  )}
+                >
+                  <MessageCommentScope traceId={traceId}>
+                    <IOViewerBody
+                      format={format}
+                      isChat={isChat}
+                      canJson={canJson}
+                      prettyJsonContent={prettyJsonContent}
+                      markdownBody={markdownBody}
+                      markdownSubmode={markdownSubmode}
+                      conversationTurns={conversationTurns}
+                      chatLayout={chatLayout}
+                      inlineBlocks={inlineBlocks}
+                      hasInlineRichContent={hasInlineRichContent}
+                      displayContent={displayContent}
+                      isLong={isLong}
+                      expanded={expanded}
+                      mode={mode}
+                    />
+                  </MessageCommentScope>
+                </TranscriptRenderProvider>
               </Box>
             </Box>
             {/*
