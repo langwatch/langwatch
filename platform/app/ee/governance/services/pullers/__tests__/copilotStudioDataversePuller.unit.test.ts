@@ -1048,6 +1048,51 @@ describe("given the pull goes wrong", () => {
   });
 
   /**
+   * The cost of stepping over unreadable rows, pinned so it stays visible.
+   *
+   * A page where every row is unreadable now drains rather than stops: the
+   * cursor walks to the end of it and the events are gone for good. That is
+   * the deliberate other half of not wedging on one bad row, and the count is
+   * the only thing that says it happened, so this asserts the count is the
+   * full page rather than a sample of it. A source answering like this for
+   * every page is reporting a broken read, not an empty table.
+   */
+  it("drains a page it cannot read a single row of, and counts every one", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({
+      status: 200,
+      body: {
+        value: [
+          transcriptRow({ name: 1 }),
+          transcriptRow({
+            conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+            createdon: "2026-08-25T19:45:00Z",
+            name: 2,
+          }),
+          transcriptRow({
+            conversationtranscriptid: "33333333-3333-4333-8333-333333333333",
+            createdon: "2026-08-25T19:46:00Z",
+            name: 3,
+          }),
+        ],
+      },
+    });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.events).toHaveLength(0);
+    expect(result.errorCount).toBe(3);
+    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+      createdon: "2026-08-25T19:46:00Z",
+      conversationtranscriptid: "33333333-3333-4333-8333-333333333333",
+    });
+  });
+
+  /**
    * The one row that must still hold the walk where it is. Its identifier is
    * the unreadable part, and that identifier is what the next run's filter
    * would be built from — there is nowhere to move to, so the run is left to
