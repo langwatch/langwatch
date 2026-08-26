@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-26
 
-**Snapshot:** committed tree at `567084da8e`
+**Snapshot:** committed tree at `8c69d4fb87`
 
 **Goal:** delete `platform/app`.
 
@@ -15,53 +15,41 @@ those decisions.
 
 ## Progress measure
 
-The authoritative number is:
+The authoritative committed number is:
 
 ```sh
-rg --files --hidden platform/app \
-  -g '!node_modules/**' \
-  -g '!.next/**' \
-  -g '!dist/**' \
-  -g '!coverage/**' \
-  | wc -l
+git ls-tree -r --name-only HEAD platform/app | wc -l
 ```
 
-At this snapshot it is **6,296 files**:
+At this snapshot it is **6,595 files**. `platform/app/src` contains 6,264.
+The shared working tree is lower while migration batches are under review, but
+those deletions are not progress until their exact paths are committed.
 
-| Kind                                           | Files |
-| ---------------------------------------------- | ----: |
-| Production code                                | 3,557 |
-| Tests                                          | 2,462 |
-| Configuration, assets, specs and other support |   277 |
-
-`platform/app/src` contains 5,965 files. The rest are scripts, E2E coverage,
-specs, public assets, Prisma files and workspace configuration. `platform/app/ee`
-contains zero files; Enterprise residue now means licensed behaviour or
-composition still scattered elsewhere in the application.
+The rest are scripts, E2E coverage, specs, public assets, Prisma files and
+workspace configuration. `platform/app/ee` contains zero files; Enterprise
+residue now means licensed behaviour or composition still scattered elsewhere
+in the application.
 
 The large physical roots are:
 
-| Current root                      |   All | Production | Tests | Destination                                                                 |
-| --------------------------------- | ----: | ---------: | ----: | --------------------------------------------------------------------------- |
-| `src/server`                      | 2,290 |      1,031 | 1,179 | Feature server packages, `apps/api`, `apps/worker`, infrastructure packages |
-| `src/features`                    | 1,179 |        770 |   372 | Feature web packages and `apps/ui` composition                              |
-| `src/components`                  | 1,098 |        733 |   364 | Feature web packages, Design System and `apps/ui` composition               |
-| `src/pages`                       |   241 |        165 |    74 | `apps/ui`; API compatibility pages to `apps/api`                            |
-| `src/app`                         |   211 |        119 |    91 | `apps/api`                                                                  |
-| `src/utils`                       |   176 |        107 |    69 | Owning feature, Design System or process app                                |
-| `src/hooks`                       |   139 |         87 |    52 | Owning feature web package or `apps/ui`                                     |
-| `src/runtime`                     |   139 |         98 |    41 | `apps/api`, `apps/worker`, `apps/ui`, `tools/dev-runtime`                   |
-| `src/experiments-v3`              |   137 |         63 |    74 | Experiment/Evaluation packages and app composition                          |
-| `src/prompts`                     |   136 |         96 |    40 | Prompt web package and `apps/ui`                                            |
-| `src/optimization_studio`         |    97 |         74 |    23 | Workflow web package and app composition                                    |
-| Other `src` roots and entry files |   138 |         82 |    51 | Owning feature or process app                                               |
+| Current root                      | Files | Destination                                                                 |
+| --------------------------------- | ----: | --------------------------------------------------------------------------- |
+| `src/server`                      | 2,532 | Feature server packages, `apps/api`, `apps/worker`, infrastructure packages |
+| `src/features`                    | 1,275 | Feature web packages and `apps/ui` composition                              |
+| `src/components`                  | 1,098 | Feature web packages, Design System and `apps/ui` composition               |
+| `src/pages`                       |   241 | `apps/ui`; API compatibility pages to `apps/api`                            |
+| `src/app`                         |   211 | `apps/api`                                                                  |
+| `src/utils`                       |   177 | Owning feature, Design System or process app                                |
+| `src/hooks`                       |   139 | Owning feature web package or `apps/ui`                                     |
+| `src/runtime`                     |    82 | `apps/api`, `apps/worker`, `apps/ui`, `tools/dev-runtime`                   |
+| `src/experiments-v3`              |   137 | Experiment/Evaluation packages and app composition                          |
+| `src/prompts`                     |   136 | Prompt web package and `apps/ui`                                            |
+| `src/optimization_studio`         |    97 | Workflow web package and app composition                                    |
+| Other `src` roots and entry files |   139 | Owning feature or process app                                               |
 
-Counts include the shared dirty worktree and are refreshed after every merged
-batch. They are evidence, not a baseline that permits new files.
-
-Five ignored local/generated files (`.env*`, `.DS_Store` and
-`src/tasks.generated.ts`) are not included. They are regenerated or removed at
-the final workspace deletion; they are not migration inputs.
+Counts are refreshed after every committed batch. Ignored local/generated files
+are regenerated or removed at final workspace deletion; they are not migration
+inputs.
 
 ## Ownership map
 
@@ -127,28 +115,28 @@ A batch is complete only when its domain search finds no implementation under
 `apps/*` workspace in the same batch; they are not left for a later directory
 shuffle. Tests, ADRs, specs and developer documentation move with the owner.
 
-|   # | Status          | Chunk                                 | Current evidence and exit                                                                                                                                                                                                                                                                                |
-| --: | --------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|  01 | review          | Model Provider legacy cut             | The 1,824-line service and 583-line repository are deleted in the worktree. The exact named lower-bound surface is 81 files across `server/modelProviders`, model-provider UI and both Hono route groups; also drain settings hooks, scripts and runtime adapters.                                       |
-|  02 | active          | Scenario execution cut                | Drain the 48-file `server/scenarios` residue: processor/child execution, typed config, secrets, ingest lag and browser coordination. The exact named Scenario surface is 99 files; move its Scenario/Simulation/Suite composition and canonical coverage too.                                            |
-|  03 | active          | Gateway vertical                      | The exact named surface is 170 files: 78 gateway server, 14 spend-pipeline, 71 gateway UI/page and seven Hono transport files. Drain the named tRPC/internal transports too. Strict architecture must reach zero before integration.                                                                     |
-|  04 | started         | Workflow and Studio                   | The current worktree has already removed 16 Studio files. Move the remaining 97-file `optimization_studio` tree, workflow persistence/execution, routes and pages; preserve DSL and response parity.                                                                                                     |
+|   # | Status          | Chunk                                 | Current evidence and exit                                                                                                                                                                                                                                                                                                                                                       |
+| --: | --------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|  01 | review          | Model Provider legacy cut             | The 1,824-line service and 583-line repository are deleted in the worktree. The exact named lower-bound surface is 81 files across `server/modelProviders`, model-provider UI and both Hono route groups; also drain settings hooks, scripts and runtime adapters.                                                                                                              |
+|  02 | active          | Scenario execution cut                | Drain the 48-file `server/scenarios` residue: processor/child execution, typed config, secrets, ingest lag and browser coordination. The exact named Scenario surface is 99 files; move its Scenario/Simulation/Suite composition and canonical coverage too.                                                                                                                   |
+|  03 | active          | Gateway vertical                      | The exact named surface is 170 files: 78 gateway server, 14 spend-pipeline, 71 gateway UI/page and seven Hono transport files. Drain the named tRPC/internal transports too. Strict architecture must reach zero before integration.                                                                                                                                            |
+|  04 | started         | Workflow and Studio                   | The current worktree has already removed 16 Studio files. Move the remaining 97-file `optimization_studio` tree, workflow persistence/execution, routes and pages; preserve DSL and response parity.                                                                                                                                                                            |
 |  05 | queued          | Evaluation execution family           | Move Evaluator, Evaluation, Monitor, Experiment, Suite and Simulation as separate owners. Exact named lower bounds are Experiment 223 files, Evaluation/Evaluator 135, Simulation 91 and Suite 85. Move `simulationRunExecution` process/intent types to Simulation server, its intent handlers/registration to `apps/worker`, and inject EvaluationService for evaluator work. |
-|  06 | queued, largest | Telemetry and Trace                   | Establish the missing Telemetry package and move intake first, then Trace storage/query/eventing/web. The exact named Trace surface is 1,052 files; Telemetry/tracer residue is additional. Preserve every response field and keep `trace_analytics`, `trace_summaries` and timeseries rollups distinct. |
-|  07 | queued          | Langy, Coding Agent and GitHub        | Finish their separate services and move API, UI, webhook and durable pipeline composition. The exact `langy`/`asaplangy` web residue is 216 files before routes and pipelines.                                                                                                                           |
-|  08 | queued          | Identity and tenancy                  | Finish Auth, User, AuthZ, Role, Organization, Project and API Key across settings/me/member UI, compatibility transports and boot.                                                                                                                                                                       |
-|  09 | queued          | Prompt, Dataset and Agent             | Apply the prompt/CopilotKit replacement from PR 7371 first, then drain the resulting three independent feature surfaces. Prompt's old named lower bound is 161 files; Dataset/Stored Object has 88 before scattered adapters.                                                                           |
-|  10 | queued          | Analytics, Dashboard and Topic        | Consolidate duplicate reads, move analytical UI, and move topic process/eventing without leaking Trace repositories. Analytics has an exact named lower bound of 164 files.                                                                                                                              |
-|  11 | queued          | Automation, Notification and Presence | Move reusable authoring UI and policy to feature packages; move effect execution and realtime registration to process apps.                                                                                                                                                                              |
-|  12 | queued          | Data and security utilities           | Complete Data Privacy, Data Retention, Secret, Share and Stored Object, including public viewer and storage adapters.                                                                                                                                                                                    |
-|  13 | queued          | Ops and Enterprise seams              | Move core admin/ops to Ops. Move every licensed residue to its Enterprise feature or Enterprise API/worker/web composition package.                                                                                                                                                                      |
-|  14 | queued          | Generic browser surface               | Empty root `components`, `hooks`, `utils`, navigation/onboarding/home/briefing and generic feature bags into feature web, Design System or `apps/ui`; no new shared catch-all.                                                                                                                           |
-|  15 | queued          | UI composition                        | Apply the React compiler setup and form fixes from PR 7282 at the final Vite root, then move the browser entry, router, pages, styles, public assets and browser tests to `apps/ui`. Remove browser inference of server implementation types.                                                              |
-|  16 | queued          | API composition                       | Move Hono/tRPC roots, middleware, static delivery, auth transport, OpenAPI and compatibility adapters to `apps/api`. Direct Hono routes must move onto `@langwatch/api`: REST keeps its URLs and verbs but handlers receive one schema-validated input and return schema-validated output, while middleware serializes errors. |
-|  17 | queued          | Worker composition                    | Move Eventing/Group Queue registration, consumers, schedulers, task registry and worker boot to `apps/worker`; deterministic feature event logic stays in feature server packages.                                                                                                                       |
-|  18 | queued          | Infrastructure and config             | Move Prisma schema/migrations/client lifecycle, boot config, storage, mail and process instrumentation to named packages/process apps. Delete global Prisma, global App and import-time environment access.                                                                                              |
-|  19 | queued          | Repository support                    | Move feature specs/docs/tests to owners; E2E to `dev/tests/e2e`; build/start/seed/ops scripts to their app, infrastructure package or contributor tooling; public product assets to UI and repository artwork to `.github/assets`.                                                                       |
-|  20 | queued          | Delete the workspace                  | Move the remaining package/config/build files, update workspace filters, CI, Docker, Helm and self-host staging, then delete `platform/app` and its migration baselines.                                                                                                                                 |
+|  06 | queued, largest | Telemetry and Trace                   | Establish the missing Telemetry package and move intake first, then Trace storage/query/eventing/web. The exact named Trace surface is 1,052 files; Telemetry/tracer residue is additional. Preserve every response field and keep `trace_analytics`, `trace_summaries` and timeseries rollups distinct.                                                                        |
+|  07 | queued          | Langy, Coding Agent and GitHub        | Finish their separate services and move API, UI, webhook and durable pipeline composition. The exact `langy`/`asaplangy` web residue is 216 files before routes and pipelines.                                                                                                                                                                                                  |
+|  08 | queued          | Identity and tenancy                  | Finish Auth, User, AuthZ, Role, Organization, Project and API Key across settings/me/member UI, compatibility transports and boot.                                                                                                                                                                                                                                              |
+|  09 | queued          | Prompt, Dataset and Agent             | Apply the prompt/CopilotKit replacement from PR 7371 first, then drain the resulting three independent feature surfaces. Prompt's old named lower bound is 161 files; Dataset/Stored Object has 88 before scattered adapters.                                                                                                                                                   |
+|  10 | queued          | Analytics, Dashboard and Topic        | Consolidate duplicate reads, move analytical UI, and move topic process/eventing without leaking Trace repositories. Analytics has an exact named lower bound of 164 files.                                                                                                                                                                                                     |
+|  11 | queued          | Automation, Notification and Presence | Move reusable authoring UI and policy to feature packages; move effect execution and realtime registration to process apps.                                                                                                                                                                                                                                                     |
+|  12 | queued          | Data and security utilities           | Complete Data Privacy, Data Retention, Secret, Share and Stored Object, including public viewer and storage adapters.                                                                                                                                                                                                                                                           |
+|  13 | queued          | Ops and Enterprise seams              | Move core admin/ops to Ops. Move every licensed residue to its Enterprise feature or Enterprise API/worker/web composition package.                                                                                                                                                                                                                                             |
+|  14 | queued          | Generic browser surface               | Empty root `components`, `hooks`, `utils`, navigation/onboarding/home/briefing and generic feature bags into feature web, Design System or `apps/ui`; no new shared catch-all.                                                                                                                                                                                                  |
+|  15 | queued          | UI composition                        | Apply the React compiler setup and form fixes from PR 7282 at the final Vite root, then move the browser entry, router, pages, styles, public assets and browser tests to `apps/ui`. Remove browser inference of server implementation types.                                                                                                                                   |
+|  16 | queued          | API composition                       | Move Hono/tRPC roots, middleware, static delivery, auth transport, OpenAPI and compatibility adapters to `apps/api`. Direct Hono routes must move onto `@langwatch/api`: REST keeps its URLs and verbs but handlers receive one schema-validated input and return schema-validated output, while middleware serializes errors.                                                  |
+|  17 | queued          | Worker composition                    | Move Eventing/Group Queue registration, consumers, schedulers, task registry and worker boot to `apps/worker`; deterministic feature event logic stays in feature server packages.                                                                                                                                                                                              |
+|  18 | queued          | Infrastructure and config             | Move Prisma schema/migrations/client lifecycle, boot config, storage, mail and process instrumentation to named packages/process apps. Delete global Prisma, global App and import-time environment access.                                                                                                                                                                     |
+|  19 | queued          | Repository support                    | Move feature specs/docs/tests to owners; E2E to `dev/tests/e2e`; build/start/seed/ops scripts to their app, infrastructure package or contributor tooling; public product assets to UI and repository artwork to `.github/assets`.                                                                                                                                              |
+|  20 | queued          | Delete the workspace                  | Move the remaining package/config/build files, update workspace filters, CI, Docker, Helm and self-host staging, then delete `platform/app` and its migration baselines.                                                                                                                                                                                                        |
 
 The immediate integration order is **01, 02, 04, 03**. Model Provider and the
 small Scenario/Workflow cuts should land while Gateway finishes its strict
