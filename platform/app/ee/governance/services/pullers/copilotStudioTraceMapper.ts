@@ -78,6 +78,25 @@ const ROLE_AGENT = 0;
 const ROLE_USER = 1;
 
 /**
+ * Both spellings of the role, because Bot Framework has two.
+ *
+ * Every activity in the capture carries the numeric form, so that is what the
+ * fixtures use and what the mapper is built around. But `RoleTypes` in the SDK
+ * is a string enum, and an activity that reached Dataverse through a different
+ * channel can arrive spelled that way. Reading only the numbers would attribute
+ * such a message to neither side and lose the turn.
+ */
+function roleOf(raw: unknown): number | null {
+  if (raw === ROLE_USER || raw === ROLE_AGENT) return raw;
+  if (typeof raw === "string") {
+    const normalized = raw.toLowerCase();
+    if (normalized === "user") return ROLE_USER;
+    if (normalized === "bot") return ROLE_AGENT;
+  }
+  return null;
+}
+
+/**
  * Activity ids must be real GUIDs. The capture contains an activity whose id
  * is the string "0" and others with none at all, and both would seed a span
  * that either collides with a different turn or moves when the text changes.
@@ -129,14 +148,18 @@ interface TranscriptRow {
   content?: string | { activities?: Activity[] | null } | null;
 }
 
-/** What the adapter supplies about the agent, read from the joined bot row. */
+/**
+ * What the adapter supplies about the agent, read from the joined bot row.
+ *
+ * There is no model here, and that is a finding rather than an omission. The
+ * `bot` table carries `name`, `schemaname`, `language`, `authenticationmode`,
+ * `statecode`, `publishedon` and `modifiedon` — and nothing naming a model.
+ * An earlier draft emitted `copilot_studio.agent_model` from a field no query
+ * could ever populate, which is worse than saying nothing: a reader would have
+ * taken its absence as "not configured" rather than "not knowable from here".
+ */
 interface BotFacts {
   botName?: string;
-  /**
-   * The agent's current model series. Not recorded in the conversation, so
-   * this is whatever the agent is set to now.
-   */
-  model?: string;
   /** When the agent was last changed. Later than the conversation = suspect. */
   modifiedOn?: string;
 }
@@ -227,7 +250,13 @@ interface ConversationGroup {
   incomplete: boolean;
   /** True when the conversation happened while designing the agent. */
   designMode: boolean;
-  startMs: number | null;
+}
+
+/** True when the batch numbers held skip one, e.g. 0 and 2 with no 1. */
+function hasBatchGap(batches: number[]): boolean {
+  if (batches.length < 2) return false;
+  const sorted = [...new Set(batches)].sort((a, b) => a - b);
+  return sorted[sorted.length - 1]! - sorted[0]! !== sorted.length - 1;
 }
 
 /**
@@ -260,9 +289,6 @@ export function groupTranscriptRows(
     if (!existing.bot.botName && typeof extra.botName === "string") {
       existing.bot.botName = extra.botName;
     }
-    if (!existing.bot.model && typeof extra.botModel === "string") {
-      existing.bot.model = extra.botModel;
-    }
     if (!existing.bot.modifiedOn && typeof extra.botModifiedOn === "string") {
       existing.bot.modifiedOn = extra.botModifiedOn;
     }
@@ -271,10 +297,19 @@ export function groupTranscriptRows(
 
   const groups: ConversationGroup[] = [];
   for (const [key, entry] of byKey) {
-    const ordered = [...entry.rows].sort((a, b) => {
+    // Unbatched rows sort last and hold their arrival order among themselves.
+    // Returning 1 for both `(a,b)` and `(b,a)` when neither has a batch is an
+    // inconsistent comparator, and what it decides is not "unspecified order"
+    // in a harmless sense: turns are paired by walking the merged activities,
+    // so two rows that swap put an answer before its question.
+    const withIndex = entry.rows.map((row, index) => ({ ...row, index }));
+    const ordered = withIndex.sort((a, b) => {
+      if (a.batchId === null && b.batchId === null) return a.index - b.index;
       if (a.batchId === null) return 1;
       if (b.batchId === null) return -1;
-      return a.batchId - b.batchId;
+      return a.batchId === b.batchId
+        ? a.index - b.index
+        : a.batchId - b.batchId;
     });
     const batches = ordered
       .map((r) => r.batchId)
@@ -283,28 +318,58 @@ export function groupTranscriptRows(
     for (const { row } of ordered) {
       const content = asObject(row.content);
       const list = content?.activities;
-      if (Array.isArray(list)) activities.push(...(list as Activity[]));
+      if (!Array.isArray(list)) continue;
+      // Each element is checked, not just the array. `content` is a JSON
+      // string the row schema validates as a string and never opens, so this
+      // is the only place anything looks inside it. A `null` element passes
+      // `Array.isArray` happily and then throws on the first property read —
+      // and the caller has no try/catch, so one malformed activity would take
+      // down routing for every conversation in the run, not just its own.
+      for (const entry of list) {
+        if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+          activities.push(entry as Activity);
+        }
+      }
     }
-    const startMs = (() => {
-      const start = key.split("|").slice(1).join("|");
-      const parsed = Date.parse(start);
-      return Number.isFinite(parsed) ? parsed : null;
-    })();
+    // Batch order, then time. Batch order alone is right whenever the rows
+    // arrive as written, and this is what makes it right when they do not:
+    // turns are paired by walking this list, so one out-of-order message
+    // attaches an answer to the wrong question. Undateable activities keep
+    // their position rather than being bunched at one end — the sort is
+    // stable, and a missing timestamp is not evidence about ordering.
+    const sortable = activities.map((activity, index) => ({
+      activity,
+      index,
+      ms: activityMs(activity),
+    }));
+    sortable.sort((a, b) => {
+      if (a.ms === null || b.ms === null) return a.index - b.index;
+      return a.ms === b.ms ? a.index - b.index : a.ms - b.ms;
+    });
     groups.push({
       key,
-      activities,
+      activities: sortable.map((s) => s.activity),
       bot: entry.bot,
       batches,
-      // A conversation whose first batch never arrived is missing its
-      // opening turns. It still routes — a partial transcript beats none —
-      // but it is marked so nobody reads it as the whole exchange.
-      incomplete: batches.length > 0 && !batches.includes(0),
+      // A hole in the batch numbers we hold — 0 and 2 with no 1 — is a piece
+      // of the conversation that is genuinely missing. It still routes, a
+      // partial transcript beating none, but it is marked so nobody reads it
+      // as the whole exchange.
+      //
+      // Deliberately not "batch 0 is absent", which was the first rule here
+      // and is wrong for an ordinary reason: batches carry different
+      // `createdon` values, so a pull window can end between them. The run
+      // holding only batch 1 would flag a conversation whose opening arrived
+      // perfectly well on the previous run. The cost of the narrower rule is
+      // that a conversation truncated at the front by the 30-day cleanup
+      // reads as complete; `transcript_batches` still shows how many pieces
+      // this is built from.
+      incomplete: hasBatchGap(batches),
       designMode: activities.some(
         (a) =>
           a.valueType === "ConversationInfo" &&
           asObject(a.value)?.isDesignMode === true,
       ),
-      startMs,
     });
   }
   return groups;
@@ -362,7 +427,7 @@ export function turnsOf(activities: Activity[]): {
       if (text) skipped += 1;
       continue;
     }
-    const role = activity.from?.role;
+    const role = roleOf(activity.from?.role);
     if (role === ROLE_USER) {
       close();
       const aad = activity.from?.aadObjectId;
@@ -393,7 +458,15 @@ export function turnsOf(activities: Activity[]): {
         startMs: ms,
         endMs: ms,
       });
+      continue;
     }
+    // Said something, cannot be attributed to either side. Counting it is the
+    // whole point: the alternative is a conversation whose every message has
+    // an unreadable role producing no turns at all, which reaches
+    // `assembleTraceRequest` as an empty span list and disappears with no
+    // log, no attribute and no error — indistinguishable from a pull that
+    // found nothing.
+    skipped += 1;
   }
   close();
   return { turns, skipped };
@@ -463,15 +536,15 @@ function chatValue(role: string, content: string): string {
 }
 
 /**
- * Whether the recorded model can be believed.
+ * Whether the agent was edited after this conversation happened.
  *
- * The stored conversation does not say which model answered it, so the only
- * available answer is what the agent is set to now. If the agent was changed
- * after the conversation happened, "now" and "then" are not the same thing
- * and the attribute says so rather than quietly asserting a model that may
- * never have run.
+ * The transcript records what was said, never which configuration said it, so
+ * the agent this trace names is the agent as it stands now. When it was last
+ * changed after the conversation ended, "now" and "then" are not the same
+ * agent, and anyone reading this trace as evidence of how the agent behaves
+ * needs to know that before they draw a conclusion from it.
  */
-function modelIsSuspect(bot: BotFacts, conversationEndMs: number): boolean {
+function agentChangedSince(bot: BotFacts, conversationEndMs: number): boolean {
   if (!bot.modifiedOn) return false;
   const modified = Date.parse(bot.modifiedOn);
   return Number.isFinite(modified) && modified > conversationEndMs;
@@ -492,13 +565,8 @@ function conversationAttrs(params: {
   if (group.bot.botName) {
     attrs.push(stringAttr("copilot_studio.agent_name", group.bot.botName));
   }
-  if (group.bot.model) {
-    attrs.push(stringAttr("copilot_studio.agent_model", group.bot.model));
-    if (modelIsSuspect(group.bot, endMs)) {
-      // The agent's settings changed after this conversation, so the model
-      // above may not be the one that answered it.
-      attrs.push(stringAttr("copilot_studio.agent_model_unreliable", "true"));
-    }
+  if (agentChangedSince(group.bot, endMs)) {
+    attrs.push(stringAttr("copilot_studio.agent_changed_since", "true"));
   }
   if (group.batches.length > 0) {
     attrs.push(

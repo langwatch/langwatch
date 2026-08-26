@@ -279,18 +279,123 @@ describe("given a conversation Microsoft stored across several rows", () => {
     );
   });
 
-  /** @scenario "A conversation missing its opening piece is marked incomplete" */
-  it("marks a conversation whose opening piece never arrived", () => {
-    const spans = spansOf([copilotEvent(second)]);
+  /**
+   * Batch order is right whenever rows arrive as written. This is what makes
+   * it right when they do not: turns are paired by walking the merged list,
+   * so one message out of place attaches an answer to the wrong question.
+   *
+   * @scenario "A conversation stored across several rows is still one conversation"
+   */
+  it("pairs the answer with the question even when a row stores them out of order", () => {
+    const jumbled = transcriptRow({
+      activities: [
+        agentMessage(
+          "a9999999-9999-4999-8999-999999999999",
+          "Hold the power button.",
+          2_000,
+        ),
+        userMessage(
+          "b8888888-8888-4888-8888-888888888888",
+          "How do I reset it?",
+          1_000,
+        ),
+      ],
+    });
+    const spans = spansOf([copilotEvent(jumbled)]);
+    expect(spans).toHaveLength(1);
+    const attrs = attrsOf(spans[0]!);
+    expect(attrs["langwatch.input"]).toContain("How do I reset it?");
+    expect(attrs["langwatch.output"]).toContain("Hold the power button.");
+  });
+
+  it("survives a null in the activity list rather than taking down the run", () => {
+    // `content` is a JSON string the row schema validates as a string and
+    // never opens, so nothing upstream rejects this. The caller has no
+    // try/catch, so a throw here would abort routing for every conversation
+    // in the run, not just this one.
+    const poisoned = transcriptRow({
+      activities: [null, ...CHAT] as never,
+    });
+    expect(() => spansOf([copilotEvent(poisoned)])).not.toThrow();
+    expect(spansOf([copilotEvent(poisoned)]).length).toBeGreaterThan(0);
+  });
+
+  it("counts a message it cannot attribute instead of losing it in silence", () => {
+    const unattributed = transcriptRow({
+      activities: [
+        {
+          id: "c7777777-7777-4777-8777-777777777777",
+          type: "message",
+          text: "Who said this?",
+          timestampMs: 1_787_685_284_913,
+          from: { id: "x", role: 9 },
+        },
+      ],
+    });
+    const spans = spansOf([copilotEvent(unattributed)]);
+    // No turn survives, so no span does — and the count is the only trace
+    // that anything was there at all.
+    expect(spans).toHaveLength(0);
+  });
+
+  it("reads the string spelling of a role as well as the numeric one", () => {
+    const stringRoles = transcriptRow({
+      activities: [
+        {
+          id: "d1111111-1111-4111-8111-111111111111",
+          type: "message",
+          text: "Is the printer online?",
+          timestampMs: 1_787_685_284_913,
+          from: { id: "x", role: "user" as never, aadObjectId: AAD_OBJECT_ID },
+        },
+        {
+          id: "d2222222-2222-4222-8222-222222222222",
+          type: "message",
+          text: "It is online.",
+          timestampMs: 1_787_685_285_913,
+          from: { id: "y", role: "bot" as never },
+        },
+      ],
+    });
+    const spans = spansOf([copilotEvent(stringRoles)]);
+    expect(spans).toHaveLength(1);
+    const attrs = attrsOf(spans[0]!);
+    expect(attrs["langwatch.input"]).toContain("Is the printer online?");
+    expect(attrs["langwatch.output"]).toContain("It is online.");
+  });
+
+  /** @scenario "A conversation with a piece missing from the middle is marked incomplete" */
+  it("marks a conversation with a hole in its numbering", () => {
+    const third = transcriptRow({
+      activities: [CHAT[2]],
+      batchId: 2,
+      transcriptId: "row-c",
+    });
+    const spans = spansOf([copilotEvent(first), copilotEvent(third)]);
     expect(spans.length).toBeGreaterThan(0);
-    expect(
-      attrsOf(spans[0]!)["copilot_studio.conversation_incomplete"],
-    ).toBe("true");
+    expect(attrsOf(spans[0]!)["copilot_studio.conversation_incomplete"]).toBe(
+      "true",
+    );
   });
 
   /** @scenario "A conversation stored across several rows is still one conversation" */
-  it("does not mark a conversation that has its opening piece", () => {
+  it("does not mark a conversation whose pieces run consecutively", () => {
     const spans = spansOf([copilotEvent(second), copilotEvent(first)]);
+    expect(
+      attrsOf(spans[0]!)["copilot_studio.conversation_incomplete"],
+    ).toBeUndefined();
+  });
+
+  /**
+   * The rule deliberately does not read "batch 0 is absent". Batches carry
+   * different `createdon` values, so a pull window can end between them: the
+   * run holding only batch 1 would flag a conversation whose opening arrived
+   * perfectly well on the run before, and the flag would mean nothing because
+   * it fires on the ordinary case.
+   */
+  it("does not flag a later piece that arrived in its own pull window", () => {
+    const spans = spansOf([copilotEvent(second)]);
+    expect(spans.length).toBeGreaterThan(0);
     expect(
       attrsOf(spans[0]!)["copilot_studio.conversation_incomplete"],
     ).toBeUndefined();
@@ -435,29 +540,30 @@ describe("given a tool call the agent ran", () => {
 
 describe("given what the agent was running", () => {
   /** @scenario "The agent's model is recorded when it can be trusted" */
-  it("records the model when the agent has not changed since", () => {
+  it("says nothing about a model, because the bot row carries none", () => {
     const spans = spansOf([
       copilotEvent(transcriptRow({ activities: CHAT }), {
-        botModel: "GPT56Reasoning",
         botModifiedOn: "2026-08-20T10:00:00Z",
       }),
     ]);
     const attrs = attrsOf(spans[0]!);
-    expect(attrs["copilot_studio.agent_model"]).toBe("GPT56Reasoning");
-    expect(attrs["copilot_studio.agent_model_unreliable"]).toBeUndefined();
+    // The `bot` table has no model column — see BotFacts. Asserting the
+    // absence rather than deleting the case: the previous version of this
+    // test injected a `botModel` no query produces and passed on data
+    // production cannot emit.
+    expect(attrs["copilot_studio.agent_model"]).toBeUndefined();
+    expect(attrs["copilot_studio.agent_changed_since"]).toBeUndefined();
   });
 
   /** @scenario "A model read after the fact is recorded but flagged" */
-  it("flags a model read from an agent changed after the conversation", () => {
+  it("flags a conversation whose agent was edited afterwards", () => {
     const spans = spansOf([
       copilotEvent(transcriptRow({ activities: CHAT }), {
-        botModel: "GPT56Reasoning",
         botModifiedOn: "2026-09-01T10:00:00Z",
       }),
     ]);
     const attrs = attrsOf(spans[0]!);
-    expect(attrs["copilot_studio.agent_model"]).toBe("GPT56Reasoning");
-    expect(attrs["copilot_studio.agent_model_unreliable"]).toBe("true");
+    expect(attrs["copilot_studio.agent_changed_since"]).toBe("true");
   });
 
   it("never prices a conversation — the agent name resolves to no model", () => {
