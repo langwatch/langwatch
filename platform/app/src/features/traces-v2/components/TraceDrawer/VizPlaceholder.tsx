@@ -13,7 +13,7 @@ import {
   LuPanelRightOpen,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
@@ -31,15 +31,14 @@ import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "@langwatch/trace-web";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { FlameView } from "@langwatch/trace-web";
-import { SequenceSkeleton } from "./sequenceView/SequenceSkeleton";
-import { TopologySkeleton } from "./sequenceView/TopologySkeleton";
+import { SequenceSkeleton, TopologySkeleton } from "@langwatch/trace-web";
 import { WaterfallView } from "./waterfallView";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
 // That's the only viz heavy enough to keep code-split — the others are
 // statically imported so tab switches stay synchronous.
 const SequenceView = lazy(() =>
-  import("./sequenceView").then((m) => ({ default: m.SequenceView })),
+  import("@langwatch/trace-web").then((m) => ({ default: m.SequenceView })),
 );
 
 interface VizPlaceholderProps {

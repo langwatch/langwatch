@@ -146,30 +146,6 @@ export function formatAbsoluteTime(timestamp: number): string {
   )} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
 }
 
-export function formatDuration(ms: number): string {
-  if (ms < 1_000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1_000).toFixed(1)}s`;
-}
-
-export function formatCost(cost: number, estimated?: boolean): string {
-  if (cost === 0) return "—";
-  const prefix = estimated ? "~" : "";
-  if (cost < 0.01) return `${prefix}$${cost.toFixed(4)}`;
-  return `${prefix}$${cost.toFixed(2)}`;
-}
-
-/**
- * Token counts in one decimal place, stepping up a tier at each thousand:
- * `840`, `12.4K`, `1.1M`. Coding-agent sessions routinely run into millions of
- * cached tokens, and `2400.0K` costs the reader a division to understand.
- */
-export function formatTokens(tokens: number): string {
-  if (tokens === 0) return "—";
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
-  return `${tokens}`;
-}
-
 /**
  * Human-readable byte size using decimal (SI) units — bytes, kB, MB, GB, TB.
  * Decimal, not binary (KiB), because the source is ClickHouse `byteSize(...)`
@@ -250,3 +226,8 @@ export function hashColor(value: string): (typeof HASH_COLOR_PALETTE)[number] {
   }
   return HASH_COLOR_PALETTE[Math.abs(hash) % HASH_COLOR_PALETTE.length]!;
 }
+export {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";

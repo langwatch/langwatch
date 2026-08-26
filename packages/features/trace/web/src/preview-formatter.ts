@@ -21,7 +21,7 @@
  * outcome — a worse-but-correct preview is better than a thrown error.
  */
 
-import { splitLeadingContextBlocks } from "./leading-context";
+import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
 import {
   applyPreviewNewlineTreatment,
   stripPreviewMarkdownNoise,

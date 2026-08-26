@@ -1,6 +1,6 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuUser } from "react-icons/lu";
-import { RenderedMarkdown } from "../markdownView";
+import { RenderedMarkdown } from "@langwatch/trace-web";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
 import { asMarkdownBody } from "./parsing";

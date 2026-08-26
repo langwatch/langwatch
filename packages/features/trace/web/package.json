@@ -21,11 +21,17 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@tanstack/react-virtual": "^3.14.5",
     "lucide-react": "^1.22.0",
+    "mermaid": "^11.16.0",
     "react": "^19.2.7",
+    "react-icons": "^5.7.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "zod": "^4.4.3",
     "zustand": "^4.5.7"
   },

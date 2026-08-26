@@ -14,7 +14,7 @@ import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
 import { EditModeBar } from "./editMode/EditModeBar";
-import { useShikiAdapter } from "./markdownView/shikiAdapter";
+import { useShikiAdapter } from "@langwatch/trace-web";
 import { PaneLayout } from "./panes/PaneLayout";
 import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";

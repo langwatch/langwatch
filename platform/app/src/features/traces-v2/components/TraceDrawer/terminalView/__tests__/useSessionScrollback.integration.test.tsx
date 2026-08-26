@@ -3,7 +3,7 @@
  */
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { CONVERSATION_TURN_CAP, useSessionScrollback } from "../useSessionScrollback";
 
 const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoisted(

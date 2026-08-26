@@ -4,15 +4,14 @@ import { useMemo, useRef, useState } from "react";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import { useTraceEvents } from "../../hooks/useTraceEvents";
+import { buildTraceMarkdown, splitTraceMarkdown } from "./markdownView";
 import {
-  buildTraceMarkdown,
   DEFAULT_MARKDOWN_CONFIG,
   type MarkdownConfig,
-  MarkdownConfigurePopover,
   MarkdownCopyButton,
   RenderedMarkdown,
-  splitTraceMarkdown,
-} from "./markdownView";
+} from "@langwatch/trace-web";
+import { MarkdownConfigurePopover } from "@langwatch/trace-web";
 
 interface LlmPanelProps {
   trace: TraceHeader;

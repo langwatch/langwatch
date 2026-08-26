@@ -24,7 +24,7 @@
  * the arithmetic while stepping around the ingest that has to supply it.
  */
 import { describe, expect, it } from "vitest";
-import { buildEntryTimeline } from "~/features/traces-v2/components/TraceDrawer/terminalView/terminalSession";
+import { buildEntryTimeline } from "@langwatch/coding-agent-web";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import {
   createInitState,

@@ -35,7 +35,10 @@ vi.mock("../../../../hooks/useConversationTurnEvents", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
-vi.mock("../../markdownView", () => ({ RenderedMarkdown: () => null }));
+vi.mock("@langwatch/trace-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web")>()),
+  RenderedMarkdown: () => null,
+}));
 
 /** The turn itself is covered by its own tests; the notice sits above them. */
 vi.mock("../AnnotatedTurnRow", () => ({

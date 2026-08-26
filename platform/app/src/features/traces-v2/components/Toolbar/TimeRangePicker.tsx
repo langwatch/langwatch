@@ -16,7 +16,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { useCopyToClipboard } from "@langwatch/trace-web";
 import type { TimeRange } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import {

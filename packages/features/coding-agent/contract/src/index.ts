@@ -14,3 +14,5 @@ export type {
   TranscriptLogRecord,
 } from "./coding-agent-transcript";
 export type { LogContentCategory, LogContentKey } from "./coding-agent-log-content";
+export * from "./injected-notice";
+export * from "./leading-context";

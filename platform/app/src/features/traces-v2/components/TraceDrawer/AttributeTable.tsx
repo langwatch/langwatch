@@ -6,7 +6,7 @@ import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
 import { compileAttributePattern } from "~/server/data-privacy/attributePatternMatcher";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { useCopyToClipboard } from "@langwatch/trace-web";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
 import type { PinnedAttributeSource } from "@langwatch/trace-web";
 import {

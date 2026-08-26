@@ -43,7 +43,10 @@ vi.mock("../../../../hooks/useTextTranslation", () => ({
   }),
 }));
 
-vi.mock("../../markdownView", () => ({ RenderedMarkdown: () => null }));
+vi.mock("@langwatch/trace-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web")>()),
+  RenderedMarkdown: () => null,
+}));
 
 vi.mock("../TurnAnnotations", () => ({
   TurnEditTraceAction: () => null,

@@ -26,3 +26,4 @@ export { SortableColumnHeader } from "./sortable-column-header";
 export { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell";
 export { ComparisonBar } from "./cells/comparison-bar";
 export { MissingValue } from "./cells/missing-value";
+export * from "./trace";

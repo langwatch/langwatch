@@ -5,8 +5,8 @@ import { hasAnsi } from "../../../utils/ansi/ansi";
 // Direct file import (not the barrel) so we don't pull TerminalView -> transcript
 // back into transcript and form an import cycle. TerminalOutput has no
 // transcript dependency of its own.
-import { TerminalOutput } from "../terminalView/TerminalOutput";
-import { toolResultBodyToString, tryPrettyJson } from "./parsing";
+import { TerminalOutput, toolResultBodyToString } from "@langwatch/coding-agent-web";
+import { tryPrettyJson } from "./parsing";
 import { skillInvocationFromToolUse } from "./skillInvocation";
 import type { ChatMessage } from "./types";
 

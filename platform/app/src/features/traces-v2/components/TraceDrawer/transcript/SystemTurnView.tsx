@@ -1,5 +1,5 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
-import { RenderedMarkdown } from "../markdownView";
+import { RenderedMarkdown } from "@langwatch/trace-web";
 import { asMarkdownBody } from "./parsing";
 import { RoleChip } from "./RoleChip";
 import { TurnCollapseChevron } from "./TurnCollapseChevron";

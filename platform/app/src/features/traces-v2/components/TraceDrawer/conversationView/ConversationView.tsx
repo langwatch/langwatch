@@ -26,7 +26,7 @@ import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useConversationAnnotations } from "../../../hooks/useConversationAnnotations";
 import { useConversationTurnEvents } from "../../../hooks/useConversationTurnEvents";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
-import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
+import { useCopyToClipboard } from "@langwatch/trace-web";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
 import {
   isTurnRailDraft,
@@ -34,7 +34,7 @@ import {
 } from "../../../stores/annotationDraftStore";
 import type { TraceListItem } from "../../../types/trace";
 import { FormatSelect } from "../FormatSelect";
-import { RenderedMarkdown } from "../markdownView";
+import { RenderedMarkdown } from "@langwatch/trace-web";
 import {
   extractReadableText,
   extractReasoningText,

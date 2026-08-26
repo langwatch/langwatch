@@ -1,23 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { api } from "~/utils/api";
 import {
   type ConversationTurn,
   useConversationContext,
 } from "../../../hooks/useConversationContext";
 import {
+  CONVERSATION_TURN_CAP,
+  type EarlierTotals,
   type LoadedTurn,
   mergeSessionTurns,
+  type ScrollbackStatus,
   type TurnDivider,
-} from "./sessionScrollback";
-import { indexToolSpansBySpanId, type TerminalToolSpan } from "./toolSpans";
+  type TerminalToolSpan,
+} from "@langwatch/coding-agent-web";
+import { indexToolSpansBySpanId } from "@langwatch/coding-agent-web";
 
 /**
  * How many turns `tracesV2.conversationContext` returns. A session longer than
  * this cannot be walked to its start, and the view says so rather than
  * pretending the oldest turn it can see is the beginning.
  */
-export const CONVERSATION_TURN_CAP = 200;
 
 /** Shared by every read of an earlier turn, matching the opened turn's own. */
 const EARLIER_TURN_FETCH = { staleTime: 60_000 } as const;
@@ -40,14 +43,6 @@ interface TurnTarget {
  * - `start`: the oldest loaded turn is the session's first.
  * - `unavailable`: the session is longer than the turn list can reach.
  */
-export type ScrollbackStatus =
-  | "pending"
-  | "hidden"
-  | "available"
-  | "loading"
-  | "error"
-  | "start"
-  | "unavailable";
 
 export interface SessionScrollback {
   entries: TranscriptEntry[];
@@ -352,10 +347,6 @@ function useOpenedTurn({
  * not read. Cost is null for a reader without `cost:view`, since the turn list
  * carries no spend for them.
  */
-export type EarlierTotals = {
-  tokens: number | null;
-  costUsd: number | null;
-};
 
 /**
  * The sum, or null when one of the values is absent. A turn that carries no

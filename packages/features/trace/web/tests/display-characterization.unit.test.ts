@@ -3,23 +3,10 @@ import {
   NON_BILLABLE_ATTR,
   extractPromptReference,
   formatPreview,
-  parseAnsi,
   resolveNonBilledCost,
 } from "../src";
 
 describe("trace display toolkit characterization", () => {
-  it("preserves terminal colour segments while dropping control noise", () => {
-    expect(parseAnsi("a\x1b[2K\x1b[31mred\x1b[0mb")).toEqual([
-      {
-        segments: [
-          { text: "a", style: {} },
-          { text: "red", style: { fg: { kind: "named", name: "red" } } },
-          { text: "b", style: {} },
-        ],
-      },
-    ]);
-  });
-
   it("keeps preview unwrap, markdown, and newline-display semantics together", () => {
     expect(
       formatPreview(

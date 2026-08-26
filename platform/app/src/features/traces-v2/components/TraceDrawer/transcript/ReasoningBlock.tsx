@@ -2,7 +2,7 @@ import { Box, chakra, Icon, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { useState } from "react";
 import { LuBrain, LuChevronDown, LuChevronRight } from "react-icons/lu";
-import { RenderedMarkdown } from "../markdownView";
+import { RenderedMarkdown } from "@langwatch/trace-web";
 
 const thinkingMirror = keyframes`
   from { background-position: 200% center; }

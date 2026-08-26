@@ -23,6 +23,7 @@
   "dependencies": {
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.22.0",
     "react-icons": "^5.5.0"
@@ -30,8 +31,12 @@
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",

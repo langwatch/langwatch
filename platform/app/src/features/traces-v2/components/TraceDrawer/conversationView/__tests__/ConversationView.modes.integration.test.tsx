@@ -42,7 +42,8 @@ vi.mock("../../../../hooks/useConversationTurnEvents", () => ({
   useConversationTurnEvents: (rows: TraceListItem[]) => rows,
 }));
 
-vi.mock("../../markdownView", () => ({
+vi.mock("@langwatch/trace-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-web")>()),
   RenderedMarkdown: () => null,
 }));
 

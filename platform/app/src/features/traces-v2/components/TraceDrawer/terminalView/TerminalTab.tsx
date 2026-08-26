@@ -1,12 +1,14 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
-import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { api } from "~/utils/api";
-import { TERMINAL_TOKENS } from "./palette";
-import { deriveSessionBanner } from "./sessionBanner";
-import { TerminalSkeleton } from "./TerminalSkeleton";
-import { TerminalView } from "./TerminalView";
-import { indexToolSpansBySpanId } from "./toolSpans";
+import {
+  deriveSessionBanner,
+  indexToolSpansBySpanId,
+  TERMINAL_TOKENS,
+  TerminalSkeleton,
+  TerminalView,
+} from "@langwatch/coding-agent-web";
 import { useSessionScrollback } from "./useSessionScrollback";
 
 /** Stable identity while the transcript is still in flight. */

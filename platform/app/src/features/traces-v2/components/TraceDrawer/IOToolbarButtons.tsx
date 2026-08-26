@@ -3,7 +3,7 @@ import { forwardRef, useState } from "react";
 import type { IconType } from "react-icons";
 import { LuCheck, LuCopy, LuLanguages, LuLightbulb, LuPlay } from "react-icons/lu";
 import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { useCopyToClipboard } from "@langwatch/trace-web";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 
 /**

@@ -1,6 +1,6 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { api } from "~/utils/api";
-import { SessionView } from "./SessionView";
+import { SessionView } from "@langwatch/coding-agent-web";
 
 interface SessionTabProps {
   projectId: string;

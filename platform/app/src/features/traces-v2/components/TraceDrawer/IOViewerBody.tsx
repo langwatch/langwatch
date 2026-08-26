@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { RenderedMarkdown, ShikiCodeBlock } from "./markdownView";
+import { RenderedMarkdown, ShikiCodeBlock } from "@langwatch/trace-web";
 import {
   AssistantTurnCard,
   type ChatLayout,

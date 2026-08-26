@@ -14,7 +14,7 @@ import {
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { useCopyToClipboard } from "@langwatch/trace-web";
 import {
   type AttributeFormat,
   buildInlineDescriptor,
@@ -27,7 +27,7 @@ import {
 } from "@langwatch/trace-web";
 import { FormatSelect } from "./FormatSelect";
 import { safePrettyJson } from "./JsonHighlight";
-import { ShikiCodeBlock } from "./markdownView";
+import { ShikiCodeBlock } from "@langwatch/trace-web";
 
 const EM_DASH = "—";
 const MAX_CHAT_MESSAGES_RENDERED = 100;

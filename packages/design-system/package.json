@@ -46,6 +46,10 @@
       "types": "./src/components/dialog.tsx",
       "default": "./src/components/dialog.tsx"
     },
+    "./display-formatters": {
+      "types": "./src/display-formatters.ts",
+      "default": "./src/display-formatters.ts"
+    },
     "./drawer": {
       "types": "./src/components/drawer.tsx",
       "default": "./src/components/drawer.tsx"
@@ -69,6 +73,14 @@
     "./radio": {
       "types": "./src/components/radio.tsx",
       "default": "./src/components/radio.tsx"
+    },
+    "./shiki": {
+      "types": "./src/shiki-adapter.ts",
+      "default": "./src/shiki-adapter.ts"
+    },
+    "./shiki-chunking": {
+      "types": "./src/shiki-chunking.ts",
+      "default": "./src/shiki-chunking.ts"
     },
     "./search-input": {
       "types": "./src/components/search-input.tsx",
@@ -105,6 +117,10 @@
     "./trigger-anchor": {
       "types": "./src/components/trigger-anchor.tsx",
       "default": "./src/components/trigger-anchor.tsx"
+    },
+    "./use-copy-to-clipboard": {
+      "types": "./src/use-copy-to-clipboard.ts",
+      "default": "./src/use-copy-to-clipboard.ts"
     }
   },
   "scripts": {
@@ -114,7 +130,8 @@
   },
   "dependencies": {
     "lucide-react": "^1.22.0",
-    "next-themes": "^0.4.6"
+    "next-themes": "^0.4.6",
+    "shiki": "^4.3.0"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
