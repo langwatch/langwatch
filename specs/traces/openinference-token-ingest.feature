@@ -8,7 +8,7 @@ Feature: Ingest OpenInference token-count attributes
   # =========================================================================
   #
   # The new event-sourcing canonicalisation pipeline
-  # (`server/app-layer/traces/canonicalisation/extractors/`) maps two upstream
+  # (`packages/features/trace/server/src/adapters/`) maps two upstream
   # conventions into canonical `gen_ai.usage.*` attributes:
   #
   #   - Vercel AI SDK (`VercelExtractor`):    `ai.usage.{...}`

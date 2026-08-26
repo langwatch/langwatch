@@ -20,7 +20,7 @@
 #   platform/app/src/components/me/AgentLabel.tsx                                       (an assistant named like its product)
 #
 # Related specs:
-#   specs/coding-agent/session-git-context.feature   , where the repo+branch identity comes from
+#   packages/features/coding-agent/specs/session-git-context.feature, where the repo+branch identity comes from
 #   specs/integrations/github-connection.feature     , the org-level GitHub connection this rides
 #
 # Motivation: the ledger question "what did this pull request cost in assistant

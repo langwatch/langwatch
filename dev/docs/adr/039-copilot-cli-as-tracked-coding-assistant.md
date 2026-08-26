@@ -96,7 +96,7 @@ utils/governance/platform-tool-policy.ts            — PlatformToolSlug union +
 utils/governance/telemetry-targets.ts               — SHELL_FUNCTION_TOOLS += copilot (+ config write target if needed)
                                                       NOTE: shell-rc.ts TOOLS must NOT gain copilot (Decision 7)
 platform/app/ee/governance/services/platformToolPolicy.service.ts — server-side copilot slug + defaults (admin UI toggle)
-platform/app/src/server/.../canonicalisation/extractors/copilot.ts — thin specifics-only extractor, registered after
+packages/features/trace/server/src/adapters/copilot-canonicalisation.adapter.ts — thin specifics-only extractor, registered after
                                                       GenAIExtractor, primitives from _extraction.ts/_messages.ts
 platform/app/src/components/me/tiles/               — copilot assistant tile/icon
 specs/ai-governance/cli-wrappers/*.feature          — scenarios for the new tool

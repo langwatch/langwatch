@@ -2,11 +2,13 @@
 
 **Date:** 2026-07-21
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Store corrected by:** [ADR-066](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md) — the session-aggregate store must read its full state back from ClickHouse. The no-read-back store (`get()` returns null, forcing an `event_log` refold on every cache miss and out-of-order delivery) caused a production outage and is forbidden. The pipeline shape and session-key decisions in this ADR stand.
 
-**Amended (2026-07-24):** the per-agent vocabulary moved from one grown-together normalization module into a **registration-style agent registry** (`coding-agent-processing/agents/` — one pure definition per agent: identity predicate, name prefixes, alias quirks; ordered, first match wins), mirroring the trace-canonicalisation extractor pattern. And the agent roster gained a sixth member: **`claude_cowork`** (Claude Cowork — the Claude desktop runtime in a VM; same event vocabulary as Claude Code, identified only by `service.name: cowork`, events-only export, model calls and tool runs folded from its `api_request`/`tool_result` events). Note the literal `claude_cowork` also names a governance IngestionSource type ([ADR-018](./018-governance-unified-observability-substrate.md)) — same product, different subsystem: governance ingests Cowork's span-shaped payloads org-wide; this pipeline folds its per-project session events.
+**Current vocabulary owner:** the Coding Agent contract's `telemetry/` registry,
+with one definition per agent and ordered first-match detection. Cowork precedes
+Claude Code because it reuses that runtime and is distinguished by service name.
 
 ## Context
 
@@ -110,14 +112,11 @@ aggregate is the **session**, not the trace.
      session aggregate. It works for any trace, coding-agent or not.
      Neither surface can break the other.
 
-7. **Provider vocabulary lives here.** The per-agent knowledge (identity
-   predicates, name prefixes, alias quirks) is single-sourced in this
-   pipeline's `agents/` registry — one pure definition per agent, folded
-   into shared tables by the normalization engine (see the 2026-07-24
-   amendment above). Cross-agent spelling folds (token buckets,
-   non-additive buckets like Codex `total` / Gemini `tool`, MCP name
-   parsing) stay in the engine. Nothing agent-specific remains in
-   `trace-processing`.
+7. **Provider vocabulary belongs to the feature contract.** Identity
+   predicates, name prefixes, aliases, token buckets, and MCP naming are
+   single-sourced in `packages/features/coding-agent/contract/src/telemetry`.
+   Event pipelines and UI callers consume that portable vocabulary; nothing
+   agent-specific remains in `trace-processing`.
 
 8. **Synthesis stays, generically.** Logs-only sources (a logs exporter with
    no traces exporter) still get a synthesized `CorrelationTraceId` and the
@@ -182,6 +181,7 @@ canonical metric tables.
   projection — superseded by this document).
 - Specs: `specs/coding-agent/session-aggregate.feature`,
   `specs/coding-agent/personal-usage.feature`.
-- Build plan + port manifest: `dev/docs/coding-agent-pipeline-plan.md`.
+- Feature service boundary:
+  `packages/features/coding-agent/adrs/001-session-read-service-boundary.md`.
 - Claude Code telemetry reference:
   https://code.claude.com/docs/en/monitoring-usage

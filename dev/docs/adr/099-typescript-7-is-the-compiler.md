@@ -165,7 +165,7 @@ The two packages on `typescript@6` are a standing item, not a resting state.
 - Related ADRs: [ADR-100](100-the-typecheck-memory-ceiling.md) (the memory
   ceiling the same investigation turned up), [ADR-076](076-single-pnpm-workspace.md)
   (why one root install governs every package's compiler version),
-  [ADR-085](085-governed-chart-runtime-without-eval.md) (which generated the
+  [ADR-085](../../../packages/features/analytics/adrs/002-lwql-chart-runtime-without-eval.md) (which generated the
   validator, and whose "`checkJs` parses it without checking it" consequence
   this supersedes — it is not parsed at all now)
 - Specs: `specs/setup/typescript-7.feature`
