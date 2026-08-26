@@ -110,7 +110,14 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const handleBack = useCallback(() => selectPlan(null), [selectPlan]);
 
   if (!isReady) {
-    return <TabSkeleton testId="agent-testing-results-tab" />;
+    // Wrap in AgentTestingTabLayout so the skeleton reserves the same rail
+    // width the ready list uses; otherwise it starts one rail-width farther
+    // left and shifts when `isReady` flips true.
+    return (
+      <AgentTestingTabLayout data-testid="agent-testing-results-tab">
+        <TabSkeleton flex={1} />
+      </AgentTestingTabLayout>
+    );
   }
 
   // The plan detail already has a rail (RunsSidebar) baked in. The list view
