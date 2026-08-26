@@ -39,7 +39,7 @@ export const MainMenuSections = function MainMenuSections({
   showExpanded: boolean;
 }) {
   const router = useRouter();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project, organization, hasPermission } = useOrganizationTeamProject();
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
@@ -49,6 +49,7 @@ export const MainMenuSections = function MainMenuSections({
   const sectionProps = {
     showExpanded,
     project,
+    organization,
     pathname: router.pathname,
   };
 
@@ -82,6 +83,7 @@ export const MainMenuSections = function MainMenuSections({
 interface ProjectSectionProps {
   showExpanded: boolean;
   project: ReturnType<typeof useOrganizationTeamProject>["project"];
+  organization: ReturnType<typeof useOrganizationTeamProject>["organization"];
   pathname: string;
 }
 
@@ -193,6 +195,7 @@ function ObserveSection({
 function TestSection({
   showExpanded,
   project,
+  organization,
   pathname,
   pendingAnnotationCount,
 }: ProjectSectionProps & { pendingAnnotationCount: number | undefined }) {
@@ -203,8 +206,10 @@ function TestSection({
     "release_ui_agent_testing_v2_enabled",
     {
       projectId: project?.id,
-      organizationId: NOT_TARGETED,
-      enabled: !!project?.id,
+      organizationId: organization?.id,
+      // Both ids come from the same workspace query, and a rule may name
+      // either one, so the read waits until both are known.
+      enabled: !!project?.id && !!organization?.id,
     },
   );
 
