@@ -26,6 +26,7 @@ vi.mock("~/server/app-layer/app", () => {
   return { getApp: app, tryGetApp: app };
 });
 
+import { ActivityMonitorClickHouseRepository } from "../activityMonitor.clickhouse.repository";
 import { ActivityMonitorService } from "../activityMonitor.service";
 
 /**
@@ -66,7 +67,12 @@ describe("money type lossless round-trip", () => {
       const prisma = {
         project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
       };
-      const service = ActivityMonitorService.create(prisma as never);
+      const service = ActivityMonitorService.create(
+        prisma as never,
+        new ActivityMonitorClickHouseRepository(
+          async () => ({ query }) as never,
+        ),
+      );
 
       const rows = await service.eventsForSource({
         organizationId: "org",
@@ -113,7 +119,12 @@ describe("money type lossless round-trip", () => {
       const prisma = {
         project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
       };
-      const service = ActivityMonitorService.create(prisma as never);
+      const service = ActivityMonitorService.create(
+        prisma as never,
+        new ActivityMonitorClickHouseRepository(
+          async () => ({ query }) as never,
+        ),
+      );
 
       const rows = await service.eventsForSource({
         organizationId: "org",
@@ -143,7 +154,12 @@ describe("money type lossless round-trip", () => {
       const prisma = {
         project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
       };
-      const service = ActivityMonitorService.create(prisma as never);
+      const service = ActivityMonitorService.create(
+        prisma as never,
+        new ActivityMonitorClickHouseRepository(
+          async () => ({ query }) as never,
+        ),
+      );
 
       const rows = await service.spendByUser({
         organizationId: "org",
@@ -183,7 +199,12 @@ describe("money type lossless round-trip", () => {
           findMany: vi.fn(async () => [{ id: "dep-1", name: "Engineering" }]),
         },
       };
-      const service = ActivityMonitorService.create(prisma as never);
+      const service = ActivityMonitorService.create(
+        prisma as never,
+        new ActivityMonitorClickHouseRepository(
+          async () => ({ query }) as never,
+        ),
+      );
 
       const rows = await service.spendByDepartment({
         organizationId: "org",
