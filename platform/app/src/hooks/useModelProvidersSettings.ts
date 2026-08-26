@@ -12,7 +12,7 @@ export function useModelProvidersSettings(params: { projectId: string | undefine
     { enabled: Boolean(projectId) },
   );
 
-  const providers = modelProviders.data?.providers;
+  const providers = modelProviders.data;
   const isLoading = modelProviders.isLoading;
 
   const hasEnabledProviders = useMemo(() => {

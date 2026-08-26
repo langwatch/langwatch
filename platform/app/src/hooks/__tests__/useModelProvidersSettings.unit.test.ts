@@ -5,20 +5,21 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { mockUseQuery } = vi.hoisted(() => ({
+  mockUseQuery: vi.fn(),
+}));
+
 vi.mock("../../utils/api", () => ({
   api: {
     modelProvider: {
       getAllForProjectForFrontend: {
-        useQuery: vi.fn(),
+        useQuery: mockUseQuery,
       },
     },
   },
 }));
 
-import { api } from "../../utils/api";
 import { useModelProvidersSettings } from "../useModelProvidersSettings";
-
-const mockUseQuery = vi.mocked(api.modelProvider.getAllForProjectForFrontend.useQuery);
 
 describe("useModelProvidersSettings()", () => {
   beforeEach(() => {
@@ -29,10 +30,10 @@ describe("useModelProvidersSettings()", () => {
     describe("when loading", () => {
       beforeEach(() => {
         mockUseQuery.mockReturnValue({
-          data: undefined,
+          data: void 0,
           isLoading: true,
           refetch: vi.fn(),
-        } as any);
+        });
       });
 
       it("returns true (optimistic default)", () => {
@@ -47,10 +48,10 @@ describe("useModelProvidersSettings()", () => {
     describe("when providers is undefined", () => {
       beforeEach(() => {
         mockUseQuery.mockReturnValue({
-          data: undefined,
+          data: void 0,
           isLoading: false,
           refetch: vi.fn(),
-        } as any);
+        });
       });
 
       it("returns true (optimistic default)", () => {
@@ -65,10 +66,10 @@ describe("useModelProvidersSettings()", () => {
     describe("when no providers are configured", () => {
       beforeEach(() => {
         mockUseQuery.mockReturnValue({
-          data: { providers: {}, modelMetadata: {} },
+          data: {},
           isLoading: false,
           refetch: vi.fn(),
-        } as any);
+        });
       });
 
       it("returns false", () => {
@@ -84,15 +85,12 @@ describe("useModelProvidersSettings()", () => {
       beforeEach(() => {
         mockUseQuery.mockReturnValue({
           data: {
-            providers: {
-              openai: { enabled: false, provider: "openai" },
-              anthropic: { enabled: false, provider: "anthropic" },
-            },
-            modelMetadata: {},
+            openai: { enabled: false, provider: "openai" },
+            anthropic: { enabled: false, provider: "anthropic" },
           },
           isLoading: false,
           refetch: vi.fn(),
-        } as any);
+        });
       });
 
       it("returns false", () => {
@@ -108,15 +106,12 @@ describe("useModelProvidersSettings()", () => {
       beforeEach(() => {
         mockUseQuery.mockReturnValue({
           data: {
-            providers: {
-              openai: { enabled: true, provider: "openai" },
-              anthropic: { enabled: false, provider: "anthropic" },
-            },
-            modelMetadata: {},
+            openai: { enabled: true, provider: "openai" },
+            anthropic: { enabled: false, provider: "anthropic" },
           },
           isLoading: false,
           refetch: vi.fn(),
-        } as any);
+        });
       });
 
       it("returns true", () => {
