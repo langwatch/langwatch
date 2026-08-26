@@ -81,6 +81,20 @@ const clauseField = (clause: unknown, key: string): unknown =>
     : undefined;
 
 /**
+ * Whether a clause names specific rows by id — either one, or a list of them.
+ *
+ * A delete bounded by ids the caller already read is bounded, whatever
+ * organizations those rows turn out to span; a delete bounded by nothing is
+ * the sweep the regime exists to refuse.
+ */
+const idPredicate = (value: unknown): boolean => {
+  if (typeof value === "string") return true;
+  if (!value || typeof value !== "object") return false;
+  const inList = (value as { in?: unknown }).in;
+  return Array.isArray(inList) && inList.length > 0;
+};
+
+/**
  * A reserved, system-managed API-key name. Only the platform can create or
  * rename a key into one (`ApiKeyService.create` refuses otherwise), so a query
  * bounded by such a name reaches platform-owned rows only — never a customer's.
@@ -256,12 +270,36 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // an inline scope) on every call site.
   CustomRole: {},
   Group: {},
-  // A request to join one organization (D12). It carries `organizationId`, and
-  // every read is either an admin listing that organization's queue or a
-  // lookup of one request by its own id — so the ordinary guard fits, and a
-  // bare `findMany()` over everybody's pending requests is exactly what it
-  // should refuse.
-  JoinRequest: {},
+  // A request to join one organization (D12). It carries `organizationId`,
+  // and most reads are an admin listing that organization's queue or a lookup
+  // of one request by its own id — the ordinary guard, and a bare
+  // `findMany()` over everybody's pending requests is exactly what it should
+  // refuse.
+  //
+  // ONE READ IS BOUNDED BY SUBJECT RATHER THAN BY TENANT, and it has to be:
+  // "what am I waiting on" spans every organization this person asked, which
+  // is the whole question. It is still BOUNDED — to one user, named in the
+  // clause — so it is not the unbounded sweep the regime exists to stop.
+  // Without this the screen that answers it degraded to an unknown error, and
+  // nobody could see a request they had made.
+  JoinRequest: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "userId") === "string",
+  },
+  // One row per SCIM request a customer's directory made (ADR-126). It
+  // carries `organizationId`, and the surface that reads it is an
+  // organization's own oversight screen — which names both the organization
+  // and the connection, because a connection id is not a tenant.
+  //
+  // The RETENTION SWEEP is the exception and the action gate is what keeps it
+  // honest. Dropping what has aged out is the platform's job and spans every
+  // tenant by definition, so its scan is admitted; the delete that follows it
+  // is bounded to the row ids that scan returned, and an unbounded
+  // `deleteMany` — which would drop every tenant's log at once — has no
+  // admitted shape.
+  ScimRequestLog: {
+    platformScopeActions: ["findMany"],
+    extraBound: ({ clause }) => idPredicate(clauseField(clause, "id")),
+  },
   // The credential vault behind an SSO connection's references (D09). Every
   // read names either the organization or one reference's own id, and there
   // is no query in the product that wants somebody else's — so the ordinary

@@ -740,3 +740,54 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
     });
   });
 });
+
+/**
+ * "What am I waiting on?" — bounded by SUBJECT rather than by tenant.
+ *
+ * The regime exists to refuse an unbounded sweep across every organization,
+ * and a person's own pending join requests span every organization they asked,
+ * which is the whole question. So the read is bounded to ONE USER, named in
+ * the clause, and that is what makes it admissible.
+ *
+ * This was a live outage of the feature and not a hypothetical: the guard
+ * refused the query with a plain Error, the boundary degraded it to "unknown
+ * error", and nobody could see a request they had made — including on the
+ * screen that exists to tell them their request is with an administrator.
+ */
+describe("guardOrganizationId — a join request bounded by its subject", () => {
+  describe("when somebody reads their own pending requests", () => {
+    it("allows a findMany named by userId, across whichever organizations they asked", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { userId: "user_sam", state: "PENDING" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when a query names no subject and no organization", () => {
+    it("still refuses the sweep over everybody's pending requests", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { state: "PENDING" } },
+        } as GuardParams),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when an administrator lists one organization's queue", () => {
+    it("allows it, which is the ordinary org-bounded read", async () => {
+      await expect(
+        runGuard({
+          model: "JoinRequest",
+          action: "findMany",
+          args: { where: { organizationId: "org_acme", state: "PENDING" } },
+        } as GuardParams),
+      ).resolves.toBe("ok");
+    });
+  });
+});

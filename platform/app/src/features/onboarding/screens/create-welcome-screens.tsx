@@ -12,6 +12,7 @@ import type React from "react";
 import { useMemo } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { Link } from "~/components/ui/link";
+import { JoinYourTeamTakeover } from "~/components/JoinYourTeamTakeover";
 import { JoinInsteadNotice } from "~/features/auth";
 import { api } from "~/utils/api";
 import { LEGAL_LINKS } from "~/utils/legalLinks";
@@ -46,10 +47,27 @@ const OrganizationScreen: React.FC = () => {
 
   return (
     <VStack gap={5} align="stretch" w="full" minW="0">
-      {/* Nudged, never blocked (D12, epic Q17): somebody starting a second
-          organization at a company that already has one is doing something
-          ordinary, and the only failure this notice can have is standing in
-          their way. The form below it completes exactly as it did. */}
+      {/* THE DECISION COMES FIRST, and it comes as a screen.
+          
+          This was a soft alert in the middle of the create-organization form,
+          on the reasoning that starting a second organization at a company
+          that already has one is ordinary and must never be blocked. That
+          reasoning is right and it is not what went wrong: the notice was
+          right, and it was the wrong SIZE. Somebody who has just signed up is
+          looking at a form with their cursor in it, and a sentence beside the
+          field lost to the field every time — so people made the second
+          workspace without ever really being asked.
+          
+          Still nudged, still never blocked. The screen leads with joining and
+          its way past says exactly what carrying on means, which lands them
+          right back on this form with nothing lost. What changed is only that
+          the question is now asked where it can be heard. */}
+      <JoinYourTeamTakeover dismissLabel="Create a new organization instead" />
+
+      {/* The soft notice stays for the case the screen above does not cover:
+          somebody who already declined for this domain, and is now looking at
+          the form again. They chose this, so they get the sentence and not
+          the screen. */}
       <JoinInsteadNotice lookup={joinLookup.data} />
 
       <Field.Root colorPalette="orange" w="full">

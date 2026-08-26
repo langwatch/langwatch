@@ -32,7 +32,18 @@ import { useSession } from "~/utils/auth-client";
  * the moment people ask again, or give up and make the second workspace this
  * screen exists to prevent.
  */
-export function JoinYourTeamTakeover() {
+export function JoinYourTeamTakeover({
+  dismissLabel = "Not now — keep working on my own",
+  onDismissed,
+}: {
+  /** What the way past is called where "keep working on my own" is not what
+   *  declining means. On the onboarding path it means "carry on and make an
+   *  organization", which is the sentence that screen should say. */
+  dismissLabel?: string;
+  /** Called once the refusal has landed, for a caller that has somewhere to
+   *  send them. Absent on the dashboard, where declining just closes it. */
+  onDismissed?: () => void;
+} = {}) {
   // The shell renders on public pages too (a shared trace), where there is no
   // session to ask about — and a protected query fired there is a refusal
   // nobody asked for.
@@ -89,7 +100,10 @@ export function JoinYourTeamTakeover() {
     dismiss.mutate(
       {},
       {
-        onSuccess: () => void utils.joinRequests.offer.invalidate(),
+        onSuccess: () => {
+          void utils.joinRequests.offer.invalidate();
+          onDismissed?.();
+        },
         // Never `error.message`: the code-keyed registry owns the words.
         onError: (error) =>
           showErrorToast({ error, fallbackTitle: "Couldn't save that" }),
@@ -129,7 +143,7 @@ export function JoinYourTeamTakeover() {
         </AuthPrimaryButton>
       ))}
       <SecondaryAction loading={dismiss.isPending} onClick={refuse}>
-        Not now — keep working on my own
+        {dismissLabel}
       </SecondaryAction>
       <Text fontSize="12.5px" color="fg.subtle" textAlign="center">
         We will not ask about this domain again.
