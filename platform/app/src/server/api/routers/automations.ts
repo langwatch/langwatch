@@ -65,7 +65,9 @@ import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -839,7 +841,15 @@ export const automationRouter = createTRPCRouter({
         if (input.channel === "webhook") {
           const allowed = await featureFlagService.isEnabled(
             "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
+            {
+              distinctId: ctx.session.user.id,
+              projectId: input.projectId,
+              // The drawer reads the same flag with both ids, so the route
+              // resolves the organization too. Without it an organization
+              // rollout would open the picker and the route would refuse it.
+              organizationId:
+                (await resolveOrganizationId(input.projectId)) ?? NOT_TARGETED,
+            },
           );
           if (!allowed) {
             throw new TRPCError({
@@ -1025,7 +1035,15 @@ export const automationRouter = createTRPCRouter({
         if (input.action === TriggerAction.SEND_WEBHOOK) {
           const allowed = await featureFlagService.isEnabled(
             "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
+            {
+              distinctId: ctx.session.user.id,
+              projectId: input.projectId,
+              // The drawer reads the same flag with both ids, so the route
+              // resolves the organization too. Without it an organization
+              // rollout would open the picker and the route would refuse it.
+              organizationId:
+                (await resolveOrganizationId(input.projectId)) ?? NOT_TARGETED,
+            },
           );
           if (!allowed) {
             throw new TRPCError({

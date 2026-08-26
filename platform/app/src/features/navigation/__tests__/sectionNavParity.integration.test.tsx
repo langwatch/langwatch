@@ -57,6 +57,7 @@ vi.mock("~/components/ui/layouts/SectionNavigationLayout", () => ({
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 describe("given the gateway section navigation data", () => {
   describe("when the gateway layout renders", () => {
@@ -98,7 +99,11 @@ describe("given the gateway section navigation data", () => {
       // is disabled rather than round-tripping for a result never read.
       expect(
         harness.flagCallOptions.release_ui_governance_billed_cost_enabled,
-      ).toEqual({ organizationId: "org-1", enabled: false });
+      ).toEqual({
+        projectId: NOT_TARGETED,
+        organizationId: "org-1",
+        enabled: false,
+      });
     });
   });
 });
@@ -143,10 +148,15 @@ describe("given the governance section navigation data", () => {
       ]);
 
       // The flag must resolve in organization context, gated on the org
-      // being loaded — flags resolved without it silently read as off.
+      // being loaded — flags resolved without it silently read as off. The
+      // layout holds no project, and says so.
       expect(
         harness.flagCallOptions.release_ui_governance_billed_cost_enabled,
-      ).toEqual({ organizationId: "org-1", enabled: true });
+      ).toEqual({
+        projectId: NOT_TARGETED,
+        organizationId: "org-1",
+        enabled: true,
+      });
     });
   });
 });

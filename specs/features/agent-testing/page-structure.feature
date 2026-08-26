@@ -45,6 +45,31 @@ Feature: The Agent Testing page
     And no Agent Testing item is shown
 
   @integration
+  Scenario: A rule that names the organization lights up the main menu
+    Given the Agent Testing release flag is off by default
+    And the flag carries one targeting rule that names the organization of
+        the person who reads the menu
+    When the main menu is read
+    Then one item named "Agent Testing" is shown
+    And the rule matches because the menu states the organization it reads
+        the flag for
+
+  @integration
+  Scenario: Quick Search offers Agent Testing while the flag is on
+    Given the Agent Testing release flag is on
+    When Quick Search is opened and "agent testing" is typed
+    Then Quick Search offers the Agent Testing page
+    And Quick Search offers neither Simulations nor Scenarios, because they
+        lead to the same runs by another route
+
+  @integration
+  Scenario: Quick Search keeps the Simulations entries while the flag is off
+    Given the Agent Testing release flag is off
+    When Quick Search is opened and "simulations" is typed
+    Then Quick Search offers Simulations
+    And Quick Search offers no Agent Testing page
+
+  @integration
   Scenario: A person without permission to read test cases cannot open the page
     Given the Agent Testing release flag is on
     And a person without permission to read test cases

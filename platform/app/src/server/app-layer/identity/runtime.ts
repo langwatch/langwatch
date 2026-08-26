@@ -113,6 +113,8 @@ export {
   resolveSignInMethodPolicy,
 } from "./signin-method-policy";
 
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
@@ -418,7 +420,12 @@ export function joinRequestsService(): JoinRequestsService {
     // self-hosted deployments that have no other way out.
     autoJoinLicensed: () => platformSSOAllowed(),
     enabled: ({ userId }) =>
-      featureFlagService.isEnabled("join_requests", { distinctId: userId }),
+      featureFlagService.isEnabled("join_requests", {
+        distinctId: userId,
+        // A person asks to join before they belong to anything.
+        projectId: NOT_TARGETED,
+        organizationId: NOT_TARGETED,
+      }),
   });
 }
 

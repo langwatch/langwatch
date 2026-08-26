@@ -257,6 +257,7 @@ export function AutomationDrawer({
   const { enabled: webhookEnabled, isLoading: webhookFlagLoading } =
     useFeatureFlag("release_webhook_automations", {
       projectId: project?.id,
+      organizationId: organization?.id,
       enabled: !!project,
     });
 

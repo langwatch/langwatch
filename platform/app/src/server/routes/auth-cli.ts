@@ -69,6 +69,7 @@ import {
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
@@ -2754,6 +2755,8 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
+      // Device login picks an organization, not a project.
+      projectId: NOT_TARGETED,
       organizationId: organization_id,
       defaultValue: true,
     })

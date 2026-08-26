@@ -5,6 +5,7 @@ import {
   type NavigationMode,
   useNavigationModeStore,
 } from "~/features/navigation/navigationModeStore";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
@@ -55,11 +56,14 @@ export function AppHeaderUserMenu({
 }) {
   const { data: session } = useRequiredSession({ required: !publicPage });
   const user = session?.user;
-  const { organization, isLoading: isOrganizationLoading } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    project,
+    organization,
+    isLoading: isOrganizationLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { isLiteMember } = useLiteMemberGuard();
 
   // The "My Workspace" entry in the user-avatar dropdown is part of the
@@ -70,7 +74,13 @@ export function AppHeaderUserMenu({
   // show the menu entry while the page it links to 404s.
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
+    {
+      // The header renders on organization pages too, where no project
+      // exists, so the project is only stated when there is one.
+      projectId: project?.id ?? NOT_TARGETED,
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
   );
 
   // The navigation-mode picker only appears once the v2 flag is on; the
@@ -81,6 +91,7 @@ export function AppHeaderUserMenu({
   const { enabled: navigationV2Enabled } = useFeatureFlag(
     "release_ui_navigation_v2_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !isOrganizationLoading,
     },
