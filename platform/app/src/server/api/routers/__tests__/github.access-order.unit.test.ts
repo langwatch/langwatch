@@ -99,6 +99,11 @@ const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 function caller() {
   return githubRouter.createCaller(
     createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
       session: { user, expires: "1" } as any,
       permissionChecked: false,
     }),

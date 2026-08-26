@@ -23,7 +23,7 @@ import type {
   SsoTestSignInLookup,
 } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { Resolver } from "dns/promises";
+import { lookup, Resolver } from "dns/promises";
 import { env } from "~/env.mjs";
 import {
   OrganizationUserRole,
@@ -318,7 +318,21 @@ const FILE_MAX_BYTES = 64 * 1024;
  * is exactly what the ceremony exists to rule out.
  */
 export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  /**
+   * `resolveHost` is injected for the same reason `fetchImpl` is: the guard
+   * that refuses a name resolving into private space is the interesting half,
+   * and a test that had to make a real DNS query to reach it would be a test
+   * that needs the network to say anything at all.
+   */
+  constructor(
+    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly resolveHost: (host: string) => Promise<string[]> = (
+      host,
+    ) =>
+      lookup(host, { all: true, verbatim: true }).then((answers) =>
+        answers.map((answer) => answer.address),
+      ),
+  ) {}
 
   async fetchVerificationFile({
     domain,
@@ -330,11 +344,17 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FILE_FETCH_TIMEOUT_MS);
     try {
-      const response = await this.fetchImpl(url, {
+      const response = await this.followToPublicHost({
+        url,
         signal: controller.signal,
-        redirect: "follow",
-        headers: { accept: "text/plain" },
       });
+      if (response === "private-host") {
+        logger.warn(
+          { domain, url },
+          "the verification file fetch was aimed at a host that is not public",
+        );
+        return { outcome: "unreachable", reason: "host_not_public" };
+      }
       return await classifyFileResponse({ domain, url, response });
     } catch (error) {
       const code = errorCodeOf(error);
@@ -352,6 +372,133 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
       clearTimeout(timer);
     }
   }
+
+  /**
+   * The fetch, following redirects OURSELVES so every hop's host is checked.
+   *
+   * `redirect: "follow"` hands the whole journey to the runtime, which will
+   * happily follow a customer-controlled 302 into `169.254.169.254` or a
+   * service on the cluster's own network — and the three outcomes this port
+   * reports back (`absent` / a status / `timeout`) are a reachability and
+   * port oracle for whatever it reached. The domain itself is now refused at
+   * claim time if it is not a public hostname, but a redirect is not the
+   * claimed domain: it is a string the customer's own web server chose, at
+   * request time, after the claim was approved.
+   *
+   * So: manual redirects, and the host is re-checked before each one. The
+   * body is only ever hash-compared, so nothing that comes back is rendered —
+   * this is about what we are made to CONNECT to.
+   */
+  private async followToPublicHost({
+    url,
+    signal,
+  }: {
+    url: string;
+    signal: AbortSignal;
+  }): Promise<Response | "private-host"> {
+    let next = url;
+    for (let hop = 0; hop <= FILE_MAX_REDIRECTS; hop++) {
+      if (!(await hostIsPublic(next, this.resolveHost))) return "private-host";
+
+      const response = await this.fetchImpl(next, {
+        signal,
+        redirect: "manual",
+        headers: { accept: "text/plain" },
+      });
+
+      const location = response.headers.get("location");
+      if (!isRedirectStatus(response.status) || !location) return response;
+
+      next = new URL(location, next).toString();
+    }
+    // Too many hops is the domain failing to answer, not the domain saying
+    // the file is absent.
+    return "private-host";
+  }
+}
+
+/** How many redirects a domain may spend before we stop following. */
+const FILE_MAX_REDIRECTS = 5;
+
+function isRedirectStatus(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 ||
+    status === 307 || status === 308;
+}
+
+/**
+ * Whether a URL names a host on the public internet.
+ *
+ * Resolved rather than pattern-matched: a name is only private once it
+ * ANSWERS with a private address, and a customer-controlled name resolving to
+ * `127.0.0.1` is the ordinary shape of this attack. Every address the name
+ * answers with has to be public — one private answer is enough to refuse,
+ * because which one a later connect picks is not ours to decide.
+ */
+async function hostIsPublic(
+  url: string,
+  resolveHost: (host: string) => Promise<string[]>,
+): Promise<boolean> {
+  let hostname: string;
+  let protocol: string;
+  try {
+    const parsed = new URL(url);
+    hostname = parsed.hostname;
+    protocol = parsed.protocol;
+  } catch {
+    return false;
+  }
+  if (protocol !== "https:") return false;
+
+  const literal = stripBrackets(hostname);
+  if (isIpLiteral(literal)) return isPublicAddress(literal);
+
+  try {
+    const answers = await resolveHost(literal);
+    return answers.length > 0 && answers.every(isPublicAddress);
+  } catch {
+    // A name that does not resolve is not a private host; let the fetch fail
+    // on its own and be reported as unreachable.
+    return true;
+  }
+}
+
+const stripBrackets = (host: string): string =>
+  host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+
+const isIpLiteral = (host: string): boolean =>
+  /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
+
+/**
+ * Loopback, link-local, private and unique-local space, in both families.
+ *
+ * Written out rather than taken from a package: the list is short, it is the
+ * part of this that must not silently change under a dependency bump, and
+ * every entry is here because a fetch reaching it is a fetch reaching our own
+ * network rather than a customer's.
+ */
+function isPublicAddress(address: string): boolean {
+  const ip = address.toLowerCase().replace(/^::ffff:/, "");
+
+  if (ip.includes(":")) {
+    if (ip === "::" || ip === "::1") return false;
+    // fc00::/7 (unique local), fe80::/10 (link local).
+    if (/^f[cd]/.test(ip)) return false;
+    if (/^fe[89ab]/.test(ip)) return false;
+    return true;
+  }
+
+  const octets = ip.split(".").map(Number);
+  if (octets.length !== 4 || octets.some((o) => Number.isNaN(o) || o > 255)) {
+    return false;
+  }
+  const [a = 0, b = 0] = octets;
+  if (a === 0 || a === 10 || a === 127) return false;
+  if (a === 169 && b === 254) return false; // link local, and the metadata service
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false; // carrier-grade NAT
+  if (a >= 224) return false; // multicast and reserved
+  return true;
 }
 
 /** What an answered fetch actually says, in the port's three outcomes. */

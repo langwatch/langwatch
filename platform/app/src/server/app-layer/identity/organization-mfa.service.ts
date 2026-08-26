@@ -151,7 +151,15 @@ export interface OrganizationMfaServiceDeps {
 /** Where a member stands with one organization. */
 export interface OrganizationMfaStanding {
   organizationId: string;
-  organizationName: string;
+  /**
+   * Null for a caller who is not a member.
+   *
+   * The name is the one identifying thing this answer carries, and the
+   * procedure asking for it holds no permission on the organization named —
+   * so it has to be absent for a stranger, or the endpoint is a directory of
+   * every tenant's display name keyed by id.
+   */
+  organizationName: string | null;
   /** Whether this organization asks for a second factor at all. */
   required: boolean;
   satisfaction: SecondFactorSatisfaction;
@@ -179,6 +187,29 @@ export class OrganizationMfaService {
     organizationId: string;
     amr: readonly string[] | null;
   }): Promise<OrganizationMfaStanding> {
+    // MEMBERSHIP FIRST, and it is a tenancy boundary rather than an
+    // optimisation. `standing` is a `.noPermission()` procedure taking a
+    // caller-supplied `organizationId` — there is no scope to hold a
+    // permission on, because the caller is asking about an organization they
+    // may not be in. So a stranger asking about somebody else's organization
+    // used to be answered with that organization's NAME, and an id that does
+    // not exist threw instead: a clean existence oracle over every tenant.
+    //
+    // A non-member gets the shape a member with nothing set up gets, which is
+    // what this procedure's own `reason` string always claimed it gave them.
+    if (!(await this.deps.members.isMember({ userId, organizationId }))) {
+      return {
+        organizationId,
+        organizationName: null,
+        required: false,
+        satisfaction: satisfiesOrganizationMfaRequirement({
+          mfaRequired: false,
+          evidence: { accountEnrollmentEnabled: false, amr },
+        }),
+        holdsPasskey: false,
+      };
+    }
+
     const organization = await this.deps.settings.read({ organizationId });
     // With the flag off nothing is asked for that was not asked for before,
     // including this. An organization that turned the requirement on before

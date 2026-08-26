@@ -18,7 +18,9 @@
 /** What the server says about one person and one organization. */
 export interface OrganizationMfaStandingView {
   organizationId: string;
-  organizationName: string;
+  /** Null when the caller is not a member — the server withholds the name
+   *  rather than answering a stranger with it. */
+  organizationName: string | null;
   required: boolean;
   satisfaction: { satisfied: boolean };
   holdsPasskey: boolean;
@@ -55,6 +57,12 @@ export function resolveEnrollmentGate({
   if (!standing) return { held: false };
   if (!standing.required) return { held: false };
   if (standing.satisfaction.satisfied) return { held: false };
+  // No name means the server did not recognise this person as a member, and
+  // an organization's requirement holds its own people. Unreachable in
+  // practice — a non-member is answered `required: false` — and stated here
+  // because the alternative is a gate that renders "undefined requires
+  // two-step verification".
+  if (standing.organizationName === null) return { held: false };
   return {
     held: true,
     organizationName: standing.organizationName,

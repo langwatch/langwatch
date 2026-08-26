@@ -83,6 +83,46 @@ describe("what a domain claim may be", () => {
       }
     });
 
+    it("refuses anything that is not a public DNS hostname", () => {
+      // A claimed domain is not only compared against addresses — the proof's
+      // second channel FETCHES it, from our own network. "At least two
+      // dot-separated labels" admitted every one of these.
+      //
+      // This is the SHAPE half only. A well-formed name that resolves into
+      // private space — `metadata.google.internal` is the obvious one — is a
+      // fact about DNS rather than about the string, and is refused at fetch
+      // time by `HttpsDomainProofFileLookup`.
+      for (const domain of [
+        "169.254.169.254", // the cloud metadata service
+        "10.0.0.5",
+        "127.0.0.1",
+        "192.168.1.1",
+        "metadata.google.internal.", // an empty trailing label
+        "acme.com.", // same shape, and the normalizer is what strips this
+        "evil.example@10.0.0.5", // userinfo, then a host on our network
+        "acme .com",
+        "acme_corp.com",
+        "-acme.com",
+        "acme-.com",
+        "acme..com",
+        "http://acme.com",
+        "acme.com/path",
+      ]) {
+        expect(isClaimableSsoDomain(domain)).toBe(false);
+      }
+    });
+
+    it("still accepts the ordinary company domains it always did", () => {
+      for (const domain of [
+        "acme.com",
+        "sso.acme.co.uk",
+        "acme-corp.example",
+        "a1.acme.com",
+      ]) {
+        expect(isClaimableSsoDomain(domain)).toBe(true);
+      }
+    });
+
     it("reads a domain in whatever case it was typed", () => {
       expect(isClaimableSsoDomain("GMAIL.com")).toBe(false);
       expect(isClaimableSsoDomain("  CO.UK  ")).toBe(false);

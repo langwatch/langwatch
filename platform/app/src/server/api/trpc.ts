@@ -97,6 +97,26 @@ interface CreateContextOptions {
    * singleton.
    */
   app?: App;
+  /**
+   * The two-step verification gate's dependencies, for a test that is not
+   * about the gate.
+   *
+   * The gate sits in the permission middleware, so it runs on the way to
+   * EVERY scoped procedure and reads the scope's owner from Prisma to do it.
+   * A router test that mocks `~/server/db` with the two models its own router
+   * touches then fails inside the pipeline rather than in the code it is
+   * testing — and, worse, only on a deployment where the gate is switched on,
+   * so the suite's colour depends on an environment variable.
+   *
+   * Passing `{ offered: () => false }` says "this suite is not about the
+   * second factor" once, at the seam the middleware already offers, instead
+   * of every Prisma double chasing whatever the pipeline reads next.
+   */
+  mfaGate?: {
+    offered?: () => boolean;
+    scopes?: unknown;
+    organizationMfa?: unknown;
+  };
   permissionChecked?: boolean;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
@@ -128,6 +148,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     res: opts.res,
     prisma,
     app: opts.app,
+    mfaGate: opts.mfaGate,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,

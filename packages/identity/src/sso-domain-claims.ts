@@ -64,9 +64,40 @@ const PUBLIC_SUFFIX_SET = new Set(SSO_PUBLIC_SUFFIXES);
 export function isClaimableSsoDomain(domain: string): boolean {
   const folded = domain.trim().toLowerCase();
   if (folded.length === 0) return false;
-  if (folded.split(".").length < 2) return false;
+  if (!isPublicDnsHostname(folded)) return false;
   if (PUBLIC_SUFFIX_SET.has(folded)) return false;
   return !isPublicEmailDomain(folded);
+}
+
+/**
+ * Whether a string is a hostname that could exist in public DNS.
+ *
+ * A claimed domain is not only a name we compare addresses against — we FETCH
+ * it. The proof's second channel builds `https://<domain>/.well-known/...`
+ * and asks for it from our own network, so anything a customer can get past
+ * this function is somewhere our servers will make a request to.
+ *
+ * "At least two dot-separated labels" is not a hostname check. It admitted
+ * `169.254.169.254` (four labels, no registry suffix, not a mail provider),
+ * `metadata.google.internal`, and — because nothing checked the characters —
+ * `evil.example@10.0.0.5`, which a URL parses as userinfo followed by a host
+ * on the internal network. Each label is now letters, digits and hyphens
+ * only, not starting or ending with a hyphen, and a name whose last label is
+ * numeric is refused outright: no public registry sells one, and every IPv4
+ * literal has one.
+ */
+function isPublicDnsHostname(folded: string): boolean {
+  if (folded.length > 253) return false;
+  const labels = folded.split(".");
+  if (labels.length < 2) return false;
+  if (!labels.every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) {
+    return false;
+  }
+  // The last label of a real hostname is a registry suffix, which is never
+  // all digits. This is what refuses every IPv4 literal without pretending to
+  // be an address parser.
+  const last = labels[labels.length - 1] ?? "";
+  return !/^\d+$/.test(last);
 }
 
 /**
