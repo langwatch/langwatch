@@ -47,14 +47,20 @@ export function GoLiveSection({
     return (
       <VStack align="start" gap={3}>
         <Text color="fg.muted" fontSize="sm">
-          This connection is on. The banner at the top of the page says whether
-          sign-in is being decided by it yet.
+          This connection is on. The chip beside its name says whether sign-in
+          is being decided by it yet.
         </Text>
+        {/* THE ERRAND IS NOT FINISHED, so the step that ends it says what the
+            next one is. Signing in and being provisioned are one continuous
+            piece of work — settle the credential here, go to the provider,
+            paste it there — and a journey that stops at "on" leaves an
+            administrator to discover the second half by browsing. */}
         <Text color="fg.muted" fontSize="sm">
-          Next, your identity provider can create and remove accounts here as
-          people join and leave — set that up in Directory.
+          Next, let your identity provider create and remove accounts here as
+          people join and leave. Set the provisioning token — or paste the one
+          your provider already has — and point it at us.
         </Text>
-        <Link href="/settings/directory">
+        <Link href="/settings/authentication/connectors">
           <Button size="sm" variant="outline">
             Set up provisioning
             <ArrowRight size={14} />

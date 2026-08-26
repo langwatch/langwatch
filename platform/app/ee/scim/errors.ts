@@ -56,6 +56,27 @@ export class ScimConnectionRequiredError extends HandledError {
 }
 
 /**
+ * A token the administrator chose, and it is too short to be one.
+ *
+ * The only way a supplied value is worse than a minted one is by being short
+ * or guessable, and this is the only place that can say so — the identity
+ * provider's console will accept anything. The length is on the error so the
+ * copy can name it rather than the reader guessing what "too short" means.
+ */
+export class ScimTokenTooShortError extends HandledError {
+  declare readonly code: "scim_token_too_short";
+
+  constructor(minimum: number) {
+    super(
+      "scim_token_too_short",
+      `A directory token you choose yourself has to be at least ${minimum} characters`,
+      { httpStatus: 422, fault: "customer", meta: { minimum } },
+    );
+    this.name = "ScimTokenTooShortError";
+  }
+}
+
+/**
  * The named connection is not one this organization has.
  *
  * A connection belonging to somebody else reads exactly like one that does

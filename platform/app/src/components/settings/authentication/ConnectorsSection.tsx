@@ -121,6 +121,8 @@ export function TokensSection({
 
   const [description, setDescription] = useState("");
   const [connectionId, setConnectionId] = useState("");
+  /** A value the administrator already has. Empty means "mint one for me". */
+  const [secret, setSecret] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [tokenToRevoke, setTokenToRevoke] = useState<string | null>(null);
 
@@ -130,17 +132,23 @@ export function TokensSection({
       ?.providerId ?? id;
 
   const handleGenerate = () => {
+    const chosen = secret.trim();
     generateMutation.mutate(
       {
         organizationId,
         connectionId: connectionId || undefined,
         description: description || undefined,
+        secret: chosen.length > 0 ? chosen : undefined,
       },
       {
         onSuccess: (result) => {
-          setNewToken(result.token);
+          // A value the administrator already had needs no "copy this now"
+          // ceremony — they have it. Only a generated one does.
+          setNewToken(chosen.length > 0 ? null : result.token);
+          if (chosen.length > 0) onGenerateClose();
           setDescription("");
           setConnectionId("");
+          setSecret("");
           void queryClient.scimToken.list.invalidate();
           void queryClient.scimReconciliation.invalidate();
         },
@@ -209,8 +217,8 @@ export function TokensSection({
             and what to do with it; the rest is a fold below. */}
         <Text color="fg.muted" fontSize="sm" maxWidth="80ch">
           A provisioning token is the password your identity provider uses to
-          reach us. Issue one here and paste it into the provider alongside the
-          provisioning address.
+          reach us. Set the one your provider already has, or let us generate
+          one, and give it the provisioning address.
         </Text>
         <SettingsDisclosure summary="What a token can do, and what revoking one stops">
           <Text color="fg.muted" fontSize="sm" maxWidth="80ch">
@@ -359,12 +367,40 @@ export function TokensSection({
                   onChange={(event) => setDescription(event.target.value)}
                 />
               </VStack>
+              {/* EITHER DIRECTION, BECAUSE THE USUAL ONE IS THE OTHER WAY.
+                  Somebody configuring an identity provider is usually
+                  standing in the provider's console with the value already
+                  decided; making them come here, take ours, and go back and
+                  paste it is an errand we invented. What matters is only that
+                  the two ends match.
+
+                  Ours stays the default, because a value we generate is
+                  long and random and a typed one might not be. */}
+              <VStack gap={1} align="start" width="full">
+                <Text fontWeight="600" fontSize="sm">
+                  Token
+                </Text>
+                <HStack width="full" gap={2}>
+                  <Input
+                    aria-label="Token"
+                    type="password"
+                    placeholder="Leave empty and we will generate one"
+                    value={secret}
+                    onChange={(event) => setSecret(event.target.value)}
+                  />
+                </HStack>
+                <Text color="fg.muted" fontSize="xs">
+                  {secret.trim().length > 0
+                    ? "We store only a hash of it, the same as one we generate. It cannot be read back."
+                    : "Paste the value from your identity provider if it already has one, or leave this empty."}
+                </Text>
+              </VStack>
               <Button
                 width="full"
                 onClick={handleGenerate}
                 disabled={generateMutation.isPending}
               >
-                Issue token
+                {secret.trim().length > 0 ? "Save token" : "Generate token"}
               </Button>
             </VStack>
           </Dialog.Body>

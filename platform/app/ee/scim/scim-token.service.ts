@@ -9,9 +9,21 @@ import {
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,
   ScimTokenNotFoundError,
+  ScimTokenTooShortError,
 } from "./errors";
+
 import { scimSyncLifecycle } from "./scim-sync.runtime";
 import type { ScimSyncLifecycle } from "./scim-sync.service";
+
+/**
+ * The shortest a token an administrator chose may be.
+ *
+ * Thirty-two, because that is what a minted one is worth in characters and a
+ * value somebody types should not be the weak half of the pair. It is a floor
+ * on LENGTH alone — see `ScimTokenTooShortError` for why there is no
+ * character-class rule beside it.
+ */
+const MINIMUM_TOKEN_LENGTH = 32;
 
 /**
  * The three answers a bearer credential can get from {@link ScimTokenService.verifyEntitled}:
@@ -93,10 +105,25 @@ export class ScimTokenService {
     organizationId,
     connectionId,
     description,
+    secret,
   }: {
     organizationId: string;
     connectionId?: string | null;
     description?: string;
+    /**
+     * A value the administrator already has, rather than one we mint.
+     *
+     * THE USUAL SEQUENCE IS THE OTHER WAY ROUND. Somebody configuring an
+     * identity provider is usually standing in the provider's console with
+     * both values already decided; making them come here, take ours, and go
+     * back and paste it is an errand we invented. Either direction works —
+     * what matters is that the two ends match — so both are offered.
+     *
+     * IT IS STILL ONLY EVER STORED AS A HASH. A supplied value takes exactly
+     * the same path as a minted one from here on; nothing about where it came
+     * from changes what we keep.
+     */
+    secret?: string;
   }): Promise<{ token: string; tokenId: string; connectionId: string }> {
     if (!connectionId) {
       throw new ScimConnectionRequiredError();
@@ -109,7 +136,17 @@ export class ScimTokenService {
       throw new ScimConnectionNotFoundError(connectionId);
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
+    // A FLOOR, NOT A POLICY. The one thing that would make a supplied token
+    // worse than a minted one is a short or guessable value, and this is the
+    // only place that can refuse it — the provider's console will accept
+    // anything. It is deliberately not a character-class rule: those push
+    // people towards `Password1!` and buy nothing against an attacker who is
+    // guessing rather than typing.
+    if (secret !== undefined && secret.trim().length < MINIMUM_TOKEN_LENGTH) {
+      throw new ScimTokenTooShortError(MINIMUM_TOKEN_LENGTH);
+    }
+
+    const token = secret?.trim() ?? crypto.randomBytes(32).toString("hex");
     const hashedToken = this.hashToken(token);
 
     const scimToken = await this.prisma.scimToken.create({

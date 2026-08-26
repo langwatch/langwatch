@@ -58,6 +58,15 @@ export const scimTokenRouter = createTRPCRouter({
         // gets the named `scim_connection_required` refusal rather than a
         // schema error the customer cannot read.
         connectionId: z.string().optional(),
+        /**
+         * A value the administrator already has, rather than one we mint.
+         *
+         * Capped here as well as floored in the service: a megabyte of
+         * "token" is not a credential, it is a way to spend our hashing.
+         * The floor is the service's because it is the rule with a reason
+         * worth stating beside the hash.
+         */
+        secret: z.string().max(512).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -66,6 +75,7 @@ export const scimTokenRouter = createTRPCRouter({
         organizationId: input.organizationId,
         connectionId: input.connectionId,
         description: input.description,
+        secret: input.secret,
       });
     }),
 

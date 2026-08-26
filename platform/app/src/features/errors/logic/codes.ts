@@ -336,6 +336,7 @@ export const APP_ERROR_CODES = [
   "scim_apply_not_retired",
   "scim_connection_not_found",
   "scim_connection_required",
+  "scim_token_too_short",
   "scim_managed_group",
   "scim_token_not_found",
   "scim_write_outside_connection",
