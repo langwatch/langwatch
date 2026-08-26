@@ -10,6 +10,11 @@ import {
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import {
+  QueryApiService,
+  type QueryRunResult,
+  type QuerySchemaResult,
+} from "@/client-sdk/services/query/query-api.service";
 
 /** A saved workbench chart, exactly as the REST surface answers it. */
 export type SavedChart =
@@ -26,24 +31,23 @@ export interface SavedChartDefinitionInput {
   vegaLiteSpec?: Record<string, unknown>;
 }
 
-/** The LangWatchQL analytics schema, as the discovery endpoint answers it. */
-export type AnalyticsSchema =
-  paths["/api/v1/projects/{projectId}/analytics/schema"]["get"]["responses"]["200"]["content"]["application/json"];
-
-/** The result of running a chart's statement through the LangWatchQL query door. */
-export type ChartRunResult =
-  paths["/api/v1/projects/{projectId}/analytics/query/clickhouse"]["post"]["responses"]["200"]["content"]["application/json"];
+/**
+ * The LangWatchQL analytics schema, as `query.schema` on the JSON-RPC query
+ * door answers it — the discovery endpoint this used to derive from
+ * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in favor
+ * of that door (issue #7565). Re-exported under this family's own name so
+ * existing imports keep working.
+ */
+export type AnalyticsSchema = QuerySchemaResult;
 
 /**
- * The datapoint step `runQuery` may request — one of the offered steps, as
- * the route itself restricts it (server-side: `lwqlGranularityStepSchema`,
- * built from `LWQL_GRANULARITY_STEPS`). Derived from the generated request
- * body rather than a hand-written `1 | 60 | 3600` copy, so a step the API
- * adds or removes changes what this method accepts without a second edit.
+ * The result of running a chart's statement through the LangWatchQL query
+ * door. Re-exported from `QueryApiService`, which is what this now delegates
+ * to — the dedicated REST endpoint this used to derive from
+ * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
+ * removed in favor of the shared JSON-RPC door (issue #7565).
  */
-export type ChartRunGranularitySeconds = NonNullable<
-  paths["/api/v1/projects/{projectId}/analytics/query/clickhouse"]["post"]["requestBody"]["content"]["application/json"]["granularitySeconds"]
->;
+export type ChartRunResult = QueryRunResult;
 
 export class ChartsApiError extends Error {
   constructor(
@@ -74,6 +78,13 @@ export class ChartsApiError extends Error {
 export class ChartsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly configuredProjectId: string | undefined;
+  /**
+   * `schema()` and `runQuery()` delegate to the shared JSON-RPC query door
+   * rather than a dedicated chart-family route (issue #7565) — built once,
+   * from the same underlying `apiClient`, so it picks up the same auth and
+   * base URL this service was configured with.
+   */
+  private readonly queryApi: QueryApiService;
 
   constructor(
     config?: Pick<InternalConfig, "langwatchApiClient"> & {
@@ -82,6 +93,7 @@ export class ChartsApiService {
   ) {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
     this.configuredProjectId = config?.projectId;
+    this.queryApi = new QueryApiService({ langwatchApiClient: this.apiClient });
   }
 
   private handleApiError(
@@ -200,15 +212,18 @@ export class ChartsApiService {
     if (error) this.handleApiError(`unplace chart "${id}"`, error, response);
   }
 
-  /** The datasets and columns this key may write chart SQL against. */
+  /**
+   * The datasets and columns this key may write chart SQL against.
+   *
+   * Delegates to the shared JSON-RPC query door's `query.schema` method — the
+   * dedicated discovery route this used to call
+   * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in
+   * favor of it (issue #7565). That door is project-implicit (the project is
+   * resolved into the underlying api client's auth, not a path segment), so
+   * this family's own `projectId()` resolution does not apply here.
+   */
   async schema(): Promise<AnalyticsSchema> {
-    const projectId = this.projectId("discover analytics schema");
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/projects/{projectId}/analytics/schema",
-      { params: { path: { projectId } } },
-    );
-    if (error) this.handleApiError("discover analytics schema", error, response);
-    return data as unknown as AnalyticsSchema;
+    return this.queryApi.schema();
   }
 
   /**
@@ -217,29 +232,18 @@ export class ChartsApiService {
    * chart's own SQL and stored parameter values (from `get`), plus the
    * surface's time window and granularity for statements that declare the
    * reserved `period_*` parameters.
+   *
+   * Delegates to the shared JSON-RPC query door's `query.run` method — the
+   * dedicated execution route this used to call
+   * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
+   * removed in favor of it (issue #7565).
    */
   async runQuery(params: {
     sql: string;
     parameters?: Record<string, ChartParameterValue>;
     timeWindow?: { start: string; end: string };
-    granularitySeconds?: ChartRunGranularitySeconds;
+    granularitySeconds?: number;
   }): Promise<ChartRunResult> {
-    const projectId = this.projectId("run chart");
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/projects/{projectId}/analytics/query/clickhouse",
-      {
-        params: { path: { projectId } },
-        body: {
-          sql: params.sql,
-          ...(params.parameters ? { parameters: params.parameters } : {}),
-          ...(params.timeWindow ? { timeWindow: params.timeWindow } : {}),
-          ...(params.granularitySeconds === undefined
-            ? {}
-            : { granularitySeconds: params.granularitySeconds }),
-        },
-      },
-    );
-    if (error) this.handleApiError("run chart", error, response);
-    return data as unknown as ChartRunResult;
+    return this.queryApi.query(params);
   }
 }
