@@ -36,9 +36,17 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 
 // The worker module pulls in the whole app graph; import after the mocks.
-const { routeConversationsToTraceDestination } = await import(
-  "../pullerWorker"
-);
+const { routeConversationsToTraceDestination, CONVERSATION_ROUTING_PROFILES } =
+  await import("../pullerWorker");
+
+/** Names every object answers to, which no source is ever stored as. */
+const INHERITED_NAMES = [
+  "constructor",
+  "toString",
+  "__proto__",
+  "valueOf",
+  "hasOwnProperty",
+];
 
 const SOURCE = {
   id: "source-1",
@@ -204,17 +212,24 @@ describe("given a source type the worker has no conversation shape for", () => {
    * literal it did: "constructor" resolved to a truthy function, whose
    * `conversationAction` is undefined, which an event carrying no action of
    * its own then matched — routing a span nobody's source ever emitted.
+   *
+   * Routing nothing is what a missing action does too, so the behaviour on its
+   * own cannot tell the two apart: the event here carries a real action, and
+   * the lookup is read directly, so an object literal fails the first case
+   * rather than passing for the wrong reason.
    */
   describe("when the stored source type is a name every object inherits", () => {
-    it.each([
-      "constructor",
-      "toString",
-      "__proto__",
-      "valueOf",
-      "hasOwnProperty",
-    ])("routes nothing for the inherited name %s", async (sourceType) => {
+    it.each(
+      INHERITED_NAMES,
+    )("finds no profile at all for the inherited name %s", (sourceType) => {
+      expect(CONVERSATION_ROUTING_PROFILES.get(sourceType)).toBeUndefined();
+    });
+
+    it.each(
+      INHERITED_NAMES,
+    )("routes nothing for the inherited name %s, even carrying a real conversation", async (sourceType) => {
       await routeConversationsToTraceDestination({
-        events: [{ ...genieEvent(), action: undefined as unknown as string }],
+        events: [genieEvent()],
         source: { ...SOURCE, sourceType },
       });
       expect(handleOtlpTraceRequest).not.toHaveBeenCalled();

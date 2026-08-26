@@ -350,7 +350,10 @@ async function writePulledEvents({
 // Keys are declared `SourceType` so a misspelled entry fails the build, but the
 // map is held as `ReadonlyMap<string, …>` because the lookup value is the raw
 // database column: narrowing the lookup would only force a cast at the call.
-const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
+// Exported for the test that pins the prototype-key hazard: routing nothing is
+// also what a missing action does, so only reading the lookup itself can tell
+// the two apart and fail if this ever stops being a Map.
+export const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
   string,
   ConversationRoutingProfile
 > = new Map<SourceType, ConversationRoutingProfile>([
