@@ -78,9 +78,7 @@ describe("given the Add source menu", () => {
       expect(
         screen.queryByText("Microsoft Copilot Studio (Purview)"),
       ).toBeNull();
-      expect(
-        screen.queryByText("OpenAI Enterprise Compliance"),
-      ).toBeNull();
+      expect(screen.queryByText("OpenAI Enterprise Compliance")).toBeNull();
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */
