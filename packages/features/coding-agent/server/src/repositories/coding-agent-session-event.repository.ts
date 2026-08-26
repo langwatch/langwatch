@@ -1,10 +1,16 @@
 import type {
   CodingAgentSessionCursor,
   CodingAgentSessionEvent,
+  CodingAgentSessionEventRecord,
 } from "@langwatch/coding-agent-contract";
 
 /** Private persistence port for the ordered session event read model. */
 export abstract class CodingAgentSessionEventRepository {
+  abstract ensure(
+    records: CodingAgentSessionEventRecord[],
+    retentionDays: number,
+  ): Promise<void>;
+
   abstract findBySessionId(input: {
     tenantId: string;
     sessionId: string;
@@ -33,4 +39,19 @@ export interface SessionModelTotalsRow {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   costUsd: number;
+}
+
+export class NullCodingAgentSessionEventRepository extends CodingAgentSessionEventRepository {
+  async ensure(): Promise<void> {}
+
+  async findBySessionId(): Promise<{
+    events: CodingAgentSessionEvent[];
+    nextCursor: CodingAgentSessionCursor | null;
+  }> {
+    return { events: [], nextCursor: null };
+  }
+
+  async sumTokensByModelPerSession(): Promise<SessionModelTotalsRow[]> {
+    return [];
+  }
 }

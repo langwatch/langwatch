@@ -6,7 +6,6 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "paths": {
-      "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
       "zod": ["../../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"]
     },
     "strict": true,

@@ -10,7 +10,7 @@ The singular `github` feature owns the organization GitHub App installation,
 webhook, repository access and pull-request linkage lifecycle. Its contract
 exports portable Zod 4 values and one abstract `GithubService`. Its server
 package composes one concrete `GithubFeatureService` through
-`GithubCompositionAdapter.create` at process boot.
+`GithubPrismaInstaller.create` at process boot.
 
 Installation and pull-request persistence ports are private abstract classes;
 Prisma adapters and the GitHub HTTP client stay private to the server package.
@@ -23,6 +23,10 @@ tRPC, worker and Langy transports remain application-owned compatibility
 adapters and are migrated to the process-owned service graph at the central
 composition hook; they do not import server internals or create per-request
 services.
+
+The web package owns reusable browser behaviour, including the GitHub App
+installation popup. Application UI remains responsible for rendering and
+routing.
 
 Required lookups throw; genuine optional discovery uses an explicit `try*`
 name. Tokens are minted on demand and never persisted.
@@ -52,7 +56,7 @@ Prisma adapters map generated records to portable values and are not exported.
 
 ## Runtime and registration
 
-The API or worker composition root calls `GithubCompositionAdapter.create` once and
+The API or worker composition root calls `GithubPrismaInstaller.create` once and
 passes the resulting `GithubService` through its process graph. Imports register
 no routes, timers or clients.
 

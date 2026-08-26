@@ -1,12 +1,38 @@
-import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
+import type {
+  CodingAgentSession,
+  CodingAgentSessionBranchRecord,
+} from "@langwatch/coding-agent-contract";
 
 /** Private persistence port for the session aggregate read model. */
 export abstract class CodingAgentSessionRepository {
-  abstract findBySessionId(input: {
+  abstract upsert(
+    row: CodingAgentSession,
+    retentionDays: number,
+    appliedEventIds: readonly string[],
+  ): Promise<void>;
+
+  abstract upsertBatch(
+    rows: Array<{
+      row: CodingAgentSession;
+      retentionDays: number;
+      appliedEventIds: readonly string[];
+    }>,
+  ): Promise<void>;
+
+  abstract tryFindBySessionId(input: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<CodingAgentSession | null>;
+
+  abstract tryFindBySessionIdWithApplied(input: {
+    tenantId: string;
+    sessionId: string;
+    window?: { fromMs: number; toMs: number };
+  }): Promise<{
+    row: CodingAgentSession;
+    appliedEventIds: string[];
+  } | null>;
 
   abstract findManyRecent(input: {
     tenantId: string;
@@ -24,5 +50,30 @@ export abstract class CodingAgentSessionRepository {
     repositoryName: string;
     branches: string[];
     startedAtFromMs: number;
-  }): Promise<CodingAgentSession[]>;
+  }): Promise<CodingAgentSessionBranchRecord[]>;
+}
+
+export class NullCodingAgentSessionRepository extends CodingAgentSessionRepository {
+  async upsert(): Promise<void> {}
+
+  async upsertBatch(): Promise<void> {}
+
+  async tryFindBySessionId(): Promise<CodingAgentSession | null> {
+    return null;
+  }
+
+  async tryFindBySessionIdWithApplied(): Promise<{
+    row: CodingAgentSession;
+    appliedEventIds: string[];
+  } | null> {
+    return null;
+  }
+
+  async findManyRecent(): Promise<CodingAgentSession[]> {
+    return [];
+  }
+
+  async listByRepositoryBranch(): Promise<CodingAgentSessionBranchRecord[]> {
+    return [];
+  }
 }

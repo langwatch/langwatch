@@ -1561,6 +1561,9 @@ importers:
 
   packages/features/coding-agent/contract:
     dependencies:
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1574,13 +1577,31 @@ importers:
 
   packages/features/coding-agent/server:
     dependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.0
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
+      '@langwatch/github-contract':
+        specifier: workspace:*
+        version: link:../../github/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -2210,9 +2231,6 @@ importers:
 
   packages/features/github/server:
     dependencies:
-      '@langwatch/coding-agent-contract':
-        specifier: workspace:*
-        version: link:../../coding-agent/contract
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../contract
@@ -2247,6 +2265,37 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/github/web:
+    dependencies:
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1(@noble/hashes@2.2.0)
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

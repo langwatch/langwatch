@@ -20,10 +20,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.23.0",
     "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/github-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/node": "^26.0.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

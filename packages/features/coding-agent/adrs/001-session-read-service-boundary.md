@@ -2,26 +2,79 @@
 
 **Status:** Accepted
 
-**Behavioural contract:** [Coding-agent session reads](../specs/coding-agent-session-read.feature)
+**Behavioural contract:**
+[Coding-agent session reads](../specs/coding-agent-session-read.feature)
 
-Coding Agent owns its durable session aggregate, trace-to-session mapping,
-metric-series overlay and ordered session-event read model. The portable
-contract exports one Zod 4 `CodingAgentService`; the server package implements
-it with private repositories, composed once at application boot.
+## Context
 
-`listRecent` is part of that complete service rather than a GitHub-specific
-branch lookup. GitHub consumes it to backfill pull-request mappings, while
-GitHub retains ownership of installations, pull requests and mapping lifecycle.
-Trace owns transcript rendering and canonical trace content, so neither content
-nor trace repositories cross into this feature.
+Coding Agent session reads, pull-request usage and event projections had been
+split between application services and ClickHouse repositories. That exposed
+private persistence to callers and let GitHub installation backfill compose a
+second session reader.
 
-Coding Agent also owns browser-safe presentation of its session and pull-request
-reads. Reusable row shaping, sorting, status derivation, formatting and small UI
-primitives live in the feature web package. The application retains page,
-router, query and drawer composition; the web package imports neither the app
-nor the server package.
+## Decision
 
-The service validates every input, preserves the aggregate's complete existing
-row shape, applies metric-series values only to zero folded totals, and treats
-trace-session discovery as genuinely optional (`tryGet*`). It has no
-environment reads, route registration or process-global database access.
+The singular Coding Agent feature owns the durable session aggregate,
+trace-to-session mapping, metric overlay, ordered events and pull-request
+usage. Its contract exposes exactly one `CodingAgentService`; the server's
+private collaborators divide session reads, pull-request reads, attribution,
+aggregation and bounded mapping backfill without becoming public capabilities.
+
+### Public surfaces and transports
+
+The contract exports portable Zod schemas, values, errors, telemetry
+classification, transcript derivation and `CodingAgentService`. The server
+exports only process composition adapters, nominal ports and the named trace
+pull-request adapter. REST, tRPC, traces, eventing and GitHub setup remain
+application transports or composition and delegate to the composed service.
+
+### Dependencies
+
+The concrete service owns private Coding Agent repositories and receives
+complete `GithubService` and `ProjectService`, a nominal billing-policy port,
+a nominal clock port and typed ClickHouse/retention configuration. It imports
+neither another feature's repository nor Enterprise implementation.
+
+### Persistence
+
+The server package owns the four concrete ClickHouse repositories for session,
+trace-session, metric-series and session-event rows. The named projection
+persistence adapter is package-created, so application composition cannot
+inject or expose those repositories. Existing tables, retention and query
+semantics remain unchanged.
+
+### Runtime and registration
+
+`CodingAgentRuntime.create` builds one service graph at process boot. Hono,
+tRPC, traces and eventing reuse it; request handlers do not construct services.
+After an installation is recorded, the setup transport starts the service's
+bounded backfill without awaiting the redirect and contains failures as
+warnings. Importing the feature registers no routes, workers or subscribers.
+
+### Environment and configuration
+
+The feature reads no environment values. The app injects retention and
+ClickHouse capability as typed configuration. Repository-host normalisation is
+owned by the injected `GithubService`; Coding Agent receives no duplicate host
+setting.
+
+### Errors
+
+Required reads return values or throw concrete contract errors. Optional
+trace/session discovery uses `tryGet*` and returns `null`. GitHub enrichment
+and installation backfill preserve their existing best-effort, warning-only
+behaviour.
+
+### Contracts and validation
+
+All service inputs and output values are defined by contract Zod schemas. The
+service validates inputs before reads; repositories map persistence rows to
+portable values. The public response fields, page bounds, time windows,
+ordering, title-null conversion, prices and metric-only overlay behaviour stay
+unchanged.
+
+## Consequences
+
+Coding Agent has one discoverable cross-feature service and one private
+persistence lifecycle. The application retains deliberate transport and
+composition files while the feature owns session behaviour and repositories.

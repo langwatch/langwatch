@@ -20,22 +20,19 @@ import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { GithubInstallationsService } from "./github-installations.service";
 import type {
-  GithubAppTokenService,
+  GithubAppTokenPort,
   GithubPullRequestSummary,
-  RedisLike,
-} from "../adapters/github.github-app-token.adapter";
+} from "../ports/github-app-token.port";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
 } from "../repositories/github-pull-requests.repository";
+import type { GithubPullRequestStatusCacheService } from "./github-pull-request-status-cache.service";
 
 const logger = createLogger("langwatch:github:pull-request-status");
 
 /** Most refs one call may ask about. A page of rows, not a crawl. */
 export const MAX_STATUS_REFS = 50;
-
-/** How long a live answer is reused. Short: this is the moving field. */
-const STATUS_CACHE_TTL_SEC = 60;
 
 export type GithubPullRequestStatus = "open" | "draft" | "merged" | "closed";
 
@@ -56,8 +53,8 @@ export interface GithubPullRequestLiveStatus extends GithubPullRequestRef {
 export interface GithubPullRequestStatusServiceDeps {
   repository: GithubPullRequestsRepository;
   installations: GithubInstallationsService;
-  appTokens: GithubAppTokenService;
-  redis: RedisLike | null;
+  appTokens: GithubAppTokenPort;
+  cache: GithubPullRequestStatusCacheService;
 }
 
 /**
@@ -65,56 +62,24 @@ export interface GithubPullRequestStatusServiceDeps {
  * because GitHub reports a merged pull request as closed, and "closed" for
  * something that shipped would read as abandoned.
  */
-export function deriveStatus({
-  mergedAt,
-  state,
-  draft,
-}: {
-  mergedAt: string | Date | null;
-  state: string;
-  draft: boolean;
-}): GithubPullRequestStatus {
-  if (mergedAt) return "merged";
-  if (state === "closed") return "closed";
-  if (draft) return "draft";
-  return "open";
-}
-
-function statusFromRow(row: GithubPullRequestRow): GithubPullRequestStatus {
-  return deriveStatus({
-    mergedAt: row.prMergedAt,
-    state: row.state,
-    draft: row.isDraft,
-  });
-}
-
-/**
- * The cache entry one pull request's status lives under.
- *
- * A free function, and never a method on the service, because the service is
- * published through `traced()` — a Proxy that hands back every function wrapped
- * in a span, so `this.cacheKey(...)` returns a Promise rather than a string.
- * Redis stringifies that to a single literal key shared by every pull request
- * in every organization, which turns a per-pull-request cache into one that
- * answers with somebody else's status.
- */
-function statusCacheKey({
-  organizationId,
-  ref,
-}: {
-  organizationId: string;
-  ref: GithubPullRequestRef;
-}): string {
-  // Host and repository are folded, matching the store this cache sits in
-  // front of: two spellings of one repository resolve to a single row there,
-  // so leaving them raw here splits one pull request's status across as many
-  // entries as there are spellings, each paying its own GitHub call.
-  const host = ref.repositoryHost.toLowerCase();
-  const fullName = ref.repositoryFullName.toLowerCase();
-  return `gh:prstatus:${organizationId}:${host}:${fullName}:${ref.prNumber}`;
-}
-
 export class GithubPullRequestStatusService {
+  static deriveStatus(input: {
+    mergedAt: string | Date | null;
+    state: string;
+    draft: boolean;
+  }): GithubPullRequestStatus {
+    if (input.mergedAt) {
+      return "merged";
+    }
+    if (input.state === "closed") {
+      return "closed";
+    }
+    if (input.draft) {
+      return "draft";
+    }
+    return "open";
+  }
+
   static create(
     deps: GithubPullRequestStatusServiceDeps,
   ): GithubPullRequestStatusService {
@@ -144,7 +109,9 @@ export class GithubPullRequestStatusService {
     const out: GithubPullRequestLiveStatus[] = [];
     for (const ref of refs) {
       const status = await this.statusForRef({ organizationId, ref });
-      if (status) out.push(status);
+      if (status) {
+        out.push(status);
+      }
     }
     return out;
   }
@@ -160,9 +127,11 @@ export class GithubPullRequestStatusService {
       organizationId,
       ...ref,
     });
-    if (!stored) return null;
+    if (!stored) {
+      return null;
+    }
 
-    const cached = await this.readCache({ organizationId, ref });
+    const cached = await this.deps.cache.tryRead({ organizationId, ref });
     if (cached) {
       return {
         ...ref,
@@ -174,14 +143,16 @@ export class GithubPullRequestStatusService {
 
     try {
       const live = await this.readFromGithub({ organizationId, ref });
-      if (!live) return this.snapshotAnswer(ref, stored);
-      const status = deriveStatus({
+      if (!live) {
+        return this.snapshotAnswer(ref, stored);
+      }
+      const status = GithubPullRequestStatusService.deriveStatus({
         mergedAt: live.mergedAt,
         state: live.state,
         draft: live.draft,
       });
-      await this.writeCache({ organizationId, ref, status });
-      if (status !== statusFromRow(stored)) {
+      await this.deps.cache.write({ organizationId, ref, status });
+      if (status !== this.statusFromRow(stored)) {
         this.refreshSnapshot({ organizationId, ref, live });
       }
       return { ...ref, status, source: "live", mappedAt: stored.mappedAt };
@@ -202,10 +173,18 @@ export class GithubPullRequestStatusService {
   ): GithubPullRequestLiveStatus {
     return {
       ...ref,
-      status: statusFromRow(stored),
+      status: this.statusFromRow(stored),
       source: "snapshot",
       mappedAt: stored.mappedAt,
     };
+  }
+
+  private statusFromRow(row: GithubPullRequestRow): GithubPullRequestStatus {
+    return GithubPullRequestStatusService.deriveStatus({
+      mergedAt: row.prMergedAt,
+      state: row.state,
+      draft: row.isDraft,
+    });
   }
 
   private async readFromGithub({
@@ -219,9 +198,13 @@ export class GithubPullRequestStatusService {
       organizationId,
       repositoryFullName: ref.repositoryFullName,
     });
-    if (!covering) return null;
+    if (!covering) {
+      return null;
+    }
     const [owner, repo] = ref.repositoryFullName.split("/");
-    if (!owner || !repo) return null;
+    if (!owner || !repo) {
+      return null;
+    }
     return this.deps.appTokens.getPullRequest({
       installationId: covering.installationId,
       repositoryId: covering.repositoryId,
@@ -265,47 +248,6 @@ export class GithubPullRequestStatusService {
         );
       });
   }
-
-  private async readCache(params: {
-    organizationId: string;
-    ref: GithubPullRequestRef;
-  }): Promise<GithubPullRequestStatus | null> {
-    if (!this.deps.redis) return null;
-    try {
-      const value = await this.deps.redis.get(statusCacheKey(params));
-      return isStatus(value) ? value : null;
-    } catch {
-      return null;
-    }
-  }
-
-  private async writeCache({
-    organizationId,
-    ref,
-    status,
-  }: {
-    organizationId: string;
-    ref: GithubPullRequestRef;
-    status: GithubPullRequestStatus;
-  }): Promise<void> {
-    if (!this.deps.redis) return;
-    try {
-      await this.deps.redis.set(
-        statusCacheKey({ organizationId, ref }),
-        status,
-        "EX",
-        STATUS_CACHE_TTL_SEC,
-      );
-    } catch {
-      /* best-effort cache */
-    }
-  }
-}
-
-const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
-
-function isStatus(value: unknown): value is GithubPullRequestStatus {
-  return typeof value === "string" && STATUSES.includes(value);
 }
 
 /**
@@ -314,7 +256,9 @@ function isStatus(value: unknown): value is GithubPullRequestStatus {
  * caller's bug behind a status the UI renders.
  */
 function assertValidRefs(refs: readonly GithubPullRequestRef[]): void {
-  if (refs.length === 0) return;
+  if (refs.length === 0) {
+    return;
+  }
   if (refs.length > MAX_STATUS_REFS) {
     throw new ValidationError(
       `At most ${MAX_STATUS_REFS} pull requests can be read at once`,

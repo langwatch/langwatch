@@ -2,11 +2,11 @@ Feature: Coding-agent session read service
 
   Rule: One service exposes the complete session capability
 
-    Scenario: another feature reads recent session branch facts
+    Scenario: a completed GitHub installation backfills recent session branches
       Given a project with recent coding-agent sessions
-      When GitHub requests the recent sessions through Coding Agent
-      Then it receives the existing session rows including repository and branch facts
-      And it does not receive a GitHub-specific coding-agent service
+      When the setup transport starts Coding Agent's mapping backfill after recording the installation
+      Then Coding Agent reads its existing session rows including repository and branch facts
+      And it requests bounded GitHub branch mapping without delaying the installation response
 
     Scenario: metric-only sessions retain their usage totals
       Given a session whose folded token or cost total is zero
@@ -29,6 +29,11 @@ Feature: Coding-agent session read service
       Given the session aggregate is available
       When Coding Agent reads the session events
       Then it bounds the first read around the session start time
+
+    Scenario: projection writes use Coding Agent persistence
+      When the event process persists coding-agent session, trace, metric or event facts
+      Then it calls Coding Agent's named projection-persistence adapter
+      And application composition cannot inject Coding Agent repositories
 
   Rule: Browser presentation belongs to Coding Agent
 

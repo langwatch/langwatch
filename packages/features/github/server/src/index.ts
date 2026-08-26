@@ -1,1 +1,4 @@
-export { GithubCompositionAdapter } from "./adapters/github.github-service.adapter";
+export {
+  PostgresGithubAdapter,
+  PostgresGithubAdapter as GithubPrismaInstaller,
+} from "./adapters/postgres-github.adapter";

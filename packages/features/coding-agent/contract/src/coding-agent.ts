@@ -10,6 +10,9 @@ const legacyPageLimitSchema = z.union([
   z.literal(Number.NEGATIVE_INFINITY),
 ]);
 
+/** The service never asks persistence for more events than this. */
+export const MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE = 1000;
+
 export const codingAgentMetricSeriesRowSchema = z
   .object({
     seriesId: z.string(),
@@ -167,6 +170,58 @@ export const codingAgentSessionEventSchema = z
   })
   .strict();
 
+/** One durable row in the ordered coding-agent session-event read model. */
+export const codingAgentSessionEventRecordSchema = codingAgentSessionEventSchema
+  .extend({ tenantId: z.string() })
+  .strict();
+
+/** One durable trace-to-session mapping written by the projection. */
+export const codingAgentTraceSessionRecordSchema = z
+  .object({
+    tenantId: z.string(),
+    traceId: z.string(),
+    sessionId: z.string(),
+    occurredAtMs: z.number(),
+  })
+  .strict();
+
+/** One converged session metric unit written by the projection. */
+export const codingAgentSessionMetricSeriesRecordSchema = z
+  .object({
+    tenantId: z.string(),
+    sessionId: z.string(),
+    seriesId: z.string(),
+    metricName: z.string(),
+    metricUnit: z.string(),
+    agent: z.string(),
+    attributes: z.record(z.string(), z.string()),
+    value: z.number(),
+    dataPointCount: z.number(),
+    asOfUnixMs: z.number(),
+  })
+  .strict();
+
+/** The bounded, content-free session fact read for pull-request aggregation. */
+export const codingAgentSessionBranchRecordSchema = z
+  .object({
+    sessionId: z.string(),
+    tenantId: z.string(),
+    startedAtMs: z.number(),
+    lastEventOccurredAtMs: z.number(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadTokens: z.number(),
+    cacheCreationTokens: z.number(),
+    costUsd: z.number(),
+    agent: z.string(),
+    models: z.array(z.string()),
+    userId: z.string(),
+    gitBranch: z.string(),
+    gitBranches: z.array(z.string()),
+    title: z.string(),
+  })
+  .strict();
+
 export const codingAgentSessionCursorSchema = z
   .object({ timeUnixMs: z.number(), recordId: z.string() })
   .strict();
@@ -202,6 +257,11 @@ export const codingAgentRecentSessionsInputSchema = z
     toMs: z.number(),
     limit: z.number().optional(),
   })
+  .strict();
+
+/** Requests bounded pull-request mapping for recent session branches. */
+export const codingAgentPullRequestMappingBackfillInputSchema = z
+  .object({ organizationId: z.string() })
   .strict();
 
 export const codingAgentUsageTotalsSchema = z
@@ -450,6 +510,18 @@ export const codingAgentPersonalPullRequestUsageInputSchema = z
 
 export type CodingAgentSession = z.infer<typeof codingAgentSessionSchema>;
 export type CodingAgentSessionEvent = z.infer<typeof codingAgentSessionEventSchema>;
+export type CodingAgentSessionEventRecord = z.infer<
+  typeof codingAgentSessionEventRecordSchema
+>;
+export type CodingAgentTraceSessionRecord = z.infer<
+  typeof codingAgentTraceSessionRecordSchema
+>;
+export type CodingAgentSessionMetricSeriesRecord = z.infer<
+  typeof codingAgentSessionMetricSeriesRecordSchema
+>;
+export type CodingAgentSessionBranchRecord = z.infer<
+  typeof codingAgentSessionBranchRecordSchema
+>;
 export type CodingAgentSessionCursor = z.infer<typeof codingAgentSessionCursorSchema>;
 export type CodingAgentSessionEventsInput = z.infer<
   typeof codingAgentSessionEventsInputSchema
@@ -462,6 +534,9 @@ export type CodingAgentTraceSessionLookupInput = z.infer<
 >;
 export type CodingAgentRecentSessionsInput = z.infer<
   typeof codingAgentRecentSessionsInputSchema
+>;
+export type CodingAgentPullRequestMappingBackfillInput = z.infer<
+  typeof codingAgentPullRequestMappingBackfillInputSchema
 >;
 export type CodingAgentUsageTotals = z.infer<typeof codingAgentUsageTotalsSchema>;
 export type CodingAgentUsageTotalsInput = z.infer<

@@ -21,7 +21,6 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",

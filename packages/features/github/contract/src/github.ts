@@ -87,15 +87,29 @@ export type GithubPullRequestEvent = {
   };
 };
 
-export type GithubInstallStatePayload = {
-  userId: string;
-  organizationId: string;
-  mode: "popup" | "redirect";
-  returnTo: string;
-  issuedAt: number;
-  nonce: string;
-  nonceRegistered: boolean;
-};
+export const GITHUB_LINKING_PULL_REQUEST_ACTIONS = [
+  "opened",
+  "reopened",
+  "synchronize",
+  "edited",
+  "converted_to_draft",
+  "ready_for_review",
+  "closed",
+] as const;
+
+export const githubInstallStatePayloadSchema = z
+  .object({
+    userId: z.string(),
+    organizationId: z.string(),
+    mode: z.enum(["popup", "redirect"]),
+    returnTo: z.string(),
+    issuedAt: z.number(),
+    nonce: z.string(),
+    nonceRegistered: z.boolean(),
+  })
+  .strict();
+
+export type GithubInstallStatePayload = z.infer<typeof githubInstallStatePayloadSchema>;
 
 export type GithubAppConfig = {
   appSlug: string;

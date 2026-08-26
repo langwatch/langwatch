@@ -311,10 +311,15 @@ export class NullGithubPullRequestsRepository extends GithubPullRequestsReposito
   async findAllByBranchKeys(): Promise<GithubPullRequestRow[]> {
     return [];
   }
-  async tryFindByNumber(): Promise<GithubPullRequestRow | null> {
+  async tryFindByNumber(_params: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    prNumber: number;
+  }): Promise<GithubPullRequestRow | null> {
     return null;
   }
-  async refreshSnapshot(): Promise<void> {}
+  async refreshSnapshot(_input: RefreshGithubPullRequestSnapshotInput): Promise<void> {}
   async tryFindBranchCheck(): Promise<GithubBranchCheckRow | null> {
     return null;
   }
@@ -324,10 +329,14 @@ export class NullGithubPullRequestsRepository extends GithubPullRequestsReposito
   }
   async touchBranchCheckRequestedAt(): Promise<void> {}
   async bringBranchRecheckForward(): Promise<void> {}
-  async findRecheckDue(): Promise<GithubBranchCheckRow[]> {
+  async findRecheckDue(_params: {
+    now: Date;
+    activeWithinMs: number;
+    limit: number;
+  }): Promise<GithubBranchCheckRow[]> {
     return [];
   }
-  async deleteStaleBefore(): Promise<{ branchChecks: number }> {
+  async deleteStaleBefore(_params: { before: Date }): Promise<{ branchChecks: number }> {
     return { branchChecks: 0 };
   }
 }

@@ -1,6 +1,5 @@
 import type {
   GithubInstallation,
-  GithubRepository,
   GithubRepositoryRef,
   GithubPullRequestLiveStatus,
   GithubPullRequest,
@@ -16,6 +15,8 @@ export abstract class GithubService {
   abstract readonly configured: boolean;
   abstract getAppConfig(): GithubAppConfig;
   abstract getWebBase(): string;
+  abstract normalizeRepositoryHost(repositoryHost: string): string;
+  abstract canMapRepositoryHost(repositoryHost: string): boolean;
   abstract getAppInstallUrl(): string;
   abstract getInstallStateTtlMs(): number;
   abstract registerInstallNonce(input: {
@@ -52,7 +53,7 @@ export abstract class GithubService {
   }): Promise<void>;
   abstract listRepositoriesForOrganization(
     organizationId: string,
-  ): Promise<readonly GithubRepository[]>;
+  ): Promise<readonly GithubRepositoryRef[]>;
   abstract tryMintTurnToken(input: {
     organizationId: string;
     repositoryFullName?: string;

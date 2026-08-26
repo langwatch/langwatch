@@ -20,6 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/trace-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

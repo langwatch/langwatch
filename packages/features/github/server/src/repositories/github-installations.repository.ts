@@ -1,18 +1,16 @@
+import type { GithubRepositoryRef } from "@langwatch/github-contract";
+
 /**
- * Data-access layer for the organization's GitHub connection (the
- * `GithubInstallation` rows) plus the `organizationUser` membership read the
- * install/webhook flow gates on. The installations service is the only caller;
- * no transport layer touches Prisma for this feature.
+ * Data-access layer for the organization's GitHub connection. The
+ * installations service is the only caller; no transport touches Prisma for
+ * this feature.
  *
  * Repository methods use findAll / findBy naming; the service exposes getAll /
  * getBy. No secret is stored — the App private key is the only credential and
  * it lives in the control-plane env, not the database.
  */
 
-export interface GithubRepositoryRef {
-  id: string;
-  fullName: string;
-}
+export type { GithubRepositoryRef } from "@langwatch/github-contract";
 
 export interface GithubInstallationRow {
   installationId: string;
@@ -73,15 +71,12 @@ export abstract class GithubInstallationsRepository {
   }): Promise<void>;
 
   abstract deleteByInstallationId(installationId: string): Promise<number>;
-
-  abstract isOrganizationMember(params: {
-    userId: string;
-    organizationId: string;
-  }): Promise<boolean>;
 }
 
 export class NullGithubInstallationsRepository extends GithubInstallationsRepository {
-  async findAllForOrganization(): Promise<GithubInstallationRow[]> {
+  async findAllForOrganization(
+    _organizationId: string,
+  ): Promise<GithubInstallationRow[]> {
     return [];
   }
   async tryFindByInstallationId(): Promise<GithubInstallationRow | null> {
@@ -101,8 +96,5 @@ export class NullGithubInstallationsRepository extends GithubInstallationsReposi
   async setSuspended(): Promise<void> {}
   async deleteByInstallationId(): Promise<number> {
     return 0;
-  }
-  async isOrganizationMember(): Promise<boolean> {
-    return false;
   }
 }

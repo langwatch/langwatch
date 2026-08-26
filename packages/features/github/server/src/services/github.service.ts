@@ -1,7 +1,7 @@
 import { GithubService as GithubServiceContract } from "@langwatch/github-contract";
 import type {
   GithubInstallation,
-  GithubRepository,
+  GithubRepositoryRef,
   GithubPullRequestLiveStatus,
   GithubPullRequestRef,
   GithubTurnToken,
@@ -10,27 +10,10 @@ import type {
   GithubInstallStatePayload,
   GithubAppConfig,
 } from "@langwatch/github-contract";
-import {
-  consumeGithubInstallNonce,
-  registerGithubInstallNonce,
-  type GithubNonceRedis,
-} from "../adapters/github.github-install-nonce.adapter";
-import {
-  signGithubInstallState,
-  verifyGithubInstallState,
-  STATE_TTL_MS,
-} from "../adapters/github.github-install-state.adapter";
-import {
-  popupErrorHtml,
-  popupResponseHtml,
-} from "../adapters/github.github-install-popup-html.adapter";
-import { parseGithubPullRequestEvent } from "../adapters/github.github-pull-request-event.adapter";
-import {
-  getGithubAppInstallUrl,
-  getGithubWebBase,
-  type GithubHostConfig,
-} from "../adapters/github.github-host.adapter";
-import type { RedisLike } from "../adapters/github.github-app-token.adapter";
+import type { GithubHostPort } from "../ports/github-host.port";
+import type { GithubInstallResponsePort } from "../ports/github-install-response.port";
+import type { GithubInstallStatePort } from "../ports/github-install-state.port";
+import type { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port";
 
 import { GithubInstallationsService } from "./github-installations.service";
 import {
@@ -43,13 +26,14 @@ type GithubServiceDependencies = {
   installations: GithubInstallationsService;
   mapping: GithubPullRequestMappingService;
   status: GithubPullRequestStatusService;
-  protocol: {
+  config: {
     appSlug: string;
     webhookSecret: string;
-    signingKey: string;
-    hostConfig: GithubHostConfig;
-    redis: (RedisLike & GithubNonceRedis) | null;
   };
+  host: GithubHostPort;
+  installState: GithubInstallStatePort;
+  installResponse: GithubInstallResponsePort;
+  pullRequestEvents: GithubPullRequestEventPort;
 };
 
 /**
@@ -63,7 +47,11 @@ export class GithubFeatureService extends GithubServiceContract {
       dependencies.installations,
       dependencies.mapping,
       dependencies.status,
-      dependencies.protocol,
+      dependencies.config,
+      dependencies.host,
+      dependencies.installState,
+      dependencies.installResponse,
+      dependencies.pullRequestEvents,
     );
   }
 
@@ -71,7 +59,11 @@ export class GithubFeatureService extends GithubServiceContract {
     private readonly installations: GithubInstallationsService,
     private readonly mapping: GithubPullRequestMappingService,
     private readonly status: GithubPullRequestStatusService,
-    private readonly protocol: GithubServiceDependencies["protocol"],
+    private readonly config: GithubServiceDependencies["config"],
+    private readonly host: GithubHostPort,
+    private readonly installState: GithubInstallStatePort,
+    private readonly installResponse: GithubInstallResponsePort,
+    private readonly pullRequestEvents: GithubPullRequestEventPort,
   ) {
     super();
   }
@@ -106,14 +98,14 @@ export class GithubFeatureService extends GithubServiceContract {
     action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";
     installationId: string;
     repositorySelection?: string;
-    repositories?: GithubRepository[] | null;
+    repositories?: GithubRepositoryRef[] | null;
   }): Promise<void> {
     return this.installations.handleWebhookEvent(input);
   }
 
   listRepositoriesForOrganization(
     organizationId: string,
-  ): Promise<readonly GithubRepository[]> {
+  ): Promise<readonly GithubRepositoryRef[]> {
     return this.installations.listRepositoriesForOrganization(organizationId);
   }
 
@@ -128,59 +120,65 @@ export class GithubFeatureService extends GithubServiceContract {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<boolean> {
-    return this.installations
-      .tryResolveInstallationForRepository(input)
-      .then((installation) => installation !== null);
+    return this.installations.coversRepository(input);
   }
 
   getAppConfig(): GithubAppConfig {
     return {
-      appSlug: this.protocol.appSlug,
-      webhookSecret: this.protocol.webhookSecret,
-      configured: Boolean(this.installations.configured && this.protocol.appSlug),
+      appSlug: this.config.appSlug,
+      webhookSecret: this.config.webhookSecret,
+      configured: Boolean(this.installations.configured && this.config.appSlug),
     };
   }
 
   getWebBase(): string {
-    return getGithubWebBase(this.protocol.hostConfig);
+    return this.host.getWebBase();
+  }
+
+  normalizeRepositoryHost(repositoryHost: string): string {
+    return this.host.normalize(repositoryHost);
+  }
+
+  canMapRepositoryHost(repositoryHost: string): boolean {
+    return this.host.isMappable(repositoryHost);
   }
 
   getAppInstallUrl(): string {
-    return getGithubAppInstallUrl(this.protocol.appSlug, this.protocol.hostConfig);
+    return this.host.getAppInstallUrl(this.config.appSlug);
   }
 
   getInstallStateTtlMs(): number {
-    return STATE_TTL_MS;
+    return this.installState.getTtlMs();
   }
 
   registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean> {
-    return registerGithubInstallNonce(this.protocol.redis, input.nonce, input.ttlSec);
+    return this.installState.registerNonce(input);
   }
 
   tryConsumeInstallNonce(nonce: string): Promise<boolean | null> {
-    return consumeGithubInstallNonce(this.protocol.redis, nonce);
+    return this.installState.tryConsumeNonce(nonce);
   }
 
   signInstallState(payload: GithubInstallStatePayload): string {
-    return signGithubInstallState(payload, this.protocol.signingKey);
+    return this.installState.sign(payload);
   }
 
   tryVerifyInstallState(
     token: string | null | undefined,
   ): GithubInstallStatePayload | null {
-    return verifyGithubInstallState(token, this.protocol.signingKey);
+    return this.installState.tryVerify(token);
   }
 
   popupResponseHtml(login: string): string {
-    return popupResponseHtml(login);
+    return this.installResponse.successHtml(login);
   }
 
   popupErrorHtml(message: string): string {
-    return popupErrorHtml(message);
+    return this.installResponse.errorHtml(message);
   }
 
   tryParsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
-    return parseGithubPullRequestEvent(payload);
+    return this.pullRequestEvents.tryParse(payload);
   }
 
   requestBranchMapping(input: BranchMappingRequest): Promise<void> {
