@@ -52,10 +52,14 @@ export const fromOutputFieldState = (
  * The agent output the scenario result reads, or `null` when the user cleared
  * the selection and nothing should be mapped.
  */
-export const resolveOutputField = (
-  state: OutputFieldState,
-  firstDeclaredOutput: string | undefined,
-): string | null => {
+export const resolveOutputField = ({
+  state,
+  firstDeclaredOutput,
+}: {
+  state: OutputFieldState;
+  /** The first output the agent declares, used when nothing was chosen. */
+  firstDeclaredOutput: string | undefined;
+}): string | null => {
   switch (state.kind) {
     case "cleared":
       return null;
