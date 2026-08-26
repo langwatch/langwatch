@@ -334,21 +334,36 @@ export function groupTranscriptRows(
     // Batch order, then time. Batch order alone is right whenever the rows
     // arrive as written, and this is what makes it right when they do not:
     // turns are paired by walking this list, so one out-of-order message
-    // attaches an answer to the wrong question. Undateable activities keep
-    // their position rather than being bunched at one end — the sort is
-    // stable, and a missing timestamp is not evidence about ordering.
+    // attaches an answer to the wrong question.
+    //
+    // The dated activities are sorted among themselves and put back into the
+    // slots dated activities already held, so an undateable one keeps its
+    // literal position. Ranking them by comparator instead does not work: a
+    // rule that compares null against a number by position and every other
+    // pair by time contradicts itself — position says A before B, time says
+    // the reverse — and a comparator that contradicts itself is answered with
+    // whatever the engine likes. One undated activity was enough to leave the
+    // largest timestamp sitting first, which is the exact failure this sort
+    // exists to prevent.
     const sortable = activities.map((activity, index) => ({
       activity,
       index,
       ms: activityMs(activity),
     }));
-    sortable.sort((a, b) => {
-      if (a.ms === null || b.ms === null) return a.index - b.index;
-      return a.ms === b.ms ? a.index - b.index : a.ms - b.ms;
-    });
+    const dated: { activity: Activity; index: number; ms: number }[] = [];
+    for (const item of sortable) {
+      if (item.ms !== null) {
+        dated.push({ activity: item.activity, index: item.index, ms: item.ms });
+      }
+    }
+    dated.sort((a, b) => (a.ms === b.ms ? a.index - b.index : a.ms - b.ms));
+    let nextDated = 0;
+    const timeOrdered = sortable.map((item) =>
+      item.ms === null ? item.activity : dated[nextDated++]!.activity
+    );
     groups.push({
       key,
-      activities: sortable.map((s) => s.activity),
+      activities: timeOrdered,
       bot: entry.bot,
       batches,
       // A hole in the batch numbers we hold — 0 and 2 with no 1 — is a piece

@@ -308,6 +308,39 @@ describe("given a conversation Microsoft stored across several rows", () => {
     expect(attrs["langwatch.output"]).toContain("Hold the power button.");
   });
 
+  it("still orders the dated messages when an undateable one sits between them", () => {
+    // The undateable activity is dropped later regardless. What it must not do
+    // is drag its neighbours: ordering the two classes against each other by a
+    // single comparator contradicts itself and the engine is then free to
+    // return anything, which in practice left the later message first.
+    const withUndateable = transcriptRow({
+      activities: [
+        agentMessage(
+          "a9999999-9999-4999-8999-999999999999",
+          "Hold the power button.",
+          2_000,
+        ),
+        {
+          id: "d6666666-6666-4666-8666-666666666666",
+          type: "message",
+          timestamp: "not-a-date",
+          from: { id: CHANNEL_ID, role: 0 },
+          text: "undateable",
+        },
+        userMessage(
+          "b8888888-8888-4888-8888-888888888888",
+          "How do I reset it?",
+          1_000,
+        ),
+      ],
+    });
+    const spans = spansOf([copilotEvent(withUndateable)]);
+    expect(spans).toHaveLength(1);
+    const attrs = attrsOf(spans[0]!);
+    expect(attrs["langwatch.input"]).toContain("How do I reset it?");
+    expect(attrs["langwatch.output"]).toContain("Hold the power button.");
+  });
+
   it("survives a null in the activity list rather than taking down the run", () => {
     // `content` is a JSON string the row schema validates as a string and
     // never opens, so nothing upstream rejects this. The caller has no
