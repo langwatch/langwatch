@@ -1,0 +1,43 @@
+# Fixture for tests/upgrade-access.sh — the old->new upgrade-access harness
+# (langwatch-saas#1168). Not a copy of values-replicated.yaml: two deliberate
+# differences, each load-bearing.
+#
+# 1. auth.clusterSecret is NOT pinned. AC18 asserts the clusterSecret is
+#    byte-identical across the upgrade. That is only a real assertion when the
+#    chart mints it (templates/secret.yaml randAlphaNum 48) on install and then
+#    preserves it through the `lookup` on upgrade. values-replicated.yaml pins
+#    "e2e-cluster-secret", which would make AC18 pass by construction.
+# 2. image.tag is NOT pinned here — the harness supplies it via --set on each
+#    side of the upgrade, because D5 requires the chart to be identical and
+#    image.tag to be the ONLY thing that changes.
+#
+# replicas is overridden by --set replicas=$REPLICAS (1 or 3).
+image:
+  repository: langwatch/clickhouse-serverless
+  # Both tags are side-loaded into kind by the harness; Never keeps the run
+  # offline and makes the AC20 digest comparison meaningful.
+  pullPolicy: Never
+replicas: 3
+memory: 1Gi
+cpu: "500m"
+storage:
+  size: 1Gi
+
+auth:
+  # Known plaintext so the AC12 probe pod can reach the Service during the
+  # rolling window without mounting the chart's Secret.
+  password: "upgrade-e2e"
+
+autogen:
+  enabled: true
+
+keeper:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  storage:
+    size: 1Gi
