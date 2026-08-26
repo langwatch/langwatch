@@ -838,35 +838,35 @@
             "pages": [
               {
                 "group": "Claude Code",
-                "icon": "/images/logos/anthropic.svg",
+                "icon": "/images/logos/claude-code.svg",
                 "pages": [
                   "coding-agents/claude-code"
                 ]
               },
               {
                 "group": "Codex",
-                "icon": "/images/logos/openai.svg",
+                "icon": "/images/logos/codex.svg",
                 "pages": [
                   "coding-agents/openai-codex"
                 ]
               },
               {
                 "group": "GitHub Copilot",
-                "icon": "github",
+                "icon": "/images/logos/github-copilot.svg",
                 "pages": [
                   "coding-agents/github-copilot-cli"
                 ]
               },
               {
                 "group": "Gemini CLI",
-                "icon": "/images/logos/google.svg",
+                "icon": "/images/logos/gemini.svg",
                 "pages": [
                   "coding-agents/gemini-cli"
                 ]
               },
               {
-                "group": "opencode",
-                "icon": "code",
+                "group": "OpenCode",
+                "icon": "/images/logos/opencode.svg",
                 "pages": [
                   "coding-agents/opencode"
                 ]

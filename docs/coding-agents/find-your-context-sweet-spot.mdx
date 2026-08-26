@@ -18,8 +18,8 @@ This investigation runs as a skill for your coding agent. It reads your sessions
 
 {/* lw-generated:skill:start */}
 
-<div className="lw-accordion">
-  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+<div className="lw-accordion" data-open="true">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">
     <span className="lw-accordion-title">Find my context sweet spot</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -166,6 +166,22 @@ The skill exports your coding-agent sessions and their per-call rows, then bucke
 - **Compaction rate**: how often the agent compressed its conversation to stay under the context window.
 
 The sweet spot is the highest context share where all three stay flat. The report states it in one line, shows the bucket comparison behind it, and dissects your three most expensive sessions: where the context grew, where it rebuilt, what one rebuild cost.
+
+## What it looks like
+
+The published version of this investigation ran on 287,748 real model calls and produced the cost curve your report draws for your own sessions:
+
+<Frame caption="Tokens per productive step against the compaction threshold. The optimum sat at 220k, and every threshold between 170k and 316k stayed within 10 percent of it. Letting the context fill to 900k costs 2.3 times the optimum.">
+  ![Tokens per productive step against the compaction threshold](/images/coding-agents/fig05-sweetspot.webp)
+</Frame>
+
+The same investigation priced the compaction itself beyond the tokens it re-bills: for the first 30 steps after one, the share of user messages containing a correction runs at up to 2.4 times the baseline, and it takes about 60 steps to return to steady state.
+
+<Frame caption="Share of user messages containing a correction, by steps since the last compaction, over 128,853 observations across 700 transcripts.">
+  ![Corrections by steps since the last compaction](/images/coding-agents/fig09-dip.webp)
+</Frame>
+
+The full study is published at [Finding the optimal context window](https://langwatch.ai/research/finding-the-optimal-context-window).
 
 ## What to do with the number
 

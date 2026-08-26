@@ -19963,8 +19963,8 @@ A price-card comparison can mislead on a coding workload. A coding agent's input
 
 {/* lw-generated:skill:start */}
 
-<div className="lw-accordion">
-  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+<div className="lw-accordion" data-open="true">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">
     <span className="lw-accordion-title">Would another provider be cheaper for my usage?</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -20125,6 +20125,12 @@ The skill exports your real token mix per model: input, output, cache reads and 
 
 The report leads with the answer ("your last 30 days cost $X; the same usage prices at $Y under the candidate"), names the cache assumption in the same sentence, and links the price pages it used with their fetch date.
 
+## What the report looks like
+
+<Frame caption="Example report output with sample numbers. The candidate with the lower sticker price costs 42 percent more once the cache reads rebill as fresh input; the candidate with a cache discount saves 41 percent while the cache-hit share holds.">
+  ![Example provider comparison report](/images/coding-agents/provider-cost-comparison-example.png)
+</Frame>
+
 ## What it does not claim
 
 Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you.
@@ -20215,8 +20221,8 @@ This investigation runs as a skill for your coding agent. It reads your sessions
 
 {/* lw-generated:skill:start */}
 
-<div className="lw-accordion">
-  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+<div className="lw-accordion" data-open="true">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">
     <span className="lw-accordion-title">Find my context sweet spot</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -20363,6 +20369,22 @@ The skill exports your coding-agent sessions and their per-call rows, then bucke
 - **Compaction rate**: how often the agent compressed its conversation to stay under the context window.
 
 The sweet spot is the highest context share where all three stay flat. The report states it in one line, shows the bucket comparison behind it, and dissects your three most expensive sessions: where the context grew, where it rebuilt, what one rebuild cost.
+
+## What it looks like
+
+The published version of this investigation ran on 287,748 real model calls and produced the cost curve your report draws for your own sessions:
+
+<Frame caption="Tokens per productive step against the compaction threshold. The optimum sat at 220k, and every threshold between 170k and 316k stayed within 10 percent of it. Letting the context fill to 900k costs 2.3 times the optimum.">
+  ![Tokens per productive step against the compaction threshold](/images/coding-agents/fig05-sweetspot.webp)
+</Frame>
+
+The same investigation priced the compaction itself beyond the tokens it re-bills: for the first 30 steps after one, the share of user messages containing a correction runs at up to 2.4 times the baseline, and it takes about 60 steps to return to steady state.
+
+<Frame caption="Share of user messages containing a correction, by steps since the last compaction, over 128,853 observations across 700 transcripts.">
+  ![Corrections by steps since the last compaction](/images/coding-agents/fig09-dip.webp)
+</Frame>
+
+The full study is published at [Finding the optimal context window](https://langwatch.ai/research/finding-the-optimal-context-window).
 
 ## What to do with the number
 
@@ -21318,17 +21340,17 @@ keywords:
 
 
 
-The first run opens a browser to sign you in, then starts your agent. Your plan keeps billing as before: LangWatch reads only the telemetry the agent already emits. The [quickstart](/coding-agents/quickstart) shows what to open next.
+This will open LangWatch for you to sign in, then start your agent with all telemetry already set up. Check out the [quickstart](/coding-agents/quickstart) for next steps.
 
 ## Set up your agent
 
 <CardGroup cols={3}>
-  <Card title="Claude Code" icon="square-terminal" href="/coding-agents/claude-code" />
-  <Card title="Codex" icon="terminal" href="/coding-agents/openai-codex" />
-  <Card title="GitHub Copilot" icon="github" href="/coding-agents/github-copilot-cli" />
-  <Card title="Gemini CLI" icon="gem" href="/coding-agents/gemini-cli" />
-  <Card title="OpenCode" icon="code" href="/coding-agents/opencode" />
-  <Card title="Cursor and Aider" icon="route" href="/ai-gateway/cli/overview">
+  <Card title="Claude Code" icon="/images/logos/claude-code.svg" href="/coding-agents/claude-code" />
+  <Card title="Codex" icon="/images/logos/codex.svg" href="/coding-agents/openai-codex" />
+  <Card title="GitHub Copilot" icon="/images/logos/github-copilot.svg" href="/coding-agents/github-copilot-cli" />
+  <Card title="Gemini CLI" icon="/images/logos/gemini.svg" href="/coding-agents/gemini-cli" />
+  <Card title="OpenCode" icon="/images/logos/opencode.svg" href="/coding-agents/opencode" />
+  <Card title="Cursor and Aider" icon="/images/logos/cursor.svg" href="/ai-gateway/cli/overview">
     Through the LangWatch AI Gateway.
   </Card>
 </CardGroup>
@@ -21521,7 +21543,7 @@ keywords:
   - langwatch cli
 ---
 
-Run your agent through the LangWatch wrapper. The first run opens a browser to sign you in, then starts your agent.
+Run your agent through the LangWatch wrapper. This will open LangWatch for you to sign in, then start your agent with all telemetry already set up.
 
 
   ### Claude Code

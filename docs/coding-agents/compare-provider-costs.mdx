@@ -16,8 +16,8 @@ A price-card comparison can mislead on a coding workload. A coding agent's input
 
 {/* lw-generated:skill:start */}
 
-<div className="lw-accordion">
-  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+<div className="lw-accordion" data-open="true">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">
     <span className="lw-accordion-title">Would another provider be cheaper for my usage?</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -177,6 +177,12 @@ The skill exports your real token mix per model: input, output, cache reads and 
 - **Sensitivity**: the same comparison at your observed cache-hit share, at half of it, and at zero, so the conclusion survives a change in how you work.
 
 The report leads with the answer ("your last 30 days cost $X; the same usage prices at $Y under the candidate"), names the cache assumption in the same sentence, and links the price pages it used with their fetch date.
+
+## What the report looks like
+
+<Frame caption="Example report output with sample numbers. The candidate with the lower sticker price costs 42 percent more once the cache reads rebill as fresh input; the candidate with a cache discount saves 41 percent while the cache-hit share holds.">
+  ![Example provider comparison report](/images/coding-agents/provider-cost-comparison-example.png)
+</Frame>
 
 ## What it does not claim
 

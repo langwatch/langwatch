@@ -583,7 +583,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Gemini CLI Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/gemini-cli.md): Monitor the Gemini CLI with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
-### opencode
+### OpenCode
 
 - [OpenCode Monitoring with OpenTelemetry](https://langwatch.ai/docs/coding-agents/opencode.md): Monitor opencode with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
