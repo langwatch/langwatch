@@ -8,7 +8,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
-  AGENT_SANDBOX_PERMISSIONS,
   mintAgentSandboxApiKey,
   reapExpiredAgentSandboxApiKeys,
   tryMintAgentSandboxApiKey,
@@ -35,7 +34,7 @@ describe("the agent sandbox key", () => {
 
   describe("given a project that can mint a key", () => {
     describe("when a run asks for one", () => {
-      it("asks for the two cache grains and nothing else", async () => {
+      it("asks for the manage grain and nothing else", async () => {
         await mintAgentSandboxApiKey({
           prisma,
           projectId: "project_1",
@@ -48,7 +47,10 @@ describe("the agent sandbox key", () => {
           isSystemManaged: true,
           userId: null,
           permissionMode: "restricted",
-          permissions: [...AGENT_SANDBOX_PERMISSIONS],
+          // Written out rather than read from the constant the code itself
+          // passes: a grain added to that list has to fail here, which is the
+          // whole reason this assertion exists.
+          permissions: ["agentCache:manage"],
           bindings: [
             { role: "CUSTOM", scopeType: "PROJECT", scopeId: "project_1" },
           ],

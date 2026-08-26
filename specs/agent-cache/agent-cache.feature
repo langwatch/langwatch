@@ -25,6 +25,14 @@ Feature: The agent cache
   #
   # There is no listing route. Names come from the agent code that wrote them.
   #
+  # ACCEPTED: an entry belongs to the project, not to one run. A later run
+  # reads what an earlier run wrote under the same name, which is what lets a
+  # second run reuse a session instead of logging in again. It is not a
+  # boundary a run could otherwise cross: every code sandbox in a project
+  # already receives every project secret in its payload, and a cache entry
+  # holds what those same secrets produced. Scoping entries per run would end
+  # reuse between runs and fence off nothing.
+  #
   # ACCEPTED: a legacy sk-lw- project key reaches these routes, as it reaches
   # the rest of the project surface. Such a key already holds full project
   # access, and the cache holds only state an agent wrote, so the passthrough
@@ -121,10 +129,14 @@ Feature: The agent cache
 
   Rule: A run reaches the cache with a key minted for that run
 
-    # The key belongs to no user, is bound to one project, holds the two cache
-    # grains and nothing else, and expires after twelve hours. It is never the
+    # The key belongs to no user, is bound to one project, holds the manage
+    # grain and nothing else, and expires after twelve hours. It is never the
     # project key. A run that cannot mint one still runs: every row does its
     # own work, which is what a run without the cache does anyway.
+    #
+    # The manage grain alone, because it is what all three routes ask for.
+    # Adding agentCache:view would reach no route today, and would hand every
+    # sandbox in the product whatever a later view-guarded route answers.
 
     @integration
     Scenario: The sandbox key reaches the agent cache

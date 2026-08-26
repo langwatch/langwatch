@@ -134,9 +134,13 @@ export const Resources = {
   // next row, so the work happens once for the run instead of once per row.
   // Entries expire on their own and the platform encrypts them at rest.
   //
-  // `agentCache:view` reads one entry by name; `agentCache:manage` writes and
-  // deletes. Granted from MEMBER upward; VIEWER and EXTERNAL get nothing,
-  // because a cache entry is agent-written state a reader has no call to see.
+  // `agentCache:manage` guards every route, the read included: a caller that
+  // can overwrite an entry already chooses what the next read answers, so a
+  // read-only tier would divide nothing. `agentCache:view` is the read half of
+  // the vocabulary and reaches no route yet, so grant it only together with a
+  // route that can answer it safely. Granted from MEMBER upward; VIEWER and
+  // EXTERNAL get nothing, because a cache entry is agent-written state a
+  // reader has no call to see.
   AGENT_CACHE: "agentCache",
 } as const;
 

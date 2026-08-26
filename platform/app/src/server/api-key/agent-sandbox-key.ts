@@ -17,9 +17,13 @@ export const AGENT_SANDBOX_KEY_TTL_MS = 12 * 60 * 60 * 1000;
  * The whole surface a sandbox key reaches: the project's agent cache, and
  * nothing else. Add a grain here only when agent code in the sandbox has a
  * reason to call the route that asks for it.
+ *
+ * `agentCache:manage` alone, because it is what all three cache routes ask
+ * for. Granting `agentCache:view` as well would reach no route today, and
+ * would silently hand every sandbox in the product whatever a later
+ * view-guarded route decides to answer.
  */
 export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = [
-  "agentCache:view",
   "agentCache:manage",
 ];
 
