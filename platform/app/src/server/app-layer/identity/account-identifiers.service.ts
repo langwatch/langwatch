@@ -91,12 +91,27 @@ export interface AccountIdentifier {
  * Spec: specs/identity/authentication-settings.feature
  */
 export class AccountIdentifiersService {
-  constructor(
-    private readonly heads: IdentityHeadsRepository,
-    private readonly identity: AccountIdentifierWrites,
-    private readonly ceremony: VerificationCeremonyService,
-    private readonly deps: AccountIdentifiersDeps,
-  ) {}
+  private readonly heads: IdentityHeadsRepository;
+  private readonly identity: AccountIdentifierWrites;
+  private readonly ceremony: VerificationCeremonyService;
+  private readonly deps: AccountIdentifiersDeps;
+
+  constructor({
+    heads,
+    identity,
+    ceremony,
+    deps,
+  }: {
+    heads: IdentityHeadsRepository;
+    identity: AccountIdentifierWrites;
+    ceremony: VerificationCeremonyService;
+    deps: AccountIdentifiersDeps;
+  }) {
+    this.heads = heads;
+    this.identity = identity;
+    this.ceremony = ceremony;
+    this.deps = deps;
+  }
 
   /**
    * Every way in this account holds, and — for each — what the guard would

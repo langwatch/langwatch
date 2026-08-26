@@ -152,36 +152,49 @@ export async function getClickHouseClientForTenant(
   if (sharedUserTenantCache.has(tenantId)) {
     return sharedClickHouseClientOrThrow();
   }
-  let orgId = tenantOrgCache.get(tenantId);
 
-  if (!orgId) {
-    const project = await prisma.project.findUnique({
-      where: { id: tenantId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    orgId = project?.team.organizationId;
+  const cached = tenantOrgCache.get(tenantId);
+  if (cached) return getClickHouseClientForOrganization(cached);
 
-    if (!orgId) {
-      const organization = await prisma.organization.findUnique({
-        where: { id: tenantId },
-        select: { id: true },
-      });
-      if (!organization) {
-        if (await tenantIsUserOnSharedInstance(tenantId)) {
-          sharedUserTenantCache.add(tenantId);
-          return sharedClickHouseClientOrThrow();
-        }
-        throw new Error(
-          `Cannot resolve ClickHouse client: tenant "${tenantId}" is neither a project, an organization, nor a user on the shared instance. Refusing to fall back to shared client to prevent data leakage.`,
-        );
-      }
-      orgId = organization.id;
-    }
-
-    tenantOrgCache.set(tenantId, orgId);
+  const orgId = await organizationIdForTenant(tenantId);
+  if (orgId === null) {
+    sharedUserTenantCache.add(tenantId);
+    return sharedClickHouseClientOrThrow();
   }
 
+  tenantOrgCache.set(tenantId, orgId);
   return getClickHouseClientForOrganization(orgId);
+}
+
+/**
+ * Which organization's instance a tenant belongs to, or `null` when the
+ * tenant is a user whose history belongs on the shared instance.
+ *
+ * The three kinds are asked for in the order they are cheap: a project names
+ * its organization in one join, an organization names itself, and only an id
+ * that is neither costs the membership check. An id that names none of them
+ * throws rather than resolving.
+ */
+async function organizationIdForTenant(
+  tenantId: string,
+): Promise<string | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: tenantId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  if (project) return project.team.organizationId;
+
+  const organization = await prisma.organization.findUnique({
+    where: { id: tenantId },
+    select: { id: true },
+  });
+  if (organization) return organization.id;
+
+  if (await tenantIsUserOnSharedInstance(tenantId)) return null;
+
+  throw new Error(
+    `Cannot resolve ClickHouse client: tenant "${tenantId}" is neither a project, an organization, nor a user on the shared instance. Refusing to fall back to shared client to prevent data leakage.`,
+  );
 }
 
 /**

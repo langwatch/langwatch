@@ -178,6 +178,20 @@ function ResetPasswordForm({ token }: { token: string }) {
     step: isDone ? "done" : "credential",
   });
 
+  /**
+   * Which of the two refusals this was, because they mean opposite things: a
+   * dead link is somebody who waited too long, and anything else is a
+   * password this screen would not take.
+   */
+  const announceRefusal = (error: unknown) => {
+    const refused = readResetRefusal(error);
+    setRefusal(refused);
+    report.refused(
+      refused.linkIsDead ? "link" : "password",
+      refused.linkIsDead ? "identity_reset_link_invalid" : null,
+    );
+  };
+
   const onSubmit = async (values: z.infer<typeof resetPasswordSchema>) => {
     setIsLoading(true);
     setRefusal(null);
@@ -187,15 +201,7 @@ function ResetPasswordForm({ token }: { token: string }) {
         token,
       });
       if (result?.error) {
-        const refused = readResetRefusal(result.error);
-        setRefusal(refused);
-        // Which of the two refusals this was, because they mean opposite
-        // things: a dead link is somebody who waited too long, and anything
-        // else is a password this screen would not take.
-        report.refused(
-          refused.linkIsDead ? "link" : "password",
-          refused.linkIsDead ? "identity_reset_link_invalid" : null,
-        );
+        announceRefusal(result.error);
         return;
       }
       setIsDone(true);

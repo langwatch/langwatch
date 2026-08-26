@@ -134,12 +134,25 @@ function requestHeaders(
   if (input instanceof Headers) return input;
   const headers = new Headers();
   for (const [name, value] of Object.entries(input)) {
-    if (value == null) continue;
-    if (Array.isArray(value)) {
-      for (const one of value) headers.append(name, one);
-    } else {
-      headers.set(name, String(value));
-    }
+    appendHeader({ headers, name, value });
   }
   return headers;
+}
+
+/** One header, which node may hand us absent, once, or repeated. */
+function appendHeader({
+  headers,
+  name,
+  value,
+}: {
+  headers: Headers;
+  name: string;
+  value: string | string[] | undefined;
+}): void {
+  if (value == null) return;
+  if (!Array.isArray(value)) {
+    headers.set(name, String(value));
+    return;
+  }
+  for (const one of value) headers.append(name, one);
 }

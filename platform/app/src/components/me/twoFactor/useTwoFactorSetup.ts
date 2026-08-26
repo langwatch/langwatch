@@ -37,6 +37,20 @@ const EMPTY: TwoFactorSetupState = {
   isConfirming: false,
 };
 
+/**
+ * The plugin answers one of two shapes, depending on which second factor it
+ * issued. Only the authenticator one carries a setup link, and it is the only
+ * one this app asks for — but the type says both, so the arm carrying the link
+ * is narrowed out rather than asserted away.
+ */
+function authenticatorFrom<T>(
+  issued: T,
+): Extract<T, { totpURI: string }> | null {
+  return issued && typeof issued === "object" && "totpURI" in issued
+    ? (issued as Extract<T, { totpURI: string }>)
+    : null;
+}
+
 export function useTwoFactorSetup({ onFinished }: { onFinished: () => void }) {
   const [state, setState] = useState<TwoFactorSetupState>(EMPTY);
 
@@ -68,12 +82,7 @@ export function useTwoFactorSetup({ onFinished }: { onFinished: () => void }) {
         setState((current) => ({ ...current, isStarting: false }));
         return;
       }
-      // The plugin answers one of two shapes, depending on which second
-      // factor it issued. Only the authenticator one carries a setup link,
-      // and it is the only one this app asks for — but the type says both,
-      // so it is narrowed rather than asserted away.
-      const issued = result.data;
-      const authenticator = issued && "totpURI" in issued ? issued : null;
+      const authenticator = authenticatorFrom(result.data);
       setState({
         step: "scan",
         setupUri: authenticator?.totpURI ?? null,

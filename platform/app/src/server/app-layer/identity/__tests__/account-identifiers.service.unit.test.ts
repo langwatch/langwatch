@@ -94,11 +94,11 @@ function build({
     }),
   } as unknown as VerificationCeremonyService;
 
-  const service = new AccountIdentifiersService(
-    repository,
+  const service = new AccountIdentifiersService({
+    heads: repository,
     identity,
     ceremony,
-    {
+    deps: {
       sendConfirmation: (args) => {
         sent.push(args);
         return Promise.resolve();
@@ -108,7 +108,7 @@ function build({
       newCommandId: () => "cmd_1",
       now: () => 1,
     },
-  );
+  });
 
   return { service, appended, sent, ceremony, state };
 }

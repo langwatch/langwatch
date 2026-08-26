@@ -175,23 +175,27 @@ export function PasskeySignUpButton({
     void run(current);
   };
 
+  const settleCreated = () => {
+    endPasskeyCeremony();
+    rememberLastUsedMethod({ id: "passkey" });
+    if (!addressIsConfirmed) {
+      // No session was opened, so there is nowhere to navigate to. The card
+      // becomes "check your email", and the link in it is what opens the
+      // first session this account ever has.
+      setIsBusy(false);
+      onAwaitingConfirmation?.(email, "passkey");
+      return;
+    }
+    // Busy stays on: the session is open and the next thing to happen is a
+    // navigation, so releasing the button first only flashes it back.
+    navigate(safeRedirectTarget(callbackUrl));
+  };
+
   const run = async (current: { abandoned: boolean }) => {
     const outcome = await createAccountWithPasskey(email, addressIsConfirmed);
     if (current.abandoned) return;
     if (outcome === "created") {
-      endPasskeyCeremony();
-      rememberLastUsedMethod({ id: "passkey" });
-      if (!addressIsConfirmed) {
-        // No session was opened, so there is nowhere to navigate to. The card
-        // becomes "check your email", and the link in it is what opens the
-        // first session this account ever has.
-        setIsBusy(false);
-        onAwaitingConfirmation?.(email, "passkey");
-        return;
-      }
-      // Busy stays on: the session is open and the next thing to happen is a
-      // navigation, so releasing the button first only flashes it back.
-      navigate(safeRedirectTarget(callbackUrl));
+      settleCreated();
       return;
     }
 

@@ -54,6 +54,39 @@ function listTeamNames(names: string[]): string {
 }
 
 /** What makes two access rows the same grant, regardless of which row it is. */
+/**
+ * The batch describes the access the admin wants the member to hold, so a
+ * staged row the member already holds — or the same row staged twice — adds
+ * nothing to it.
+ */
+function additionsNotAlreadyHeld({
+  staged,
+  held,
+}: {
+  staged: readonly PendingBinding[];
+  held: ReadonlyArray<Parameters<typeof bindingKey>[0]>;
+}): PendingBinding[] {
+  const keys = new Set(held.map(bindingKey));
+  return staged.filter((binding) => {
+    const key = bindingKey(binding);
+    if (keys.has(key)) return false;
+    keys.add(key);
+    return true;
+  });
+}
+
+/**
+ * A seat correction is allowed to take away a team's only team-scoped admin,
+ * so this is the one place the admin who did it finds out.
+ */
+function teamsLeftWithoutAdminLine(
+  teams: ReadonlyArray<{ id: string; name: string }>,
+): string | undefined {
+  if (teams.length === 0) return undefined;
+  const one = teams.length === 1;
+  return `${listTeamNames(teams.map((team) => team.name))} no longer ${one ? "has" : "have"} a team admin. Organization admins can still manage ${one ? "it" : "them"}.`;
+}
+
 function bindingKey(binding: {
   role: string;
   customRoleId?: string | null;
@@ -190,26 +223,56 @@ export function MemberAccessEditor({
       queryClient.limits.getUsage.invalidate(),
     ]);
 
-  const handleSave = async () => {
+  /**
+   * The seat itself. Answers with the teams the change left without an admin,
+   * defaulted rather than read straight off: during a rollout this code can
+   * reach a server that answers without the field, and the save has already
+   * succeeded by then.
+   */
+  const saveOrgRole = async (): Promise<
+    Array<{ id: string; name: string }>
+  > => {
+    if (!roleChanged) return [];
+    const roleResult = await updateOrgRole.mutateAsync({
+      organizationId,
+      userId,
+      role: pendingRole,
+    });
+    return roleResult?.teamsLeftWithoutAdmin ?? [];
+  };
+
+  /** Every staged assignment as one transactional batch. */
+  const saveBindings = async (additions: readonly PendingBinding[]) => {
+    await applyMemberBindings.mutateAsync({
+      organizationId,
+      userId,
+      bindingIdsToDelete: [...pendingBindingRemovals],
+      bindingsToCreate: additions.map((b) => ({
+        role: b.role as TeamUserRole,
+        customRoleId: b.customRoleId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      })),
+    });
+  };
+
+  /** Every row the save is about to create, including one still being typed. */
+  const stagedBindingAdditions = (): PendingBinding[] => {
     // Auto-stage any uncommitted row (fields chosen but never assigned).
     const uncommitted = bindingInputRef.current?.flush() ?? null;
-    const stagedAdditions = uncommitted
+    const staged = uncommitted
       ? [...pendingBindingAdditions, uncommitted]
       : pendingBindingAdditions;
-    // The batch describes the access the admin wants the member to hold, so
-    // a staged row the member already holds (or the same row staged twice)
-    // adds nothing to it.
-    const heldKeys = new Set(
-      (directBindings.data ?? [])
-        .filter((row) => !pendingBindingRemovals.has(row.id))
-        .map(bindingKey),
-    );
-    const allBindingAdditions = stagedAdditions.filter((binding) => {
-      const key = bindingKey(binding);
-      if (heldKeys.has(key)) return false;
-      heldKeys.add(key);
-      return true;
+    return additionsNotAlreadyHeld({
+      staged,
+      held: (directBindings.data ?? []).filter(
+        (row) => !pendingBindingRemovals.has(row.id),
+      ),
     });
+  };
+
+  const handleSave = async () => {
+    const allBindingAdditions = stagedBindingAdditions();
     const hasBindingChangesNow =
       pendingBindingRemovals.size > 0 || allBindingAdditions.length > 0;
 
@@ -218,44 +281,17 @@ export function MemberAccessEditor({
       // Apply org role first — it has license/plan checks that should block
       // the whole save if they fail. Assignments then run as a single
       // transactional batch so they cannot leave a partial state behind.
-      let teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
-      if (roleChanged) {
-        const roleResult = await updateOrgRole.mutateAsync({
-          organizationId,
-          userId,
-          role: pendingRole,
-        });
-        // Defaulted rather than read straight off: during a rollout this code
-        // can reach a server that answers without the field, and the save has
-        // already succeeded by then.
-        teamsLeftWithoutAdmin = roleResult?.teamsLeftWithoutAdmin ?? [];
-      }
-
-      if (hasBindingChangesNow) {
-        await applyMemberBindings.mutateAsync({
-          organizationId,
-          userId,
-          bindingIdsToDelete: [...pendingBindingRemovals],
-          bindingsToCreate: allBindingAdditions.map((b) => ({
-            role: b.role as TeamUserRole,
-            customRoleId: b.customRoleId,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
-        });
-      }
+      const teamsLeftWithoutAdmin = await saveOrgRole();
+      if (hasBindingChangesNow) await saveBindings(allBindingAdditions);
 
       await refreshAccessQueries();
+      const withoutAdmin = teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
       toaster.create({
         title: "Member updated",
-        // A seat correction is allowed to take away a team's only team-scoped
-        // admin, so this is the one place the admin who did it finds out.
-        description:
-          teamsLeftWithoutAdmin.length > 0
-            ? `${listTeamNames(teamsLeftWithoutAdmin.map((team) => team.name))} no longer ${teamsLeftWithoutAdmin.length === 1 ? "has" : "have"} a team admin. Organization admins can still manage ${teamsLeftWithoutAdmin.length === 1 ? "it" : "them"}.`
-            : undefined,
+        description: withoutAdmin,
         type: "success",
-        duration: teamsLeftWithoutAdmin.length > 0 ? 10000 : undefined,
+        // Long enough to read a sentence nobody was expecting.
+        duration: withoutAdmin ? 10000 : undefined,
       });
       onSaved?.();
     } catch (e) {

@@ -53,27 +53,6 @@ export function setupProgressFor({
   arrivalsDecided: boolean;
   activated: boolean;
 }): SetupProgress {
-  // Registering happened, or none of this would be on screen.
-  const provider: SetupStepState = "done";
-
-  // Turning it on is the only step with prerequisites, and the aggregate
-  // refuses it until all three hold. Naming them here is what turns a
-  // button that does nothing into a sentence somebody can act on.
-  const outstanding = [
-    domainProved ? null : "a proved domain",
-    testSignInDone ? null : "a sign-in that worked",
-    breakGlassInPlace ? null : "somebody who can still get in without it",
-    // The fourth, and the only one that is a DECISION rather than a thing
-    // that had to happen. Turning a connection on without saying what it
-    // does with somebody it has never seen is choosing by not choosing.
-    arrivalsDecided ? null : "a decision about who it lets in",
-  ].filter((entry): entry is string => entry !== null);
-
-  const goLiveBlockedBecause =
-    activated || outstanding.length === 0
-      ? null
-      : `Turning it on needs ${listed(outstanding)}. Finish ${outstanding.length === 1 ? "that step" : "those steps"} above and this opens up.`;
-
   // The one to do now is the first unfinished step that CAN be done. Every
   // step but the last is always available: a test sign-in names the
   // connection directly, so it works before a domain is proved, and break
@@ -86,22 +65,93 @@ export function setupProgressFor({
   ];
   const current = order.find(([, done]) => !done)?.[0] ?? null;
 
-  const stateFor = (key: keyof SetupProgress, done: boolean): SetupStepState =>
-    done ? "done" : current === key ? "current" : "todo";
+  const goLiveBlockedBecause = blockedBecause({
+    activated,
+    outstanding: outstandingFor({
+      domainProved,
+      testSignInDone,
+      breakGlassInPlace,
+      arrivalsDecided,
+    }),
+  });
 
   return {
-    provider,
-    domain: stateFor("domain", domainProved),
-    testSignIn: stateFor("testSignIn", testSignInDone),
-    breakGlass: stateFor("breakGlass", breakGlassInPlace),
-    arrivals: stateFor("arrivals", arrivalsDecided),
-    goLive: activated
-      ? "done"
-      : goLiveBlockedBecause !== null
-        ? "blocked"
-        : "current",
+    // Registering happened, or none of this would be on screen.
+    provider: "done",
+    domain: stateOf({ key: "domain", done: domainProved, current }),
+    testSignIn: stateOf({ key: "testSignIn", done: testSignInDone, current }),
+    breakGlass: stateOf({
+      key: "breakGlass",
+      done: breakGlassInPlace,
+      current,
+    }),
+    arrivals: stateOf({ key: "arrivals", done: arrivalsDecided, current }),
+    goLive: goLiveState({ activated, goLiveBlockedBecause }),
     goLiveBlockedBecause,
   };
+}
+
+/**
+ * Turning it on is the only step with prerequisites, and the aggregate
+ * refuses it until all four hold. Naming them is what turns a button that
+ * does nothing into a sentence somebody can act on.
+ */
+function outstandingFor({
+  domainProved,
+  testSignInDone,
+  breakGlassInPlace,
+  arrivalsDecided,
+}: {
+  domainProved: boolean;
+  testSignInDone: boolean;
+  breakGlassInPlace: boolean;
+  arrivalsDecided: boolean;
+}): string[] {
+  return [
+    domainProved ? null : "a proved domain",
+    testSignInDone ? null : "a sign-in that worked",
+    breakGlassInPlace ? null : "somebody who can still get in without it",
+    // The fourth, and the only one that is a DECISION rather than a thing
+    // that had to happen. Turning a connection on without saying what it
+    // does with somebody it has never seen is choosing by not choosing.
+    arrivalsDecided ? null : "a decision about who it lets in",
+  ].filter((entry): entry is string => entry !== null);
+}
+
+function blockedBecause({
+  activated,
+  outstanding,
+}: {
+  activated: boolean;
+  outstanding: string[];
+}): string | null {
+  if (activated || outstanding.length === 0) return null;
+  const steps = outstanding.length === 1 ? "that step" : "those steps";
+  return `Turning it on needs ${listed(outstanding)}. Finish ${steps} above and this opens up.`;
+}
+
+function stateOf({
+  key,
+  done,
+  current,
+}: {
+  key: keyof SetupProgress;
+  done: boolean;
+  current: keyof SetupProgress | null;
+}): SetupStepState {
+  if (done) return "done";
+  return current === key ? "current" : "todo";
+}
+
+function goLiveState({
+  activated,
+  goLiveBlockedBecause,
+}: {
+  activated: boolean;
+  goLiveBlockedBecause: string | null;
+}): SetupStepState {
+  if (activated) return "done";
+  return goLiveBlockedBecause !== null ? "blocked" : "current";
 }
 
 /** "a and b", "a, b and c" — the way a person writes a short list. */

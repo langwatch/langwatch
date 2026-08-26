@@ -152,48 +152,55 @@ export function PasskeySignInButton({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart]);
 
+  // A cancelled prompt is not a failure worth shouting about: the person
+  // closed it, and the other methods are still on the screen behind this.
+  // But ONLY the explicit abort is a cancel. A client-side failure — the
+  // authenticator erroring, a relying-party mismatch — also comes back with
+  // no status, and silencing it left somebody whose passkey FAILED staring at
+  // a screen that said nothing at all.
+  const announceRefusal = (error: { code?: string; status?: number }) => {
+    const cancelled = error.code === "ERROR_CEREMONY_ABORTED";
+    if (!cancelled) {
+      onError(passkeyFailure(error.status === 0 ? void 0 : error.status));
+    }
+    // Told either way, quiet refusal included: the screen's job now is to
+    // offer the next-best method, and that is as true of a prompt somebody
+    // closed as of one the server turned down.
+    onDeclined?.();
+  };
+
+  /**
+   * A throw from the WebAuthn client — unsupported, an insecure origin, a
+   * ceremony that never got started. It never reached the server, so there is
+   * no status to read and nothing to tell apart.
+   */
+  const announceThrow = (current: { abandoned: boolean }) => {
+    if (current.abandoned) return;
+    onError(passkeyFailure(void 0));
+    onDeclined?.();
+  };
+
+  /** A ceremony somebody walked away from releases nothing it no longer owns. */
+  const release = (current: { abandoned: boolean }) => {
+    if (current.abandoned) return;
+    setIsBusy(false);
+    endPasskeyCeremony();
+  };
+
   const run = async (current: { abandoned: boolean }) => {
     try {
       const result = await authClient.signIn.passkey();
       if (current.abandoned) return;
-      // A cancelled prompt is not a failure worth shouting about: the person
-      // closed it, and the other methods are still on the screen behind this.
-      // But ONLY the explicit abort is a cancel. A client-side failure — the
-      // authenticator erroring, a relying-party mismatch — also comes back
-      // with no status, and silencing it left somebody whose passkey FAILED
-      // staring at a screen that said nothing at all.
       if (result?.error) {
-        const cancelled =
-          "code" in result.error &&
-          result.error.code === "ERROR_CEREMONY_ABORTED";
-        if (!cancelled) {
-          onError(
-            passkeyFailure(
-              result.error.status === 0 ? void 0 : result.error.status,
-            ),
-          );
-        }
-        // Told either way, quiet refusal included: the screen's job now is to
-        // offer the next-best method, and that is as true of a prompt somebody
-        // closed as of one the server turned down.
-        onDeclined?.();
+        announceRefusal(result.error);
         return;
       }
       rememberLastUsedMethod({ id: "passkey" });
       navigate(safeRedirectTarget(callbackUrl));
     } catch {
-      // A throw from the WebAuthn client — unsupported, an insecure origin, a
-      // ceremony that never got started. It never reached the server, so there
-      // is no status to read and nothing to tell apart.
-      if (!current.abandoned) {
-        onError(passkeyFailure(void 0));
-        onDeclined?.();
-      }
+      announceThrow(current);
     } finally {
-      if (!current.abandoned) {
-        setIsBusy(false);
-        endPasskeyCeremony();
-      }
+      release(current);
     }
   };
 

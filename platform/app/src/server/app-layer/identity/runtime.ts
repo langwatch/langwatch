@@ -280,17 +280,17 @@ export function identitySecretCarry(): IdentitySecretCarryService {
  * the app's, but it holds no env and renders no mail.
  */
 export function accountIdentifiers(): AccountIdentifiersService {
-  return new AccountIdentifiersService(
-    identityHeads,
-    identityService(),
-    verificationCeremony(),
-    {
+  return new AccountIdentifiersService({
+    heads: identityHeads,
+    identity: identityService(),
+    ceremony: verificationCeremony(),
+    deps: {
       sendConfirmation: sendAddressConfirmationEmail,
       buildConfirmationUrl: buildAddressConfirmationUrl,
       newCommandId: newIdentityCommandId,
       now: () => Date.now(),
     },
-  );
+  });
 }
 
 export function identityBackfill(): IdentityBackfillService {

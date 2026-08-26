@@ -153,38 +153,19 @@ export class EventLogIdentityRepository
       if (!proposalId) continue;
 
       if (event.type === LINK_PROPOSED_EVENT_TYPE) {
-        proposals.set(proposalId, {
+        proposals.set(
           proposalId,
-          userId,
-          connectionId: text(data.connectionId),
-          provider: (text(data.provider) ??
-            "email") as LinkProposalRecord["provider"],
-          providerAccountId: text(data.providerAccountId) ?? "",
-          value: text(data.value),
-          domain: text(data.domain),
-          reason: (text(data.reason) ??
-            "ambiguous_candidates") as LinkProposalRecord["reason"],
-          proposedAtMs: event.occurredAt,
-          decision: null,
-        });
+          proposalFrom({ event, data, userId, proposalId }),
+        );
         continue;
       }
 
+      // A proposal is decided once. The first verb that reaches it wins, and
+      // anything after it is a replay rather than a change of mind.
       const existing = proposals.get(proposalId);
       if (!existing || existing.decision) continue;
-      if (event.type === LINK_CONFIRMED_EVENT_TYPE) {
-        existing.decision = {
-          outcome: "confirmed",
-          byActorId: actorOf(data.actor).id,
-          atMs: event.occurredAt,
-        };
-      } else if (event.type === LINK_REJECTED_EVENT_TYPE) {
-        existing.decision = {
-          outcome: "rejected",
-          byActorId: actorOf(data.actor).id,
-          atMs: event.occurredAt,
-        };
-      }
+      const decision = decisionFrom({ event, data });
+      if (decision) existing.decision = decision;
     }
 
     return [...proposals.values()].sort(
@@ -260,4 +241,55 @@ function newestFirst(a: IdentityHistoryEntry, b: IdentityHistoryEntry): number {
 function oldestFirstEvents(a: IdentityEvent, b: IdentityEvent): number {
   if (a.occurredAt !== b.occurredAt) return a.occurredAt - b.occurredAt;
   return a.id.localeCompare(b.id);
+}
+
+/** The two verbs that decide a proposal, and what each one decides. */
+const DECISION_OUTCOME: Readonly<
+  Record<string, NonNullable<LinkProposalRecord["decision"]>["outcome"]>
+> = {
+  [LINK_CONFIRMED_EVENT_TYPE]: "confirmed",
+  [LINK_REJECTED_EVENT_TYPE]: "rejected",
+};
+
+function proposalFrom({
+  event,
+  data,
+  userId,
+  proposalId,
+}: {
+  event: IdentityEvent;
+  data: IdentityPayloadShape;
+  userId: string;
+  proposalId: string;
+}): LinkProposalRecord {
+  return {
+    proposalId,
+    userId,
+    connectionId: text(data.connectionId),
+    provider: (text(data.provider) ??
+      "email") as LinkProposalRecord["provider"],
+    providerAccountId: text(data.providerAccountId) ?? "",
+    value: text(data.value),
+    domain: text(data.domain),
+    reason: (text(data.reason) ??
+      "ambiguous_candidates") as LinkProposalRecord["reason"],
+    proposedAtMs: event.occurredAt,
+    decision: null,
+  };
+}
+
+function decisionFrom({
+  event,
+  data,
+}: {
+  event: IdentityEvent;
+  data: IdentityPayloadShape;
+}): LinkProposalRecord["decision"] {
+  const outcome = DECISION_OUTCOME[event.type];
+  if (!outcome) return null;
+  return {
+    outcome,
+    byActorId: actorOf(data.actor).id,
+    atMs: event.occurredAt,
+  };
 }

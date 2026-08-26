@@ -157,17 +157,17 @@ function buildCaller(heads: IdentityHeads) {
     } as never,
   );
 
-  serviceRef.current = new AccountIdentifiersService(
-    repository,
+  serviceRef.current = new AccountIdentifiersService({
+    heads: repository,
     identity,
-    null as never,
-    {
+    ceremony: null as never,
+    deps: {
       sendConfirmation: () => Promise.resolve(),
       buildConfirmationUrl: () => "https://example.test/confirm",
       newCommandId: () => "cmd_1",
       now: () => 1,
     },
-  );
+  });
 
   const ctx = createInnerTRPCContext({
     session: { user: { id: USER_ID }, expires: "1" },
