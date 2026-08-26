@@ -3,6 +3,7 @@ import {
   type IdentifierProvider,
   type LinkProposalReason,
   normalizeIdentifierValue,
+  type SsoArrivalPolicy,
 } from "@langwatch/identity";
 import type { IdentityCeremonyClock } from "./better-auth/ceremony-types";
 import type { IdentityLinkProposalWrites } from "./identity-writes";

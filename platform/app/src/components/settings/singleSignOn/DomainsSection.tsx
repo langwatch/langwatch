@@ -438,6 +438,11 @@ function Disclosure({
       <Box
         as="summary"
         cursor="pointer"
+        // The summary is the one interactive line in a quiet block, so it
+        // wears the brand accent — set here because nothing above it carries
+        // a palette, and a bare `colorPalette.*` reference would silently
+        // fall through to the theme's default one.
+        colorPalette="orange"
         color="colorPalette.fg"
         _hover={{ textDecoration: "underline" }}
       >

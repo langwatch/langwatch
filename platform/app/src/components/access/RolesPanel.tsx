@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
@@ -8,6 +8,7 @@ import { showErrorToast } from "~/features/errors";
 import type { RouterOutputs } from "~/utils/api";
 import { api } from "~/utils/api";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
+import { SectionTitle } from "../settings/kit/SettingRow";
 import { Tooltip } from "../ui/tooltip";
 import { BuiltinRoleCard, CustomRoleCard } from "./RoleCards";
 import { RoleDetailDialog } from "./RoleDetailDialog";
@@ -104,7 +105,7 @@ export function RolesPanel({
   const closeDialog = () => setDialog({ kind: "none" });
 
   return (
-    <VStack align="stretch" width="full" gap={10}>
+    <VStack align="stretch" width="full" gap={8}>
       <PredefinedRoles
         assignments={assignmentRows}
         countsPending={countsPending}
@@ -199,12 +200,12 @@ function PredefinedRoles({
 }) {
   return (
     <VStack align="stretch" width="full" gap={4}>
-      <Box>
-        <Text fontWeight="semibold">Predefined roles</Text>
-        <Text color="fg.muted" fontSize="sm">
-          Three roles cover most teams. They cannot be changed or deleted.
-        </Text>
-      </Box>
+      {/* Section headers come from the kit, so this page spells them the
+          way Authentication, Directory and Access do. */}
+      <SectionTitle
+        title="Predefined roles"
+        hint="Three roles cover most teams. They cannot be changed or deleted."
+      />
 
       <SectionErrorNotice
         error={readFailure}
@@ -263,24 +264,21 @@ function CustomRoles({
 }) {
   return (
     <VStack align="stretch" width="full" gap={4}>
-      <HStack width="full" align="start">
-        <Box>
-          <Text fontWeight="semibold">Custom roles</Text>
-          <Text color="fg.muted" fontSize="sm">
-            Scoped grants for people who need one thing and nothing else.
-          </Text>
-        </Box>
-        <Spacer />
-        <Tooltip
-          content="You need permission to manage this organization to write a role."
-          disabled={canManage}
-        >
-          <Button size="sm" onClick={onCreate} disabled={!canManage}>
-            <Plus size={14} aria-hidden />
-            New role
-          </Button>
-        </Tooltip>
-      </HStack>
+      <SectionTitle
+        title="Custom roles"
+        hint="Scoped grants for people who need one thing and nothing else."
+        right={
+          <Tooltip
+            content="You need permission to manage this organization to write a role."
+            disabled={canManage}
+          >
+            <Button size="sm" onClick={onCreate} disabled={!canManage}>
+              <Plus size={14} aria-hidden />
+              New role
+            </Button>
+          </Tooltip>
+        }
+      />
 
       {readFailure ? (
         <SectionErrorNotice
@@ -291,8 +289,8 @@ function CustomRoles({
         <Box
           width="full"
           borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
+          borderColor="border.muted"
+          borderRadius="xl"
           padding={8}
         >
           <Text fontSize="sm" color="fg.muted">

@@ -1495,12 +1495,12 @@ const presentations = {
   },
   scim_token_too_short: {
     title: "That token is too short",
-    // The number comes off the error rather than being written twice, so the
-    // copy cannot drift from the rule that refused.
-    describe: (meta) =>
-      `A token you choose yourself has to be at least ${
-        typeof meta?.minimum === "number" ? meta.minimum : 32
-      } characters — it is the whole password your identity provider uses to reach us. Use a longer one, or let us generate it.`,
+    // The number is written here rather than read off the error: `meta` is a
+    // client contract of named fields, and adding one that only this sentence
+    // reads would be a field with no consumer. The service and this string
+    // are two lines apart in review, which is what keeps them in step.
+    describe: () =>
+      "A token you choose yourself has to be at least 32 characters — it is the whole password your identity provider uses to reach us. Use a longer one, or let us generate it.",
   },
   scim_connection_not_found: {
     // Reads the same for a connection that never existed and one belonging to

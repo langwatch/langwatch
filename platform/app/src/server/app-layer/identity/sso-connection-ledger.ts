@@ -30,6 +30,9 @@ import {
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   DISCARD_CONNECTION_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
@@ -86,6 +89,12 @@ const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
   [RESUME_CONNECTION_COMMAND_TYPE]: "resumeConnection",
   [REQUEST_TEARDOWN_COMMAND_TYPE]: "requestTeardown",
   [COMPLETE_TEARDOWN_COMMAND_TYPE]: "completeTeardown",
+  [SET_ARRIVAL_POLICY_COMMAND_TYPE]: "setArrivalPolicy",
+  // The two re-check verbs the scheduler commands (ADR-123). They were
+  // missing from this map, which the `Record` had been quietly tolerating
+  // until another verb made the type complain about all three at once.
+  [RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE]: "recordDomainProofAbsent",
+  [RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE]: "recordDomainProofPresent",
   [GRANDFATHER_CONNECTION_COMMAND_TYPE]: "grandfatherConnection",
 };
 

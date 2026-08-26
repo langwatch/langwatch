@@ -57,6 +57,24 @@ const CHIP: Record<
   todo: null,
 };
 
+/**
+ * The wizard's geometry, in one place.
+ *
+ * Every number the timeline hangs on is defined or derived HERE and nowhere
+ * else. The rail is positioned against the ROW while the marker is laid out
+ * by the header's flex row, so the two agree only because these numbers say
+ * so: the header's horizontal padding puts the marker's left edge at
+ * `PADDING_X`, and its vertical padding puts the top edge at `PADDING_Y`.
+ */
+const PADDING_X = 20;
+const PADDING_Y = 14;
+const MARKER = 22;
+const MARKER_GAP = 10;
+const RAIL_WIDTH = 2;
+/** Where a row's body begins: past the marker and the gap after it, so the
+ *  content hangs off its own marker rather than starting a new column. */
+const BODY_INDENT = PADDING_X + MARKER + MARKER_GAP;
+
 /** The joined column the steps are rows of. */
 export function SetupSteps({ children }: { children: ReactNode }) {
   return (
@@ -120,6 +138,7 @@ export function SetupStep({
           cursor="pointer"
           alignItems="start"
           _hover={{ background: "bg.muted" }}
+          transition="background 0.15s ease"
           width="full"
           textAlign="left"
         >
@@ -178,23 +197,6 @@ export function SetupStep({
 }
 
 /**
- * Where the marker sits, in one place.
- *
- * The rail is positioned against the ROW while the marker is laid out by the
- * header's flex row, so the two agree only because these numbers say so: the
- * header's horizontal padding puts the marker's left edge at `PADDING_X`, and
- * its vertical padding puts the top edge at `PADDING_Y`.
- */
-const PADDING_X = 20;
-const PADDING_Y = 14;
-const MARKER = 22;
-const MARKER_GAP = 10;
-const RAIL_WIDTH = 2;
-/** Where a row's body begins: past the marker and the gap after it, so the
- *  content hangs off its own marker rather than starting a new column. */
-const BODY_INDENT = PADDING_X + MARKER + MARKER_GAP;
-
-/**
  * The thread between one marker and the next.
  *
  * It starts under this row's marker and runs past the row's own bottom edge,
@@ -226,6 +228,10 @@ function Marker({ number, state }: { number: number; state: SetupStepState }) {
   const done = state === "done";
   return (
     <Box
+      // The current step wears the brand accent — set here because nothing
+      // above the marker carries a palette, and a bare `colorPalette.*`
+      // reference would silently fall through to the theme's default one.
+      colorPalette="orange"
       width={`${MARKER}px`}
       height={`${MARKER}px`}
       borderRadius="full"
@@ -242,15 +248,10 @@ function Marker({ number, state }: { number: number; state: SetupStepState }) {
       }
       borderWidth={done || state === "current" ? 0 : "1px"}
       borderColor="border.emphasized"
-      color={
-        done
-          ? "white"
-          : state === "current"
-            ? "colorPalette.contrast"
-            : "fg.muted"
-      }
-      fontSize="11px"
+      color={done || state === "current" ? "colorPalette.contrast" : "fg.muted"}
+      fontSize="xs"
       fontWeight="semibold"
+      transition="background 0.15s ease"
       // Above the rail, so the thread runs behind the circle rather than
       // into its edge.
       zIndex={2}

@@ -6,6 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Boxes, Clock, Plug, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   DirectoryFactUnavailable,
@@ -68,22 +69,23 @@ export function DirectorySummary({
 
   if (reconciliation.isLoading) {
     // The shape is known before the data is, so the wait shows the five
-    // tiles rather than a spinner the content then displaces.
+    // tiles rather than a spinner the content then displaces. The geometry
+    // is the loaded tile's — card radius, padding, icon-sized lead, label
+    // bar over value bar — so nothing moves when the answer arrives.
     return (
       <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} width="full">
         {[0, 1, 2, 3, 4].map((tile) => (
-          <VStack
-            key={tile}
-            align="start"
-            gap={2}
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="lg"
-            padding={3}
-          >
-            <Skeleton height="2.5" width="16" />
-            <Skeleton height="4" width="24" />
-          </VStack>
+          <Card.Root key={tile} borderRadius="xl" minWidth={0}>
+            <Card.Body paddingX={4} paddingY={3}>
+              <VStack align="start" gap={1.5} minWidth={0}>
+                <HStack gap={1.5}>
+                  <Skeleton height="14px" width="14px" borderRadius="sm" />
+                  <Skeleton height="3" width="16" />
+                </HStack>
+                <Skeleton height="5" width="24" />
+              </VStack>
+            </Card.Body>
+          </Card.Root>
         ))}
       </SimpleGrid>
     );
@@ -99,6 +101,7 @@ export function DirectorySummary({
         <Fact
           label="Authentication source"
           hint="Configured on the Authentication page."
+          icon={<Plug size={14} />}
         >
           {/* The names ARE the value here: an administrator with two sources
               is not asking how many they have, they are asking which one is
@@ -109,7 +112,7 @@ export function DirectorySummary({
             addHref="/settings/authentication"
           />
         </Fact>
-        <Fact label="Last sync">
+        <Fact label="Last sync" icon={<Clock size={14} />}>
           {/* A date the directory has never written is not a date, so it
               is set in the muted ink the other "nothing yet" states use
               rather than in the weight a real timestamp earns. */}
@@ -132,10 +135,10 @@ export function DirectorySummary({
               : formatTimeAgo(facts.lastPushedAtMs)}
           </Text>
         </Fact>
-        <Fact label="People it manages">
+        <Fact label="People it manages" icon={<Users size={14} />}>
           <FactNumber>{facts.managedPeople}</FactNumber>
         </Fact>
-        <Fact label="Groups it sent">
+        <Fact label="Groups it sent" icon={<Boxes size={14} />}>
           <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
             <FactNumber>{facts.directoryGroups.length}</FactNumber>
           </DirectoryFactUnavailable>
@@ -143,6 +146,7 @@ export function DirectorySummary({
         <Fact
           label="Members it does not manage"
           hint="Invited by a colleague or admitted by a domain, so removing them from your directory will not remove them here."
+          icon={<UserX size={14} />}
         >
           <DirectoryFactUnavailable
             canRead={canReadMembership}
@@ -180,41 +184,45 @@ export function DirectorySummary({
  * A tile each rather than five cells in one card, because the facts are
  * glanced at independently — "is it syncing" and "how many people" are
  * different questions on different visits — and a shared card made every
- * glance read the other four. The label is fixed here and the value row is
- * given ONE height, so a tile holding chips and a tile holding a number put
- * their contents on the same line.
+ * glance read the other four. The label carries a small muted mark of its
+ * own, so a band of five tiles can be scanned by shape before any word is
+ * read. Contents stack naturally: a tile holding chips is simply taller than
+ * one holding a number, and no height is reserved to pretend otherwise.
  */
 function Fact({
   label,
   hint,
+  icon,
   children,
 }: {
   label: string;
   /** One small line under the value; on hover it says the whole of it. */
   hint?: string;
+  /** A 14px lucide mark beside the label, in the same muted ink. */
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <Card.Root borderRadius="xl" minWidth={0}>
+    <Card.Root
+      borderRadius="xl"
+      minWidth={0}
+      transition="border-color 0.15s ease"
+      _hover={{ borderColor: "border.emphasized" }}
+    >
       <Card.Body paddingX={4} paddingY={3}>
         <VStack align="start" gap={1.5} minWidth={0}>
-          <Text
-            fontSize="xs"
-            color="fg.muted"
-            fontWeight={500}
-            lineHeight="1.3"
-          >
-            {label}
-          </Text>
-          {/* The chip is the tallest thing any tile can hold, so every tile
-              reserves its height. Without it the text tiles sat two pixels
-              higher than the one with a chip in it. */}
-          <HStack minHeight="7" align="center" minWidth={0} maxWidth="full">
+          <HStack gap={1.5} color="fg.muted">
+            {icon}
+            <Text fontSize="xs" fontWeight={500} lineHeight="1.3">
+              {label}
+            </Text>
+          </HStack>
+          <HStack align="center" minWidth={0} maxWidth="full">
             {children}
           </HStack>
           {hint && (
             <Text
-              fontSize="11px"
+              fontSize="xs"
               color="fg.muted"
               lineHeight="1.35"
               title={hint}

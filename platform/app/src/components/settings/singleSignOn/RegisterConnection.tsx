@@ -433,6 +433,11 @@ function ProviderTile({
       role="radio"
       aria-checked={selected}
       onClick={onPick}
+      // The selected wash, border and monogram resolve against the brand
+      // accent — set here because nothing above the tile carries a palette,
+      // and a bare `colorPalette.*` reference would silently fall through to
+      // the theme's default one.
+      colorPalette="orange"
       display="flex"
       alignItems="center"
       gap={2.5}

@@ -70,7 +70,7 @@ export class ScimTokenTooShortError extends HandledError {
     super(
       "scim_token_too_short",
       `A directory token you choose yourself has to be at least ${minimum} characters`,
-      { httpStatus: 422, fault: "customer", meta: { minimum } },
+      { httpStatus: 422, fault: "customer" },
     );
     this.name = "ScimTokenTooShortError";
   }

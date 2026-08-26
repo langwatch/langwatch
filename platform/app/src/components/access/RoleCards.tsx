@@ -60,6 +60,9 @@ export function BuiltinRoleCard({
       borderColor="border.muted"
       colorPalette={TIER_TONE[tier]}
       _hover={{ borderColor: "border.emphasized", boxShadow: "sm" }}
+      // The border and the shadow lift together, on the same ease — a card
+      // that changes one without the other reads as two separate reactions.
+      transition="border-color 0.15s ease, box-shadow 0.15s ease"
       data-testid={`builtin-role-${tier}`}
     >
       <Card.Body display="flex" flexDirection="column" gap={2.5} padding={4}>
@@ -112,7 +115,6 @@ export function BuiltinRoleCard({
           variant="ghost"
           color="fg.muted"
           alignSelf="start"
-          marginLeft={-2}
           onClick={onOpenDetail}
         >
           See what it can do
@@ -185,6 +187,9 @@ export function CustomRoleCard({
       variant="outline"
       borderColor="border.muted"
       _hover={{ borderColor: "border.emphasized", boxShadow: "sm" }}
+      // The border and the shadow lift together, on the same ease — a card
+      // that changes one without the other reads as two separate reactions.
+      transition="border-color 0.15s ease, box-shadow 0.15s ease"
       data-testid={`custom-role-${role.id}`}
     >
       <Card.Body display="flex" flexDirection="column" gap={3} padding={4}>
@@ -286,8 +291,9 @@ export function CustomRoleCard({
 
 /** The tracked, quiet label every card section leads with — the same
  *  register as the stat-tile labels on the directory overview, so the two
- *  screens read as one system. */
-function SectionEyebrow({ children }: { children: React.ReactNode }) {
+ *  screens read as one system. Exported for the role dialogs, whose section
+ *  labels are the same thing said in a different container. */
+export function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return (
     <Text
       fontSize="10px"

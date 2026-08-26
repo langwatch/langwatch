@@ -58,7 +58,12 @@ export function DirectorySourceChips({
           Nobody is provisioned here automatically.
         </Text>
         {addHref ? (
-          <Box asChild fontSize="xs" color="colorPalette.fg">
+          <Box
+            asChild
+            fontSize="xs"
+            colorPalette="orange"
+            color="colorPalette.fg"
+          >
             <RouterLink href={addHref} data-testid="connect-identity-provider">
               Connect an identity provider →
             </RouterLink>
@@ -118,6 +123,7 @@ function ConnectAnotherSource({
   return (
     <Box
       asChild
+      colorPalette="orange"
       display="inline-flex"
       alignItems="center"
       justifyContent="center"
