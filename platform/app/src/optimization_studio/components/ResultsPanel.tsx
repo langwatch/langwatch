@@ -19,7 +19,12 @@ import {
   BatchRunsSidebar,
   BatchSummaryFooter,
   transformBatchEvaluationData,
-} from "../../components/batch-evaluation-results";
+} from "@langwatch/experiment-web";
+import { ExternalImage } from "~/components/ExternalImage";
+import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
+import { describeCellFailure } from "~/experiments-v3/utils/cellFailure";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useBatchEvaluationState } from "../../components/experiments/BatchEvaluationV2";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -108,6 +113,7 @@ export function EvaluationResults({
   sidebarProps?: StackProps;
 }) {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
 
   const [keepFetching, setKeepFetching] = useState(false);
 
@@ -273,6 +279,32 @@ export function EvaluationResults({
           <BatchEvaluationResultsTable
             data={transformedData}
             isLoading={runDataQuery.isLoading}
+            describeFailure={describeCellFailure}
+            renderEvaluatorResult={({ result }) => (
+              <EvaluatorResultChip
+                name={result.evaluatorName}
+                result={{
+                  status: result.status,
+                  score: result.score,
+                  passed: result.passed,
+                  label: result.label,
+                  details: result.details,
+                }}
+                inputs={result.inputs}
+              />
+            )}
+            renderTracePeek={({ traceId }) => <TraceIdPeek traceId={traceId} />}
+            onOpenTrace={(traceId) => openDrawer("traceV2Details", { traceId })}
+            renderDatasetImage={({ src }) => (
+              <ExternalImage
+                src={src}
+                minWidth="24px"
+                minHeight="24px"
+                maxHeight="80px"
+                maxWidth="100%"
+                expandable
+              />
+            )}
           />
         </Box>
         {sidebarSelectedRun && (

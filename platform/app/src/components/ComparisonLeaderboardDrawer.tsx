@@ -32,18 +32,16 @@ import {
   findCheaperTiedAlternative,
 } from "@langwatch/experiment-web";
 import { computeSampleAdequacy } from "@langwatch/experiment-web";
-import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import {
   buildTrustChecks,
   LeaderboardTrustPanel,
-} from "./batch-evaluation-results/LeaderboardTrustPanel";
-import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
-import {
   DEFAULT_WARN_THRESHOLD,
+  LeaderboardStep,
+  LeaderboardVerdictPanel,
   PairwiseLeaderboard,
-} from "./batch-evaluation-results/PairwiseLeaderboard";
-import { ParetoScatterChart } from "./batch-evaluation-results/ParetoScatterChart";
-import { TradeoffSummaryLine } from "./batch-evaluation-results/TradeoffSummaryLine";
+  ParetoScatterChart,
+  TradeoffSummaryLine,
+} from "@langwatch/experiment-web";
 import type { BatchComparisonColumn, BatchResultRow } from "@langwatch/experiment-web";
 import { useBTLeaderboard } from "@langwatch/experiment-web";
 import { useShowComparisonLeaderboard } from "./batch-evaluation-results/useShowComparisonLeaderboard";

@@ -123,3 +123,61 @@ export {
   type SortDir,
   type SortKey,
 } from "./use-pairwise-sort";
+export {
+  BatchEvaluationResultsTable,
+  ColumnVisibilityButton,
+  DEFAULT_HIDDEN_COLUMNS,
+  FieldsButton,
+  GroupRowsButton,
+  RowHeightButton,
+  type ColumnVisibilityButtonProps,
+  type FieldsButtonProps,
+  type GroupRowsButtonProps,
+  type RowHeightButtonProps,
+} from "./batch-results/batch-evaluation-results-table";
+export {
+  BatchRunsSidebar,
+  type BatchRunSummary,
+} from "./batch-results/batch-runs-sidebar";
+export { BatchSummaryFooter } from "./batch-results/batch-summary-footer";
+export { BatchTargetCell } from "./batch-results/batch-target-cell";
+export { BatchTargetHeader } from "./batch-results/batch-target-header";
+export {
+  ComparisonCharts,
+  computeRunMetrics,
+  computeTargetMetrics,
+} from "./batch-results/comparison-charts";
+export { ComparisonLeaderboardChart } from "./batch-results/comparison-leaderboard-chart";
+export { ComparisonTable } from "./batch-results/comparison-table";
+export {
+  ComparisonWinnerCell,
+  resolveWinner,
+} from "./batch-results/comparison-winner-cell";
+export { ExpandableDatasetCell } from "./batch-results/expandable-dataset-cell";
+export {
+  LeaderboardStep,
+  type LeaderboardStepProps,
+} from "./batch-results/leaderboard-step";
+export {
+  buildTrustChecks,
+  LeaderboardTrustPanel,
+} from "./batch-results/leaderboard-trust-panel";
+export { LeaderboardVerdictPanel } from "./batch-results/leaderboard-verdict-panel";
+export {
+  DEFAULT_WARN_THRESHOLD,
+  PairwiseLeaderboard,
+} from "./batch-results/pairwise-leaderboard";
+export { ParetoScatterChart } from "./batch-results/pareto-scatter-chart";
+export { RunDisplayName } from "./batch-results/run-display-name";
+export {
+  SingleRunTable,
+  trailingComparisonColumns,
+} from "./batch-results/single-run-table";
+export { TableSkeleton } from "./batch-results/table-skeleton";
+export {
+  calculateMinTableWidth,
+  getTableStyles,
+  inferColumnType,
+} from "./batch-results/table-utils";
+export { TradeoffSummaryLine } from "./batch-results/tradeoff-summary-line";
+export { WinRateChart } from "./batch-results/win-rate-chart";

@@ -30,8 +30,10 @@ named `try*`.
 ## Public surfaces and transports
 
 Existing REST and tRPC names and response shapes remain compatibility
-transports over the process-owned service. App pages retain routing, tRPC
-hooks, rollout gates, trace drawers, and table composition.
+transports over the process-owned service. Experiment web owns controlled
+batch-result tables, sidebars, charts, leaderboards, CSV controls, and their
+direct tests. App pages retain routing, tRPC hooks, rollout gates, page layout,
+trace drawers, and image/evaluator/error render ports.
 
 ## Dependencies
 
@@ -68,5 +70,5 @@ save. Storage and durable-execution failures retain their concrete causes.
 
 There is one service graph and one browser implementation of result behaviour.
 Slug conflicts remain retried by the service, and no Experiment repository
-writes another feature's table. App compatibility files contain composition or
-presentation only.
+writes another feature's table. App compatibility files are routing or process
+composition only.

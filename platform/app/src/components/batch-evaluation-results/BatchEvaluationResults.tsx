@@ -20,33 +20,39 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
+import type { Experiment } from "@langwatch/experiment-contract";
+import type { Project } from "@langwatch/project-contract";
+import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
+import { ExternalImage } from "~/components/ExternalImage";
 import { Link } from "~/components/ui/link";
-import { type Experiment, ExperimentType, type Project } from "~/generated/prisma/client";
+import { describeCellFailure } from "~/experiments-v3/utils/cellFailure";
+import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import {
   BatchEvaluationResultsTable,
+  type BatchRunSummary,
+  BatchRunsSidebar,
   ColumnVisibilityButton,
+  ComparisonCharts,
   DEFAULT_HIDDEN_COLUMNS,
   FieldsButton,
   GroupRowsButton,
   RowHeightButton,
-} from "./BatchEvaluationResultsTable";
-import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
-import { ComparisonCharts } from "./ComparisonCharts";
+  TableSkeleton,
+  transformBatchEvaluationData,
+  type BatchEvaluationData,
+} from "@langwatch/experiment-web";
 import { downloadCsv, getRunDisplayName } from "@langwatch/experiment-web";
 import { isRunFinished } from "@langwatch/experiment-web";
-import { TableSkeleton } from "./TableSkeleton";
-import {
-  type BatchEvaluationData,
-  transformBatchEvaluationData,
-} from "@langwatch/experiment-web";
 import { useComparisonMode } from "@langwatch/experiment-web";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
 import { useResultDisplayPreferences } from "@langwatch/experiment-web";
 import { useResultsGrouping } from "@langwatch/experiment-web";
+import { useShowComparisonLeaderboard } from "./useShowComparisonLeaderboard";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -91,6 +97,8 @@ export function BatchEvaluationResults({
   onSelectRunId,
 }: BatchEvaluationResultsProps) {
   const { isLiteMember } = useLiteMemberGuard();
+  const { openDrawer } = useDrawer();
+  const showComparisonLeaderboard = useShowComparisonLeaderboard();
 
   // Track if any run is still in progress
   const [isSomeRunning, setIsSomeRunning] = useState(false);
@@ -581,7 +589,7 @@ export function BatchEvaluationResults({
               </Button>
             </Link>
           )}
-          {experiment?.type === ExperimentType.EVALUATIONS_V3 && (
+          {experiment?.type === "EVALUATIONS_V3" && (
             <Link
               href={`/${project?.slug}/experiments/workbench/${experiment?.slug}`}
               asChild
@@ -605,6 +613,8 @@ export function BatchEvaluationResults({
             onTargetColorsChange={setTargetColors}
             comparisonColumns={transformedData?.comparisonColumns}
             comparisonRows={transformedData?.rows}
+            showComparisonLeaderboard={showComparisonLeaderboard}
+            onOpenLeaderboard={(input) => openDrawer("comparisonLeaderboard", input)}
           />
         )}
 
@@ -631,6 +641,32 @@ export function BatchEvaluationResults({
                   showCostAndLatency={fields.costAndLatency}
                   rowHeight={rowHeight}
                   groupBy={localGroupBy ?? queryGroupBy}
+                  describeFailure={describeCellFailure}
+                  renderEvaluatorResult={({ result }) => (
+                    <EvaluatorResultChip
+                      name={result.evaluatorName}
+                      result={{
+                        status: result.status,
+                        score: result.score,
+                        passed: result.passed,
+                        label: result.label,
+                        details: result.details,
+                      }}
+                      inputs={result.inputs}
+                    />
+                  )}
+                  renderTracePeek={({ traceId }) => <TraceIdPeek traceId={traceId} />}
+                  onOpenTrace={(traceId) => openDrawer("traceV2Details", { traceId })}
+                  renderDatasetImage={({ src }) => (
+                    <ExternalImage
+                      src={src}
+                      minWidth="24px"
+                      minHeight="24px"
+                      maxHeight="80px"
+                      maxWidth="100%"
+                      expandable
+                    />
+                  )}
                 />
               </Card.Body>
             </Card.Root>

@@ -26,3 +26,9 @@ Feature: Experiment service boundary
     When the step is written and read
     Then the Experiment service validates the Zod 4 value
     And uses its private ClickHouse repository
+
+  Scenario: Batch-result presentation remains controlled and portable
+    Given app transport has loaded experiment run values
+    When it renders batch results
+    Then Experiment web preserves controlled result tables, comparisons, and CSV
+    And the app keeps routing, polling, feature gates, drawers, and named rendering actions
