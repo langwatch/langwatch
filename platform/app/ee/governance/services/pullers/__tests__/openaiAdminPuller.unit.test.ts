@@ -17,6 +17,18 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: (...args: unknown[]) => fetchMock(...args),
 }));
 
+/** The reason a failed run leaves behind is a log line, so the log is captured. */
+const logged = vi.hoisted(() => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  createLogger: () => logged,
+}));
+
 import {
   OPENAI_ADMIN_ADAPTER_ID,
   OpenAiAdminPuller,
@@ -123,6 +135,7 @@ function requestedUrl(callIndex = 0): URL {
 describe("given an OpenAI Admin cost source", () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    for (const level of Object.values(logged)) level.mockReset();
   });
 
   describe("when the provider reports a day's spend", () => {
@@ -192,6 +205,20 @@ describe("given an OpenAI Admin cost source", () => {
       const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
 
       expect(result.events[0]?.extra?.apiKeyId).toBe("key_a");
+    });
+
+    /** @scenario "Spend billed to a deleted key is still recorded against it" */
+    it("records spend against a key id that no longer names a live key", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(page({ results: [costRow({ api_key_id: "key_gone" })] })),
+      );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(result.events[0]?.extra?.apiKeyId).toBe("key_gone");
+      // Nothing is asked about the key — the cost report is the only request —
+      // so a key deleted since the spend cannot drop the row that names it.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "Nobody is looked up while pulling" */
@@ -625,6 +652,30 @@ describe("given an OpenAI Admin cost source", () => {
           report: "usage",
         }),
       ).toThrow(ZodError);
+    });
+
+    /** @scenario "A refused key does not put the key in the reason" */
+    it("fails a run on a rejected key without writing the key into the reason", async () => {
+      fetchMock.mockResolvedValue(
+        errorResponse({
+          status: 401,
+          param: null,
+          code: "invalid_api_key",
+          message: "Incorrect API key provided: sk-a***min.",
+        }),
+      );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      expect(result.errorCount).toBe(1);
+      // The reason is logged and shown on the source, so it is read by people
+      // who were never given the credential.
+      expect(logged.error).toHaveBeenCalled();
+      for (const call of logged.error.mock.calls) {
+        expect(JSON.stringify(call)).not.toContain(
+          RUN_OPTIONS.credentials.token,
+        );
+      }
     });
 
     it("fails a run with no admin key rather than reporting an empty organization", async () => {
