@@ -276,6 +276,119 @@ function botFactsOf(row: Record<string, unknown>): Record<string, string> {
   return facts;
 }
 
+/**
+ * What a walk of this run's pages has read so far.
+ *
+ * Held on one object because a page read can throw part-way through the walk.
+ * The run keeps the rows it already read, and reading them back off a shared
+ * accumulator is what makes that true rather than aspirational.
+ */
+interface TranscriptWalk {
+  events: NormalizedPullEvent[];
+  errorCount: number;
+  last: Cursor | null;
+}
+
+/**
+ * One transcript row as the event it becomes and the cursor it advances to,
+ * or null when the row is shaped unlike the rest.
+ *
+ * This is where a fact read off the row turns into something a reader sees,
+ * so a field added to the query is turned into an attribute here and nowhere
+ * else.
+ */
+function readTranscriptRow(params: {
+  raw: object;
+  previous: Cursor | null;
+}): { event: NormalizedPullEvent; cursor: Cursor } | null {
+  const { raw, previous } = params;
+  const parsed = transcriptRowSchema.safeParse(raw);
+  if (!parsed.success) return null;
+
+  const row = parsed.data;
+  const facts = botFactsOf(raw as Record<string, unknown>);
+  // A row with no `createdon` keeps the previous row's, so the cursor never
+  // goes backwards and never lands on an empty timestamp that the next run's
+  // filter would read as "everything".
+  const previousCreatedOn: string = previous ? previous.createdon : "";
+
+  return {
+    cursor: {
+      createdon: row.createdon ?? previousCreatedOn,
+      conversationtranscriptid: row.conversationtranscriptid,
+    },
+    event: {
+      source_event_id: row.conversationtranscriptid,
+      event_timestamp:
+        row.conversationstarttime ?? row.createdon ?? new Date().toISOString(),
+      // Attribution lives on the turns inside the transcript, where the
+      // account identifier actually is. A row has no single author.
+      actor: "",
+      action: COPILOT_CONVERSATION_ACTION,
+      target: facts.botName ?? "",
+      cost_usd: "0",
+      tokens_input: 0,
+      tokens_output: 0,
+      raw_payload: JSON.stringify(row),
+      extra: facts,
+    },
+  };
+}
+
+/** Read one page's rows into the walk. */
+function readPageRows(params: {
+  page: z.infer<typeof pageSchema>;
+  walk: TranscriptWalk;
+}): void {
+  const { page, walk } = params;
+  for (const raw of page.value) {
+    if (!raw || typeof raw !== "object") continue;
+    const read = readTranscriptRow({ raw, previous: walk.last });
+    if (!read) {
+      // A row shaped unlike the rest is counted, not fatal: one bad row must
+      // not cost the whole window.
+      walk.errorCount += 1;
+      continue;
+    }
+    walk.last = read.cursor;
+    walk.events.push(read.event);
+  }
+}
+
+/**
+ * Whether this run must stop before reading another page.
+ *
+ * Stopping here is clean and keeps what the run already read: the next run
+ * resumes from the cursor rather than repeating the whole window.
+ */
+function runIsOver(options: PullRunOptions): boolean {
+  if (options.signal?.aborted) return true;
+  return Boolean(options.deadlineMs && Date.now() > options.deadlineMs);
+}
+
+/**
+ * Whether the server pointed the walk at a host that is not the customer's
+ * environment, in which case the walk stops where it is.
+ *
+ * The next page is a URL out of the response body, and the request that
+ * follows it carries the access token. `followRedirects: false` stops the
+ * server bouncing the credential somewhere else, and this is the same hop by
+ * another name — the host allowlist has to hold for every request that
+ * carries the secret, not only the first.
+ */
+function refusesNextLink(params: {
+  link: string | null;
+  walk: TranscriptWalk;
+}): boolean {
+  const { link, walk } = params;
+  if (!link || isDataverseEnvironmentOrigin(link)) return false;
+  walk.errorCount += 1;
+  logger.error(
+    "copilot studio dataverse: refusing a next-page link outside the environment host",
+  );
+  return true;
+}
+
 export class CopilotStudioDataversePuller
   implements PullerAdapter<CopilotStudioDataverseConfig>
 {
@@ -298,10 +411,7 @@ export class CopilotStudioDataversePuller
     options: PullRunOptions,
     config: CopilotStudioDataverseConfig,
   ): Promise<PullResult> {
-    const cursor = parseCursor(options.cursor);
-    const events: NormalizedPullEvent[] = [];
-    let errorCount = 0;
-    let nextCursor: string | null = null;
+    const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
 
     try {
       const token = await resolveEnvironmentToken({
@@ -309,106 +419,73 @@ export class CopilotStudioDataversePuller
         environmentUrl: config.environmentUrl,
         signal: options.signal,
       });
-
-      let url: string | null = buildFirstPageUrl({
-        environmentUrl: config.environmentUrl,
-        config,
-        cursor,
-        now: Date.now(),
-      });
-      let last: Cursor | null = null;
-      let pageCount = 0;
-
-      while (url && pageCount < MAX_PAGES_PER_RUN) {
-        pageCount += 1;
-        if (options.signal?.aborted) break;
-        if (options.deadlineMs && Date.now() > options.deadlineMs) {
-          // Stop cleanly and keep what this run already read. The next run
-          // resumes from `last` rather than repeating the whole window.
-          break;
-        }
-
-        const page = await this.fetchPage({
-          url,
-          token,
-          signal: options.signal,
-        });
-        for (const raw of page.value) {
-          if (!raw || typeof raw !== "object") continue;
-          const parsed = transcriptRowSchema.safeParse(raw);
-          if (!parsed.success) {
-            // A row shaped unlike the rest is counted, not fatal: one bad row
-            // must not cost the whole window.
-            errorCount += 1;
-            continue;
-          }
-          const row = parsed.data;
-          // A row with no `createdon` keeps the previous row's, so the cursor
-          // never goes backwards and never lands on an empty timestamp that
-          // the next run's filter would read as "everything".
-          const previousCreatedOn: string = last ? last.createdon : "";
-          last = {
-            createdon: row.createdon ?? previousCreatedOn,
-            conversationtranscriptid: row.conversationtranscriptid,
-          };
-          events.push({
-            source_event_id: row.conversationtranscriptid,
-            event_timestamp:
-              row.conversationstarttime ??
-              row.createdon ??
-              new Date().toISOString(),
-            // Attribution lives on the turns inside the transcript, where the
-            // account identifier actually is. A row has no single author.
-            actor: "",
-            action: COPILOT_CONVERSATION_ACTION,
-            target: botFactsOf(raw as Record<string, unknown>).botName ?? "",
-            cost_usd: "0",
-            tokens_input: 0,
-            tokens_output: 0,
-            raw_payload: JSON.stringify(row),
-            extra: botFactsOf(raw as Record<string, unknown>),
-          });
-        }
-
-        const nextLink = page["@odata.nextLink"] ?? null;
-        // The next page is a URL out of the response body, and the request
-        // that follows it carries the access token. `followRedirects: false`
-        // stops the server bouncing the credential somewhere else, and this
-        // is the same hop by another name — the host allowlist has to hold
-        // for every request that carries the secret, not only the first.
-        if (nextLink && !isDataverseEnvironmentOrigin(nextLink)) {
-          errorCount += 1;
-          logger.error(
-            "copilot studio dataverse: refusing a next-page link outside the environment host",
-          );
-          break;
-        }
-        url = nextLink;
-      }
-
-      if (url && pageCount >= MAX_PAGES_PER_RUN) {
-        logger.warn(
-          { pageCount },
-          "copilot studio dataverse hit the page cap; the next run resumes from the cursor",
-        );
-      }
-
-      // Only advance past rows this run actually read. A run that read
-      // nothing leaves the cursor alone so the same window is retried.
-      nextCursor = last?.createdon ? JSON.stringify(last) : options.cursor;
+      await this.walkTranscriptPages({ walk, options, config, token });
     } catch (error) {
-      errorCount += 1;
+      walk.errorCount += 1;
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
         "copilot studio dataverse pull failed",
       );
       // The cursor is deliberately not advanced: the next run retries the
       // same window, and re-reading is safe because identifiers are derived
-      // from the conversation rather than minted per pull.
-      return { events, cursor: options.cursor, errorCount };
+      // from the conversation rather than minted per pull. What the walk read
+      // before it failed is kept.
+      return {
+        events: walk.events,
+        cursor: options.cursor,
+        errorCount: walk.errorCount,
+      };
     }
 
-    return { events, cursor: nextCursor, errorCount };
+    return {
+      events: walk.events,
+      // Only advance past rows this run actually read. A run that read
+      // nothing leaves the cursor alone so the same window is retried.
+      cursor: walk.last?.createdon ? JSON.stringify(walk.last) : options.cursor,
+      errorCount: walk.errorCount,
+    };
+  }
+
+  /**
+   * Page through the transcript table, reading each page into `walk`.
+   *
+   * Throws whatever a page read throws, on purpose: the caller holds the same
+   * `walk` and answers with the rows already in it.
+   */
+  private async walkTranscriptPages(params: {
+    walk: TranscriptWalk;
+    options: PullRunOptions;
+    config: CopilotStudioDataverseConfig;
+    token: string;
+  }): Promise<void> {
+    const { walk, options, config, token } = params;
+
+    let url: string | null = buildFirstPageUrl({
+      environmentUrl: config.environmentUrl,
+      config,
+      cursor: parseCursor(options.cursor),
+      now: Date.now(),
+    });
+    let pageCount = 0;
+
+    while (url && pageCount < MAX_PAGES_PER_RUN) {
+      pageCount += 1;
+      if (runIsOver(options)) break;
+
+      const page = await this.fetchPage({ url, token, signal: options.signal });
+      readPageRows({ page, walk });
+
+      const nextLink = page["@odata.nextLink"] ?? null;
+      if (refusesNextLink({ link: nextLink, walk })) break;
+      url = nextLink;
+    }
+
+    if (url && pageCount >= MAX_PAGES_PER_RUN) {
+      logger.warn(
+        { pageCount },
+        "copilot studio dataverse hit the page cap; the next run resumes from the cursor",
+      );
+    }
   }
 
   private async fetchPage(params: {
