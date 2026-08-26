@@ -19,6 +19,8 @@ Its service owns policy cascade, policy persistence, caching, and trace pins.
 The contract exports Zod 4 values, errors, and one `DataRetentionService`.
 The web package exports reusable transport-free settings presentation. App
 tRPC and pages remain compatibility composition until the physical app split.
+Retroactive updates, metering and policy-authorisation adapters remain app
+migration debt until their server and process slices move.
 
 ## Dependencies
 

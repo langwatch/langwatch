@@ -6,8 +6,8 @@ import {
   type DataRetentionRedis,
 } from "../stores/data-retention-cache.store";
 import type { DataRetentionDatabasePort } from "../ports/data-retention-database.port";
-import { PrismaDataRetentionRepository } from "../repositories/prisma/prisma-data-retention.repository";
-import { PrismaPinnedTraceRepository } from "../repositories/prisma/prisma-pinned-trace.repository";
+import { PrismaDataRetentionRepository } from "../repositories/prisma/prisma.data-retention.repository";
+import { PrismaPinnedTraceRepository } from "../repositories/prisma/prisma.pinned-trace.repository";
 import { DataRetentionService } from "../services/data-retention.service";
 
 export class PrismaDataRetentionAdapter {

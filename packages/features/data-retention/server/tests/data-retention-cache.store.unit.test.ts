@@ -10,7 +10,7 @@ const retention = {
   experiments: 91,
 };
 
-describe("RedisDataRetentionCache", () => {
+describe("RedisDataRetentionCacheStore", () => {
   it("uses the injected Redis connection and keeps a warm memory fallback", async () => {
     const redis = {
       get: vi.fn().mockRejectedValue(new Error("redis unavailable")),
