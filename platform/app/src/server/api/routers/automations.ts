@@ -1,5 +1,9 @@
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
+  buildGraphAlertTriggerData,
+  buildReportTriggerData,
+  type GraphAlertActionParams,
+  graphAlertActionParamsSchema,
   MAX_TRACE_DEBOUNCE_MS,
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
@@ -31,11 +35,6 @@ import {
 } from "~/server/app-layer/automations/dispatch/persistCap";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import {
-  buildGraphAlertTriggerData,
-  type GraphAlertActionParams,
-  graphAlertActionParamsSchema,
-} from "~/server/app-layer/automations/graph-alert.builder";
-import {
   actionParamsSchemaFor,
   persistActionParamsFor,
   redactActionParamsFor,
@@ -46,7 +45,6 @@ import {
   decryptWebhookSigningSecrets,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
-import { buildReportTriggerData } from "~/server/app-layer/automations/report.builder";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { featureFlagService } from "~/server/featureFlag";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";

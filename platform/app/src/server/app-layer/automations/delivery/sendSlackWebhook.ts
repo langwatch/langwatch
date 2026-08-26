@@ -4,7 +4,7 @@ import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webho
 import { env } from "~/env.mjs";
 import { type AlertType, AlertType as AlertTypeEnum } from "~/generated/prisma/client";
 import type { Trace } from "~/server/tracer/types";
-import { assertSlackWebhookUrl } from "./slackWebhookGuard";
+import { assertSlackWebhookUrl } from "~/runtime/app/features/automation-slack-webhook.adapter";
 
 /**
  * Minimal Slack mrkdwn escaping. Slack only requires the three HTML-ish

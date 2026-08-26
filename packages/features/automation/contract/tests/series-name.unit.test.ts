@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSeriesIndex } from "@langwatch/automation-contract";
+import { parseSeriesIndex } from "../src";
 
 describe("parseSeriesIndex", () => {
   describe("given a well-formed seriesName", () => {

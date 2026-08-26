@@ -1,11 +1,11 @@
 import { Box, Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { CADENCE_LABELS } from "@langwatch/automation-contract";
-import { useEffect, useState } from "react";
 import {
+  CADENCE_LABELS,
   GRAPH_ALERT_TIME_PERIODS,
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
-} from "~/server/app-layer/automations/graph-alert.builder";
+} from "@langwatch/automation-contract";
+import { useEffect, useState } from "react";
 import {
   type AutomationDraft,
   cadenceIsSet,

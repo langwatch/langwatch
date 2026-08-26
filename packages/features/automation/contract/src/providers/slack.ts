@@ -10,6 +10,24 @@ export const slackDeliveryMethodSchema = z.enum(SLACK_DELIVERY_METHODS);
 export type SlackDeliveryMethod = (typeof SLACK_DELIVERY_METHODS)[number];
 export const SLACK_BOT_TOKEN_KEPT = "__kept__";
 
+export function isSlackWebhookUrl(value: string): boolean {
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  const secure = url.protocol === "https:";
+  const slackHost = url.hostname === "hooks.slack.com";
+  const defaultPort = url.port === "" || url.port === "443";
+  const noCredentials = url.username === "" && url.password === "";
+  const hasWebhookPath = url.pathname.startsWith("/services/");
+
+  return secure && slackHost && defaultPort && noCredentials && hasWebhookPath;
+}
+
 export const slackActionParamsSchema = z
   .object({
     slackDelivery: slackDeliveryMethodSchema.optional(),
@@ -28,7 +46,7 @@ export const slackActionParamsSchema = z
           message: "A Slack incoming webhook URL is required.",
           path: ["slackWebhook"],
         });
-      } else if (!url.startsWith("https://hooks.slack.com/")) {
+      } else if (!isSlackWebhookUrl(url)) {
         context.addIssue({
           code: "custom",
           message: "Expected a Slack incoming webhook URL (https://hooks.slack.com/…).",

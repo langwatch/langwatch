@@ -35,6 +35,7 @@ export {
   SLACK_BOT_TOKEN_KEPT,
   SLACK_DELIVERY_METHODS,
   SLACK_TEMPLATE_TYPES,
+  isSlackWebhookUrl,
   slackActionParamsSchema,
   slackDeliveryMethodOf,
   slackDeliveryMethodSchema,

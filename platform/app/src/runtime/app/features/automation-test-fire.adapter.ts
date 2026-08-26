@@ -12,7 +12,7 @@ import {
   TEST_FIRE_TRIGGER_ID_SENTINEL,
 } from "~/server/mailer/triggerNoReply";
 import { assertWebhookDelivered, sendWebhook } from "~/server/webhooks/sendWebhook";
-import { isSlackWebhookUrl } from "~/server/app-layer/automations/delivery/slackWebhookGuard";
+import { isSlackWebhookUrl } from "@langwatch/automation-contract";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 
 export class AppAutomationTestFireAdapter extends AutomationTestFirePort {

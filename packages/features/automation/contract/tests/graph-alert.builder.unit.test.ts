@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { AlertType, TriggerAction } from "~/generated/prisma/client";
 import {
+  AlertType,
   buildGraphAlertTriggerData,
   extractGraphAlertFromTriggerRow,
   GRAPH_ALERT_OPERATORS,
   GRAPH_ALERT_TIME_PERIODS,
   graphAlertActionParamsSchema,
-} from "../graph-alert.builder";
+  TriggerAction,
+} from "../src";
 
 describe("buildGraphAlertTriggerData", () => {
   describe("given a Slack-channel graph alert input", () => {

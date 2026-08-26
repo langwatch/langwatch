@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import {
   buildReportTriggerData,
   extractReportFromTriggerRow,
   type ReportActionParams,
   reportScheduleSchema,
   reportSourceSchema,
-} from "../report.builder";
+  TriggerAction,
+} from "../src";
 
 const traceQueryParams: ReportActionParams = {
   source: {
@@ -32,7 +32,7 @@ describe("buildReportTriggerData", () => {
         },
       });
 
-      expect(data.triggerKind).toBe(TriggerKind.REPORT);
+      expect(data.triggerKind).toBe("REPORT");
       expect(data.name).toBe("Weekly errors");
       expect(data.filters).toEqual({});
       expect(data.active).toBe(true);
@@ -128,7 +128,7 @@ describe("extractReportFromTriggerRow", () => {
       const out = extractReportFromTriggerRow(row);
       expect(out?.source.kind).toBe("traceQuery");
       expect(out?.schedule.cron).toBe("0 9 * * 1");
-      expect((out as unknown as { members: string[] }).members).toEqual(["a@b.co"]);
+      expect(out?.members).toEqual(["a@b.co"]);
     });
   });
 

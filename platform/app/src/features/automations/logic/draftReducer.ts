@@ -1,5 +1,8 @@
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
+  extractGraphAlertFromTriggerRow as parseGraphAlertRow,
+  type GraphAlertOperator,
+  type GraphAlertTimePeriod,
   reportSourceSchema,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
@@ -12,11 +15,6 @@ import {
 import { isNotifyEntry } from "@langwatch/automation-web";
 import type { AlertType, TriggerAction } from "~/generated/prisma/client";
 import type { FilterParam } from "~/hooks/useFilterParams";
-import {
-  type GraphAlertOperator,
-  type GraphAlertTimePeriod,
-  extractGraphAlertFromTriggerRow as parseGraphAlertRow,
-} from "~/server/app-layer/automations/graph-alert.builder";
 import type { FilterField } from "~/server/filters/types";
 import { describeCron, isValidCron } from "@langwatch/automation-web";
 

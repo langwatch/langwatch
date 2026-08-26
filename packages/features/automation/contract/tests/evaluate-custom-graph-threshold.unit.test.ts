@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  evaluateCustomGraphThreshold,
-  isNoDataPredicate,
-} from "@langwatch/automation-contract";
+import { evaluateCustomGraphThreshold, isNoDataPredicate } from "../src";
 
 describe("evaluateCustomGraphThreshold", () => {
   describe("when operator is gt", () => {
