@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Mock components with complex transitive dependencies
-vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
+vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", () => ({
   CodeEditor: () => null,
 }));
 

@@ -87,7 +87,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
+vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", () => ({
   CodeEditor: () => null,
   CodeEditorModal: () => null,
 }));

@@ -17,7 +17,7 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
+import { CodeEditor } from "~/optimization_studio/components/code/workflow-code-editor.transport";
 import { rewriteCodeSignature } from "@langwatch/workflow-web";
 import {
   type CodeEvaluatorConfig,

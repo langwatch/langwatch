@@ -1,17 +1,13 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 
-import { useColorMode } from "~/components/ui/color-mode";
-import dynamic from "~/utils/compat/next-dynamic";
-import { vscodeThemeName } from "./CodeEditorModal";
-import { validateLiquidCondition } from "./validateLiquidCondition";
+import { vscodeThemeName } from "./workflow-code-editor";
+import { validateLiquidCondition } from "./liquid-condition";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-  loading: () => <Box height="22px" flex="1" />,
-});
+const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
 const LANGUAGE_ID = "liquid-condition";
 const MARKER_OWNER = "liquid-condition";
@@ -153,39 +149,41 @@ export function LiquidConditionEditor({
           {"{%"}
         </Text>
         <Box flex="1" minWidth="0" height="22px">
-          <MonacoEditor
-            height="22px"
-            language={LANGUAGE_ID}
-            theme={vscodeThemeName(colorMode === "dark" ? "dark" : "light")}
-            value={value}
-            beforeMount={ensureLiquidConditionLanguage}
-            onMount={handleMount}
-            onChange={handleChange}
-            options={{
-              lineNumbers: "off",
-              minimap: { enabled: false },
-              folding: false,
-              glyphMargin: false,
-              lineDecorationsWidth: 0,
-              lineNumbersMinChars: 0,
-              renderLineHighlight: "none",
-              scrollBeyondLastLine: false,
-              scrollbar: {
-                vertical: "hidden",
-                horizontal: "hidden",
-                handleMouseWheel: false,
-              },
-              overviewRulerLanes: 0,
-              hideCursorInOverviewRuler: true,
-              wordWrap: "off",
-              fontSize: 13,
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
-              placeholder,
-              fixedOverflowWidgets: true,
-              contextmenu: false,
-              automaticLayout: true,
-            }}
-          />
+          <Suspense fallback={<Box height="22px" flex="1" />}>
+            <MonacoEditor
+              height="22px"
+              language={LANGUAGE_ID}
+              theme={vscodeThemeName(colorMode === "dark" ? "dark" : "light")}
+              value={value}
+              beforeMount={ensureLiquidConditionLanguage}
+              onMount={handleMount}
+              onChange={handleChange}
+              options={{
+                lineNumbers: "off",
+                minimap: { enabled: false },
+                folding: false,
+                glyphMargin: false,
+                lineDecorationsWidth: 0,
+                lineNumbersMinChars: 0,
+                renderLineHighlight: "none",
+                scrollBeyondLastLine: false,
+                scrollbar: {
+                  vertical: "hidden",
+                  horizontal: "hidden",
+                  handleMouseWheel: false,
+                },
+                overviewRulerLanes: 0,
+                hideCursorInOverviewRuler: true,
+                wordWrap: "off",
+                fontSize: 13,
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
+                placeholder,
+                fixedOverflowWidgets: true,
+                contextmenu: false,
+                automaticLayout: true,
+              }}
+            />
+          </Suspense>
         </Box>
         <Text fontFamily="mono" fontSize="13px" color="fg.muted" userSelect="none">
           {"%}"}

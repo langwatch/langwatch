@@ -18,7 +18,7 @@ import {
   PromptTargetMappingSection,
 } from "../PromptTargetMappingSection";
 
-vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
+vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", () => ({
   CodeEditor: () => null,
 }));
 

@@ -2,7 +2,7 @@ import { Box, Center, HStack, Text } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
 import { useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
-import { CodeEditorModal } from "../../optimization_studio/components/code/CodeEditorModal";
+import { CodeEditorModal } from "../../optimization_studio/components/code/workflow-code-editor.transport";
 import { RenderCode } from "../code/RenderCode";
 
 export interface CodeBlockField {

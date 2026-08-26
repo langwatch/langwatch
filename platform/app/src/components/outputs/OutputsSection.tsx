@@ -17,7 +17,7 @@ import { fromZodError } from "zod-validation-error";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
+import { CodeEditor } from "~/optimization_studio/components/code/workflow-code-editor.transport";
 import type { Field } from "@langwatch/workflow-contract";
 import { FieldTypeSelect } from "@langwatch/prompt-web";
 import { TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-web";

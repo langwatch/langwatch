@@ -6,7 +6,7 @@ import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
 
 import { Dialog } from "~/components/ui/dialog";
-import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
+import { CodeEditor } from "~/optimization_studio/components/code/workflow-code-editor.transport";
 import { TypeLabel } from "@langwatch/workflow-web";
 import { outputsSchema } from "@langwatch/prompt-contract";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";

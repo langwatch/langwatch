@@ -19,6 +19,18 @@ export * from "./studio-dataset.utils";
 export * from "./code-agent-config";
 export * from "./llm-signature-node-factory";
 export * from "./code/python-providers";
+export {
+  WorkflowCodeEditor,
+  WorkflowCodeEditorModal,
+  vscodeThemeName,
+  type WorkflowCodeEditorContractProps,
+  type WorkflowCodeEditorModalHost,
+} from "./code/workflow-code-editor";
+export { LiquidConditionEditor } from "./code/liquid-condition-editor";
+export {
+  validateLiquidCondition,
+  type LiquidConditionValidation,
+} from "./code/liquid-condition";
 export type {
   ContractRef,
   PythonContract,

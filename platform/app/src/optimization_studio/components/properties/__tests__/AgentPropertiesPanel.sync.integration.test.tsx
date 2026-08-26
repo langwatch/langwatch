@@ -85,7 +85,7 @@ vi.mock("~/components/blocks/CodeBlockEditor", () => ({
   ),
 }));
 
-vi.mock("../../code/CodeEditorModal", () => ({
+vi.mock("../../code/workflow-code-editor.transport", () => ({
   CodeEditorModal: () => null,
 }));
 

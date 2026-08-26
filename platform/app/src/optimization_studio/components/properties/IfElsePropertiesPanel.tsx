@@ -7,14 +7,13 @@ import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import { Switch } from "~/components/ui/switch";
 import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { LiquidConditionEditor, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
 } from "@langwatch/workflow-web";
-import { LiquidConditionEditor } from "../code/LiquidConditionEditor";
 import { BasePropertiesPanel, PropertySectionTitle } from "./BasePropertiesPanel";
 
 const LIQUID_OPERATORS_DOCS = "https://shopify.github.io/liquid/basics/operators/";

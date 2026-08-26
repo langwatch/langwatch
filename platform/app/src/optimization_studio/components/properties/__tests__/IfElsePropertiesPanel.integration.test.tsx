@@ -30,6 +30,19 @@ vi.mock("@langwatch/workflow-web", async (importOriginal) => {
         edges: [],
         getWorkflow: () => ({ nodes: [], edges: [] }),
       }),
+    LiquidConditionEditor: ({
+      value,
+      onChange,
+    }: {
+      value: string;
+      onChange: (value: string) => void;
+    }) => (
+      <input
+        data-testid="if-else-condition-input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    ),
   };
 });
 
@@ -52,22 +65,6 @@ vi.mock("../BasePropertiesPanel", async (importOriginal) => {
     ),
   };
 });
-
-vi.mock("../../code/LiquidConditionEditor", () => ({
-  LiquidConditionEditor: ({
-    value,
-    onChange,
-  }: {
-    value: string;
-    onChange: (value: string) => void;
-  }) => (
-    <input
-      data-testid="if-else-condition-input"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  ),
-}));
 
 import { IfElsePropertiesPanel } from "../IfElsePropertiesPanel";
 

@@ -54,10 +54,10 @@ Feature: Workflow service boundary
     And no backend imports the Workflow browser surface
 
   Scenario: Code-node Python language support is portable browser behaviour
-    Given the Studio code editor registers Python providers
+    Given the Studio code or Liquid-condition editor opens
     When it completes, validates, formats, hovers, or offers quick fixes
-    Then it uses the Workflow browser surface
-    And the application retains only Monaco editor chrome
+    Then it uses the Workflow browser surface for its editor and Python providers
+    And the application supplies only project-scoped secret transport and controls
 
   Scenario: Canvas node renderers use explicit application host ports
     Given Studio renders workflow nodes or palette entries

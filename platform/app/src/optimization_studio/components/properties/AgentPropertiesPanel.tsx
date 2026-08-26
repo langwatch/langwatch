@@ -54,7 +54,7 @@ import {
   buildAvailableSources,
   buildInputMappings,
 } from "@langwatch/workflow-web";
-import { CodeEditorModal } from "../code/CodeEditorModal";
+import { CodeEditorModal } from "../code/workflow-code-editor.transport";
 import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 

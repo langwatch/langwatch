@@ -45,7 +45,7 @@ vi.mock("~/hooks/useLicenseEnforcement", () => ({
 }));
 
 // Mock components with complex transitive dependencies
-vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
+vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", () => ({
   CodeEditor: () => null,
   CodeEditorModal: () => null,
 }));

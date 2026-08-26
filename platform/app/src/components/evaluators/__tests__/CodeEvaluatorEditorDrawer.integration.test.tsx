@@ -44,7 +44,7 @@ vi.mock("~/components/ui/toaster", () => ({
 
 // Stub the monaco editor and the variables section so the test stays focused on
 // the drawer's create-vs-edit behavior without pulling in heavy editors.
-vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
+vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", () => ({
   CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
 vi.mock("~/components/variables", () => ({

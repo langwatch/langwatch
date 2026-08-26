@@ -59,12 +59,13 @@ The browser surface is `@langwatch/workflow-web`. It owns graph, field-edge,
 and Studio dataset transforms; templates; the node palette and default-edge
 registries; agent-node transforms; prompt, evaluator, and agent selection
 state transitions; the workflow Zustand store; browser LLM-node and code-agent
-helpers; and small browser hooks. The contract owns portable local-config DSL
+helpers; controlled Workflow code and Liquid-condition editors; and small
+browser hooks. The contract owns portable local-config DSL
 transforms and default-node values because API dispatch uses them too. The
 selection transitions receive named application drawer ports, while app page
-shells, query/event transport composition, Monaco editor chrome, and
-Lambda/worker infrastructure remain application responsibilities. The browser
-package owns the code-node Python provider behaviour used by that chrome.
+shells, query/event transport composition, secret controls, and Lambda/worker
+infrastructure remain application responsibilities. The browser package owns
+the code-node Python provider behaviour used by its editor.
 
 ## Runtime and registration
 

@@ -37,7 +37,7 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
+import { CodeEditorModal } from "~/optimization_studio/components/code/workflow-code-editor.transport";
 import type {
   CodeComponentConfig,
   Field as DSLField,

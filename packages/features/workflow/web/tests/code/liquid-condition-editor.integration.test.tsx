@@ -11,13 +11,15 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/components/ui/color-mode", () => ({
+vi.mock("@langwatch/design-system/color-mode", () => ({
   useColorMode: () => ({ colorMode: "light" }),
 }));
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
-vi.mock("../CodeEditorModal", () => ({ vscodeThemeName: () => "vs" }));
+vi.mock("../../src/code/workflow-code-editor", () => ({
+  vscodeThemeName: () => "vs",
+}));
 
-import { LiquidConditionEditor } from "../LiquidConditionEditor";
+import { LiquidConditionEditor } from "../../src/code/liquid-condition-editor";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -40,14 +42,14 @@ describe("LiquidConditionEditor", () => {
   describe("given a valid condition over a known input", () => {
     it("shows neither an error nor a warning", () => {
       renderEditor("amount < 5", ["amount"]);
-      expect(screen.queryByTestId("if-else-condition-error")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("if-else-condition-warning")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("if-else-condition-error")).toBeNull();
+      expect(screen.queryByTestId("if-else-condition-warning")).toBeNull();
     });
 
     it("frames the field with the liquid tag adornments", () => {
       renderEditor("amount < 5", ["amount"]);
-      expect(screen.getByText("{%")).toBeInTheDocument();
-      expect(screen.getByText("%}")).toBeInTheDocument();
+      expect(screen.getByText("{%")).toBeTruthy();
+      expect(screen.getByText("%}")).toBeTruthy();
     });
   });
 
@@ -55,7 +57,7 @@ describe("LiquidConditionEditor", () => {
     /** @scenario The condition flags invalid Liquid syntax */
     it("shows an error message", () => {
       renderEditor("foobar < 5 asdjoiasjdioa 123 %^!", ["amount"]);
-      expect(screen.getByTestId("if-else-condition-error")).toBeInTheDocument();
+      expect(screen.getByTestId("if-else-condition-error")).toBeTruthy();
     });
   });
 
@@ -64,7 +66,7 @@ describe("LiquidConditionEditor", () => {
     it("warns and names the unknown input", () => {
       renderEditor("foobar < 5", ["amount"]);
       const warning = screen.getByTestId("if-else-condition-warning");
-      expect(warning).toHaveTextContent("foobar");
+      expect(warning.textContent).toContain("foobar");
     });
   });
 });
