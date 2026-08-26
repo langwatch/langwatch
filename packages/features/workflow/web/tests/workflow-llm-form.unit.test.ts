@@ -68,6 +68,17 @@ describe("LLMConfigFormatUtils", () => {
     expect(form.reasoning).toBe("high");
   });
 
+  it("writes legacy reasoning back through the canonical field", () => {
+    const form = LLMConfigFormatUtils.dslToFormFormat({
+      model: "legacy-model",
+      reasoning_effort: "high",
+    });
+    const dsl = LLMConfigFormatUtils.formToDslFormat(form);
+
+    expect(dsl.reasoning).toBe("high");
+    expect(dsl).not.toHaveProperty("reasoning_effort");
+  });
+
   it("round-trips both representations without losing values", () => {
     const formRoundTrip = LLMConfigFormatUtils.dslToFormFormat(
       LLMConfigFormatUtils.formToDslFormat(completeForm),
