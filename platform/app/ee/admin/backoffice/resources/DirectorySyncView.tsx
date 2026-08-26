@@ -111,7 +111,6 @@ const STATE_TONE: Record<string, string> = {
  */
 type OversightList = OversightSyncList;
 type SyncRow = OversightList["syncs"][number];
-type Failure = SyncRow["deadLetters"][number];
 
 function SyncsTable({
   syncs,
