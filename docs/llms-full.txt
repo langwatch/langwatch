@@ -34754,24 +34754,11 @@ That answer exists only behind the auth wall, so the scenario passing is the pro
 
 ## Reusing one login across the rows of a run
 
-The rows of an experiment or a dataset run are isolated on purpose, so that they
-can run in parallel. Each row starts cold, and a login on every row is the
-default result.
+Rows are isolated and run in parallel, so by default each row logs in on its own. You can use the **agent cache** to store the login credential after the first row and read it back on every row that follows, so the run authenticates once instead of once per row.
 
-The **agent cache** is where an agent keeps what it produced during a run. It is
-a per-project store: the agent writes the session there after it logs in, and
-reads it back at the start of every row. Values are encrypted at rest, and each
-entry expires by itself, so nothing has to clean up after a run that stopped
-halfway. A dataset row is the alternative, and it is stored in clear and is
-readable in the UI, so it suits a fixture and not a credential.
+The cache is encrypted at rest and entries expire on their own. The platform gives each run a scoped credential inside the sandbox, so no `langwatch.setup()` call or LangWatch secret is required.
 
-There is nothing to set up. The platform gives each run its own LangWatch
-credential inside the sandbox, so the agent needs no `langwatch.setup()` call
-and no LangWatch secret. That credential reaches the agent cache and nothing
-else, and it expires on its own after the run.
-
-The whole agent is below. It is executed on every commit against the real
-code-agent runtime, so this is working code and not a sketch.
+This code is executed on every commit against the real runtime:
 
 ```python shared_session_code_agent.py
 # Log in once and share the session across the rows of a run.
@@ -34905,65 +34892,33 @@ def secret(name):
 ```
 
 <Note>
-  `langwatch.cache` needs `langwatch` **1.3.0** or later. Pin it in the sandbox
-  before you use this agent.
+  Requires `langwatch` **1.3.0** or later.
 </Note>
 
-### Setting the two numbers
+### Tuning the TTL
 
-`SESSION_TTL_SECONDS` is what the target system promises.
-`REFRESH_MARGIN_SECONDS` is how much of that the agent gives up, so a session
-it hands out is never about to lapse. The margin has to sit between the duration
-of your slowest row and `SESSION_TTL_SECONDS`. Below the slowest row, a session
-can expire in the middle of a call. At or above the promise, every entry is
-already gone by the time the next row reads it, and every row logs in again.
+`SESSION_TTL_SECONDS` is the session lifetime the target system returns. `REFRESH_MARGIN_SECONDS` is subtracted from it so a stored session is never about to expire when a row reads it. Set the margin between the duration of your slowest row and `SESSION_TTL_SECONDS`.
 
-The lifetime is the only thing that decides freshness. The agent stores no
-timestamp and does no arithmetic on one: an entry the platform still answers
-with is good, and an entry it no longer holds is a miss.
-
-Neither number can be a guarantee, because the target system owns the session
-and ends it whenever it likes: a restart, an operator closing it, a password
-change. So the agent also treats a `401` from the target as a stale session. It
-logs in again, stores the new session for the rows that follow, and sends that
-row a second time. Without this a session the target ended early fails every
-remaining row of the run; with it, the run pays for one extra login.
+The agent also treats a `401` as an expired session: it logs in again and retries once, so an early expiration costs one extra login instead of failing the run.
 
 ### Cache limits
 
 | Rule | Value |
 |---|---|
-| Entry name | `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`), up to 64 characters |
+| Entry name | `UPPER_SNAKE_CASE`, up to 64 characters |
 | Value size | Up to 32 KB |
 | Lifetime | 5 seconds to 24 hours, 15 minutes by default |
 
-### What this pattern does and does not do
+### Behavior
 
-The agent reads the cache when the row runs, not when the row is prepared, so a
-row picks up whatever the newest session is at that moment. Five results follow:
+- Each run logs in only once. Every later row reads the stored session from the cache.
+- When rows start at the same time, each one can find the cache empty and log in. Both sessions are valid and the last write wins. Keep the login idempotent on the target, or lower the run's parallelism.
+- Entries belong to the project, not to a single run. A second run reuses the session the first run stored. If two concurrent runs write the same entry name, the last write wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
+- If a read fails, the row treats it as a miss and logs in. If a write fails, the row still succeeds; only the next row has to log in again.
 
-- A run over a dataset logs in once and every row after that reuses the session.
-- Rows that start at the same moment can each read an empty cache, so each of
-  them logs in once. Both sessions are valid and the last write wins. No lock
-  prevents this. Keep the login idempotent on the target system, or lower the
-  run's parallelism when the target rate-limits the login.
-- A failed read is a miss, and the row logs in. That covers an entry that was
-  never written, one whose lifetime has passed, and one the platform can no
-  longer read after a key rotation.
-- A failed write does not fail the row. The row already holds a working session,
-  and the only cost is that the next row logs in again. The agent says on stderr
-  what the cache did, in its own fixed words, and nothing from the exception
-  reaches the output: an error message can quote the credential that caused it.
-- A session the target refuses costs one login, not the run. The row logs in
-  again, stores the new session, and sends its work a second time. This is what
-  covers a target that ended the session before the lifetime it promised.
+Source: [`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
 
-The source of this file is
-[`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
-
-### Reading and writing the cache yourself
-
-The three calls the facade offers:
+### Cache API
 
 ```python
 langwatch.cache.set("ACME_SESSION", session, ttl_seconds=840)
@@ -34971,13 +34926,9 @@ langwatch.cache.get("ACME_SESSION", default=None)
 langwatch.cache.delete("ACME_SESSION")
 ```
 
-`get` answers the default when the project holds no live entry under that name,
-so a miss on its own needs no `try`/`except`. Every other refusal raises, so keep
-the read inside a `try`/`except` when the row has to run without the cache.
+`get` returns the default on a miss, so no `try`/`except` is needed for that case. Other errors raise.
 
-The same three operations are available over REST, at
-[`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry). Outside a
-run, a request needs an API key that can manage the agent cache.
+Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry).
 
 ## Troubleshooting
 
