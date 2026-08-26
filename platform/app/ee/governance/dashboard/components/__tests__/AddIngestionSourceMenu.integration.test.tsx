@@ -63,7 +63,7 @@ describe("given the Add source menu", () => {
         "Claude Code (Anthropic OAuth)",
         "Anthropic Claude (Cowork)",
         "Workato",
-        "Microsoft Copilot Studio (Purview)",
+        "Microsoft Copilot Studio",
         "OpenAI Enterprise Compliance",
         "Anthropic Claude Enterprise Compliance",
         "Anthropic Admin API (usage & cost)",
@@ -73,6 +73,12 @@ describe("given the Add source menu", () => {
       ]) {
         expect(screen.getByText(label)).toBeTruthy();
       }
+
+      // The retired directory-audit source is filtered out of the picker, so
+      // the offer carries one Copilot entry, not two near-identical ones.
+      expect(
+        screen.queryByText("Microsoft Copilot Studio (Purview)"),
+      ).toBeNull();
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */
