@@ -292,10 +292,9 @@ describe("feature package boundary lint", () => {
     const violations = lintWorkspace({ root, declarations: false }).filter(
       ({ policy }) => policy === "feature-source-filename",
     );
-    expect(violations).toHaveLength(4);
+    expect(violations).toHaveLength(3);
     expect(violations.map(({ file }) => file)).toEqual([
       "packages/features/agent/contract/src/agentCommands.ts",
-      "packages/features/agent/server/src/repositories/prisma.agent.repository.ts",
       "packages/features/agent/server/src/services/agentService.service.ts",
       "packages/features/agent/web/src/agentCard.tsx",
     ]);
@@ -309,11 +308,11 @@ describe("feature package boundary lint", () => {
       "export abstract class ThisThisService {}",
     );
     write(
-      "packages/features/agent/server/src/repositories/prisma-ingestion-source.repository.ts",
+      "packages/features/agent/server/src/repositories/prisma/prisma.ingestion-source.repository.ts",
       "export abstract class PrismaIngestionSourceRepository {}",
     );
     write(
-      "packages/features/agent/server/src/adapters/clickhouse-trace.adapter.ts",
+      "packages/features/agent/server/src/adapters/clickhouse.trace.adapter.ts",
       "export class ClickhouseTraceAdapter { static create() { return new ClickhouseTraceAdapter(); } }",
     );
     write(
@@ -326,6 +325,34 @@ describe("feature package boundary lint", () => {
         ({ policy }) => policy === "feature-source-filename",
       ),
     ).toEqual([]);
+  });
+
+  it("rejects merged known server qualifiers but accepts kebab-case subjects", () => {
+    featurePackage({ feature: "data-retention", role: "server" });
+    write(
+      "packages/features/data-retention/server/src/repositories/prisma-data-retention.repository.ts",
+      "export class PrismaDataRetentionRepository {}",
+    );
+    write(
+      "packages/features/data-retention/server/src/repositories/prisma-pinned-trace.repository.ts",
+      "export class PrismaPinnedTraceRepository {}",
+    );
+    write(
+      "packages/features/data-retention/server/src/repositories/prisma/prisma.data-retention.repository.ts",
+      "export class PrismaDataRetentionRepository {}",
+    );
+    write(
+      "packages/features/data-retention/server/src/stores/data-retention-cache.store.ts",
+      "export class DataRetentionCacheStore {}",
+    );
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      ({ policy }) => policy === "feature-source-filename",
+    );
+    expect(violations.map(({ file }) => file)).toEqual([
+      "packages/features/data-retention/server/src/repositories/prisma-data-retention.repository.ts",
+      "packages/features/data-retention/server/src/repositories/prisma-pinned-trace.repository.ts",
+    ]);
   });
 
   /** @scenario Cross-feature collaboration uses only contracts */

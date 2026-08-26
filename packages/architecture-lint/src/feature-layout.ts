@@ -28,6 +28,18 @@ const CANONICAL_ARTIFACTS = new Set([
   "subscriber",
 ]);
 const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
+const SERVER_QUALIFIED_ARTIFACTS = new Set(["adapter", "mapper", "repository", "store"]);
+const SERVER_ARCHITECTURAL_QUALIFIERS = new Set([
+  "clickhouse",
+  "eventing",
+  "in-memory",
+  "ledger",
+  "memory",
+  "postgres",
+  "prisma",
+  "redis",
+  "routed",
+]);
 const CONTRACT_ARTIFACT = new RegExp(
   `^${NAME}\\.(?:commands|errors|events|queries|service)\\.ts$`,
 );
@@ -73,7 +85,7 @@ function filenameViolation(file: string, name: string): ArchitectureViolation {
     file,
     message: `Strict feature source filename ${JSON.stringify(name)} is not lower-case kebab case with dotted architectural qualifiers.`,
     allowed:
-      "Use lower-case kebab subject names and canonical dotted roles, for example langy-turn-preparation.service.ts or prisma-ingestion-source.repository.ts.",
+      "Use lower-case kebab subject names and canonical dotted roles, for example langy-turn-preparation.service.ts or prisma.ingestion-source.repository.ts.",
   };
 }
 
@@ -90,11 +102,28 @@ export function isLowerKebabFilename(name: string): boolean {
   if (parts.length === 3 && parts[2] === "test" && TEST_LEVELS.has(parts[1]!)) {
     return NAME_RE.test(parts[0]!);
   }
+  if (parts.length === 3 && CANONICAL_ARTIFACTS.has(parts[2]!)) {
+    return parts.every((part) => NAME_RE.test(part));
+  }
   if (CANONICAL_ARTIFACTS.has(parts.at(-1)!)) return false;
   // Non-architectural domain qualifiers (for example generated/native) are
-  // retained when their components are already lower kebab case. Recognised
-  // architecture roles above intentionally have the stricter one-stem form.
+  // retained when their components are already lower kebab case.
   return parts.every((part) => NAME_RE.test(part));
+}
+
+function isStrictServerFilename(name: string): boolean {
+  if (!isLowerKebabFilename(name)) return false;
+
+  const extension = name.match(/\.[cm]?[jt]sx?$/)?.[0];
+  if (!extension) return false;
+  const parts = name.slice(0, -extension.length).split(".");
+  if (parts.length !== 2 || !SERVER_QUALIFIED_ARTIFACTS.has(parts[1]!)) {
+    return true;
+  }
+
+  return ![...SERVER_ARCHITECTURAL_QUALIFIERS].some((qualifier) =>
+    parts[0]!.startsWith(`${qualifier}-`),
+  );
 }
 
 function lintSourceFilenames(pkg: ClassifiedPackage): ArchitectureViolation[] {
@@ -102,7 +131,9 @@ function lintSourceFilenames(pkg: ClassifiedPackage): ArchitectureViolation[] {
   const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
   for (const file of files) {
     const name = file.slice(file.lastIndexOf("/") + 1);
-    if (!isLowerKebabFilename(name)) violations.push(filenameViolation(file, name));
+    const valid =
+      pkg.kind === "server" ? isStrictServerFilename(name) : isLowerKebabFilename(name);
+    if (!valid) violations.push(filenameViolation(file, name));
   }
   return violations;
 }
