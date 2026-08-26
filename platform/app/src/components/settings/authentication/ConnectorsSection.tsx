@@ -22,7 +22,7 @@ import { SettingsDisclosure } from "~/components/settings/SettingsDisclosure";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { isActiveConnection } from "~/features/directory/logic/connectionLifecycle";
-import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 /**
@@ -144,13 +144,27 @@ export function TokensSection({
    */
   const issuableConnections = connectionOptions.filter(isActiveConnection);
   const hasIssuableConnection = issuableConnections.length > 0;
+  /**
+   * Which connection the token will be issued against.
+   *
+   * With exactly ONE to choose from, the choice is already made and asking is
+   * an errand: the picker offers a list of one and the mint is refused until
+   * somebody picks the only option on it. With several, nothing is assumed —
+   * a token issued against the wrong connection is a token with the wrong
+   * write authority, and guessing that is worse than asking.
+   */
+  const chosenConnectionId =
+    connectionId ||
+    (issuableConnections.length === 1
+      ? (issuableConnections[0]?.connectionId ?? "")
+      : "");
 
   const handleGenerate = () => {
     const chosen = secret.trim();
     generateMutation.mutate(
       {
         organizationId,
-        connectionId: connectionId || undefined,
+        connectionId: chosenConnectionId || undefined,
         description: description || undefined,
         secret: chosen.length > 0 ? chosen : undefined,
       },
@@ -246,6 +260,21 @@ export function TokensSection({
         </SettingsDisclosure>
       </VStack>
 
+      {/* A read that failed is not a table with nothing in it. Without this the
+          section renders a bare header — indistinguishable from "no tokens
+          issued" — and the dialog goes on to claim no connection is live when
+          the connection list merely could not be loaded. */}
+      {(tokens.isError || connections.isError) && (
+        <HandledErrorAlert
+          error={tokens.error ?? connections.error}
+          fallbackTitle="We couldn't load your provisioning tokens"
+          onRetry={() => {
+            void tokens.refetch();
+            void connections.refetch();
+          }}
+        />
+      )}
+
       <Card.Root width="full" overflow="hidden">
         <Card.Body paddingY={0} paddingX={0} overflowX="auto">
           <Table.Root variant="line" size="md" width="full">
@@ -259,7 +288,7 @@ export function TokensSection({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {tokens.data?.length === 0 && (
+              {!tokens.isError && tokens.data?.length === 0 && (
                 <Table.Row>
                   <Table.Cell colSpan={mayManage ? 5 : 4}>
                     <Text color="fg.muted" textAlign="center" paddingY={4}>
@@ -296,9 +325,26 @@ export function TokensSection({
                     {token.lastUsedAt ? (
                       new Date(token.lastUsedAt).toLocaleDateString()
                     ) : (
-                      <Badge size="sm" colorPalette="gray">
-                        Never
-                      </Badge>
+                      // THE ONE ANSWER AVAILABLE for the most common setup
+                      // failure there is (ADR-126). A request carrying a token
+                      // we do not recognise cannot be attributed to anybody —
+                      // a SCIM token is an opaque value looked up by hash, so
+                      // there is no organization to file a mistyped one under
+                      // and it can never appear in the request list. This
+                      // badge is the whole remedy, so it says what it means
+                      // instead of leaving a reader to infer it from a date
+                      // that is missing, and it points at the provider rather
+                      // than at us.
+                      <VStack align="start" gap={0}>
+                        <Badge size="sm" colorPalette="gray">
+                          Never
+                        </Badge>
+                        <Text fontSize="xs" color="fg.muted">
+                          Nothing has presented this token yet. If your identity
+                          provider says it is syncing, check the token it is
+                          using.
+                        </Text>
+                      </VStack>
                     )}
                   </Table.Cell>
                   {mayManage && (
@@ -352,7 +398,7 @@ export function TokensSection({
                   <NativeSelect.Root>
                     <NativeSelect.Field
                       aria-label="Connection"
-                      value={connectionId}
+                      value={chosenConnectionId}
                       onChange={(event) => setConnectionId(event.target.value)}
                     >
                       <option value="">Choose a connection</option>
@@ -423,7 +469,15 @@ export function TokensSection({
               <Button
                 width="full"
                 onClick={handleGenerate}
-                disabled={generateMutation.isPending || !hasIssuableConnection}
+                // `connectionId` is the placeholder until one is chosen, and
+                // submitting without it is refused by the service as
+                // `scim_connection_required` — a rejection the reader could
+                // see coming, arriving as a toast. The control says so instead.
+                disabled={
+                  generateMutation.isPending ||
+                  !hasIssuableConnection ||
+                  !chosenConnectionId
+                }
               >
                 {secret.trim().length > 0 ? "Save token" : "Generate token"}
               </Button>

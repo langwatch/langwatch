@@ -77,6 +77,28 @@ export class ScimTokenTooShortError extends HandledError {
 }
 
 /**
+ * A token value that cannot be used, because somebody already stores it.
+ *
+ * The message says nothing about who. Confirming that a value is taken tells
+ * one customer that another customer holds it, which turns an error message
+ * into a probe — so it is written as advice, not as a finding. The unique
+ * constraint on the column refuses the same thing independently; this is the
+ * sentence a person reads, not the thing standing in the way.
+ */
+export class ScimTokenUnavailableError extends HandledError {
+  declare readonly code: "scim_token_unavailable";
+
+  constructor() {
+    super(
+      "scim_token_unavailable",
+      "That token value cannot be used. Choose a different one, or let LangWatch generate it",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "ScimTokenUnavailableError";
+  }
+}
+
+/**
  * The named connection is not one this organization has.
  *
  * A connection belonging to somebody else reads exactly like one that does

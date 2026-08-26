@@ -339,6 +339,7 @@ export const APP_ERROR_CODES = [
   "scim_managed_group",
   "scim_token_not_found",
   "scim_token_too_short",
+  "scim_token_unavailable",
   "scim_write_outside_connection",
   "scope_not_in_organization",
   "seat_billing_unavailable",

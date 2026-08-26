@@ -157,6 +157,13 @@ let reads: ReturnType<typeof createReads>;
 let activity: ReturnType<typeof createActivity>;
 let service: ScimReconciliationService;
 
+/** The request log's read half. Empty by default: every test in this file is
+ *  about the reconciliation panel, and a request feed it does not assert on
+ *  must not be able to affect what it reads. */
+const createRequests = () => ({
+  findForConnection: vi.fn(async () => []),
+});
+
 function buildService(
   entriesByConnection: Record<string, DirectoryActivityEntry[]> = {},
 ) {
@@ -165,6 +172,7 @@ function buildService(
   service = new ScimReconciliationService({
     reads: reads as never,
     activity: activity as never,
+    requests: createRequests() as never,
   });
 }
 
@@ -287,6 +295,7 @@ describe("the organization's directory sync panel", () => {
       service = new ScimReconciliationService({
         reads: reads as never,
         activity: activity as never,
+        requests: createRequests() as never,
       });
 
       const panel = await service.getAll({ organizationId: ACME });

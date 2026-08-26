@@ -26,17 +26,25 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockUseOrganizationTeamProject, mockReconciliation, mockTokenList } =
-  vi.hoisted(() => ({
-    mockUseOrganizationTeamProject: vi.fn(),
-    mockReconciliation: vi.fn(),
-    mockTokenList: vi.fn(),
-  }));
+const {
+  mockUseOrganizationTeamProject,
+  mockReconciliation,
+  mockTokenList,
+  mockRequests,
+} = vi.hoisted(() => ({
+  mockUseOrganizationTeamProject: vi.fn(),
+  mockReconciliation: vi.fn(),
+  mockTokenList: vi.fn(),
+  mockRequests: vi.fn(),
+}));
 
 const apiDouble = {
   api: {
     scimReconciliation: {
       getAll: { useQuery: mockReconciliation },
+      // What the identity provider asked and what we answered (ADR-126),
+      // beside the state the panel already read.
+      getRequests: { useQuery: mockRequests },
     },
     // The page leads with a status strip that counts the groups the directory
     // sent and the members it does not manage, and the groups tab lists them.
@@ -205,6 +213,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockReconciliation.mockReturnValue({ data: PANEL, isLoading: false });
   mockTokenList.mockReturnValue({ data: [], isLoading: false });
+  mockRequests.mockReturnValue({ data: [], isLoading: false });
   readerHolding(["sso:view", "sso:manage"]);
 });
 
@@ -407,6 +416,7 @@ describe("the directory provisioning page", () => {
 
   describe("given somebody who may see single sign-on but not manage it", () => {
     /** @scenario "Seeing sync status and managing tokens are two different permissions" */
+    /** @scenario "Reading the requests takes seeing single sign-on, and writes nothing" */
     it("reads the panel normally and is offered no minting or revoking control", async () => {
       readerHolding(["sso:view"]);
       mockTokenList.mockReturnValue({
@@ -473,5 +483,186 @@ describe("the directory provisioning page", () => {
         organizationId: "org_acme",
       });
     });
+  });
+});
+
+/**
+ * The requests half of ADR-126.
+ *
+ * The panel above reads the sync LOG, which carries what the directory
+ * decided. A push refused before it reached a handler decided nothing, so it
+ * appends no fact and is invisible there — and that refusal is precisely what
+ * somebody who has just pasted a token needs to see. These drive the surface
+ * that closes the gap.
+ */
+describe("given a connection the directory has been pushing to", () => {
+  describe("when requests have been recorded", () => {
+    /** @scenario "The requests a connection has served are on the SCIM settings page" */
+    it("reads them, refusals in our own words", async () => {
+      mockRequests.mockReturnValue({
+        data: [
+          {
+            id: "req_2",
+            method: "POST",
+            resource: "Users",
+            status: 400,
+            reason: "invalid_resource",
+            detail: "The resource is not valid: externalId",
+            occurredAt: new Date("2026-08-26T10:10:52.000Z"),
+          },
+        ],
+        isLoading: false,
+      });
+
+      const { ScimReconciliationPanel } = await import(
+        "../../../components/settings/ScimReconciliationPanel"
+      );
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
+
+      // The fixture has more than one running connection, and each card
+      // carries its own list. The first is this connection's.
+      const [requests] = screen.getAllByTestId("directory-requests");
+      if (!requests) throw new Error("no requests list rendered");
+      // "users", not "Users" and never "Users/:id": the stored form keeps a
+      // routing convention so rows group, and a person reading their
+      // directory's activity has no reason to know it.
+      expect(within(requests).getByText(/POST users/)).toBeTruthy();
+      expect(within(requests).getByText("Refused")).toBeTruthy();
+      expect(
+        within(requests).getByText(/The resource is not valid: externalId/),
+      ).toBeTruthy();
+      // The slug is what a reader BRANCHES on, never what they read.
+      expect(within(requests).queryByText("invalid_resource")).toBeNull();
+    });
+  });
+
+  describe("when a refusal was recorded with no sentence of its own", () => {
+    it("still says what kind of refusal it was", async () => {
+      // The recorder writes `detail` only where a handler composed one. A row
+      // that carries the slug and nothing else renders as an orange badge and
+      // no words, which is the question this surface exists to answer.
+      mockRequests.mockReturnValue({
+        data: [
+          {
+            id: "req_3",
+            method: "POST",
+            resource: "Users",
+            status: 403,
+            reason: "plan_not_entitled",
+            detail: null,
+            occurredAt: new Date("2026-08-26T10:11:00.000Z"),
+          },
+        ],
+        isLoading: false,
+      });
+
+      const { ScimReconciliationPanel } = await import(
+        "../../../components/settings/ScimReconciliationPanel"
+      );
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
+
+      const [requests] = screen.getAllByTestId("directory-requests");
+      if (!requests) throw new Error("no requests list rendered");
+      expect(
+        within(requests).getByText(/plan no longer includes directory sync/i),
+      ).toBeTruthy();
+      expect(within(requests).queryByText("plan_not_entitled")).toBeNull();
+    });
+  });
+
+  describe("when the requests could not be read at all", () => {
+    it("says so rather than reporting that nothing was ever sent", async () => {
+      // An absent row is not a denial — this component's own promise. On a
+      // failed read the empty state makes exactly that denial, to the one
+      // reader trying to find out whether their provider reached us.
+      mockRequests.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new Error("the log could not be read"),
+      });
+
+      const { ScimReconciliationPanel } = await import(
+        "../../../components/settings/ScimReconciliationPanel"
+      );
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
+
+      const [requests] = screen.getAllByTestId("directory-requests");
+      if (!requests) throw new Error("no requests list rendered");
+      expect(within(requests).queryByText(/No requests recorded/)).toBeNull();
+    });
+  });
+
+  describe("when nothing has been recorded", () => {
+    /** @scenario "An absent request is not evidence that it never happened" */
+    it("says what it holds rather than that nothing was ever sent", async () => {
+      mockRequests.mockReturnValue({ data: [], isLoading: false });
+
+      const { ScimReconciliationPanel } = await import(
+        "../../../components/settings/ScimReconciliationPanel"
+      );
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
+
+      // The fixture has more than one running connection, and each card
+      // carries its own list. The first is this connection's.
+      const [requests] = screen.getAllByTestId("directory-requests");
+      if (!requests) throw new Error("no requests list rendered");
+      expect(within(requests).getByText(/thirty days/i)).toBeTruthy();
+      expect(
+        within(requests).queryByText(/has never sent|nothing was sent/i),
+      ).toBeNull();
+    });
+  });
+});
+
+describe("given a token nothing has ever presented", () => {
+  /** @scenario "A token nothing has presented says so, rather than only showing a date that is missing" */
+  it("says nothing has presented it, in words pointing at the provider", async () => {
+    readerHolding(["sso:view", "sso:manage"]);
+    mockTokenList.mockReturnValue({
+      data: [
+        {
+          id: "scimtok_1",
+          description: "Okta production",
+          connectionId: "acme-okta",
+          createdAt: new Date(T0),
+          lastUsedAt: null,
+        },
+      ],
+      isLoading: false,
+    });
+    const { default: ConnectorsPage } = await import(
+      "../authentication/connectors"
+    );
+
+    draw(<ConnectorsPage />, "/settings/authentication/connectors");
+
+    // A mistyped token is the most common setup failure there is and can
+    // never reach the request list, so this badge is the whole remedy — and
+    // a bare "Never" leaves the reader to infer it.
+    expect(
+      screen.getByText(/Nothing has presented this token yet/),
+    ).toBeTruthy();
+    expect(screen.getByText(/check the token it is using/)).toBeTruthy();
   });
 });

@@ -31,6 +31,7 @@ interface TokenRow {
   organizationId: string;
   connectionId: string | null;
   hashedToken: string;
+  hashScheme: string;
   description: string | null;
   createdAt: Date;
   lastUsedAt: Date | null;
@@ -40,11 +41,18 @@ interface TokenRow {
 function createStore(connections: { id: string; organizationId: string }[]) {
   const tokens: TokenRow[] = [];
   let minted = 0;
+  // Equality and `in`, because those are the two shapes the service uses. A
+  // double that understood only equality answered "no such token" for the
+  // `in` the token lookup issues — which reads as a failing test rather than
+  // as a double that cannot express the query.
   const matches = (row: TokenRow, where: Record<string, unknown>): boolean =>
-    Object.entries(where).every(
-      ([field, value]) =>
-        (row as unknown as Record<string, unknown>)[field] === value,
-    );
+    Object.entries(where).every(([field, value]) => {
+      const held = (row as unknown as Record<string, unknown>)[field];
+      if (value !== null && typeof value === "object" && "in" in value) {
+        return (value as { in: unknown[] }).in.includes(held);
+      }
+      return held === value;
+    });
   return {
     tokens,
     prisma: {
@@ -55,6 +63,7 @@ function createStore(connections: { id: string; organizationId: string }[]) {
             organizationId: data.organizationId!,
             connectionId: data.connectionId ?? null,
             hashedToken: data.hashedToken!,
+            hashScheme: data.hashScheme ?? "sha256",
             description: data.description ?? null,
             createdAt: new Date(),
             lastUsedAt: null,
@@ -63,6 +72,12 @@ function createStore(connections: { id: string; organizationId: string }[]) {
           return row;
         }),
         findFirst: vi.fn(
+          async ({ where }: { where: Record<string, unknown> }) =>
+            tokens.find((row) => matches(row, where)) ?? null,
+        ),
+        // `hashedToken` is unique in the schema, so the service asks by it
+        // directly when it needs to know whether a value is already taken.
+        findUnique: vi.fn(
           async ({ where }: { where: Record<string, unknown> }) =>
             tokens.find((row) => matches(row, where)) ?? null,
         ),
@@ -213,6 +228,11 @@ describe("directory provisioning tokens", () => {
         organizationId: ORG,
         connectionId: null,
         hashedToken: hashOf("legacy-token"),
+        // The bare digest is what the old scheme stored. This row is now also
+        // the regression test for the lookup's legacy fallback: a token minted
+        // before the pepper is still the credential its identity provider is
+        // configured with, and must keep working.
+        hashScheme: "sha256",
         description: "issued in 2025",
         createdAt: new Date(0),
         lastUsedAt: null,

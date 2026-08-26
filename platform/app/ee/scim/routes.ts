@@ -43,6 +43,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
+import type { ZodError } from "zod";
 import { ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
 import {
   createServiceApp,
@@ -50,6 +51,10 @@ import {
   publicEndpoint,
 } from "~/server/api/security";
 import { prisma } from "~/server/db";
+import {
+  type ScimRefusalReason,
+  ScimRequestLogService,
+} from "./scim-request-log.service";
 
 /**
  * What the bearer credential resolved to, set by {@link scimAuth}: the
@@ -63,6 +68,12 @@ type ScimEnv = {
   Variables: {
     scimOrganizationId: string;
     scimConnectionId: string | null;
+    /** An override for the slug the status would otherwise imply, set only
+     *  where two refusals share a status and mean different things. The
+     *  recorder reads it once, after the handler returns. */
+    scimRefusalReason: ScimRefusalReason | null;
+    /** Our own sentence for the refusal, recorded beside the slug. */
+    scimRefusalDetail: string | null;
   };
 };
 
@@ -120,10 +131,96 @@ function scimJson(c: Context, data: unknown, status = 200) {
  * a real token on a lapsed plan is 403: the credential is fine, the account
  * is not, and telling the identity provider to retry would be a lie.
  */
+/**
+ * The resource a request asked for, as a person reads it.
+ *
+ * Never the raw path: it carries ids and query strings, and this string is
+ * rendered on a settings page rather than matched by a machine. An id
+ * collapses to `:id` so "the same thing, forty times" reads as forty rows of
+ * one shape instead of forty different-looking ones.
+ */
+function scimResourceOf(path: string): string {
+  const tail = path.replace(/^.*\/scim\/v2\/?/, "").split("?")[0] ?? "";
+  if (!tail) return "/";
+  const [head, ...rest] = tail.split("/");
+  return rest.length > 0 ? `${head}/:id` : (head ?? "/");
+}
+
+/**
+ * What a status means, when nothing said otherwise.
+ *
+ * The slug exists so a reader branches on it rather than on our prose, and
+ * most statuses mean exactly one thing here. Where two refusals share a
+ * status and do not share a meaning — an unparseable body against a body that
+ * parsed and was not a valid resource — the handler overrides it.
+ */
+function refusalReasonFor(status: number): ScimRefusalReason {
+  if (status === 401) return "unauthorized";
+  if (status === 403) return "plan_not_entitled";
+  if (status === 404) return "not_found";
+  if (status === 409) return "conflict";
+  if (status === 400) return "invalid_resource";
+  if (status === 429) return "rate_limited";
+  // 405 and 415 are the router's own answers rather than a handler's, and
+  // they are refusals of the CALLER's request. Reading them as
+  // `internal_error` puts "LangWatch broke" on an operator's page for a
+  // method or a content type their provider chose.
+  if (status === 405 || status === 415 || status === 501) return "unsupported";
+  return "internal_error";
+}
+
+/**
+ * A body we could not parse at all, said in our own words.
+ *
+ * Distinguished from a body that parsed and was not a valid resource, because
+ * an administrator can act on the difference: one is the provider sending
+ * something that is not JSON, the other is a resource missing a field.
+ */
+function malformedBody(c: Context) {
+  const detail = "The request body could not be read as JSON";
+  c.set("scimRefusalReason", "malformed_body");
+  c.set("scimRefusalDetail", detail);
+  return scimError(c, 400, detail);
+}
+
+/**
+ * A resource that parsed and is not one we can accept.
+ *
+ * OUR SENTENCE, NAMING THE FIELDS — never the validator's. `parsed.error.message`
+ * was going out on the wire, so an identity provider was told "String must
+ * contain at least 1 character(s)" by a library we happen to use, and the row
+ * this refusal is recorded in would have carried it too. The payload rule is
+ * the same one `scim_apply_failed` keeps: a code and our own words, never
+ * somebody else's message. The field paths ARE ours and are what makes the
+ * refusal actionable, so they stay.
+ */
+function invalidResource(c: Context, error: ZodError) {
+  const fields = [
+    ...new Set(
+      error.issues
+        .map((issue) => issue.path.join("."))
+        .filter((path) => path.length > 0),
+    ),
+  ];
+  const detail =
+    fields.length > 0
+      ? `The resource is not valid: ${fields.join(", ")}`
+      : "The resource is not valid";
+  // Recorded as well as sent. The field paths are the whole of what makes
+  // this refusal actionable, and a row that carries the slug without them
+  // shows an administrator "invalid_resource" and nothing to do about it.
+  c.set("scimRefusalReason", "invalid_resource");
+  c.set("scimRefusalDetail", detail);
+  return scimError(c, 400, detail);
+}
+
 const scimAuth: MiddlewareHandler<ScimEnv> = async (c, next) => {
   const authHeader = c.req.header("authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {
+    // Unattributable by construction — there is no organization to file it
+    // under, and a table unauthenticated traffic can write is a table anybody
+    // can fill (ADR-126). `ScimToken.lastUsedAt` staying null is the answer.
     return scimError(c, 401, "Bearer token is required");
   }
 
@@ -135,13 +232,80 @@ const scimAuth: MiddlewareHandler<ScimEnv> = async (c, next) => {
     return scimError(c, 401, "Bearer token is not valid");
   }
 
+  const requests = ScimRequestLogService.create(prisma);
+  const record = async ({
+    organizationId,
+    connectionId,
+    status,
+    reason,
+    detail,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
+    status: number;
+    reason: ScimRefusalReason | null;
+    detail: string | null;
+  }) =>
+    requests.record({
+      organizationId,
+      connectionId,
+      method: c.req.method,
+      resource: scimResourceOf(c.req.path),
+      status,
+      reason,
+      detail,
+    });
+
   if (result.status === "plan_not_entitled") {
+    // Recorded, unlike the 401s above: a lapsed plan is a credential we
+    // recognize, so we know whose page it belongs on.
+    await record({
+      organizationId: result.organizationId,
+      // The token names its connection even when the plan has lapsed, and the
+      // only reader queries by a concrete connection id. Filed under null,
+      // this row was written where nobody could ever read it.
+      connectionId: result.connectionId,
+      status: 403,
+      reason: "plan_not_entitled",
+      detail: ENTERPRISE_FEATURE_ERRORS.SCIM,
+    });
     return scimError(c, 403, ENTERPRISE_FEATURE_ERRORS.SCIM);
   }
 
   c.set("scimOrganizationId", result.organizationId);
   c.set("scimConnectionId", result.connectionId);
-  await next();
+  c.set("scimRefusalReason", null);
+  c.set("scimRefusalDetail", null);
+  try {
+    await next();
+  } finally {
+    // `finally`, so a handler that threw is recorded as the 500 the error
+    // handler turned it into.
+    //
+    // `c.finalized` rather than `c.res?.status`: Hono's `res` getter is
+    // `this.#res ||= createResponseInstance(...)`, so it NEVER returns
+    // undefined and the `?? 500` was dead — and on the one path where no
+    // response was set it lazily fabricates one whose status is 200. That
+    // path is reachable (a throw that is not an `Error` is rethrown past the
+    // error handler), and it recorded a 200 for a request the caller was
+    // never given a 200 for.
+    const status = c.finalized ? c.res.status : 500;
+    // NOT awaited. The record is an observation of a request that has already
+    // been answered, and awaiting it put a database write on the critical
+    // path of every SCIM call — including the hundreds of reads a full sync
+    // issues. `record` swallows and logs its own failure, so there is no
+    // rejection to lose.
+    void record({
+      organizationId: result.organizationId,
+      connectionId: result.connectionId,
+      status,
+      reason:
+        status >= 400
+          ? (c.get("scimRefusalReason") ?? refusalReasonFor(status))
+          : null,
+      detail: c.get("scimRefusalDetail") ?? null,
+    });
+  }
 };
 
 const secured = createServiceApp<ScimEnv>({
@@ -422,12 +586,12 @@ secured
 
     const body = await parseJsonBody(c);
     if (body === null) {
-      return scimError(c, 400, "Invalid JSON in request body");
+      return malformedBody(c);
     }
 
     const parsed = scimCreateUserRequestSchema.safeParse(body);
     if (!parsed.success) {
-      return scimError(c, 400, parsed.error.message);
+      return invalidResource(c, parsed.error);
     }
 
     const result = await scimService.createUser({
@@ -470,12 +634,12 @@ secured
 
     const body = await parseJsonBody(c);
     if (body === null) {
-      return scimError(c, 400, "Invalid JSON in request body");
+      return malformedBody(c);
     }
 
     const parsed = scimCreateUserRequestSchema.safeParse(body);
     if (!parsed.success) {
-      return scimError(c, 400, parsed.error.message);
+      return invalidResource(c, parsed.error);
     }
 
     const result = await scimService.replaceUser({
@@ -502,12 +666,12 @@ secured
 
     const body = await parseJsonBody(c);
     if (body === null) {
-      return scimError(c, 400, "Invalid JSON in request body");
+      return malformedBody(c);
     }
 
     const parsed = scimPatchRequestSchema.safeParse(body);
     if (!parsed.success) {
-      return scimError(c, 400, parsed.error.message);
+      return invalidResource(c, parsed.error);
     }
 
     const result = await scimService.updateUser({
@@ -561,6 +725,7 @@ secured
 
     const result = await service.listGroups({
       organizationId,
+      connectionId: c.get("scimConnectionId"),
       filter: c.req.query("filter") ?? undefined,
       startIndex: positiveIntegerQuery(c.req.query("startIndex"), 1),
       count: pageSizeQuery(c.req.query("count")),
@@ -579,12 +744,12 @@ secured
 
     const body = await parseJsonBody(c);
     if (body === null) {
-      return scimError(c, 400, "Invalid JSON");
+      return malformedBody(c);
     }
 
     const parsed = scimCreateGroupRequestSchema.safeParse(body);
     if (!parsed.success) {
-      return scimError(c, 400, parsed.error.message);
+      return invalidResource(c, parsed.error);
     }
 
     const result = await service.createGroup({
@@ -615,6 +780,7 @@ secured
     const result = await ScimGroupService.create({ prisma }).getGroup({
       scimResourceId: id,
       organizationId,
+      connectionId: c.get("scimConnectionId"),
       excludeMembers: excludedAttributes.includes("members"),
     });
 
@@ -634,17 +800,18 @@ secured
 
     const body = await parseJsonBody(c);
     if (body === null) {
-      return scimError(c, 400, "Invalid JSON");
+      return malformedBody(c);
     }
 
     const parsed = scimReplaceGroupRequestSchema.safeParse(body);
     if (!parsed.success) {
-      return scimError(c, 400, parsed.error.message);
+      return invalidResource(c, parsed.error);
     }
 
     const result = await ScimGroupService.create({ prisma }).replaceGroup({
       scimResourceId: id,
       organizationId,
+      connectionId: c.get("scimConnectionId"),
       request: parsed.data,
     });
 
@@ -664,17 +831,18 @@ secured
 
     const body = await parseJsonBody(c);
     if (body === null) {
-      return scimError(c, 400, "Invalid JSON");
+      return malformedBody(c);
     }
 
     const parsed = scimPatchRequestSchema.safeParse(body);
     if (!parsed.success) {
-      return scimError(c, 400, parsed.error.message);
+      return invalidResource(c, parsed.error);
     }
 
     const result = await ScimGroupService.create({ prisma }).updateGroup({
       scimResourceId: id,
       organizationId,
+      connectionId: c.get("scimConnectionId"),
       patchRequest: parsed.data,
     });
 
@@ -694,6 +862,7 @@ secured
     const result = await ScimGroupService.create({ prisma }).deleteGroup({
       scimResourceId: id,
       organizationId,
+      connectionId: c.get("scimConnectionId"),
     });
 
     if (result && isScimError(result)) {

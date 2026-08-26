@@ -166,6 +166,22 @@ async function bootBreakGlassExpiryWorker(
   }
 }
 
+// Drops recorded SCIM requests once they age out (ADR-126). The table is
+// evidence rather than truth, so it has a retention window an event log would
+// never have, and this is the "somewhere that runs" enforcing it.
+async function bootScimRequestLogRetentionWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startScimRequestLogRetentionWorker } = await import(
+    "~/server/scimRequestLogRetentionWorker"
+  );
+  const worker = startScimRequestLogRetentionWorker();
+  if (worker) {
+    shutdownHandles.push(() => worker.stop());
+    logger.info("SCIM request log retention worker ready");
+  }
+}
+
 // Re-reads the TXT records that prove domains, and states what changed
 // (ADR-123). It never lapses anything on its own schedule: the deadline is
 // written on the wavering fact and compared when a check runs, so a missed
@@ -557,6 +573,7 @@ export async function startWorkers(
     await bootRealtimeSessionPoller(shutdownHandles);
     await bootBreakGlassExpiryWorker(shutdownHandles);
     await bootSsoDomainReproofWorker(shutdownHandles);
+    await bootScimRequestLogRetentionWorker(shutdownHandles);
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful

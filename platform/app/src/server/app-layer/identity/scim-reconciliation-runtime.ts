@@ -10,6 +10,7 @@
  * Server-only. Its graph reaches `~/server/db`.
  */
 import { ScimDeprovisionService } from "@ee/scim/scim-deprovision.service";
+import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
 import { scimSyncLifecycle } from "@ee/scim/scim-sync.runtime";
 import type { ScimSyncLifecycle } from "@ee/scim/scim-sync.service";
 import { prisma } from "../../db";
@@ -51,6 +52,10 @@ export function scimReconciliation(): ScimReconciliationService {
     // store lazily for the same reason everything else here is built per
     // call: there may not be an App yet at module scope.
     activity: new EventLogScimSyncActivityRepository(),
+    // The requests table (ADR-126). The service holds a port rather than the
+    // enterprise service itself, so the organization view never learns where
+    // the evidence is stored to render it.
+    requests: ScimRequestLogService.create(prisma),
   });
 }
 

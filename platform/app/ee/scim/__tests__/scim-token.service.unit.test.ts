@@ -8,6 +8,9 @@ function createMockPrisma() {
     scimToken: {
       create: vi.fn(),
       findFirst: vi.fn(),
+      // Nothing holds the value by default: `generate` asks whether a token
+      // value is already taken before it writes one.
+      findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn(),
       updateMany: vi.fn(),
       deleteMany: vi.fn(),
@@ -65,9 +68,49 @@ describe("ScimTokenService", () => {
         const createCall = (prisma.scimToken.create as ReturnType<typeof vi.fn>)
           .mock.calls[0]![0];
         expect(createCall.data.organizationId).toBe("org-1");
-        expect(createCall.data.hashedToken).toBe(
+        // What is stored is not the token. Asserted as properties rather than
+        // by re-deriving the digest here: an expectation that recomputes the
+        // implementation agrees with it by construction, including when the
+        // implementation is wrong.
+        expect(createCall.data.hashedToken).not.toBe(result.token);
+        expect(createCall.data.hashedToken).not.toContain(result.token);
+        // And it is KEYED. A bare digest of a value somebody chose is a
+        // wordlist away from a live credential once the rows leak; the point
+        // of the pepper is that the rows alone are inert.
+        expect(createCall.data.hashedToken).not.toBe(
           crypto.createHash("sha256").update(result.token).digest("hex"),
         );
+        expect(createCall.data.hashScheme).toBe("hmac-sha256");
+      });
+
+      it("refuses a value some other organization already stores", async () => {
+        // The P0 this closes: `hashedToken` had no unique constraint and the
+        // lookup that turns a bearer token into an organization is keyed on it
+        // alone. Two organizations choosing the same supplied secret meant one
+        // customer's directory provisioning and deleting another customer's
+        // people, decided by whichever row the planner reached first.
+        (
+          prisma.scimToken.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ id: "token-held-by-somebody-else" });
+
+        const refusal = await service
+          .generate({
+            organizationId: "org-1",
+            connectionId: "conn-okta",
+            secret: "a-value-another-tenant-also-chose",
+          })
+          .then(
+            () => {
+              throw new Error("the mint was expected to be refused");
+            },
+            (error: { code: string; message: string }) => error,
+          );
+
+        expect(refusal.code).toBe("scim_token_unavailable");
+        // Says nothing about who holds it: confirming that would turn the
+        // error into a probe for another customer's credential.
+        expect(refusal.message).not.toMatch(/taken|exists|another|already/i);
+        expect(prisma.scimToken.create).not.toHaveBeenCalled();
       });
 
       it("stores the description when provided", async () => {
@@ -327,9 +370,12 @@ describe("ScimTokenService", () => {
         const result = await service.verify({ token: "valid-token" });
 
         expect(result).toEqual({ organizationId: "org-1" });
-        expect(prisma.scimToken.findFirst).toHaveBeenCalledWith({
-          where: { hashedToken },
-        });
+        // A token minted before the pepper existed is still the credential
+        // its identity provider is configured with, so the lookup has to ask
+        // for the legacy digest as well as the current one.
+        const asked = (prisma.scimToken.findFirst as ReturnType<typeof vi.fn>)
+          .mock.calls[0]![0] as { where: { hashedToken: { in: string[] } } };
+        expect(asked.where.hashedToken.in).toContain(hashedToken);
         expect(prisma.scimToken.updateMany).toHaveBeenCalledWith({
           where: { id: "token-1" },
           data: { lastUsedAt: expect.any(Date) },

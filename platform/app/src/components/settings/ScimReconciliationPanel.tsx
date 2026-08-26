@@ -18,6 +18,7 @@ import { isRunningConnection } from "~/features/directory/logic/connectionLifecy
 import type { OrganizationReconciliation } from "~/server/app-layer/identity/scim-reconciliation.service";
 import { api } from "../../utils/api";
 import RouterLink from "../../utils/compat/next-link";
+import { DirectoryRequestsPanel } from "./DirectoryRequestsPanel";
 import { SettingsDisclosure } from "./SettingsDisclosure";
 import { SettingsEmptyState } from "./SettingsEmptyState";
 
@@ -87,6 +88,7 @@ export function ScimReconciliationPanel({
           <ConnectionCard
             key={connection.connectionId}
             connection={connection}
+            organizationId={organizationId}
           />
         ))}
         {/* A connection that has left is not one of the connections. It stays
@@ -242,7 +244,15 @@ const TONE_PALETTE: Record<string, string> = {
   ended: "gray",
 };
 
-function ConnectionCard({ connection }: { connection: ConnectionPanel }) {
+function ConnectionCard({
+  connection,
+  organizationId,
+}: {
+  connection: ConnectionPanel;
+  /** From the panel's own props: a connection panel carries no tenant, and
+   *  the request read is organization-scoped by construction. */
+  organizationId: string;
+}) {
   return (
     <Card.Root width="full">
       <Card.Body>
@@ -282,6 +292,13 @@ function ConnectionCard({ connection }: { connection: ConnectionPanel }) {
           {connection.failures.length > 0 && (
             <DirectoryFailures connection={connection} />
           )}
+
+          {/* Under the facts and the failures, because it answers a question
+              the reader only has once those did not answer it. */}
+          <DirectoryRequestsPanel
+            organizationId={organizationId}
+            connectionId={connection.connectionId}
+          />
         </VStack>
       </Card.Body>
     </Card.Root>

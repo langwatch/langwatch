@@ -1502,6 +1502,14 @@ const presentations = {
     describe: () =>
       "A token you choose yourself has to be at least 32 characters — it is the whole password your identity provider uses to reach us. Use a longer one, or let us generate it.",
   },
+  scim_token_unavailable: {
+    title: "Choose a different token value",
+    // Says nothing about why it cannot be used. "Somebody else has it" would
+    // confirm to one customer that another customer holds a particular secret,
+    // which is a probe rather than an explanation.
+    describe: () =>
+      "That value cannot be used. Pick a different one, or let us generate a token for you.",
+  },
   scim_connection_not_found: {
     // Reads the same for a connection that never existed and one belonging to
     // somebody else, on purpose: the copy must not confirm the second.

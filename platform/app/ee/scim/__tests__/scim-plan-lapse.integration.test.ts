@@ -72,6 +72,7 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
+        ["scimRequestLog", { organizationId }],
         ["scimToken", { organizationId }],
         ["ssoConnection", { organizationId }],
         ["organizationUser", { organizationId }],
@@ -145,6 +146,71 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
       // Distinct from the missing-header refusal: an operator debugging a
       // rotated token must not read "required" for a token they did present.
       expect(body.detail).toBe("Bearer token is not valid");
+    });
+  });
+
+  /**
+   * What gets written down about a request, and what deliberately does not
+   * (ADR-126 — see specs/identity/scim-request-log.feature).
+   *
+   * The rule is attribution, and the second half of it is load-bearing: a
+   * token that does not verify cannot be filed under an organization, and a
+   * table unauthenticated traffic can write is a table anybody on the
+   * internet can fill. So the 403 is recorded and the 401 is not, and that
+   * asymmetry is asserted here against the real app and the real table
+   * rather than described in a comment.
+   */
+  describe("given requests the app has answered", () => {
+    /** @scenario "A refusal we can attribute is recorded as a refusal" */
+    it("records a refusal it can attribute, with a reason rather than an error code", async () => {
+      mockGetActivePlan.mockResolvedValue(FREE_PLAN);
+
+      await app.request("/api/scim/v2/Users", {
+        headers: { Authorization: `Bearer ${bearerToken}` },
+      });
+
+      const recorded = await prisma.scimRequestLog.findFirst({
+        where: { organizationId, status: 403 },
+        orderBy: { occurredAt: "desc" },
+      });
+      expect(recorded).not.toBeNull();
+      expect(recorded?.method).toBe("GET");
+      expect(recorded?.resource).toBe("Users");
+      // A slug a provisioning tool can branch on, beside our own sentence.
+      expect(recorded?.reason).toBe("plan_not_entitled");
+    });
+
+    /** @scenario "A request we cannot attribute is answered and not recorded" */
+    it("records nothing for a token nothing issued, because there is no anybody to record it for", async () => {
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+      const before = await prisma.scimRequestLog.count();
+
+      const res = await app.request("/api/scim/v2/Users", {
+        headers: { Authorization: "Bearer still-not-a-real-token" },
+      });
+
+      expect(res.status).toBe(401);
+      // Across the whole table, not just this organization: the point is that
+      // the row lands nowhere, not that it lands somewhere else.
+      expect(await prisma.scimRequestLog.count()).toBe(before);
+    });
+
+    /** @scenario "A request the directory makes is recorded with what we answered" */
+    it("records a request it served with the status it answered", async () => {
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
+
+      await app.request("/api/scim/v2/Users", {
+        headers: { Authorization: `Bearer ${bearerToken}` },
+      });
+
+      const recorded = await prisma.scimRequestLog.findFirst({
+        where: { organizationId, status: 200 },
+        orderBy: { occurredAt: "desc" },
+      });
+      expect(recorded).not.toBeNull();
+      expect(recorded?.resource).toBe("Users");
+      // Nothing was refused, so there is nothing to call it.
+      expect(recorded?.reason).toBeNull();
     });
   });
 });

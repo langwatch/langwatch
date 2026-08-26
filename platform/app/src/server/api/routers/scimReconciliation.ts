@@ -20,6 +20,22 @@ import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
  * service takes it and never accepts a connection id on its own, so naming
  * another organization's connection answers as if it did not exist.
  */
+/**
+ * The same read, WITHOUT the plan assertion.
+ *
+ * Only the request log uses it, and the reason is that the log's headline
+ * case is a plan that lapsed: `plan_not_entitled` refusals are recorded so an
+ * administrator can find out why their directory stopped syncing. Gating the
+ * reader on the plan means the one organization that needs those rows is the
+ * one organization refused them — the answer to "why did my push stop"
+ * withheld on the grounds that the push stopped.
+ *
+ * `sso:view` still applies. What is dropped is entitlement, not permission.
+ */
+const scimRequestLogProcedure = protectedProcedure
+  .input(z.object({ organizationId: z.string().min(1) }))
+  .permission("sso:view");
+
 const scimViewProcedure = protectedProcedure
   .input(z.object({ organizationId: z.string().min(1) }))
   .permission("sso:view")
@@ -48,6 +64,22 @@ export const scimReconciliationRouter = createTRPCRouter({
     .input(z.object({ connectionId: z.string().min(1) }))
     .query(async ({ input }) =>
       scimReconciliation().getActivity({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+      }),
+    ),
+
+  /**
+   * Every request the directory made on one connection (ADR-126).
+   *
+   * Beside `getActivity` and not folded into it: the log says what the
+   * directory DECIDED, this says what it ASKED and what we answered, and the
+   * push that never reached a handler exists only here.
+   */
+  getRequests: scimRequestLogProcedure
+    .input(z.object({ connectionId: z.string().min(1) }))
+    .query(async ({ input }) =>
+      scimReconciliation().getRequests({
         organizationId: input.organizationId,
         connectionId: input.connectionId,
       }),

@@ -116,12 +116,43 @@ export interface DirectoryActivityEntryView {
  *  invite reading it as an audit trail, which the audit page already is. */
 export const DIRECTORY_ACTIVITY_LIMIT = 25;
 
+/** One recorded request, as a reader sees it (ADR-126). */
+export interface ScimRequestEntry {
+  id: string;
+  method: string;
+  resource: string;
+  status: number;
+  reason: string | null;
+  detail: string | null;
+  occurredAt: Date;
+}
+
+/**
+ * The requests table, read-only.
+ *
+ * A port because the table is the enterprise half's (`ee/scim`) and this
+ * service is the organization view's: the view must not learn where the
+ * evidence is stored to render it.
+ */
+export interface ScimRequestReadPort {
+  findForConnection(args: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<ScimRequestEntry[]>;
+}
+
 export class ScimReconciliationService {
   constructor(
     private readonly deps: {
       reads: ScimReconciliationReadRepository;
       /** The scim_sync log, read as a sequence (ADR-126). */
       activity: ScimSyncActivityReadRepository;
+      /** The requests we could attribute, which is the other half of ADR-126
+       *  and deliberately a different source: the log says what the directory
+       *  DECIDED, and this says what it ASKED and what we answered. A push
+       *  refused before it reached a handler appears only here. */
+      requests: ScimRequestReadPort;
     },
   ) {}
 
@@ -157,6 +188,35 @@ export class ScimReconciliationService {
         .filter((userId): userId is string => userId !== null),
     });
     return entries.map((entry) => toActivityView({ entry, names }));
+  }
+
+  /**
+   * Every request the directory made on one connection, newest first.
+   *
+   * THE HALF THE LOG CANNOT ANSWER. A push refused before it reached a
+   * handler — an unparseable body, a resource we would not accept, a lapsed
+   * plan — decided nothing, so it appends no fact and appears in no activity
+   * feed. "My provider says it is pushing and your page says no push yet" is
+   * exactly that gap, and this is what closes it.
+   *
+   * An absent row is not evidence that nothing was sent: rows age out of the
+   * retention window, and a caller rendering this must say what it HOLDS
+   * rather than that nothing ever arrived.
+   */
+  async getRequests({
+    organizationId,
+    connectionId,
+    limit = DIRECTORY_ACTIVITY_LIMIT,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    limit?: number;
+  }): Promise<ScimRequestEntry[]> {
+    return this.deps.requests.findForConnection({
+      organizationId,
+      connectionId,
+      limit,
+    });
   }
 
   /**
