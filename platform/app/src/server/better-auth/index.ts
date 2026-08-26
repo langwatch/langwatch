@@ -43,6 +43,7 @@ import {
   beforeAccountCreate,
   beforeSessionCreate,
   beforeUserCreate,
+  ssoAssertionDecision,
 } from "./hooks";
 import { passkeySignUpRegistration } from "./passkey-signup";
 import { isSingleSignOnRequest, registeredIssuers } from "./registeredIssuers";
@@ -207,6 +208,27 @@ const plugins = [
     // means. Whether they then land in the organization is the connection's
     // `allowsJit` and the join policy's business, not this plugin's.
     disableImplicitSignUp: false,
+    /**
+     * What makes trusting the flag above defensible.
+     *
+     * `trustEmailVerified` hands the decision "is this address real" to the
+     * customer's own identity provider, and better-auth will link a verified
+     * address onto an existing account. On its own that is an account
+     * takeover: register a connection, point it at a server you control,
+     * assert somebody else's address. The comment above this option claims
+     * "the domain is DNS-proved before the connection may route" — this hook
+     * is what makes that sentence true, because nothing else on the link path
+     * ever looked at the connection's proved domains.
+     *
+     * The only pre-link callback the plugin offers, which is why the check
+     * lives here and not in a database hook.
+     */
+    resolveUser: async (input) =>
+      ssoAssertionDecision({
+        prisma,
+        providerId: input.providerId,
+        email: input.providerUser.email,
+      }),
   }),
 ];
 

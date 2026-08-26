@@ -52,11 +52,25 @@ export interface SsoEngineProviderRow {
  * to authenticate people while a screen elsewhere says it is paused.
  * DISCARDED and TORN_DOWN are terminal and go the same way.
  */
+/**
+ * The states a sign-in may reach the identity provider through.
+ *
+ * Wider than "live" on purpose, and the reason is the journey rather than a
+ * convenience: activation refuses without a sign-in that actually happened
+ * through the connection, so a connection under setup HAS to be dialable or
+ * it could never be activated. What stops that from being a way in for
+ * anybody is not this set — it is `ssoAssertionDecision`, which lets a
+ * connection that is not yet ACTIVE assert only addresses already belonging
+ * to its own organization's members.
+ *
+ * `REJECTED` is not here. An operator turning a domain claim down is a
+ * decision, and a connection that could still carry sign-ins afterwards would
+ * make it a decision about nothing.
+ */
 const DIALABLE_STATES = new Set([
   "DRAFT",
   "CLAIMED",
   "APPROVED",
-  "REJECTED",
   "VERIFICATION_PENDING",
   "VERIFIED",
   "ACTIVE",

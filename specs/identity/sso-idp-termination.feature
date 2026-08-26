@@ -200,6 +200,43 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   # ---------------------------------------------------------------------
 
   @unit
+  # ── What an identity provider is allowed to assert ───────────────────
+  #
+  # The connection is the customer's own, and so is the identity provider
+  # behind it. Trusting its word on whether an address is verified is what
+  # lets an organization move off a brokered provider without minting a
+  # second account for everybody - and it is only defensible while the
+  # address is one that connection proved it speaks for.
+
+  @unit
+  Scenario: A provider may only assert addresses on the domains it proved
+    Given "acme" has a live connection that proved "acme.com"
+    When its identity provider asserts an address on a domain it never proved
+    Then the sign-in is refused
+    And no account is linked and no session is minted
+
+  @unit
+  Scenario: A connection still being set up carries only its own people
+    Given "acme" has registered a connection and proved no domain yet
+    When its identity provider asserts an address belonging to nobody in "acme"
+    Then the sign-in is refused
+    But an administrator of "acme" signing in to test it is carried through
+    And that is the sign-in going live rests on
+
+  @unit
+  Scenario: Every refusal at the door says the same thing
+    Given an assertion is refused for any reason
+    When the person is sent back
+    Then the reason names no cause
+    And which check refused them is not something the caller learns
+
+  @unit
+  Scenario: A connection whose claim an operator turned down carries nobody
+    Given an operator rejected "acme"'s claim on a domain
+    When somebody tries to sign in through that connection
+    Then the identity provider is never dialled
+
+  @unit
   Scenario: A live connection decides the domains it proved
     Given the organization has turned its connection on
     When the sign-in router resolves a domain the connection proved

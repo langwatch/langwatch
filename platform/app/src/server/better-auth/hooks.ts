@@ -1,6 +1,7 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { normalizeDomain } from "@langwatch/identity";
 import { looksLikeSsoConnectionId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -286,6 +287,122 @@ const joinSsoOrganization = async ({
  * still ROUTES, so people who already work there keep signing in, and stops
  * PROVISIONING, so it admits nobody new.
  */
+/**
+ * Whether an assertion from a customer's identity provider may become a
+ * session at all — asked BEFORE better-auth links it to anybody.
+ *
+ * This is the only place that asks. `admitSsoArrival` below compares the
+ * asserted domain against the connection's proved domains too, but it runs in
+ * `account.create.after`, which is after the link has already happened, and it
+ * decides organization membership rather than identity. That ordering was an
+ * account takeover: `trustEmailVerified` makes `emailVerified` the CUSTOMER'S
+ * OWN identity provider's word, better-auth links a verified address onto an
+ * existing user, and a connection is dialable from DRAFT — so anybody who
+ * could register a connection could point it at a server they control, assert
+ * `someone-else@their-company.com` with `email_verified: true`, and be handed
+ * that person's session.
+ *
+ * Two questions, and the second is why this is not simply "is the domain
+ * proved":
+ *
+ *   - A LIVE connection may only assert addresses on domains it has proved.
+ *     Nothing else is defensible; the proof is the entire basis for trusting
+ *     the flag.
+ *
+ *   - A connection that is NOT live may only assert addresses that already
+ *     belong to its own organization's members. This is not a loophole, it is
+ *     the setup journey: activation refuses without a real sign-in through the
+ *     connection (`SsoActivationTestSignInMissingError`), so the administrator
+ *     doing the setup has to be able to sign in before the domain is proved.
+ *     They are a member; an attacker asserting a stranger's address is not.
+ *
+ * The refusal is deliberately one code for every cause. Which of the two
+ * questions failed is not something an unauthenticated caller gets to learn.
+ */
+export const ssoAssertionDecision = async ({
+  prisma,
+  providerId,
+  email,
+}: {
+  prisma: PrismaClient;
+  providerId: string;
+  email: string | null | undefined;
+}): Promise<{ action: "continue" } | { action: "reject"; code: string }> => {
+  // A code the client registry already has words for; the words are the
+  // ones a person who was refused at a customer's identity provider needs.
+  const refuse = {
+    action: "reject",
+    code: "identity_sign_in_refused",
+  } as const;
+  const carryOn = { action: "continue" } as const;
+
+  // Not a connection at all: the deployment's own brokered provider and the
+  // generic OAuth path do not come through this plugin, and an id that is not
+  // a connection's reaching it is not something to wave past.
+  if (!looksLikeSsoConnectionId(providerId)) return refuse;
+
+  const raw = extractEmailDomain(email);
+  if (!raw) return refuse;
+  // Folded the way a claimed domain is folded, or a trailing dot and a
+  // unicode homograph both compare unequal to the domain they impersonate.
+  const domain = normalizeDomain(raw);
+
+  const connection = await prisma.ssoConnection.findUnique({
+    where: { id: providerId },
+    select: { organizationId: true, state: true, verifiedDomains: true },
+  });
+  if (!connection) return refuse;
+
+  if (connection.state === "ACTIVE") {
+    return connection.verifiedDomains.includes(domain) ? carryOn : refuse;
+  }
+
+  const member = await memberAtAddress({
+    prisma,
+    organizationId: connection.organizationId,
+    email: email ?? "",
+  });
+  return member ? carryOn : refuse;
+};
+
+/**
+ * Whether this address already belongs to somebody in this organization.
+ *
+ * Both places an address can live are asked, because the identity work moved
+ * the truth to `Identifier` while `User.email` remains a copy for accounts the
+ * backfill has not finalized (ADR-101 §5). Asking only one of them would make
+ * the setup sign-in work for some administrators and not others.
+ */
+const memberAtAddress = async ({
+  prisma,
+  organizationId,
+  email,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  email: string;
+}): Promise<boolean> => {
+  const address = email.trim().toLowerCase();
+  if (!address) return false;
+  const membership = await prisma.organizationUser.findFirst({
+    where: {
+      organizationId,
+      OR: [
+        { user: { email: { equals: address, mode: "insensitive" } } },
+        {
+          user: {
+            identifiers: {
+              some: { value: address, verifiedAt: { not: null } },
+            },
+          },
+        },
+      ],
+    },
+    select: { userId: true },
+  });
+  return membership !== null;
+};
+
 const arrivalDecisionFor = async ({
   prisma,
   connectionId,

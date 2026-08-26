@@ -528,6 +528,41 @@ describe("the engine's provider row", () => {
       ).toBeNull();
     });
 
+    /** @scenario "A connection whose claim an operator turned down carries nobody" */
+    it("projects no row once an operator has rejected its claim", async () => {
+      const clientIdRef = await credentials.put({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        kind: "oidc-client-id",
+        value: "client_acme",
+      });
+      const secretRef = await credentials.put({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        kind: "oidc-client-secret",
+        value: "secret_acme",
+      });
+
+      // A rejection an identity provider could still be dialled through would
+      // be a decision about nothing.
+      expect(
+        await engineProviderFor({
+          connection: connection({
+            state: "REJECTED",
+            idpMetadata: {
+              issuer: "https://login.acme.okta.com",
+              providerId: "okta",
+              clientIdRef,
+              secretRef,
+              certRefs: [],
+            },
+          }),
+          credentials,
+          baseUrl: BASE_URL,
+        }),
+      ).toBeNull();
+    });
+
     it("projects no row once the connection is suspended", async () => {
       const clientIdRef = await credentials.put({
         organizationId: ORG,
