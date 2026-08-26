@@ -15,7 +15,7 @@
  * Pairs with: activityMonitor.service.ts (orchestration + PG queries)
  * Spec: specs/ai-gateway/governance/folds.feature
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type {
   PulledEventChRow,
   PushedEventChRow,
@@ -35,12 +35,17 @@ import { ActivityMonitorHealthClickHouseRepository } from "./activityMonitor.hea
 import { ActivityMonitorSpendClickHouseRepository } from "./activityMonitor.spend.clickhouse.repository";
 
 export class ActivityMonitorClickHouseRepository {
-  private readonly spend = new ActivityMonitorSpendClickHouseRepository();
-  private readonly events = new ActivityMonitorEventsClickHouseRepository();
-  private readonly health = new ActivityMonitorHealthClickHouseRepository();
+  private readonly spend: ActivityMonitorSpendClickHouseRepository;
+  private readonly events: ActivityMonitorEventsClickHouseRepository;
+  private readonly health: ActivityMonitorHealthClickHouseRepository;
+
+  constructor(resolveClient: ClickHouseClientResolver) {
+    this.spend = new ActivityMonitorSpendClickHouseRepository(resolveClient);
+    this.events = new ActivityMonitorEventsClickHouseRepository(resolveClient);
+    this.health = new ActivityMonitorHealthClickHouseRepository(resolveClient);
+  }
 
   findSummarySpend(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     thisStart: number;
     prevStart: number;
@@ -49,7 +54,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findSpendByUser(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     windowStart: number;
     sortBy: SpendSortField;
@@ -61,7 +65,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findSpendByDepartment(params: {
-    ch: ClickHouseClient;
     tenantIds: string[];
     windowStart: number;
   }): Promise<SpendByDepartmentChRow[]> {
@@ -69,7 +72,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findSpendByTeamSource(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     thisStart: number;
     prevStart: number;
@@ -78,7 +80,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findSpendOverTime(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     windowStart: number;
     groupBy: SpendOverTimeGroupBy;
@@ -87,7 +88,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   countTracedEventsBySource(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
@@ -96,7 +96,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   countLoggedEventsBySource(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
@@ -105,7 +104,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   countPulledEventsBySource(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
@@ -114,7 +112,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findPushedEventsForSource(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     beforeMs: number;
@@ -124,7 +121,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findPulledEventsForSource(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     beforeMs: number;
@@ -134,7 +130,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findTracedEventWindowCounts(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     since24h: number;
@@ -145,7 +140,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findLoggedEventWindowCounts(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     since24h: number;
@@ -156,7 +150,6 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findPulledEventWindowCounts(params: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     since24h: number;

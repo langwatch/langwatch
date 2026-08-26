@@ -31,11 +31,9 @@
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *     (single trace store, reserved namespaces)
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { tryGetApp } from "~/server/app-layer/app";
 import {
   nanoUsdToDecimalString,
   usdToNanoUsd,
@@ -45,7 +43,7 @@ import {
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
 import { PROJECT_KIND } from "../governanceProject.service";
-import { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
+import type { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 import type {
   PulledEventChRow,
   PushedEventChRow,
@@ -385,12 +383,33 @@ function emptyDenseBuckets(
 // ---------------------------------------------------------------------------
 
 export class ActivityMonitorService {
-  private readonly repo = new ActivityMonitorClickHouseRepository();
+  private readonly prisma: PrismaClient;
+  /**
+   * The activity-monitor read side, from the App. `undefined` on a
+   * deployment without ClickHouse — every method degrades to its
+   * empty-state shape, same as the pre-repository "no client" fallback.
+   */
+  private readonly repository?: ActivityMonitorClickHouseRepository;
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor({
+    prisma,
+    repository,
+  }: {
+    prisma: PrismaClient;
+    repository?: ActivityMonitorClickHouseRepository;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+  }
 
-  static create(prisma: PrismaClient): ActivityMonitorService {
-    return new ActivityMonitorService(prisma);
+  static create({
+    prisma,
+    repository,
+  }: {
+    prisma: PrismaClient;
+    repository?: ActivityMonitorClickHouseRepository;
+  }): ActivityMonitorService {
+    return new ActivityMonitorService({ prisma, repository });
   }
 
   /**
@@ -410,14 +429,6 @@ export class ActivityMonitorService {
       select: { id: true },
     });
     return project?.id ?? null;
-  }
-
-  private async getClickhouse(
-    organizationId: string,
-  ): Promise<ClickHouseClient | null> {
-    const app = tryGetApp();
-    if (!app?.clickhouse.enabled) return null;
-    return app.clickhouse.resolveOrganizationClient(organizationId);
   }
 
   // -----------------------------------------------------------------------
@@ -440,9 +451,7 @@ export class ActivityMonitorService {
     if (!govProjectId) {
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) {
+    if (!this.repository) {
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
 
@@ -451,8 +460,7 @@ export class ActivityMonitorService {
     const thisWindowStart = now - windowMs;
     const previousWindowStart = now - 2 * windowMs;
 
-    const row = await this.repo.findSummarySpend({
-      ch,
+    const row = await this.repository.findSummarySpend({
       tenantId: govProjectId,
       thisStart: thisWindowStart,
       prevStart: previousWindowStart,
@@ -503,15 +511,12 @@ export class ActivityMonitorService {
   }): Promise<SpendByUserRow[]> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
+    if (!this.repository) return [];
 
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
 
-    const rows = await this.repo.findSpendByUser({
-      ch,
+    const rows = await this.repository.findSpendByUser({
       tenantId: govProjectId,
       windowStart: now - windowMs,
       sortBy: input.sortBy ?? "spend",
@@ -569,9 +574,7 @@ export class ActivityMonitorService {
       select: { id: true, departmentId: true },
     });
     if (projects.length === 0) return [];
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
+    if (!this.repository) return [];
 
     const projectDepartmentById = new Map(
       projects.map((p) => [p.id, p.departmentId] as const),
@@ -587,8 +590,7 @@ export class ActivityMonitorService {
     const now = Date.now();
     const windowStart = now - input.windowDays * 24 * 60 * 60 * 1000;
 
-    const rows = await this.repo.findSpendByDepartment({
-      ch,
+    const rows = await this.repository.findSpendByDepartment({
       tenantIds,
       windowStart,
     });
@@ -740,20 +742,17 @@ export class ActivityMonitorService {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
 
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
-
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
     const limit = input.limit ?? 50;
     const offset = Math.max(0, input.offset ?? 0);
     const sortBy = input.sortBy ?? "spend";
     const sortDir = input.sortDir ?? "desc";
+    if (!this.repository) return [];
 
     const previousWindowStart = now - 2 * windowMs;
 
-    const sourceRows = await this.repo.findSpendByTeamSource({
-      ch,
+    const sourceRows = await this.repository.findSpendByTeamSource({
       tenantId: govProjectId,
       thisStart: now - windowMs,
       prevStart: previousWindowStart,
@@ -885,13 +884,11 @@ export class ActivityMonitorService {
       return { buckets: emptyDenseBuckets(windowStart, windowDays) };
     }
 
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) {
+    if (!this.repository) {
       return { buckets: emptyDenseBuckets(windowStart, windowDays) };
     }
 
-    const rows = await this.repo.findSpendOverTime({
-      ch,
+    const rows = await this.repository.findSpendOverTime({
       tenantId: govProjectId,
       windowStart,
       groupBy: input.groupBy,
@@ -1055,29 +1052,23 @@ export class ActivityMonitorService {
     if (sources.length === 0) return [];
 
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    const ch = govProjectId
-      ? await this.getClickhouse(input.organizationId)
-      : null;
 
     const eventsBySource = new Map<string, number>();
-    if (ch && govProjectId) {
+    if (this.repository && govProjectId) {
       const sourceIds = sources.map((s) => s.id);
       const since = Date.now() - 24 * 60 * 60 * 1000;
       const counts = await Promise.all([
-        this.repo.countTracedEventsBySource({
-          ch,
+        this.repository.countTracedEventsBySource({
           tenantId: govProjectId,
           sourceIds,
           since,
         }),
-        this.repo.countLoggedEventsBySource({
-          ch,
+        this.repository.countLoggedEventsBySource({
           tenantId: govProjectId,
           sourceIds,
           since,
         }),
-        this.repo.countPulledEventsBySource({
-          ch,
+        this.repository.countPulledEventsBySource({
           tenantId: govProjectId,
           sourceIds,
           since,
@@ -1113,9 +1104,7 @@ export class ActivityMonitorService {
   }): Promise<ActivityEventDetailRow[]> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return [];
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return [];
+    if (!this.repository) return [];
 
     const limit = input.limit ?? 50;
     const parsedBeforeMs = input.beforeIso
@@ -1126,18 +1115,16 @@ export class ActivityMonitorService {
       : Date.now();
 
     const [pushedEvents, pulledEvents] = await Promise.all([
-      this.repo
+      this.repository
         .findPushedEventsForSource({
-          ch,
           tenantId: govProjectId,
           sourceId: input.sourceId,
           beforeMs,
           limit,
         })
         .then((rows) => rows.map(toPushedEvent)),
-      this.repo
+      this.repository
         .findPulledEventsForSource({
-          ch,
           tenantId: govProjectId,
           sourceId: input.sourceId,
           beforeMs,
@@ -1172,14 +1159,11 @@ export class ActivityMonitorService {
   }): Promise<SourceHealthMetrics> {
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) return emptySourceHealthMetrics();
-
-    const ch = await this.getClickhouse(input.organizationId);
-    if (!ch) return emptySourceHealthMetrics();
+    if (!this.repository) return emptySourceHealthMetrics();
 
     const now = Date.now();
     const day = 24 * 60 * 60 * 1000;
     const windowParams = {
-      ch,
       tenantId: govProjectId,
       sourceId: input.sourceId,
       since24h: now - day,
@@ -1188,9 +1172,9 @@ export class ActivityMonitorService {
     };
 
     const windows = await Promise.all([
-      this.repo.findTracedEventWindowCounts(windowParams),
-      this.repo.findLoggedEventWindowCounts(windowParams),
-      this.repo.findPulledEventWindowCounts(windowParams),
+      this.repository.findTracedEventWindowCounts(windowParams),
+      this.repository.findLoggedEventWindowCounts(windowParams),
+      this.repository.findPulledEventWindowCounts(windowParams),
     ]);
 
     const total = (pick: (row: WindowCountChRow) => number) =>
