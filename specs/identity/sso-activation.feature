@@ -97,6 +97,24 @@ Feature: Going live with your own identity provider, without asking us
     And it says what it will do: sign them in through their own identity
     provider
 
+  # TESTING AS SOMEBODY WHO IS NOT YOU is the test that proves the connection:
+  # signing in as the administrator who registered it exercises a path most of
+  # the organization will never take. The obvious offer — a copy of the SIGN-IN
+  # link, pressed in another browser profile — cannot work, and it is written
+  # down here so nobody builds it again. Starting a sign-in mints a state and
+  # puts a signed copy of it in a cookie on the browser that asked; the
+  # callback refuses when the two disagree, which is what stops somebody being
+  # walked through a sign-in they did not begin. A copied authorization URL
+  # carries the state and leaves the cookie behind. Switching that check off to
+  # save a step would weaken every sign-in on the installation.
+
+  @integration
+  Scenario: Testing from another browser copies the page, never the sign-in
+    When the administrator asks to test from another browser
+    Then they are given a link to the page they are on
+    And they are told to press the test there, because a sign-in has to start
+    in the browser that finishes it
+
   # ---------------------------------------------------------------------
   # A way back in
   # ---------------------------------------------------------------------

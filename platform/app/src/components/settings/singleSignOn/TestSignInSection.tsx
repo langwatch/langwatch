@@ -1,6 +1,7 @@
 import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeGoLiveView } from "@langwatch/identity-server";
 import { ExternalLink, RefreshCw } from "lucide-react";
+import { TestFromAnotherBrowser } from "~/features/sso/components/TestFromAnotherBrowser";
 import { TestSignInFailureNotice } from "~/features/sso/components/TestSignInFailureNotice";
 import { useTestSignIn } from "~/features/sso/hooks/useTestSignIn";
 
@@ -72,6 +73,10 @@ export function TestSignInSection({
               : "Test sign-in"}
         </Button>
       )}
+      {/* AS SOMEBODY WHO IS NOT YOU, which is the test that actually proves
+          the connection: signing in as the administrator who registered it
+          exercises a path most of the organization will never take. */}
+      {canManage && <TestFromAnotherBrowser />}
     </VStack>
   );
 }
