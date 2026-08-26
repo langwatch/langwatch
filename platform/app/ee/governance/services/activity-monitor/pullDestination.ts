@@ -17,6 +17,10 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import {
+  COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+  isDataverseEnvironmentOrigin,
+} from "../pullers/dataverseEnvironment";
+import {
   DATABRICKS_GENIE_ADAPTER_ID,
   isDatabricksWorkspaceOrigin,
 } from "../pullers/databricksGenie.puller";
@@ -40,6 +44,18 @@ export function assertPullDestinationAllowed(
     ) {
       throw new ValidationError(
         "Workspace URL must be an https Databricks workspace address, ending in .azuredatabricks.net, .cloud.databricks.com or .gcp.databricks.com.",
+      );
+    }
+  }
+
+  if (parserConfig.adapter === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
+    const environmentUrl = parserConfig.environmentUrl;
+    if (
+      typeof environmentUrl !== "string" ||
+      !isDataverseEnvironmentOrigin(environmentUrl)
+    ) {
+      throw new ValidationError(
+        "Environment URL must be an https Power Platform environment address, ending in .dynamics.com, .microsoftdynamics.us, .appsplatform.us or .dynamics.cn. Environments served from a custom domain are not supported yet — contact support.",
       );
     }
   }

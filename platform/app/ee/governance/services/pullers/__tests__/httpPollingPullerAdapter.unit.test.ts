@@ -14,6 +14,7 @@
  * Spec: specs/ai-governance/puller-framework/http-polling.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RedirectRefusedError as ActualRedirectRefusedError } from "~/utils/ssrfProtection";
 
 import { HttpPollingPullerAdapter } from "../httpPollingPullerAdapter";
 
@@ -57,10 +58,18 @@ beforeEach(() => {
   // Mock undici fetch via the ssrfSafeFetch path. Easiest is to mock
   // the module — adapter imports `~/utils/ssrfProtection`.
   vi.doMock("~/utils/ssrfProtection", () => ({
+    // The adapter checks `instanceof RedirectRefusedError`, so the mock has
+    // to carry the real class. Mocking the module replaces all of its
+    // exports, and an `instanceof` against an undefined import throws a
+    // TypeError that reads nothing like the missing export it actually is.
+    RedirectRefusedError: ActualRedirectRefusedError,
     ssrfSafeFetch: async (url: string, init?: RequestInit) => {
       capturedCalls.push({ url, init });
       const next = responseQueue.shift();
       if (!next) throw new Error("test bug: no queued response");
+      if (next.status >= 300 && next.status < 400) {
+        throw new ActualRedirectRefusedError();
+      }
       return new Response(JSON.stringify(next.body), {
         status: next.status,
         headers: { "content-type": "application/json" },
@@ -109,6 +118,65 @@ describe("HttpPollingPullerAdapter", () => {
       const { method: _omit, ...withoutMethod } = VALID_CONFIG;
       const parsed = adapter.validateConfig(withoutMethod);
       expect(parsed.method).toBe("GET");
+    });
+  });
+
+  describe("credential handling on the wire", () => {
+    /**
+     * The request headers carry the source's decrypted upstream secret, and
+     * `ssrfSafeFetch` follows up to ten redirects by default — re-sending
+     * those headers to each host it lands on. A configured endpoint that
+     * starts answering with a redirect would hand the credential to wherever
+     * it points, with nothing in a pull run reporting it.
+     *
+     * Asserted on the call rather than through a redirecting fixture on
+     * purpose: the inherited default is to follow, so the only thing that
+     * proves this adapter opted out is the option itself being passed.
+     *
+     * @scenario "A redirect never carries the credentials onward"
+     */
+    it("tells the fetch helper not to follow redirects", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({
+        status: 200,
+        body: { events: [], next_cursor: null },
+      });
+
+      await adapter.runOnce(
+        { cursor: null, credentials: { token: "secret-xyz" } },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      expect(capturedCalls).toHaveLength(1);
+      expect(
+        (capturedCalls[0]!.init as { followRedirects?: boolean })
+          .followRedirects,
+      ).toBe(false);
+    });
+
+    /**
+     * A configured endpoint that redirects is a permanent property of that
+     * endpoint, so retrying it only delays the error the admin needs to read.
+     *
+     * @scenario "A redirect never carries the credentials onward"
+     */
+    it("fails immediately on a refused redirect instead of retrying it", async () => {
+      const { HttpPollingPullerAdapter: AdapterUnderTest } = await import(
+        "../httpPollingPullerAdapter"
+      );
+      const adapter = new AdapterUnderTest();
+      responseQueue.push({ status: 302, body: {} });
+
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: { token: "secret-xyz" } },
+        adapter.validateConfig(VALID_CONFIG),
+      );
+
+      expect(result.errorCount).toBe(1);
+      expect(capturedCalls).toHaveLength(1);
     });
   });
 
