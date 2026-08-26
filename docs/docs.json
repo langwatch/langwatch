@@ -843,6 +843,7 @@
             "group": "Using Langy",
             "pages": [
               "langy/chat",
+              "langy/prompt-optimization",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
               "langy/insights"

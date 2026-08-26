@@ -164,6 +164,19 @@ jobs:
       - name: Check docs structure
         run: go run ./cmd/docscheck
 
+  check_prose:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check docs prose for banned words
+        run: bash docs/scripts/check-docs-prose.sh
+
   check_generated_files:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
@@ -237,11 +250,11 @@ jobs:
           fi
 
   docs-complete:
-    needs: [changes, check_links, check_structure, check_generated_files]
+    needs: [changes, check_links, check_structure, check_prose, check_generated_files]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: check_links, check_structure, check_generated_files
+          allowed-skips: check_links, check_structure, check_prose, check_generated_files
