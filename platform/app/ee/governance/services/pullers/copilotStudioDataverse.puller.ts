@@ -151,6 +151,20 @@ const transcriptRowSchema = z
   .passthrough();
 
 /**
+ * The part of a row the cursor is built from, on its own.
+ *
+ * These two fields are the position; everything else on the row is the event.
+ * Reading them separately is what lets a row that fails the schema above still
+ * be stepped over — `name` arriving as a number costs that one event, not the
+ * whole source. The constraints are deliberately the same ones, because the
+ * value ends up in the same bare `$filter` either way.
+ */
+const cursorRowSchema = z.object({
+  conversationtranscriptid: z.string().uuid(),
+  createdon: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+/**
  * One row of the `bot` table, read once per run to put a name on each
  * conversation.
  */
@@ -482,6 +496,39 @@ function readTranscriptRow(params: {
   };
 }
 
+/**
+ * Where the walk gets to after a row it could not read as an event, or null
+ * when that row cannot even say where it sits.
+ *
+ * Only the identifier and the timestamp go into the next run's filter, so the
+ * two are read on their own here. A row whose `content` came back as a number
+ * is unreadable as an event and still perfectly readable as a position, and
+ * this is what lets the walk step over it. Rows arrive in `TRANSCRIPT_ORDER_BY`
+ * order, so a row further down the page is always a cursor further forward.
+ *
+ * Null is the row whose own identifier is the unreadable part. That id is what
+ * the next filter would be built from, so there is no position to move to and
+ * the caller leaves the cursor where it was — the run then fails, loudly and
+ * repeatedly, which is the right answer for a row nobody can name. Skipping it
+ * would mean stepping over a row without being able to say which one.
+ */
+function cursorPastUnreadableRow(params: {
+  raw: object;
+  previous: Cursor | null;
+}): Cursor | null {
+  const { raw, previous } = params;
+  const parsed = cursorRowSchema.safeParse(raw);
+  if (!parsed.success) return null;
+
+  return {
+    // Same fallback as a readable row with no `createdon`: keep the previous
+    // timestamp rather than let an empty one through, where the next run's
+    // filter would read it as "everything".
+    createdon: parsed.data.createdon ?? (previous ? previous.createdon : ""),
+    conversationtranscriptid: parsed.data.conversationtranscriptid,
+  };
+}
+
 /** Read one page's rows into the walk. */
 function readPageRows(params: {
   page: z.infer<typeof odataPageSchema>;
@@ -502,6 +549,14 @@ function readPageRows(params: {
     const read = readTranscriptRow({ raw, previous: walk.last, bots });
     if (!read) {
       walk.errorCount += 1;
+      // Step over it if it can still say where it sits. Leaving the cursor
+      // behind an unreadable row is what wedges a source: the next run asks
+      // for everything after the last good row, gets the bad one back, counts
+      // the same error against a cursor that has not moved, and the worker
+      // fails it as no progress — every run, until some later row happens to
+      // arrive and drag the window past it.
+      walk.last =
+        cursorPastUnreadableRow({ raw, previous: walk.last }) ?? walk.last;
       continue;
     }
     walk.last = read.cursor;

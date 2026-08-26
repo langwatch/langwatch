@@ -1009,6 +1009,79 @@ describe("given the pull goes wrong", () => {
   });
 
   /**
+   * The ordering the test above cannot see. With the unreadable row last, the
+   * cursor used to stay behind it: the next run asked for everything after the
+   * good row, got the bad one back on its own, and handed back an unchanged
+   * cursor with an error against it — which the worker fails as no progress.
+   * Nothing about that repeats differently, so one bad newest row wedged the
+   * source until some later row arrived to drag the window past it.
+   */
+  it("moves past an unreadable row that is the last one on the page", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({
+      status: 200,
+      body: {
+        value: [
+          transcriptRow(),
+          // Readable as a position, not as an event: `name` is a string column.
+          transcriptRow({
+            conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+            createdon: "2026-08-25T19:45:00Z",
+            name: 42,
+          }),
+        ],
+      },
+    });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.errorCount).toBe(1);
+    expect(result.events).toHaveLength(1);
+    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+      createdon: "2026-08-25T19:45:00Z",
+      conversationtranscriptid: "22222222-2222-4222-8222-222222222222",
+    });
+  });
+
+  /**
+   * The one row that must still hold the walk where it is. Its identifier is
+   * the unreadable part, and that identifier is what the next run's filter
+   * would be built from — there is nowhere to move to, so the run is left to
+   * fail rather than step over a row it cannot name.
+   */
+  it("stays put when the unreadable row cannot even identify itself", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({
+      status: 200,
+      body: {
+        value: [
+          transcriptRow(),
+          {
+            conversationtranscriptid: "1 eq 1",
+            createdon: "2026-08-25T19:45:00Z",
+          },
+        ],
+      },
+    });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.errorCount).toBe(1);
+    expect(JSON.parse(result.cursor ?? "null")).toEqual({
+      createdon: "2026-08-25T19:44:43Z",
+      conversationtranscriptid: "11111111-1111-4111-8111-111111111111",
+    });
+  });
+
+  /**
    * An entry that is not an object at all is no more readable than one that
    * fails the schema, and it used to be dropped by a bare `continue`. A page
    * of those then came back as zero events, zero errors and an unmoved cursor
