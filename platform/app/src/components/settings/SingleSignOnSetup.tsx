@@ -6,6 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { SsoConnectionLifecycleState } from "@langwatch/identity";
 import type {
   SelfServeGoLiveView,
   SelfServeSetupView,
@@ -13,13 +14,17 @@ import type {
 import { Copy } from "lucide-react";
 import { useState } from "react";
 import {
-  connectionProtocolName,
-  connectionStatusChipFor,
-} from "~/features/sso/logic/connectionStatus";
-import {
   arrivalAnswerLabel,
   SSO_ANSWER_BY_POLICY,
 } from "~/features/sso/logic/arrivals";
+import {
+  connectionRemovalActFor,
+  connectionRemovalCopyFor,
+} from "~/features/sso/logic/connectionRemoval";
+import {
+  connectionProtocolName,
+  connectionStatusChipFor,
+} from "~/features/sso/logic/connectionStatus";
 import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -42,7 +47,6 @@ import {
 import { ServiceProviderDetails } from "./singleSignOn/ServiceProviderDetails";
 import { SetupStep, SetupSteps } from "./singleSignOn/SetupStep";
 import { TestSignInSection } from "./singleSignOn/TestSignInSection";
-
 
 /**
  * Setting enterprise single sign-on up yourself, all the way to live (D05
@@ -287,7 +291,8 @@ function ConnectedJourney({
           organizationId={organizationId}
           connectionId={connection.connectionId}
           providerName={connection.providerId}
-          activated={goLive?.activated ?? false}
+          state={connection.state}
+          tearDownAfterMs={connection.tearDownAfterMs}
         />
       )}
     </VStack>
@@ -302,10 +307,18 @@ function ConnectedJourney({
  *   - a connection that never went live is DISCARDED — the journey opens
  *     back on the register step, immediately, and the history keeps what
  *     was tried;
- *   - a live connection is REMOVED on teardown's terms — scheduled, with a
- *     seven-day grace in which sign-in keeps working and the removal can
- *     be called off, and refused outright while anybody would be left with
- *     no other way in.
+ *   - a connection that reached live is REMOVED on teardown's terms —
+ *     scheduled, with a grace in which sign-in keeps working, and refused
+ *     outright while anybody would be left with no other way in;
+ *   - a connection ALREADY being removed says so, with the date, and the
+ *     press re-derives that date from now rather than refusing.
+ *
+ * Which of the three is read from the connection's lifecycle state by
+ * {@link connectionRemovalActFor}, never from whether it is activated.
+ * "Activated" means ACTIVE and nothing else, so a paused connection and one
+ * already on its way out both read as never-went-live, and both then sent a
+ * discard the aggregate refuses. The state is the fact the guard consults, so
+ * it is the fact this section asks for.
  *
  * DRAWN AS A DANGER ZONE, not as another hairline: the red-tinted border and
  * the red title say "destructive lives here" before a word is read, which is
@@ -315,18 +328,21 @@ function RemoveConnectionSection({
   organizationId,
   connectionId,
   providerName,
-  activated,
+  state,
+  tearDownAfterMs,
 }: {
   organizationId: string;
   connectionId: string;
   providerName: string;
-  activated: boolean;
+  state: SsoConnectionLifecycleState;
+  tearDownAfterMs: number | null;
 }) {
   const discard = api.ssoSetup.discardConnection.useMutation();
   const remove = api.ssoSetup.removeConnection.useMutation();
   const utils = api.useUtils();
   const [confirming, setConfirming] = useState(false);
   const pending = discard.isPending || remove.isPending;
+  const act = connectionRemovalActFor(state);
 
   const settle = {
     onSuccess: () => {
@@ -335,6 +351,19 @@ function RemoveConnectionSection({
     },
     onError: reportRefusal,
   };
+
+  // A tombstone has no way out left, and a section headed "danger zone" whose
+  // only control cannot do anything is worse than no section.
+  if (act.verb === "none") return null;
+
+  const copy = connectionRemovalCopyFor({
+    act,
+    providerName,
+    scheduledFor:
+      tearDownAfterMs === null
+        ? null
+        : new Date(tearDownAfterMs).toLocaleDateString(),
+  });
 
   return (
     <Card.Root borderColor="red.muted">
@@ -349,9 +378,7 @@ function RemoveConnectionSection({
           flexDirection={{ base: "column", sm: "row" }}
         >
           <Text fontSize="13px" color="fg.muted" maxWidth="64ch">
-            {activated
-              ? `Removing ${providerName} schedules it: sign-in keeps working for seven days, the removal can be called off in that time, and it is refused while anybody would have no other way in.`
-              : `Removing ${providerName} takes you back to the start. Nothing about anybody's sign-in changes, and you can register a connection again at any time.`}
+            {copy.explanation}
           </Text>
           {confirming ? (
             <HStack gap={2} flexShrink={0}>
@@ -360,8 +387,9 @@ function RemoveConnectionSection({
                 colorPalette="red"
                 variant="solid"
                 loading={pending}
+                data-testid="sso-remove-confirm"
                 onClick={() =>
-                  activated
+                  act.verb === "teardown"
                     ? remove.mutate(
                         { organizationId, connectionId, reason: null },
                         settle,
@@ -369,7 +397,7 @@ function RemoveConnectionSection({
                     : discard.mutate({ organizationId, connectionId }, settle)
                 }
               >
-                {activated ? "Yes, schedule the removal" : "Yes, remove it"}
+                {copy.confirm}
               </Button>
               <Button
                 size="sm"
@@ -387,9 +415,10 @@ function RemoveConnectionSection({
               colorPalette="red"
               flexShrink={0}
               alignSelf={{ base: "start", sm: "center" }}
+              data-testid="sso-remove-open"
               onClick={() => setConfirming(true)}
             >
-              Remove this connection
+              {copy.open}
             </Button>
           )}
         </HStack>

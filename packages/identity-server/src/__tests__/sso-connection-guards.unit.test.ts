@@ -442,6 +442,30 @@ describe("sso connection guards", () => {
         await connections.findDomainOwner({ domain: "acme.com" }),
       ).toBeNull();
     });
+
+    /** @scenario "Asking again while a removal waits brings the date forward" */
+    it("accepts a re-ask and re-derives the deadline from it", async () => {
+      const { state } = await run(() =>
+        guards.requestTeardown({ ...identity, reason: null, graceMs: 0 }),
+      );
+      expect(state.state).toBe("TEARDOWN_PENDING");
+      expect(state.tearDownAfterMs).toBe(T0);
+
+      const done = await run(() =>
+        guards.completeTeardown({ ...identity, occurredAtMs: T0 }),
+      );
+      expect(done.state.state).toBe("TORN_DOWN");
+    });
+
+    /** @scenario "Asking again while a removal waits brings the date forward" */
+    it("runs the stranding check again on the way through", async () => {
+      stranding.set(["user_sam"]);
+      await expect(
+        guards.requestTeardown({ ...identity, reason: null, graceMs: 0 }),
+      ).rejects.toMatchObject({
+        code: "sso_connection_teardown_strands_users",
+      });
+    });
   });
 
   describe("given a grandfathered ACTIVE connection", () => {

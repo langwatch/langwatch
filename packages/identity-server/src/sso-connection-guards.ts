@@ -161,7 +161,13 @@ const ALLOWED_FROM: Record<
   [ACTIVATE_CONNECTION_COMMAND_TYPE]: ["VERIFIED"],
   [SUSPEND_CONNECTION_COMMAND_TYPE]: ["ACTIVE"],
   [RESUME_CONNECTION_COMMAND_TYPE]: ["SUSPENDED"],
-  [REQUEST_TEARDOWN_COMMAND_TYPE]: ["ACTIVE", "SUSPENDED"],
+  // TEARDOWN_PENDING too: asking again for a removal already scheduled is
+  // not a new removal, it re-derives the deadline — which is how an
+  // organization that stopped routing off the connection brings the date
+  // forward instead of waiting out a grace that protects nobody. The
+  // stranded-users check runs again on the way through, so the re-ask can
+  // never complete a teardown the first ask would have refused.
+  [REQUEST_TEARDOWN_COMMAND_TYPE]: ["ACTIVE", "SUSPENDED", "TEARDOWN_PENDING"],
   [COMPLETE_TEARDOWN_COMMAND_TYPE]: ["TEARDOWN_PENDING"],
   // From VERIFIED, because "anybody on a domain you proved" is not an answer
   // anybody can give before there is one — the journey asks it at the step

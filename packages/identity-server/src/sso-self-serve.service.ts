@@ -403,6 +403,15 @@ export interface SelfServeSetupView {
      * behaviour that is very much set.
      */
     arrivalPolicy: SsoArrivalPolicy;
+    /**
+     * When a scheduled removal completes, and null while none is scheduled.
+     *
+     * On the view because the danger zone has to SAY it. A connection being
+     * removed a week from now and one being removed in a minute are the same
+     * state and very different news, and an administrator deciding whether to
+     * call it off is deciding about a date.
+     */
+    tearDownAfterMs: number | null;
     verifiedDomains: string[];
     /** One entry per proved domain: what proved it is elsewhere, this is
      *  whether that evidence is still there. */
@@ -487,6 +496,7 @@ export class SsoSelfServeService {
             providerId: state.idpMetadata.providerId,
             issuer: state.idpMetadata.issuer,
             arrivalPolicy: ssoArrivalPolicy(state),
+            tearDownAfterMs: state.tearDownAfterMs,
             verifiedDomains: state.verifiedDomains,
             domainProofs: state.domainVerifications.map((proof) => ({
               domain: proof.domain,
@@ -1239,10 +1249,17 @@ export class SsoSelfServeService {
   }
 
   /**
-   * Remove a live connection, with the grace teardown always has: sign-in
-   * keeps working while the removal is scheduled, and the schedule is
-   * visible and reversible until it completes. The guards refuse it while
-   * anybody would be stranded without another way in.
+   * Remove a live connection. The grace exists for the people signing in
+   * through it: sign-in keeps working while the removal is scheduled, and
+   * the schedule is visible and reversible until it completes. The guards
+   * refuse it while anybody would be stranded without another way in.
+   *
+   * A connection the organization is NOT routing off strands nobody, so its
+   * removal owes nobody a grace: the deadline is now, and the teardown wake
+   * completes it immediately. This is also how a scheduled removal is
+   * brought forward — asking again re-derives the deadline (the guards
+   * accept a re-ask from TEARDOWN_PENDING), so an organization that turned
+   * routing off does not wait out a week that protects nobody.
    */
   async removeConnection({
     organizationId,
@@ -1258,10 +1275,13 @@ export class SsoSelfServeService {
     graceMs: number;
   }): Promise<void> {
     await this.requireOrganizationConnection({ organizationId, connectionId });
+    const routing = await this.deps.routing.routesOffConnection({
+      organizationId,
+    });
     await this.deps.connections().requestTeardown({
       ...this.command({ organizationId, connectionId, actor }),
       reason,
-      graceMs,
+      graceMs: routing ? graceMs : 0,
     });
   }
 

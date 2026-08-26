@@ -226,6 +226,36 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the removal is scheduled with teardown's own grace, not completed at once
     And another organization's administrator naming the connection is answered as if it did not exist
 
+  # The grace exists for the people signing in through the connection. A
+  # connection the organization is not routing off strands nobody, so its
+  # removal owes nobody a week.
+  @unit
+  Scenario: A removal nothing routes off is scheduled for now, not next week
+    Given "acme"'s connection is ACTIVE and routing is not switched on
+    When "ana" removes it from the setup page
+    Then the teardown deadline is the moment of the ask
+    And the wake completes it as soon as it fires
+
+  @unit
+  Scenario: Asking again while a removal waits brings the date forward
+    Given a connection in TEARDOWN_PENDING with days of grace left
+    When the administrator removes it again
+    Then the deadline is re-derived from the new ask
+    And the stranded-users check runs again on the way through
+
+  # One button, two removals, and the aggregate refuses each from the other's
+  # states — so which one a press is has to be read from where the connection
+  # stands. Reading it from whether the connection is ACTIVE is the same
+  # question asked wrongly: a paused connection and one already being removed
+  # are both "not active", neither can be discarded, and the screen offered
+  # both a button whose only outcome was a refusal.
+  @integration
+  Scenario: Which removal a press sends is read from where the connection stands
+    Given "acme"'s connection is paused, or already scheduled for removal
+    When "ana" removes it from the setup page
+    Then the connection is torn down on teardown's terms, never discarded
+    And a connection already being removed says so on the page, and says when
+
   @unit
   Scenario: The projection replays whole-row like every identity projection
     Given a connection with a full lifecycle of events

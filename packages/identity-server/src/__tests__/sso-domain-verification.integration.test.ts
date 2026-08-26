@@ -463,6 +463,7 @@ describe("proving a domain by publishing a record", () => {
             certRefs: [],
           },
           allowsJit: false,
+          arrivalPolicy: null,
           source: "self-serve",
           testLoginAccountId: "acc_first",
           rejection: null,

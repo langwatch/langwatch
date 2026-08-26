@@ -108,6 +108,8 @@ export interface IdentityStack {
    *  restates facts the store already holds and they are absorbed, so
    *  this is also the count of what a retry did NOT duplicate. */
   events: InMemoryIdentityEventStore;
+  /** Registers a connection, the way its setup journey would have. */
+  registerConnection: (args: { providerId: string; issuer: string }) => void;
 }
 
 /**

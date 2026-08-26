@@ -164,6 +164,16 @@ const refused = (): never => {
 };
 
 let connections: InMemoryConnections;
+/**
+ * Whether the organization is actually being SENT to the connection.
+ *
+ * Held as a variable rather than built inline because it is the one seam a
+ * removal reads: a teardown owes its grace to the people signing in through
+ * the connection, so an organization routing off it gets the week and one
+ * that is not gets a deadline of now. A scenario about either says which it
+ * is by flipping this.
+ */
+let routing: StubRouting;
 let breakGlass: StubBreakGlassBindings;
 let licenseAuthority: StubLicenseAuthority;
 let context: StubContext;
@@ -178,6 +188,7 @@ let selfServe: SsoSelfServeService;
 
 beforeEach(() => {
   connections = new InMemoryConnections();
+  routing = new StubRouting(false);
   breakGlass = new StubBreakGlassBindings(true);
   licenseAuthority = new StubLicenseAuthority(true);
   context = new StubContext(SELF_HOSTED_LICENSED);
@@ -226,7 +237,7 @@ beforeEach(() => {
     testSignIns: new StubTestSignIns(),
     breakGlass: new StubBreakGlassReads(),
     members: new StubMembers(),
-    routing: new StubRouting(false),
+    routing,
     now: () => clock,
   });
 });
@@ -1267,6 +1278,9 @@ describe("removing a connection from the setup page", () => {
   it("schedules a live connection's removal with teardown's grace, and answers another organization as if it did not exist", async () => {
     const graceMs = 7 * 24 * 60 * 60 * 1000;
     seedOwnActiveConnection();
+    // The grace exists for the people signing in through the connection, so
+    // it is only owed while the organization is being sent to it.
+    routing.set(true);
 
     await selfServe.removeConnection({
       organizationId: ORG,
@@ -1294,6 +1308,25 @@ describe("removing a connection from the setup page", () => {
           "sso_domain_proof_not_found",
         ),
       );
+  });
+
+  /** @scenario "A removal nothing routes off is scheduled for now, not next week" */
+  it("schedules a removal nothing routes off for the moment of the ask", async () => {
+    seedOwnActiveConnection();
+    // Nobody is being sent to it, so the week protects nobody.
+    routing.set(false);
+
+    await selfServe.removeConnection({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      actor: ANA,
+      reason: null,
+      graceMs: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const scheduled = await held();
+    expect(scheduled?.state).toBe("TEARDOWN_PENDING");
+    expect(scheduled?.tearDownAfterMs).toBe(clock);
   });
 });
 
@@ -1371,6 +1404,7 @@ function seedOwnActiveConnection({
       certRefs: [],
     },
     allowsJit: false,
+    arrivalPolicy: null,
     source: "self-serve",
     testLoginAccountId: "acc_acme",
     rejection: null,
@@ -1403,6 +1437,7 @@ function seedOtherOrganizationOn(domain: string): void {
       certRefs: [],
     },
     allowsJit: false,
+    arrivalPolicy: null,
     source: "self-serve",
     testLoginAccountId: "acc_first",
     rejection: null,
