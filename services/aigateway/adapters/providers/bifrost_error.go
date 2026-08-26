@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -285,7 +286,6 @@ var bfMessageRules = []bfMessageRule{
 	{needle: "no keys found", code: domain.ErrProviderConfigInvalid},
 	{needle: "deployments not set", code: domain.ErrProviderConfigInvalid},
 	{needle: "endpoint not set", code: domain.ErrProviderConfigInvalid},
-	{needle: "is not supported by", code: domain.ErrProviderConfigInvalid},
 
 	// Transport never reached the provider (DNS, connection refused).
 	//   schemas.ErrProviderNetworkError
@@ -358,7 +358,11 @@ func bfCodeForMessage(msg string) (herr.Code, bool) {
 func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 	switch code {
 	case domain.ErrProviderCredentialInvalid:
-		return "The credentials configured for this model provider were not accepted. Check the provider's credentials in your model provider settings."
+		// The "retrying will not help" half belongs here rather than in a tip:
+		// tipsFor caps at maxTips, and Vertex fills every slot with
+		// provider-specific advice, so a generic tip carrying it is truncated
+		// away for the very provider this was written for.
+		return "The credentials configured for this model provider were not accepted, so the request never reached the provider and will fail the same way on every retry. Check the provider's credentials in your model provider settings."
 	case domain.ErrProviderConfigInvalid:
 		if model := berr.ExtraFields.ModelRequested; model != "" {
 			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", model)
@@ -389,10 +393,60 @@ func bfCause(berr *bfschemas.BifrostError) error {
 	}
 	cause := berr.Error.Error
 	category := strings.TrimSpace(berr.Error.Message)
+	// The marker can sit on either side: the credential parse failure names
+	// itself in the CAUSE ("failed to parse auth credentials JSON: ..."), while
+	// the unreadable-body failures name themselves in the CATEGORY and leave the
+	// cause as the body itself. Checking only one of the two leaves the other
+	// quoting verbatim.
+	if described, ok := bfDescribeUnquotableCause(category, cause); ok {
+		cause = errors.New(described)
+	}
 	if category == "" || strings.Contains(cause.Error(), category) {
 		return cause
 	}
 	return fmt.Errorf("%s: %w", category, cause)
+}
+
+// bfCauseQuotesItsInput lists the Bifrost failures whose wrapped cause embeds
+// the bytes it was given rather than describing them. There are two kinds and
+// both are unsafe to relay:
+//
+//   - A credential that will not parse. Bifrost wraps sonic's error, and
+//     sonic's SyntaxError.Error renders Src[p:q] — a window of the SOURCE,
+//     which on the Vertex path is the pasted service-account document. A stray
+//     newline inside the PEM (the document's largest field, so the likeliest
+//     place for an offset to land) would put private-key bytes on a log line.
+//   - A response body Bifrost could not read. Its HTML and unmarshal branches
+//     construct the cause as errors.New(string(responseBody)), so the cause IS
+//     the body — and a captive portal, WAF or CDN interstitial commonly
+//     reflects the request that produced it.
+//
+// This is the policy upstreamReason already applies to forwarded bodies, in
+// the same file: describe, never quote. Scrubbing the text instead would be
+// unsafe by construction — a scrubber that is wrong once is worse than none.
+var bfCauseQuotesItsInput = []string{
+	"failed to parse auth credentials JSON",
+	bfResponseHTMLMessage,
+	bfResponseUnmarshalMessage,
+	bfResponseDecodeMessage,
+	bfResponseDecompressMessage,
+}
+
+// bfDescribeUnquotableCause replaces such a cause with its category and size,
+// which is everything an operator can safely learn from it: which failure it
+// was, and that a payload came back. The size is the one detail that
+// distinguishes an empty body from a truncated one.
+func bfDescribeUnquotableCause(category string, cause error) (string, bool) {
+	text := cause.Error()
+	loweredCategory := strings.ToLower(category)
+	loweredText := strings.ToLower(text)
+	for _, marker := range bfCauseQuotesItsInput {
+		lowered := strings.ToLower(marker)
+		if strings.Contains(loweredCategory, lowered) || strings.Contains(loweredText, lowered) {
+			return fmt.Sprintf("%s (%d bytes, not quoted)", marker, len(text)), true
+		}
+	}
+	return "", false
 }
 
 func bfStatus(e *bfschemas.BifrostError) int {

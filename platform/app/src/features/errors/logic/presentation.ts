@@ -279,9 +279,9 @@ const label = (
  * The provider's display name, read from `meta.provider`.
  *
  * The gateway sends the dispatch engine's own name ("vertex", "azure"), which
- * is not what a customer calls it. Anything unmapped falls through as-is
- * rather than being dropped: a lower-cased provider name in the sentence is
- * still better than a sentence that names no provider at all.
+ * is not what a customer calls it. Entries are bare noun phrases with no
+ * leading article, so a caller can put one in front without having to know
+ * which entries already carry one.
  */
 const PROVIDER_LABELS: Record<string, string> = {
   vertex: "Google Vertex AI",
@@ -291,13 +291,28 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   gemini: "Google Gemini",
-  vllm: "the custom OpenAI-compatible provider",
+  vllm: "custom OpenAI-compatible provider",
 };
 
+/**
+ * An unmapped provider yields "", and every caller has a branch for that which
+ * names no provider at all. Falling through to the raw value instead would put
+ * an internal identifier in front of a customer: the gateway mints synthetic
+ * provider keys of the form `anthropic-url-<16 hex>` and `gemini-url-<16 hex>`
+ * for credentials carrying a base URL (adapters/providers/bifrost.go), so a
+ * self-hosted Anthropic failure would read "Anthropic-url-3f9a2b8c1d0e4f57
+ * received the credentials and refused them".
+ *
+ * Read through `label`, not by indexing: `meta.provider` is untrusted wire
+ * data, and a bare index answers `"constructor"` with a function and
+ * `"__proto__"` with an object — the second of which makes `capitalise` throw
+ * while rendering an error, replacing the failure the customer came to read
+ * with a blank region.
+ */
 const providerLabel = (error: HandledErrorShape): string => {
   const provider = str(error, "provider", "");
   if (!provider) return "";
-  return PROVIDER_LABELS[provider.toLowerCase()] ?? provider;
+  return label(PROVIDER_LABELS, provider.toLowerCase()) ?? "";
 };
 
 /** Sentence-cases a label that may already be a proper noun. */
@@ -2683,7 +2698,11 @@ const presentations = {
   // model from `meta`, because "check your credentials" is unactionable to
   // anyone whose key holds more than one provider.
   provider_credential_invalid: {
-    title: "The model provider's credentials were not accepted",
+    // "Can't be used" rather than "not accepted": nothing reached the provider,
+    // so nobody accepted or refused anything. The sibling code below is the one
+    // the provider actually judged, and the two titles have to say which is
+    // which or the split buys nothing.
+    title: "Those provider credentials can't be used",
     describe: (error) => {
       const provider = providerLabel(error);
       return provider
@@ -2706,10 +2725,10 @@ const presentations = {
       const model = str(error, "model", "");
       const provider = providerLabel(error);
       if (model && provider) {
-        return `${capitalise(provider)} is configured on this project, but not for ${model}.`;
+        return `${capitalise(provider)} is configured on this project, but not for ${model}. Add it to that provider in Settings → Model Providers.`;
       }
       if (model) {
-        return `No provider on this project is configured for ${model}.`;
+        return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
       }
       return "Add the model to this provider in Settings → Model Providers, or send the request to a provider that serves it.";
     },
@@ -2719,7 +2738,7 @@ const presentations = {
     // CHECK finding nothing answering. This one is a real request that never
     // left, so the copy must not say anything about a key being unchecked.
     title: "The model provider could not be reached",
-    describe: () => "Nothing answered. Try again in a moment.",
+    describe: () => "Try again in a moment.",
   },
   request_abandoned: {
     title: "The request was cancelled before the provider answered",

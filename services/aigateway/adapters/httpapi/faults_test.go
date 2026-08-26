@@ -431,15 +431,25 @@ func TestWriteErrorLogsCarryBundleIdentity(t *testing.T) {
 //
 // @scenario "A gateway-classified error is logged by its error code"
 func TestWrittenErrorsCarryTheirFaultOnTheWire(t *testing.T) {
+	// The status is the whole point of the change — "a 5xx here made agent
+	// clients retry a dead credential ten times" — and it was pinned by nothing:
+	// setting provider_credential_invalid to 500 left the entire package green.
+	// A terminal 4xx for the setup failures is what stops the retry loop, so it
+	// is asserted here beside the fault rather than left to the registration.
 	cases := []struct {
-		code  herr.Code
-		fault string
+		code       herr.Code
+		fault      string
+		wantStatus int
 	}{
-		{domain.ErrProviderCredentialInvalid, "customer"},
-		{domain.ErrProviderConfigInvalid, "customer"},
-		{domain.ErrProviderTimeout, "provider"},
-		{domain.ErrProviderConnectionFailed, "provider"},
-		{domain.ErrInternal, "platform"},
+		{domain.ErrProviderCredentialInvalid, "customer", http.StatusBadRequest},
+		{domain.ErrProviderConfigInvalid, "customer", http.StatusBadRequest},
+		{domain.ErrProviderCredentialRejected, "customer", http.StatusUnauthorized},
+		{domain.ErrProviderTimeout, "provider", http.StatusGatewayTimeout},
+		{domain.ErrProviderConnectionFailed, "provider", http.StatusBadGateway},
+		// 499: the caller hung up. Not 504, which would blame a provider that
+		// was answering fine.
+		{domain.ErrRequestAbandoned, "customer", 499},
+		{domain.ErrInternal, "platform", http.StatusInternalServerError},
 	}
 	for _, tc := range cases {
 		t.Run(tc.code.String(), func(t *testing.T) {
@@ -458,6 +468,8 @@ func TestWrittenErrorsCarryTheirFaultOnTheWire(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 			assert.Equal(t, tc.code.String(), body.Error.Code)
 			assert.Equal(t, tc.fault, body.Error.Fault)
+			assert.Equalf(t, tc.wantStatus, w.Code,
+				"%s reaches the client as this status; a retryable 5xx on a terminal failure is the retry loop this change exists to stop", tc.code)
 		})
 	}
 }

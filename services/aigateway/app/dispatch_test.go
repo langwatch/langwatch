@@ -742,9 +742,47 @@ func TestClassifyProviderError_ProviderSetupFailuresDoNotRetry(t *testing.T) {
 		domain.ErrProviderCredentialRejected,
 		domain.ErrProviderConfigInvalid,
 	} {
-		assert.Equalf(t, retry.ReasonNonRetryable, classifyProviderError(herr.New(ctx, code, nil)),
+		reason := classifyProviderError(herr.New(ctx, code, nil))
+
+		assert.Equalf(t, retry.ReasonNotDialed, reason,
 			"%s repeats identically on every credential", code)
+		// Asserting the enum alone proves nothing here: classifyProviderError's
+		// default arm already answers NonRetryable, so this test passed with the
+		// case arms deleted. What the code arms have to earn is the BREAKER
+		// consequence — NonRetryable credits a success (pkg/retry recordBreaker's
+		// default), which force-closes an open circuit on a provider that never
+		// answered. ReasonNotDialed records nothing; pkg/retry's own test pins
+		// that, and this pins that these codes reach it.
+		assert.NotEqualf(t, retry.ReasonNonRetryable, reason,
+			"%s never reached the upstream, so it must not credit the slot as alive", code)
 	}
+}
+
+// The caller hanging up must beat Bifrost's no-fallback marker, which its
+// context-done constructor always sets — so an abandoned request carries BOTH
+// signals and the order they are read in decides the outcome. Reading the
+// marker first sent every client disconnect to ReasonNonRetryable, which
+// credits a breaker success and wipes the slot's failure window: clients giving
+// up during a provider outage held the breaker closed on the dead slot.
+func TestClassifyProviderError_AbandonmentOutranksTheNoFallbackMarker(t *testing.T) {
+	abandoned := domain.WithNoFallback(
+		herr.New(context.Background(), domain.ErrRequestAbandoned, nil))
+
+	assert.Equal(t, retry.ReasonContextDone, classifyProviderError(abandoned),
+		"production always wraps this error; ReasonContextDone is the only reason that records nothing")
+}
+
+// The marker has to be read before the UpstreamError branch, because
+// AllowFallbacks is set on ANSWERED responses too and errors.As matches through
+// the marker's Unwrap — so reading it afterwards left it inert for exactly the
+// errors that carry it. A retryable status is the case that proves the order.
+func TestClassifyProviderError_NoFallbackMarkerOutranksARetryableStatus(t *testing.T) {
+	rateLimited := &domain.UpstreamError{StatusCode: 429, Message: "slow down"}
+	require.Equal(t, retry.ReasonRateLimit, classifyProviderError(rateLimited))
+
+	assert.Equal(t, retry.ReasonNonRetryable,
+		classifyProviderError(domain.WithNoFallback(rateLimited)),
+		"the engine said no other credential will do better; the chain must stop")
 }
 
 // A host that never answered says the slot is unhealthy, so unlike the setup

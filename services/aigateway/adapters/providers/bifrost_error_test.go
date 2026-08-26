@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -185,7 +186,7 @@ func TestClassifyBifrostError_RequestBuildFailuresArePlatformFaults(t *testing.T
 // different fixes behind one string.
 // @scenario "The engine's wrapped cause survives classification"
 func TestClassifyBifrostError_CarriesTheWrappedCause(t *testing.T) {
-	cause := errors.New("failed to parse auth credentials JSON: Syntax error at index 0")
+	cause := errors.New("invalid google auth credentials: missing 'type'")
 	berr := &bfschemas.BifrostError{
 		IsBifrostError: true,
 		Error: &bfschemas.ErrorField{
@@ -203,8 +204,66 @@ func TestClassifyBifrostError_CarriesTheWrappedCause(t *testing.T) {
 	require.ErrorIs(t, e.Reasons[0], cause)
 	assert.Contains(t, e.Reasons[0].Error(), "error creating auth token source",
 		"the category and its cause read as one sentence")
-	assert.Contains(t, e.Reasons[0].Error(), "Syntax error at index 0",
-		"the detail that tells this apart from the other four token-source failures")
+	assert.Contains(t, e.Reasons[0].Error(), "missing 'type'",
+		"the detail that tells this apart from the other five token-source failures")
+}
+
+// The one cause that must NOT be relayed. Bifrost wraps sonic's error here, and
+// sonic's SyntaxError renders a window of the SOURCE it was parsing — which on
+// this path is the pasted service-account document. A stray newline inside the
+// PEM puts private-key bytes wherever the cause is written, and handledCause
+// writes it to a log line.
+func TestClassifyBifrostError_NeverQuotesACauseThatEmbedsItsInput(t *testing.T) {
+	privateKeyFragment := "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQ"
+	berr := &bfschemas.BifrostError{
+		IsBifrostError: true,
+		Error: &bfschemas.ErrorField{
+			Message: "error creating auth token source",
+			Error: fmt.Errorf(
+				"failed to parse auth credentials JSON: %q",
+				`Syntax error at index 412: invalid char..."private_key": "-----BEGIN PRIVATE KEY-----\n`+
+					privateKeyFragment+`"...`),
+		},
+		ExtraFields: bfschemas.BifrostErrorExtraFields{Provider: bfschemas.Vertex},
+	}
+
+	var e herr.E
+	require.ErrorAs(t, classifyBifrostError(context.Background(), berr), &e)
+	require.Len(t, e.Reasons, 1)
+	reason := e.Reasons[0].Error()
+
+	assert.NotContains(t, reason, privateKeyFragment,
+		"credential material must not reach the reason, which is logged verbatim")
+	assert.NotContains(t, reason, "BEGIN PRIVATE KEY")
+	assert.Contains(t, reason, "failed to parse auth credentials JSON",
+		"the operator still learns which failure it was")
+	assert.Contains(t, reason, "bytes, not quoted",
+		"and that a payload was withheld rather than absent")
+}
+
+// A provider body Bifrost could not read is the other unquotable cause: its
+// HTML and unmarshal branches build the cause as errors.New(string(body)), and
+// an edge page commonly reflects the request that produced it. upstreamReason,
+// in the same package, already refuses to quote these when they arrive as a
+// forwarded body; the cause must not be a second door into the same policy.
+func TestClassifyBifrostError_NeverQuotesAnUnreadableProviderBody(t *testing.T) {
+	reflected := `<html><body>Blocked: prompt=my patient's diagnosis is ...</body></html>`
+	berr := &bfschemas.BifrostError{
+		IsBifrostError: true,
+		Error: &bfschemas.ErrorField{
+			Message: bfResponseHTMLMessage,
+			Error:   errors.New(reflected),
+		},
+	}
+
+	var e herr.E
+	require.ErrorAs(t, classifyBifrostError(context.Background(), berr), &e)
+	require.Len(t, e.Reasons, 1)
+	reason := e.Reasons[0].Error()
+
+	assert.NotContains(t, reason, "patient")
+	assert.NotContains(t, reason, "<html>")
+	assert.Contains(t, reason, "bytes, not quoted")
 }
 
 // meta is the client contract. Bifrost's internal sentence can name a

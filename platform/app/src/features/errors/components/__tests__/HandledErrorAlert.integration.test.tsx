@@ -43,6 +43,45 @@ function handledError({
   return { message: code, data: { error: { code, httpStatus, ...rest } } };
 }
 
+/**
+ * The canonical envelope the GO gateway writes (pkg/herr WriteHTTP →
+ * ErrorResponse): the whole failure nested under `error`, lower_snake_case
+ * throughout. Distinct from the tRPC helper above, and the distinction is the
+ * point — the gateway's fields are `docs_url` / `trace_id`, and reading them
+ * under the camelCase names is the bug `fromCanonicalEnvelope` was added to
+ * fix. A fixture in the tRPC shape cannot exercise that path at all.
+ */
+function gatewayError({
+  code,
+  message,
+  meta,
+  tips,
+  docsUrl,
+  traceId,
+  fault = "customer",
+}: {
+  code: string;
+  message?: string;
+  meta?: Record<string, unknown>;
+  tips?: string[];
+  docsUrl?: string;
+  traceId?: string;
+  fault?: string;
+}) {
+  return {
+    error: {
+      type: code,
+      code,
+      message: message ?? code,
+      ...(meta ? { meta } : {}),
+      ...(tips ? { tips } : {}),
+      ...(docsUrl ? { docs_url: docsUrl } : {}),
+      ...(traceId ? { trace_id: traceId } : {}),
+      fault,
+    },
+  };
+}
+
 const renderAlert = (props: Parameters<typeof HandledErrorAlert>[0]) =>
   render(
     <ChakraProvider value={defaultSystem}>
@@ -53,10 +92,15 @@ const renderAlert = (props: Parameters<typeof HandledErrorAlert>[0]) =>
 describe("<HandledErrorAlert />", () => {
   /**
    * The gateway's provider-setup failures, rendered from the envelope the Go
-   * service actually writes. The payload below is copied verbatim from
-   * `herr.Body(...)` in
-   * services/aigateway/adapters/providers/bifrost_error_test.go — if the two
-   * drift, this test is asserting a shape nobody sends.
+   * service actually writes: the nested `{error:{...}}` shape with
+   * lower_snake_case fields, so these exercise `fromCanonicalEnvelope` rather
+   * than the tRPC reading.
+   *
+   * The tips are the four in
+   * `services/aigateway/domain/remediation.go#providerCredentialTips["vertex"]`,
+   * which is what the server sends and what `TestRemediate_Vertex…` pins on the
+   * Go side. Four, not more: `capTips` caps the server at the client's
+   * MAX_TIPS, so a fifth would be written only to be discarded.
    *
    * These failures used to reach customers as `provider_timeout`: "The model
    * provider timed out. Try again in a moment." for a pasted credential that
@@ -66,23 +110,23 @@ describe("<HandledErrorAlert />", () => {
   describe("given a gateway provider-setup failure", () => {
     const vertexCredentialEnvelope = {
       code: "provider_credential_invalid",
-      httpStatus: 400,
+      message:
+        "The credentials configured for this model provider were not accepted. Check the provider's credentials in your model provider settings.",
       fault: "customer",
       docsUrl: "https://docs.langwatch.ai/ai-gateway/providers/vertex",
       traceId: "827cbb32e654bf7700000000827cbb32",
       meta: { provider: "vertex", model: "gemini-2.5-flash" },
       tips: [
-        "Paste the CONTENTS of the service account JSON file, not a path to it — the field is named after Google's GOOGLE_APPLICATION_CREDENTIALS variable, which is a path everywhere else",
-        'Check the JSON has a top-level "type" field; an OAuth client file ({"web": ...} or {"installed": ...}) is valid JSON but is not a service account',
-        "Give the service account the Vertex AI User role (roles/aiplatform.user) on the project you named",
-        "Leave the JSON empty only if this gateway runs with Application Default Credentials available (workload identity on GKE or Cloud Run)",
-        "This fails the same way on every retry, so the request will not succeed until the credential is corrected",
+        "Vertex AI authenticates with a Google Cloud service-account JSON document, not an API key — paste the whole file contents into the provider's credentials field",
+        'The document must be valid JSON with a top-level "type" of "service_account"; a file PATH, or the OAuth client JSON that has no "type", is rejected here',
+        "The service account needs the Vertex AI User role on the project named by Vertex Project ID",
+        'Vertex Location may be a region such as us-central1, or "global" — both are valid, and neither one causes this error',
       ],
     };
 
     /** @scenario "A provider-setup failure tells the customer how to fix it" */
     it("names the provider from meta instead of saying 'this provider'", () => {
-      renderAlert({ error: handledError(vertexCredentialEnvelope) });
+      renderAlert({ error: gatewayError(vertexCredentialEnvelope) });
 
       expect(
         screen.getByText(/Google Vertex AI credentials saved for this project/),
@@ -99,16 +143,36 @@ describe("<HandledErrorAlert />", () => {
      * @scenario "A provider-setup failure tells the customer how to fix it"
      */
     it("renders the remediation tips the gateway sent, up to the client's cap", () => {
-      renderAlert({ error: handledError(vertexCredentialEnvelope) });
+      renderAlert({ error: gatewayError(vertexCredentialEnvelope) });
 
-      for (const tip of vertexCredentialEnvelope.tips.slice(0, 4)) {
+      for (const tip of vertexCredentialEnvelope.tips) {
         expect(screen.getByText(tip)).toBeInTheDocument();
       }
     });
 
+    /**
+     * The cap only constrains anything if the far side is asserted too:
+     * asserting the first four are present passes just as well with the cap
+     * raised to eight.
+     *
+     * @scenario "A provider-setup failure tells the customer how to fix it"
+     */
+    it("drops a tip past the client's cap rather than rendering a document", () => {
+      const overLong = [
+        ...vertexCredentialEnvelope.tips,
+        "a fifth tip nobody should read",
+      ];
+      renderAlert({
+        error: gatewayError({ ...vertexCredentialEnvelope, tips: overLong }),
+      });
+
+      expect(screen.getByText(overLong[0]!)).toBeInTheDocument();
+      expect(screen.queryByText(overLong[4]!)).not.toBeInTheDocument();
+    });
+
     /** @scenario "A provider-setup failure tells the customer how to fix it" */
     it("links the provider's own docs page, not a generic one", () => {
-      renderAlert({ error: handledError(vertexCredentialEnvelope) });
+      renderAlert({ error: gatewayError(vertexCredentialEnvelope) });
 
       const link = screen.getByRole("link");
       expect(link).toHaveAttribute(
@@ -120,7 +184,7 @@ describe("<HandledErrorAlert />", () => {
     /** @scenario "A provider-setup failure tells the customer how to fix it" */
     it("never tells the customer to retry a credential that cannot work", () => {
       const { container } = renderAlert({
-        error: handledError(vertexCredentialEnvelope),
+        error: gatewayError(vertexCredentialEnvelope),
       });
 
       expect(container.textContent).not.toContain("timed out");
@@ -130,9 +194,8 @@ describe("<HandledErrorAlert />", () => {
     /** @scenario "A provider-setup failure tells the customer how to fix it" */
     it("names the model the provider is not configured for", () => {
       renderAlert({
-        error: handledError({
+        error: gatewayError({
           code: "provider_config_invalid",
-          httpStatus: 400,
           fault: "customer",
           docsUrl: "https://docs.langwatch.ai/ai-gateway/providers/vertex",
           meta: { provider: "vertex", model: "gemini-3.1-pro-preview" },
@@ -144,7 +207,7 @@ describe("<HandledErrorAlert />", () => {
 
       expect(
         screen.getByText(
-          "Google Vertex AI is configured on this project, but not for gemini-3.1-pro-preview.",
+          "Google Vertex AI is configured on this project, but not for gemini-3.1-pro-preview. Add it to that provider in Settings → Model Providers.",
         ),
       ).toBeInTheDocument();
     });
@@ -155,7 +218,7 @@ describe("<HandledErrorAlert />", () => {
      */
     it("shows nothing of the engine's internal cause", () => {
       const { container } = renderAlert({
-        error: handledError(vertexCredentialEnvelope),
+        error: gatewayError(vertexCredentialEnvelope),
       });
 
       expect(container.textContent).not.toContain("auth token source");
