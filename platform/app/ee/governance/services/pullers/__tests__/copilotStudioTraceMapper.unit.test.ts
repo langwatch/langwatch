@@ -305,9 +305,8 @@ describe("given a conversation Microsoft stored across several rows", () => {
    * Batch order is right whenever rows arrive as written. This is what makes
    * it right when they do not: turns are paired by walking the merged list,
    * so one message out of place attaches an answer to the wrong question.
-   *
-   * @scenario "A conversation stored across several rows is still one conversation"
    */
+  /** @scenario "A conversation stored across several rows is still one conversation" */
   it("pairs the answer with the question even when a row stores them out of order", () => {
     const jumbled = transcriptRow({
       activities: [
@@ -448,6 +447,7 @@ describe("given a conversation Microsoft stored across several rows", () => {
    * perfectly well on the run before, and the flag would mean nothing because
    * it fires on the ordinary case.
    */
+  /** @scenario "A later piece arriving on its own is not mistaken for a missing one" */
   it("does not flag a later piece that arrived in its own pull window", () => {
     const spans = spansOf([copilotEvent(second)]);
     expect(spans.length).toBeGreaterThan(0);
@@ -654,7 +654,7 @@ describe("given what the agent was running", () => {
     expect(attrs["copilot_studio.agent_changed_since"]).toBeUndefined();
   });
 
-  /** @scenario "A model read after the fact is recorded but flagged" */
+  /** @scenario "A conversation whose agent was edited afterwards is flagged" */
   it("flags a conversation whose agent was edited afterwards", () => {
     const spans = spansOf([
       copilotEvent(transcriptRow({ activities: CHAT }), {

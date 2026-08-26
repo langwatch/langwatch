@@ -60,9 +60,8 @@ describe("given the ingestion-source catalog", () => {
      * type is displayed, so deleting the entry turns an existing source's
      * name into a blank — and the completeness guard in the catalog would
      * stop the build first.
-     *
-     * @scenario "Sources already configured on the old type still display"
      */
+    /** @scenario "Sources already configured on the old type still display" */
     it("still resolves a label for sources already configured on it", () => {
       expect(SOURCE_TYPE_LABEL.copilot_studio).toBeTruthy();
       expect(
