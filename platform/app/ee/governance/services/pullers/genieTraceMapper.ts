@@ -44,8 +44,8 @@ import {
   deriveConversationIdentity,
   hashId,
   intAttr,
-  type KnownAgentIdentity,
   KNOWN_AGENT_IDENTITIES,
+  type KnownAgentIdentity,
   msToNano,
   type OtlpJsonAttr,
   type OtlpJsonSpan,
@@ -58,8 +58,8 @@ import type { NormalizedPullEvent } from "./pullerAdapter";
 
 export {
   type ConversationRoutingProfile,
-  type KnownAgentIdentity,
   KNOWN_AGENT_IDENTITIES,
+  type KnownAgentIdentity,
 };
 
 /** Root span (the turn itself, `llm`-typed so the estimator runs). */

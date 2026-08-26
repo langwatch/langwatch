@@ -359,7 +359,7 @@ export function groupTranscriptRows(
     dated.sort((a, b) => (a.ms === b.ms ? a.index - b.index : a.ms - b.ms));
     let nextDated = 0;
     const timeOrdered = sortable.map((item) =>
-      item.ms === null ? item.activity : dated[nextDated++]!.activity
+      item.ms === null ? item.activity : dated[nextDated++]!.activity,
     );
     groups.push({
       key,

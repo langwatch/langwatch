@@ -37,7 +37,9 @@ describe("given the ingestion-source catalog", () => {
      */
     it("keeps every offerable option visible so the locked ones can say why", () => {
       const options = gatedSourceTypeOptions({ isEnterprise: false });
-      expect(options.map((o) => o.value)).toEqual(offerable.map((o) => o.value));
+      expect(options.map((o) => o.value)).toEqual(
+        offerable.map((o) => o.value),
+      );
     });
   });
 

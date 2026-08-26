@@ -220,7 +220,10 @@ describe("given a config whose adapter is known only to the caller", () => {
     // not talk the check out of the stored adapter's rule.
     expect(() =>
       assertPullDestinationAllowed(
-        { adapter: "http_polling", environmentUrl: "https://attacker.example.com" },
+        {
+          adapter: "http_polling",
+          environmentUrl: "https://attacker.example.com",
+        },
         COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
       ),
     ).toThrow(/Power Platform environment address/);

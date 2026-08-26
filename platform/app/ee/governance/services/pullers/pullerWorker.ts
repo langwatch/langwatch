@@ -23,6 +23,7 @@
  */
 import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import { createLogger } from "@langwatch/observability";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
@@ -40,7 +41,6 @@ import {
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
-import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,

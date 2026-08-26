@@ -18,11 +18,11 @@
  * Spec: specs/governance/edit-pull-source-config.feature
  */
 
+import { SOURCE_TYPE_OPTIONS } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import {
   PARSER_FIELDS,
   SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER,
 } from "@ee/governance/dashboard/pages/inventory";
-import { SOURCE_TYPE_OPTIONS } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import { describe, expect, it } from "vitest";
 
 /**

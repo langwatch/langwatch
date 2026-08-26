@@ -235,7 +235,9 @@ function resolvePullConfig(
   };
 
   const builder = (
-    builders as Partial<Record<SourceType, (typeof builders)[keyof typeof builders]>>
+    builders as Partial<
+      Record<SourceType, (typeof builders)[keyof typeof builders]>
+    >
   )[composer.sourceType];
   if (builder) {
     const [build, title, description] = builder;

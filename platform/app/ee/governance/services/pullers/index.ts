@@ -47,12 +47,12 @@ export {
   type CopilotStudioDataverseConfig,
   copilotStudioDataversePullConfigSchema,
 } from "./copilotStudioDataverse.puller";
-export { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverseEnvironment";
 export {
   DATABRICKS_GENIE_ADAPTER_ID,
   type DatabricksGeniePullConfig,
   databricksGeniePullConfigSchema,
 } from "./databricksGenie.puller";
+export { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverseEnvironment";
 export type { HttpPollingConfig } from "./httpPollingPullerAdapter";
 export { OPENAI_COMPLIANCE_PULL_CONFIG } from "./openaiCompliance.puller";
 export type {

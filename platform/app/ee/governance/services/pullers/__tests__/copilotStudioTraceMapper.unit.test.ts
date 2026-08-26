@@ -45,7 +45,11 @@ function userMessage(id: string, text: string, ms: number) {
     id,
     type: "message",
     timestampMs: ms,
-    from: { id: "0c6d08e2-882b-1ca1-8a8c-dad72374f3a3", role: 1, aadObjectId: AAD_OBJECT_ID },
+    from: {
+      id: "0c6d08e2-882b-1ca1-8a8c-dad72374f3a3",
+      role: 1,
+      aadObjectId: AAD_OBJECT_ID,
+    },
     text,
   };
 }
@@ -142,9 +146,21 @@ function attrsOf(span: { attributes?: { key: string; value: unknown }[] }) {
 }
 
 const CHAT = [
-  agentMessage("d4628de6-730d-401d-849a-0eb8f66ddbf5", "Hello! How can I help?", 1_787_685_274_483),
-  userMessage("c1955eab-a6c8-42ea-9c72-6ff22994543d", "How do I reset my laptop?", 1_787_685_284_913),
-  agentMessage("a1111111-1111-4111-8111-111111111111", "Hold the power button for ten seconds.", 1_787_685_290_000),
+  agentMessage(
+    "d4628de6-730d-401d-849a-0eb8f66ddbf5",
+    "Hello! How can I help?",
+    1_787_685_274_483,
+  ),
+  userMessage(
+    "c1955eab-a6c8-42ea-9c72-6ff22994543d",
+    "How do I reset my laptop?",
+    1_787_685_284_913,
+  ),
+  agentMessage(
+    "a1111111-1111-4111-8111-111111111111",
+    "Hold the power button for ten seconds.",
+    1_787_685_290_000,
+  ),
 ];
 
 describe("given a Copilot conversation stored in one row", () => {
@@ -251,17 +267,23 @@ describe("given a conversation Microsoft stored across several rows", () => {
   /** @scenario "Chopped pieces are ordered by their number, not their spelling" */
   it("orders piece 2 before piece 10", () => {
     const two = transcriptRow({
-      activities: [userMessage("b2222222-2222-4222-8222-222222222222", "second", 2000)],
+      activities: [
+        userMessage("b2222222-2222-4222-8222-222222222222", "second", 2000),
+      ],
       batchId: 2,
       transcriptId: "row-2",
     });
     const ten = transcriptRow({
-      activities: [userMessage("b1010101-1010-4010-8010-101010101010", "tenth", 3000)],
+      activities: [
+        userMessage("b1010101-1010-4010-8010-101010101010", "tenth", 3000),
+      ],
       batchId: 10,
       transcriptId: "row-10",
     });
     const zero = transcriptRow({
-      activities: [userMessage("b0000000-0000-4000-8000-000000000000", "first", 1000)],
+      activities: [
+        userMessage("b0000000-0000-4000-8000-000000000000", "first", 1000),
+      ],
       batchId: 0,
       transcriptId: "row-0",
     });
@@ -471,7 +493,13 @@ describe("given activities the mapper must not turn into turns", () => {
         transcriptRow({
           activities: [
             ...CHAT,
-            { id: "0", type: "message", timestampMs: 1_787_685_295_000, from: { id: CHANNEL_ID, role: 0 }, text: "orphan" },
+            {
+              id: "0",
+              type: "message",
+              timestampMs: 1_787_685_295_000,
+              from: { id: CHANNEL_ID, role: 0 },
+              text: "orphan",
+            },
           ],
         }),
       ),
@@ -488,7 +516,13 @@ describe("given activities the mapper must not turn into turns", () => {
         transcriptRow({
           activities: [
             ...CHAT,
-            { id: "c3333333-3333-4333-8333-333333333333", type: "message", timestamp: "not a date", from: { id: CHANNEL_ID, role: 0 }, text: "undateable" },
+            {
+              id: "c3333333-3333-4333-8333-333333333333",
+              type: "message",
+              timestamp: "not a date",
+              from: { id: CHANNEL_ID, role: 0 },
+              text: "undateable",
+            },
           ],
         }),
       ),
@@ -509,8 +543,21 @@ describe("given activities the mapper must not turn into turns", () => {
         transcriptRow({
           activities: [
             ...CHAT,
-            { valueType: "SessionInfo", type: "trace", id: "0", timestampMs: 1_787_685_274_483, from: { id: "", role: 0 }, value: { turnCount: 1 } },
-            { id: "e4444444-4444-4444-8444-444444444444", type: "event", name: "turn.complete", timestampMs: 1_787_685_291_000, from: { id: CHANNEL_ID, role: 0 } },
+            {
+              valueType: "SessionInfo",
+              type: "trace",
+              id: "0",
+              timestampMs: 1_787_685_274_483,
+              from: { id: "", role: 0 },
+              value: { turnCount: 1 },
+            },
+            {
+              id: "e4444444-4444-4444-8444-444444444444",
+              type: "event",
+              name: "turn.complete",
+              timestampMs: 1_787_685_291_000,
+              from: { id: CHANNEL_ID, role: 0 },
+            },
           ],
         }),
       ),
@@ -529,9 +576,24 @@ describe("given a tool call the agent ran", () => {
         transcriptRow({
           activities: [
             ...CHAT,
-            toolCall("f5555555-5555-4555-8555-555555555555", 1_787_685_286_000, "Started", "call-a"),
-            toolCall("f6666666-6666-4666-8666-666666666666", 1_787_685_287_000, "Started", "call-b"),
-            toolCall("f7777777-7777-4777-8777-777777777777", 1_787_685_288_000, "Completed", "call-a"),
+            toolCall(
+              "f5555555-5555-4555-8555-555555555555",
+              1_787_685_286_000,
+              "Started",
+              "call-a",
+            ),
+            toolCall(
+              "f6666666-6666-4666-8666-666666666666",
+              1_787_685_287_000,
+              "Started",
+              "call-b",
+            ),
+            toolCall(
+              "f7777777-7777-4777-8777-777777777777",
+              1_787_685_288_000,
+              "Completed",
+              "call-a",
+            ),
           ],
         }),
       ),
@@ -556,7 +618,11 @@ describe("given a tool call the agent ran", () => {
         transcriptRow({
           activities: [
             ...CHAT,
-            toolCall("f5555555-5555-4555-8555-555555555555", 1_787_685_286_000, "Started"),
+            toolCall(
+              "f5555555-5555-4555-8555-555555555555",
+              1_787_685_286_000,
+              "Started",
+            ),
           ],
         }),
       ),
@@ -620,7 +686,13 @@ describe("given a conversation held while designing the agent", () => {
       copilotEvent(
         transcriptRow({
           activities: [
-            { valueType: "ConversationInfo", type: "trace", timestampMs: 1_787_685_274_483, from: { id: "", role: 0 }, value: { isDesignMode: true, locale: "en-US" } },
+            {
+              valueType: "ConversationInfo",
+              type: "trace",
+              timestampMs: 1_787_685_274_483,
+              from: { id: "", role: 0 },
+              value: { isDesignMode: true, locale: "en-US" },
+            },
             ...CHAT,
           ],
         }),
@@ -647,7 +719,14 @@ describe("given events that are not Copilot conversations", () => {
       copilotEvent(
         transcriptRow({
           activities: [
-            { valueType: "SessionInfo", type: "trace", id: "0", timestampMs: 1_787_685_274_483, from: { id: "", role: 0 }, value: {} },
+            {
+              valueType: "SessionInfo",
+              type: "trace",
+              id: "0",
+              timestampMs: 1_787_685_274_483,
+              from: { id: "", role: 0 },
+              value: {},
+            },
           ],
         }),
       ),

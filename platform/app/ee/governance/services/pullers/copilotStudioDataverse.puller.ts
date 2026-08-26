@@ -328,7 +328,11 @@ export class CopilotStudioDataversePuller
           break;
         }
 
-        const page = await this.fetchPage({ url, token, signal: options.signal });
+        const page = await this.fetchPage({
+          url,
+          token,
+          signal: options.signal,
+        });
         for (const raw of page.value) {
           if (!raw || typeof raw !== "object") continue;
           const parsed = transcriptRowSchema.safeParse(raw);
@@ -350,7 +354,9 @@ export class CopilotStudioDataversePuller
           events.push({
             source_event_id: row.conversationtranscriptid,
             event_timestamp:
-              row.conversationstarttime ?? row.createdon ?? new Date().toISOString(),
+              row.conversationstarttime ??
+              row.createdon ??
+              new Date().toISOString(),
             // Attribution lives on the turns inside the transcript, where the
             // account identifier actually is. A row has no single author.
             actor: "",
