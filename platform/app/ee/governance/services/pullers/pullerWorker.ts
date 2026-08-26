@@ -350,15 +350,29 @@ async function writePulledEvents({
 // Keys are declared `SourceType` so a misspelled entry fails the build, but the
 // map is held as `ReadonlyMap<string, …>` because the lookup value is the raw
 // database column: narrowing the lookup would only force a cast at the call.
-// Exported for the test that pins the prototype-key hazard: routing nothing is
-// also what a missing action does, so only reading the lookup itself can tell
-// the two apart and fail if this ever stops being a Map.
-export const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
+const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
   string,
   ConversationRoutingProfile
 > = new Map<SourceType, ConversationRoutingProfile>([
   ["databricks_genie", GENIE_ROUTING_PROFILE],
 ]);
+
+/**
+ * The registry's only reader outside this module.
+ *
+ * Routing nothing is also what a missing action does, so a test that only
+ * watches behaviour cannot tell the prototype-key guard from the action one —
+ * it needs to read the lookup. It reads it through here rather than through
+ * the map itself: `ReadonlyMap` is a compile-time promise, so exporting the
+ * map would hand every module a registry one cast away from accepting a
+ * source type nobody wrote a conversation shape for. Which is the thing this
+ * whole path exists to refuse.
+ */
+export function conversationRoutingProfileFor(
+  sourceType: string,
+): ConversationRoutingProfile | undefined {
+  return CONVERSATION_ROUTING_PROFILES.get(sourceType);
+}
 
 /**
  * ADR-088 v7 (Decisions 8–14): conversation-bearing pulled events additionally

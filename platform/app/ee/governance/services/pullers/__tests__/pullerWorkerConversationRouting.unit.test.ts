@@ -36,7 +36,7 @@ vi.mock("~/server/featureFlag", () => ({
 }));
 
 // The worker module pulls in the whole app graph; import after the mocks.
-const { routeConversationsToTraceDestination, CONVERSATION_ROUTING_PROFILES } =
+const { routeConversationsToTraceDestination, conversationRoutingProfileFor } =
   await import("../pullerWorker");
 
 /** Names every object answers to, which no source is ever stored as. */
@@ -222,7 +222,7 @@ describe("given a source type the worker has no conversation shape for", () => {
     it.each(
       INHERITED_NAMES,
     )("finds no profile at all for the inherited name %s", (sourceType) => {
-      expect(CONVERSATION_ROUTING_PROFILES.get(sourceType)).toBeUndefined();
+      expect(conversationRoutingProfileFor(sourceType)).toBeUndefined();
     });
 
     it.each(
