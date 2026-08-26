@@ -56,7 +56,7 @@ func TestRemediate_VertexCredentialFailureNamesWhatVertexNeeds(t *testing.T) {
 		"a Vertex failure links to the Vertex page, not the provider index")
 }
 
-// Each provider's credential is a different artefact, and generic advice is
+// Each provider's credential is a different artifact, and generic advice is
 // what makes a tip useless.
 // @scenario "A terminal provider failure tells the caller how to fix it"
 func TestRemediate_ProviderSpecificTipsAndDocs(t *testing.T) {

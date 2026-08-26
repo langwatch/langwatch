@@ -25,7 +25,7 @@ import (
 // classifier composes it into `meta`, and Remediate leaves `meta` alone.
 
 // docsBase is the canonical docs origin. The client only renders a docs link
-// whose origin it recognises (readHandledError.safeDocsUrl), so this must be an
+// whose origin it recognizes (readHandledError.safeDocsUrl), so this must be an
 // absolute URL rather than a path.
 const docsBase = "https://docs.langwatch.ai"
 
@@ -53,7 +53,7 @@ var providerDocsPath = map[string]string{
 
 // providerCredentialTips names what a given provider's credential actually is,
 // because "check your credentials" means something different for each of them:
-// a service-account document, an IAM role, an API key. Naming the artefact is
+// a service-account document, an IAM role, an API key. Naming the artifact is
 // the difference between a tip and a shrug.
 var providerCredentialTips = map[string][]string{
 	"vertex": {
