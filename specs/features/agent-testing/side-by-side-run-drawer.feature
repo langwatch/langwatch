@@ -9,10 +9,12 @@ Feature: The wide run detail drawer
     sit side by side when the width allows. When it does not, the results stay
     stacked under the conversation, exactly as they are today.
 
-    The results read as one flat list of the criteria of the test case, in the
-    order the case declares them, each one marked met or unmet. Nothing there
-    repeats the chips at the top of the drawer: no status, no success rate, no
-    criteria count and no duration.
+    The results read as a labelled "Status:" line at the top, followed by the
+    criteria split into a "Passed criteria" section over a "Failed criteria"
+    section. Each section is drawn only when it has rows. Within a section the
+    criteria keep the order the case declares them. Nothing there repeats the
+    chips at the top of the drawer: no success rate, no criteria count and no
+    duration.
 
     The messages carry no section heading of their own, and no line is drawn
     between them and the results. The results column is narrow, so the drawer
@@ -61,12 +63,26 @@ Feature: The wide run detail drawer
     Then the same conversation, verdicts, duration and cost are shown in both
 
   @integration
-  Scenario: The results read as one flat list of the criteria
+  Scenario: The results split the criteria into passed and failed sections
     Given a finished run whose judge met two criteria and missed one
     When the results are read
-    Then the three criteria read as one list, in the order the case declares them
-    And met and unmet are not split into two sections
-    And a met criterion carries a green check and an unmet one a red cross
+    Then a "Passed criteria" section reads over a "Failed criteria" section
+    And each section keeps the criteria in the order the case declares them
+    And a passed row carries a green check and a failed row a red cross
+
+  @integration
+  Scenario: A pass run hides the Failed criteria section
+    Given a finished run whose judge met every criterion
+    When the results are read
+    Then only the "Passed criteria" section is drawn
+    And no empty "Failed criteria" heading is shown
+
+  @integration
+  Scenario: A fail run hides the Passed criteria section
+    Given a finished run whose judge missed every criterion
+    When the results are read
+    Then only the "Failed criteria" section is drawn
+    And no empty "Passed criteria" heading is shown
 
   @integration
   Scenario: The messages carry no heading and no line beside the results
@@ -76,12 +92,18 @@ Feature: The wide run detail drawer
     And no line is drawn between the messages and the results
 
   @integration
-  Scenario: The results panel is headed Results and repeats no chip
+  Scenario: The results panel is headed with a Status line
     Given a finished run open in the drawer
     When the results panel is read
-    Then it is headed "Results"
-    And it shows no status, no success rate, no criteria count and no duration
+    Then a "Status:" label is followed by "PASSED" in green or "FAILED" in red
+    And it shows no success rate, no criteria count and no duration
     And there is no terminal log box
+
+  @integration
+  Scenario: A failed run reads FAILED in the Status line
+    Given a failed run open in the drawer
+    When the results panel is read
+    Then the status line reads "FAILED" in red
 
   @integration
   Scenario: What the judge said about the run as a whole reads last

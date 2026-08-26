@@ -333,7 +333,7 @@ describe("the wide run detail drawer", () => {
 
     const assertContent = () => {
       expect(screen.getByText("I want my money back")).toBeInTheDocument();
-      expect(screen.getAllByText(/Criteria/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/criteria/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText("6.3s").length).toBeGreaterThan(0);
       expect(screen.getAllByText("$0.004200").length).toBeGreaterThan(0);
     };

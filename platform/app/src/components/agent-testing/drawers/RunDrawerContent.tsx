@@ -32,7 +32,7 @@ import {
   isTerminalStatus,
   ScenarioRunStatus,
 } from "~/server/scenarios/scenario-event.enums";
-import { orderVerdicts, RunVerdictPanel } from "./RunVerdictPanel";
+import { RunVerdictPanel } from "./RunVerdictPanel";
 import {
   hasCriteria,
   type RunDetail,
@@ -182,11 +182,10 @@ function ResultsSection({
         <PendingVerdictLine message={pendingMessage} />
       ) : (
         <RunVerdictPanel
-          verdicts={orderVerdicts({
-            metCriteria: scenarioState.results?.metCriteria ?? [],
-            unmetCriteria: scenarioState.results?.unmetCriteria ?? [],
-            declaredCriteria: detail.scenarioData?.criteria ?? [],
-          })}
+          status={scenarioState.status}
+          metCriteria={scenarioState.results?.metCriteria ?? []}
+          unmetCriteria={scenarioState.results?.unmetCriteria ?? []}
+          declaredCriteria={detail.scenarioData?.criteria ?? []}
           reasoning={scenarioState.results?.reasoning}
           error={scenarioState.results?.error}
         />
