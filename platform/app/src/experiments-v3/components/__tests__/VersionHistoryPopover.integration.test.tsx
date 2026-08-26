@@ -187,6 +187,23 @@ describe("VersionHistoryButton", () => {
       });
     });
 
+    // jsdom has no layout, so where the panel lands cannot be asserted here.
+    // What can be asserted is the cause of the one mispositioning we shipped:
+    // a Tooltip wrapped the trigger, both it and Popover.Trigger cloned their
+    // props onto the same button, the Tooltip's won, and the popover was left
+    // with no anchor registered. floating-ui then computed no position and put
+    // the panel at the window origin, over the sidebar, while the button sat
+    // at the far right. A trigger the popover owns says so in the DOM, and a
+    // trigger another component has taken over does not.
+    /** @scenario "The history is anchored to the button that opens it" */
+    it("gives the popover its own trigger rather than sharing the node", async () => {
+      await openHistory();
+
+      const trigger = historyTrigger();
+      expect(trigger.getAttribute("data-scope")).toBe("popover");
+      expect(trigger.getAttribute("aria-controls")).toBeTruthy();
+    });
+
     /** @scenario "The version history names each version and who saved it" */
     it("renders a row per version naming its author", async () => {
       await openHistory();

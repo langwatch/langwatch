@@ -14,7 +14,6 @@ import { History } from "lucide-react";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Popover } from "~/components/ui/popover";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { VersionList } from "./VersionHistoryList";
@@ -45,26 +44,27 @@ export function VersionHistoryButton({
       onOpenChange={({ open }) => setIsOpen(open)}
       positioning={{ placement: "bottom-end" }}
     >
-      <Tooltip
-        content="Version history"
-        showArrow
-        positioning={{ placement: "bottom" }}
-        openDelay={100}
-      >
-        <Popover.Trigger asChild>
-          <Button
-            size="sm"
-            variant="ghost"
-            color="fg.muted"
-            _hover={{ color: "fg", bg: "bg.subtle" }}
-            disabled={disabled}
-            aria-label="Version history"
-          >
-            <History size={18} />
-            History
-          </Button>
-        </Popover.Trigger>
-      </Tooltip>
+      {/*
+        No Tooltip around this trigger. Both Tooltip and Popover.Trigger clone
+        their props onto the same child, the Tooltip's win, and the popover is
+        left with no anchor registered: floating-ui then computes no position
+        and the panel renders at the window origin instead of under the button.
+        The button says "History" in plain text anyway, so a tooltip repeating
+        it bought nothing. The name a screen reader reads stays on the button.
+      */}
+      <Popover.Trigger asChild>
+        <Button
+          size="sm"
+          variant="ghost"
+          color="fg.muted"
+          _hover={{ color: "fg", bg: "bg.subtle" }}
+          disabled={disabled}
+          aria-label="Version history"
+        >
+          <History size={18} />
+          History
+        </Button>
+      </Popover.Trigger>
       <Popover.Content width="420px" maxWidth="calc(100vw - 32px)">
         <Popover.Arrow />
         <Popover.Body

@@ -388,6 +388,18 @@ Feature: Versioned workbench saves
       Then the history opens anchored to that button
       And clicking the button again closes it
 
+    # Anchoring is not decoration: the first version of this shipped with a
+    # tooltip wrapped around the trigger, both claimed the same button, and the
+    # history opened at the top-left corner of the window while the button sat
+    # at the far right. It looked wired up, because the button still carried the
+    # popover's own class and placement.
+    @integration
+    Scenario: The history is anchored to the button that opens it
+      Given an experiment with saved versions
+      When the reader opens the history
+      Then the button that opened it is the history's own trigger
+      And no other component has taken that button over
+
     @integration
     Scenario: The history closes once a restore lands
       Given the version history is open
