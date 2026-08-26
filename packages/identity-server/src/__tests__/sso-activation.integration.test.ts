@@ -213,7 +213,6 @@ beforeEach(async () => {
   const registered = await selfServe.registerConnection({
     organizationId: ORG,
     providerId: "okta",
-    arrivalPolicy: "refuse",
     idp: OIDC_REGISTRATION,
     actor: ANA,
   });

@@ -240,7 +240,6 @@ async function issuedRecord(): Promise<SelfServeIssuedDnsRecord> {
   const { connectionId } = await selfServe.registerConnection({
     organizationId: ORG,
     providerId: "okta",
-    arrivalPolicy: "refuse",
     idp: {
       protocol: "oidc",
       issuer: "https://login.acme.okta.com",
@@ -461,7 +460,7 @@ describe("proving a domain by publishing a record", () => {
             certRefs: [],
           },
           arrivalPolicy: "refuse",
-          arrivalPolicy: null,
+          arrivalPolicyDecidedAtMs: null,
           source: "self-serve",
           testLoginAccountId: "acc_first",
           rejection: null,

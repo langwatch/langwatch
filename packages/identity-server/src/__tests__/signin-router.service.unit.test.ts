@@ -27,7 +27,7 @@ const ACME: RoutableConnection = {
   method: okta,
   state: "ACTIVE",
   configured: true,
-  arrivalPolicy: "admit",
+  allowsJit: true,
 };
 
 const POLICY: SignInMethodPolicy = {

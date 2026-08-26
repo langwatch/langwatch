@@ -33,7 +33,9 @@ function connection(
     method: okta,
     state: "ACTIVE",
     configured: true,
-    arrivalPolicy: "admit",
+    // The field this replaced was `arrivalPolicy`; "admit" is the answer that
+    // let an unmatched subject through, which is `allowsJit: true`.
+    allowsJit: true,
     ...overrides,
   };
 }
