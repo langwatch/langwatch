@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Snapshot:** committed tree at `8b68603fd8`
+**Snapshot:** committed tree at `997ee654af`
 
 **Goal:** delete `platform/app`.
 
@@ -21,7 +21,7 @@ The authoritative committed number is:
 git ls-tree -r --name-only HEAD platform/app | wc -l
 ```
 
-At this snapshot it is **6,401 files**. `platform/app/src` contains 6,070.
+At this snapshot it is **6,398 files**. `platform/app/src` contains 6,067.
 The shared working tree is lower while migration batches are under review, but
 those deletions are not progress until their exact paths are committed.
 
@@ -34,7 +34,7 @@ The large physical roots are:
 
 | Current root                      | Files | Destination                                                                 |
 | --------------------------------- | ----: | --------------------------------------------------------------------------- |
-| `src/server`                      | 2,410 | Feature server packages, `apps/api`, `apps/worker`, infrastructure packages |
+| `src/server`                      | 2,405 | Feature server packages, `apps/api`, `apps/worker`, infrastructure packages |
 | `src/features`                    | 1,259 | Feature web packages and `apps/ui` composition                              |
 | `src/components`                  | 1,032 | Feature web packages, Design System and `apps/ui` composition               |
 | `src/pages`                       |   243 | `apps/ui`; API compatibility pages to `apps/api`                            |
@@ -115,12 +115,12 @@ moved wholesale.
 
 | Committed files | Owner                                                                                                                                                                |
 | --------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|             420 | Feature server packages: Automation, Enterprise Billing, Coding Agent, Evaluation, Experiment, Gateway, GitHub, Langy, Telemetry, Simulation, Suite, Topic and Trace |
+|             417 | Feature server packages: Automation, Enterprise Billing, Coding Agent, Evaluation, Experiment, Gateway, GitHub, Langy, Telemetry, Simulation, Suite, Topic and Trace |
 |              36 | `apps/worker` and Ops composition: concrete adapters, registry, process maintenance, replay presets and infrastructure integration coverage                          |
 |               1 | Delete unused `pipelines/shared/analyticsStoreBase.ts`                                                                                                               |
 |               0 | One-for-one moves into `packages/eventing`; that package already owns the reusable framework                                                                         |
 
-The 131-file Trace pipeline needs an internal split: Trace owns its aggregate,
+The 128-file Trace pipeline needs an internal split: Trace owns its aggregate,
 commands and projections; Evaluation, Experiment, Simulation, project metadata
 and broadcast reactions remain named feature or worker adapters. Directory
 proximity does not transfer their ownership to Trace.
@@ -139,7 +139,7 @@ shuffle. Tests, ADRs, specs and developer documentation move with the owner.
 |  03 | repair      | Gateway vertical                      | Production Virtual Key composition now receives Project and the old app trace-destination decision is down 224 lines. Review found stale test constructors and a second Gateway-owned trace-project query in budget scope reach, so this is not commit-ready. Replace that query through the complete Project service, retarget every test constructor, then continue draining the 170-file named Gateway surface.                                                                                                                                                            |
 |  04 | active      | Workflow and Studio                   | `optimization_studio` is down from 97 to 85 files. Workflow web owns the palette, draggable nodes, previews, running status, autosave, undo/redo, metadata, progress, run-until-here and the reusable properties frame. Move the remaining browser-owned property panels, results, evaluate, optimise, history, dataset and execution-transport surfaces while preserving the DSL and response shapes.                                                                                                                                                                        |
 |  05 | active      | Evaluation execution family           | Evaluation server owns the processing pipeline, deterministic projections, retry-safe execution intent, analytics stores and distinct ClickHouse analytics/rollup adapters. Trace supplies the portable span/event reads and no Elasticsearch ingestion shape was retained. Finish the stored-input read/offload seam and retarget its tests; Simulation's existing process manager remains the only manager for this execution path.                                                                                                                                         |
-|  06 | active      | Telemetry and Trace                   | Telemetry intake and the 131-file Trace pipeline are now separate active cuts. Telemetry must pass strict service/layout repair before landing; Trace is being split by the owning reactions rather than moved wholesale. The live intake routes use the registered event-sourcing pipeline and no Elasticsearch client or shape is being retained. Preserve every response field and keep `trace_analytics`, `trace_summaries` and timeseries rollups distinct.                                                                                                              |
+|  06 | active      | Telemetry and Trace                   | Commit `997ee654af` moves Trace constants, OTLP schemas and normalised span contracts into `trace/contract`, rewires all pipeline consumers and deletes the three app definitions. Telemetry still needs strict service/layout review before landing. Next move the Trace aggregate commands/events and deterministic projections while leaving Evaluation, Automation and worker effects with their owners. No Elasticsearch shape is retained; preserve every response field and keep `trace_analytics`, `trace_summaries` and timeseries rollups distinct.                                                        |
 |  07 | queued      | Langy, Coding Agent and GitHub        | Finish their separate services and move API, UI, webhook and durable pipeline composition. The exact `langy`/`asaplangy` web residue is 216 files before routes and pipelines.                                                                                                                                                                                                                                                                                                                                                                                                |
 |  08 | queued      | Identity and tenancy                  | Finish Auth, User, AuthZ, Role, Organization, Project and API Key across settings/me/member UI, compatibility transports and boot.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |  09 | queued      | Prompt, Dataset and Agent             | Apply the prompt/CopilotKit replacement from PR 7371 first, then drain the resulting three independent feature surfaces. Prompt's old named lower bound is 161 files; Dataset/Stored Object has 88 before scattered adapters.                                                                                                                                                                                                                                                                                                                                                 |
