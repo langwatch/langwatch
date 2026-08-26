@@ -9,11 +9,7 @@
 import { chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronRight, Folder, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-  FG_MUTED,
-  GROUP_HEADER_BG,
-  QUIET_BUTTON_SHADOW,
-} from "./design";
+import { FG_MUTED, GROUP_HEADER_BG, QUIET_BUTTON_SHADOW } from "./design";
 
 export type FolderHeaderRowProps = {
   name: string;
