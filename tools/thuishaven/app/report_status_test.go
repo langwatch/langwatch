@@ -11,7 +11,11 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// captureStdout runs fn with os.Stdout redirected and returns what it printed.
+// captureStdout exists because the status report writes to os.Stdout directly
+// rather than to an injected writer: the report IS the command's output, and
+// adding a writer parameter only so a test can read it would put a hook in
+// production code that no caller uses. Redirecting the file descriptor keeps
+// the assertion on the bytes a person actually sees.
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()

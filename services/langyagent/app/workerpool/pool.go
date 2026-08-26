@@ -136,8 +136,8 @@ type Pool struct {
 	runner             app.Runner
 	// agentsTemplate is the shared /workspace/AGENTS.md read ONCE at New; each
 	// spawn writes these bytes through unchanged and never reads disk for them.
-	// Empty if the file was unreadable at startup, so a spawn then fails with
-	// a clear error rather than crash-looping the whole service at boot.
+	// Always populated: New fails when the file is unreadable, so no Pool
+	// reaches a spawn without the system prompt it has to write.
 	agentsTemplate string
 
 	telemetry *telemetry.Telemetry
