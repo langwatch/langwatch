@@ -62,7 +62,10 @@ export const formatSeriesGroupName = ({
   if (groupKey === undefined) return "";
 
   if (groupBy === GROUP_BY_WITH_VERDICT_LABELS) {
-    const verdict = VERDICT_LABELS[groupKey];
+    // A row with no verdict at all belongs in the same bucket as one the
+    // query labelled `unknown`, otherwise the generic path below rebuilds
+    // exactly the "evaluation passed unknown" string this replaces.
+    const verdict = VERDICT_LABELS[groupKey === "" ? "unknown" : groupKey];
     if (verdict) return verdict;
   }
 

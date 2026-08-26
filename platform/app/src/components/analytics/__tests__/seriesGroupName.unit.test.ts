@@ -146,17 +146,25 @@ describe("formatSeriesGroupName", () => {
 });
 
 describe("formatSingleSeriesName", () => {
-  it("keeps the existing shortenings", () => {
-    expect(formatSingleSeriesName("contains error true")).toBe("Traces true");
-    expect(formatSingleSeriesName("evaluation label helpful")).toBe("helpful");
-    expect(formatSingleSeriesName("thumbs up/down positive")).toBe("positive");
+  describe("given a group name carrying a recognised prefix", () => {
+    it.each([
+      { groupName: "contains error true", expected: "Traces true" },
+      { groupName: "evaluation label helpful", expected: "helpful" },
+      { groupName: "thumbs up/down positive", expected: "positive" },
+    ])("shortens $groupName to $expected", ({ groupName, expected }) => {
+      expect(formatSingleSeriesName(groupName)).toBe(expected);
+    });
   });
 
-  it("uppercases the first letter of everything else", () => {
-    expect(formatSingleSeriesName("user id u-1")).toBe("User id u-1");
+  describe("given an ordinary group name", () => {
+    it("uppercases the first letter and leaves the rest alone", () => {
+      expect(formatSingleSeriesName("user id u-1")).toBe("User id u-1");
+    });
   });
 
-  it("passes an empty group through, so the series keeps its own name", () => {
-    expect(formatSingleSeriesName("")).toBe("");
+  describe("given an empty group name", () => {
+    it("passes it through, so the series keeps its own name", () => {
+      expect(formatSingleSeriesName("")).toBe("");
+    });
   });
 });
