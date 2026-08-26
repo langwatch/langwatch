@@ -176,6 +176,8 @@ jobs:
 
       - name: Check docs prose for banned words
         run: bash docs/scripts/check-docs-prose.sh
+        env:
+          DOCS_PROSE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
 
   check_generated_files:
     needs: changes

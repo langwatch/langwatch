@@ -70,21 +70,23 @@ for file in "${FILES[@]}"; do
   [[ -f "$file" ]] || continue
   rel="${file#"$REPO_ROOT"/}"
 
-  # Strip code fences and founder-decision exemptions before matching.
+  # Blank out code fences and founder-decision exemptions but keep line count
+  # intact so grep -n reports the real source line number.
   cleaned=$(awk '
-    /^```/      { in_code = !in_code; next }
-    in_code     { next }
-    /\{\/\* Founder decision:/ { next }
+    /^```/      { in_code = !in_code; print ""; next }
+    in_code     { print ""; next }
+    /\{\/\* Founder decision:/ { print ""; next }
     { print }
   ' "$file")
 
   while IFS=$'\t' read -r pattern label; do
     [[ -z "$pattern" ]] && continue
-    # Match with line numbers from the cleaned content.
     matches=$(echo "$cleaned" | grep -niE "$pattern" || true)
     if [[ -n "$matches" ]]; then
       while IFS= read -r match; do
-        echo "::error file=$rel::$match  [$label]"
+        lineno="${match%%:*}"
+        text="${match#*:}"
+        echo "::error file=$rel,line=$lineno::$text  [$label]"
         ERRORS=$((ERRORS + 1))
       done <<< "$matches"
     fi
