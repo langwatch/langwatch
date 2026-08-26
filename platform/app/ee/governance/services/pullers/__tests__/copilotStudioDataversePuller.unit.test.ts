@@ -26,7 +26,11 @@ let responseQueue: Array<{ status: number; body: unknown }> = [];
 let warnings: string[] = [];
 let errors: string[] = [];
 
-/** One captured log call, with its structured context readable. */
+/**
+ * Serialise a log call's arguments so a redaction assertion can see all of
+ * them. `String()` on the structured context object yields "[object Object]",
+ * which hides the one argument a secret could travel in.
+ */
 function captured(args: unknown[]): string {
   return args
     .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
