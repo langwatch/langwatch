@@ -1,5 +1,5 @@
 /**
- * The row that opens a folder of test cases inside a table: the folder and
+ * The row that opens a folder of scenarios inside a table: the folder and
  * how many cases it holds.
  *
  * The row carries no result summary: the cases table is authoring only, so
@@ -14,7 +14,7 @@ import { FG_MUTED, GROUP_HEADER_BG, QUIET_BUTTON_SHADOW } from "./design";
 
 export type FolderHeaderRowProps = {
   name: string;
-  /** How many test cases the folder holds. */
+  /** How many scenarios the folder holds. */
   caseCount: number;
   /** The columns of the table, so the row lines up with the rows under it. */
   templateColumns: string;
@@ -44,7 +44,7 @@ export function FolderHeaderRow({
       width="full"
       textAlign="left"
       paddingX={4}
-      paddingY={2}
+      paddingY="10px"
       background={GROUP_HEADER_BG}
       boxShadow={QUIET_BUTTON_SHADOW}
       borderBottomWidth="1px"
@@ -64,7 +64,7 @@ export function FolderHeaderRow({
           fontSize="10.5px"
           color={FG_MUTED}
           aria-label={
-            caseCount === 1 ? "1 test case" : `${caseCount} test cases`
+            caseCount === 1 ? "1 scenario" : `${caseCount} scenarios`
           }
         >
           {caseCount}
