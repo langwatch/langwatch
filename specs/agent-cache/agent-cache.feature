@@ -39,6 +39,11 @@ Feature: The agent cache
   # authors to pick collision-resistant entry names when a project runs
   # several distinct agents concurrently.
   #
+  # A caller that needs one row rather than all of them to do the work takes
+  # the name with a claim, which writes only when the name is free. That is
+  # the answer to rows that start together, and it stays opt-in: the plain
+  # write is still last-write-wins.
+  #
   # ACCEPTED: a legacy sk-lw- project key reaches these routes, as it reaches
   # the rest of the project surface. Such a key already holds full project
   # access, and the cache holds only state an agent wrote, so the passthrough
@@ -132,6 +137,47 @@ Feature: The agent cache
       Given a request that carries the legacy project API key
       When the caller stores an entry and reads it back
       Then the request succeeds
+
+  Rule: A caller can take a name only if the project does not hold it
+
+    # Rows that start together all read an empty cache and all do the work
+    # the entry was meant to save. A claim is how one of them takes the name
+    # first: the write happens only if the name is free, and the answer says
+    # whether this caller is the one that took it. Losing is not a refusal,
+    # so agent code reads a boolean rather than catching an exception.
+
+    @integration
+    Scenario: A claim on a free name is taken
+      Given the project holds no entry named ACME_SESSION
+      When the caller claims ACME_SESSION
+      Then the response says the name was taken
+      And a read answers the claimed value
+
+    @integration
+    Scenario: A claim on a held name leaves the held value alone
+      Given the project holds an entry named ACME_SESSION
+      When the caller claims ACME_SESSION with a different value
+      Then the response says the name was not taken
+      And a read still answers the value that was already there
+
+    @integration
+    Scenario: A name is free again once its lifetime passes
+      Given the caller claims ACME_SESSION with a lifetime of five seconds
+      When the caller claims ACME_SESSION after that lifetime has passed
+      Then the response says the name was taken
+
+    @integration
+    Scenario: Only one of several claims sent at once takes the name
+      Given the project holds no entry named ACME_SESSION
+      When several callers claim ACME_SESSION at the same moment
+      Then exactly one response says the name was taken
+      And a read answers the value that caller sent
+
+    @unit
+    Scenario: The SDK answers a lost claim with false
+      Given the project already holds an entry named ACME_SESSION
+      When the agent claims ACME_SESSION
+      Then the agent is given false, and no exception is raised
 
   Rule: A run reaches the cache with a key minted for that run
 

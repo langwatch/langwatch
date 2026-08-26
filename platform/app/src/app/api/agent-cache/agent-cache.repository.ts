@@ -56,6 +56,28 @@ export class AgentCacheRepository {
     await this.cache.set(this.key({ projectId, name }), encryptedValue, ttlMs);
   }
 
+  /**
+   * Write only when the project holds no live entry under this name.
+   * Answers whether this caller is the one that took it.
+   */
+  async claim({
+    projectId,
+    name,
+    encryptedValue,
+    ttlMs,
+  }: {
+    projectId: string;
+    name: string;
+    encryptedValue: string;
+    ttlMs: number;
+  }): Promise<boolean> {
+    return this.cache.claim(
+      this.key({ projectId, name }),
+      encryptedValue,
+      ttlMs,
+    );
+  }
+
   async delete({
     projectId,
     name,

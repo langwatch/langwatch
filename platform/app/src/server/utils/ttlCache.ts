@@ -77,8 +77,14 @@ export class TtlCache<T> {
   /**
    * Atomically set `key` only if it does not already exist (Redis SET NX EX).
    * Returns `true` if this call claimed the key, `false` if it was already taken.
+   *
+   * `ttlMs` overrides the cache's own lifetime for this entry only, the same
+   * way `set` takes one, so a caller that knows how long its value stays good
+   * says so on the call that writes it.
    */
-  async claim(key: string, value: T): Promise<boolean> {
+  async claim(key: string, value: T, ttlMs?: number): Promise<boolean> {
+    const lifetimeMs = ttlMs ?? this.ttlMs;
+
     const r = this.redis;
     if (r) {
       try {
@@ -86,11 +92,11 @@ export class TtlCache<T> {
           `${this.prefix}${key}`,
           JSON.stringify(value),
           "EX",
-          this.ttlSeconds,
+          Math.ceil(lifetimeMs / 1000),
           "NX",
         );
         if (result === "OK") {
-          this.memory.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+          this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
           return true;
         }
         return false;
@@ -100,7 +106,7 @@ export class TtlCache<T> {
     }
 
     if (this.memoryGet(key) !== undefined) return false;
-    this.memory.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
     return true;
   }
 

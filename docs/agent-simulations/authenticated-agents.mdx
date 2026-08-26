@@ -291,21 +291,58 @@ The agent also treats a `401` as an expired session: it logs in again and retrie
 ### Behavior
 
 - Each run logs in only once. Every later row reads the stored session from the cache.
-- When rows start at the same time, each one can find the cache empty and log in. Both sessions are valid and the last write wins. Keep the login idempotent on the target, or lower the run's parallelism.
+- When rows start at the same time, each one can find the cache empty and log in. Both sessions are valid and the last write wins. Keep the login idempotent on the target, lower the run's parallelism, or take a claim as shown below.
 - Entries belong to the project, not to a single run. A second run reuses the session the first run stored. If two concurrent runs write the same entry name, the last write wins. Use distinct names per agent (for example `BILLING_SESSION` and `SUPPORT_SESSION`) to avoid collisions.
 - If a read fails, the row treats it as a miss and logs in. If a write fails, the row still succeeds; only the next row has to log in again.
 
 Source: [`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
+
+### One login when rows start together
+
+The rows that start at the same moment all read an empty cache, so they all log in. To make one of them do it, take a claim on a second name first. A claim writes only if the project does not hold that name yet, and returns `True` for the row that took it and `False` for the rows that did not.
+
+Replace `get_session()` in the agent above with this:
+
+```python
+import time
+
+LOGIN_CLAIM_NAME = "ACME_LOGIN_CLAIM"  # the name one row takes to log in
+CLAIM_TTL_SECONDS = 60  # a row that stops before it stores frees the name
+
+
+def get_session():
+    stored = langwatch.cache.get(SESSION_ENTRY_NAME)
+    if stored:
+        return stored
+
+    if langwatch.cache.claim(LOGIN_CLAIM_NAME, "taken", ttl_seconds=CLAIM_TTL_SECONDS):
+        return renew_session()
+
+    # Another row took the name and is logging in. Wait for what it stores.
+    for _ in range(CLAIM_TTL_SECONDS):
+        time.sleep(1)
+        stored = langwatch.cache.get(SESSION_ENTRY_NAME)
+        if stored:
+            return stored
+
+    # It did not finish in time, so this row logs in on its own.
+    return renew_session()
+```
+
+The last branch is what keeps the row answering: if the row that took the name stops before it stores a session, every other row logs in, which is the same result as no claim at all.
+
+Use a name for the claim that is not the name of the entry. The claim is taken before the login, and the entry can only be written after it.
 
 ### Cache API
 
 ```python
 langwatch.cache.set("ACME_SESSION", session, ttl_seconds=840)
 langwatch.cache.get("ACME_SESSION", default=None)
+langwatch.cache.claim("ACME_LOGIN_CLAIM", "taken", ttl_seconds=60)
 langwatch.cache.delete("ACME_SESSION")
 ```
 
-`get` returns the default on a miss, so no `try`/`except` is needed for that case. Other errors raise.
+`get` returns the default on a miss, so no `try`/`except` is needed for that case. `claim` returns `True` when it stored the value and `False` when the name was already held, and does not raise for a name it could not take. Other errors raise.
 
 Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry).
 
