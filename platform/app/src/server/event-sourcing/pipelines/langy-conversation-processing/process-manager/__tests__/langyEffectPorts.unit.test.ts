@@ -35,7 +35,12 @@ function makeDeps(value: LangyTurnHandoff | null = handoff()) {
       read: vi.fn().mockResolvedValue(value),
       stash: vi.fn().mockResolvedValue(undefined),
     },
-    worker: { dispatch: vi.fn().mockResolvedValue("accepted") },
+    worker: {
+      probe: vi.fn().mockResolvedValue(false),
+      warm: vi.fn().mockResolvedValue(undefined),
+      dispatch: vi.fn().mockResolvedValue("accepted"),
+      cancel: vi.fn().mockResolvedValue(undefined),
+    },
     mintSessionKey: vi.fn().mockResolvedValue({
       token: "sk-lw-recovered",
       apiKeyId: "key-recovered",

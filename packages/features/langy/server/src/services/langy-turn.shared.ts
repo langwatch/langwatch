@@ -14,6 +14,7 @@ import {
   LangySessionKeyPort,
   LangyTurnContextPort,
   LangyTurnMetricsPort,
+  type LangyWorkerProbeInput,
   LangyWorkerPort,
 } from "../ports/langy-turn-runtime.port";
 import type { LangyTurnAccessStore } from "../streaming/langy-turn-access";
@@ -137,7 +138,7 @@ export function buildWorkerProbeArgs({
   conversationId: string;
   model: string;
   credentials: LangyCredentials;
-}): Parameters<LangyWorkerPort["probe"]>[0] {
+}): LangyWorkerProbeInput {
   return {
     projectId,
     actorUserId,

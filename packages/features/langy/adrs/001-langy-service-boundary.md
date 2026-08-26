@@ -36,13 +36,17 @@ conversations, and retained for 30 days.
 ## Runtime and registration
 
 `PostgresLangyAdapter` builds the private graph. Each process composes one
-service and injects it into transports and workers; requests never construct
-or locate it globally.
+service and injects it into transports and workers. The package-owned HTTP
+worker adapter owns manager probe, warm, dispatch, and cancel calls; requests
+never construct or locate the service globally.
 
 ## Environment and configuration
 
 Configuration and technology adapters enter at process composition. Contract,
-server and web packages do not read app environment modules.
+server and web packages do not read app environment modules. Boot validates
+the manager URL and internal secret as one optional pair and injects semantic
+configuration. A configured process constructs one HTTP adapter with an
+explicit metrics port; an unconfigured process does not admit new turns.
 
 ## Errors
 

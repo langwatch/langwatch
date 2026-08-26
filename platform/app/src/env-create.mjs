@@ -53,6 +53,8 @@ export const rumSampleRatioSchema = z.preprocess(
  */
 export const storedObjectsBackendSchema = z.enum(["s3", "azure"]).optional();
 
+export const langyWorkerAgentUrlSchema = z.string().url().optional();
+
 /**
  * Azure Blob authentication mode (issue #6087). An explicit toggle — never
  * inferred from which credential vars happen to be present, the same
@@ -251,6 +253,7 @@ export function createEnvConfig(source) {
       LANGY_WORKER_GATEWAY_URL: z.string().url().optional(),
       LANGY_MIRROR_PROJECT_ID: z.string().min(1).optional(),
       LANGY_INTERNAL_SECRET: z.string().min(1).optional(),
+      OPENCODE_AGENT_URL: langyWorkerAgentUrlSchema,
       LANGY_PROMPT_PROJECT_ID: z.string().min(1).optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
@@ -588,6 +591,7 @@ export function createEnvConfig(source) {
       LANGY_WORKER_GATEWAY_URL: source.LANGY_WORKER_GATEWAY_URL,
       LANGY_MIRROR_PROJECT_ID: source.LANGY_MIRROR_PROJECT_ID,
       LANGY_INTERNAL_SECRET: source.LANGY_INTERNAL_SECRET,
+      OPENCODE_AGENT_URL: source.OPENCODE_AGENT_URL,
       LANGY_PROMPT_PROJECT_ID: source.LANGY_PROMPT_PROJECT_ID,
       LANGEVALS_ENDPOINT: source.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES: source.LANGEVALS_STAGING_THRESHOLD_BYTES,

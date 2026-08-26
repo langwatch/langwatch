@@ -8,9 +8,22 @@ import {
   azureBlobAuthModeSchema,
   createEnvConfig,
   gatewaySecretsSchema,
+  langyWorkerAgentUrlSchema,
   rumSampleRatioSchema,
   storedObjectsBackendSchema,
 } from "../env-create.mjs";
+
+describe("langyWorkerAgentUrlSchema", () => {
+  it("accepts an absolute manager URL", () => {
+    expect(langyWorkerAgentUrlSchema.parse("https://agent.internal")).toBe(
+      "https://agent.internal",
+    );
+  });
+
+  it("rejects a non-URL manager address", () => {
+    expect(langyWorkerAgentUrlSchema.safeParse("agent.internal").success).toBe(false);
+  });
+});
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server

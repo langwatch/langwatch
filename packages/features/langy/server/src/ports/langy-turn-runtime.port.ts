@@ -7,45 +7,58 @@ export type LangyDispatchOutcome =
   | "rejected"
   | "unavailable";
 
+export type LangyWorkerProbeInput = {
+  projectId: string;
+  actorUserId: string;
+  conversationId: string;
+  model?: string;
+  hasGithubAuth: boolean;
+  githubRepoScopeKey?: string;
+  egressAllowlist?: string[];
+  mirrorTier?: string;
+  harness?: string;
+};
+
+export type LangyWorkerWarmInput = {
+  projectId: string;
+  actorUserId: string;
+  conversationId: string;
+  credentials: unknown;
+  modelOverride?: string;
+};
+
+export type LangyWorkerDispatchInput = {
+  intent: "create" | "revive" | "continue";
+  conversationId: string;
+  turnId: string;
+  projectId: string;
+  userId: string;
+  runToken: string;
+  prompt: string;
+  system: string;
+  historySeed?: string;
+  credentials: unknown;
+  modelOverride?: string;
+  resumeToken?: string;
+};
+
+export type LangyWorkerCancelInput = {
+  conversationId: string;
+  turnId: string;
+  projectId: string;
+};
+
 /** Process-owned adapter for the external Langy worker manager. */
 export abstract class LangyWorkerPort {
-  abstract probe(input: {
-    projectId: string;
-    actorUserId: string;
-    conversationId: string;
-    model?: string;
-    hasGithubAuth: boolean;
-    githubRepoScopeKey?: string;
-    egressAllowlist?: string[];
-    mirrorTier?: string;
-    harness?: string;
-  }): Promise<boolean>;
-  abstract warm(input: {
-    projectId: string;
-    actorUserId: string;
-    conversationId: string;
-    credentials: unknown;
-    modelOverride?: string;
-  }): Promise<void>;
-  abstract dispatch(input: {
-    intent: "create" | "revive" | "continue";
-    conversationId: string;
-    turnId: string;
-    projectId: string;
-    userId: string;
-    runToken: string;
-    prompt: string;
-    system: string;
-    historySeed?: string;
-    credentials: unknown;
-    modelOverride?: string;
-    resumeToken?: string;
-  }): Promise<LangyDispatchOutcome>;
-  abstract cancel(input: {
-    conversationId: string;
-    turnId: string;
-    projectId: string;
-  }): Promise<void>;
+  abstract probe(input: LangyWorkerProbeInput): Promise<boolean>;
+  abstract warm(input: LangyWorkerWarmInput): Promise<void>;
+  abstract dispatch(input: LangyWorkerDispatchInput): Promise<LangyDispatchOutcome>;
+  abstract cancel(input: LangyWorkerCancelInput): Promise<void>;
+}
+
+/** Preserves worker dispatch metrics without coupling the feature to app metrics. */
+export abstract class LangyWorkerMetricsPort {
+  abstract recordDispatch(input: { outcome: LangyDispatchOutcome | "error" }): void;
 }
 
 /** Supplies feature-flag-derived worker-harness selection. */

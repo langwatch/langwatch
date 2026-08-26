@@ -37,7 +37,7 @@ const logger = createLogger("langwatch:langy:internal");
  * our responses, and this surface is reachable from inside the cluster.
  */
 export async function verifyLangyInternalSecret(c: Context, next: Next) {
-  const secret = process.env.LANGY_INTERNAL_SECRET;
+  const secret = appFromContext(c).config.langyWorker?.internalSecret;
   if (!secret) {
     logger.error("LANGY_INTERNAL_SECRET is not configured");
     return c.json({ error: "Not configured" }, 503);

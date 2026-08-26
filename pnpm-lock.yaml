@@ -2296,6 +2296,9 @@ importers:
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
+      langwatch:
+        specifier: workspace:*
+        version: link:../../../../sdks/typescript
       zod:
         specifier: ^4.4.3
         version: 4.4.3

@@ -4,7 +4,7 @@ import { serializeLangyTurnError } from "@langwatch/langy-server";
 import type { LangyEffectPorts } from "@langwatch/langy-server";
 import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
 import { LangyTurnDispatchRetry } from "@langwatch/langy-server/processes/langy-turn-dispatch-retry";
-import { type LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import type { LangyWorkerPort } from "@langwatch/langy-server";
 import type { LangyTurnHandoff, LangyTurnHandoffStore } from "@langwatch/langy-server";
 import type { LangyFailTurnCommandPort } from "@langwatch/langy-server";
 
@@ -29,7 +29,7 @@ const logger = createLogger("langwatch:langy:process-effects");
 
 export interface CreateLangyEffectPortsOptions {
   handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
-  worker: Pick<LangyWorkerPort, "dispatch">;
+  worker: LangyWorkerPort;
   mintSessionKey: (args: {
     userId: string;
     projectId: string;

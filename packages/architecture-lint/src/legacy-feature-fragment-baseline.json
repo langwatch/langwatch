@@ -2633,11 +2633,6 @@
     },
     {
       "feature": "langy",
-      "file": "platform/app/src/server/app-layer/langy/langyWorker.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "langy",
       "file": "platform/app/src/server/app-layer/langy/repositories/langy-analytics-event.clickhouse.repository.ts",
       "kind": "legacy-implementation"
     },

@@ -104,6 +104,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
+    "langwatch": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -73,7 +73,7 @@ import {
   mintLangySessionApiKeyForUser,
   revokeLangySessionApiKey,
 } from "../../app-layer/langy/langyApiKey";
-import type { LangyWorkerPort } from "../../app-layer/langy/langyWorker";
+import type { LangyWorkerPort } from "@langwatch/langy-server";
 import type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 import type { LangyTokenBuffer } from "@langwatch/langy-server";
 import type { LangyTurnHandoffStore } from "@langwatch/langy-server";
@@ -356,7 +356,7 @@ export interface PipelineRegistryDeps {
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
     handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
-    worker: Pick<LangyWorkerPort, "dispatch">;
+    worker: LangyWorkerPort;
     titleGenerator: LangyTitleGenerator;
   };
   topicClustering: {

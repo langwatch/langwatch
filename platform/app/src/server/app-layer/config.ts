@@ -3,6 +3,7 @@ import {
   resolveNlpLambdaRuntimeConfig,
   type NlpLambdaRuntimeConfig,
 } from "~/runtime/api/nlp-lambda.config";
+import type { LangyWorkerHttpConfig } from "@langwatch/langy-server";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -56,6 +57,7 @@ export interface AppConfig {
 
   // Services
   langevalsEndpoint?: string;
+  langyWorker?: LangyWorkerHttpConfig;
   baseHost?: string;
   slackPlanLimitChannel?: string;
   slackSignupsChannel?: string;
@@ -105,6 +107,10 @@ export function createAppConfigFromEnv(overrides?: {
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
     redisDbIndex: env.REDIS_DB_INDEX,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
+    langyWorker: resolveLangyWorkerConfig({
+      agentUrl: env.OPENCODE_AGENT_URL,
+      internalSecret: env.LANGY_INTERNAL_SECRET,
+    }),
     baseHost: env.BASE_HOST,
     slackPlanLimitChannel: env.SLACK_PLAN_LIMIT_CHANNEL,
     slackSignupsChannel: env.SLACK_CHANNEL_SIGNUPS,
@@ -121,5 +127,28 @@ export function createAppConfigFromEnv(overrides?: {
     opsSidebarEmails: env.SHOW_OPS_IN_MAIN_SIDEBAR?.split(",")
       .map((email: string) => email.trim().toLowerCase())
       .filter(Boolean),
+  };
+}
+
+export function resolveLangyWorkerConfig(input: {
+  agentUrl: string | undefined;
+  internalSecret: string | undefined;
+}): LangyWorkerHttpConfig | undefined {
+  const hasAgentUrl = input.agentUrl !== undefined;
+  const hasInternalSecret = input.internalSecret !== undefined;
+
+  if (!hasAgentUrl && !hasInternalSecret) {
+    return void 0;
+  }
+
+  if (!input.agentUrl || !input.internalSecret) {
+    throw new Error(
+      "OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together",
+    );
+  }
+
+  return {
+    agentUrl: input.agentUrl,
+    internalSecret: input.internalSecret,
   };
 }

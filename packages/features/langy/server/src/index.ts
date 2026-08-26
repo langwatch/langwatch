@@ -39,6 +39,24 @@ export {
   verifyFrame,
 } from "./ports/langy-frame-auth.port";
 export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./ports/langy-effect.port";
+export {
+  AGENT_DISPATCH_TIMEOUT_MS,
+  createLangyWorkerPort,
+} from "./adapters/langy-worker-http.adapter";
+export type {
+  LangyDispatchOutcome,
+  LangyWorkerAdapterConfig,
+  LangyWorkerHttpConfig,
+} from "./adapters/langy-worker-http.adapter";
+export { NullLangyWorkerMetricsAdapter } from "./adapters/null-langy-worker-metrics.adapter";
+export { UnavailableLangyWorkerAdapter } from "./adapters/unavailable-langy-worker.adapter";
+export { LangyWorkerMetricsPort, LangyWorkerPort } from "./ports/langy-turn-runtime.port";
+export type {
+  LangyWorkerCancelInput,
+  LangyWorkerDispatchInput,
+  LangyWorkerProbeInput,
+  LangyWorkerWarmInput,
+} from "./ports/langy-turn-runtime.port";
 export { createLangyConversationProcessingPipeline } from "./adapters/eventing.langy-conversation.adapter";
 export type { LangyConversationProcessingPipelineDeps } from "./adapters/eventing.langy-conversation.adapter";
 export type { LangyAnalyticsEventProjectionRecord } from "./adapters/eventing.langy-projections-index.adapter";

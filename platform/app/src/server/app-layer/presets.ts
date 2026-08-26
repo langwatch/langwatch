@@ -99,7 +99,10 @@ import {
   LangyTurnHandoffStore,
   LangyTokenBuffer,
   PostgresLangyAdapter,
+  UnavailableLangyWorkerAdapter,
+  createLangyWorkerPort,
 } from "@langwatch/langy-server";
+import { AppLangyWorkerMetricsPort } from "~/runtime/app/features/langy";
 import { AuthzFeature } from "~/runtime/app/features/authz";
 import { AnalyticsAdapter, LoggingAnalyticsTripwire } from "@langwatch/analytics-server";
 import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
@@ -128,7 +131,6 @@ import {
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
 import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
-import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import {
@@ -1047,12 +1049,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const langyAdapter = PostgresLangyAdapter.create({ database: prisma });
   const langyPersistence = langyAdapter.eventing();
-  const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
-  const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
-  const langyWorker = createLangyWorkerPort({
-    agentUrl: langyAgentUrl ?? "",
-    internalSecret: langyInternalSecret ?? "",
-  });
+  const langyWorkerMetrics = AppLangyWorkerMetricsPort.create();
+  const langyWorker = config.langyWorker
+    ? createLangyWorkerPort({ ...config.langyWorker, metrics: langyWorkerMetrics })
+    : UnavailableLangyWorkerAdapter.create(langyWorkerMetrics);
   const langyHandoffStore = LangyTurnHandoffStore.create({ redis: redis! });
   const langyTokenBuffer = redis ? LangyTokenBuffer.create({ redis }) : null;
   const langyTitleGenerator = createLangyConversationTitleGenerator({
@@ -1699,7 +1699,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
             managedProviders,
           }),
       },
-      worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
+      worker: config.langyWorker ? langyWorker : null,
       tokenBuffer: redis ? langyTokenBuffer : null,
       permits: {
         reserve: reserveLangyGithubPrPermit,

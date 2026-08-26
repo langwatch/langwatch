@@ -1,5 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { type ProcessRole, roleRunsWorkers, roleSatisfiesRunIn } from "../config";
+import {
+  type ProcessRole,
+  resolveLangyWorkerConfig,
+  roleRunsWorkers,
+  roleSatisfiesRunIn,
+} from "../config";
+
+describe("resolveLangyWorkerConfig", () => {
+  it("returns no worker config when both values are absent", () => {
+    expect(
+      resolveLangyWorkerConfig({ agentUrl: void 0, internalSecret: void 0 }),
+    ).toBeUndefined();
+  });
+
+  it("returns complete semantic worker config", () => {
+    expect(
+      resolveLangyWorkerConfig({
+        agentUrl: "https://agent.internal",
+        internalSecret: "secret",
+      }),
+    ).toEqual({
+      agentUrl: "https://agent.internal",
+      internalSecret: "secret",
+    });
+  });
+
+  it.each([
+    { agentUrl: "https://agent.internal", internalSecret: void 0 },
+    { agentUrl: void 0, internalSecret: "secret" },
+  ])("rejects partial worker config", (input) => {
+    expect(() => resolveLangyWorkerConfig(input)).toThrow(
+      "OPENCODE_AGENT_URL and LANGY_INTERNAL_SECRET must be configured together",
+    );
+  });
+});
 
 describe("roleRunsWorkers", () => {
   describe("given a role that hosts the worker stack", () => {
