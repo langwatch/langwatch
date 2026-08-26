@@ -259,6 +259,181 @@ function hasBatchGap(batches: number[]): boolean {
   return sorted[sorted.length - 1]! - sorted[0]! !== sorted.length - 1;
 }
 
+/** One conversation's rows, with the agent facts seen alongside them. */
+interface ConversationBucket {
+  rows: { batchId: number | null; row: TranscriptRow }[];
+  bot: BotFacts;
+}
+
+/** A row together with the position it arrived in, which breaks sort ties. */
+interface IndexedRow {
+  batchId: number | null;
+  row: TranscriptRow;
+  index: number;
+}
+
+/**
+ * Take what this event knows about the agent.
+ *
+ * Bot facts repeat identically across a conversation's rows; the first row
+ * that carries them wins, so a later batch missing the join does not erase
+ * what an earlier one knew. A fact newly carried on the pulled event is read
+ * across into `BotFacts` here.
+ */
+function rememberBotFacts(params: {
+  bot: BotFacts;
+  extra: Record<string, unknown>;
+}): void {
+  const { bot, extra } = params;
+  if (!bot.botName && typeof extra.botName === "string") {
+    bot.botName = extra.botName;
+  }
+  if (!bot.modifiedOn && typeof extra.botModifiedOn === "string") {
+    bot.modifiedOn = extra.botModifiedOn;
+  }
+}
+
+/** Bucket the run's rows by the conversation each belongs to. */
+function bucketRowsByConversation(
+  events: NormalizedPullEvent[],
+): Map<string, ConversationBucket> {
+  const byKey = new Map<string, ConversationBucket>();
+  for (const event of events) {
+    const row = parseRow(event);
+    if (!row) continue;
+    const key = conversationKeyOf(row);
+    if (!key) continue;
+    const existing = byKey.get(key) ?? { rows: [], bot: {} };
+    existing.rows.push({ batchId: batchIdOf(row), row });
+    rememberBotFacts({ bot: existing.bot, extra: event.extra ?? {} });
+    byKey.set(key, existing);
+  }
+  return byKey;
+}
+
+/**
+ * Batch order, then arrival order within a batch, with unbatched rows last.
+ *
+ * Returning 1 for both `(a,b)` and `(b,a)` when neither has a batch is an
+ * inconsistent comparator, and what it decides is not "unspecified order" in
+ * a harmless sense: turns are paired by walking the merged activities, so two
+ * rows that swap put an answer before its question. Hence the arrival index.
+ */
+function byBatchThenArrival(a: IndexedRow, b: IndexedRow): number {
+  if (a.batchId === null && b.batchId === null) return a.index - b.index;
+  if (a.batchId === null) return 1;
+  if (b.batchId === null) return -1;
+  return a.batchId === b.batchId ? a.index - b.index : a.batchId - b.batchId;
+}
+
+/**
+ * True for something that can be read as an activity.
+ *
+ * Each element is checked, not just the array. `content` is a JSON string the
+ * row schema validates as a string and never opens, so this is the only place
+ * anything looks inside it. A `null` element passes `Array.isArray` happily
+ * and then throws on the first property read — and the caller has no
+ * try/catch, so one malformed activity would take down routing for every
+ * conversation in the run, not just its own.
+ */
+function isActivityObject(value: unknown): value is Activity {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Every activity these rows hold, in row order. */
+function activitiesOf(rows: IndexedRow[]): Activity[] {
+  const activities: Activity[] = [];
+  for (const { row } of rows) {
+    const list = asObject(row.content)?.activities;
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      if (isActivityObject(entry)) activities.push(entry);
+    }
+  }
+  return activities;
+}
+
+/**
+ * The activities in time order, with an undateable one left where it lies.
+ *
+ * The dated activities are sorted among themselves and put back into the
+ * slots dated activities already held, so an undateable one keeps its literal
+ * position. Ranking them by comparator instead does not work: a rule that
+ * compares null against a number by position and every other pair by time
+ * contradicts itself — position says A before B, time says the reverse — and
+ * a comparator that contradicts itself is answered with whatever the engine
+ * likes. One undated activity was enough to leave the largest timestamp
+ * sitting first, which is the exact failure this sort exists to prevent.
+ */
+function timeOrderActivities(activities: Activity[]): Activity[] {
+  const sortable = activities.map((activity, index) => ({
+    activity,
+    index,
+    ms: activityMs(activity),
+  }));
+  const dated: { activity: Activity; index: number; ms: number }[] = [];
+  for (const item of sortable) {
+    if (item.ms !== null) {
+      dated.push({ activity: item.activity, index: item.index, ms: item.ms });
+    }
+  }
+  dated.sort((a, b) => (a.ms === b.ms ? a.index - b.index : a.ms - b.ms));
+  let nextDated = 0;
+  return sortable.map((item) =>
+    item.ms === null ? item.activity : dated[nextDated++]!.activity,
+  );
+}
+
+/** True when the conversation happened while someone was building the agent. */
+function isDesignModeConversation(activities: Activity[]): boolean {
+  return activities.some(
+    (a) =>
+      a.valueType === "ConversationInfo" &&
+      asObject(a.value)?.isDesignMode === true,
+  );
+}
+
+/** One bucket's rows merged into the conversation they describe. */
+function conversationGroupOf(params: {
+  key: string;
+  bucket: ConversationBucket;
+}): ConversationGroup {
+  const { key, bucket } = params;
+  const ordered = bucket.rows
+    .map((row, index) => ({ ...row, index }))
+    .sort(byBatchThenArrival);
+  const batches = ordered
+    .map((r) => r.batchId)
+    .filter((b): b is number => b !== null);
+  const activities = activitiesOf(ordered);
+
+  return {
+    key,
+    // Batch order, then time. Batch order alone is right whenever the rows
+    // arrive as written, and this is what makes it right when they do not:
+    // turns are paired by walking this list, so one out-of-order message
+    // attaches an answer to the wrong question.
+    activities: timeOrderActivities(activities),
+    bot: bucket.bot,
+    batches,
+    // A hole in the batch numbers we hold — 0 and 2 with no 1 — is a piece
+    // of the conversation that is genuinely missing. It still routes, a
+    // partial transcript beating none, but it is marked so nobody reads it
+    // as the whole exchange.
+    //
+    // Deliberately not "batch 0 is absent", which was the first rule here
+    // and is wrong for an ordinary reason: batches carry different
+    // `createdon` values, so a pull window can end between them. The run
+    // holding only batch 1 would flag a conversation whose opening arrived
+    // perfectly well on the previous run. The cost of the narrower rule is
+    // that a conversation truncated at the front by the 30-day cleanup
+    // reads as complete; `transcript_batches` still shows how many pieces
+    // this is built from.
+    incomplete: hasBatchGap(batches),
+    designMode: isDesignModeConversation(activities),
+  };
+}
+
 /**
  * Group rows into conversations and merge their activity lists.
  *
@@ -270,122 +445,9 @@ function hasBatchGap(batches: number[]): boolean {
 export function groupTranscriptRows(
   events: NormalizedPullEvent[],
 ): ConversationGroup[] {
-  const byKey = new Map<
-    string,
-    { rows: { batchId: number | null; row: TranscriptRow }[]; bot: BotFacts }
-  >();
-
-  for (const event of events) {
-    const row = parseRow(event);
-    if (!row) continue;
-    const key = conversationKeyOf(row);
-    if (!key) continue;
-    const existing = byKey.get(key) ?? { rows: [], bot: {} };
-    existing.rows.push({ batchId: batchIdOf(row), row });
-    // Bot facts repeat identically across a conversation's rows; the first
-    // row that carries them wins, so a later batch missing the join does not
-    // erase what an earlier one knew.
-    const extra = event.extra ?? {};
-    if (!existing.bot.botName && typeof extra.botName === "string") {
-      existing.bot.botName = extra.botName;
-    }
-    if (!existing.bot.modifiedOn && typeof extra.botModifiedOn === "string") {
-      existing.bot.modifiedOn = extra.botModifiedOn;
-    }
-    byKey.set(key, existing);
-  }
-
   const groups: ConversationGroup[] = [];
-  for (const [key, entry] of byKey) {
-    // Unbatched rows sort last and hold their arrival order among themselves.
-    // Returning 1 for both `(a,b)` and `(b,a)` when neither has a batch is an
-    // inconsistent comparator, and what it decides is not "unspecified order"
-    // in a harmless sense: turns are paired by walking the merged activities,
-    // so two rows that swap put an answer before its question.
-    const withIndex = entry.rows.map((row, index) => ({ ...row, index }));
-    const ordered = withIndex.sort((a, b) => {
-      if (a.batchId === null && b.batchId === null) return a.index - b.index;
-      if (a.batchId === null) return 1;
-      if (b.batchId === null) return -1;
-      return a.batchId === b.batchId
-        ? a.index - b.index
-        : a.batchId - b.batchId;
-    });
-    const batches = ordered
-      .map((r) => r.batchId)
-      .filter((b): b is number => b !== null);
-    const activities: Activity[] = [];
-    for (const { row } of ordered) {
-      const content = asObject(row.content);
-      const list = content?.activities;
-      if (!Array.isArray(list)) continue;
-      // Each element is checked, not just the array. `content` is a JSON
-      // string the row schema validates as a string and never opens, so this
-      // is the only place anything looks inside it. A `null` element passes
-      // `Array.isArray` happily and then throws on the first property read —
-      // and the caller has no try/catch, so one malformed activity would take
-      // down routing for every conversation in the run, not just its own.
-      for (const entry of list) {
-        if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-          activities.push(entry as Activity);
-        }
-      }
-    }
-    // Batch order, then time. Batch order alone is right whenever the rows
-    // arrive as written, and this is what makes it right when they do not:
-    // turns are paired by walking this list, so one out-of-order message
-    // attaches an answer to the wrong question.
-    //
-    // The dated activities are sorted among themselves and put back into the
-    // slots dated activities already held, so an undateable one keeps its
-    // literal position. Ranking them by comparator instead does not work: a
-    // rule that compares null against a number by position and every other
-    // pair by time contradicts itself — position says A before B, time says
-    // the reverse — and a comparator that contradicts itself is answered with
-    // whatever the engine likes. One undated activity was enough to leave the
-    // largest timestamp sitting first, which is the exact failure this sort
-    // exists to prevent.
-    const sortable = activities.map((activity, index) => ({
-      activity,
-      index,
-      ms: activityMs(activity),
-    }));
-    const dated: { activity: Activity; index: number; ms: number }[] = [];
-    for (const item of sortable) {
-      if (item.ms !== null) {
-        dated.push({ activity: item.activity, index: item.index, ms: item.ms });
-      }
-    }
-    dated.sort((a, b) => (a.ms === b.ms ? a.index - b.index : a.ms - b.ms));
-    let nextDated = 0;
-    const timeOrdered = sortable.map((item) =>
-      item.ms === null ? item.activity : dated[nextDated++]!.activity,
-    );
-    groups.push({
-      key,
-      activities: timeOrdered,
-      bot: entry.bot,
-      batches,
-      // A hole in the batch numbers we hold — 0 and 2 with no 1 — is a piece
-      // of the conversation that is genuinely missing. It still routes, a
-      // partial transcript beating none, but it is marked so nobody reads it
-      // as the whole exchange.
-      //
-      // Deliberately not "batch 0 is absent", which was the first rule here
-      // and is wrong for an ordinary reason: batches carry different
-      // `createdon` values, so a pull window can end between them. The run
-      // holding only batch 1 would flag a conversation whose opening arrived
-      // perfectly well on the previous run. The cost of the narrower rule is
-      // that a conversation truncated at the front by the 30-day cleanup
-      // reads as complete; `transcript_batches` still shows how many pieces
-      // this is built from.
-      incomplete: hasBatchGap(batches),
-      designMode: activities.some(
-        (a) =>
-          a.valueType === "ConversationInfo" &&
-          asObject(a.value)?.isDesignMode === true,
-      ),
-    });
+  for (const [key, bucket] of bucketRowsByConversation(events)) {
+    groups.push(conversationGroupOf({ key, bucket }));
   }
   return groups;
 }
@@ -406,13 +468,111 @@ function textOf(activity: Activity): string {
   return typeof activity.text === "string" ? activity.text.trim() : "";
 }
 
+/** A message activity that is identified, dated, and actually said something. */
+interface ReadableMessage {
+  id: string;
+  ms: number;
+  text: string;
+  role: number | null;
+  /** Directory account of the speaker; only user messages carry one. */
+  aadObjectId: string | null;
+}
+
 /**
- * Pair message activities into turns.
+ * A message a turn can be built from, or null.
+ *
+ * Never invented: a message with no GUID and a message that cannot be dated
+ * are both rejected here rather than given a made-up identity or the clock.
+ */
+function readableMessage(activity: Activity): ReadableMessage | null {
+  const id = typeof activity.id === "string" ? activity.id : "";
+  const ms = activityMs(activity);
+  const text = textOf(activity);
+  if (!GUID.test(id) || ms === null || !text) return null;
+
+  const aad = activity.from?.aadObjectId;
+  return {
+    id,
+    ms,
+    text,
+    role: roleOf(activity.from?.role),
+    // `from.id` is deliberately not consulted. It is GUID-shaped and looks
+    // like an account, but it is per-conversation and naming a person by it
+    // would invent one person per conversation.
+    aadObjectId: typeof aad === "string" && aad ? aad : null,
+  };
+}
+
+/** What pairing a conversation's messages into turns has built so far. */
+interface TurnAccumulator {
+  turns: Turn[];
+  open: Turn | null;
+  skipped: number;
+}
+
+function closeTurn(state: TurnAccumulator): void {
+  if (state.open) state.turns.push(state.open);
+  state.open = null;
+}
+
+/**
+ * Fold one message into the turns built so far.
  *
  * A user message opens a turn and the agent messages that follow close it.
- * An agent message with no user message before it is its own turn — the
- * agent greets first, and dropping that would lose the opening line of most
+ * An agent message with no user message before it is its own turn — the agent
+ * greets first, and dropping that would lose the opening line of most
  * conversations.
+ */
+function applyMessage(params: {
+  state: TurnAccumulator;
+  message: ReadableMessage;
+}): void {
+  const { state, message } = params;
+
+  if (message.role === ROLE_USER) {
+    closeTurn(state);
+    state.open = {
+      seedActivityId: message.id,
+      question: message.text,
+      answer: null,
+      authorAadObjectId: message.aadObjectId,
+      startMs: message.ms,
+      endMs: message.ms,
+    };
+    return;
+  }
+
+  if (message.role === ROLE_AGENT) {
+    const open = state.open;
+    if (open) {
+      open.answer = open.answer
+        ? `${open.answer}\n\n${message.text}`
+        : message.text;
+      open.endMs = Math.max(open.endMs, message.ms);
+      return;
+    }
+    state.turns.push({
+      seedActivityId: message.id,
+      question: null,
+      answer: message.text,
+      authorAadObjectId: null,
+      startMs: message.ms,
+      endMs: message.ms,
+    });
+    return;
+  }
+
+  // Said something, cannot be attributed to either side. Counting it is the
+  // whole point: the alternative is a conversation whose every message has
+  // an unreadable role producing no turns at all, which reaches
+  // `assembleTraceRequest` as an empty span list and disappears with no
+  // log, no attribute and no error — indistinguishable from a pull that
+  // found nothing.
+  state.skipped += 1;
+}
+
+/**
+ * Pair message activities into turns.
  *
  * Skipped and counted, never invented: a message with no GUID, and a message
  * that cannot be dated.
@@ -421,70 +581,23 @@ export function turnsOf(activities: Activity[]): {
   turns: Turn[];
   skipped: number;
 } {
-  const messages = activities.filter((a) => a.type === "message");
-  const turns: Turn[] = [];
-  let skipped = 0;
-  let open: Turn | null = null;
+  const state: TurnAccumulator = { turns: [], open: null, skipped: 0 };
 
-  const close = () => {
-    if (open) turns.push(open);
-    open = null;
-  };
-
-  for (const activity of messages) {
-    const id = typeof activity.id === "string" ? activity.id : "";
-    const ms = activityMs(activity);
-    const text = textOf(activity);
-    if (!GUID.test(id) || ms === null || !text) {
+  for (const activity of activities) {
+    if (activity.type !== "message") continue;
+    const message = readableMessage(activity);
+    if (!message) {
       // A message with nothing said is not a skip worth counting — there is
       // no turn being lost. A message that said something but cannot be
       // identified or dated is.
-      if (text) skipped += 1;
+      if (textOf(activity)) state.skipped += 1;
       continue;
     }
-    const role = roleOf(activity.from?.role);
-    if (role === ROLE_USER) {
-      close();
-      const aad = activity.from?.aadObjectId;
-      open = {
-        seedActivityId: id,
-        question: text,
-        answer: null,
-        // `from.id` is deliberately not consulted. It is GUID-shaped and
-        // looks like an account, but it is per-conversation and naming a
-        // person by it would invent one person per conversation.
-        authorAadObjectId: typeof aad === "string" && aad ? aad : null,
-        startMs: ms,
-        endMs: ms,
-      };
-      continue;
-    }
-    if (role === ROLE_AGENT) {
-      if (open) {
-        open.answer = open.answer ? `${open.answer}\n\n${text}` : text;
-        open.endMs = Math.max(open.endMs, ms);
-        continue;
-      }
-      turns.push({
-        seedActivityId: id,
-        question: null,
-        answer: text,
-        authorAadObjectId: null,
-        startMs: ms,
-        endMs: ms,
-      });
-      continue;
-    }
-    // Said something, cannot be attributed to either side. Counting it is the
-    // whole point: the alternative is a conversation whose every message has
-    // an unreadable role producing no turns at all, which reaches
-    // `assembleTraceRequest` as an empty span list and disappears with no
-    // log, no attribute and no error — indistinguishable from a pull that
-    // found nothing.
-    skipped += 1;
+    applyMessage({ state, message });
   }
-  close();
-  return { turns, skipped };
+
+  closeTurn(state);
+  return { turns: state.turns, skipped: state.skipped };
 }
 
 interface ToolCall {
@@ -505,39 +618,85 @@ interface ToolCall {
  * happened and still shows, marked unfinished. Waiting for a completion that
  * is not coming would hold the whole conversation back.
  */
+/** One `ToolCallTrace:` activity, read into the fields the pairing needs. */
+interface ToolCallTrace {
+  /** What pairs a start with its completion. */
+  callId: string;
+  seedActivityId: string;
+  name: string;
+  arguments: string | null;
+  ms: number;
+  completed: boolean;
+}
+
+/** The most human of the names the trace carries. */
+function toolNameOf(value: ToolCallValue): string {
+  return (
+    (typeof value.toolDisplayName === "string" && value.toolDisplayName) ||
+    (typeof value.toolName === "string" && value.toolName) ||
+    "tool"
+  );
+}
+
+/**
+ * What pairs a start with its completion: the call id when the trace names
+ * one, and otherwise the activity's own id, which pairs it with nothing and
+ * so stands alone.
+ */
+function callIdOf(params: {
+  value: ToolCallValue;
+  activityId: string;
+}): string {
+  const { value, activityId } = params;
+  return typeof value.toolCallId === "string" && value.toolCallId
+    ? value.toolCallId
+    : activityId;
+}
+
+/**
+ * One tool-call trace, or null when the activity is not one or cannot be
+ * identified or dated.
+ */
+function toolCallTraceOf(activity: Activity): ToolCallTrace | null {
+  if (activity.type !== "event") return null;
+  if (!(activity.name ?? "").startsWith("ToolCallTrace:")) return null;
+
+  const id = typeof activity.id === "string" ? activity.id : "";
+  const ms = activityMs(activity);
+  if (!GUID.test(id) || ms === null) return null;
+
+  const value = (asObject(activity.value) ?? {}) as ToolCallValue;
+  return {
+    callId: callIdOf({ value, activityId: id }),
+    seedActivityId: id,
+    name: toolNameOf(value),
+    arguments: value.filledParameters
+      ? JSON.stringify(value.filledParameters)
+      : null,
+    ms,
+    completed: (value.toolCallStatus ?? "").toLowerCase() === "completed",
+  };
+}
+
 export function toolCallsOf(activities: Activity[]): ToolCall[] {
   const byCallId = new Map<string, ToolCall>();
   for (const activity of activities) {
-    if (activity.type !== "event") continue;
-    const name = activity.name ?? "";
-    if (!name.startsWith("ToolCallTrace:")) continue;
-    const id = typeof activity.id === "string" ? activity.id : "";
-    const ms = activityMs(activity);
-    if (!GUID.test(id) || ms === null) continue;
-    const value = (asObject(activity.value) ?? {}) as ToolCallValue;
-    const callId =
-      typeof value.toolCallId === "string" && value.toolCallId
-        ? value.toolCallId
-        : id;
-    const status = (value.toolCallStatus ?? "").toLowerCase();
-    const existing = byCallId.get(callId);
+    const trace = toolCallTraceOf(activity);
+    if (!trace) continue;
+
+    const existing = byCallId.get(trace.callId);
     if (existing) {
-      existing.endMs = Math.max(existing.endMs, ms);
-      if (status === "completed") existing.finished = true;
+      existing.endMs = Math.max(existing.endMs, trace.ms);
+      if (trace.completed) existing.finished = true;
       continue;
     }
-    byCallId.set(callId, {
-      seedActivityId: id,
-      name:
-        (typeof value.toolDisplayName === "string" && value.toolDisplayName) ||
-        (typeof value.toolName === "string" && value.toolName) ||
-        "tool",
-      arguments: value.filledParameters
-        ? JSON.stringify(value.filledParameters)
-        : null,
-      startMs: ms,
-      endMs: ms,
-      finished: status === "completed",
+    byCallId.set(trace.callId, {
+      seedActivityId: trace.seedActivityId,
+      name: trace.name,
+      arguments: trace.arguments,
+      startMs: trace.ms,
+      endMs: trace.ms,
+      finished: trace.completed,
     });
   }
   return [...byCallId.values()].sort((a, b) => a.startMs - b.startMs);
