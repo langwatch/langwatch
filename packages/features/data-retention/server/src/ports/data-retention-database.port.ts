@@ -17,7 +17,7 @@ type PinnedTraceDelegate = {
 };
 
 /** Process-owned database capability used only by private Data Retention repositories. */
-export type DataRetentionDatabase = {
-  retentionPolicy: RetentionPolicyDelegate;
-  pinnedTrace: PinnedTraceDelegate;
-};
+export abstract class DataRetentionDatabasePort {
+  abstract readonly retentionPolicy: RetentionPolicyDelegate;
+  abstract readonly pinnedTrace: PinnedTraceDelegate;
+}

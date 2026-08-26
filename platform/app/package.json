@@ -114,6 +114,7 @@
     "@langwatch/dashboard-server": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/data-retention-server": "workspace:*",
+    "@langwatch/data-retention-web": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-server": "workspace:*",
     "@langwatch/dataset-web": "workspace:*",

@@ -46,6 +46,7 @@ import {
 } from "~/server/data-retention/retentionPolicy.schema";
 import { api } from "~/utils/api";
 import { isScopeInFilter, resolveScopeFilter } from "~/utils/filterProvidersByScope";
+import { retentionRemovalPreviewQuery } from "./data-retention-preview-query";
 
 function DataRetentionSettings() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -157,14 +158,10 @@ function DataRetentionPage({
   // Fallback preview for the remove-confirm dialog: owned here (transport is
   // an app concern) and passed down as controlled data so the dialog itself
   // stays presentation-only.
+  const removePreview = retentionRemovalPreviewQuery(projectId, removeTarget);
   const removePreviewQuery = api.dataRetention.previewScopeRemoval.useQuery(
-    {
-      projectId,
-      scope: removeTarget
-        ? { scopeType: removeTarget.scopeType, scopeId: removeTarget.scopeId }
-        : { scopeType: "PROJECT", scopeId: "" },
-    },
-    { enabled: !!removeTarget },
+    removePreview.input,
+    removePreview.options,
   );
 
   const invalidate = () => utils.dataRetention.getRules.invalidate({ projectId });

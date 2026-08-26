@@ -344,24 +344,6 @@
       "platform/app/src/components/DashboardLayout.tsx": [
         "../server/app-layer/organizations/repositories/organization.repository"
       ],
-      "platform/app/src/components/data-retention/AddOverrideDrawer.tsx": [
-        "~/server/data-retention/retentionPolicy.schema"
-      ],
-      "platform/app/src/components/data-retention/ApplyToExistingConfirmDialog.tsx": [
-        "~/server/data-retention/retentionPolicy.schema"
-      ],
-      "platform/app/src/components/data-retention/constants.ts": [
-        "~/server/data-retention/retentionPolicy.schema"
-      ],
-      "platform/app/src/components/data-retention/grouping.ts": [
-        "~/server/data-retention/retentionPolicy.schema"
-      ],
-      "platform/app/src/components/data-retention/RetentionAndUsageCard.tsx": [
-        "~/server/data-retention/retentionPolicy.schema"
-      ],
-      "platform/app/src/components/data-retention/RetroactiveProgressCard.tsx": [
-        "~/server/data-retention/retroactive/retroactiveUpdate.service"
-      ],
       "platform/app/src/components/datasets/AddRowsFromCSVModal.tsx": [
         "../../server/datasets/types"
       ],

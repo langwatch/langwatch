@@ -23,7 +23,7 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import { DataRetentionRepository } from "../repositories/data-retention.repository";
 import { PinnedTraceRepository } from "../repositories/pinned-trace.repository";
-import type { DataRetentionCache } from "../cache/data-retention.cache";
+import type { DataRetentionCacheStore } from "../stores/data-retention-cache.store";
 
 export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
 
@@ -34,7 +34,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     organizations: OrganizationService;
     defaultRetentionDays: number;
     pinRepository: PinnedTraceRepository;
-    cache?: DataRetentionCache;
+    cache?: DataRetentionCacheStore;
   }): DataRetentionService {
     return new DataRetentionService(
       options.repository,
@@ -52,18 +52,18 @@ export class DataRetentionService extends DataRetentionServiceContract {
     private readonly organizations: OrganizationService,
     private readonly defaultRetentionDays: number,
     private readonly pinRepository: PinnedTraceRepository,
-    private readonly cache?: DataRetentionCache,
+    private readonly cache?: DataRetentionCacheStore,
   ) {
     super();
   }
 
-  async resolve(projectId: string): Promise<ResolvedRetention | null> {
-    const cached = await this.cache?.get(projectId);
+  async getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
+    const cached = await this.cache?.tryGet(input.projectId);
     if (cached !== void 0) {
       return cached;
     }
 
-    const project = await this.projects.tryGetWithTeam(projectId);
+    const project = await this.projects.tryGetWithTeam(input.projectId);
     const context = project
       ? {
           organizationId: project.team.organizationId,
@@ -80,19 +80,10 @@ export class DataRetentionService extends DataRetentionServiceContract {
           chain: resolveScopeChain(context),
           defaultRetentionDays: this.defaultRetentionDays,
         })
-      : null;
-    await this.cache?.set(projectId, resolved);
-    return resolved;
-  }
+      : this.defaultRetention();
+    await this.cache?.set(input.projectId, resolved);
 
-  async getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
-    return (
-      (await this.resolve(input.projectId)) ?? {
-        traces: this.defaultRetentionDays,
-        scenarios: this.defaultRetentionDays,
-        experiments: this.defaultRetentionDays,
-      }
-    );
+    return resolved;
   }
 
   async getRetentionDays(input: {

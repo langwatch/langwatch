@@ -6,7 +6,7 @@ import {
   type UnpinTraceInput,
 } from "@langwatch/data-retention-contract";
 import { PinnedTraceRepository } from "../pinned-trace.repository";
-import type { DataRetentionDatabase } from "./data-retention.database";
+import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port";
 
 function mapPinnedTrace(row: unknown): PinnedTrace {
   return pinnedTraceSchema.parse(row);
@@ -15,12 +15,12 @@ function mapPinnedTrace(row: unknown): PinnedTrace {
 /** Private persistence for trace pin annotations owned by Data Retention. */
 export class PrismaPinnedTraceRepository extends PinnedTraceRepository {
   static create(options: {
-    database: DataRetentionDatabase;
+    database: DataRetentionDatabasePort;
   }): PrismaPinnedTraceRepository {
     return new PrismaPinnedTraceRepository(options.database);
   }
 
-  private constructor(private readonly database: DataRetentionDatabase) {
+  private constructor(private readonly database: DataRetentionDatabasePort) {
     super();
   }
 

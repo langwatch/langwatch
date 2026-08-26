@@ -9,10 +9,15 @@ Feature: Data Retention service boundary
     When a caller sets a retention value that is not a whole week
     Then the Data Retention service rejects the mutation
 
-  Scenario: Reject a missing scope target
-    Given a retention read or write names a project or team that does not exist
+  Scenario: Default a missing read target
+    Given a retention read names a project that does not exist
+    When the Data Retention service resolves that project
+    Then the platform default is returned
+
+  Scenario: Reject a missing write target
+    Given a retention write names a project or team that does not exist
     When the Data Retention service resolves that scope
-    Then the canonical Project or Organization service error is thrown
+    Then a concrete domain or canonical dependency error is thrown
 
   Scenario: Resolve scope ownership through canonical services
     Given a retention rule targets a project or team

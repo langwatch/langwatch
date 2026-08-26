@@ -13,7 +13,6 @@ export class ScopeTargetNotFoundError extends Error {
 }
 
 export abstract class DataRetentionService {
-  abstract resolve(projectId: string): Promise<ResolvedRetention | null>;
   abstract getResolvedForProject(input: {
     projectId: string;
   }): Promise<ResolvedRetention>;

@@ -11,6 +11,7 @@ import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contrac
 import { DataRetentionRepository } from "../src/repositories/data-retention.repository";
 import { DataRetentionService } from "../src/services/data-retention.service";
 import { PinnedTraceRepository } from "../src/repositories/pinned-trace.repository";
+import { DataRetentionCacheStore } from "../src/stores/data-retention-cache.store";
 
 class Repository extends DataRetentionRepository {
   rows: RetentionPolicy[] = [];
@@ -43,13 +44,13 @@ class Repository extends DataRetentionRepository {
   async deleteForScope() {}
 }
 
-class Cache {
-  values = new Map<string, ResolvedRetention | null>();
+class Cache extends DataRetentionCacheStore {
+  values = new Map<string, ResolvedRetention>();
   deleted: string[] = [];
-  async get(key: string) {
+  async tryGet(key: string) {
     return this.values.get(key);
   }
-  async set(key: string, value: any) {
+  async set(key: string, value: ResolvedRetention) {
     this.values.set(key, value);
   }
   async delete(key: string) {

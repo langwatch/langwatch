@@ -4,9 +4,9 @@ import {
 } from "@langwatch/data-retention-contract";
 
 /** Internal cache port; cache implementation and wiring stay server-owned. */
-export abstract class DataRetentionCache {
-  abstract get(key: string): Promise<ResolvedRetention | null | undefined>;
-  abstract set(key: string, value: ResolvedRetention | null): Promise<void>;
+export abstract class DataRetentionCacheStore {
+  abstract tryGet(key: string): Promise<ResolvedRetention | undefined>;
+  abstract set(key: string, value: ResolvedRetention): Promise<void>;
   abstract delete(key: string): Promise<void>;
 }
 
@@ -17,7 +17,7 @@ export interface DataRetentionRedis {
 }
 
 type MemoryEntry = {
-  value: ResolvedRetention | null;
+  value: ResolvedRetention;
   expiresAt: number;
 };
 
@@ -25,14 +25,14 @@ type MemoryEntry = {
  * The one retention-policy cache. Redis is shared across processes; the
  * in-memory shadow keeps reads available when Redis is absent or unhealthy.
  */
-export class RedisDataRetentionCache extends DataRetentionCache {
+export class RedisDataRetentionCacheStore extends DataRetentionCacheStore {
   static create(options: {
     redis?: DataRetentionRedis | null;
     ttlMs: number;
     prefix?: string;
     now?: () => number;
-  }): RedisDataRetentionCache {
-    return new RedisDataRetentionCache(
+  }): RedisDataRetentionCacheStore {
+    return new RedisDataRetentionCacheStore(
       options.redis ?? null,
       options.ttlMs,
       options.prefix ?? "retention-policy:",
@@ -53,12 +53,12 @@ export class RedisDataRetentionCache extends DataRetentionCache {
     this.ttlSeconds = Math.ceil(ttlMs / 1_000);
   }
 
-  async get(key: string): Promise<ResolvedRetention | null | undefined> {
+  async tryGet(key: string): Promise<ResolvedRetention | undefined> {
     if (this.redis) {
       try {
         const encoded = await this.redis.get(this.redisKey(key));
         if (encoded !== null) {
-          return resolvedRetentionSchema.nullable().parse(JSON.parse(encoded));
+          return resolvedRetentionSchema.parse(JSON.parse(encoded));
         }
 
         return void 0;
@@ -70,7 +70,7 @@ export class RedisDataRetentionCache extends DataRetentionCache {
     return this.getFromMemory(key);
   }
 
-  async set(key: string, value: ResolvedRetention | null): Promise<void> {
+  async set(key: string, value: ResolvedRetention): Promise<void> {
     this.memory.set(key, {
       value,
       expiresAt: this.now() + this.ttlMs,
@@ -100,7 +100,7 @@ export class RedisDataRetentionCache extends DataRetentionCache {
     }
   }
 
-  private getFromMemory(key: string): ResolvedRetention | null | undefined {
+  private getFromMemory(key: string): ResolvedRetention | undefined {
     const entry = this.memory.get(key);
     if (!entry) {
       return void 0;

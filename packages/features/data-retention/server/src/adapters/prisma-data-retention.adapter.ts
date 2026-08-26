@@ -2,17 +2,17 @@ import type { DataRetentionService as DataRetentionServiceContract } from "@lang
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
-  RedisDataRetentionCache,
+  RedisDataRetentionCacheStore,
   type DataRetentionRedis,
-} from "../cache/data-retention.cache";
-import { PrismaDataRetentionRepository } from "../repositories/prisma/prisma.data-retention.repository";
-import { PrismaPinnedTraceRepository } from "../repositories/prisma/pinned-trace.repository";
-import type { DataRetentionDatabase } from "../repositories/prisma/data-retention.database";
+} from "../stores/data-retention-cache.store";
+import type { DataRetentionDatabasePort } from "../ports/data-retention-database.port";
+import { PrismaDataRetentionRepository } from "../repositories/prisma/prisma-data-retention.repository";
+import { PrismaPinnedTraceRepository } from "../repositories/prisma/prisma-pinned-trace.repository";
 import { DataRetentionService } from "../services/data-retention.service";
 
 export class PrismaDataRetentionAdapter {
   static create(options: {
-    database: DataRetentionDatabase;
+    database: DataRetentionDatabasePort;
     projects: ProjectService;
     organizations: OrganizationService;
     defaultRetentionDays: number;
@@ -25,7 +25,7 @@ export class PrismaDataRetentionAdapter {
       organizations: options.organizations,
       defaultRetentionDays: options.defaultRetentionDays,
       pinRepository: PrismaPinnedTraceRepository.create(options),
-      cache: RedisDataRetentionCache.create({
+      cache: RedisDataRetentionCacheStore.create({
         redis: options.redis,
         ttlMs: options.cacheTtlMs ?? 60_000,
       }),

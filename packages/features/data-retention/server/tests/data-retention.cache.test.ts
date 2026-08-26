@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  RedisDataRetentionCache,
+  RedisDataRetentionCacheStore,
   type DataRetentionRedis,
-} from "../src/cache/data-retention.cache";
+} from "../src/stores/data-retention-cache.store";
 
 const retention = {
   traces: 49,
@@ -17,11 +17,11 @@ describe("RedisDataRetentionCache", () => {
       setex: vi.fn().mockResolvedValue("OK"),
       del: vi.fn().mockResolvedValue(1),
     } satisfies DataRetentionRedis;
-    const cache = RedisDataRetentionCache.create({ redis, ttlMs: 60_000 });
+    const cache = RedisDataRetentionCacheStore.create({ redis, ttlMs: 60_000 });
 
     await cache.set("project", retention);
 
-    await expect(cache.get("project")).resolves.toEqual(retention);
+    await expect(cache.tryGet("project")).resolves.toEqual(retention);
     expect(redis.setex).toHaveBeenCalledWith(
       "retention-policy:project",
       60,
@@ -29,21 +29,21 @@ describe("RedisDataRetentionCache", () => {
     );
 
     await cache.delete("project");
-    await expect(cache.get("project")).resolves.toBeUndefined();
+    await expect(cache.tryGet("project")).resolves.toBeUndefined();
     expect(redis.del).toHaveBeenCalledWith("retention-policy:project");
   });
 
   it("expires the process-local fallback without a global app lookup", async () => {
     let now = 1_000;
-    const cache = RedisDataRetentionCache.create({
+    const cache = RedisDataRetentionCacheStore.create({
       ttlMs: 50,
       now: () => now,
     });
 
-    await cache.set("project", null);
-    await expect(cache.get("project")).resolves.toBeNull();
+    await cache.set("project", retention);
+    await expect(cache.tryGet("project")).resolves.toEqual(retention);
 
     now = 1_051;
-    await expect(cache.get("project")).resolves.toBeUndefined();
+    await expect(cache.tryGet("project")).resolves.toBeUndefined();
   });
 });
