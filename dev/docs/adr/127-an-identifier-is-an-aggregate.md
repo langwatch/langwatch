@@ -145,6 +145,19 @@ head), and a per-identifier fold is the same function plus a different delivery
 (hand each stream what `identityStreamsFor` routes to it). On the facts a
 command states, the two agree, and a test pins that.
 
+**A third invariant needed no move.** Address uniqueness was already outside the
+aggregate: `IdentifierReservation` is a row-truth lock claimed before any fact is
+stated (ADR-116 §6, migration `20260824120003`). A per-identifier aggregate
+changes nothing about it. The provider-subject collision is likewise arbitrated
+by a partial unique index on the projection, not by fold state.
+
+**A fourth is a genuine loss, named.** Two-step verification stays on the
+person's stream, so factor commands and identifier commands stop serialising.
+Nothing today reads across them (above), so nothing breaks on the day this
+lands. What this ADR forbids is acquiring such a coupling later and relying on
+the lane for it: a cross-family invariant is enforced by a read and a refusal in
+a guard, the way uniqueness is, never by two things happening to share a queue.
+
 ### What one head cannot see
 
 "On the facts a command states" is doing real work in that sentence, and the
@@ -168,19 +181,6 @@ not a change to the fold: a rule that repaired state the fact did not name is
 precisely the sweep a bounded aggregate gives up.
 
 Tests pin both divergences, so the boundary is asserted rather than assumed.
-
-**A third invariant needed no move.** Address uniqueness was already outside the
-aggregate: `IdentifierReservation` is a row-truth lock claimed before any fact is
-stated (ADR-116 §6, migration `20260824120003`). A per-identifier aggregate
-changes nothing about it. The provider-subject collision is likewise arbitrated
-by a partial unique index on the projection, not by fold state.
-
-**A fourth is a genuine loss, named.** Two-step verification stays on the
-person's stream, so factor commands and identifier commands stop serialising.
-Nothing today reads across them (above), so nothing breaks on the day this
-lands. What this ADR forbids is acquiring such a coupling later and relying on
-the lane for it: a cross-family invariant is enforced by a read and a refusal in
-a guard, the way uniqueness is, never by two things happening to share a queue.
 
 ### The lane is not the aggregate
 
