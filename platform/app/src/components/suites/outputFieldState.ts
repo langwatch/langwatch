@@ -49,8 +49,15 @@ export const fromOutputFieldState = (
 };
 
 /**
- * The agent output the scenario result reads, or `null` when the user cleared
- * the selection and nothing should be mapped.
+ * The output this editor shows as mapped, or `null` when the user cleared the
+ * selection and the editor should show no mapping row.
+ *
+ * This is the editor's reading of the stored value, not the executor's. The
+ * serialized adapters branch on `if (scenarioOutputField)`, so at execution
+ * time `""` takes the same path as `undefined` and falls back to the agent's
+ * first declared output. Whether a cleared selection should keep falling back
+ * or should mean something else at execution is a behaviour question this
+ * refactor deliberately does not answer.
  */
 export const resolveOutputField = ({
   state,
