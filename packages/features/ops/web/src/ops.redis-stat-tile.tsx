@@ -1,6 +1,6 @@
 import { HStack, Stat, Text, VStack } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
-import { formatBytes } from "@langwatch/ops-web";
+import { formatBytes } from "./formatters";
 
 // CloudWatch defaults for ElastiCache: 80% memory, 70% engine CPU. The goal is
 // to surface Redis saturation before an operator has to open the AWS console.

@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { LatencyWindowsCard } from "../LatencyWindowsCard";
+import { LatencyWindowsCard } from "../src/ops.latency-windows-card";
 
 afterEach(cleanup);
 

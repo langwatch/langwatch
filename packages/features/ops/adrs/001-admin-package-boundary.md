@@ -3,12 +3,12 @@
 **Status:** Accepted
 
 **Placement amended by:**
-[ADR-112: singular feature ownership](../../../../../dev/docs/adr/112-singular-feature-ownership.md).
+[ADR-112: singular feature ownership](../../../../dev/docs/adr/112-singular-feature-ownership.md).
 The behaviour in this record moves to core `ops`; it is not Enterprise-licensed.
 
 **Behavioural contract:** [Platform administration](../specs/admin.feature)
 
-**Related:** [Impersonation reason](../../../../../specs/features/backoffice-user-impersonation-reason.feature), [Impersonation banner](../../../../../specs/auth/impersonation-banner.feature)
+**Related:** [Impersonation reason](../../../../specs/features/backoffice-user-impersonation-reason.feature), [Impersonation banner](../../../../specs/auth/impersonation-banner.feature), [shared Ops snapshot](../../../../dev/docs/adr/090-shared-ops-snapshot-single-writer.md), [scheduler operator control](../../../../dev/docs/adr/091-operator-control-over-the-scheduler.md)
 
 ## Context
 

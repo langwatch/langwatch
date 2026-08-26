@@ -30,3 +30,33 @@ generation, browser-side OTel emission, and presentation state.
 The DejaView page follows the same boundary: the app supplies tRPC results and
 handled-error rendering, while the web package owns URL-fragment state,
 keyboard navigation, and the complete search/replay presentation.
+
+## Behavioural contracts
+
+Package-owned worker, queue, and presentation contracts live beside the
+implementation:
+
+- [Admin](./specs/admin.feature)
+- [Latency windows](./specs/dashboard-latency-windows.feature)
+- [Tenant rate anomalies](./specs/event-queue-anomaly-detection.feature)
+- [Tenant-scoped queue drain](./specs/event-queue-resilience.feature)
+- [Pending-counter reconciliation](./specs/pending-counter-reconcile.feature)
+- [Queue discovery](./specs/queue-discovery.feature)
+- [Queue-group state](./specs/queue-group-state.feature)
+
+Some contracts remain at the repository boundary because they describe a
+composed app or shared infrastructure rather than one package surface:
+[dead-letter recovery](../../../specs/ops/dead-letter-recovery.feature),
+[scheduler control](../../../specs/ops/scheduler-operator-control.feature),
+[the shared snapshot](../../../specs/ops/shared-ops-snapshot.feature),
+[process visibility](../../../specs/ops/process-manager-visibility.feature),
+and [Ops dashboard density](../../../specs/ops/ops-dashboard-density.feature).
+The app owns their transport/composition assertions; the package tests still
+bind the package portions to named scenarios.
+
+The shared architectural decisions [ADR-090](../../../dev/docs/adr/090-shared-ops-snapshot-single-writer.md)
+and [ADR-091](../../../dev/docs/adr/091-operator-control-over-the-scheduler.md)
+remain in the repository ADR catalogue because they govern process and app
+composition, not only this package. The remaining root `specs/ops` contracts
+cover ClickHouse, email, feature flags, local observability, and production
+bundle infrastructure, so they are intentionally not duplicated here.

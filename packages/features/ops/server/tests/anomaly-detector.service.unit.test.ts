@@ -93,6 +93,7 @@ describe("AnomalyDetectorService", () => {
     expect(values).toEqual([10, 1, 5, 8, 2, 7, 3, 9, 4, 6]);
   });
 
+  /** @scenario "Insufficient history is cached briefly so quiet tenants are not re-read every tick" */
   it("caches an insufficient-history verdict with its short retry TTL", async () => {
     const { detector, rateTracker, anomalyState } = createDetector();
     rateTracker.listActiveTenants.mockResolvedValue(["proj_new"]);
@@ -108,6 +109,7 @@ describe("AnomalyDetectorService", () => {
     });
   });
 
+  /** @scenario "Baseline cache hit avoids re-scanning the 7-day series" */
   it("uses a warm baseline without rescanning the seven-day series", async () => {
     const { detector, rateTracker } = createDetector();
     rateTracker.baselines.set("proj_acme", 10);
@@ -120,6 +122,7 @@ describe("AnomalyDetectorService", () => {
     expect(rateTracker.setCachedBaseline).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Baseline cache miss triggers a fresh p95 computation and stores it" */
   it("surfaces a rate breaker at the surface threshold", async () => {
     const { detector, rateTracker, anomalyState } = createDetector();
     rateTracker.listActiveTenants.mockResolvedValue(["proj_acme"]);
@@ -188,6 +191,8 @@ describe("AnomalyDetectorService", () => {
     expect(anomalyState.clear).toHaveBeenCalledWith("proj_acme", "rate_breaker");
   });
 
+  /** @scenario "Kill-switch FF disables anomaly detection for one tenant without a redeploy" */
+  /** @scenario "Kill-switch fails open when PostHog is unavailable" */
   it("skips a killed tenant and fails open when flags are unavailable", async () => {
     const flags = new FeatureFlagsFake();
     const { detector, rateTracker, anomalyState } = createDetector({ flags });

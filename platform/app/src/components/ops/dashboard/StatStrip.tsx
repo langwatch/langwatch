@@ -1,9 +1,8 @@
 import { HStack } from "@chakra-ui/react";
 import { LATENCY_SAMPLE_SIZE, type DashboardData } from "@langwatch/ops-contract";
-import { formatCount, formatMs, formatRate } from "@langwatch/ops-web";
+import { formatCount, formatMs, formatRate, RedisStatTile } from "@langwatch/ops-web";
 import { api } from "~/utils/api";
 import { LinkedStat } from "./LinkedStat";
-import { RedisStatTile } from "./RedisStatTile";
 
 /**
  * What the percentile tiles are measured over. A sample count, deliberately

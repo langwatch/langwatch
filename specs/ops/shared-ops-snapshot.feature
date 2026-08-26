@@ -192,7 +192,7 @@ Feature: Shared ops snapshot with a single elected writer
 
   # The pending-counter reconcile is NOT governed here. It already has its own
   # cross-instance single-flight marker, specified end to end in
-  # specs/ops/pending-counter-reconcile.feature — every pod attempts it, one
+  # packages/features/ops/specs/pending-counter-reconcile.feature — every pod attempts it, one
   # runs. The snapshot lease does not gate it, and no scenario in this file
   # should imply that it does.
 

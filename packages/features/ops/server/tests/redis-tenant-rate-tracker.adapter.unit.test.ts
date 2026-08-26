@@ -116,6 +116,7 @@ describe("RedisTenantRateTrackerAdapter", () => {
     expect(hashes.get("obs:tenant_rate:proj_acme")?.has(staleMinute)).toBe(false);
   });
 
+  /** @scenario "Kill-switch FF makes the rate tracker record() a no-op on the hot path" */
   it("uses the feature flag as a fail-open hot-path kill switch", async () => {
     const { redis } = redisFake();
     const flags = new FeatureFlagsFake();

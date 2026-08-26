@@ -1,10 +1,9 @@
 import { useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { describeError, HandledErrorAlert } from "~/features/errors";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { DejaView, Kbd, type EventResult, useDejaViewState } from "@langwatch/ops-web";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { DejaView, type EventResult, useDejaViewState } from "@langwatch/ops-web";
 
 export function DejaViewContent() {
   const router = useRouter();
