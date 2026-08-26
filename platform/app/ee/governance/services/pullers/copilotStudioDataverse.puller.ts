@@ -116,6 +116,32 @@ const tokenResponseSchema = z.object({
 });
 
 /**
+ * The part of a row the cursor is built from, on its own.
+ *
+ * These two fields are the position; everything else on the row is the event.
+ * Read separately so a row that fails the full schema below can still be
+ * stepped over — `name` arriving as a number costs that one event rather than
+ * wedging the whole source behind a row the walk cannot get past.
+ *
+ * Both end up interpolated bare into the next run's `$filter`, where
+ * `conversationtranscriptid` is an `Edm.Guid` and `createdon` an
+ * `Edm.DateTimeOffset` — neither takes quotes. A row whose value carries OData
+ * operator text would therefore build a broken predicate, and because that
+ * value is persisted as the cursor, every later run would repeat the same 400
+ * with the cursor unchanged. Constrained here so a row like that is counted and
+ * dropped instead of poisoning the walk.
+ *
+ * The full row schema extends this one rather than restating the two field
+ * types. They are the same constraint for the same reason, and a copy is a
+ * thing that can be loosened in one place — in the one spot where loosening it
+ * is what lets operator text reach the filter.
+ */
+const cursorRowSchema = z.object({
+  conversationtranscriptid: z.string().uuid(),
+  createdon: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+/**
  * The row fields the query asks for. Anything else Dataverse sends passes by,
  * which is what `.passthrough()` is doing rather than decoration: zod strips
  * undeclared keys by default, and the stripped object is what gets stored as
@@ -129,19 +155,10 @@ const tokenResponseSchema = z.object({
  * the row's own `metadata` carries a `BotId`, and that one is a different value
  * that joins to nothing.
  */
-const transcriptRowSchema = z
-  .object({
-    // Both of these end up interpolated bare into the next run's `$filter`,
-    // where `conversationtranscriptid` is an `Edm.Guid` and `createdon` an
-    // `Edm.DateTimeOffset` — neither takes quotes. A row whose value carries
-    // OData operator text would therefore build a broken predicate, and
-    // because that value is persisted as the cursor, every later run would
-    // repeat the same 400 with the cursor unchanged. Constrained here so a
-    // row like that is counted and dropped instead of poisoning the walk.
-    conversationtranscriptid: z.string().uuid(),
+const transcriptRowSchema = cursorRowSchema
+  .extend({
     name: z.string().nullable().optional(),
     conversationstarttime: z.string().nullable().optional(),
-    createdon: z.string().datetime({ offset: true }).nullable().optional(),
     content: z.string().nullable().optional(),
     metadata: z.string().nullable().optional(),
     schematype: z.string().nullable().optional(),
@@ -149,20 +166,6 @@ const transcriptRowSchema = z
     _bot_conversationtranscriptid_value: z.string().nullable().optional(),
   })
   .passthrough();
-
-/**
- * The part of a row the cursor is built from, on its own.
- *
- * These two fields are the position; everything else on the row is the event.
- * Reading them separately is what lets a row that fails the schema above still
- * be stepped over — `name` arriving as a number costs that one event, not the
- * whole source. The constraints are deliberately the same ones, because the
- * value ends up in the same bare `$filter` either way.
- */
-const cursorRowSchema = z.object({
-  conversationtranscriptid: z.string().uuid(),
-  createdon: z.string().datetime({ offset: true }).nullable().optional(),
-});
 
 /**
  * One row of the `bot` table, read once per run to put a name on each
