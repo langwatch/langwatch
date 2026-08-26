@@ -82,6 +82,11 @@ overrides:
 
 packageExtensionsChecksum: sha256-m/G/WH1yLdya4bNe65I9ulURa/FU76z3o30vd4qvq6M=
 
+patchedDependencies:
+  '@langwatch/ksuid@2.0.2':
+    hash: edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980
+    path: patches/@langwatch__ksuid@2.0.2.patch
+
 importers:
 
   .:
@@ -695,7 +700,7 @@ importers:
         version: link:../../../../eventing
       '@langwatch/ksuid':
         specifier: ^2.0.2
-        version: 2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../observability
@@ -1043,7 +1048,7 @@ importers:
         version: link:../handled-error
       '@langwatch/ksuid':
         specifier: ^2.0.2
-        version: 2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
@@ -1442,7 +1447,7 @@ importers:
         version: link:../../../handled-error
       '@langwatch/ksuid':
         specifier: ^2.0.2
-        version: 2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -1947,7 +1952,7 @@ importers:
         version: link:../../../eventing
       '@langwatch/ksuid':
         specifier: ^2.0.2
-        version: 2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
@@ -2332,7 +2337,7 @@ importers:
         version: link:../../../handled-error
       '@langwatch/ksuid':
         specifier: ^2.0.2
-        version: 2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract
@@ -2869,7 +2874,7 @@ importers:
         version: link:../../authz/contract
       '@langwatch/ksuid':
         specifier: ^2.0.2
-        version: 2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
@@ -3099,6 +3104,9 @@ importers:
         specifier: workspace:*
         version: link:../contract
     devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -4057,7 +4065,7 @@ importers:
         version: link:../../packages/handled-error
       '@langwatch/ksuid':
         specifier: ^2.0.2
-        version: 2.0.2
+        version: 2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../packages/features/langy/contract
@@ -18371,7 +18379,7 @@ snapshots:
       uuid: 11.1.1
       weaviate-client: 3.14.0
 
-  '@langwatch/ksuid@2.0.2': {}
+  '@langwatch/ksuid@2.0.2(patch_hash=edd8defd29b1ef2b8aae1ae6d2c0d68b69a8789e0018817b024fb88ff9f36980)': {}
 
   '@langwatch/scenario@0.4.15(67d3e9a0a24b45215f99ad8b65d3e39d)':
     dependencies:

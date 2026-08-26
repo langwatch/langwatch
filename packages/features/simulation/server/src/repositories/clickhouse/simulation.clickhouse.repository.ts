@@ -6,6 +6,7 @@ import type {
   SimulationSetData,
 } from "@langwatch/simulation-contract";
 import { SimulationRunStatus } from "@langwatch/simulation-contract";
+import { Buffer } from "node:buffer";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,

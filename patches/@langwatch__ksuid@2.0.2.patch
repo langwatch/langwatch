@@ -1,0 +1,11 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 8ddb279f110c1d7665d3d16c38d04b908ded4dca..ff22228164d2a23af57dc30775b725cc1bc0e827 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -189,6 +189,0 @@ declare class Ksuid {
+-declare global {
+-    var require: (module: string) => unknown;
+-    var Buffer: {
+-        from: (input: string, encoding: string) => Uint8Array;
+-    };
+-}
