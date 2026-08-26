@@ -2,7 +2,7 @@ import { Button } from "@chakra-ui/react";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { Tooltip } from "../../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { copyToClipboard } from "./copy-to-clipboard";
 
 export function InlineCopyButton({

@@ -39,7 +39,7 @@ import { DashboardLayout } from "../../components/DashboardLayout";
 import { BulkUploadDrawer } from "../../components/datasets/bulkUpload/BulkUploadDrawer";
 import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
 import { Link } from "../../components/ui/link";
-import { Menu } from "../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "../../components/ui/toaster";
 import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

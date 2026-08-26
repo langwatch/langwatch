@@ -6,11 +6,11 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useGetRotatingColorForCharts } from "../useGetRotatingColorForCharts";
 
-vi.mock("../../components/ui/color-mode", () => ({
+vi.mock("@langwatch/design-system/color-mode", () => ({
   getRawColorValue: vi.fn((color: string) => color),
 }));
 
-import { getRawColorValue } from "../../components/ui/color-mode";
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 
 const mockGetRawColorValue = vi.mocked(getRawColorValue);
 

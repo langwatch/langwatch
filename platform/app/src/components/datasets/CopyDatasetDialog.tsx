@@ -6,7 +6,7 @@ import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { hasPermissionWithHierarchy, teamRoleHasPermission } from "../../server/api/rbac";
 import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "../ui/toaster";
 
 export const CopyDatasetDialog = ({

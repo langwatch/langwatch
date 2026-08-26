@@ -56,8 +56,8 @@ import { FeedbackLink } from "../FeedbackLink";
 import { LLMIcon } from "../icons/LLMIcon";
 import { MetadataTag } from "../MetadataTag";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { getRawColorValue } from "../ui/color-mode";
-import { Switch } from "../ui/switch";
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
+import { Switch } from "@langwatch/design-system/switch";
 
 export function DSPyExperiment({
   project,

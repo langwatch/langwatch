@@ -5,7 +5,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { clampMaxTokens } from "../../utils/clampMaxTokens";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { type Output, OutputsSection, type OutputType } from "../outputs/OutputsSection";
-import { Popover } from "../ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { ParameterRow } from "./ParameterRow";
 import {
   DEFAULT_SUPPORTED_PARAMETERS,

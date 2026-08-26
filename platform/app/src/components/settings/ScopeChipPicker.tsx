@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SmallLabel } from "../SmallLabel";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { ProviderScopeChips } from "./ProviderScopeChips";
 
 /**

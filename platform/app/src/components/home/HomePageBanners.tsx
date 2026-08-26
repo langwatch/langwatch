@@ -23,7 +23,7 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
-import { useColorModeValue } from "../ui/color-mode";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 
 // ---- Timing knobs -------------------------------------------------------
 

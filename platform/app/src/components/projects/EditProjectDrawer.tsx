@@ -20,7 +20,7 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { Drawer } from "../ui/drawer";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "../ui/toaster";
 
 interface EditProjectFormData {

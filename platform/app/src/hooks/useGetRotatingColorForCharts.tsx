@@ -1,4 +1,4 @@
-import { getRawColorValue } from "../components/ui/color-mode";
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { type RotatingColorSet, rotatingColors } from "../utils/rotatingColors";
 
 export const useGetRotatingColorForCharts = () => {

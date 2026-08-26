@@ -38,10 +38,10 @@ import {
   useColorMode,
   useColorModeValue,
   useColorRawValue,
-} from "../../components/ui/color-mode";
+} from "@langwatch/design-system/color-mode";
 import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { GlobalTraceV2DrawerMount } from "../../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

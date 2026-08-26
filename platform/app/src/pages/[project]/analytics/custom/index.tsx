@@ -83,7 +83,7 @@ import {
   useFilterToggle,
 } from "../../../../components/filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "../../../../components/PeriodSelector";
-import { getRawColorValue } from "../../../../components/ui/color-mode";
+import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import {
   analyticsGroups,

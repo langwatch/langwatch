@@ -13,7 +13,7 @@ import type React from "react";
 import { useCallback, useRef, useState } from "react";
 import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../../hooks/useSavedViews";
 import { Dialog } from "../ui/dialog";
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 export function SaveAsViewButton() {
   const { saveView } = useSavedViews();

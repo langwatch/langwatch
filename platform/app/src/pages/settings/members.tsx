@@ -35,7 +35,7 @@ import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog
 import { MemberSeatUsage } from "../../components/settings/MemberSeatUsage";
 import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { Dialog } from "../../components/ui/dialog";
-import { Menu } from "../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useInviteActions } from "../../hooks/useInviteActions";

@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronsUpDown, Lock } from "lucide-react";
-import { Menu } from "../../../components/ui/menu";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type AccessLevel,
   PERMISSION_CATEGORIES,

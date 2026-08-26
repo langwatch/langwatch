@@ -6,7 +6,7 @@ import { trackEvent } from "../../utils/tracking";
 import { BetaPill } from "../ui/BetaPill";
 import { LegacyPill } from "../ui/LegacyPill";
 import { Link } from "../ui/link";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { SIDE_MENU_DENSITIES, useSideMenuDensity } from "./sideMenuDensity";
 
 export const MENU_ITEM_HEIGHT = SIDE_MENU_DENSITIES.comfortable.height;

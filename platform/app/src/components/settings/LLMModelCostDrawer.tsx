@@ -9,7 +9,7 @@ import {
 } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
-import { InputGroup } from "../../components/ui/input-group";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";

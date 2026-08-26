@@ -1,7 +1,7 @@
 import { Button, HStack, PopoverTrigger, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { X } from "react-feather";
-import { Popover } from "../../../../components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 
 export function ConfigModal({
   open,

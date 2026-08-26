@@ -17,7 +17,7 @@ import CheckConfigForm, {
 } from "../../../../components/checks/CheckConfigForm";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { ConfirmDialog } from "../../../../components/gateway/ConfirmDialog";
-import { Menu } from "../../../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "../../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../../utils/api";

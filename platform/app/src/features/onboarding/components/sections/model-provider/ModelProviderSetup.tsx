@@ -14,7 +14,7 @@ import { z } from "zod";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { CodexSignIn } from "../../../../../components/settings/CodexSignIn";
 import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
-import { Switch } from "../../../../../components/ui/switch";
+import { Switch } from "@langwatch/design-system/switch";
 import { useCredentialProbeGate } from "../../../../../hooks/useCredentialProbeGate";
 import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";

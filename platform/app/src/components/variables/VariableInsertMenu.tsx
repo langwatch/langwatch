@@ -7,7 +7,7 @@ import {
 } from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType } from "@langwatch/workflow-contract";
 import { VariableTypeBadge, VariableTypeIcon } from "@langwatch/prompt-web";
-import { Popover } from "../ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import type { AvailableSource, FieldType, SourceType } from "./VariableMappingInput";
 
 // ============================================================================

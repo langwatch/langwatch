@@ -8,7 +8,7 @@ import {
   orderedResources,
 } from "../../utils/permissionsConfig";
 import { Checkbox } from "../ui/checkbox";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * PermissionSelector component

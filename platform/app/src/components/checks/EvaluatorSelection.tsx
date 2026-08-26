@@ -26,7 +26,7 @@ import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";
 import { titleCase } from "../../utils/stringCasing";
 import { Link } from "../ui/link";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 
 type Category = EvaluatorDefinition<any>["category"];

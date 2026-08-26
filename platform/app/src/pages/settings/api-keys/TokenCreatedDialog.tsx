@@ -20,7 +20,7 @@
 import { Alert, Box, createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { Dialog } from "../../../components/ui/dialog";
-import { Select } from "../../../components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { CodePreview } from "../../../features/onboarding/components/sections/observability/CodePreview";
 import { maskApiKey } from "../../../features/onboarding/components/sections/shared/api-key-utils";
 import {

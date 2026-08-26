@@ -14,7 +14,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { showErrorToast } from "~/features/errors";
 import type { Experiment, Project } from "~/generated/prisma/client";
-import { Menu } from "../../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { api } from "../../../utils/api";
 import { BatchEvaluationV2EvaluationResult } from "./BatchEvaluationV2EvaluationResult";

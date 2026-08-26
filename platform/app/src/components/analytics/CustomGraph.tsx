@@ -45,7 +45,7 @@ import { describeError } from "~/features/errors";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
 import { useRouter } from "~/utils/compat/next-router";
-import { useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
+import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

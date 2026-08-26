@@ -9,7 +9,7 @@ import {
   MenuItem,
   MenuRoot,
   MenuTrigger,
-} from "../../../../components/ui/menu";
+} from "@langwatch/design-system/menu";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { useUIStore } from "@langwatch/trace-web";

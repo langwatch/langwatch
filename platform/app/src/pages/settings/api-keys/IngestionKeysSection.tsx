@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { Radio, Trash2 } from "lucide-react";
 
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { RouterOutputs } from "../../../utils/api";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { apiKeyRowAnchorId } from "./apiKeyAnchor";

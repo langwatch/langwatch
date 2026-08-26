@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 
 import { CopyIcon } from "./icons/Copy";
 import { Link as UiLink } from "./ui/link";
-import { Popover } from "./ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 
 const MAX_VALUE_LENGTH = 48;
 

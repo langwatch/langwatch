@@ -1,7 +1,7 @@
 import { Box, type IconProps, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { useColorModeValue } from "../../../../../components/ui/color-mode";
-import { Tooltip } from "../../../../../components/ui/tooltip";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type IconSizeKey, iconSizeToPixels } from "../../../../../utils/iconSize";
 import type { IconData } from "../../../regions/shared/types";
 import { SELECTED_SURFACE_BG, SELECTED_SURFACE_BORDER } from "./accent-surface";

@@ -49,7 +49,7 @@ import { type MappingState, mappingStateSchema } from "../../server/tracer/trace
 import { api } from "../../utils/api";
 import { EvaluatorTracesMapping } from "../evaluations/EvaluatorTracesMapping";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { EvaluatorSelection } from "./EvaluatorSelection";

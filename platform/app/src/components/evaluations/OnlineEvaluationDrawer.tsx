@@ -58,7 +58,7 @@ import { api } from "~/utils/api";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorShared";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { SmallLabel } from "../SmallLabel";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";
 import { StepRadio } from "./StepButton";
 

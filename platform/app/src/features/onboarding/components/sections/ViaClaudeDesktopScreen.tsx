@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { CodePreview } from "./observability/CodePreview";
 import { buildMcpJson, findLangwatchEnvLines } from "./shared/build-mcp-config";

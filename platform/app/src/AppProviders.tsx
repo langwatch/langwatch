@@ -8,7 +8,7 @@ import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
 import { EnterpriseSaasFooter } from "./components/enterprise/EnterpriseSaasFooter";
 import { GraphicsQualityProvider } from "./components/GraphicsQualityProvider";
-import { ColorModeProvider } from "./components/ui/color-mode";
+import { ColorModeProvider } from "@langwatch/design-system/color-mode";
 import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
 import { useNavigationV2Tracking } from "./features/navigation/useNavigationV2Tracking";

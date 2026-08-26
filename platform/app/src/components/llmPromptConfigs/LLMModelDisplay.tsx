@@ -4,7 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { MODEL_ICON_SIZE } from "./constants";
 
 export interface LLMModelDisplayProps extends StackProps {

@@ -7,7 +7,7 @@ import type { Snippet, Target } from "~/prompts/types";
 import { uppercaseFirstLetter } from "~/utils/stringCasing";
 import { RenderCode } from "./code/RenderCode";
 import { Dialog } from "./ui/dialog";
-import { Menu } from "./ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { SegmentedControl } from "./ui/segmented-control";
 
 /**

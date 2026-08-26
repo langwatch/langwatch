@@ -15,7 +15,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { toggleSupportChat } from "~/utils/crispBubblePolicy";
 import { DiscordOutlineIcon } from "../icons/DiscordOutline";
 import { Link } from "../ui/link";
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { SideMenuItem } from "./SideMenuLink";
 
 export type SupportMenuProps = {

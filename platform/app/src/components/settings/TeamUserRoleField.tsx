@@ -7,7 +7,7 @@ import {
   isTeamRoleAllowedForOrganizationRole,
   type TeamRoleValue,
 } from "../../utils/memberRoleConstraints";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 
 export type RoleOption = {
   label: string;

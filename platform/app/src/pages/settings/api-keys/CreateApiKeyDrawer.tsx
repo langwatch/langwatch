@@ -17,7 +17,7 @@ import {
   type ScopeChipPickerEntry,
 } from "../../../components/settings/ScopeChipPicker";
 import { Drawer } from "../../../components/ui/drawer";
-import { Select } from "../../../components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { getTeamRolePermissions } from "../../../server/api/rbac";
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
 import type { RouterOutputs } from "../../../utils/api";

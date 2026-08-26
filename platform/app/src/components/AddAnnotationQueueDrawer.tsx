@@ -24,7 +24,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
-import { Popover } from "../components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "../components/ui/toaster";
 import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
 import { FullWidthFormControl } from "./FullWidthFormControl";

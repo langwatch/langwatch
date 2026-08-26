@@ -10,7 +10,7 @@ import { modelProviderIcons } from "~/components/modelProviders/iconsMap";
 import { modelDisplayLabel } from "~/server/modelProviders/customModelDisplayNames";
 import { isLatestAlias, resolveLatestAlias } from "~/server/modelProviders/latestAliases";
 import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../llmPromptConfigs/constants";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface Props {
   /** Full model id of the form "provider/family-variant". */

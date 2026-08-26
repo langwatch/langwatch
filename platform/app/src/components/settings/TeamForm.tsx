@@ -26,13 +26,13 @@ import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { ConfirmDialog } from "../../components/gateway/ConfirmDialog";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
 import { Link } from "../../components/ui/link";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "../ui/toaster";
 import {
   TeamRoleSelect,

@@ -1,6 +1,6 @@
 import { Button, Text } from "@chakra-ui/react";
 import { Save } from "react-feather";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
  * Version Save Button

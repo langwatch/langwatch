@@ -3,7 +3,7 @@ import { ExternalLink } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { SummaryMetricValue } from "./SummaryMetric";
 
 export const FeedbacksTable = () => {

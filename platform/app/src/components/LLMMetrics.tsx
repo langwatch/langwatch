@@ -13,7 +13,7 @@ import { analyticsMetrics } from "../server/analytics/registry";
 import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
 import { LLMSummary } from "./analytics/LLMSummary";
 import { Link } from "./ui/link";
-import { Tooltip } from "./ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

@@ -10,7 +10,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { FieldErrors, Path, PathValue, UseFormSetValue } from "react-hook-form";
 import type { Dataset } from "~/generated/prisma/client";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 
 /**
  * What the picker has to show. An empty dropdown renders identically whether

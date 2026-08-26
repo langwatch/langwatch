@@ -9,7 +9,7 @@ import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
 import { RenderCode } from "../code/RenderCode";
 import { Checkbox } from "../ui/checkbox";
 import { Link } from "../ui/link";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 
 export function EvaluationManualIntegration({

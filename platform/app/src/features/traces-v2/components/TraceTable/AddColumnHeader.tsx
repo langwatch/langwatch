@@ -2,7 +2,7 @@ import { IconButton } from "@chakra-ui/react";
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { Plus } from "lucide-react";
 import type React from "react";
-import { Popover } from "../../../../components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import type { TraceListItem } from "../../types/trace";
 import { ColumnPickerContent } from "../Toolbar/ColumnPickerContent";
 

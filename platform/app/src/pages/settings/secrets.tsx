@@ -20,8 +20,8 @@ import { api } from "~/utils/api";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
-import { Menu } from "../../components/ui/menu";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export default function SecretsPage() {

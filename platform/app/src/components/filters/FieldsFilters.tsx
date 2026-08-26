@@ -34,11 +34,11 @@ import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Checkbox } from "../ui/checkbox";
-import { useColorRawValue } from "../ui/color-mode";
-import { InputGroup } from "../ui/input-group";
-import { Popover } from "../ui/popover";
-import { Slider } from "../ui/slider";
-import { Tooltip } from "../ui/tooltip";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Popover } from "@langwatch/design-system/popover";
+import { Slider } from "@langwatch/design-system/slider";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { SaveAsViewButton } from "./SaveAsViewButton";
 
 export function QueryStringFieldsFilters({

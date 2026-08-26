@@ -6,7 +6,7 @@ import {
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
-} from "../../../../components/ui/popover";
+} from "@langwatch/design-system/popover";
 
 interface LensNamePopoverProps {
   /** Pre-fill the name input (e.g. "All (copy)"). */

@@ -37,7 +37,7 @@ import { CopyExperimentDialog } from "../../components/experiments/CopyExperimen
 import { NavigationFooter, useNavigationFooter } from "../../components/NavigationFooter";
 import { OverflownTextWithTooltip } from "../../components/OverflownText";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
-import { Menu } from "../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

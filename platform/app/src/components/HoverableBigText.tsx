@@ -4,8 +4,8 @@ import { isJson } from "../utils/isJson";
 import { Markdown } from "./Markdown";
 import { RenderInputOutput } from "./traces/RenderInputOutput";
 import { Dialog } from "./ui/dialog";
-import { Switch } from "./ui/switch";
-import { Tooltip } from "./ui/tooltip";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function ExpandedTextDialog({
   open,

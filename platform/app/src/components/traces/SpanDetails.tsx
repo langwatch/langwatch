@@ -24,9 +24,9 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { evaluationPassed, evaluationStatusColor } from "../checks/EvaluationStatus";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Link } from "../ui/link";
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { RedactedField } from "../ui/RedactedField";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
 
 /**

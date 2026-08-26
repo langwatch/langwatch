@@ -15,7 +15,7 @@ import {
   MenuItem,
   MenuRoot,
   MenuSeparator,
-} from "../../../../components/ui/menu";
+} from "@langwatch/design-system/menu";
 import type { LensConfig } from "../../stores/viewStore";
 import { useViewStore } from "../../stores/viewStore";
 import { LensNameDialog } from "./LensNameDialog";

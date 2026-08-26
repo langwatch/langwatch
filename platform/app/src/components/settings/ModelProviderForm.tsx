@@ -25,7 +25,7 @@ import {
 } from "../../utils/modelProviderHelpers";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
-import { Switch } from "../ui/switch";
+import { Switch } from "@langwatch/design-system/switch";
 import { toaster } from "../ui/toaster";
 import { useCodexCodingDefaultsAskStore } from "./CodexCodingDefaultsAsk";
 import { CodexSignIn } from "./CodexSignIn";

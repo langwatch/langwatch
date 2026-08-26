@@ -8,7 +8,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 
 import { uppercaseFirstLetter } from "~/utils/stringCasing";
-import { Popover } from "../ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { ParameterPopoverContent } from "./ParameterPopoverContent";
 import { getParameterIcon, type ParameterConfig } from "./parameterConfig";
 

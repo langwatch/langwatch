@@ -11,7 +11,7 @@ import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
-import { Tooltip } from "../../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 interface InputWithPrefixProps {
   value: string;

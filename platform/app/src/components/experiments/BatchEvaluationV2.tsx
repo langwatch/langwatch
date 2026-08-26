@@ -20,7 +20,7 @@ import { Download, ExternalLink } from "react-feather";
 import type { Experiment, Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { Link } from "../../components/ui/link";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useDejaViewLink } from "../../hooks/useDejaViewLink";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";

@@ -22,7 +22,7 @@ import { ProviderScopeChips } from "../../../components/settings/ProviderScopeCh
 import { RegenerateApiKeyDialog } from "../../../components/settings/RegenerateApiKeyDialog";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { toaster } from "../../../components/ui/toaster";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { api, type RouterOutputs } from "../../../utils/api";

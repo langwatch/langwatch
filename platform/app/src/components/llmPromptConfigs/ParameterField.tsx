@@ -7,7 +7,7 @@
 
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 
-import { Slider } from "../ui/slider";
+import { Slider } from "@langwatch/design-system/slider";
 import { useSliderControl } from "./hooks/useSliderControl";
 import type {
   ParameterConfig,

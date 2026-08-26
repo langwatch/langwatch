@@ -13,7 +13,7 @@ import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { usePathname } from "~/utils/compat/next-navigation";
 import { RandomColorAvatar } from "./RandomColorAvatar";
-import { Menu } from "./ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 /**
  * One queue in the sidebar list. The queue's own actions live here rather than

@@ -55,7 +55,7 @@ import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { DevBadge } from "./ui/DevBadge";
 import { Link } from "./ui/link";
-import { Menu } from "./ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 

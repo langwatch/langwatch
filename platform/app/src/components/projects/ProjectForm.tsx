@@ -17,7 +17,7 @@ import { type Control, Controller, type SubmitHandler, useForm } from "react-hoo
 import { applyHandledErrorToForm, HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 import {
   NEW_TEAM_VALUE,
   validateNewTeamName,

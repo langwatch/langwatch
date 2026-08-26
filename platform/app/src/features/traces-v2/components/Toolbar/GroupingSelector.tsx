@@ -9,7 +9,7 @@ import {
   MenuRadioItemGroup,
   MenuRoot,
   MenuTrigger,
-} from "../../../../components/ui/menu";
+} from "@langwatch/design-system/menu";
 import type { GroupingMode } from "../../stores/viewStore";
 import { useViewStore } from "../../stores/viewStore";
 

@@ -14,7 +14,7 @@ import {
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
 import { WeaviateIcon } from "../../components/icons/WeaviateIcon";
-import { useColorModeValue } from "../../components/ui/color-mode";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import type { ComponentType } from "@langwatch/workflow-contract";
 
 const sizeMap = {

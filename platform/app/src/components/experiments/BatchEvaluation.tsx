@@ -18,7 +18,7 @@ import Parse from "papaparse";
 import { Download } from "react-feather";
 import type { BatchEvaluation, Experiment, Project } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatMoney } from "../../utils/formatMoney";
 
 export default function BatchEvaluation({

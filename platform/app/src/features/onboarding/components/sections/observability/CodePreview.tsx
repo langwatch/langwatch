@@ -10,9 +10,9 @@ import { Check, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { HighlighterGeneric } from "shiki";
-import { useColorMode } from "../../../../../components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { toaster } from "../../../../../components/ui/toaster";
-import { Tooltip } from "../../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { InlineCopyButton } from "../shared/InlineCopyButton";
 
 /**

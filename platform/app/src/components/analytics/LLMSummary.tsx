@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { Link } from "../ui/link";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 
 export const LLMSummary = () => {

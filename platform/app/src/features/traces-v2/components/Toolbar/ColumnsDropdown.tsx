@@ -3,7 +3,7 @@ import { ChevronDown, Columns3 } from "lucide-react";
 import type React from "react";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Popover } from "../../../../components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { ColumnPickerContent } from "./ColumnPickerContent";
 
 /**

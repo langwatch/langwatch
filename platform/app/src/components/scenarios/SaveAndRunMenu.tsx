@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
-import { Popover } from "../ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import type { TargetValue } from "./TargetSelector";
 import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 

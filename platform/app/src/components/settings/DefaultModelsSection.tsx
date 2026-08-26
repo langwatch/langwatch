@@ -60,7 +60,7 @@ import { scopeBreadthRank } from "~/utils/scopeBreadth";
 // the page instead of rendering inline inside the <td>, which would
 // push the row's other cells to a wrapped line on open (caught on
 // 2026-05-18 dogfood, Image #118).
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { ModelChip } from "./ModelChip";
 import { type ScopeFilter, ScopeFilter as ScopeFilterComponent } from "./ScopeFilter";
 

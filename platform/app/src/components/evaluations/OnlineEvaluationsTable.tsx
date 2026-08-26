@@ -15,7 +15,7 @@ import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import Link from "~/utils/compat/next-link";
 
 import { ListTable } from "../ui/ListTable";
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import {
   type OnlineEvaluationPerformance,
   PerformancePreview,

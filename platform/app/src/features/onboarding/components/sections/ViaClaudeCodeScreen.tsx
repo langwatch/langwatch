@@ -8,7 +8,7 @@ import { useAnalytics } from "react-contextual-analytics";
 const MotionVStack = motion.create(VStack);
 
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import {
   PROMPT_AGENT_PERFORMANCE,

@@ -7,7 +7,7 @@ import { hasPermissionWithHierarchy, teamRoleHasPermission } from "../../server/
 import { api } from "../../utils/api";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { toaster } from "../ui/toaster";
 
 export const CopyExperimentDialog = ({

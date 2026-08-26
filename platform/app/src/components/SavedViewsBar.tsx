@@ -45,7 +45,7 @@ import { getOriginColor } from "../utils/originColors";
 import { getColorForString } from "../utils/rotatingColors";
 import { ConfirmDialog } from "./gateway/ConfirmDialog";
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
-import { Menu } from "./ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 /**
  * Returns badge colors for a view.

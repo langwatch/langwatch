@@ -15,9 +15,9 @@ import { UserAvatar } from "~/components/UserAvatar";
 import type { Project } from "~/generated/prisma/client";
 
 import { HistoryIcon } from "../../components/icons/History";
-import { Popover } from "../../components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { workflowApi } from "../../utils/workflow-api";

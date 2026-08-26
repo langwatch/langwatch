@@ -2,7 +2,7 @@ import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { FieldInfoTooltip } from "../ui/FieldInfoTooltip";
-import { Select } from "../ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { InfoWithoutSelecting } from "./InfoWithoutSelecting";
 import {
   LITE_MEMBER_EXPLANATION,

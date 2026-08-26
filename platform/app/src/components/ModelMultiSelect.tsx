@@ -6,7 +6,7 @@ import { titleCase } from "../utils/stringCasing";
 import { MODEL_ICON_SIZE } from "./llmPromptConfigs/constants";
 import { allModelOptions, useModelSelectionOptions } from "./ModelSelector";
 import { Checkbox } from "./ui/checkbox";
-import { InputGroup } from "./ui/input-group";
+import { InputGroup } from "@langwatch/design-system/input-group";
 
 /**
  * Grouped, searchable multi-select over the project's available models.

@@ -10,7 +10,7 @@ import {
   useModelSelectionOptions,
 } from "../../components/ModelSelector";
 import { SmallLabel } from "../../components/SmallLabel";
-import { InputGroup } from "../../components/ui/input-group";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useWorkflowStore } from "@langwatch/workflow-web";

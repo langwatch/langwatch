@@ -9,7 +9,7 @@ import {
 import numeral from "numeral";
 import { HelpCircle } from "react-feather";
 import { Delayed } from "../Delayed";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function SummaryMetric({
   label,

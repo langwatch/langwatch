@@ -4,7 +4,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import numeral from "numeral";
 import React, { useEffect, useMemo, useState } from "react";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FormatMoney } from "../../../optimization_studio/components/FormatMoney";
 import type { AppRouter } from "../../../server/api/root";
 import type { ExperimentRun } from "../../../server/experiments-v3/services/types";

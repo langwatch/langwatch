@@ -18,7 +18,7 @@ import { trackEvent } from "../utils/tracking";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { UserAvatar } from "./UserAvatar";
 import { Link } from "./ui/link";
-import { Menu } from "./ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 const GRAPHICS_OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
   auto: "Auto",

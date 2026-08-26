@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useAgentPickerFlow } from "../../hooks/useAgentPickerFlow";
 import { useEvaluatorPickerFlow } from "../../hooks/useEvaluatorPickerFlow";
 import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";

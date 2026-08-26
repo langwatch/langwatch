@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { FilterToggle } from "../filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { PageLayout } from "../ui/layouts/PageLayout";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export interface AnalyticsHeaderProps {
   title: string;

@@ -6,7 +6,7 @@ import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { FilterField } from "../../server/filters/types";
 import { URL_QS_PARSE_OPTIONS } from "../../utils/qsParseOptions";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FilterIconWithBadge } from "./FilterIconWithBadge";
 
 /**

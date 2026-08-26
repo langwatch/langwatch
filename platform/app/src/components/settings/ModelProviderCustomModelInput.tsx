@@ -8,7 +8,7 @@ import type {
 import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { SmallLabel } from "../SmallLabel";
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { AddCustomEmbeddingsModelDialog } from "./AddCustomEmbeddingsModelDialog";
 import { AddCustomModelDialog } from "./AddCustomModelDialog";
 import { RegistryModelsModal } from "./RegistryModelsModal";

@@ -1,7 +1,7 @@
 import { Box, Table, Text, VStack } from "@chakra-ui/react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { SummaryMetricValue } from "./SummaryMetric";
 
 export const DocumentsCountsTable = () => {

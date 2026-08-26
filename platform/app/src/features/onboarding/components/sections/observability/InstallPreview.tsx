@@ -9,7 +9,7 @@ import {
 import type React from "react";
 import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
-import { useColorMode } from "../../../../../components/ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import type { InstallMatrix } from "../../../regions/observability/codegen/registry";
 
 interface InstallPreviewProps {

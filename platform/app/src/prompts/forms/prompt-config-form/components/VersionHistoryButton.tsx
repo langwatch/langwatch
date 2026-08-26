@@ -1,5 +1,5 @@
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
 
 export function VersionHistoryButton({

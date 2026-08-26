@@ -5,7 +5,7 @@ import { LuArrowRight, LuRocket } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 
-import { useColorModeValue } from "../ui/color-mode";
+import { useColorModeValue } from "@langwatch/design-system/color-mode";
 
 // Amber → orange → violet palette so the governance hero visually rhymes with
 // the home announcements (same MeshGradient + glass-card shape as

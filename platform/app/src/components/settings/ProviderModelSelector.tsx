@@ -9,8 +9,8 @@ import {
 } from "../../server/modelProviders/latestAliases";
 import { titleCase } from "../../utils/stringCasing";
 import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../llmPromptConfigs/constants";
-import { InputGroup } from "../ui/input-group";
-import { Select } from "../ui/select";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Select } from "@langwatch/design-system/select";
 
 type ModelOption = {
   label: string;

@@ -30,10 +30,10 @@ import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
 import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "./llmPromptConfigs/constants";
 import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
-import { InputGroup } from "./ui/input-group";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import { Link } from "./ui/link";
-import { Select } from "./ui/select";
-import { Tooltip } from "./ui/tooltip";
+import { Select } from "@langwatch/design-system/select";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export type ModelOption = {
   label: string;

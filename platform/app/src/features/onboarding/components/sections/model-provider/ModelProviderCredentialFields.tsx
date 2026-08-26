@@ -2,7 +2,7 @@ import { Field, HStack, IconButton, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
-import { Tooltip } from "../../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { DerivedFieldMeta } from "../../../../../hooks/useModelProviderFields";
 import type { FieldMetadata } from "../../../regions/model-providers/types";
 import { InputWithPrefix } from "../shared/InputWithPrefix";

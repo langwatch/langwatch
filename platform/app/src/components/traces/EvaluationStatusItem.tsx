@@ -21,8 +21,8 @@ import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import { evaluationPassed, evaluationStatusColor } from "../checks/EvaluationStatus";
 import { HoverableBigText } from "../HoverableBigText";
-import { Menu } from "../ui/menu";
-import { Tooltip } from "../ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;

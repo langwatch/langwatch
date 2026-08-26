@@ -11,7 +11,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 
 import { PageLayout } from "../ui/layouts/PageLayout";
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 export const CreateExperimentButton = () => {
   const { project, hasPermission } = useOrganizationTeamProject();

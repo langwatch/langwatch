@@ -1,4 +1,4 @@
-import { useColorMode } from "../ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 
 export function FullLogo({
   width = 155,

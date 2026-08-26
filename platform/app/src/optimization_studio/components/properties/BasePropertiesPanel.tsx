@@ -20,7 +20,7 @@ import { type FieldTypeOption, FieldTypeSelect } from "@langwatch/prompt-web";
 import { getTypeLabel } from "@langwatch/prompt-web";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { toaster } from "../../../components/ui/toaster";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_MODEL } from "../../../utils/constants";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import { useInsideDrawer, useWorkflowStore } from "@langwatch/workflow-web";

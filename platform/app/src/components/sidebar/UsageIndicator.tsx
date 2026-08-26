@@ -7,7 +7,7 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 import type { UsageUnit } from "../../server/app-layer/usage/usage-meter-policy";
 import { api } from "../../utils/api";
 import { Link } from "../ui/link";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 const MENU_ITEM_HEIGHT = "32px";
 

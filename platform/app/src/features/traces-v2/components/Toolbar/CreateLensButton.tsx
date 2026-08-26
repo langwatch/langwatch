@@ -1,7 +1,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import type React from "react";
 import { LuPlus } from "react-icons/lu";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useViewStore } from "../../stores/viewStore";
 import { LensNamePopover } from "./LensNamePopover";
 

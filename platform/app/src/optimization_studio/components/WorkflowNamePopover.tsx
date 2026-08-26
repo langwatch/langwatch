@@ -10,8 +10,8 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { Popover } from "../../components/ui/popover";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Popover } from "@langwatch/design-system/popover";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import { WorkflowIcon } from "./ColorfulBlockIcons";
 import { EmojiPickerModal } from "./properties/modals/EmojiPickerModal";

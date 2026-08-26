@@ -13,7 +13,7 @@ import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
 import { useRouter } from "~/utils/compat/next-router";
-import { Popover } from "./ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 
 /** Date range used for time-based filtering across the app. */
 export type Period = { startDate: Date; endDate: Date };

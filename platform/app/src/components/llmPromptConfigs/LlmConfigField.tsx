@@ -10,7 +10,7 @@ import { AddModelProviderKey } from "~/optimization_studio/components/AddModelPr
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { ModelOption } from "~/server/app-layer/topic-clustering/clustering.types";
 import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
-import { Popover } from "../ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 import { LLMModelDisplay } from "./LLMModelDisplay";
 
 type LLMConfigFieldProps = {

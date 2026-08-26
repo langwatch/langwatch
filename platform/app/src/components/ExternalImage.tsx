@@ -1,7 +1,7 @@
 import { Box, Image, Portal, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "~/hooks/useEscapeKey";
-import { Tooltip } from "../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 export const getImageUrl = (str: unknown): string | null => {
   if (!str) {

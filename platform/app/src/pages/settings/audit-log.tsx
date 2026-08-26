@@ -25,7 +25,7 @@ import { NavigationFooter } from "../../components/NavigationFooter";
 import { PeriodSelector, usePeriodSelector } from "../../components/PeriodSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
-import { InputGroup } from "../../components/ui/input-group";
+import { InputGroup } from "@langwatch/design-system/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

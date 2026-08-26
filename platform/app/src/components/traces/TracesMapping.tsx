@@ -28,7 +28,7 @@ import {
   TRACE_MAPPINGS,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
-import { Switch } from "../ui/switch";
+import { Switch } from "@langwatch/design-system/switch";
 
 /** Trace field options for the threads sub-field selector, excluding thread sources themselves. */
 const THREAD_SUB_FIELD_OPTIONS = Object.keys(TRACE_MAPPINGS)

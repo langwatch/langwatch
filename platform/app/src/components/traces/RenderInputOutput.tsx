@@ -6,9 +6,9 @@ import { collectMediaParts, type MediaPartData } from "~/shared/traces/mediaPart
 import { isPythonRepr, parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 import dynamic from "~/utils/compat/next-dynamic";
 import { CopyIcon } from "../icons/Copy";
-import { useColorMode } from "../ui/color-mode";
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { toaster } from "../ui/toaster";
-import { Tooltip } from "../ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TraceMediaPart } from "./TraceMediaPart";
 
 const ReactJson = dynamic(() => import("@microlink/react-json-view"), {

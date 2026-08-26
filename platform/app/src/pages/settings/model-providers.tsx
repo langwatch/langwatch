@@ -30,9 +30,9 @@ import { DefaultModelsSection } from "../../components/settings/DefaultModelsSec
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
 import { Dialog } from "../../components/ui/dialog";
-import { Menu } from "../../components/ui/menu";
-import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
 import {

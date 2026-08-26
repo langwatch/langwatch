@@ -2,7 +2,7 @@ import { Input } from "@chakra-ui/react";
 import { useState } from "react";
 import { FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
 import { toaster } from "../components/ui/toaster";
-import { InputGroup, type InputGroupProps } from "./ui/input-group";
+import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
 
 export function CopyInput(
   props: {

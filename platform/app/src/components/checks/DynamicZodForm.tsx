@@ -36,8 +36,8 @@ import {
 } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
 import { PropertySectionTitle } from "../ui/PropertySectionTitle";
-import { Switch } from "../ui/switch";
-import { Tooltip } from "../ui/tooltip";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 
 // Simple component to handle model disabled check

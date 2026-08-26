@@ -12,7 +12,7 @@ import {
 import { Plus, Users } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { Select } from "../../components/ui/select";
+import { Select } from "@langwatch/design-system/select";
 import { RandomColorAvatar } from "../RandomColorAvatar";
 
 export const AddParticipants = ({

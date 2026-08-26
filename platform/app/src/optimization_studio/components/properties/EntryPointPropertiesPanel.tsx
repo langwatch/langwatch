@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { type Variable, VariablesSection } from "~/components/variables";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Entry, Field } from "@langwatch/workflow-contract";

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle } from "react-feather";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { useColorRawValue } from "../../../../../components/ui/color-mode";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 
 export function WaitingForTracesChip(): React.ReactElement {

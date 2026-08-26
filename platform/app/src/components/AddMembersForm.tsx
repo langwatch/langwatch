@@ -37,7 +37,7 @@ import {
   teamRolesOptions,
 } from "./settings/TeamUserRoleField";
 import { FieldInfoTooltip } from "./ui/FieldInfoTooltip";
-import { Select } from "./ui/select";
+import { Select } from "@langwatch/design-system/select";
 
 type Option = { label: string; value: string; description?: string };
 

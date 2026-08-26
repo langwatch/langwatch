@@ -24,7 +24,7 @@ import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
-import { Menu } from "../ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
 export type EvaluatorListDrawerProps = {

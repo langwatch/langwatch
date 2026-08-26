@@ -4,8 +4,8 @@ import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { Link } from "./ui/link";
-import { Menu } from "./ui/menu";
-import { Tooltip } from "./ui/tooltip";
+import { Menu } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
 
