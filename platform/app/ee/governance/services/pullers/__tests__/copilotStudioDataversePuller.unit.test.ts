@@ -25,6 +25,13 @@ let capturedCalls: FetchCall[] = [];
 let responseQueue: Array<{ status: number; body: unknown }> = [];
 let warnings: string[] = [];
 let errors: string[] = [];
+
+/** One captured log call, with its structured context readable. */
+function captured(args: unknown[]): string {
+  return args
+    .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+    .join(" ");
+}
 let transcripts: TranscriptTable | null = null;
 
 /**
@@ -239,11 +246,17 @@ beforeEach(() => {
   // diagnostic one: the misconfiguration it has to survive is also the one it
   // has to name, and a warning nobody asserts is a warning that can be
   // deleted without a single test noticing.
+  //
+  // Serialised rather than `String()`-ed, and that is the whole point of
+  // `captured`. Every one of these calls is `logger.x({ context }, "message")`
+  // — the context object is the argument that could carry a leaked secret, and
+  // `String({ error: "..." })` is `"[object Object]"`. A redaction assertion
+  // over that string can only ever see the message.
   vi.doMock("@langwatch/observability", async (importOriginal) => ({
     ...(await importOriginal<Record<string, unknown>>()),
     createLogger: () => ({
-      warn: (...args: unknown[]) => warnings.push(args.map(String).join(" ")),
-      error: (...args: unknown[]) => errors.push(args.map(String).join(" ")),
+      warn: (...args: unknown[]) => warnings.push(captured(args)),
+      error: (...args: unknown[]) => errors.push(captured(args)),
       info: () => undefined,
       debug: () => undefined,
     }),
