@@ -27,19 +27,25 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   captureException,
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+import type { SourceType } from "../activity-monitor/ingestionSource.service";
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
-import { mapGenieEventsToTraceRequest } from "./genieTraceMapper";
+import {
+  type ConversationRoutingProfile,
+  GENIE_ROUTING_PROFILE,
+  mapGenieEventsToTraceRequest,
+} from "./genieTraceMapper";
 import {
   type NormalizedPullEvent,
   type PullResult,
@@ -326,10 +332,55 @@ async function writePulledEvents({
 }
 
 /**
+ * The source types that carry conversations, and what each contributes to
+ * the ones it routes. A type absent from here routes nothing — which is the
+ * honest answer for a source that pulls totals rather than conversations.
+ *
+ * The composer keeps its own list (`routesConversations` in
+ * ingestionSourceCatalog.tsx) for deciding whether to offer the picker at
+ * all. The two are deliberately separate: that one shapes a form, this one
+ * decides what reaches a customer's project.
+ */
+// A Map, not an object literal: `sourceType` is a free-form column read back
+// from the database, and indexing an object with it answers "constructor",
+// "toString" or "__proto__" with a truthy prototype member. That would pass
+// the guard below with a profile whose `conversationAction` is undefined —
+// which an event carrying no action then matches, routing a fabricated span
+// into a customer's project. A Map has no prototype keys to inherit.
+//
+// Keys are declared `SourceType` so a misspelled entry fails the build, but the
+// map is held as `ReadonlyMap<string, …>` because the lookup value is the raw
+// database column: narrowing the lookup would only force a cast at the call.
+const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
+  string,
+  ConversationRoutingProfile
+> = new Map<SourceType, ConversationRoutingProfile>([
+  ["databricks_genie", GENIE_ROUTING_PROFILE],
+]);
+
+/**
+ * The registry's only reader outside this module.
+ *
+ * Routing nothing is also what a missing action does, so a test that only
+ * watches behaviour cannot tell the prototype-key guard from the action one —
+ * it needs to read the lookup. It reads it through here rather than through
+ * the map itself: `ReadonlyMap` is a compile-time promise, so exporting the
+ * map would hand every module a registry one cast away from accepting a
+ * source type nobody wrote a conversation shape for. Which is the thing this
+ * whole path exists to refuse.
+ */
+export function conversationRoutingProfileFor(
+  sourceType: string,
+): ConversationRoutingProfile | undefined {
+  return CONVERSATION_ROUTING_PROFILES.get(sourceType);
+}
+
+/**
  * ADR-088 v7 (Decisions 8–14): conversation-bearing pulled events additionally
  * flow through the standard trace door into the source's chosen destination
- * project. Aggregate pulls never route — only `genie_query` events are
- * conversations.
+ * project. Aggregate pulls never route, and neither does a source with no
+ * entry in `CONVERSATION_ROUTING_PROFILES`; a source that has one routes the
+ * events its own profile names as conversations.
  *
  * Tenancy + redaction (Decision 13): the destination project id is the tenant,
  * and the redaction level passed is the same `DEFAULT_PII_REDACTION_LEVEL`
@@ -367,10 +418,22 @@ export async function routeConversationsToTraceDestination({
 }): Promise<void> {
   if (!source.traceProjectId) return;
 
-  const request = mapGenieEventsToTraceRequest(events, {
-    ingestionSourceId: source.id,
-    organizationId: source.organizationId,
-    sourceType: source.sourceType,
+  // A destination is an ordinary stored column: the write path checks the
+  // project is this org's and live, never that this kind of source carries
+  // conversations at all — only the composer declines to offer the picker.
+  // So the source type has to earn its way in here, and one we have no
+  // conversation shape for routes nothing rather than being guessed at.
+  const profile = CONVERSATION_ROUTING_PROFILES.get(source.sourceType);
+  if (!profile) return;
+
+  const request = mapGenieEventsToTraceRequest({
+    events,
+    origin: {
+      ingestionSourceId: source.id,
+      organizationId: source.organizationId,
+      sourceType: source.sourceType,
+      profile,
+    },
   });
   if (!request) return;
 
@@ -444,7 +507,12 @@ async function pulledUsageCostEnabled(
 ): Promise<boolean> {
   return await featureFlagService.isEnabled(
     "release_pulled_usage_cost_enabled",
-    { distinctId: organizationId, organizationId },
+    {
+      distinctId: organizationId,
+      // Pulled usage is priced for a whole organization.
+      projectId: NOT_TARGETED,
+      organizationId,
+    },
   );
 }
 

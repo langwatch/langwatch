@@ -34,6 +34,15 @@ const registry = {
     ],
   },
 
+  // ---- dataset storage ----
+  storage_not_writable: {
+    tips: [
+      "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",
+      "Or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory and restart the service",
+      "The server log line next to this failure names the directory that was refused",
+    ],
+  },
+
   // ---- traces ----
   trace_not_found: {
     tips: [
@@ -313,6 +322,18 @@ const registry = {
     ],
   },
 
+  // ---- agent cache ----
+  // Read by agent code inside a run, so the tips name the next call rather
+  // than a page to open.
+  cache_entry_not_found: {
+    tips: [
+      "Store the entry before you read it; a read never creates one",
+      "Check the name, which is case sensitive",
+      "An entry is gone once its lifetime passes; store it again with a longer one if the run needs it for longer",
+    ],
+    docsPath: "/agent-simulations/authenticated-agents",
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [
@@ -372,6 +393,20 @@ const registry = {
       "Or pick an existing one: langwatch evaluator list",
     ],
     docsPath: "/evaluations/evaluators/list",
+  },
+
+  // ---- default models ----
+  model_not_configured: {
+    // The write is almost always organization scoped: providers are org rows,
+    // and the onboarding seed lands the default config at ORGANIZATION so the
+    // whole organization inherits. Naming the page AND the scope is what makes
+    // this recoverable without a support round trip.
+    tips: [
+      "Open Settings, then Default Models, and set a model for the role in meta.role",
+      "Set it at the organization scope so every team and project inherits it; a project scope covers that project only",
+      "Enabling a provider is not enough on its own: the role still needs a model chosen for it",
+    ],
+    docsPath: "/platform/model-providers",
   },
 
   // ---- langy ----

@@ -84,11 +84,91 @@ export type {
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
 export { IdentityService } from "./identity.service";
+export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
+export { MfaGuards } from "./mfa-guards";
+export {
+  type SignInBreakGlassLimiter,
+  type SignInDomainRoutingPort,
+  type SignInMethodPolicyPort,
+  type SignInRouteRequest,
+  SignInRouterService,
+  type SignInRouterDeps,
+  type SignInRoutingRecord,
+  type SignInRoutingRecorder,
+} from "./signin-router.service";
 export type {
   IdentityAdoptionWrites,
   IdentityCeremonyWrites,
+  IdentityLinkProposalWrites,
   IdentityVerificationWrites,
 } from "./identity-writes";
+export {
+  IdentityJitDisabledError,
+  IdentityLinkProposedError,
+} from "./signin-callback-errors";
+export {
+  type CallbackAssertion,
+  type CallbackAuditRecord,
+  type CallbackLinkOutcome,
+  type CallbackUserMatch,
+  type SignInCallbackAudit,
+  type SignInCallbackDirectoryPort,
+  SignInCallbackLinkingService,
+  type SignInCallbackLinkingDeps,
+} from "./signin-callback-linking.service";
+export {
+  JoinRequestGuards,
+  type JoinRequestGuardsDeps,
+} from "./join-request-guards";
+export {
+  approveJoinCommandId,
+  expireJoinCommandId,
+  newJoinRequestCommandId,
+  newJoinRequestId,
+} from "./join-request-id";
+export type { JoinRequestLedger } from "./join-request-ledger";
+export type {
+  JoinCandidateRepository,
+  JoinRequestReadRepository,
+} from "./join-request.repository";
+export { JoinRequestService } from "./join-request.service";
+export {
+  SCIM_APPLY_MAX_ATTEMPTS,
+  ScimSyncGuards,
+} from "./scim-sync-guards";
+export { newScimSyncCommandId } from "./scim-sync-id";
+export type { ScimSyncLedger } from "./scim-sync-ledger";
+export type { ScimSyncReadRepository } from "./scim-sync.repository";
+export {
+  type LegacySsoOrganizationRepository,
+  type SsoConnectionGrandfatherDeps,
+  type SsoConnectionGrandfatherOutcome,
+  SsoConnectionGrandfatherService,
+} from "./sso-connection-grandfather.service";
+export {
+  SsoConnectionGuards,
+  type SsoConnectionGuardsDeps,
+} from "./sso-connection-guards";
+export {
+  grandfatherCommandId,
+  grandfatheredSsoConnectionId,
+  newSsoConnectionCommandId,
+  newSsoConnectionId,
+} from "./sso-connection-id";
+export type { SsoConnectionLedger } from "./sso-connection-ledger";
+export {
+  ShadowComparingDomainRoutingRepository,
+  type SsoConnectionRoutingShadowDeps,
+  type SsoConnectionRoutingShadowRecord,
+  type SsoConnectionRoutingShadowRecorder,
+} from "./sso-connection-routing-shadow";
+export type {
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
+} from "./sso-connection.repository";
+export { SsoConnectionService } from "./sso-connection.service";
 export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,

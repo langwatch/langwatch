@@ -454,7 +454,8 @@ describe.skipIf(!hasTestcontainers)(
           queues = queues.filter((q) => q !== queue);
           await expect(queue.close()).resolves.toBeUndefined();
 
-          // Sending after close throws
+          // Sending after close throws. The gate sits at the end of the
+          // drain, so the refusal names the finished drain.
           await expect(
             queue.send({
               id: "job-after-close",

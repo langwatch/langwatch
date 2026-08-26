@@ -599,8 +599,12 @@ function HydratedRowsCard({
   projectSlug: string | null;
 }) {
   const { noun } = descriptor;
+  // `returned` is how many rows came back and is what the skeletons stand in
+  // for. It is NOT the size of the result: an oversized read is reduced before
+  // it is recorded, so the title takes the digest's total and falls back to the
+  // sample only when there is no total to have.
   const returned = digest?.counts?.returned ?? null;
-  const total = hydration.totalCount ?? returned;
+  const total = hydration.totalCount ?? digest?.counts?.total ?? returned;
   const title =
     total !== null
       ? `${total.toLocaleString()} ${total === 1 ? noun.singular : noun.plural}`

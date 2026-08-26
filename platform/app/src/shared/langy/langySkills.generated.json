@@ -120,7 +120,7 @@
 	{
 		"id": "prompt-optimization",
 		"label": "Prompt optimization",
-		"description": "Improve a prompt on the evaluations workbench through a measured loop. Duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
+		"description": "Improve a prompt on the evaluations workbench through a measured loop. Score the baseline first, then duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's \"Optimize this prompt\" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.",
 		"category": "skill"
 	},
 	{

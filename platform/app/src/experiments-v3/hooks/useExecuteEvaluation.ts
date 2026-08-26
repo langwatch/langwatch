@@ -4,19 +4,19 @@ import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
 import { describeError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import {
   type EvaluationV3Event,
-  type ExecutionRequest,
   type ExecutionScope,
   UNNAMED_FAILURE,
 } from "~/server/experiments-v3/execution/types";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { buildExecutionRequest } from "../execution/buildExecutionRequest";
 import {
-  computeExecutionCells,
-  createExecutionCellSet,
-} from "../utils/executionScope";
-import { toComparisonConfig } from "../utils/normalizeComparison";
+  applyEvaluatorResult,
+  applyTargetError,
+  applyTargetOutput,
+} from "../execution/resultsFold";
+import { createExecutionCellSet } from "../utils/executionScope";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 // ============================================================================
@@ -43,8 +43,18 @@ export type UseExecuteEvaluationReturn = {
   error: string | null;
   /** Whether an abort request is in progress */
   isAborting: boolean;
-  /** Start execution with given scope */
-  execute: (scope?: ExecutionScope) => Promise<void>;
+  /**
+   * Start execution with given scope.
+   *
+   * `onRunStarted` fires as soon as the run has an id, before any cell lands.
+   * A caller that has to ANSWER with the run id (the assistant's UI action)
+   * cannot wait for the whole run, and the id is only minted once the stream
+   * opens.
+   */
+  execute: (
+    scope?: ExecutionScope,
+    options?: { onRunStarted?: (runId: string) => void },
+  ) => Promise<void>;
   /** Re-run a single evaluator for a specific cell, using existing target output */
   rerunEvaluator: (
     rowIndex: number,
@@ -126,9 +136,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
 
   /**
-   * Helper to update target output in the store.
-   * Uses functional update to properly merge with existing state.
-   * Also marks all evaluators for this cell as "running" since they start after target output.
+   * Write one target's output into the store.
+   *
+   * The fold itself is `execution/resultsFold.ts`; what stays here is the store
+   * write, so the same cell arithmetic can be run and asserted without a store.
    */
   const updateTargetOutput = useCallback(
     (
@@ -137,60 +148,21 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       output: unknown,
       metadata?: { cost?: number; duration?: number; traceId?: string },
     ) => {
-      // Use the store's setState directly for atomic updates
-      useEvaluationsV3Store.setState((state) => {
-        // Deep copy the target's array, or create new if doesn't exist
-        const existingOutputs = state.results.targetOutputs[targetId] ?? [];
-        const newOutputs = [...existingOutputs];
-        newOutputs[rowIndex] = output;
-
-        // Deep copy metadata if provided
-        let newMetadata = state.results.targetMetadata;
-        if (metadata) {
-          const existingMeta = state.results.targetMetadata[targetId] ?? [];
-          const newMeta = [...existingMeta];
-          newMeta[rowIndex] = metadata;
-          newMetadata = {
-            ...state.results.targetMetadata,
-            [targetId]: newMeta,
-          };
-        }
-
-        // Mark all evaluators for this cell as "running"
-        // They will be removed when their results arrive
-        const newRunningEvaluators = new Set(
-          state.results.runningEvaluators ?? [],
-        );
-        for (const evaluator of state.evaluators) {
-          newRunningEvaluators.add(`${rowIndex}:${targetId}:${evaluator.id}`);
-        }
-
-        return {
-          results: {
-            ...state.results,
-            targetOutputs: {
-              ...state.results.targetOutputs,
-              [targetId]: newOutputs,
-            },
-            targetMetadata: newMetadata,
-            runningEvaluators: newRunningEvaluators,
-          },
-        };
-      });
+      useEvaluationsV3Store.setState((state) => ({
+        results: applyTargetOutput({
+          results: state.results,
+          rowIndex,
+          targetId,
+          output,
+          metadata,
+          evaluatorIds: state.evaluators.map((evaluator) => evaluator.id),
+        }),
+      }));
     },
     [],
   );
 
-  /**
-   * Helper to update target error in the store.
-   *
-   * Stores the failure, not the sentence: the engine's raw string in `errors`
-   * and the failure's CODE beside it in `targetMetadata`. The cell derives its
-   * copy from the code at render time (`describeCellFailure`), so rewriting an
-   * error's copy changes what every past run says — where concatenating the
-   * rendered title and description into `errors` froze one release's words
-   * into the workbench's autosaved state, then re-parsed them with a regex.
-   */
+  /** Write one target's failure into the store. */
   const updateTargetError = useCallback(
     (
       rowIndex: number,
@@ -198,42 +170,20 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       errorMsg: string,
       domainError?: SerializedHandledError,
     ) => {
-      useEvaluationsV3Store.setState((state) => {
-        const existingErrors = state.results.errors[targetId] ?? [];
-        const newErrors = [...existingErrors];
-        newErrors[rowIndex] = errorMsg;
-
-        const existingMeta = state.results.targetMetadata[targetId] ?? [];
-        const newMeta = [...existingMeta];
-        newMeta[rowIndex] = { ...(newMeta[rowIndex] ?? {}), domainError };
-
-        // NOTE: We do NOT remove the cell from executingCells here.
-        // The cell stays in executingCells until execution cleanup happens.
-        // TargetCell's isLoading checks for both (cell in executingCells AND no output/error).
-
-        return {
-          results: {
-            ...state.results,
-            errors: {
-              ...state.results.errors,
-              [targetId]: newErrors,
-            },
-            targetMetadata: {
-              ...state.results.targetMetadata,
-              [targetId]: newMeta,
-            },
-            // Keep executingCells unchanged
-          },
-        };
-      });
+      useEvaluationsV3Store.setState((state) => ({
+        results: applyTargetError({
+          results: state.results,
+          rowIndex,
+          targetId,
+          error: errorMsg,
+          domainError,
+        }),
+      }));
     },
     [],
   );
 
-  /**
-   * Helper to update evaluator result in the store.
-   * Also removes the evaluator from runningEvaluators since it has completed.
-   */
+  /** Write one evaluator's result into the store. */
   const updateEvaluatorResult = useCallback(
     (
       rowIndex: number,
@@ -241,40 +191,15 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       evaluatorId: string,
       result: unknown,
     ) => {
-      useEvaluationsV3Store.setState((state) => {
-        const existingTargetResults =
-          state.results.evaluatorResults[targetId] ?? {};
-        const existingEvalResults = existingTargetResults[evaluatorId] ?? [];
-        const newEvalResults = [...existingEvalResults];
-        newEvalResults[rowIndex] = result;
-
-        // Remove this evaluator from runningEvaluators
-        let newRunningEvaluators = state.results.runningEvaluators;
-        if (newRunningEvaluators) {
-          const evaluatorKey = `${rowIndex}:${targetId}:${evaluatorId}`;
-          if (newRunningEvaluators.has(evaluatorKey)) {
-            newRunningEvaluators = new Set(newRunningEvaluators);
-            newRunningEvaluators.delete(evaluatorKey);
-            if (newRunningEvaluators.size === 0) {
-              newRunningEvaluators = undefined;
-            }
-          }
-        }
-
-        return {
-          results: {
-            ...state.results,
-            evaluatorResults: {
-              ...state.results.evaluatorResults,
-              [targetId]: {
-                ...existingTargetResults,
-                [evaluatorId]: newEvalResults,
-              },
-            },
-            runningEvaluators: newRunningEvaluators,
-          },
-        };
-      });
+      useEvaluationsV3Store.setState((state) => ({
+        results: applyEvaluatorResult({
+          results: state.results,
+          rowIndex,
+          targetId,
+          evaluatorId,
+          result,
+        }),
+      }));
     },
     [],
   );
@@ -426,7 +351,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
    * Start execution
    */
   const execute = useCallback(
-    async (scope: ExecutionScope = { type: "full" }) => {
+    async (
+      scope: ExecutionScope = { type: "full" },
+      options?: { onRunStarted?: (runId: string) => void },
+    ) => {
       if (!project?.id || !activeDataset) {
         toaster.create({
           title: "Cannot execute",
@@ -449,80 +377,34 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         }));
       }
 
-      // Compute which cells will be executed (single source of truth)
-      const datasetRows = activeDataset.inline?.records
-        ? transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records)
-        : (activeDataset.savedRecords ?? []);
-
-      const baseExecutionCells = computeExecutionCells({
+      // The request and the cells it covers, comparison dependencies included.
+      // Built from state alone (`execution/buildExecutionRequest.ts`) so a run
+      // started here and a run started with no page attached cover the same
+      // cells and seed the same outputs.
+      const built = buildExecutionRequest({
+        state: {
+          name,
+          datasets,
+          activeDatasetId,
+          targets,
+          evaluators,
+          experimentId: experimentId ?? undefined,
+          experimentSlug: experimentSlug ?? undefined,
+          results: useEvaluationsV3Store.getState().results,
+        },
+        projectId: project.id,
         scope,
-        targetIds: targets.map((t) => t.id),
-        datasetRows,
+        concurrency,
       });
-
-      // Pairwise dispatch: when the user runs only the Pairwise column,
-      // Phase 2 needs both variants' outputs to exist. Two cases:
-      //   (a) Variants haven't run / are missing outputs for some rows →
-      //       expand the dispatch to include those variant cells so Phase 1
-      //       produces fresh outputs for them.
-      //   (b) Variants ALREADY ran and have outputs for every row → send
-      //       the existing outputs as `seedTargetOutputs` so the orchestrator
-      //       pre-fills its completedTargetOutputs map, and Phase 2 reuses
-      //       them without forcing a re-run.
-      // The two cases coexist row-by-row: re-run rows that are missing,
-      // seed rows that already have output.
-      const targetComparisonDeps = (id: string): string[] => {
-        const t = targets.find((tg) => tg.id === id);
-        if (t?.type !== "evaluator") return [];
-        return (toComparisonConfig(t)?.variants ?? []).filter(
-          (v): v is string => !!v,
-        );
-      };
-      const currentTargetOutputs =
-        useEvaluationsV3Store.getState().results.targetOutputs;
-      const currentTargetMetadata =
-        useEvaluationsV3Store.getState().results.targetMetadata;
-      const seedTargetOutputs: Record<
-        string,
-        { output: unknown; cost?: number; duration?: number }
-      > = {};
-      const expandedCells = [...baseExecutionCells];
-      const scopedTargetIds =
-        scope.type === "target" || scope.type === "cell"
-          ? [scope.targetId]
-          : scope.type === "target-rows"
-            ? scope.targetIds
-            : [];
-      if (scopedTargetIds.length) {
-        const rowsForExpansion =
-          scope.type === "cell"
-            ? [scope.rowIndex]
-            : scope.type === "target-rows" && scope.rowIndices
-              ? scope.rowIndices
-              : datasetRows.map((_, i) => i);
-        for (const scopedTargetId of scopedTargetIds) {
-          const deps = targetComparisonDeps(scopedTargetId);
-          for (const depTargetId of deps) {
-            const depOutputs = currentTargetOutputs[depTargetId] ?? [];
-            const depMeta = currentTargetMetadata[depTargetId] ?? [];
-            for (const rowIndex of rowsForExpansion) {
-              const existing = depOutputs[rowIndex];
-              if (existing !== undefined && existing !== null) {
-                // Already have an output for this row — seed it.
-                seedTargetOutputs[`${rowIndex}:${depTargetId}`] = {
-                  output: existing,
-                  cost: depMeta[rowIndex]?.cost ?? undefined,
-                  duration: depMeta[rowIndex]?.duration ?? undefined,
-                };
-              } else {
-                // Missing — schedule the variant cell to actually run.
-                expandedCells.push({ rowIndex, targetId: depTargetId });
-              }
-            }
-          }
-        }
+      if (!built) {
+        toaster.create({
+          title: "Cannot execute",
+          description: "No project or dataset selected",
+          type: "error",
+        });
+        return;
       }
-      const executionCells = expandedCells;
+      const { request, executionCells } = built;
       const executingCellsSet = createExecutionCellSet(executionCells);
 
       // Set progress based on actual cells to execute
@@ -652,73 +534,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         });
       }
 
-      // Build dataset for request
-      const datasetColumns = activeDataset.columns ?? [];
-
-      // Build request payload
-      const request: ExecutionRequest = {
-        projectId: project.id,
-        experimentId: experimentId ?? undefined,
-        experimentSlug: experimentSlug ?? undefined,
-        name: name || "Evaluation",
-        dataset: {
-          id: activeDataset.id,
-          name: activeDataset.name,
-          type: activeDataset.type ?? "inline",
-          inline: activeDataset.inline,
-          datasetId: activeDataset.datasetId,
-          columns: datasetColumns,
-          savedRecords: activeDataset.savedRecords,
-        },
-        targets: targets.map((t) => ({
-          id: t.id,
-          type: t.type,
-          promptId: t.promptId,
-          promptVersionId: t.promptVersionId,
-          promptVersionNumber: t.promptVersionNumber,
-          dbAgentId: t.dbAgentId,
-          agentType: t.agentType,
-          httpConfig: t.httpConfig,
-          targetEvaluatorId: t.targetEvaluatorId,
-          inputs: t.inputs,
-          outputs: t.outputs,
-          mappings: t.mappings,
-          localPromptConfig: t.localPromptConfig,
-          localEvaluatorConfig: t.localEvaluatorConfig,
-          // Comparison column-targets need this on the wire so the
-          // orchestrator can skip the column in Phase 1 and emit Phase 2
-          // synthetic cells with every variant's output baked in. Without it,
-          // the server falls through to a normal evaluator-target dispatch
-          // whose mappings have no per-row candidate outputs, and the judge
-          // endpoint rejects the empty payload.
-          //
-          // Normalized rather than passed through: a state loaded from a
-          // pre-merge experiment still carries the legacy `pairwise` shape
-          // here, and the server only understands `comparison`.
-          comparison: toComparisonConfig(t),
-        })),
-        evaluators: evaluators.map((e) => ({
-          id: e.id,
-          evaluatorType: e.evaluatorType,
-          inputs: e.inputs,
-          mappings: e.mappings,
-          dbEvaluatorId: e.dbEvaluatorId,
-          localEvaluatorConfig: e.localEvaluatorConfig,
-          // The comparison config must survive the wire. The orchestrator keys
-          // its whole Phase-1/Phase-2 split off this field: without it every
-          // comparison evaluator looks like a plain per-row evaluator, gets
-          // attached to each target cell in Phase 1, and dispatches an empty
-          // input payload (nlpgo: "Data required").
-          comparison: toComparisonConfig(e),
-        })),
-        scope,
-        concurrency,
-        seedTargetOutputs:
-          Object.keys(seedTargetOutputs).length > 0
-            ? seedTargetOutputs
-            : undefined,
-      };
-
       // Helper to remove this execution's cells and evaluators from state when done
       // This only removes state for THIS execution, preserving concurrent executions
       const cleanupThisExecution = () => {
@@ -781,7 +596,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         await fetchSSE<EvaluationV3Event>({
           endpoint: "/api/experiments/execute",
           payload: request,
-          onEvent: handleEvent,
+          onEvent: (event) => {
+            // Before the fold, so a caller waiting on the id is answered as
+            // soon as the run has one rather than after the whole stream.
+            if (event.type === "execution_started") {
+              options?.onRunStarted?.(event.runId);
+            }
+            handleEvent(event);
+          },
           shouldStopProcessing: (event) =>
             event.type === "done" || event.type === "stopped",
           timeout: 30_000, // 30s to connect
@@ -823,6 +645,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     [
       project?.id,
       activeDataset,
+      datasets,
+      activeDatasetId,
       experimentId,
       experimentSlug,
       name,

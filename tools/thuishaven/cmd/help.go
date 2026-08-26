@@ -119,13 +119,18 @@ var envHelpText = `Environment variables.
                                  forever.
     CHECK_SLOTS=N                Caps concurrent whole-repo checks ("pnpm
                                  typecheck", "pnpm lint") machine wide (0
-                                 disables). With haven installed those runs are
+                                 disables — from a person's shell; agent shells
+                                 carry CLAUDECODE and a gate-off there is
+                                 ignored). With haven installed those runs are
                                  delegated to "haven slot run", which gates on
                                  the same flock semaphore "haven typecheck"
                                  holds — one counter for everything that
                                  saturates the cores. Both set CHECK_SLOTS=0
-                                 for the run they spawn, so a run is never
-                                 counted twice and cannot queue behind itself.
+                                 with their pid in CHECK_QUEUE_HELD for the run
+                                 they spawn, so a run is never counted twice
+                                 and cannot queue behind itself; the marker
+                                 only convinces a descendant, and only when it
+                                 names one of those two wrappers.
                                  CHECK_QUEUE_IMPL=js forces the JavaScript
                                  queue in dev/scripts/check-queue.mjs.
     HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:

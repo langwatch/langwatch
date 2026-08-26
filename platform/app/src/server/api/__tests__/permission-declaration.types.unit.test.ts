@@ -157,6 +157,15 @@ describe("typed permission declarations", () => {
       expect(organizationScoped).toBeDefined();
     });
 
+    /** @scenario "Declaring a permission with no usable scope id in the input fails to compile" */
+    it("refuses a declaration whose input names no scope id at all", () => {
+      // The assertion is the `@ts-expect-error` on the name-only declaration
+      // above. Its runtime counterpart — an input that names the field and
+      // leaves it empty — is a different answer entirely, and lives with the
+      // middleware that gives it.
+      expect(projectScoped).toBeDefined();
+    });
+
     /** @scenario "A platform-tier permission is refused by the scoped declaration surface" */
     it("refuses ops permissions on the scoped surface", () => {
       // The assertion is the `@ts-expect-error` on the ops:view declaration.

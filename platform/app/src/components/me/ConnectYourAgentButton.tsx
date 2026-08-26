@@ -8,8 +8,8 @@ import { docsUrl } from "~/utils/docsUrl";
  *
  * The mirror image of `SetupWithAgentButton`: that one lives on empty states
  * and sets a feature up; this one appears only once usage EXISTS and hands an
- * agent the reader's own usage to explore. Same menu anatomy (Langy first,
- * copy-a-prompt, docs), different job.
+ * agent the reader's own usage to explore. Same menu anatomy (copy-a-prompt,
+ * Langy, docs), different job.
  *
  * The gate is `Project.firstMessage` on the personal project, the same
  * first-traces signal the authorize page's post-login watch polls

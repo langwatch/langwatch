@@ -60,3 +60,102 @@ Feature: Scenario CLI Commands
     Given LANGWATCH_API_KEY is not set
     When I run "langwatch scenario list"
     Then I see an error prompting me to configure my API key
+
+  # ============================================================================
+  # Test suite membership (Agent Testing v2)
+  # ============================================================================
+  # A scenario belongs to at most one test suite folder. The domain rules are
+  # in specs/suites/suite-folders.feature and
+  # specs/scenarios/scenario-folder-assignment.feature.
+
+  @unit
+  Scenario: Create a scenario inside a test suite folder
+    Given my project has a test suite folder "folder_abc"
+    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --folder folder_abc"
+    Then the scenario is created inside that folder
+    And the confirmation names the folder
+
+  @unit
+  Scenario: Move a scenario to another test suite folder
+    Given my project has a scenario and a test suite folder "folder_xyz"
+    When I run "langwatch scenario update <scenario-id> --folder folder_xyz"
+    Then the scenario is moved to that folder
+    And it no longer belongs to the folder it was in
+
+  @unit
+  Scenario: Unfile a scenario from its test suite folder
+    Given my project has a scenario inside a folder
+    When I run "langwatch scenario update <scenario-id> --no-folder"
+    Then the scenario belongs to no folder
+
+  @unit
+  Scenario: Create a scenario with a folder id that does not exist
+    When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --folder nonexistent-id"
+    Then I see an error that the folder was not found
+    And no scenario is created
+
+  @unit
+  Scenario: Combining --folder and --no-folder is rejected
+    When I run "langwatch scenario update <scenario-id> --folder folder_abc --no-folder"
+    Then I see an error that the two options cannot be used together
+    And the scenario is unchanged
+
+  @unit
+  Scenario: List scenarios shows the folder each one belongs to
+    Given my project has scenarios inside and outside test suite folders
+    When I run "langwatch scenario list"
+    Then the table has a folder column
+    And a scenario with no folder reads as unfiled
+
+  # ============================================================================
+  # Run notes (Agent Testing v2)
+  # ============================================================================
+  # The note travels with the batch. See specs/suites/run-notes.feature.
+
+  @unit
+  Scenario: Run a scenario with a note
+    Given my project has a scenario "Login Flow" and an HTTP agent
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --note 'after the timeout fix'"
+    Then the run is scheduled with that note
+    And the note is shown in the confirmation
+
+  @unit
+  Scenario: Run a scenario with a note over two hundred characters
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --note '<201 characters>'"
+    Then I see an error that the note is too long
+    And no run is scheduled
+
+  @unit
+  Scenario: Run a scenario with a note of only spaces
+    When I run "langwatch scenario run <scenario-id> --target http:agent_abc --note '   '"
+    Then the run is scheduled with no note
+
+  # ============================================================================
+  # Versions (Agent Testing v2)
+  # ============================================================================
+  # See specs/scenarios/scenario-versioning.feature.
+
+  @unit
+  Scenario: List the versions of a scenario
+    Given my project has a scenario that was edited twice
+    When I run "langwatch scenario version list <scenario-id>"
+    Then I see the versions newest first with number, author, date, and changed fields
+
+  @unit
+  Scenario: Get one version of a scenario
+    Given my project has a scenario with three versions
+    When I run "langwatch scenario version get <scenario-id> 2"
+    Then I see the name, situation, criteria, and labels as they were at version 2
+
+  @unit
+  Scenario: Get a version that does not exist
+    Given my project has a scenario with three versions
+    When I run "langwatch scenario version get <scenario-id> 9"
+    Then I see an error that the version was not found
+
+  @unit
+  Scenario: Updating a scenario from the command line records a new version
+    Given my project has a scenario at version 1
+    When I run "langwatch scenario update <scenario-id> --name 'Updated Login Flow'"
+    Then the scenario is at version 2
+    And the new version names the command line as its author

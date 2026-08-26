@@ -48,6 +48,7 @@ const fact = (id: string, state: "ATTACHED" | "VERIFIED" | "DETACHED") => ({
   identifierHash: "hmac:abc",
   accountId: null,
   providerId: null,
+  issuer: null,
   providerAccountId: null,
   connectionId: null,
   state,
@@ -244,6 +245,9 @@ describe("PrismaIdentityProjectionRepository", () => {
               // unfolded id, and `Account` is keyed by that.
               provider: "oidc" as const,
               providerId: "auth0",
+              // The issuer the fact states, which the fold must reproduce
+              // rather than derive: better-auth 1.7 looks the row up by it.
+              issuer: "local:oauth:auth0",
             },
           },
           { acceptedAt: 10, eventId: "evt_1" },
@@ -255,6 +259,11 @@ describe("PrismaIdentityProjectionRepository", () => {
         where: { id: `${namespace}-acc` },
       });
       expect(row?.provider).toBe("auth0");
+      // The other half of better-auth 1.7's account key, projected from the
+      // fact rather than computed here. It has to be the value the library
+      // will ASK for: a row carrying a different issuer is a row its lookup
+      // cannot find, which reads as a missing sign-in method.
+      expect(row?.issuer).toBe("local:oauth:auth0");
       // Which is what better-auth's own callback lookup asks for.
       expect(
         await prisma.account.findUnique({

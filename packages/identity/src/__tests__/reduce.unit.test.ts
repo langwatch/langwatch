@@ -26,6 +26,7 @@ function attached(
       accountId: null,
       provider: "email",
       providerId: null,
+      issuer: null,
       providerAccountId: null,
       value: "sam@acme.com",
       identifierHash: "hmac:abc",

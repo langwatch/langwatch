@@ -154,6 +154,43 @@ Feature: Versioned workbench saves
     When the run loads its execution data
     Then the run fails and names the missing evaluator
 
+  Rule: The numbers a reader follows count the deliberate versions
+
+    Every accepted save moves the setup counter, and typing moves it several
+    times a minute. Numbering the history by that counter put "v20" directly
+    above "v1" after twenty minutes of work, because the nineteen saves in
+    between all landed on the one autosave row and took a number with them.
+
+    A number now says which deliberate version this is: a commit, an assistant
+    write and a restore each take one more than the highest number the
+    evaluation holds. The autosave row is not one of them, so it is shown as an
+    autosave and its number is a handle for a restore, not a place in the list.
+    The counter still guards every write and still says which row is the newest.
+
+    @regression @integration
+    Scenario: Typing between two commits leaves no gap in the numbers
+      Given an evaluation created, committed, typed on several times, and committed again
+      When the numbered versions are read
+      Then they read v1, v2 and v3, with nothing missing between them
+
+    @regression @integration
+    Scenario: The newest version is the one written last
+      Given an evaluation committed after a session of typing
+      When the versions are listed
+      Then the second commit is first, the autosave next, and the older versions after it
+
+    @regression @integration
+    Scenario: The autosave row and the numbered versions never take the same number
+      Given a person saves an evaluation once with no commit message
+      When the caller commits a version straight after
+      Then both rows are still there, each with its own number
+
+    @regression @integration
+    Scenario: A restore of the autosave says so instead of naming a number
+      Given a version history holding an autosave
+      When the caller restores that row
+      Then the version the restore writes reads "Restored from the autosave"
+
   Rule: A run with no browser writes its cells into the saved state
 
     A run started over REST, from the command line or by the assistant has no
@@ -326,6 +363,12 @@ Feature: Versioned workbench saves
       When it runs
       Then it prints a row per version naming who saved it
 
+    @regression @unit
+    Scenario: The command line names the autosave instead of numbering it
+      Given the versions command on a history that holds an autosave
+      When it runs
+      Then the autosave row reads "autosave" and the others read their numbers
+
     @unit
     Scenario: Restoring an experiment version from the CLI
       Given the restore command with a version number
@@ -334,11 +377,52 @@ Feature: Versioned workbench saves
 
   Rule: The workbench shows its own history
 
+    # The history is a short list a reader checks and leaves, so it opens on
+    # the button that asks for it and the workbench stays visible behind it. It
+    # was a drawer, which covered the setup the versions describe.
+
+    @integration
+    Scenario: The history opens on the button that asks for it
+      Given an experiment with saved versions
+      When the reader clicks the history button
+      Then the history opens anchored to that button
+      And clicking the button again closes it
+
+    # Anchoring is not decoration: the first version of this shipped with a
+    # tooltip wrapped around the trigger, both claimed the same button, and the
+    # history opened at the top-left corner of the window while the button sat
+    # at the far right. It looked wired up, because the button still carried the
+    # popover's own class and placement.
+    @integration
+    Scenario: The history is anchored to the button that opens it
+      Given an experiment with saved versions
+      When the reader opens the history
+      Then the button that opened it is the history's own trigger
+      And no other component has taken that button over
+
+    @integration
+    Scenario: The history closes once a restore lands
+      Given the version history is open
+      When the reader confirms a restore
+      Then the history closes
+
     @integration
     Scenario: The version history names each version and who saved it
       Given an experiment with saved versions
       When the version history opens
       Then each row names the version, its author and when it was saved
+
+    @regression @integration
+    Scenario: The version history shows the autosave as an autosave
+      Given an experiment whose history holds an autosave
+      When the version history opens
+      Then that row reads "Autosave" and carries no version number
+
+    @regression @integration
+    Scenario: The current badge marks the version the workbench holds
+      Given an experiment whose newest version is the one open in the workbench
+      When the version history opens
+      Then that row carries the current badge and offers no restore
 
     @integration
     Scenario: A restore asks for confirmation first

@@ -181,6 +181,7 @@ import { StreamingStatusLine } from "./StreamingStatusLine";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
 import "../langyTheme.css";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 
 // The same feature key Langy's chat route resolves against. Used to seed the
 // composer's model picker with whatever's actually resolving today — opening
@@ -382,7 +383,14 @@ export function LangySidecar({
   // classic corner launcher orb. ONE renders at a time — never both — and
   // only the closed state differs: opening, the panel and Cmd/Ctrl+I are
   // identical on either side of the flag.
-  const peekDock = useFeatureFlag("release_ui_langy_peek_dock_enabled");
+  const { project, organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const peekDock = useFeatureFlag("release_ui_langy_peek_dock_enabled", {
+    projectId: project?.id ?? NOT_TARGETED,
+    organizationId: organization?.id ?? NOT_TARGETED,
+  });
 
   return (
     <>

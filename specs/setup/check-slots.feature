@@ -27,7 +27,8 @@ Feature: Machine-wide slots for whole-repo checks
   # hung tool.
   #
   # Knobs, all optional:
-  #   CHECK_SLOTS=N            how many may run at once (0 disables the gate)
+  #   CHECK_SLOTS=N            how many may run at once (0 disables the gate,
+  #                            from a person's shell; agent shells cannot)
   #   CHECK_PRESSURE=<level>   force the memory-pressure level (green/amber/red)
   #   CHECK_QUEUE_DIR=<path>   where the shared state lives
   #   CHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
@@ -123,7 +124,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   @unit
   Scenario: The limit can be turned off
-    Given CHECK_SLOTS is 0
+    Given CHECK_SLOTS is 0 in a person's shell
     When several checks run at once
     Then none of them queue
 
@@ -144,6 +145,64 @@ Feature: Machine-wide slots for whole-repo checks
     Given CI is set and CHECK_SLOTS is not
     When a check runs
     Then the gate is off, because a CI runner runs one check at a time anyway
+
+  # --- The gate-off is the operator's lever, not the agents' ---
+
+  # Observed in the wild: an agent prefixed CHECK_SLOTS=0 onto a whole-tree
+  # typecheck to jump the queue, and the machine ran three checks at once, 14
+  # GB into swap. The queue exists to serialize agents, so a lever any agent
+  # may pull is not a limit. Agent shells are recognizable: Claude Code sets
+  # CLAUDECODE in every shell it spawns. A person's own shell does not carry
+  # it, so the operator keeps the lever.
+
+  @unit
+  Scenario: An agent shell cannot turn the queue off
+    Given CLAUDECODE is set, as it is in every agent shell
+    And CHECK_SLOTS asks for the gate to be off
+    When the limit is resolved
+    Then the derived limit applies as if CHECK_SLOTS were unset
+    And the run says the gate-off was ignored and that only a person may turn the queue off
+
+  # The queue itself turns the gate off for everything below a run it already
+  # counted, or a slot-holding run would queue behind itself at the first bin
+  # shim. That gate-off carries the wrapper's pid in CHECK_QUEUE_HELD, and the
+  # pid must pass two tests: it is a live ancestor of the run asking, and that
+  # process is one of the queue's own wrappers. Ancestry alone would prove
+  # nothing, because a shell is an ancestor of every command it runs, so
+  # CHECK_QUEUE_HELD=$$ would hand the gate-off to any agent that types it.
+  #
+  # This is a lock on an honest door, not a vault. Anyone who may start
+  # processes on the machine may start one named haven. It closes the one-token
+  # bypasses, which is what the queue needs: the runs it serializes are all
+  # started by the wrappers themselves.
+
+  @unit
+  Scenario: A run the queue spawned itself stays unqueued in an agent shell
+    Given a wrapper holding a slot spawned the run with its pid in CHECK_QUEUE_HELD
+    And CLAUDECODE is set
+    When the limit is resolved
+    Then the gate is off for this run, because the wrapper above already counted it
+    And nothing is printed, because nothing was refused
+
+  @unit
+  Scenario: A borrowed held-marker does not turn the queue off
+    Given CHECK_QUEUE_HELD names a live process that is not an ancestor of the run
+    And CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
+    When the limit is resolved
+    Then the derived limit applies
+
+  @unit
+  Scenario: An agent's own shell is not a queue wrapper
+    Given CHECK_QUEUE_HELD names a live ancestor of the run that is not a queue wrapper
+    And CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
+    When the limit is resolved
+    Then the derived limit applies, because the marker names no wrapper that counted the run
+
+  @unit
+  Scenario: haven ignores an agent's gate-off the same way
+    Given CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
+    When haven resolves the slot limit
+    Then the derived limit applies, exactly as the JavaScript queue resolves it
 
   # --- Memory pressure: the machine says the formula's assumption is false ---
 

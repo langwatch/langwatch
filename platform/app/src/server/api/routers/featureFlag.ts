@@ -3,6 +3,7 @@ import { z } from "zod";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import type { FeatureFlagKey } from "../../featureFlag/registry";
+import { NOT_TARGETED } from "../../featureFlag/targeting";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:feature-flag-router");
@@ -15,8 +16,9 @@ const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
 /**
  * tRPC router for feature flag checks.
  *
- * Resolves through the in-code registry and the operator flag store, with
- * optional project/organization targeting.
+ * Resolves through the in-code registry and the operator flag store. Every
+ * read states the project and the organization it is about, so targeting
+ * rules can match.
  * Results are cached server-side (5s TTL) and client-side (React Query).
  *
  * @see dev/docs/adr/005-feature-flags.md for architecture decisions
@@ -25,17 +27,23 @@ export const featureFlagRouter = createTRPCRouter({
   /**
    * Check if a feature flag is enabled for the current user.
    *
+   * Both targeting fields are required on the wire, and `null` states that
+   * the calling surface has no such scope. An optional field would let a
+   * caller drop the organization by accident, and an organization rule would
+   * then match nothing. JSON has no `undefined`, so `null` also carries the
+   * "not known yet" case; the client disables the query in that case.
+   *
    * @param flag - The feature flag key (must be in FRONTEND_FEATURE_FLAGS)
-   * @param projectId - Optional project ID for project-level targeting
-   * @param organizationId - Optional organization ID for org-level targeting
+   * @param projectId - Project ID for project-level targeting, or null
+   * @param organizationId - Organization ID for org-level targeting, or null
    * @returns { enabled: boolean }
    */
   isEnabled: protectedProcedure
     .input(
       z.object({
         flag: frontendFeatureFlagSchema,
-        projectId: z.string().optional(),
-        organizationId: z.string().optional(),
+        projectId: z.string().nullable(),
+        organizationId: z.string().nullable(),
       }),
     )
     .noPermission({
@@ -73,8 +81,8 @@ export const featureFlagRouter = createTRPCRouter({
         {
           distinctId: userId,
           defaultValue: false,
-          projectId: input.projectId,
-          organizationId: input.organizationId,
+          projectId: input.projectId ?? NOT_TARGETED,
+          organizationId: input.organizationId ?? NOT_TARGETED,
         },
       );
 
@@ -152,6 +160,9 @@ export const featureFlagRouter = createTRPCRouter({
           featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
             distinctId: userId,
             defaultValue: false,
+            // The procedure asks one organization at a time by design, and
+            // the surfaces that call it have no project of their own.
+            projectId: NOT_TARGETED,
             organizationId,
           }),
         ),
@@ -213,6 +224,9 @@ export const featureFlagRouter = createTRPCRouter({
             await featureFlagService.isEnabled(input.flag as FeatureFlagKey, {
               distinctId: userId,
               defaultValue: false,
+              // Same as above: an organization-at-a-time read from a
+              // workspace surface that has no project.
+              projectId: NOT_TARGETED,
               organizationId,
             }),
           ],

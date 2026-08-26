@@ -518,7 +518,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
           <Text fontWeight="semibold">{text}</Text>
           <Text color="fg.muted" fontSize="sm">
             {assistant.reviewHint ??
-              "Nothing is saved yet — you will review and edit the draft first."}
+              "Nothing is saved yet. You will review and edit the draft first."}
           </Text>
         </VStack>
       </VStack>
@@ -716,8 +716,8 @@ function ManualStartState({ assistantName }: { assistantName: string }) {
           <Text fontWeight="semibold">Build it yourself</Text>
           <Text color="fg.muted" fontSize="sm" lineHeight="tall">
             Open a blank scenario and write the situation and success criteria
-            by hand — no model involved. You can hand it to {assistantName} for
-            a draft at any point.
+            by hand, with no model involved. You can hand it to {assistantName}{" "}
+            for a draft at any point.
           </Text>
         </VStack>
       </HStack>

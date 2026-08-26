@@ -232,6 +232,9 @@ describe("better-auth over the databaseHooks seam", () => {
         ).internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          // better-auth 1.7 keys an account by `(issuer, accountId)`, and
+          // synthesises this issuer for a provider with none of its own.
+          issuer: "local:oauth:google",
           accountId: "sub-google-1",
         });
 

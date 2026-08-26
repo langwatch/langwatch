@@ -20,6 +20,8 @@ function makeSuiteRow(
     projectId: "proj_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "custom",
+    scope: null,
     description: null,
     scenarioIds: ["scen_1", "scen_2"],
     targets: [{ type: "http", referenceId: "agent_1" }],
@@ -153,12 +155,16 @@ describe("SuiteRepository", () => {
           prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue(suites);
 
-        const result = await repository.findAll({ projectId: "proj_1" });
+        const result = await repository.findAll({
+          projectId: "proj_1",
+          kinds: ["custom"],
+        });
 
         expect(result).toEqual(suites);
         expect(prisma.simulationSuite.findMany).toHaveBeenCalledWith({
           where: {
             projectId: "proj_1",
+            kind: { in: ["custom"] },
             archivedAt: null,
           },
           orderBy: { updatedAt: "desc" },
@@ -172,7 +178,10 @@ describe("SuiteRepository", () => {
           prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue([]);
 
-        const result = await repository.findAll({ projectId: "proj_1" });
+        const result = await repository.findAll({
+          projectId: "proj_1",
+          kinds: ["custom"],
+        });
 
         expect(result).toEqual([]);
       });

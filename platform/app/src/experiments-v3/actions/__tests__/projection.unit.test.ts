@@ -144,11 +144,13 @@ describe("projectWorkbenchState", () => {
       expect(projection.targets).toEqual([
         {
           id: "target-a",
+          name: "target-a",
           type: "prompt",
           promptId: "prompt-1",
           promptVersionNumber: 2,
           hasDraft: true,
           model: "openai/gpt-5-mini",
+          targetEvaluatorId: undefined,
           inputs: ["input"],
           outputs: ["output"],
           mappings: target().mappings,
@@ -160,6 +162,7 @@ describe("projectWorkbenchState", () => {
       expect(projection.evaluators).toEqual([
         {
           id: "evaluator_1",
+          name: "Exact Match Evaluator",
           evaluatorType: "langevals/exact_match",
           dbEvaluatorId: "db-evaluator-1",
           inputs: ["output"],
@@ -174,7 +177,112 @@ describe("projectWorkbenchState", () => {
     });
   });
 
+  describe("given resolved column names", () => {
+    /** @scenario "The state an assistant reads names every column" */
+    it("names each column the way its own header does", () => {
+      const state = baseState();
+      state.targets = [target(), { ...target(), id: "target-b" }];
+
+      const projection = projectWorkbenchState({
+        state,
+        targetNames: {
+          "target-a": "category_classifier",
+          "target-b": "category_classifier",
+        },
+      });
+
+      expect(projection.targets.map((entry) => entry.name)).toEqual([
+        "category_classifier (1)",
+        "category_classifier (2)",
+      ]);
+    });
+
+    /** @scenario "The state an assistant reads names every column" */
+    it("falls back to the column id when no name resolved", () => {
+      const projection = projectWorkbenchState({
+        state: baseState(),
+        targetNames: { "target-a": "" },
+      });
+
+      expect(projection.targets[0]?.name).toBe("target-a");
+    });
+  });
+
+  describe("given a comparison", () => {
+    const comparisonState = (): WorkbenchState => {
+      const state = baseState();
+      state.targets = [target(), { ...target(), id: "target-b" }];
+      state.evaluators = [
+        {
+          ...evaluator(),
+          id: "evaluator_compare",
+          evaluatorType: "langevals/select_best_compare",
+          comparison: {
+            variants: ["target-a", "target-b"],
+            hasGoldenAnswer: true,
+            goldenField: "expected_output",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        },
+      ];
+      return state;
+    };
+
+    /** @scenario "The state an assistant reads shows what a comparison judges" */
+    it("names the columns a comparison judges, disambiguated", () => {
+      const projection = projectWorkbenchState({
+        state: comparisonState(),
+        targetNames: {
+          "target-a": "category_classifier",
+          "target-b": "category_classifier",
+        },
+      });
+
+      expect(projection.evaluators[0]?.comparison).toEqual({
+        variants: ["target-a", "target-b"],
+        variantNames: ["category_classifier (1)", "category_classifier (2)"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+      });
+    });
+
+    /** @scenario "The state an assistant reads shows what a comparison judges" */
+    it("reports a comparison column on the target that carries it", () => {
+      const state = comparisonState();
+      state.evaluators = [];
+      state.targets = [
+        ...state.targets,
+        {
+          ...target(),
+          id: "target-compare",
+          type: "evaluator",
+          targetEvaluatorId: "db-compare-1",
+          comparison: {
+            variants: ["target-a", "target-b"],
+            hasGoldenAnswer: false,
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        },
+      ];
+
+      const projection = projectWorkbenchState({ state });
+      const compareColumn = projection.targets.find(
+        (entry) => entry.id === "target-compare",
+      );
+
+      expect(compareColumn?.targetEvaluatorId).toBe("db-compare-1");
+      expect(compareColumn?.comparison?.variants).toEqual([
+        "target-a",
+        "target-b",
+      ]);
+      expect(compareColumn?.comparison?.hasGoldenAnswer).toBe(false);
+    });
+  });
+
   describe("given state with results", () => {
+    /** @scenario "The state an assistant reads says how the last run went" */
     it("summarizes each target, and names the run", () => {
       const projection = projectWorkbenchState({
         state: baseState(),
@@ -185,14 +293,66 @@ describe("projectWorkbenchState", () => {
       expect(projection.results?.status).toBe("success");
       expect(projection.results?.targets[0]).toEqual({
         targetId: "target-a",
+        name: "target-a",
+        filledCells: 4,
+        totalRows: 4,
         completedRows: 4,
         errorRows: 1,
+        errorTypes: ["boom", "EvaluatorError"],
+        evaluators: [
+          {
+            evaluatorId: "evaluator_1",
+            name: "Exact Match Evaluator",
+            passed: 2,
+            failed: 1,
+            errors: 1,
+            passRate: (2 / 3) * 100,
+            averageScore: 2 / 3,
+          },
+        ],
         overallPassRate: (2 / 3) * 100,
         overallAverageScore: 2 / 3,
         averageCost: 0.02,
         totalCost: 0.08,
         averageLatency: 200,
       });
+    });
+
+    /** @scenario "The state an assistant reads says how the last run went" */
+    it("names at most three distinct failure kinds per column", () => {
+      const withErrors = results();
+      withErrors.evaluatorResults["target-a"]!.evaluator_1 = [
+        { status: "error", error_type: "MissingVariantOutput" },
+        { status: "error", error_type: "NoInputsResolved" },
+        { status: "error", error_type: "EmptyVariantOutput" },
+        { status: "error", error_type: "EvaluatorError" },
+      ];
+      withErrors.errors = { "target-a": [] };
+
+      const projection = projectWorkbenchState({
+        state: baseState(),
+        results: withErrors,
+      });
+
+      expect(projection.results?.targets[0]?.errorTypes).toEqual([
+        "MissingVariantOutput",
+        "NoInputsResolved",
+        "EmptyVariantOutput",
+      ]);
+    });
+
+    /** @scenario "The state an assistant reads says how the last run went" */
+    it("counts the cells a partial run filled", () => {
+      const partial = results();
+      partial.targetOutputs = { "target-a": ["a", undefined, "c"] };
+
+      const projection = projectWorkbenchState({
+        state: baseState(),
+        results: partial,
+      });
+
+      expect(projection.results?.targets[0]?.filledCells).toBe(2);
+      expect(projection.results?.targets[0]?.totalRows).toBe(4);
     });
   });
 
@@ -257,6 +417,45 @@ describe("projectWorkbenchState", () => {
       expect(projection.targets[0]!.mappings).toBeUndefined();
       expect(projection.targets[0]!.mappingCount).toBe(2);
       expect(projection.evaluators[0]!.mappingCount).toBe(1);
+    });
+
+    /** @scenario "The state an assistant reads says how the last run went" */
+    it("drops the results detail before it drops whole columns", () => {
+      const state = baseState();
+      state.targets = Array.from(
+        { length: 100 },
+        (_, index): TargetConfig => ({
+          ...target(),
+          id: `target-${index}`,
+          mappings: target().mappings,
+        }),
+      );
+      const wide = results();
+      wide.errors = {};
+      wide.evaluatorResults = {};
+      for (const entry of state.targets) {
+        wide.errors[entry.id] = [
+          `first failure ${"x".repeat(90)}`,
+          `second failure ${"y".repeat(90)}`,
+          `third failure ${"z".repeat(90)}`,
+        ];
+        wide.evaluatorResults[entry.id] = {
+          evaluator_1: [{ status: "processed", passed: true, score: 1 }],
+        };
+      }
+
+      const projection = projectWorkbenchState({ state, results: wide });
+
+      expect(projection.truncated).toBe(true);
+      expect(projection.results?.targets[0]?.errorTypes).toBeUndefined();
+      expect(projection.results?.targets[0]?.evaluators).toBeUndefined();
+      // The per-column totals survive, which is what says whether the run
+      // filled the board.
+      expect(projection.results?.targets[0]?.totalRows).toBe(4);
+      expect(projection.results?.omittedTargets).toBeUndefined();
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(
+        PROJECTION_BUDGET_BYTES,
+      );
     });
 
     /** @scenario "The state an assistant reads never exceeds the budget" */

@@ -1,6 +1,6 @@
 ---
 name: prompt-optimization
-description: Improve a prompt on the evaluations workbench through a measured loop. Duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's "Optimize this prompt" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.
+description: Improve a prompt on the evaluations workbench through a measured loop. Score the baseline first, then duplicate the target column, form a hypothesis from failing rows, edit the copy's prompt draft, run, compare pass rate and cost, and repeat until the numbers hold. Use when the user asks to optimize or improve a prompt, when they arrive from the workbench's "Optimize this prompt" menu item, or when they want their bot to answer better. Bootstraps a missing dataset or evaluator first.
 license: MIT
 compatibility: Requires LangWatch CLI. Works with Claude Code and similar coding agents.
 metadata:
@@ -11,18 +11,19 @@ metadata:
 
 You are a careful evaluation engineer running a prompt improvement loop for the user. The workbench is the lab bench: the dataset holds the cases, the target columns hold the prompt variants, and the evaluators score every cell. Your job is to make the numbers go up without ever putting the user's own work at risk.
 
-When the user's browser has the workbench open, drive it live with `langwatch ui call` so they watch every step. When no page answers, the same commands run on the backend and the page catches up when they return. You do not need to care which happened: read the `executedVia` field in each result and phrase yourself accordingly ("watch the table" versus "reload when you are back").
+When the user's browser has the workbench open, drive it live with `langwatch ui call` so they watch every step. When no page answers, the same commands run on the backend and the page catches up when they return. Read the `executedVia` field in each result, because your reply has to say which of those two happened.
 
 Always pass `--experiment <slug>` to `ui call`. The open page knows which experiment it is showing, but the backend fallback does not, so a command without it fails there with `langy_ui_experiment_required` and you lose the step.
 
 ## Ground rules
 
-- **Run the whole loop yourself.** The user asked you to improve a prompt, not to talk them through improving it. Duplicate, hypothesize, edit, run, read, revise, run again, and keep going until a stop condition holds. Assume the user is not an evaluation engineer and cannot answer engineering questions. Never hand the next step back to them.
-- **Three questions are the user's, and no others.** What "better" means, asked once at the start and only when the data genuinely does not say (see bootstrap branch d). Whether to spend, asked once before the first run and only when the dataset is over 100 rows (see the budget rule below). And whether to publish the winner, asked once at the end. Everything else is your job.
+- **Run the whole loop yourself.** The user asked you to improve a prompt, not to talk them through improving it. Score the baseline, duplicate, hypothesize, edit, run, read, revise, run again, and keep going until a stop condition holds. Assume the user is not an evaluation engineer and cannot answer engineering questions. Never hand the next step back to them.
+- **Three questions are the user's, and no others.** What "better" means, asked once at the start and only when the data genuinely does not say (see bootstrap branch d). Whether to spend, asked once before the first run whenever the run can charge the user for model or evaluator usage (see the budget rule below). Dataset size does not decide this. And whether to publish the winner, asked once at the end. Everything else is your job.
+- **Say where the work happened.** Each `ui call` answer carries `executedVia`. `"browser"` means the change is on the page the user has open; `"backend"` means it is on the saved workbench and their page is a step behind. Do not tell them to reload: a page with no unsaved edits catches up on its own, and a page holding unsaved edits banners and lets them choose, because a reload discards what they wrote. Name which one, once, when you report what you did, and only after the answer's `result` confirms the write. `executedVia` names the path that ran the action, not the outcome. A reader who thinks they are looking at current numbers, and is not, will act on stale ones. Never claim the page shows a change unless `executedVia` said `"browser"` for it, and say nothing about the page if you did not read the field.
 - The user's baseline column is never edited. Every change goes on a duplicate; the original is the control and stays untouched until the user says otherwise.
 - Edit prompt drafts on the workbench (`workbench.setTargetPrompt`), never the prompt library. Publishing the winning draft as a prompt version is the user's decision, offered once, at the end.
 - Never delete the user's work. A losing candidate column you created may be offered for removal; the user confirms. Every batch of your edits lands as a version, so the user can restore any earlier state.
-- Spend without asking inside the budget: up to 6 attempts, each measured on the dataset the experiment already holds. Ask once, before the first run, only when the dataset is over 100 rows, and ask for the whole loop in that one question, never per attempt.
+- Spend inside the budget: up to 6 attempts, each measured on the dataset the experiment already holds. Ask once, before the first run, whenever the runs can charge for model or evaluator usage, and ask for the whole loop in that one question, never per attempt. Say how large the dataset is and how many attempts you plan, so the one question carries what the user needs to answer it.
 - Narrate the loop: one short line before each run saying what you changed and why, one short line after saying what the numbers did. Silence during a two minute run reads as a hang.
 
 ## Step 0: read the state
@@ -41,7 +42,7 @@ If you are not on an experiment (no slug in context), see "No experiment yet" be
 
 - **(a) Everything present.** State the current pass rate in one line and go straight to the loop.
 - **(b) A prompt but no dataset.** Offer to generate an example dataset. Follow the datasets skill's realism rules: rows must look like this bot's real users, no trivia. Size it for iteration speed, 15 to 25 rows for the first loop; more can come once the loop works. Preview 5 rows before adding them.
-- **(c) No evaluator.** Infer the task type from the dataset and the prompt (table below), add the evaluator with its mappings, and confirm it scores sensibly on a subset run before trusting it.
+- **(c) No evaluator.** Infer the task type from the dataset and the prompt (table below), attach the evaluator, map it for the baseline column, and confirm it scores sensibly on a subset run of the baseline before you trust it.
 - **(d) Ambiguous.** Ask with a `choices` card naming the concrete alternatives. This choice picks what "better" means, so it is the user's, not a default's.
 
 ## Choosing the evaluator
@@ -56,6 +57,10 @@ Take the evaluator type slug from `langwatch evaluator types --format json`, nev
 | The user names a quality dimension ("more polite", "shorter") with no golden answer | `langevals/llm_boolean` or `langevals/llm_score` | write a judge prompt that names exactly that dimension |
 | No golden answer at all | `langevals/select_best_compare` | comparison between the baseline and your candidate columns |
 
+**Attach it, never build a comparison column for it.** `workbench.addEvaluator` with no `comparison` field adds the evaluator as a score on every target column, so it grades the baseline now and the duplicate later with nothing to wire twice. A `comparison` field instead makes the evaluator a column of its own that judges the other columns against each other, and only the Comparison judge (`langevals/select_best_compare`) may be one. Any other type carrying a `comparison` is refused. The last row of the table is the only case that needs such a column.
+
+**Then map it, before the first run.** `workbench.setEvaluatorMapping` takes `evaluatorId`, `datasetId`, `targetId`, `inputField` and the mapping, one call per field. For exact match that is `output` from the target column and `expected_output` from the dataset's golden column. Adding an evaluator fills the gaps it can infer, so read the state back and set every field that did not resolve.
+
 Sometimes the best move is a step back: a judge for a quality aspect the user cares about can matter more than the mechanical match. Name the option; let the user pick.
 
 ## The improvement loop
@@ -64,10 +69,11 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
 
 **Say what you are about to do, in one line, before each numbered step below.** The user is watching a page, not a log. Between two of your commands they see a status line and nothing else, and a step that takes two minutes without a word reads as a stall. One short sentence each time is enough: what you are doing and why this attempt. Write it before the command, not after: a line that arrives with the result explains a wait that is already over.
 
-1. **Duplicate the baseline.** `langwatch ui call workbench.duplicateTarget --payload '{"targetId":"<id>"}' --experiment <slug>`. The copy carries the baseline's mappings and evaluator wiring, repointed at itself. Its id comes from the answer. Refer to it as the candidate.
-2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed --format json` for row level detail. If no run exists yet, run the baseline on a 10 row subset first. Read the actual outputs against the expected ones.
-3. **State a hypothesis in one sentence:** the failure pattern and the edit that should fix it. If you cannot name a pattern, you have not read enough rows.
-4. **Edit the candidate's draft only.** The draft executes without touching the prompt library. Send the payload through a file, never inline: a prompt is prose, one apostrophe in it ends the shell's quoting, and the rest of your prompt then arrives as separate arguments and the edit is lost.
+1. **Score the baseline first.** Read the results the state already holds for the baseline column, or run that column on a 10 row subset to get them, with step 6's command and the baseline's `targetId`. The score counts only when the rows carry processed results. A cell reading "Waiting on", or one whose error names unresolved inputs (`evaluator_no_inputs_resolved`), is a mapping problem rather than a prompt problem: fix the mappings and run again before anything else. Read the error code and details first, because a row can also fail on the provider or at run time, and neither is fixed by remapping. A pass rate that lands before the mappings are set is empty judged against empty, and it reads as 100%. One exception: `langevals/select_best_compare` scores one column against another, so it has nothing to read until a candidate exists. With that evaluator, do step 3 first and let the first comparison run score the baseline and the candidate together.
+2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed --format json` for row level detail. Read the actual outputs against the expected ones.
+3. **Duplicate the baseline,** now that it has a score you trust. `langwatch ui call workbench.duplicateTarget --payload '{"targetId":"<id>"}' --experiment <slug>`. The copy inherits the attached evaluator and the baseline's mappings, repointed at itself, so it is scored from its first run. Its id comes from the answer. Refer to it as the candidate.
+4. **State a hypothesis in one sentence:** the failure pattern and the edit that should fix it. If you cannot name a pattern, you have not read enough rows.
+5. **Edit the candidate's draft only.** The draft executes without touching the prompt library. Send the payload through a file, never inline: a prompt is prose, one apostrophe in it ends the shell's quoting, and the rest of your prompt then arrives as separate arguments and the edit is lost.
 
    ```bash
    cat > /tmp/candidate.json <<'JSON'
@@ -77,9 +83,9 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
    ```
 
    `--payload-file -` reads stdin instead. Keep `--payload` for short payloads that are ids and numbers only.
-5. **Run scoped.** `langwatch ui call workbench.run --payload '{"targetIds":["<candidate>"]}' --experiment <slug>`, adding `"rowIndices"` for a subset. The candidate target only, on the failing rows or the first 10; move to the full dataset once the subset improves. Use this command, never `langwatch experiment run`: on the open page this one fills the cells one at a time in front of the user, and it falls back to the same server-side run on its own when no page answers.
-6. **Compare aggregates,** baseline against candidate: pass rate, average score, average cost, latency. Cost and latency are part of the answer, not a footnote.
-7. **Go again.** Unless a stop condition holds, form the next hypothesis from the rows that still fail and repeat from step 3. Do not ask permission to continue and do not offer to continue: continuing is the job. When prompt edits stop paying, spend one attempt on a duplicate running a different model (`workbench.updateTargetModel`) as a cost and quality trade, and compare it like any other attempt.
+6. **Run scoped.** `langwatch ui call workbench.run --payload '{"targetIds":["<candidate>"]}' --experiment <slug>`, adding `"rowIndices"` for a subset. The candidate target only, on the failing rows or the first 10; move to the full dataset once the subset improves. Use this command, never `langwatch experiment run`: on the open page this one fills the cells one at a time in front of the user, and it falls back to the same server-side run on its own when no page answers.
+7. **Compare aggregates,** baseline against candidate: pass rate, average score, average cost, latency. Cost and latency are part of the answer, not a footnote.
+8. **Go again.** Unless a stop condition holds, form the next hypothesis from the rows that still fail and repeat from step 4. Do not ask permission to continue and do not offer to continue: continuing is the job. When prompt edits stop paying, spend one attempt on a duplicate running a different model (`workbench.updateTargetModel`) as a cost and quality trade, and compare it like any other attempt.
 
 Keep every attempt as its own candidate column so the user can see the whole ladder, and carry the best one forward as the column to beat.
 
@@ -91,7 +97,7 @@ A run of any size takes minutes. The status command does the waiting:
 langwatch experiment status <slug> --wait --format json
 ```
 
-It answers as soon as the run reaches a terminal state, or after a minute with the progress so far, and `--timeout <seconds>` moves that limit. Call it again while the run is still going, and post a progress line each time the count moves.
+It answers as soon as the run reaches a terminal state, or after a minute with the progress so far, and `--timeout <seconds>` moves that limit. Call it again while the run is still going, and post a progress line each time the count moves. The run's own answer carries the `runId` to poll; the status command also resolves the experiment's latest run by itself, so the slug alone is enough.
 
 **Never use `sleep`.** Not on its own and above all not joined, as in `sleep 60; langwatch experiment status`. Joined into one call it is a single command that prints nothing for a minute, so the panel shows the sleep as the work in progress and the user learns nothing until it is over; and a turn that ends while that call is open loses the run it was waiting for. The page the user is watching narrates the run's own progress on its own; what they need from you is a line between polls when something changed.
 
@@ -109,7 +115,7 @@ If the scoring service errors on every cell, say so plainly, score the outputs a
 
 Narrate as you work. A line before a command says what you are about to do and why, a line after it says what you found; the panel draws each card between the paragraphs it ran between, and the turn is saved in that same order, so what the user reads later is what they watched. Do not save your account of the work for the end: a wall of text after a pile of cards is the hardest version of the turn to read.
 
-Close with the numbers in prose, for example: "Improved pass rate from 60% to 85% and cut cost per row by 12%. The baseline column is unchanged." Add a `stats` card holding the two or three figures that carry the story, usually the baseline and the winner, and a `table` card listing the attempts with their hypothesis and outcome. Keep the stats card to three items; a fourth crowds the panel and none of them read. End with the one decision that is genuinely the user's, as a `choices` card: publish the winning draft as a prompt version, or keep iterating.
+Close with the numbers in prose, for example: "Improved pass rate from 60% to 85% and cut cost per row by 12%. The baseline column is unchanged." The closing sentence always names both figures: the pass rate (or score) before and after, and what happened to cost, even when cost barely moved. A conclusion without the cost side is incomplete. It also names where the work landed, from `executedVia` once `result` has confirmed the write: on the page the user has open, or on the saved workbench their page is a step behind. One clause is enough, and getting it wrong is worse than leaving it out. Add a `stats` card holding the two or three figures that carry the story, usually the baseline and the winner, and a `table` card listing the attempts with their hypothesis and outcome. Keep the stats card to three items; a fourth crowds the panel and none of them read. End with the one decision that is genuinely the user's, as a `choices` card: publish the winning draft as a prompt version, or keep iterating.
 
 **Publishing is the user's own click, and it is on the column.** There is no publish action and no command for it: the winning text is a draft on its own column, and the Save in that column's prompt editor is what writes it to the prompt library as a new version. So when the answer is publish, say where the draft is and that Save publishes it, in one sentence, and stop. Never go looking for a publish control on other pages, and never navigate away: the reader is looking at the columns your numbers are about, and a hunt that ends on an unrelated page reads as the work coming apart.
 

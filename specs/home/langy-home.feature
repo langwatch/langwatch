@@ -109,8 +109,13 @@ Feature: The Langy home
     Given the Langy home renders
     And the project has never received a trace
     Then a prominent send-your-first-trace control sits above the example asks
-    And it offers Langy's walkthrough, a prompt for my coding agent, and the docs
+    And it offers the same routes in the same order as every empty page: the
+      prompt for my coding agent first, Langy's walkthrough second, the docs third
+    And the prompt it copies is the tracing skill, led by the project's keys,
+      falling back to the install line while the skill is still on its way
+      (specs/skills/empty-state-skill-setup.feature)
     And the walkthrough route is withheld when I cannot start conversations
+    And the control's glyphs count the routes it opens with
 
   Scenario: A populated project keeps the quiet onboarding route
     Given the Langy home renders

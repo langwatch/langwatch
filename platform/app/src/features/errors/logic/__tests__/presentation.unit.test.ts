@@ -289,6 +289,21 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("given a deployment whose dataset storage is not writable", () => {
+    /** @scenario The customer reads copy written for the code */
+    it("says nothing was saved and that an administrator has to act", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "storage_not_writable", httpStatus: 500 }),
+      );
+
+      expect(title).not.toContain("storage_not_writable");
+      expect(description).toContain("Nothing was saved");
+      expect(description).toContain("administrator");
+      expect(description).not.toContain("S3_BUCKET_NAME");
+      expect(description).not.toContain("LANGWATCH_LOCAL_STORAGE_PATH");
+    });
+  });
+
   describe("given a code the registry has never seen", () => {
     /**
      * The fallback used to be `FAULT_TITLES[fault]`, which is a guess dressed

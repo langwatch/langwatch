@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   type NavigationModeResolution,
   resolveNavigationMode,
@@ -42,15 +43,20 @@ export function useNavigationMode(): NavigationModeResolution {
 
   // The same organization queries the dashboard layout itself runs; react-query
   // dedupes them, so the opted-out path stays at zero extra requests.
-  const { organization, isLoading: isOrganizationLoading } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    project,
+    organization,
+    isLoading: isOrganizationLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
 
   const { enabled: isFlagEnabled, isLoading: isFlagLoading } = useFeatureFlag(
     "release_ui_navigation_v2_enabled",
     {
+      // The shell also renders on organization pages, which hold no project.
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       // A reader who opted out of the new navigation pays for no flag
       // check, and the check waits until the organization is known (an

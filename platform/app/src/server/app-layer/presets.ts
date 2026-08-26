@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -223,10 +224,27 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
+import {
+  EmailJoinRequestNotifier,
+  JoinRequestLifecycleDispatcher,
+} from "./identity/join-request-adapters";
+import { AdminEmailPlatformOperators } from "./identity/platform-operators";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./identity/repositories/identity-users.prisma.repository";
+import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-request.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
+import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
+import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
+import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
+import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "./identity/repositories/sso-connection-reads.prisma.repository";
+import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -795,6 +813,9 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(
+    prisma,
+  );
   const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
   const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
   const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
@@ -903,6 +924,28 @@ export function initializeDefaultApp(options?: {
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
     identityUsers: new PrismaIdentityUsersRepository(prisma),
     identityReservations,
+    mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
+    mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
+    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
+      prisma,
+    ),
+    ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
+    ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
+    ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
+    // One repository, two roles (D08): the fold's store and the guards' read
+    // are the same `ScimSyncState` rows, so composing them separately would
+    // be two objects that must agree about a JSON column and eventually
+    // would not.
+    scimSyncProjection: scimSyncProjectionRepository,
+    scimSyncReads: scimSyncProjectionRepository,
+    joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
+    joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
+    joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
+      prisma,
+      new EmailJoinRequestNotifier(prisma),
+    ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -994,6 +1037,14 @@ export function initializeDefaultApp(options?: {
   // and the gateway ledger's PRINCIPAL rows.
   const personalUsageRepository = clickhouseEnabled
     ? new PersonalUsageClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // The /governance activity-monitor read side (spend rollups, per-source
+  // events and health). Org-scoped aggregates, but the queries key on the
+  // hidden governance Project, so it takes the standard per-tenant resolver —
+  // getClickHouseClientForTenant maps a project id to its org's route.
+  const activityMonitorRepository = clickhouseEnabled
+    ? new ActivityMonitorClickHouseRepository(resolveClickHouseClient)
     : undefined;
 
   // Billing-month usage rollups (billable_events + trace_summaries),
@@ -1797,6 +1848,7 @@ export function initializeDefaultApp(options?: {
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
+      activityMonitor: activityMonitorRepository,
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
@@ -2133,6 +2185,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       traceActivity: undefined,
       kpis: undefined,
       personalUsage: undefined,
+      activityMonitor: undefined,
     },
     billableEvents: undefined,
     codingAgents: {

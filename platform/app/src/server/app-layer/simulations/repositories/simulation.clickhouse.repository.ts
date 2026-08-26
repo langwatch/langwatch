@@ -10,6 +10,7 @@ import type {
   BatchHistoryItem,
   BatchSummary,
   ExternalSetSummary,
+  ScenarioLastResultSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
@@ -104,10 +105,12 @@ type BatchAggregateRow = {
  *
  * stalledCount stays out: the history page counts it from the preview items it
  * already holds, and the single-batch summary reads the StalledCount column.
+ * The note stays out for the same reason: the history page reads it off the
+ * preview rows, the single-batch summary off its own aggregate.
  */
 function mapBatchAggregateRow(
   row: BatchAggregateRow,
-): Omit<BatchSummary, "stalledCount"> {
+): Omit<BatchSummary, "stalledCount" | "note"> {
   const firstCompletedAt = Number(row.FirstCompletedAt);
   const allCompletedAt = Number(row.AllCompletedAt);
 
@@ -343,12 +346,25 @@ const LIST_COLUMNS = `
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
   toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
 
+/**
+ * The run note, read out of the run metadata server-side so only the short
+ * string crosses the wire.
+ *
+ * The note is a top-level metadata key, the same one an SDK or CI caller
+ * writes, so a batch reports its note whether it came from the platform or from
+ * outside it. A run without one extracts as the empty string.
+ *
+ * @see specs/suites/run-note-metadata-convention.feature
+ */
+const RUN_NOTE_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'note')";
+
 /** Columns for a slim batch-history preview — no full message arrays. */
 const PREVIEW_COLUMNS = `
   ScenarioRunId, BatchRunId, Name, Description, Status,
   toString(DurationMs) AS DurationMs,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
+  ${RUN_NOTE_EXPR} AS Note,
   arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
   arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
 
@@ -367,6 +383,7 @@ interface PreviewItemRow {
   DurationMs: string | null;
   UpdatedAt: string;
   FinishedAt: string | null;
+  Note: string;
   MessagePreviewRoles: string[];
   MessagePreviewContents: string[];
 }
@@ -668,9 +685,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
       const stalledCount = items.filter((i) => i.status === "STALLED").length;
 
+      // Every run of a batch is stamped with the same note at queue time, so
+      // the first non-empty one is the batch's note. Reading it here costs no
+      // extra query: the preview rows are already loaded.
+      const note =
+        (itemsByBatch.get(b.BatchRunId) ?? []).find((r) => r.Note !== "")
+          ?.Note ?? null;
+
       return {
         ...mapBatchAggregateRow(b),
         stalledCount,
+        note,
         items,
       };
     });
@@ -701,8 +726,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const whereFilters =
       "TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String}";
 
-    const rows = await this.queryRows<BatchAggregateRow>(
-      `SELECT ${BATCH_AGGREGATE_COLUMNS}
+    // The note read is safe here and not in BATCH_AGGREGATE_COLUMNS: this query
+    // is bounded to one batch, while the history page shares those columns with
+    // a step that aggregates over the whole run set.
+    const rows = await this.queryRows<BatchAggregateRow & { Note: string }>(
+      `SELECT ${BATCH_AGGREGATE_COLUMNS},
+        anyIf(${RUN_NOTE_EXPR}, ${RUN_NOTE_EXPR} != '')                AS Note
        FROM ${TABLE_NAME}
        WHERE ${whereFilters}
          AND ArchivedAt IS NULL
@@ -717,6 +746,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return {
       ...mapBatchAggregateRow(row),
       stalledCount: Number(row.StalledCount),
+      note: row.Note === "" ? null : row.Note,
     };
   }
 
@@ -1207,6 +1237,93 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       failedCount: Number(row.FailCount),
       totalCount: Number(row.TotalCount),
       lastRunTimestamp: Number(row.LastRunAt),
+    }));
+  }
+
+  /**
+   * The latest run result per scenario inside the window, for the last-result
+   * cells of the test cases table.
+   *
+   * "Latest" is resolved with argMax over UpdatedAt across the scenario's
+   * deduped runs, matching how every other latest-wins read in this file
+   * picks a row. The dedup subquery keeps the ArchivedAt filter honest: an
+   * archived run's older versions still carry a NULL ArchivedAt, so the
+   * filter runs on deduped rows only (the getScenarioSetsData pattern).
+   */
+  async getLastResultSummaries({
+    projectId,
+    scenarioIds,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioIds?: string[];
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ScenarioLastResultSummary[]> {
+    if (scenarioIds !== undefined && scenarioIds.length === 0) {
+      return [];
+    }
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    const scenarioFilter =
+      scenarioIds !== undefined
+        ? "AND ScenarioId IN ({scenarioIds:Array(String)})"
+        : "";
+    const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause}`;
+
+    const rows = await this.queryRows<{
+      ScenarioId: string;
+      LastStatus: string;
+      MetCriteriaCount: string;
+      UnmetCriteriaCount: string;
+      LastRunAt: string;
+      LastBatchRunId: string;
+      LastScenarioSetId: string;
+      LastDurationMs: string;
+      LastTotalCost: string;
+    }>(
+      // Duration and cost ride the same argMax as the verdict, stringified
+      // with '' for NULL first: an aggregate over the raw Nullable column
+      // would skip NULL rows and serve an older run's value for a latest run
+      // that has none yet.
+      `SELECT
+        ScenarioId,
+        argMax(Status, UpdatedAt)                                   AS LastStatus,
+        toString(argMax(length(MetCriteria), UpdatedAt))            AS MetCriteriaCount,
+        toString(argMax(length(UnmetCriteria), UpdatedAt))          AS UnmetCriteriaCount,
+        toString(toUnixTimestamp64Milli(max(ifNull(StartedAt, CreatedAt)))) AS LastRunAt,
+        argMax(BatchRunId, UpdatedAt)                               AS LastBatchRunId,
+        argMax(ScenarioSetId, UpdatedAt)                            AS LastScenarioSetId,
+        argMax(ifNull(toString(DurationMs), ''), UpdatedAt)         AS LastDurationMs,
+        argMax(ifNull(toString(TotalCost), ''), UpdatedAt)          AS LastTotalCost
+       FROM (
+         SELECT ScenarioId, Status, MetCriteria, UnmetCriteria, BatchRunId,
+                ScenarioSetId, DurationMs, TotalCost,
+                StartedAt, CreatedAt, UpdatedAt, ArchivedAt
+         FROM ${TABLE_NAME}
+         WHERE ${whereFilters}
+           ${simulationRunDedupPredicate(whereFilters)}
+       )
+       WHERE ArchivedAt IS NULL
+       GROUP BY ScenarioId`,
+      {
+        tenantId: projectId,
+        ...(scenarioIds !== undefined ? { scenarioIds } : {}),
+        ...dateFilter.params,
+      },
+    );
+
+    return rows.map((row) => ({
+      scenarioId: row.ScenarioId,
+      status: mapStatus(row.LastStatus),
+      metCriteriaCount: Number(row.MetCriteriaCount),
+      unmetCriteriaCount: Number(row.UnmetCriteriaCount),
+      lastRunAt: Number(row.LastRunAt),
+      batchRunId: row.LastBatchRunId,
+      scenarioSetId: row.LastScenarioSetId,
+      durationInMs:
+        row.LastDurationMs === "" ? null : Number(row.LastDurationMs),
+      totalCost: row.LastTotalCost === "" ? null : Number(row.LastTotalCost),
     }));
   }
 

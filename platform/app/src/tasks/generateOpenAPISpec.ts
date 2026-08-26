@@ -4,6 +4,7 @@ import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs as generateSpecsUnpinned } from "hono-openapi";
 import path from "path";
+import { app as agentCacheApp } from "../app/api/agent-cache/[[...route]]/app";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as analyticsSqlApp } from "../app/api/analytics-sql/[[...route]]/app";
@@ -71,6 +72,7 @@ const generateSpecs: typeof generateSpecsUnpinned = async (hono, options, c) =>
 // the previous spec below: without the prune, a deleted route would ride
 // the merge union forever.
 const APP_DERIVED_PREFIXES = [
+  "/api/agent-cache",
   "/api/agents",
   "/api/api-keys",
   "/api/analytics",
@@ -181,6 +183,8 @@ const langwatchSpec = {
  */
 export default async function execute() {
   console.log("Generating OpenAPI spec...");
+  console.log("Building agent cache spec...");
+  const agentCacheSpec = await generateSpecs(agentCacheApp);
   console.log("Building agents spec...");
   const agentsSpec = await generateSpecs(agentsApp);
   console.log("Building api keys spec...");
@@ -271,6 +275,7 @@ export default async function execute() {
     // Merges this way ==>
     [
       currentSpec,
+      agentCacheSpec,
       agentsSpec,
       apiKeysSpec,
       analyticsSpec,

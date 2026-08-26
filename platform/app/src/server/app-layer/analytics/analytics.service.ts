@@ -34,6 +34,7 @@ import type {
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { adjustTimeScaleForBucketCap } from "./query-builders/_shared";
@@ -333,7 +334,9 @@ export class AnalyticsService {
 async function isTripwireEnabled(projectId: string): Promise<boolean> {
   return featureFlagService.isEnabled(
     "release_event_sourced_analytics_read_tripwire",
-    { distinctId: projectId, projectId },
+    // A read tripwire on the analytics hot path. It takes no organization
+    // lookup, so only the project targets it.
+    { distinctId: projectId, projectId, organizationId: NOT_TARGETED },
   );
 }
 

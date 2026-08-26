@@ -25,12 +25,17 @@ import {
   type ManagementTestOrg,
   seedManagementOrg,
 } from "~/test-utils/managementApiOrg";
+import { seedSsoConnection } from "~/test-utils/ssoConnection";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: SCIM tokens REST API", () => {
   const ns = `scim-tokens-${nanoid(8)}`;
 
   let seeded: ManagementTestOrg;
+  /** A token names the connection it was issued for (D08), so every mint here
+   *  names this one. Which connection is setup, not the subject: what these
+   *  tests are about is where the token value appears and stops working. */
+  let connectionId: string;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${seeded.adminToken}`,
@@ -55,12 +60,17 @@ describe("Feature: SCIM tokens REST API", () => {
     });
 
     seeded = await seedManagementOrg({ prisma, ns });
+    ({ connectionId } = await seedSsoConnection({
+      prisma,
+      organizationId: seeded.organization.id,
+    }));
   });
 
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
         ["scimToken", { organizationId: seeded?.organization.id }],
+        ["ssoConnection", { organizationId: seeded?.organization.id }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["apiKey", { organizationId: seeded?.organization.id }],
         ["organizationUser", { organizationId: seeded?.organization.id }],
@@ -80,7 +90,10 @@ describe("Feature: SCIM tokens REST API", () => {
       const create = await app.request("/api/scim-tokens", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ description: `List Secrets ${ns}` }),
+        body: JSON.stringify({
+          connectionId,
+          description: `List Secrets ${ns}`,
+        }),
       });
       expect(create.status).toBe(201);
       const created = await create.json();
@@ -112,7 +125,7 @@ describe("Feature: SCIM tokens REST API", () => {
       const response = await app.request("/api/scim-tokens", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ description: "Okta production" }),
+        body: JSON.stringify({ connectionId, description: "Okta production" }),
       });
 
       expect(response.status).toBe(201);
@@ -135,7 +148,7 @@ describe("Feature: SCIM tokens REST API", () => {
         await app.request("/api/scim-tokens", {
           method: "POST",
           headers: authHeaders(),
-          body: JSON.stringify({ description: `Revoke ${ns}` }),
+          body: JSON.stringify({ connectionId, description: `Revoke ${ns}` }),
         })
       ).json();
 
