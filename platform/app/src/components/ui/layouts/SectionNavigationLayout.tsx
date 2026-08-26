@@ -62,8 +62,20 @@ export function SectionNavigationLayout({
            path, and the only padding on either. The frame itself draws none:
            mounted inside SettingsLayout it sits in a container that already
            padded the page, and a second helping was the doubled gutter this
-           used to ship with. */
-        <Box padding={4}>
+           used to ship with.
+
+           THE WIDTH CAP STAYS ON THIS PATH. Removing the frame's nested
+           container took the 1600px with it, which on a wide display made
+           these pages full-bleed — a change to how every one of them reads,
+           made as a side effect of deleting a duplicated gutter. Inside
+           SettingsLayout the cap is the settings container's (1280px, which
+           is narrower anyway); here there is nothing else to draw it. */
+        <Box
+          padding={4}
+          maxW="1600px"
+          width="full"
+          data-testid="section-navigation-container"
+        >
           <SectionNavigationFrame
             sectionLabel={sectionLabel}
             navigationItems={navigationItems}

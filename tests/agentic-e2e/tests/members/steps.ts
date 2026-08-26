@@ -19,13 +19,18 @@ import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  // Members settings is org-scoped at /settings/members (resolved via the
-  // session's active org), not project-prefixed — every app nav link uses this
-  // exact href (see platform/app/src/routes.tsx). The org context comes from the
-  // authenticated session, not the URL.
+  // Members settings is org-scoped (resolved via the session's active org),
+  // not project-prefixed. The org context comes from the authenticated
+  // session, not the URL.
+  //
+  // MEMBERS BECAME THE FIRST CUT OF DIRECTORY. The old address is kept alive
+  // as a redirect on purpose — a support thread linking to it has to keep
+  // landing somewhere — so this walks in through the old door and waits for
+  // the page it becomes, which exercises the redirect as well as the list.
   await page.goto(`/settings/members`);
+  await expect(page).toHaveURL(/\/settings\/directory/, { timeout: 15000 });
   await expect(
-    page.getByRole("heading", { name: "Organization Members" })
+    page.getByRole("heading", { name: "Directory" })
   ).toBeVisible({ timeout: 15000 });
 }
 

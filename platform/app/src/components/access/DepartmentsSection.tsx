@@ -41,7 +41,16 @@ export function DepartmentsSection({
       { enabled: !!organizationId },
     );
 
-  const assigned = (map: Map<string, string>, departmentId: string) => {
+  // ReadonlyMap<string, string | null>: `departmentId` is a nullable column
+  // and `getAssignments` answers for EVERY member, team and project, so null
+  // means unassigned rather than missing. The narrower type here was the
+  // typecheck failure; widening it changes no behaviour, because `value ===
+  // departmentId` is only ever asked with a real department id and a null
+  // never matches one.
+  const assigned = (
+    map: ReadonlyMap<string, string | null>,
+    departmentId: string,
+  ) => {
     let count = 0;
     for (const value of map.values()) if (value === departmentId) count += 1;
     return count;
