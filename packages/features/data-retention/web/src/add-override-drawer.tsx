@@ -9,20 +9,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
-import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "~/components/settings/ScopeChipPicker";
-import { Drawer } from "~/components/ui/drawer";
-import { Select } from "@langwatch/design-system/select";
-import { Switch } from "@langwatch/design-system/switch";
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
   RETENTION_WEEK_DAYS,
-} from "~/server/data-retention/retentionPolicy.schema";
+  type ScopeAssignment,
+} from "@langwatch/data-retention-contract";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Select } from "@langwatch/design-system/select";
+import { Switch } from "@langwatch/design-system/switch";
+import { useEffect, useMemo, useState } from "react";
 import {
   buildRetentionMenuItems,
   CUSTOM_PRESET_VALUE,
@@ -39,7 +36,7 @@ import {
 /** A row the overflow menu's Edit action targets: a single scope's policy,
  *  prefilled into the drawer with the scope locked. */
 export type RetentionEditTarget = {
-  scope: ScopeTriadEntry;
+  scope: ScopeAssignment;
   scopeName: string;
   retentionDays: number;
 };
@@ -91,24 +88,17 @@ export function AddOverrideDrawer({
   open,
   onClose,
   available,
-  currentOrganizationId,
-  currentTeamId,
   currentProjectId,
   isPlatformAdmin,
   isEnterprise,
   isSaving,
   onSave,
   editTarget,
+  scopePicker,
 }: {
   open: boolean;
   onClose: () => void;
-  available: {
-    organization: { id: string; name: string } | null;
-    teams: { id: string; name: string }[];
-    projects: { id: string; name: string; teamId: string }[];
-  };
-  currentOrganizationId: string | undefined;
-  currentTeamId: string | undefined;
+  available: { projects: { id: string }[] };
   currentProjectId: string;
   isPlatformAdmin: boolean;
   /** True for enterprise (and self-hosted, which resolves to enterprise). Paid
@@ -116,20 +106,28 @@ export function AddOverrideDrawer({
   isEnterprise: boolean;
   isSaving: boolean;
   onSave: (params: {
-    scopes: ScopeTriadEntry[];
+    scopes: ScopeAssignment[];
     retentionDays: number;
     applyToExisting: boolean;
   }) => void;
   /** When set, the drawer edits this existing policy: the scope is locked and
    *  shown read-only, and the retention is prefilled. Absent = add mode. */
   editTarget?: RetentionEditTarget | null;
+  /** Renders the scope picker in Add mode. A named render port rather than a
+   *  direct dependency: scope selection is a shared app concern (organization
+   *  / team / project data, not owned by this feature), so the caller supplies
+   *  its own picker wired to `value`/`onChange`. */
+  scopePicker: (props: {
+    value: ScopeAssignment[];
+    onChange: (value: ScopeAssignment[]) => void;
+  }) => React.ReactNode;
 }) {
   // The retention menu is plan-gated: paid orgs get a fixed short pair, while
   // enterprise/self-hosted get the full list plus a custom field.
   const presets = useMemo(() => retentionPresetsForTier(isEnterprise), [isEnterprise]);
   const defaultPreset = presets[0]?.value ?? CUSTOM_PRESET_VALUE;
 
-  const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
+  const [scopes, setScopes] = useState<ScopeAssignment[]>([]);
   const [preset, setPreset] = useState<string>(defaultPreset);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
@@ -272,20 +270,7 @@ export function AddOverrideDrawer({
                   name={editTarget.scopeName}
                 />
               ) : (
-                <ScopeChipPicker
-                  value={scopes}
-                  onChange={setScopes}
-                  organizationId={available.organization?.id}
-                  organizationName={available.organization?.name}
-                  availableTeams={available.teams}
-                  availableProjects={available.projects}
-                  label=""
-                  currentOrganizationId={
-                    available.organization ? currentOrganizationId : undefined
-                  }
-                  currentTeamId={currentTeamId}
-                  currentProjectId={currentProjectId}
-                />
+                scopePicker({ value: scopes, onChange: setScopes })
               )}
             </VStack>
 
@@ -406,7 +391,7 @@ function ScopeReadout({
   scopeType,
   name,
 }: {
-  scopeType: ScopeTriadEntry["scopeType"];
+  scopeType: ScopeAssignment["scopeType"];
   name: string;
 }) {
   const Icon = SCOPE_ICON[scopeType];

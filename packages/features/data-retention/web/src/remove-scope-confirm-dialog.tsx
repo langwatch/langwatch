@@ -1,7 +1,7 @@
 import { Alert, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { ResolvedRetention } from "@langwatch/data-retention-contract";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { ArrowRight } from "lucide-react";
-import { Dialog } from "~/components/ui/dialog";
-import { api } from "~/utils/api";
 import { type RetentionScopeGroup, renderPolicyValue } from "./grouping";
 
 /**
@@ -9,34 +9,32 @@ import { type RetentionScopeGroup, renderPolicyValue } from "./grouping";
  * delete of data — it only changes the retention applied to NEW data, which
  * falls back to the next tier in the cascade (or the platform default). This
  * dialog spells that out and shows the real fallback number resolved
- * server-side (never a guessed value), so a user can't mistake "remove rule"
- * for "delete my traces" — the fear that prompted this UI.
+ * server-side (never a guessed value, and never fetched here — the caller
+ * owns the preview query and passes its result down), so a user can't
+ * mistake "remove rule" for "delete my traces" — the fear that prompted this
+ * UI.
  */
 export function RemoveScopeConfirmDialog({
   group,
-  projectId,
   isRemoving,
   onCancel,
   onConfirm,
+  preview,
 }: {
   group: RetentionScopeGroup | null;
-  projectId: string;
   isRemoving: boolean;
   onCancel: () => void;
   onConfirm: () => void | Promise<void>;
+  /** The fallback retention preview for `group`, owned and fetched by the
+   *  caller so this component stays transport-free. */
+  preview: {
+    data: ResolvedRetention | undefined;
+    isLoading: boolean;
+    isError: boolean;
+  };
 }) {
-  const previewQuery = api.dataRetention.previewScopeRemoval.useQuery(
-    {
-      projectId,
-      scope: group
-        ? { scopeType: group.scopeType, scopeId: group.scopeId }
-        : { scopeType: "PROJECT", scopeId: "" },
-    },
-    { enabled: !!group },
-  );
-
   const current = group ? renderPolicyValue(group.byCategory) : "—";
-  const fallback = previewQuery.data ? renderPolicyValue(previewQuery.data) : null;
+  const fallback = preview.data ? renderPolicyValue(preview.data) : null;
 
   return (
     <Dialog.Root
@@ -72,7 +70,7 @@ export function RemoveScopeConfirmDialog({
                 <Text fontSize="xs" color="fg.muted">
                   Retention for {group.name}
                 </Text>
-                {previewQuery.isLoading ? (
+                {preview.isLoading ? (
                   <HStack gap={2}>
                     <Spinner size="sm" />
                     <Text fontSize="sm" color="fg.muted">
@@ -92,7 +90,7 @@ export function RemoveScopeConfirmDialog({
                 </Text>
               </VStack>
 
-              {previewQuery.isError && (
+              {preview.isError && (
                 <Alert.Root status="warning">
                   <Alert.Indicator />
                   <Alert.Content>

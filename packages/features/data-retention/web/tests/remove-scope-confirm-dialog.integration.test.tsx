@@ -4,19 +4,9 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RetentionScopeGroup } from "../grouping";
-
-const queryMock = vi.fn();
-vi.mock("~/utils/api", () => ({
-  api: {
-    dataRetention: {
-      previewScopeRemoval: { useQuery: (...args: any[]) => queryMock(...args) },
-    },
-  },
-}));
-
-import { RemoveScopeConfirmDialog } from "../RemoveScopeConfirmDialog";
+import { afterEach, describe, expect, it } from "vitest";
+import type { RetentionScopeGroup } from "../src/grouping";
+import { RemoveScopeConfirmDialog } from "../src/remove-scope-confirm-dialog";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -31,27 +21,23 @@ const group: RetentionScopeGroup = {
 };
 
 describe("RemoveScopeConfirmDialog", () => {
-  afterEach(() => {
-    cleanup();
-    queryMock.mockReset();
-  });
+  afterEach(cleanup);
 
   describe("given a scope group targeted for removal", () => {
     describe("when the fallback retention has resolved", () => {
       it("reassures that no data is deleted", () => {
-        queryMock.mockReturnValue({
-          data: { traces: 49, scenarios: 49, experiments: 49 },
-          isLoading: false,
-          isError: false,
-        });
         render(
           <Wrapper>
             <RemoveScopeConfirmDialog
               group={group}
-              projectId="proj-1"
               isRemoving={false}
               onCancel={() => {}}
               onConfirm={() => {}}
+              preview={{
+                data: { traces: 49, scenarios: 49, experiments: 49 },
+                isLoading: false,
+                isError: false,
+              }}
             />
           </Wrapper>,
         );
@@ -59,19 +45,18 @@ describe("RemoveScopeConfirmDialog", () => {
       });
 
       it("shows the current value falling back to the resolved value", () => {
-        queryMock.mockReturnValue({
-          data: { traces: 49, scenarios: 49, experiments: 49 },
-          isLoading: false,
-          isError: false,
-        });
         render(
           <Wrapper>
             <RemoveScopeConfirmDialog
               group={group}
-              projectId="proj-1"
               isRemoving={false}
               onCancel={() => {}}
               onConfirm={() => {}}
+              preview={{
+                data: { traces: 49, scenarios: 49, experiments: 49 },
+                isLoading: false,
+                isError: false,
+              }}
             />
           </Wrapper>,
         );
@@ -83,19 +68,14 @@ describe("RemoveScopeConfirmDialog", () => {
 
     describe("when the fallback is still resolving", () => {
       it("shows a resolving indicator instead of a guessed number", () => {
-        queryMock.mockReturnValue({
-          data: undefined,
-          isLoading: true,
-          isError: false,
-        });
         render(
           <Wrapper>
             <RemoveScopeConfirmDialog
               group={group}
-              projectId="proj-1"
               isRemoving={false}
               onCancel={() => {}}
               onConfirm={() => {}}
+              preview={{ data: undefined, isLoading: true, isError: false }}
             />
           </Wrapper>,
         );
@@ -103,30 +83,21 @@ describe("RemoveScopeConfirmDialog", () => {
         expect(screen.queryByText("49 days")).toBeNull();
       });
     });
-  });
 
-  describe("given no scope group is targeted", () => {
-    describe("when the dialog renders", () => {
-      it("does not query for a fallback", () => {
-        queryMock.mockReturnValue({
-          data: undefined,
-          isLoading: false,
-          isError: false,
-        });
+    describe("when the fallback preview failed to load", () => {
+      it("warns that the preview couldn't resolve but removal still works", () => {
         render(
           <Wrapper>
             <RemoveScopeConfirmDialog
-              group={null}
-              projectId="proj-1"
+              group={group}
               isRemoving={false}
               onCancel={() => {}}
               onConfirm={() => {}}
+              preview={{ data: undefined, isLoading: false, isError: true }}
             />
           </Wrapper>,
         );
-        // The query hook is always called (rules of hooks) but disabled.
-        const lastCall = queryMock.mock.calls.at(-1);
-        expect(lastCall?.[1]).toMatchObject({ enabled: false });
+        expect(screen.getByText(/Couldn't preview the fallback retention/i)).toBeTruthy();
       });
     });
   });

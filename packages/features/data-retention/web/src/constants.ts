@@ -1,10 +1,10 @@
 import { createListCollection } from "@chakra-ui/react";
 import { Building2, Folder, Users } from "lucide-react";
-import type { ScopeTriadType } from "~/components/settings/ScopeChipPicker";
 import {
   INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
-} from "~/server/data-retention/retentionPolicy.schema";
+  type RetentionScopeType,
+} from "@langwatch/data-retention-contract";
 
 export const CATEGORY_LABELS: Record<RetentionCategory, string> = {
   traces: "Traces & Spans",
@@ -12,7 +12,7 @@ export const CATEGORY_LABELS: Record<RetentionCategory, string> = {
   experiments: "Experiments",
 };
 
-export const SCOPE_ICON: Record<ScopeTriadType, typeof Building2> = {
+export const SCOPE_ICON: Record<RetentionScopeType, typeof Building2> = {
   ORGANIZATION: Building2,
   TEAM: Users,
   PROJECT: Folder,
@@ -133,7 +133,7 @@ export const CUSTOM_PRESET_VALUE = "custom";
  *  mutation route authorizes it independently. */
 export const INDEFINITE_PRESET_VALUE = String(INDEFINITE_RETENTION_DAYS);
 
-export const BINDING_SCOPE_TIERS: Record<ScopeTriadType, number> = {
+export const BINDING_SCOPE_TIERS: Record<RetentionScopeType, number> = {
   ORGANIZATION: 0,
   TEAM: 1,
   PROJECT: 2,
