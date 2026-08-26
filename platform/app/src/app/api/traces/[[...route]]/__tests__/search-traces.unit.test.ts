@@ -39,6 +39,12 @@ vi.mock("~/server/traces/trace-formatting", () => ({
   formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
 }));
 
+vi.mock("~/app/api/shared/platform-url", () => ({
+  platformUrl: vi.fn(
+    ({ path }: { path: string }) => `https://app.langwatch.ai/project${path}`,
+  ),
+}));
+
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -116,6 +122,18 @@ function searchRequest(body: Record<string, unknown>) {
 }
 
 describe("POST /search", () => {
+  const sampleEvaluations = [
+    {
+      evaluation_id: "eval-1",
+      evaluator_id: "evaluator-1",
+      name: "sentiment",
+      status: "processed" as const,
+      score: 0.95,
+      label: "positive",
+      timestamps: { started_at: 1000, finished_at: 2000 },
+    },
+  ];
+
   const sampleTraces: Partial<Trace>[] = [
     {
       trace_id: "trace-1",
@@ -143,17 +161,7 @@ describe("POST /search", () => {
       groups: [sampleTraces],
       totalHits: 2,
       traceChecks: {
-        "trace-1": [
-          {
-            evaluation_id: "eval-1",
-            evaluator_id: "evaluator-1",
-            name: "sentiment",
-            status: "processed",
-            score: 0.95,
-            label: "positive",
-            timestamps: { started_at: 1000, finished_at: 2000 },
-          },
-        ],
+        "trace-1": sampleEvaluations,
         "trace-2": [],
       },
       scrollId: undefined,
@@ -172,7 +180,7 @@ describe("POST /search", () => {
       expect(options.includeSpans).toBe(false);
     });
 
-    it("returns compact summary digests instead of full span content", async () => {
+    it("preserves the complete digest response envelope", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
@@ -180,8 +188,21 @@ describe("POST /search", () => {
       });
 
       const body = await res.json();
-      expect(body.traces).toHaveLength(2);
-      expect(body.traces[0].formatted_trace).toBe("Input: hello\nOutput: world");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      expect(body).toEqual({
+        traces: sampleTraces.map((trace, index) => ({
+          trace_id: trace.trace_id,
+          formatted_trace: "Input: hello\nOutput: world",
+          input: trace.input,
+          output: trace.output,
+          timestamps: trace.timestamps,
+          metadata: trace.metadata,
+          evaluations: index === 0 ? sampleEvaluations : [],
+          platformUrl: `https://app.langwatch.ai/project/traces/${trace.trace_id}`,
+        })),
+        pagination: { totalHits: 2 },
+      });
     });
 
     it("includes trace metadata in each digest entry", async () => {
@@ -216,7 +237,7 @@ describe("POST /search", () => {
   });
 
   describe("when format is json", () => {
-    it("returns raw trace data", async () => {
+    it("preserves the complete json response envelope", async () => {
       const res = await searchRequest({
         startDate: 1000,
         endDate: 5000,
@@ -224,9 +245,16 @@ describe("POST /search", () => {
       });
 
       const body = await res.json();
-      expect(body.traces).toHaveLength(2);
-      expect(body.traces[0]).toHaveProperty("trace_id", "trace-1");
-      expect(body.traces[0]).not.toHaveProperty("formatted_trace");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      expect(body).toEqual({
+        traces: sampleTraces.map((trace, index) => ({
+          ...trace,
+          evaluations: index === 0 ? sampleEvaluations : [],
+          platformUrl: `https://app.langwatch.ai/project/traces/${trace.trace_id}`,
+        })),
+        pagination: { totalHits: 2 },
+      });
     });
   });
 

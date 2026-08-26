@@ -59,6 +59,12 @@ vi.mock("~/server/traces/trace-formatting", () => ({
   formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
 }));
 
+vi.mock("~/app/api/shared/platform-url", () => ({
+  platformUrl: vi.fn(
+    ({ path }: { path: string }) => `https://app.langwatch.ai/project${path}`,
+  ),
+}));
+
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -181,18 +187,34 @@ describe("GET /:traceId", () => {
       );
     });
 
-    it("includes evaluations in the json response", async () => {
+    it("preserves the complete json response envelope", async () => {
       const res = await makeRequest("trace-abc", { format: "json" });
       const body = await res.json();
 
-      expect(body.evaluations).toEqual(sampleEvaluations);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      expect(body).toEqual({
+        ...sampleTrace,
+        evaluations: sampleEvaluations,
+        ascii_tree: "ascii tree",
+        platformUrl: "https://app.langwatch.ai/project/traces/trace-abc",
+      });
     });
 
-    it("includes evaluations in the digest response", async () => {
+    it("preserves the complete digest response envelope", async () => {
       const res = await makeRequest("trace-abc", { format: "digest" });
       const body = await res.json();
 
-      expect(body.evaluations).toEqual(sampleEvaluations);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("application/json");
+      expect(body).toEqual({
+        trace_id: "trace-abc",
+        formatted_trace: "formatted trace",
+        timestamps: sampleTrace.timestamps,
+        metadata: sampleTrace.metadata,
+        evaluations: sampleEvaluations,
+        platformUrl: "https://app.langwatch.ai/project/traces/trace-abc",
+      });
     });
   });
 
