@@ -40,8 +40,16 @@ import {
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import type {
+  ConversationRoutingProfile,
+  RoutingOrigin,
+} from "./conversationTraceAssembly";
 import {
-  type ConversationRoutingProfile,
+  COPILOT_ROUTING_PROFILE,
+  mapCopilotEventsToTraceRequest,
+} from "./copilotStudioTraceMapper";
+import {
   GENIE_ROUTING_PROFILE,
   mapGenieEventsToTraceRequest,
 } from "./genieTraceMapper";
@@ -350,12 +358,35 @@ async function writePulledEvents({
 // Keys are declared `SourceType` so a misspelled entry fails the build, but the
 // map is held as `ReadonlyMap<string, …>` because the lookup value is the raw
 // database column: narrowing the lookup would only force a cast at the call.
-const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
-  string,
-  ConversationRoutingProfile
-> = new Map<SourceType, ConversationRoutingProfile>([
-  ["databricks_genie", GENIE_ROUTING_PROFILE],
-]);
+/**
+ * A source's profile travels with the mapper that reads its payloads. The two
+ * cannot be chosen independently: a profile names the action a source calls a
+ * conversation, and the mapper is what knows how to read the rows carrying
+ * that action. Pairing them here means adding a source is one entry rather
+ * than two that can disagree.
+ */
+interface ConversationRouting {
+  profile: ConversationRoutingProfile;
+  map: (args: {
+    events: NormalizedPullEvent[];
+    origin: RoutingOrigin;
+  }) => IExportTraceServiceRequest | null;
+}
+
+const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<string, ConversationRouting> =
+  new Map<SourceType, ConversationRouting>([
+    [
+      "databricks_genie",
+      { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest },
+    ],
+    [
+      "copilot_studio_dataverse",
+      {
+        profile: COPILOT_ROUTING_PROFILE,
+        map: mapCopilotEventsToTraceRequest,
+      },
+    ],
+  ]);
 
 /**
  * The registry's only reader outside this module.
@@ -371,7 +402,7 @@ const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<
 export function conversationRoutingProfileFor(
   sourceType: string,
 ): ConversationRoutingProfile | undefined {
-  return CONVERSATION_ROUTING_PROFILES.get(sourceType);
+  return CONVERSATION_ROUTING_PROFILES.get(sourceType)?.profile;
 }
 
 /**
@@ -422,16 +453,16 @@ export async function routeConversationsToTraceDestination({
   // conversations at all — only the composer declines to offer the picker.
   // So the source type has to earn its way in here, and one we have no
   // conversation shape for routes nothing rather than being guessed at.
-  const profile = CONVERSATION_ROUTING_PROFILES.get(source.sourceType);
-  if (!profile) return;
+  const routing = CONVERSATION_ROUTING_PROFILES.get(source.sourceType);
+  if (!routing) return;
 
-  const request = mapGenieEventsToTraceRequest({
+  const request = routing.map({
     events,
     origin: {
       ingestionSourceId: source.id,
       organizationId: source.organizationId,
       sourceType: source.sourceType,
-      profile,
+      profile: routing.profile,
     },
   });
   if (!request) return;

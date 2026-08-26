@@ -53,7 +53,9 @@ export type SourceType =
   | "claude_code"
   | "claude_cowork"
   | "workato"
+  /** Retired: reads the directory audit, which holds no conversations. */
   | "copilot_studio"
+  | "copilot_studio_dataverse"
   | "openai_compliance"
   | "claude_compliance"
   | "anthropic_admin"
@@ -67,6 +69,7 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "claude_cowork",
   "workato",
   "copilot_studio",
+  "copilot_studio_dataverse",
   "openai_compliance",
   "claude_compliance",
   "anthropic_admin",

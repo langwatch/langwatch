@@ -127,8 +127,17 @@ export const SOURCE_TYPE_OPTIONS = [
       "Retired. This source polled Microsoft's directory audit, which records changes to the directory and has never contained a Copilot conversation.",
     icon: <Microsoft />,
     // Kept so existing rows keep their label and the guards below still
-    // compile; filtered out of the picker by `selectableSourceTypes`.
+    // compile; filtered out of the picker by `gatedSourceTypeOptions`.
     deprecated: true,
+  },
+  {
+    value: "copilot_studio_dataverse",
+    label: "Microsoft Copilot Studio",
+    mode: "pull",
+    blurb:
+      "Reads Copilot Studio conversations from your Power Platform environment. Needs an app registration with a client secret and a Dataverse role that can read the conversation transcript and bot tables — no directory permission of any kind.",
+    icon: <Microsoft />,
+    routesConversations: true,
   },
   {
     value: "openai_compliance",

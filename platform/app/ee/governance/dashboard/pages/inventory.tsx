@@ -1805,6 +1805,35 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       hint: "How often to call Purview Audit. Default 300s.",
     },
   ],
+  copilot_studio_dataverse: [
+    {
+      key: "environmentUrl",
+      label: "Power Platform environment URL",
+      placeholder: "https://org12345.crm.dynamics.com",
+      hint: "From Power Platform admin centre → your environment → Environment URL. Environments served from a custom domain are not supported yet.",
+      required: true,
+    },
+    {
+      key: "tenantId",
+      label: "Microsoft Entra tenant ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      required: true,
+    },
+    {
+      key: "clientId",
+      label: "App registration client ID",
+      placeholder: "00000000-0000-0000-0000-000000000000",
+      required: true,
+    },
+    {
+      key: "clientSecret",
+      label: "App registration client secret",
+      placeholder: "(value pasted from the Azure portal)",
+      hint: "The app needs a Dataverse application user in this environment with read access to the conversation transcript and bot tables. No directory permission is required.",
+      required: true,
+      secret: true,
+    },
+  ],
   openai_compliance: [
     {
       key: "bucket",
