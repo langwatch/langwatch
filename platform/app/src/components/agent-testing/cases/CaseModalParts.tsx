@@ -220,7 +220,7 @@ export function CaseModalFields({
   if (editor.isLoading) return <CaseModalSkeleton />;
 
   return (
-    <VStack align="stretch" gap={4}>
+    <VStack align="stretch" gap={4} minHeight="full">
       {editor.staleVersion !== null && (
         <StaleVersionNotice
           currentVersion={editor.staleVersion}
@@ -229,7 +229,12 @@ export function CaseModalFields({
       )}
       <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
       <SituationAndCriteria draft={draft} setDraft={setDraft} />
-      <CustomizeSection editor={editor} />
+      {/* The chip row sits pinned to the bottom of the scroll area, so the
+          gap between the last question and the footer belongs to it, not to
+          empty space. */}
+      <Box marginTop="auto">
+        <CustomizeSection editor={editor} />
+      </Box>
     </VStack>
   );
 }
