@@ -49,6 +49,92 @@ export function isSingleSignOnRequest(request: Request | undefined): boolean {
 }
 
 /**
+ * The connection id this request is about, from the path.
+ *
+ * `/sso/callback/:providerId` and `/sso/saml2/sp/acs/:providerId` both carry
+ * it, and for us a provider id IS a connection id — the projection keys the
+ * engine's row on it.
+ */
+function connectionIdInPath(pathname: string): string | null {
+  const match =
+    /\/sso\/callback\/([^/?#]+)/.exec(pathname) ??
+    /\/sso\/saml2\/sp\/acs\/([^/?#]+)/.exec(pathname);
+  return match?.[1] ?? null;
+}
+
+/** The same, from a sign-in body, without consuming the caller's stream. */
+async function connectionIdInBody(request: Request): Promise<string | null> {
+  try {
+    const body = (await request.clone().json()) as {
+      providerId?: unknown;
+    } | null;
+    const providerId = body?.providerId;
+    return typeof providerId === "string" && providerId.length > 0
+      ? providerId
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The issuers to trust FOR THIS REQUEST, rather than every issuer we hold.
+ *
+ * `trustedOrigins` is not only the discovery allowlist this file's docstring
+ * describes. better-auth's `originCheckMiddleware` runs the same list against
+ * the `Origin` header of every cookie-bearing POST and against
+ * `callbackURL` / `redirectTo` / `errorCallbackURL`. So handing it every
+ * customer's issuer made one tenant's registered origin a valid CSRF origin
+ * and a valid redirect target on the single sign-on endpoints — for every
+ * other tenant.
+ *
+ * Scoping it to the connection the request names removes that entirely: what
+ * is left is "you may be redirected to an origin you registered yourself",
+ * which is not an escalation, because you already control it.
+ *
+ * A request that names no connection falls back to the whole set. That is
+ * the domain-first sign-in, where the issuer is not known until the domain
+ * is resolved — it still needs the discovery fetch to be allowed, and it
+ * carries no caller-supplied redirect that the narrow set would protect.
+ */
+export async function issuersForRequest(
+  request: Request | undefined,
+): Promise<string[]> {
+  if (!isSingleSignOnRequest(request) || !request?.url) return [];
+
+  let named: string | null = null;
+  try {
+    named = connectionIdInPath(new URL(request.url).pathname);
+  } catch {
+    named = null;
+  }
+  named ??= await connectionIdInBody(request);
+  if (named === null) return registeredIssuers();
+
+  const only = await issuerForConnection(named);
+  return only === null ? [] : [only];
+}
+
+/** One connection's issuer, cached with the rest. */
+async function issuerForConnection(
+  connectionId: string,
+): Promise<string | null> {
+  try {
+    const row = await prisma.ssoProvider.findFirst({
+      where: { providerId: connectionId },
+      select: { issuer: true },
+    });
+    return row?.issuer ?? null;
+  } catch (error) {
+    logger.warn(
+      { error, connectionId },
+      "could not read the single sign-on issuer for this request",
+    );
+    return null;
+  }
+}
+
+/**
  * Every registered issuer, or an empty list if we cannot read them.
  *
  * A read that fails must NOT take the whole auth request down with it: the

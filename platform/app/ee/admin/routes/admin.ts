@@ -29,6 +29,7 @@ import { assertLegacySsoStringWriteAllowed } from "~/server/app-layer/identity/l
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
+import { identityEmail } from "~/server/app-layer/identity/runtime";
 import { UserService } from "~/server/users/user.service";
 import { adminSurfaceHidden } from "../adminSurfaceHidden";
 import {
@@ -132,8 +133,13 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
 
   // Adapt the real `auditLog` (typed with NextApiRequest) to the service's
   // structural `AuditLogFn`, which keeps Next/Hono types out of the service.
-  const service = ImpersonationService.create(prisma, async (entry) =>
-    auditLog({ ...entry, req: entry.req as any }),
+  const service = ImpersonationService.create(
+    prisma,
+    async (entry) => auditLog({ ...entry, req: entry.req as any }),
+    // The same fork `getServerAuthSession` resolves the session's own address
+    // through, so the admin gate on this route and the admin guard inside the
+    // service are reading one answer rather than two.
+    ({ userId }) => identityEmail().resolveEmail({ userId }),
   );
 
   if (method === "DELETE") {

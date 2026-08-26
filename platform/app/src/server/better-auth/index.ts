@@ -46,7 +46,7 @@ import {
   ssoAssertionDecision,
 } from "./hooks";
 import { passkeySignUpRegistration } from "./passkey-signup";
-import { isSingleSignOnRequest, registeredIssuers } from "./registeredIssuers";
+import { issuersForRequest } from "./registeredIssuers";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { sessionClaimsData } from "./session-claims-hook";
 import { runSignInRouterShadow } from "./signInRouterShadow";
@@ -422,9 +422,11 @@ export const auth = betterAuth({
           baseHost: env.BASE_HOST,
           trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
           idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
-          registeredIssuers: isSingleSignOnRequest(request)
-            ? await registeredIssuers()
-            : [],
+          // Scoped to the connection this request names, not every issuer we
+          // hold: the same list gates the Origin header and `callbackURL`, so
+          // the whole set made one tenant's registered origin a redirect
+          // target on the single sign-on endpoints for every other tenant.
+          registeredIssuers: await issuersForRequest(request),
           isProduction: env.NODE_ENV === "production",
         }),
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,

@@ -79,6 +79,13 @@ function makeAuditLog(): AuditLogFn & { calls: Parameters<AuditLogFn>[0][] } {
   return fn;
 }
 
+/**
+ * The identity fork the session resolves an address through. Answers null by
+ * default, which means "fall back to the legacy column" — the shape every
+ * case here already assumed.
+ */
+const resolveIdentityEmail = vi.fn(async () => null as string | null);
+
 describe("ImpersonationService", () => {
   const originalAdminEmails = process.env.ADMIN_EMAILS;
 
@@ -121,6 +128,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           auditLog,
+          resolveIdentityEmail,
         );
 
         const attempt = service.start({
@@ -146,6 +154,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
+          resolveIdentityEmail,
         );
 
         await service.start({
@@ -165,6 +174,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
+          resolveIdentityEmail,
         );
 
         await service.start({
@@ -211,6 +221,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
+          resolveIdentityEmail,
         );
 
         await service.start({
@@ -245,6 +256,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           auditLog,
+          resolveIdentityEmail,
         );
 
         await service.start({
@@ -298,6 +310,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           auditLog,
+          resolveIdentityEmail,
         );
 
         await service.start({
@@ -331,6 +344,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
+          resolveIdentityEmail,
         );
 
         await service.start({
@@ -358,6 +372,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           auditLog,
+          resolveIdentityEmail,
         );
 
         await expect(
@@ -388,6 +403,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
+          resolveIdentityEmail,
         );
 
         const err = await service
@@ -422,6 +438,7 @@ describe("ImpersonationService", () => {
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
           makeAuditLog(),
+          resolveIdentityEmail,
         );
 
         const err = await service
@@ -438,6 +455,43 @@ describe("ImpersonationService", () => {
         expect((err as CannotImpersonateAdminError).httpStatus).toBe(403);
         expect(prisma.session.update).not.toHaveBeenCalled();
       });
+
+      it("still refuses when their admin address is only on their identifier", async () => {
+        // ADR-101 §5: once a user's backfill is finalized their address lives
+        // on the identifier and `User.email` is a stale copy. The session's
+        // admin gate reads the resolved one, so a guard reading the column
+        // would let an operator whose ADMIN_EMAILS address moved be
+        // impersonated — the admin-to-admin hop this refusal exists to stop.
+        const prisma = makePrisma();
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user_other_admin",
+          name: "Other Admin",
+          // The stale copy, which is NOT in ADMIN_EMAILS.
+          email: "old-address@example.com",
+          image: null,
+          deactivatedAt: null,
+        });
+        resolveIdentityEmail.mockResolvedValueOnce("root@langwatch.ai");
+
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          makeAuditLog(),
+          resolveIdentityEmail,
+        );
+
+        const err = await service
+          .start({
+            sessionId: "sess_1",
+            impersonatorUserId: "user_admin",
+            userIdToImpersonate: "user_other_admin",
+            reason: "…",
+            req: null,
+          })
+          .catch((e) => e);
+
+        expect(err).toBeInstanceOf(CannotImpersonateAdminError);
+        expect(prisma.session.update).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -448,6 +502,7 @@ describe("ImpersonationService", () => {
       const service = ImpersonationService.create(
         prisma as unknown as PrismaClient,
         makeAuditLog(),
+        resolveIdentityEmail,
       );
 
       await service.stop({ sessionId: "sess_1" });

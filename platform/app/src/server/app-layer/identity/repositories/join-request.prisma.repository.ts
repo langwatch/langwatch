@@ -248,7 +248,9 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
       // Every connection that ever proved this domain, whatever state the
       // connection is in: an admitting ACTIVE one closes the join door, and
       // a proof on a connection that never went live still proves the
-      // organization controls the domain.
+      // organization controls the domain. What the two sets below do with
+      // the state differs, which is why it is selected rather than filtered
+      // for here.
       this.prisma.ssoConnection.findMany({
         where: {
           organizationId: { in: organizationIds },
@@ -273,12 +275,25 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
         )
         .map((row) => row.organizationId),
     );
-    // A live proof on ANY connection: verified and not lapsed. This is what
-    // authorizes walking in automatically — evidence the organization
+    // A live proof on ANY connection that still exists: verified, not lapsed,
+    // and not on a connection that has been discarded or torn down. This is
+    // what authorizes walking in automatically — evidence the organization
     // controls the domain, not a count of who receives mail on it.
+    //
+    // The terminal states matter here and nowhere else in this file. The
+    // reducer keeps `verifiedDomains` intact through teardown, so without
+    // this an organization that registered a connection, proved `acme.com`
+    // and then removed the connection kept a permanent "we control acme.com"
+    // that walked strangers straight in, years later, through a door nobody
+    // could see was still open.
     const provedByConnection = new Set(
       connections
-        .filter((row) => !row.lapsedDomains.includes(domain))
+        .filter(
+          (row) =>
+            !row.lapsedDomains.includes(domain) &&
+            row.state !== "DISCARDED" &&
+            row.state !== "TORN_DOWN",
+        )
         .map((row) => row.organizationId),
     );
 

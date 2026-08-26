@@ -87,17 +87,36 @@ export interface StopImpersonationInput {
  * inside service logic (per the project's no-abstraction-leaks rule in
  * `CLAUDE.md`).
  */
+/**
+ * The address a person is known by, resolved the way a SESSION resolves it.
+ *
+ * `getServerAuthSession` sets `session.user.email` to
+ * `identityResolvedEmail ?? User.email`, and ADR-101 §5 makes those two
+ * different on purpose: once a user's identity backfill is finalized their
+ * address lives on the identifier and `User.email` is explicitly "a stale
+ * copy". The admin gate on the route reads the session's answer; the guard
+ * below has to read the same one, or an operator whose `ADMIN_EMAILS`
+ * address is on their identifier authenticates as an admin and reads as a
+ * non-admin when they are the TARGET — which is exactly the admin-to-admin
+ * hop `CannotImpersonateAdminError` exists to stop.
+ */
+export type ResolveIdentityEmail = (args: {
+  userId: string;
+}) => Promise<string | null>;
+
 export class ImpersonationService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly auditLog: AuditLogFn,
+    private readonly resolveIdentityEmail: ResolveIdentityEmail,
   ) {}
 
   static create(
     prisma: PrismaClient,
     auditLog: AuditLogFn,
+    resolveIdentityEmail: ResolveIdentityEmail,
   ): ImpersonationService {
-    return new ImpersonationService(prisma, auditLog);
+    return new ImpersonationService(prisma, auditLog, resolveIdentityEmail);
   }
 
   /**
@@ -201,7 +220,11 @@ export class ImpersonationService {
     if (target.deactivatedAt) {
       throw new CannotImpersonateDeactivatedUserError(target.id);
     }
-    if (isAdmin(target)) {
+    // Resolved through the same fork the session uses. `target.email` is the
+    // legacy column, which is stale for every finalized user.
+    const targetEmail =
+      (await this.resolveIdentityEmail({ userId: target.id })) ?? target.email;
+    if (isAdmin({ email: targetEmail })) {
       throw new CannotImpersonateAdminError(target.id);
     }
     await this.assertOperatorCanProveSecondFactor({

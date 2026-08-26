@@ -49,7 +49,21 @@ export class PrismaSsoConnectionReadRepository
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null> {
     const row = await this.prisma.ssoConnection.findFirst({
-      where: { state: "ACTIVE", verifiedDomains: { has: domain } },
+      // A PROOF, not a live connection. Filtering to ACTIVE meant a
+      // connection that had proved `acme.com` but sat at VERIFIED, SUSPENDED
+      // or TEARDOWN_PENDING owned nothing — so a second organization could
+      // claim the same domain, prove it, and activate, and then routing
+      // picked between two live connections by `updatedAt`. "First verifier
+      // owns" has to mean whoever verified it, whatever they have done since.
+      //
+      // The terminal states are the exception and the only one: a connection
+      // that was discarded or torn down is gone, and holding a domain
+      // hostage afterwards would make removal a thing customers could not
+      // undo.
+      where: {
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+        verifiedDomains: { has: domain },
+      },
       select: { id: true, organizationId: true },
     });
     return row === null
