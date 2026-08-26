@@ -682,7 +682,6 @@ describe("given an OpenAI Admin cost source", () => {
 
       const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
 
-      // The no-currency row is skipped; only the second row lands.
       expect(result.events).toHaveLength(1);
       expect(result.errorCount).toBe(0);
     });
