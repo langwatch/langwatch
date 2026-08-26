@@ -151,13 +151,10 @@ describe("given a project with one saved experiment", () => {
   });
 
   describe("when the slug belongs to no experiment", () => {
-    /**
-     * The whole point of the route: a caller has to be able to tell "there is
-     * no such experiment" from "there is no such route". A named code does
-     * that; the framework's bare `{"error":"Not Found"}` did not.
-     *
-     * @scenario "A slug that names no experiment is refused by name"
-     */
+    // The whole point of the route: a caller has to be able to tell "there is
+    // no such experiment" from "there is no such route". A named code does
+    // that; the framework's bare `{"error":"Not Found"}` did not.
+    /** @scenario "A slug that names no experiment is refused by name" */
     it("refuses with the experiment_not_found code", async () => {
       const { status, text, body } = await read(`no-such-${ns}`);
 
