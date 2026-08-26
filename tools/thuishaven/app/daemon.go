@@ -148,33 +148,53 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 					o.pruneIdleDatabases(ctx)
 				}
 			}
-			now := o.sys.Now()
-			for _, s := range o.store.Stacks() {
-				dead := s.LauncherPID != 0 && !o.sys.ProcessAlive(s.LauncherPID)
-				stale := s.Stale(now, o.cfg.IdleTTL)
-				if !dead && !stale {
-					continue
-				}
-				if stale && !dead {
-					o.sys.Terminate(s.LauncherPID) // let the launcher stop its own children
-				}
-				for _, svc := range s.Services {
-					o.proxy.Remove(svc.Name, s.Slug)
-				}
-				o.store.RemoveStack(s.Slug)
-				reason := "launcher died"
-				if stale && !dead {
-					reason = "heartbeat stale past the idle TTL"
-				}
-				o.recordReap("stack", s.Slug, reason)
-				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
-			}
+			o.reapDeadStacks()
 			o.governPressure()
 			o.governProcesses()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
 	}
+}
+
+// reapDeadStacks is the tick's route-to-backend reconciliation: every 10s it
+// compares each registered stack against the process that is supposed to be
+// serving it. A stack whose launcher is gone (an external OOM kill, a closed
+// terminal, a crashed pnpm dev) is deregistered and dropped, so the proxy
+// answers its own "no route" refusal on that hostname instead of proxying to
+// whatever process the kernel later gave the port to. haven never respawns a
+// stack it did not start: `haven up` is the recovery, and the daemon owning
+// somebody's dev processes would be a worse surprise than a hostname that
+// stops answering.
+func (o *Orchestrator) reapDeadStacks() {
+	now := o.sys.Now()
+	for _, s := range o.store.Stacks() {
+		dead := s.LauncherPID != 0 && !o.sys.ProcessAlive(s.LauncherPID)
+		if stale := s.Stale(now, o.cfg.IdleTTL); dead || stale {
+			o.reapStack(s, dead, stale)
+		}
+	}
+}
+
+// reapStack takes one stack off the machine: its routes first, then its
+// registry entry. Order matters. Dropping the entry first is what left the
+// hostnames with nothing to reconcile them against, which is how a hostname
+// outlived the stack that owned it.
+func (o *Orchestrator) reapStack(s domain.Stack, dead, stale bool) {
+	timedOut := stale && !dead
+	if timedOut {
+		o.sys.Terminate(s.LauncherPID) // let the launcher stop its own children
+	}
+	if !s.PortlessDisabled {
+		o.removeStackRoutes(s.Slug, s.Services)
+	}
+	o.store.RemoveStack(s.Slug)
+	reason := "launcher died"
+	if timedOut {
+		reason = "heartbeat stale past the idle TTL"
+	}
+	o.recordReap("stack", s.Slug, reason)
+	o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 }
 
 // vitestWorkerMarker is what an orphaned test worker's command line contains.

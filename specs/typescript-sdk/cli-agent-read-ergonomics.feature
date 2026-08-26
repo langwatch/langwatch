@@ -78,6 +78,33 @@ Feature: The CLI reads the way an agent expects
       When the caller asks for json output with a limit of 1
       Then the command receives the limit and the result is not cut again
 
+  Rule: A paginated list says how many there are under one name
+
+    # Counting is a normal thing to want, and the CLI gave two answers to it:
+    # `.pagination.total` on the resource lists and `.pagination.totalHits` on
+    # the search-backed ones. A caller that read the first got null on a trace
+    # search and went looking for another way to count. The field the API sent
+    # is kept, so nothing that reads `totalHits` breaks.
+
+    @unit
+    Scenario: A search-backed list also carries the total under the common name
+      Given a result whose pagination holds totalHits
+      When the caller asks for json output
+      Then the pagination holds the same number as total
+      And it still holds totalHits
+
+    @unit
+    Scenario: The total survives a capped page
+      Given a result of 2 rows whose pagination says there are 40
+      When the caller asks for json output with a limit of 1
+      Then one row is printed and the total still reads 40
+
+    @unit
+    Scenario: A result with no pagination is left alone
+      Given a result that carries no pagination
+      When the caller asks for json output
+      Then the result is printed as it was
+
   Rule: A list command takes the paging flag the other list commands take
 
     @unit

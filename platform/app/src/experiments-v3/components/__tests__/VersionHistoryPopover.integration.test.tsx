@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 /**
- * The workbench's version-history drawer.
+ * The workbench's version history, in the popover its header button anchors.
  *
- * Renders the real component against mocked tRPC boundaries: the list it
- * paints, the two-step restore, and the permission that decides whether the
- * restore is offered at all.
+ * Renders the real button and the real list against mocked tRPC boundaries:
+ * the list it paints, the two-step restore, the permission that decides
+ * whether the restore is offered at all, and the popover closing once a
+ * restore lands.
  *
  * @see specs/experiments-v3/workbench-versioning.feature
  */
@@ -12,11 +13,6 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const mockCloseDrawer = vi.fn();
-vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ closeDrawer: mockCloseDrawer, openDrawer: vi.fn() }),
-}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -43,6 +39,8 @@ vi.mock("~/experiments-v3/hooks/useEvaluationsV3Store", () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   useEvaluationsV3Store: (selector: (state: any) => unknown) =>
     selector({
+      experimentId: "exp_1",
+      experimentSlug: "checkout",
       loadState: mockLoadState,
       setWorkbenchVersion: mockSetWorkbenchVersion,
       setStaleWorkbench: mockSetStaleWorkbench,
@@ -90,7 +88,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { VersionHistoryDrawer } from "../VersionHistoryDrawer";
+import { VersionHistoryButton } from "../VersionHistoryButton";
 
 /**
  * A history as the seam writes one: two deliberate versions numbered without
@@ -134,14 +132,29 @@ const versions = [
   },
 ];
 
-const renderDrawer = () =>
+const historyTrigger = () =>
+  screen.getByRole("button", { name: "Version history" });
+
+/**
+ * Render the header button and open its popover, which is what every case
+ * below starts from: the history has no existence of its own any more.
+ */
+const openHistory = async () => {
+  const user = userEvent.setup();
   render(
     <ChakraProvider value={defaultSystem}>
-      <VersionHistoryDrawer experimentId="exp_1" experimentSlug="checkout" />
+      <VersionHistoryButton />
     </ChakraProvider>,
   );
+  await user.click(historyTrigger());
+  await screen.findByTestId("version-history-popover");
+  await waitFor(() => {
+    expect(historyTrigger()).toHaveAttribute("aria-expanded", "true");
+  });
+  return user;
+};
 
-describe("VersionHistoryDrawer", () => {
+describe("VersionHistoryButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     canRestore = true;
@@ -162,9 +175,38 @@ describe("VersionHistoryDrawer", () => {
   });
 
   describe("given the experiment has versions", () => {
+    /** @scenario "The history opens on the button that asks for it" */
+    it("opens on the button and closes on a second click", async () => {
+      const user = await openHistory();
+
+      expect(screen.getByTestId("version-history-popover")).toBeDefined();
+
+      await user.click(historyTrigger());
+      await waitFor(() => {
+        expect(historyTrigger()).toHaveAttribute("aria-expanded", "false");
+      });
+    });
+
+    // jsdom has no layout, so where the panel lands cannot be asserted here.
+    // What can be asserted is the cause of the one mispositioning we shipped:
+    // a Tooltip wrapped the trigger, both it and Popover.Trigger cloned their
+    // props onto the same button, the Tooltip's won, and the popover was left
+    // with no anchor registered. floating-ui then computed no position and put
+    // the panel at the window origin, over the sidebar, while the button sat
+    // at the far right. A trigger the popover owns says so in the DOM, and a
+    // trigger another component has taken over does not.
+    /** @scenario "The history is anchored to the button that opens it" */
+    it("gives the popover its own trigger rather than sharing the node", async () => {
+      await openHistory();
+
+      const trigger = historyTrigger();
+      expect(trigger.getAttribute("data-scope")).toBe("popover");
+      expect(trigger.getAttribute("aria-controls")).toBeTruthy();
+    });
+
     /** @scenario "The version history names each version and who saved it" */
     it("renders a row per version naming its author", async () => {
-      renderDrawer();
+      await openHistory();
 
       expect(await screen.findByText("v2")).toBeDefined();
       expect(screen.getByText("v1")).toBeDefined();
@@ -175,7 +217,7 @@ describe("VersionHistoryDrawer", () => {
 
     /** @scenario "The version history shows the autosave as an autosave" */
     it("ages the autosave row by its last write, not by its first", async () => {
-      renderDrawer();
+      await openHistory();
 
       // The row is rewritten in place all session, so its createdAt is three
       // hours old while what it holds is five minutes old.
@@ -186,7 +228,7 @@ describe("VersionHistoryDrawer", () => {
 
     /** @scenario "The version history shows the autosave as an autosave" */
     it("names the autosave row rather than numbering it", async () => {
-      renderDrawer();
+      await openHistory();
 
       expect(await screen.findByText("Autosave")).toBeDefined();
       // The autosave row carries version 11 as a restore handle. Showing it
@@ -196,7 +238,7 @@ describe("VersionHistoryDrawer", () => {
 
     /** @scenario "The current badge marks the version the workbench holds" */
     it("badges the version the workbench holds and offers no restore on it", async () => {
-      renderDrawer();
+      await openHistory();
 
       // Which row carries it is the whole claim: the badge sits beside the
       // title, so the row it names has to be the one the workbench holds.
@@ -209,9 +251,9 @@ describe("VersionHistoryDrawer", () => {
 
     describe("when the caller confirms a restore", () => {
       /** @scenario "Restoring a version reloads the workbench" */
+      /** @scenario "The history closes once a restore lands" */
       it("restores it and loads the fresh setup into the workbench", async () => {
-        const user = userEvent.setup();
-        renderDrawer();
+        const user = await openHistory();
 
         const [firstRestore] = await screen.findAllByText("Restore");
         await user.click(firstRestore!);
@@ -231,15 +273,18 @@ describe("VersionHistoryDrawer", () => {
         });
         expect(mockStateInvalidate).toHaveBeenCalled();
         expect(mockVersionsInvalidate).toHaveBeenCalled();
-        expect(mockCloseDrawer).toHaveBeenCalled();
+        // Chakra keeps the content mounted and marks it closed, so the
+        // trigger's own state is what says the history went away.
+        await waitFor(() => {
+          expect(historyTrigger()).toHaveAttribute("aria-expanded", "false");
+        });
       });
     });
 
     describe("when the caller only clicks Restore", () => {
       /** @scenario "A restore asks for confirmation first" */
       it("asks to confirm before restoring anything", async () => {
-        const user = userEvent.setup();
-        renderDrawer();
+        const user = await openHistory();
 
         const [firstRestore] = await screen.findAllByText("Restore");
         await user.click(firstRestore!);
@@ -253,7 +298,7 @@ describe("VersionHistoryDrawer", () => {
   describe("given the workbench is behind the newest saved version", () => {
     it("badges the newest row, because that is the one the reader is shown", async () => {
       storeWorkbenchVersion = 3;
-      renderDrawer();
+      await openHistory();
 
       const badge = await screen.findByText("Current");
       expect(badge.parentElement?.textContent).toContain("v2");
@@ -265,7 +310,7 @@ describe("VersionHistoryDrawer", () => {
     /** @scenario "Restore is not offered without the permission" */
     it("offers no restore action", async () => {
       canRestore = false;
-      renderDrawer();
+      await openHistory();
 
       expect(await screen.findByText("v2")).toBeDefined();
       expect(screen.queryByText("Restore")).toBeNull();
@@ -279,7 +324,7 @@ describe("VersionHistoryDrawer", () => {
         isLoading: false,
         isError: false,
       };
-      renderDrawer();
+      await openHistory();
 
       expect(await screen.findByText("No versions saved yet.")).toBeDefined();
     });

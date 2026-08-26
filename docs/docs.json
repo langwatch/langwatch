@@ -1094,6 +1094,7 @@
               "api-reference/experiments/read-run-results",
               "api-reference/experiments/report-dspy-optimizer-steps",
               "api-reference/experiments/post-create-an-experiment",
+              "api-reference/experiments/read-one-experiment",
               "api-reference/experiments/list-an-experiment-s-versions",
               "api-reference/experiments/read-an-experiment-s-setup",
               "api-reference/experiments/save-an-experiment-s-setup",

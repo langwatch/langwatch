@@ -377,6 +377,35 @@ Feature: Versioned workbench saves
 
   Rule: The workbench shows its own history
 
+    # The history is a short list a reader checks and leaves, so it opens on
+    # the button that asks for it and the workbench stays visible behind it. It
+    # was a drawer, which covered the setup the versions describe.
+
+    @integration
+    Scenario: The history opens on the button that asks for it
+      Given an experiment with saved versions
+      When the reader clicks the history button
+      Then the history opens anchored to that button
+      And clicking the button again closes it
+
+    # Anchoring is not decoration: the first version of this shipped with a
+    # tooltip wrapped around the trigger, both claimed the same button, and the
+    # history opened at the top-left corner of the window while the button sat
+    # at the far right. It looked wired up, because the button still carried the
+    # popover's own class and placement.
+    @integration
+    Scenario: The history is anchored to the button that opens it
+      Given an experiment with saved versions
+      When the reader opens the history
+      Then the button that opened it is the history's own trigger
+      And no other component has taken that button over
+
+    @integration
+    Scenario: The history closes once a restore lands
+      Given the version history is open
+      When the reader confirms a restore
+      Then the history closes
+
     @integration
     Scenario: The version history names each version and who saved it
       Given an experiment with saved versions

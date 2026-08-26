@@ -7,9 +7,15 @@ import (
 	"testing"
 )
 
-// AgentsTemplate returns the embedded system prompt, keeping the literal
-// ${LANGWATCH_ENDPOINT} placeholder the manager substitutes per worker.
-func TestAgentsTemplate_CarriesPlaceholder(t *testing.T) {
+// The prompt used to name the worker's own endpoint, as an example of an
+// address the user must never be given. The manager substitutes that
+// placeholder per worker at spawn, so the sentence warning against worker-side
+// hosts arrived carrying one, and the agent read a real internal address in the
+// one paragraph telling it not to repeat internal addresses. The rule survives;
+// the example does not.
+//
+// @scenario "The system prompt names no address the user cannot reach"
+func TestAgentsTemplate_NamesNoWorkerSideAddress(t *testing.T) {
 	tmpl, err := AgentsTemplate()
 	if err != nil {
 		t.Fatalf("AgentsTemplate: %v", err)
@@ -17,8 +23,34 @@ func TestAgentsTemplate_CarriesPlaceholder(t *testing.T) {
 	if len(tmpl) == 0 {
 		t.Fatal("AgentsTemplate is empty")
 	}
-	if !strings.Contains(tmpl, "${LANGWATCH_ENDPOINT}") {
-		t.Error("AgentsTemplate must keep the literal ${LANGWATCH_ENDPOINT} placeholder for per-worker substitution")
+	for _, banned := range []string{
+		"${LANGWATCH_ENDPOINT}",
+		"LANGWATCH_ENDPOINT",
+		"localhost",
+		"127.0.0.1",
+	} {
+		if strings.Contains(tmpl, banned) {
+			t.Errorf("AGENTS.md names %q; the prompt reaches the user through the reply, so it must not carry an address or variable only the worker can use", banned)
+		}
+	}
+}
+
+// Counting is a normal thing to want, and the prompt told the agent to "get the
+// total first with the cheapest count query" without ever saying what that was.
+// So the agent guessed, twice: a filter the output did not answer and a flag
+// the command did not take, then a Python one-liner whose traceback reached the
+// user. The rule now names the flags.
+//
+// @scenario "The prompt says how to count"
+func TestAgentsTemplate_SaysHowToCount(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	for _, named := range []string{"--jq length", ".pagination.total"} {
+		if !strings.Contains(tmpl, named) {
+			t.Errorf("AGENTS.md tells the agent to get a total but never names %q, which is what leaves it guessing at a count", named)
+		}
 	}
 }
 
