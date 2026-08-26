@@ -1,3 +1,13 @@
+# RETIRED. This source reads Microsoft's directory audit — the log of
+# directory changes — which has never contained a Copilot conversation and
+# cannot be made to. Copilot conversations are read from Dataverse instead;
+# see copilot-studio-dataverse.feature and ADR-088 Decision 15.
+#
+# The scenarios below are kept because rows configured on this source type
+# still exist and must keep rendering, and because the framework behaviour
+# they pin (cursor restart, 401 handling, one-click enablement) is still the
+# framework's contract. The source type is no longer offered in the picker.
+
 Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAdapter)
   As a platform engineer who needs Copilot Studio audit-log ingestion working
   end-to-end without writing a custom adapter
@@ -41,5 +51,14 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
 
   Scenario: Future pullers follow the same pattern
     Given the openai_compliance + claude_compliance reference pullers eventually land
-    Then they MUST: extend `HttpPollingPullerAdapter` (not implement PullerAdapter directly), export their reference config as a constant, lock URL + auth shape, allow only credentials override
+    Then they MUST: export their reference config as a constant, lock URL + auth shape, allow only credentials override
     And the admin UI auto-discovers reference impls + presents them as one-click options
+    # This scenario originally also required extending `HttpPollingPullerAdapter`
+    # rather than implementing `PullerAdapter` directly. That requirement is
+    # withdrawn: it holds only for sources whose credential is a fixed value
+    # known before the run, which is what that base class substitutes into
+    # header templates. A source that must exchange credentials for a token
+    # and refresh it on expiry has no seam there, and forcing the reuse would
+    # push token machinery into a base class four adapters share for the sake
+    # of one. See ADR-088 Decision 17 (v10.2). The rest of the pattern —
+    # locked config, credentials-only override, auto-discovery — still binds.
