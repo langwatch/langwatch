@@ -32,17 +32,24 @@ describe.skipIf(!hasCredentialsSecret)(
   "given the onboarding seed running at a scope that already has defaults",
   () => {
     const ns = `seed-merge-${nanoid(8)}`;
+    // A const, and the row is created with it rather than reading it back: the
+    // deleteMany below filters on this id, and a `let` assigned in `beforeAll`
+    // is undefined whenever setup threw first, which Prisma drops from the
+    // filter so the delete matches every row (#6219).
+    const organizationId = `organization_${ns}`;
 
-    let organizationId: string;
     let teamId: string;
     let projectId: string;
     let orgAdminUserId: string;
 
     beforeAll(async () => {
-      const organization = await prisma.organization.create({
-        data: { name: `Seed Merge Org ${ns}`, slug: `--test-${ns}` },
+      await prisma.organization.create({
+        data: {
+          id: organizationId,
+          name: `Seed Merge Org ${ns}`,
+          slug: `--test-${ns}`,
+        },
       });
-      organizationId = organization.id;
 
       const team = await prisma.team.create({
         data: { name: `Team ${ns}`, slug: `--team-${ns}`, organizationId },
