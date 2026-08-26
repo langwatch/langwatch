@@ -802,7 +802,7 @@ const presentations = {
     // people to a page that was not the one holding the value.
     title: "Choose a model first",
     describe: () =>
-      "Nothing has a model set yet. Open Settings, then Default Models, and pick one for your organization.",
+      "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
   model_restricted_for_feature: {
     // Distinct from `model_not_configured`: a model IS set, but it's
