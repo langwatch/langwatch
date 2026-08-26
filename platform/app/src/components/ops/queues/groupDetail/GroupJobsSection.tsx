@@ -1,5 +1,5 @@
 import { Button, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
+import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";
 import { GroupJobCard } from "./GroupJobCard";
 import { jobMatchesFilter } from "./jobContext";

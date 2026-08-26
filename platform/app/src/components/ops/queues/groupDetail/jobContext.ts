@@ -1,4 +1,4 @@
-import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
+import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 
 /**
  * The request context a job carries in its `__context` machinery field —

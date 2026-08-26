@@ -1,8 +1,8 @@
 import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { formatBytes, formatTimeAgo } from "@langwatch/ops-web";
+import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
-import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
 import { type GrafanaDeepLinkConfig, grafanaTraceUrl } from "~/utils/grafanaLinks";
 import { middleEllipsis } from "../clusterGroups";
 import { type JobContextInfo, readJobContext, readJobKind } from "./jobContext";

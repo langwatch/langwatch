@@ -11,7 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
+import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { GroupDetailContent } from "../GroupDetailContent";
 
 const NOW = 1_755_100_000_000;
