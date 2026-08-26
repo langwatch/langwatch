@@ -170,10 +170,9 @@ describe("simulationRunnerRouter.run", () => {
 
   describe("given scenario does not exist", () => {
     beforeEach(() => {
-      mockPrefetchScenarioData.mockResolvedValue({
-        success: false,
-        error: "Scenario nonexistent not found",
-      });
+      mockResolveRunParameters.mockRejectedValue(
+        new ScenarioNotFoundError("nonexistent"),
+      );
     });
 
     describe("when run is called", () => {

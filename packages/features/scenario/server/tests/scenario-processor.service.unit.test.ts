@@ -108,16 +108,23 @@ class TestChildSession extends ScenarioChildExecutionSession {
 function deferred<T>(): {
   promise: Promise<T>;
   resolve(value: T): void;
+  reject(reason: unknown): void;
 } {
   let resolvePromise: ((value: T) => void) | undefined;
-  const promise = new Promise<T>((resolve) => {
+  let rejectPromise: ((reason: unknown) => void) | undefined;
+  const promise = new Promise<T>((resolve, reject) => {
     resolvePromise = resolve;
+    rejectPromise = reject;
   });
   return {
     promise,
     resolve(value) {
       if (!resolvePromise) throw new Error("Deferred promise was not initialised");
       resolvePromise(value);
+    },
+    reject(reason) {
+      if (!rejectPromise) throw new Error("Deferred promise was not initialised");
+      rejectPromise(reason);
     },
   };
 }
@@ -334,6 +341,45 @@ describe("ScenarioProcessorService", () => {
     expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledWith(
       expect.objectContaining({ error: "target unavailable" }),
     );
+  });
+
+  it("releases the pool when preparation fails before a child starts", async () => {
+    const fixture = processorFixture();
+    fixture.execution.prepare = vi.fn().mockReturnValue({
+      childEnvironment: Promise.resolve(null),
+      result: Promise.resolve({ success: false, error: "scenario missing" }),
+    });
+
+    fixture.pool.submit(job("missing"));
+    fixture.pool.submit(job("next"));
+
+    await vi.waitFor(() => {
+      expect(fixture.finishUnsuccessfulRun).toHaveBeenCalledTimes(2);
+    });
+    expect(fixture.pool.activeCount).toBe(0);
+    expect(fixture.pool.pendingCount).toBe(0);
+  });
+
+  it("aborts an early child when preparation rejects", async () => {
+    const fixture = processorFixture();
+    const result = deferred<ScenarioExecutionPrefetchResult>();
+    const session = new TestChildSession();
+    fixture.childProcesses.start = vi.fn().mockReturnValue(session);
+    fixture.execution.prepare = vi.fn().mockReturnValue({
+      childEnvironment: Promise.resolve({
+        labels: [],
+        telemetry: { endpoint: "https://app.langwatch.ai", apiKey: "project-key" },
+      }),
+      result: result.promise,
+    });
+
+    const execution = fixture.processor.execute(job("rejected-prefetch"));
+    await vi.waitFor(() => expect(fixture.childProcesses.start).toHaveBeenCalledOnce());
+    result.reject(new Error("prefetch unavailable"));
+
+    await expect(execution).rejects.toThrow("prefetch unavailable");
+    expect(session.abort).toHaveBeenCalledOnce();
+    expect(session.execute).not.toHaveBeenCalled();
   });
 
   it("aborts an early child when cancellation arrives during preparation", async () => {

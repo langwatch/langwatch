@@ -5,17 +5,18 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
+  generateBatchRunId,
+  getOnPlatformSetId,
   type RunParameterValues,
+  type RunSecretCiphertext,
   runParameterValuesSchema,
+  ScenarioNotFoundError,
   type ScenarioService,
 } from "@langwatch/scenario-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import type { App } from "~/server/app-layer/app";
-import { getOnPlatformSetId } from "@langwatch/scenario-contract";
-import type { RunSecretCiphertext } from "@langwatch/scenario-contract";
-import { generateBatchRunId } from "@langwatch/scenario-contract";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { projectSchema } from "./schemas";
 
@@ -69,7 +70,14 @@ async function resolveParametersForRun({
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
 }> {
-  return scenarios.resolveRunParameters({ projectId, scenarioId, values });
+  try {
+    return await scenarios.resolveRunParameters({ projectId, scenarioId, values });
+  } catch (error) {
+    if (error instanceof ScenarioNotFoundError) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    }
+    throw error;
+  }
 }
 
 /**

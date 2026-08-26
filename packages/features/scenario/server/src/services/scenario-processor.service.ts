@@ -1,4 +1,5 @@
 import type {
+  ScenarioExecutionPrefetchResult,
   ScenarioExecutionService,
   ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
@@ -172,15 +173,30 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
         environment: childEnvironment,
       });
     }
-    const prefetch = await preparation.result;
+    let prefetch: ScenarioExecutionPrefetchResult;
+    try {
+      prefetch = await preparation.result;
+    } catch (error) {
+      await childSession?.abort();
+      if (!childSession) {
+        this.options.pool.deregisterChild(jobData.scenarioRunId);
+      }
+      throw error;
+    }
 
     if (this.options.pool.wasCancelled(jobData.scenarioRunId)) {
       await childSession?.abort();
+      if (!childSession) {
+        this.options.pool.deregisterChild(jobData.scenarioRunId);
+      }
       await this.handleCancelled(jobData, "Cancelled before execution started");
       return;
     }
     if (!prefetch.success) {
       await childSession?.abort();
+      if (!childSession) {
+        this.options.pool.deregisterChild(jobData.scenarioRunId);
+      }
       jobLogger.error(
         { error: prefetch.error, phase: "prefetch" },
         "Failed to prefetch scenario data",
