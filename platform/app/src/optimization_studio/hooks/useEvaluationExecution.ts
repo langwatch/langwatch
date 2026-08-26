@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef } from "react";
 import { toaster } from "../../components/ui/toaster";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
+import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 

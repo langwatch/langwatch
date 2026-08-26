@@ -9,7 +9,7 @@ import { api } from "../../utils/api";
 import { useVersionState } from "../components/History";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { hasDSLChanged } from "@langwatch/workflow-contract";
-import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
+import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./usePostEvent";
 
 import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";

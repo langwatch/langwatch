@@ -5,7 +5,7 @@ import { toaster } from "../../components/ui/toaster";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { BaseComponent, Component, Field } from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
+import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "@langwatch/workflow-web";

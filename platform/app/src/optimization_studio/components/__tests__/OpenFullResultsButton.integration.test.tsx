@@ -9,8 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { BatchRunSummary } from "~/components/batch-evaluation-results/BatchRunsSidebar";
-import { BatchSummaryFooter } from "~/components/batch-evaluation-results/BatchSummaryFooter";
+import { type BatchRunSummary, BatchSummaryFooter } from "@langwatch/experiment-web";
 import { OpenFullResultsButton } from "../OpenFullResultsButton";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
