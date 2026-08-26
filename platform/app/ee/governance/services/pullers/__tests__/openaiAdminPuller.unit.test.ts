@@ -550,7 +550,7 @@ describe("given an OpenAI Admin cost source", () => {
         page: null,
         query: `cost:1d:project_id,line_item,user_id,api_key_id:${CONFIG.startingAt}`,
         watermark: null,
-        keyGrouping: true,
+        hasKeyGrouping: true,
       });
 
       const starts: string[] = [];
@@ -613,7 +613,7 @@ describe("given an OpenAI Admin cost source", () => {
         query:
           "cost:1d:project_id,line_item,user_id,api_key_id:2026-06-01T00:00:00.000Z",
         watermark: null,
-        keyGrouping: true,
+        hasKeyGrouping: true,
       });
 
       await new OpenAiAdminPuller().runOnce(
@@ -633,7 +633,7 @@ describe("given an OpenAI Admin cost source", () => {
         query:
           "cost:1d:project_id,line_item,user_id,api_key_id:2026-07-01T00:00:00.000Z",
         watermark: null,
-        keyGrouping: true,
+        hasKeyGrouping: true,
       });
 
       await new OpenAiAdminPuller().runOnce(
@@ -664,6 +664,25 @@ describe("given an OpenAI Admin cost source", () => {
 
       // The euro row is dropped; the rest of the bucket still lands. A throw
       // here would discard the whole run and fail identically on every retry.
+      expect(result.events).toHaveLength(1);
+      expect(result.errorCount).toBe(0);
+    });
+
+    it("skips a row whose currency is missing rather than assuming USD", async () => {
+      const noCurrency = costRow();
+      // Remove currency entirely — the adapter must not infer a denomination.
+      delete (noCurrency.amount as Record<string, unknown>).currency;
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          page({
+            results: [noCurrency, costRow({ project_id: "proj_b" })],
+          }),
+        ),
+      );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      // The no-currency row is skipped; only the second row lands.
       expect(result.events).toHaveLength(1);
       expect(result.errorCount).toBe(0);
     });

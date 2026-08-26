@@ -143,7 +143,7 @@ export type OpenAiAdminPullConfig = z.infer<typeof openaiAdminPullConfigSchema>;
  * binding one config edit mid-window would wedge the source permanently, every
  * retry replaying the same dead token.
  *
- * `keyGrouping` records whether the in-flight window is being read WITH
+ * `hasKeyGrouping` records whether the in-flight window is being read WITH
  * `api_key_id` in the group-by. It has to be durable for the same reason
  * `page` does: the token is bound to the group-by that produced it, so a run
  * resuming into a window that fell back to user_id-only must keep asking
@@ -158,7 +158,7 @@ const cursorSchema = z.object({
    * window drains, at which point `startingAt` itself is the resume point.
    */
   watermark: z.string().nullable().default(null),
-  keyGrouping: z.boolean().default(true),
+  hasKeyGrouping: z.boolean().default(true),
 });
 
 interface ParsedCursor {
@@ -178,7 +178,7 @@ interface ParsedCursor {
   storedStart: string;
   page: string | null;
   watermark: string | null;
-  keyGrouping: boolean;
+  hasKeyGrouping: boolean;
 }
 
 /**
@@ -225,7 +225,7 @@ function parseCursor({
           storedStart: parsed.startingAt,
           page: parsed.page,
           watermark: parsed.watermark,
-          keyGrouping: parsed.keyGrouping,
+          hasKeyGrouping: parsed.hasKeyGrouping,
         };
       }
       return staleCursorRestart({ parsed, config });
@@ -242,7 +242,7 @@ function parseCursor({
     storedStart: fresh,
     page: null,
     watermark: null,
-    keyGrouping: true,
+    hasKeyGrouping: true,
   };
 }
 
@@ -281,7 +281,7 @@ function staleCursorRestart({
     storedStart: rewound,
     page: null,
     watermark: null,
-    keyGrouping: true,
+    hasKeyGrouping: true,
   };
 }
 
@@ -371,7 +371,7 @@ const costResultSchema = z
      */
     amount: z.object({
       value: z.union([z.string(), z.number()]).transform(String),
-      currency: z.string().default("usd"),
+      currency: z.string(),
     }),
     line_item: z.string().nullable().default(null),
     project_id: z.string().nullable().default(null),
@@ -434,11 +434,11 @@ function bucketStartIso(startTime: number): string {
 function reportUrl({
   startingAt,
   page,
-  keyGrouping,
+  hasKeyGrouping,
 }: {
   startingAt: string;
   page: string | null;
-  keyGrouping: boolean;
+  hasKeyGrouping: boolean;
 }): URL {
   const url = new URL(`${API_BASE}/costs`);
   const startMs = Date.parse(startingAt);
@@ -450,7 +450,9 @@ function reportUrl({
   url.searchParams.set("start_time", String(Math.floor(startMs / 1000)));
   url.searchParams.set("bucket_width", COST_REPORT_BUCKET_WIDTH);
   url.searchParams.set("limit", String(PAGE_LIMIT));
-  for (const dim of keyGrouping ? COST_GROUP_BY : COST_GROUP_BY_WITHOUT_KEY) {
+  for (const dim of hasKeyGrouping
+    ? COST_GROUP_BY
+    : COST_GROUP_BY_WITHOUT_KEY) {
     url.searchParams.append("group_by[]", dim);
   }
   if (page) url.searchParams.set("page", page);
@@ -476,7 +478,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     const query = queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
-    let keyGrouping = cursor.keyGrouping;
+    let hasKeyGrouping = cursor.hasKeyGrouping;
 
     /**
      * What an unfinished run persists as its resume point. With a page token
@@ -497,7 +499,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             page,
             query,
             watermark,
-            keyGrouping,
+            hasKeyGrouping,
           }),
           errorCount: 0,
         };
@@ -506,7 +508,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       const read = await this.readPage({
         startingAt,
         page,
-        keyGrouping,
+        hasKeyGrouping,
         options,
       });
       if (!read.ok) {
@@ -515,7 +517,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         return { events, cursor: options.cursor, errorCount: 1 };
       }
       events.push(...read.events);
-      keyGrouping = read.keyGrouping;
+      hasKeyGrouping = read.hasKeyGrouping;
       watermark = laterOf(watermark, read.watermark);
 
       if (read.nextPage === null) {
@@ -532,7 +534,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             page: null,
             query,
             watermark: null,
-            keyGrouping: true,
+            hasKeyGrouping: true,
           }),
           errorCount: 0,
         };
@@ -551,7 +553,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         page,
         query,
         watermark,
-        keyGrouping,
+        hasKeyGrouping,
       }),
       errorCount: 0,
     };
@@ -568,12 +570,12 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
   private async readPage({
     startingAt,
     page,
-    keyGrouping,
+    hasKeyGrouping,
     options,
   }: {
     startingAt: string;
     page: string | null;
-    keyGrouping: boolean;
+    hasKeyGrouping: boolean;
     options: PullRunOptions;
   }): Promise<
     | {
@@ -581,16 +583,16 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         events: NormalizedPullEvent[];
         nextPage: string | null;
         watermark: string | null;
-        keyGrouping: boolean;
+        hasKeyGrouping: boolean;
       }
     | { ok: false }
   > {
-    let fetched: { body: unknown; keyGrouping: boolean } | null;
+    let fetched: { body: unknown; hasKeyGrouping: boolean } | null;
     try {
       fetched = await this.fetchWithKeyGroupingFallback({
         startingAt,
         page,
-        keyGrouping,
+        hasKeyGrouping,
         options,
       });
     } catch (error) {
@@ -604,7 +606,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       return { ok: false };
     }
     if (fetched === null) return { ok: false };
-    const usedKeyGrouping = fetched.keyGrouping;
+    const usedKeyGrouping = fetched.hasKeyGrouping;
 
     const parsed = pageSchema.parse(fetched.body);
     // `has_more` with no token to follow it is a contract violation, and the
@@ -619,7 +621,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     }
 
     const events = parsed.data.flatMap((bucket) =>
-      this.bucketEvents({ bucket, keyGrouping: usedKeyGrouping }),
+      this.bucketEvents({ bucket, hasKeyGrouping: usedKeyGrouping }),
     );
     // The LATEST bucket on the page rather than the last one in the array.
     // Buckets are observed to arrive strictly ascending, but taking the max
@@ -634,7 +636,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       events,
       nextPage: parsed.next_page,
       watermark: newest,
-      keyGrouping: usedKeyGrouping,
+      hasKeyGrouping: usedKeyGrouping,
     };
   }
 
@@ -649,22 +651,22 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
   private async fetchWithKeyGroupingFallback({
     startingAt,
     page,
-    keyGrouping,
+    hasKeyGrouping,
     options,
   }: {
     startingAt: string;
     page: string | null;
-    keyGrouping: boolean;
+    hasKeyGrouping: boolean;
     options: PullRunOptions;
-  }): Promise<{ body: unknown; keyGrouping: boolean } | null> {
+  }): Promise<{ body: unknown; hasKeyGrouping: boolean } | null> {
     const first = await this.fetchPage({
       startingAt,
       page,
-      keyGrouping,
+      hasKeyGrouping,
       options,
     });
-    if (first.ok) return { body: first.body, keyGrouping };
-    if (!keyGrouping || page !== null) return null;
+    if (first.ok) return { body: first.body, hasKeyGrouping };
+    if (!hasKeyGrouping || page !== null) return null;
 
     logger.warn(
       { adapter: this.id, startingAt },
@@ -673,10 +675,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     const retried = await this.fetchPage({
       startingAt,
       page,
-      keyGrouping: false,
+      hasKeyGrouping: false,
       options,
     });
-    return retried.ok ? { body: retried.body, keyGrouping: false } : null;
+    return retried.ok ? { body: retried.body, hasKeyGrouping: false } : null;
   }
 
   /**
@@ -687,12 +689,12 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
   private async fetchPage({
     startingAt,
     page,
-    keyGrouping,
+    hasKeyGrouping,
     options,
   }: {
     startingAt: string;
     page: string | null;
-    keyGrouping: boolean;
+    hasKeyGrouping: boolean;
     options: PullRunOptions;
   }): Promise<{ ok: true; body: unknown } | { ok: false }> {
     const apiKey = options.credentials?.token;
@@ -702,7 +704,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       );
     }
 
-    const url = reportUrl({ startingAt, page, keyGrouping });
+    const url = reportUrl({ startingAt, page, hasKeyGrouping });
     const signal = options.signal
       ? AbortSignal.any([
           options.signal,
@@ -742,17 +744,25 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
    */
   private bucketEvents({
     bucket,
-    keyGrouping,
+    hasKeyGrouping,
   }: {
     bucket: z.infer<typeof bucketSchema>;
-    keyGrouping: boolean;
+    hasKeyGrouping: boolean;
   }): NormalizedPullEvent[] {
     const startingAt = bucketStartIso(bucket.start_time);
     return bucket.results.flatMap((result) => {
+      const parsed = costResultSchema.safeParse(result);
+      if (!parsed.success) {
+        logger.error(
+          { adapter: this.id, startingAt },
+          "openai cost row does not match the expected shape; skipping the row",
+        );
+        return [];
+      }
       const event = this.costEvent({
-        result: costResultSchema.parse(result),
+        result: parsed.data,
         startingAt,
-        keyGrouping,
+        hasKeyGrouping,
       });
       return event ? [event] : [];
     });
@@ -761,11 +771,11 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
   private costEvent({
     result,
     startingAt,
-    keyGrouping,
+    hasKeyGrouping,
   }: {
     result: z.infer<typeof costResultSchema>;
     startingAt: string;
-    keyGrouping: boolean;
+    hasKeyGrouping: boolean;
   }): NormalizedPullEvent | null {
     const dimensions: Record<string, string> = {
       report: "cost",
@@ -777,7 +787,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       // the provider's floor the coordinate is absent rather than empty: a
       // stable "" would be a claim about a key, and the map for a given bucket
       // is read one way or the other, never both.
-      ...(keyGrouping ? { apiKeyId: dimension(result.api_key_id) } : {}),
+      ...(hasKeyGrouping ? { apiKeyId: dimension(result.api_key_id) } : {}),
     };
 
     if (result.amount.currency.toLowerCase() !== "usd") {
@@ -835,9 +845,9 @@ function encodeCursor({
   page,
   query,
   watermark,
-  keyGrouping,
+  hasKeyGrouping,
 }: Omit<z.infer<typeof cursorSchema>, "query"> & { query: string }): string {
-  return JSON.stringify({ startingAt, page, query, watermark, keyGrouping });
+  return JSON.stringify({ startingAt, page, query, watermark, hasKeyGrouping });
 }
 
 /** The later of two ISO instants, tolerating nulls and unparseable input. */
