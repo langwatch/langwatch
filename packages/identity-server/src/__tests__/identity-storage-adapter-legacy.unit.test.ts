@@ -231,6 +231,45 @@ describe("better-auth over the identity storage adapter", () => {
       ]);
     });
 
+    it("finds a built-in provider's account by the real issuer it was linked under", async () => {
+      // The case nothing covered, and the reason it mattered: the OAuth
+      // callback looks an account up by `(issuer, accountId)`, and Google's
+      // issuer is its own URL rather than a synthetic one. While the write
+      // stripped the column and the read answered "no rows" for an issuer it
+      // could not decode, every returning Google sign-in failed to find its
+      // own row — and better-auth created it again, into the unique
+      // constraint on (provider, providerAccountId).
+      const cookie = await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: "google",
+        issuer: "https://accounts.google.com",
+        accountId: "sub-google-real",
+      });
+
+      const found = await context.adapter.findOne<{ userId: string }>({
+        model: "account",
+        where: [
+          { field: "issuer", value: "https://accounts.google.com" },
+          { field: "accountId", value: "sub-google-real" },
+        ],
+      });
+      expect(found?.userId).toBe(userId);
+
+      // And the row kept the issuer it was linked under, rather than being
+      // handed back a synthetic one 1.7's own comparison would reject.
+      const listed = await identity.auth.api.listUserAccounts({
+        headers: new Headers({ cookie }),
+      });
+      expect(listed.map((row) => row.providerId).sort()).toEqual([
+        "credential",
+        "google",
+      ]);
+    });
+
     /** @scenario "An issuer-keyed account read on the legacy branch drops the synthetic issuer" */
     it("serves the issuer-keyed credential read /two-factor/enable sends", async () => {
       await signUp(identity.auth, EMAIL);
@@ -304,9 +343,11 @@ describe("better-auth over the identity storage adapter", () => {
       });
       expect(contradicted).toBeNull();
 
-      // An issuer standing alone in a real-URL form is equally unanswerable:
-      // the table keys nothing by issuer, and widening to "any provider"
-      // would resolve one IdP's subject onto another's.
+      // A real issuer standing alone IS answerable now — it matches the
+      // column — and the answer here is still empty, because the only row
+      // seeded carries the synthetic credential issuer. That is narrowing,
+      // not widening: nothing resolves one identity provider's subject onto
+      // another's.
       const unanswerable = await context.adapter.findMany({
         model: "account",
         where: [{ field: "issuer", value: "https://accounts.google.com" }],

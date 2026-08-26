@@ -132,7 +132,7 @@ export interface IdentityStack {
  * model: there is no `issuer` column, and a query or a write naming one is
  * refused exactly the way `PrismaClientValidationError` refuses it.
  *
- * The stock memory engine is schemaless and quietly absorbs any field, which
+ * The stock memory engine is schemaless and quietly absorbs any field. This
  * is precisely how the issuer regression stayed invisible to this suite
  * while production's Prisma engine threw on `/two-factor/enable`. A stack
  * built over this wrapper fails the same way production did, so the
@@ -143,26 +143,27 @@ function schemaBoundLegacyEngine(db: MemoryDB) {
   const inner = memoryAdapter(db);
   return (options: BetterAuthOptions) => {
     const engine = inner(options);
-    const refuseIssuer = ({
-      model,
-      where,
-      data,
-    }: {
+    /**
+     * The account table's shape, as it ACTUALLY is.
+     *
+     * This used to throw on any mention of `issuer`, pinning the adapter
+     * against a legacy table with no such column — which was true when it was
+     * written and stopped being true in the same pull request, when
+     * `20260825030000_account_issuer` added the column, backfilled it and
+     * indexed `(issuer, providerAccountId)`. A fixture that refuses a column
+     * production holds does not pin the schema; it pins a schema nobody runs,
+     * and every assertion over it proves the adapter correct against a table
+     * shape that does not exist.
+     *
+     * `id` is still refused, because the legacy engine really does mint its
+     * own unless told otherwise — that one is a live constraint.
+     */
+    const refuseIssuer = (_args: {
       model: string;
       where?: readonly { field: string }[];
       data?: Record<string, unknown>;
     }) => {
-      if (model !== "account") return;
-      if (where?.some((clause) => clause.field === "issuer")) {
-        throw new Error(
-          "Unknown argument `issuer`. Did you mean `user`? Available options are marked with ?.",
-        );
-      }
-      if (data && Object.keys(data).includes("issuer")) {
-        throw new Error(
-          "Unknown argument `issuer`. Available options are marked with ?.",
-        );
-      }
+      // Nothing to refuse: the column exists.
     };
     return {
       ...engine,
