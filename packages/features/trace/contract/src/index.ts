@@ -6,6 +6,7 @@ export * from "./trace";
 export * from "./trace-view.contract";
 export * from "./trace-canonicalisation";
 export * from "./trace-content-part";
+export * from "./trace-content-part.visitor";
 export * from "./trace-attributes";
 export * from "./trace-query-analysis";
 export * from "./trace-query-ast";

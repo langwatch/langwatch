@@ -199,6 +199,7 @@
     "@langwatch/share-server": "workspace:*",
     "@langwatch/simulation-contract": "workspace:*",
     "@langwatch/simulation-server": "workspace:*",
+    "@langwatch/simulation-web": "workspace:*",
     "@langwatch/ssrf": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",

@@ -16,7 +16,7 @@ import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
-import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
+import { buildDisplayTitle } from "@langwatch/suite-web";
 import { HandledErrorAlert } from "~/features/errors";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
@@ -34,15 +34,20 @@ import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Drawer } from "../ui/drawer";
-import { CopyIdChip } from "./CopyIdChip";
-import { RunCriteriaChip } from "./RunCriteriaChip";
-import { RunDetailSection } from "./RunDetailSection";
-import { getRunStatePollInterval } from "./run-state-polling";
+import {
+  CopyIdChip,
+  RunCriteriaChip,
+  RunDetailSection,
+  getRunStatePollInterval,
+} from "@langwatch/simulation-web";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
-import { ScenarioRunActions } from "./ScenarioRunActions";
-import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
-import { hasNoResults, shouldShowNoResponse } from "./scenario-run-status.utils";
-import { SimulationConsole } from "./simulation-console/SimulationConsole";
+import {
+  ScenarioRunActions,
+  ScenarioRunStatusIcon,
+  SimulationConsole,
+  hasNoResults,
+  shouldShowNoResponse,
+} from "@langwatch/simulation-web";
 
 export interface ScenarioRunDetailDrawerProps {
   open?: boolean;

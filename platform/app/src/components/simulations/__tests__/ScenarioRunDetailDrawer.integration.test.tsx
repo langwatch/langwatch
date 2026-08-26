@@ -10,12 +10,12 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
+import type { ScenarioMessageSnapshotEvent } from "@langwatch/scenario-contract";
 import { Drawer } from "../../ui/drawer";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
-import { ScenarioRunHeader } from "../ScenarioRunHeader";
-import { SimulationConsole } from "../simulation-console/SimulationConsole";
+import { ScenarioRunHeader } from "@langwatch/simulation-web";
+import { SimulationConsole } from "@langwatch/simulation-web";
 
 // MediaPart fires a tRPC existence probe on a media error event; stub it so the
 // probe never resolves to a placeholder on the happy path (mirrors the

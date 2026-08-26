@@ -1,7 +1,6 @@
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import React from "react";
 import { TraceInputOutput, type TraceJsonViewOptions } from "@langwatch/trace-web";
-import type { SpanInputOutput } from "~/server/tracer/types";
 import { collectMediaParts, type MediaPartData } from "~/shared/traces/mediaParts";
 import { isPythonRepr, parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 import dynamic from "~/utils/compat/next-dynamic";
@@ -16,7 +15,7 @@ const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
 });
 
 type RenderInputOutputProps = {
-  value: SpanInputOutput["value"] | string | undefined;
+  value: unknown;
   showTools?: boolean | "copy-only";
   collapsed?: ReactJsonViewProps["collapsed"];
   collapseStringsAfterLength?: ReactJsonViewProps["collapseStringsAfterLength"];

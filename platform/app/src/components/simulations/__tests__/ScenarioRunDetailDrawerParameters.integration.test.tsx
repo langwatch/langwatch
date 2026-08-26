@@ -10,8 +10,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 const mocks = vi.hoisted(() => ({
   runState: null as ScenarioRunData | null,
@@ -38,10 +38,6 @@ vi.mock("~/components/scenarios/RunScenarioModal", () => ({
 vi.mock("~/components/scenarios/ScenarioFormDrawer", () => ({
   ScenarioFormDrawer: () => null,
 }));
-vi.mock("../ScenarioRunActions", () => ({
-  ScenarioRunActions: () => null,
-}));
-
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
   useDrawerParams: () => ({ scenarioRunId: "run_1" }),
