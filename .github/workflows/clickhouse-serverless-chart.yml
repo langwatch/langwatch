@@ -5,12 +5,14 @@ on:
     paths:
       - "charts/clickhouse-serverless/**"
       - "charts/lib/**"
+      - "infra/clickhouse-serverless/**"
       - ".github/workflows/clickhouse-serverless-chart.yml"
   push:
     branches: [main]
     paths:
       - "charts/clickhouse-serverless/**"
       - "charts/lib/**"
+      - "infra/clickhouse-serverless/**"
 
 permissions:
   contents: read
