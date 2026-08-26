@@ -554,3 +554,110 @@ describe("readAuthoredMessage", () => {
     });
   });
 });
+
+/**
+ * The canonical envelope both planes answer with — nested under `error` as an
+ * object, lower_snake_case throughout. The AI gateway's failures arrive in it,
+ * and until it was read here they reached the UI as unhandled: generic
+ * "Something went wrong" copy for an error the server had explained in full.
+ */
+describe("given the canonical nested error envelope", () => {
+  /** The exact body the gateway writes for the Vertex credential failure. */
+  const gatewayVertexFailure = {
+    error: {
+      type: "provider_credential_invalid",
+      code: "provider_credential_invalid",
+      message:
+        "The credentials configured for this model provider were not accepted. Check the provider's credentials in your model provider settings.",
+      meta: { provider: "vertex", model: "gemini-2.5-flash" },
+      trace_id: "4d5d3c474d04e81bfeff824cb8215b0b",
+      tips: [
+        "Vertex AI authenticates with a Google Cloud service-account JSON document, not an API key",
+        'The document must be valid JSON with a top-level "type" of "service_account"',
+      ],
+      docs_url: "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+      fault: "customer",
+    },
+  };
+
+  describe("when the gateway refuses a request", () => {
+    it("reads the code, the fault and the trace id", () => {
+      const handled = readHandledError(gatewayVertexFailure);
+
+      expect(handled?.code).toBe("provider_credential_invalid");
+      expect(handled?.fault).toBe("customer");
+      expect(handled?.traceId).toBe("4d5d3c474d04e81bfeff824cb8215b0b");
+    });
+
+    it("keeps the remediation tips the server wrote", () => {
+      const handled = readHandledError(gatewayVertexFailure);
+
+      expect(handled?.tips).toHaveLength(2);
+      expect(handled?.tips[0]).toContain("service-account JSON document");
+    });
+
+    /**
+     * The wire spells it `docs_url`; the flat reading looked for `docsUrl`, so
+     * every docs link from every Go service was dropped on the floor.
+     */
+    it("reads the docs link off its snake_case wire name", () => {
+      expect(readHandledError(gatewayVertexFailure)?.docsUrl).toBe(
+        "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+      );
+    });
+
+    it("carries the structured detail through as meta", () => {
+      const handled = readHandledError(gatewayVertexFailure);
+
+      expect(handled?.meta.provider).toBe("vertex");
+      expect(handled?.meta.model).toBe("gemini-2.5-flash");
+    });
+
+    it("keeps the server's own sentence for the registry to fall back on", () => {
+      expect(readHandledError(gatewayVertexFailure)?.meta.message).toContain(
+        "were not accepted",
+      );
+    });
+  });
+
+  describe("when the envelope names only the status-class alias", () => {
+    it("falls back to type as the discriminant", () => {
+      const handled = readHandledError({
+        error: { type: "bad_request", message: "nope" },
+      });
+
+      expect(handled?.code).toBe("bad_request");
+    });
+  });
+
+  describe("when the nested object is not ours", () => {
+    it("refuses prose in the code slot", () => {
+      expect(
+        readHandledError({ error: { code: "Something went badly wrong" } }),
+      ).toBeNull();
+    });
+
+    it("refuses an object that names no failure at all", () => {
+      expect(readHandledError({ error: { message: "nope" } })).toBeNull();
+    });
+
+    it("survives a docs link pointing somewhere that is not our docs", () => {
+      const handled = readHandledError({
+        error: { code: "provider_error", docs_url: "https://evil.example.com" },
+      });
+
+      expect(handled?.docsUrl).toBeUndefined();
+    });
+  });
+
+  describe("when a flat REST body arrives instead", () => {
+    it("still reads the flat shape", () => {
+      const handled = readHandledError({
+        error: "trace_not_found",
+        message: "no trace",
+      });
+
+      expect(handled?.code).toBe("trace_not_found");
+    });
+  });
+});

@@ -51,6 +51,118 @@ const renderAlert = (props: Parameters<typeof HandledErrorAlert>[0]) =>
   );
 
 describe("<HandledErrorAlert />", () => {
+  /**
+   * The gateway's provider-setup failures, rendered from the envelope the Go
+   * service actually writes. The payload below is copied verbatim from
+   * `herr.Body(...)` in
+   * services/aigateway/adapters/providers/bifrost_error_test.go — if the two
+   * drift, this test is asserting a shape nobody sends.
+   *
+   * These failures used to reach customers as `provider_timeout`: "The model
+   * provider timed out. Try again in a moment." for a pasted credential that
+   * would never work. Nothing about which provider, which model, what a
+   * correct value looks like, or where it is documented.
+   */
+  describe("given a gateway provider-setup failure", () => {
+    const vertexCredentialEnvelope = {
+      code: "provider_credential_invalid",
+      httpStatus: 400,
+      fault: "customer",
+      docsUrl: "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+      traceId: "827cbb32e654bf7700000000827cbb32",
+      meta: { provider: "vertex", model: "gemini-2.5-flash" },
+      tips: [
+        "Paste the CONTENTS of the service account JSON file, not a path to it — the field is named after Google's GOOGLE_APPLICATION_CREDENTIALS variable, which is a path everywhere else",
+        'Check the JSON has a top-level "type" field; an OAuth client file ({"web": ...} or {"installed": ...}) is valid JSON but is not a service account',
+        "Give the service account the Vertex AI User role (roles/aiplatform.user) on the project you named",
+        "Leave the JSON empty only if this gateway runs with Application Default Credentials available (workload identity on GKE or Cloud Run)",
+        "This fails the same way on every retry, so the request will not succeed until the credential is corrected",
+      ],
+    };
+
+    /** @scenario "A provider-setup failure tells the customer how to fix it" */
+    it("names the provider from meta instead of saying 'this provider'", () => {
+      renderAlert({ error: handledError(vertexCredentialEnvelope) });
+
+      expect(
+        screen.getByText(/Google Vertex AI credentials saved for this project/),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * The client caps the list at `MAX_TIPS` (4) — "more than this is a
+     * document, not remediation" — so the server orders the advice with the
+     * provider-specific, actionable lines first and truncates to the same
+     * number before sending. This asserts the surviving tips are the ones
+     * worth surviving, which is the half a cap can get wrong.
+     *
+     * @scenario "A provider-setup failure tells the customer how to fix it"
+     */
+    it("renders the remediation tips the gateway sent, up to the client's cap", () => {
+      renderAlert({ error: handledError(vertexCredentialEnvelope) });
+
+      for (const tip of vertexCredentialEnvelope.tips.slice(0, 4)) {
+        expect(screen.getByText(tip)).toBeInTheDocument();
+      }
+    });
+
+    /** @scenario "A provider-setup failure tells the customer how to fix it" */
+    it("links the provider's own docs page, not a generic one", () => {
+      renderAlert({ error: handledError(vertexCredentialEnvelope) });
+
+      const link = screen.getByRole("link");
+      expect(link).toHaveAttribute(
+        "href",
+        "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+      );
+    });
+
+    /** @scenario "A provider-setup failure tells the customer how to fix it" */
+    it("never tells the customer to retry a credential that cannot work", () => {
+      const { container } = renderAlert({
+        error: handledError(vertexCredentialEnvelope),
+      });
+
+      expect(container.textContent).not.toContain("timed out");
+      expect(container.textContent).not.toContain("Try again in a moment");
+    });
+
+    /** @scenario "A provider-setup failure tells the customer how to fix it" */
+    it("names the model the provider is not configured for", () => {
+      renderAlert({
+        error: handledError({
+          code: "provider_config_invalid",
+          httpStatus: 400,
+          fault: "customer",
+          docsUrl: "https://docs.langwatch.ai/ai-gateway/providers/vertex",
+          meta: { provider: "vertex", model: "gemini-3.1-pro-preview" },
+          tips: [
+            "Add the model to this provider's model list in Settings → Model Providers",
+          ],
+        }),
+      });
+
+      expect(
+        screen.getByText(
+          "Google Vertex AI is configured on this project, but not for gemini-3.1-pro-preview.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    /**
+     * The cause that distinguishes the five credential failures from each
+     * other is the operator's, and stays on the log line.
+     */
+    it("shows nothing of the engine's internal cause", () => {
+      const { container } = renderAlert({
+        error: handledError(vertexCredentialEnvelope),
+      });
+
+      expect(container.textContent).not.toContain("auth token source");
+      expect(container.textContent).not.toContain("google auth credentials");
+    });
+  });
+
   describe("given a code the registry has copy for", () => {
     /** @scenario "A caller's generic headline loses to specific copy" */
     it("shows that copy rather than the caller's generic headline", () => {

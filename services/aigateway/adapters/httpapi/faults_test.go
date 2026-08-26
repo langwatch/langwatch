@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -165,6 +166,14 @@ func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 		{domain.ErrBudgetExceeded, "customer", zapcore.InfoLevel},
 		{domain.ErrProviderTimeout, "provider", zapcore.WarnLevel},
 		{domain.ErrInternal, "platform", zapcore.ErrorLevel},
+		// A settings mistake is the customer's to fix, and reading it as a
+		// provider fault put it on the warn line operators watch for provider
+		// outages while sending the customer to a provider status page.
+		{domain.ErrProviderCredentialInvalid, "customer", zapcore.InfoLevel},
+		{domain.ErrProviderConfigInvalid, "customer", zapcore.InfoLevel},
+		{domain.ErrProviderCredentialRejected, "customer", zapcore.InfoLevel},
+		// The host never answered — that one really is the provider's.
+		{domain.ErrProviderConnectionFailed, "provider", zapcore.WarnLevel},
 	}
 	for _, tc := range cases {
 		logs := observedWriteError(t, context.Background(),
@@ -175,6 +184,39 @@ func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 		assert.Equal(t, tc.fault, fields["fault"], "code %s", tc.code)
 		assert.Equal(t, tc.code.String(), fields["code"])
 	}
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+//
+// The customer-facing message states what to do; the cause states why, and
+// only one of the two can be both actionable and safe to show a customer.
+// Bifrost splits a failure into a category ("error creating auth token
+// source") and a wrapped cause, the gateway carried only the category, and the
+// category is one string for five credential problems with five different
+// fixes — which is what made a production Vertex failure undiagnosable from
+// the logs.
+func TestWriteErrorLogsTheUnderlyingCauseOfAHandledError(t *testing.T) {
+	err := herr.New(context.Background(), domain.ErrProviderCredentialInvalid,
+		herr.M{"message": "The credentials configured for this model provider were not accepted."},
+		errors.New("error creating auth token source: invalid google auth credentials: missing 'type'"))
+
+	entry := requireSingleFailureLog(t, observedWriteError(t, context.Background(), err))
+
+	assert.Equal(t, "invalid google auth credentials: missing 'type'",
+		strings.TrimPrefix(entry.ContextMap()["upstream_reason"].(string),
+			"error creating auth token source: "),
+		"the operator reads which of the credential failures this was")
+}
+
+// A cause the customer-facing message already states is not printed twice.
+func TestWriteErrorDoesNotRepeatACauseTheMessageAlreadyStates(t *testing.T) {
+	err := herr.New(context.Background(), domain.ErrProviderConfigInvalid,
+		herr.M{"message": "deployments not set for this provider"},
+		errors.New("deployments not set"))
+
+	entry := requireSingleFailureLog(t, observedWriteError(t, context.Background(), err))
+
+	assert.Nil(t, entry.ContextMap()["upstream_reason"])
 }
 
 // @scenario "An unexpected error is logged with platform fault"
@@ -294,6 +336,9 @@ func TestFaultForCodeAttributesEveryCodeTheGatewayAuthors(t *testing.T) {
 		domain.ErrNoProviderConfigured, domain.ErrEndUserRequired,
 		domain.ErrCodexSessionExpired,
 		domain.ErrProviderError, domain.ErrProviderTimeout,
+		domain.ErrProviderCredentialInvalid, domain.ErrProviderCredentialRejected,
+		domain.ErrProviderConfigInvalid, domain.ErrProviderConnectionFailed,
+		domain.ErrRequestAbandoned,
 		domain.ErrChainExhausted, domain.ErrCircuitOpen,
 	}
 	for _, code := range notOurFault {
@@ -375,4 +420,60 @@ func TestWriteErrorLogsCarryBundleIdentity(t *testing.T) {
 	assert.Equal(t, "project_x", fields["project_id"])
 	assert.Equal(t, "org_y", fields["organization_id"])
 	assert.Equal(t, "vk_z", fields["virtual_key_id"])
+}
+
+// Attribution has to travel WITH the error. The gateway authors most of its
+// failures rather than forwarding a provider response, so there is no upstream
+// status for a client, an agent or a support conversation to infer "whose
+// problem is this" from — and until writeError stamped it, a gateway-authored
+// error reached the client with no fault at all while the log line beside it
+// had one.
+//
+// @scenario "A gateway-classified error is logged by its error code"
+func TestWrittenErrorsCarryTheirFaultOnTheWire(t *testing.T) {
+	cases := []struct {
+		code  herr.Code
+		fault string
+	}{
+		{domain.ErrProviderCredentialInvalid, "customer"},
+		{domain.ErrProviderConfigInvalid, "customer"},
+		{domain.ErrProviderTimeout, "provider"},
+		{domain.ErrProviderConnectionFailed, "provider"},
+		{domain.ErrInternal, "platform"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.code.String(), func(t *testing.T) {
+			w, _ := observedWriteErrorResponse(t, context.Background(),
+				herr.New(context.Background(), tc.code, herr.M{"message": "boom"}))
+
+			// The envelope nests the whole failure under `error` (herr.WriteHTTP
+			// -> ErrorResponse), so reading `code`/`fault` off the top level
+			// finds nothing and would pass for an error carrying neither.
+			var body struct {
+				Error struct {
+					Code  string `json:"code"`
+					Fault string `json:"fault"`
+				} `json:"error"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+			assert.Equal(t, tc.code.String(), body.Error.Code)
+			assert.Equal(t, tc.fault, body.Error.Fault)
+		})
+	}
+}
+
+// A construction site that knows better than the code-level default has said
+// so deliberately, and must not be overwritten by it.
+func TestWrittenErrorsKeepAnExplicitFault(t *testing.T) {
+	w, _ := observedWriteErrorResponse(t, context.Background(),
+		herr.New(context.Background(), domain.ErrProviderError,
+			herr.M{"message": "boom", "fault": "customer"}))
+
+	var body struct {
+		Error struct {
+			Fault string `json:"fault"`
+		} `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "customer", body.Error.Fault)
 }

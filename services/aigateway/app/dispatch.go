@@ -345,11 +345,37 @@ func classifyProviderError(err error) retry.Reason {
 			return retry.ReasonNonRetryable
 		}
 	}
+	// Bifrost's own refusal to fail over outranks everything below: when the
+	// engine (or a plugin) says no other credential will do better, walking
+	// the chain only multiplies one terminal failure by the number of slots.
+	if domain.IsNoFallback(err) {
+		return retry.ReasonNonRetryable
+	}
+
 	switch {
 	case herr.IsCode(err, domain.ErrProviderTimeout):
 		return retry.ReasonTimeout
 	case herr.IsCode(err, domain.ErrRateLimited):
 		return retry.ReasonRateLimit
+	case herr.IsCode(err, domain.ErrProviderConnectionFailed):
+		// The host never answered, which says the slot is unhealthy — retry
+		// the chain and let it count toward the breaker, exactly like a
+		// timeout. Distinct from the two codes below, which the slot answered.
+		return retry.ReasonNetwork
+	case herr.IsCode(err, domain.ErrProviderCredentialInvalid),
+		herr.IsCode(err, domain.ErrProviderCredentialRejected),
+		herr.IsCode(err, domain.ErrProviderConfigInvalid):
+		// A credential that cannot authenticate, or a slot that does not serve
+		// this model, fails identically on every attempt. Retrying spends the
+		// whole chain to arrive at the same answer more slowly, and — while
+		// these wore provider_timeout — recorded a breaker failure each time,
+		// pushing a healthy provider's circuit toward open.
+		return retry.ReasonNonRetryable
+	case herr.IsCode(err, domain.ErrRequestAbandoned):
+		// The caller went away. Says nothing about the slot, so it neither
+		// falls back nor moves the breaker — the same treatment a bare
+		// context error gets below.
+		return retry.ReasonContextDone
 	case herr.IsCode(err, domain.ErrProviderError):
 		return retry.ReasonRetryable5xx
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):

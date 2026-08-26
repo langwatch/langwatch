@@ -728,3 +728,49 @@ func TestClassifyProviderError_HerrCodes(t *testing.T) {
 	assert.Equal(t, retry.ReasonRetryable5xx, classifyProviderError(herr.New(ctx, domain.ErrProviderError, nil)))
 	assert.Equal(t, retry.ReasonNonRetryable, classifyProviderError(herr.New(ctx, domain.ErrBadRequest, nil)))
 }
+
+// A credential that cannot authenticate, and a slot that does not serve the
+// model, fail identically on every credential in the chain. Retrying them
+// spends the chain to arrive at the same answer more slowly — and, while these
+// wore provider_timeout, recorded a breaker failure on each attempt, pushing a
+// healthy provider's circuit toward open.
+// @scenario "A terminal setup failure does not spend the fallback chain"
+func TestClassifyProviderError_ProviderSetupFailuresDoNotRetry(t *testing.T) {
+	ctx := context.Background()
+	for _, code := range []herr.Code{
+		domain.ErrProviderCredentialInvalid,
+		domain.ErrProviderCredentialRejected,
+		domain.ErrProviderConfigInvalid,
+	} {
+		assert.Equalf(t, retry.ReasonNonRetryable, classifyProviderError(herr.New(ctx, code, nil)),
+			"%s repeats identically on every credential", code)
+	}
+}
+
+// A host that never answered says the slot is unhealthy, so unlike the setup
+// failures above it retries and counts toward the breaker, exactly like a
+// timeout does.
+// @scenario "A provider that was never reached is retryable, unlike a settings mistake"
+func TestClassifyProviderError_UnreachableProviderRetries(t *testing.T) {
+	assert.Equal(t, retry.ReasonNetwork,
+		classifyProviderError(herr.New(context.Background(), domain.ErrProviderConnectionFailed, nil)))
+}
+
+// The caller leaving says nothing about the credential. retry.recordBreaker
+// records nothing for ReasonContextDone, which is what keeps one client on a
+// flaky connection from opening the circuit on a provider that was answering.
+func TestClassifyProviderError_AbandonedRequestNeitherFallsBackNorMovesTheBreaker(t *testing.T) {
+	assert.Equal(t, retry.ReasonContextDone,
+		classifyProviderError(herr.New(context.Background(), domain.ErrRequestAbandoned, nil)))
+}
+
+// Bifrost's own AllowFallbacks=false verdict outranks the code underneath:
+// even a normally-retryable error stops the walk when the engine has already
+// said no other credential will do better.
+// @scenario "The engine's own refusal to fall over is honored"
+func TestClassifyProviderError_HonorsNoFallbackMarker(t *testing.T) {
+	retryable := herr.New(context.Background(), domain.ErrProviderError, nil)
+	require.Equal(t, retry.ReasonRetryable5xx, classifyProviderError(retryable))
+
+	assert.Equal(t, retry.ReasonNonRetryable, classifyProviderError(domain.WithNoFallback(retryable)))
+}

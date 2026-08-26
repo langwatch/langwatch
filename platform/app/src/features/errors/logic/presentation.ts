@@ -275,6 +275,35 @@ const label = (
   return typeof value === "string" ? value : undefined;
 };
 
+/**
+ * The provider's display name, read from `meta.provider`.
+ *
+ * The gateway sends the dispatch engine's own name ("vertex", "azure"), which
+ * is not what a customer calls it. Anything unmapped falls through as-is
+ * rather than being dropped: a lower-cased provider name in the sentence is
+ * still better than a sentence that names no provider at all.
+ */
+const PROVIDER_LABELS: Record<string, string> = {
+  vertex: "Google Vertex AI",
+  vertex_ai: "Google Vertex AI",
+  bedrock: "Amazon Bedrock",
+  azure: "Azure OpenAI",
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  gemini: "Google Gemini",
+  vllm: "the custom OpenAI-compatible provider",
+};
+
+const providerLabel = (error: HandledErrorShape): string => {
+  const provider = str(error, "provider", "");
+  if (!provider) return "";
+  return PROVIDER_LABELS[provider.toLowerCase()] ?? provider;
+};
+
+/** Sentence-cases a label that may already be a proper noun. */
+const capitalise = (text: string): string =>
+  text.charAt(0).toUpperCase() + text.slice(1);
+
 const presentations = {
   // ---- traces & spans ----
   trace_not_found: {
@@ -2647,6 +2676,54 @@ const presentations = {
   provider_timeout: {
     title: "The model provider timed out",
     describe: () => "Try again in a moment.",
+  },
+  // The three below used to reach customers as provider_timeout — "try again
+  // in a moment" for a settings mistake that would repeat forever. Each one
+  // names the setting to change instead, and each names WHICH provider and
+  // model from `meta`, because "check your credentials" is unactionable to
+  // anyone whose key holds more than one provider.
+  provider_credential_invalid: {
+    title: "The model provider's credentials were not accepted",
+    describe: (error) => {
+      const provider = providerLabel(error);
+      return provider
+        ? `The ${provider} credentials saved for this project could not be used to authenticate. Check them in Settings → Model Providers.`
+        : "The credentials saved for this provider could not be used to authenticate. Check them in Settings → Model Providers.";
+    },
+  },
+  provider_credential_rejected: {
+    title: "The model provider rejected its credentials",
+    describe: (error) => {
+      const provider = providerLabel(error);
+      return provider
+        ? `${capitalise(provider)} received the credentials and refused them, so the account behind them is what to check — not their format.`
+        : "The provider received the credentials and refused them, so the account behind them is what to check — not their format.";
+    },
+  },
+  provider_config_invalid: {
+    title: "This provider is not set up to serve that model",
+    describe: (error) => {
+      const model = str(error, "model", "");
+      const provider = providerLabel(error);
+      if (model && provider) {
+        return `${capitalise(provider)} is configured on this project, but not for ${model}.`;
+      }
+      if (model) {
+        return `No provider on this project is configured for ${model}.`;
+      }
+      return "Add the model to this provider in Settings → Model Providers, or send the request to a provider that serves it.";
+    },
+  },
+  provider_connection_failed: {
+    // Distinct from the app's `provider_unreachable`, which is a credential
+    // CHECK finding nothing answering. This one is a real request that never
+    // left, so the copy must not say anything about a key being unchecked.
+    title: "The model provider could not be reached",
+    describe: () => "Nothing answered. Try again in a moment.",
+  },
+  request_abandoned: {
+    title: "The request was cancelled before the provider answered",
+    describe: () => "Send it again if you still need the answer.",
   },
   chain_exhausted: {
     title: "Every provider failed",
