@@ -22,11 +22,14 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { CaseModal } from "./CaseModal";
+// The key lives in a component-free module so a static importer never pulls
+// this drawer's React and Chakra dependencies into its own chunk. The drawer
+// re-exports the key so existing importers stay unaffected.
+import { CASE_EDITOR_DRAWER } from "./drawerKeys";
 import type { TestSuiteEntry } from "./test-cases";
 import { useCaseEditor } from "./useCaseEditor";
 
-/** The key the case editor drawer is opened under. */
-export const CASE_EDITOR_DRAWER = "agentTestingCaseEditor" as const;
+export { CASE_EDITOR_DRAWER };
 
 /**
  * The props the drawer accepts at open time. The three URL-serializable fields

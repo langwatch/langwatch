@@ -17,7 +17,7 @@ import { hasNoResults } from "~/components/simulations/scenario-run-status.utils
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { Drawer } from "~/components/ui/drawer";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
-import { CASE_EDITOR_DRAWER } from "../cases/AgentTestingCaseEditorDrawer";
+import { CASE_EDITOR_DRAWER } from "../cases/drawerKeys";
 import { CaseVersionChip } from "../shared/CaseVersionChip";
 import type {
   RunDetail,

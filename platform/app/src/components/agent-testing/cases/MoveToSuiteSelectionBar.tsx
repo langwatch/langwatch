@@ -1,11 +1,4 @@
 /**
- * The floating action bar for the "Move to suite" bulk flow.
- *
- * When at least one test case is selected in the table the bar shows the count
- * and one Move to suite button. Clicking that button opens a small dialog
- * that lists every suite plus a "No test suite" option to unfile, and confirms
- * a bulk move.
- *
  * @see specs/features/agent-testing/cases-table.feature
  * @see dev/docs/best_practices/selection-action-bar.md
  */
@@ -20,7 +13,8 @@ import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { TestSuiteEntry } from "./test-cases";
 
-/** The sentinel value the picker uses for "no test suite". */
+// Distinct from any real suite id: `null` is the wire value for the unfile
+// target, and a `Select` cannot carry `null` as an option value.
 const UNFILED_VALUE = "__unfiled__";
 
 export type MoveToSuiteSelectionBarProps = {
@@ -36,7 +30,7 @@ export function MoveToSuiteSelectionBar({
   onClear,
   onConfirm,
 }: MoveToSuiteSelectionBarProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   if (selectedCount === 0) return null;
 
@@ -52,7 +46,7 @@ export function MoveToSuiteSelectionBar({
           colorPalette="blue"
           background={undefined}
           borderColor="transparent"
-          onClick={() => setDialogOpen(true)}
+          onClick={() => setIsDialogOpen(true)}
           data-testid="cases-selection-move-to-suite"
         >
           <Folder size={13} />
@@ -60,12 +54,12 @@ export function MoveToSuiteSelectionBar({
         </SmallButton>
       </SelectionActionBar>
       <MoveToSuiteDialog
-        open={dialogOpen}
+        open={isDialogOpen}
         selectedCount={selectedCount}
         suites={suites}
-        onCancel={() => setDialogOpen(false)}
+        onCancel={() => setIsDialogOpen(false)}
         onConfirm={(target) => {
-          setDialogOpen(false);
+          setIsDialogOpen(false);
           onConfirm(target);
         }}
       />

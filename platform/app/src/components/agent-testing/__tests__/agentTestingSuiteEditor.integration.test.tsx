@@ -123,69 +123,77 @@ describe("the suite editor drawer", () => {
 
   afterEach(cleanup);
 
-  /** @scenario "Edit suite opens the suite editor drawer with four tabs" */
-  it("draws four tabs: General, Test cases, Simulation models, Execution", () => {
-    openEditor();
-    render(<AgentTestingSuiteEditorDrawer />, { wrapper: Wrapper });
+  describe("given a folder suite the drawer is opened on", () => {
+    describe("when the drawer first renders", () => {
+      /** @scenario "Edit suite opens the suite editor drawer with four tabs" */
+      it("draws four tabs: General, Test cases, Simulation models, Execution", () => {
+        openEditor();
+        render(<AgentTestingSuiteEditorDrawer />, { wrapper: Wrapper });
 
-    expect(screen.getByTestId("suite-editor-tab-general")).toHaveTextContent(
-      "General",
-    );
-    expect(screen.getByTestId("suite-editor-tab-cases")).toHaveTextContent(
-      "Test cases",
-    );
-    expect(screen.getByTestId("suite-editor-tab-models")).toHaveTextContent(
-      "Simulation models",
-    );
-    expect(screen.getByTestId("suite-editor-tab-execution")).toHaveTextContent(
-      "Execution",
-    );
-  });
+        expect(
+          screen.getByTestId("suite-editor-tab-general"),
+        ).toHaveTextContent("General");
+        expect(screen.getByTestId("suite-editor-tab-cases")).toHaveTextContent(
+          "Test cases",
+        );
+        expect(screen.getByTestId("suite-editor-tab-models")).toHaveTextContent(
+          "Simulation models",
+        );
+        expect(
+          screen.getByTestId("suite-editor-tab-execution"),
+        ).toHaveTextContent("Execution");
+      });
+    });
 
-  /** @scenario "The Test cases tab lists the cases filed under the suite and can add and remove" */
-  it("lists the cases filed under the suite and offers add and remove", async () => {
-    const user = userEvent.setup();
-    openEditor();
-    render(<AgentTestingSuiteEditorDrawer />, { wrapper: Wrapper });
+    describe("when the person opens the Test cases tab", () => {
+      /** @scenario "The Test cases tab lists the cases filed under the suite and offers add and remove controls" */
+      it("lists the filed cases and shows add and remove controls", async () => {
+        const user = userEvent.setup();
+        openEditor();
+        render(<AgentTestingSuiteEditorDrawer />, { wrapper: Wrapper });
 
-    await user.click(screen.getByTestId("suite-editor-tab-cases"));
+        await user.click(screen.getByTestId("suite-editor-tab-cases"));
 
-    expect(
-      screen.getByTestId("suite-editor-case-Double charge"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("suite-editor-add-cases")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
-        name: "Remove Double charge from this test suite",
-      }),
-    ).toBeInTheDocument();
-  });
+        expect(
+          screen.getByTestId("suite-editor-case-Double charge"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("suite-editor-add-cases"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", {
+            name: "Remove Double charge from this test suite",
+          }),
+        ).toBeInTheDocument();
+      });
+    });
 
-  /** @scenario "Add test cases opens a picker of cases not currently in the suite" */
-  it("opens a picker with the cases NOT currently in the suite", async () => {
-    const user = userEvent.setup();
-    openEditor();
-    render(<AgentTestingSuiteEditorDrawer />, { wrapper: Wrapper });
+    describe("when the person picks a case to add and confirms", () => {
+      /** @scenario "Add test cases opens a picker of cases not currently in the suite" */
+      it("opens a picker with the cases NOT in the suite and moves the chosen one", async () => {
+        const user = userEvent.setup();
+        openEditor();
+        render(<AgentTestingSuiteEditorDrawer />, { wrapper: Wrapper });
 
-    await user.click(screen.getByTestId("suite-editor-tab-cases"));
-    await user.click(screen.getByTestId("suite-editor-add-cases"));
+        await user.click(screen.getByTestId("suite-editor-tab-cases"));
+        await user.click(screen.getByTestId("suite-editor-add-cases"));
 
-    expect(
-      screen.getByTestId("suite-editor-add-cases-dialog"),
-    ).toBeInTheDocument();
-    // The already-filed case is not offered again.
-    expect(
-      screen.queryByTestId("suite-editor-picker-Double charge"),
-    ).not.toBeInTheDocument();
-    // The unfiled one is.
-    const row = screen.getByTestId("suite-editor-picker-Late refund");
-    await user.click(row);
-    await user.click(screen.getByTestId("suite-editor-add-cases-confirm"));
+        expect(
+          screen.getByTestId("suite-editor-add-cases-dialog"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("suite-editor-picker-Double charge"),
+        ).not.toBeInTheDocument();
+        const row = screen.getByTestId("suite-editor-picker-Late refund");
+        await user.click(row);
+        await user.click(screen.getByTestId("suite-editor-add-cases-confirm"));
 
-    expect(mockMoveMutate).toHaveBeenCalledWith({
-      projectId: "proj_1",
-      scenarioId: "case_2",
-      folderId: REFUNDS.id,
+        expect(mockMoveMutate).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          scenarioId: "case_2",
+          folderId: REFUNDS.id,
+        });
+      });
     });
   });
 });

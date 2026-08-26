@@ -123,16 +123,16 @@ Feature: A test suite is a folder of test cases
   # --- Folder editor overrides ---
 
   @unit
-  Scenario: A folder suite round-trips the run overrides through update
+  Scenario: The suite editor saves the name, labels, model overrides, repeat count and targets on a folder suite
     Given a folder suite in the project
-    When the update carries a name, labels, model overrides, a repeat count and targets
-    Then every field is persisted on the SimulationSuite row
-    And the slug is not re-generated
+    When the suite editor saves a name, labels, model overrides, a repeat count and targets
+    Then the folder shows the saved values on the next read
+    And the folder keeps its address the person opened it under
 
   @unit
-  Scenario: A folder suite refuses a scope or scenarioIds write on update
+  Scenario: The suite editor refuses to broaden a folder into a code-owned suite
     Given a folder suite in the project
-    When the update carries a scope
-    Then the request is refused with "suite_scope_not_allowed"
-    When the update carries a scenarioIds list
-    Then the request is refused with "validation_error"
+    When the suite editor tries to change what the folder collects to a plain rule
+    Then the change is refused with "suite_scope_not_allowed"
+    When the suite editor tries to name the cases directly
+    Then the change is refused with "validation_error"

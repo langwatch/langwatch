@@ -1354,74 +1354,80 @@ describe("SuiteService", () => {
     });
   });
 
-  describe("when updating a folder suite", () => {
-    /** @scenario "A folder suite round-trips the run overrides through update" */
-    it("persists name, labels, models, repeat count and targets on a folder", async () => {
-      const { service, suiteRepo } = createService();
-      const stored = makeSuite({
-        id: "folder_1",
-        kind: "folder",
-        slug: "refunds",
-        name: "Refunds",
-      });
-      suiteRepo.findById.mockResolvedValue(stored);
-      suiteRepo.update.mockImplementation(
-        async ({ data }: { data: Record<string, unknown> }) =>
-          makeSuite({ ...stored, ...data }),
-      );
+  describe("given a folder suite", () => {
+    describe("when the suite editor updates it", () => {
+      /** @scenario "The suite editor saves the name, labels, model overrides, repeat count and targets on a folder suite" */
+      it("persists name, labels, models, repeat count and targets on a folder", async () => {
+        const { service, suiteRepo } = createService();
+        const stored = makeSuite({
+          id: "folder_1",
+          kind: "folder",
+          slug: "refunds",
+          name: "Refunds",
+        });
+        suiteRepo.findById.mockResolvedValue(stored);
+        suiteRepo.update.mockImplementation(
+          async ({ data }: { data: Record<string, unknown> }) =>
+            makeSuite({ ...stored, ...data }),
+        );
 
-      await service.update({
-        id: stored.id,
-        projectId: stored.projectId,
-        data: {
-          name: "Refunds v2",
-          labels: ["priority"],
-          simulatorModel: "openai/gpt-5-mini",
-          judgeModel: "openai/gpt-5-mini",
-          repeatCount: 3,
-          targets: [{ type: "http", referenceId: "agent_2" }] as SuiteTarget[],
-        },
-      });
-
-      expect(suiteRepo.update).toHaveBeenCalledWith(
-        expect.objectContaining({
+        await service.update({
           id: stored.id,
-          data: expect.not.objectContaining({ slug: expect.anything() }),
-        }),
-      );
-      const firstCall = suiteRepo.update.mock.calls[0];
-      if (!firstCall) throw new Error("update was not called");
-      const data = firstCall[0].data as Record<string, unknown>;
-      expect(data.name).toBe("Refunds v2");
-      expect(data.labels).toEqual(["priority"]);
-      expect(data.simulatorModel).toBe("openai/gpt-5-mini");
-      expect(data.judgeModel).toBe("openai/gpt-5-mini");
-      expect(data.repeatCount).toBe(3);
-      expect(data.targets).toEqual([{ type: "http", referenceId: "agent_2" }]);
-    });
+          projectId: stored.projectId,
+          data: {
+            name: "Refunds v2",
+            labels: ["priority"],
+            simulatorModel: "openai/gpt-5-mini",
+            judgeModel: "openai/gpt-5-mini",
+            repeatCount: 3,
+            targets: [
+              { type: "http", referenceId: "agent_2" },
+            ] as SuiteTarget[],
+          },
+        });
 
-    /** @scenario "A folder suite refuses a scope or scenarioIds write on update" */
-    it("refuses a scope or scenarioIds write on a folder", async () => {
-      const { service, suiteRepo } = createService();
-      suiteRepo.findById.mockResolvedValue(
-        makeSuite({ id: "folder_1", kind: "folder" }),
-      );
+        expect(suiteRepo.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: stored.id,
+            data: expect.not.objectContaining({ slug: expect.anything() }),
+          }),
+        );
+        const firstCall = suiteRepo.update.mock.calls[0];
+        if (!firstCall) throw new Error("update was not called");
+        const data = firstCall[0].data as Record<string, unknown>;
+        expect(data.name).toBe("Refunds v2");
+        expect(data.labels).toEqual(["priority"]);
+        expect(data.simulatorModel).toBe("openai/gpt-5-mini");
+        expect(data.judgeModel).toBe("openai/gpt-5-mini");
+        expect(data.repeatCount).toBe(3);
+        expect(data.targets).toEqual([
+          { type: "http", referenceId: "agent_2" },
+        ]);
+      });
 
-      await expect(
-        service.update({
-          id: "folder_1",
-          projectId: "proj_1",
-          data: { scope: { mode: "all" } },
-        }),
-      ).rejects.toMatchObject({ code: "suite_scope_not_allowed" });
+      /** @scenario "The suite editor refuses to broaden a folder into a code-owned suite" */
+      it("refuses a scope or scenarioIds write on a folder", async () => {
+        const { service, suiteRepo } = createService();
+        suiteRepo.findById.mockResolvedValue(
+          makeSuite({ id: "folder_1", kind: "folder" }),
+        );
 
-      await expect(
-        service.update({
-          id: "folder_1",
-          projectId: "proj_1",
-          data: { scenarioIds: ["scen_x"] },
-        }),
-      ).rejects.toMatchObject({ code: "validation_error" });
+        await expect(
+          service.update({
+            id: "folder_1",
+            projectId: "proj_1",
+            data: { scope: { mode: "all" } },
+          }),
+        ).rejects.toMatchObject({ code: "suite_scope_not_allowed" });
+
+        await expect(
+          service.update({
+            id: "folder_1",
+            projectId: "proj_1",
+            data: { scenarioIds: ["scen_x"] },
+          }),
+        ).rejects.toMatchObject({ code: "validation_error" });
+      });
     });
   });
 });

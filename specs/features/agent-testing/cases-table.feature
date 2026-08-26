@@ -81,7 +81,7 @@ Feature: The test cases table
     And it carries the play icon
 
   @integration
-  Scenario: The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order
+  Scenario: The row menu offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order
     Given a test case row with a finished run
     When its row menu is opened
     Then the actions read, in order: "Edit", "Duplicate", "Open last run", "Move to suite...", "History", "Archive"

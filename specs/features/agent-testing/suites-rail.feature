@@ -84,7 +84,7 @@ Feature: The test suites rail
     And it holds four tabs: "General", "Test cases", "Simulation models", "Execution"
 
   @integration
-  Scenario: The Test cases tab lists the cases filed under the suite and can add and remove
+  Scenario: The Test cases tab lists the cases filed under the suite and offers add and remove controls
     Given the suite editor drawer is open on a test suite
     When the "Test cases" tab is chosen
     Then every test case filed under the suite is listed

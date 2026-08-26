@@ -9,7 +9,7 @@ import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { CASE_EDITOR_DRAWER } from "../cases/AgentTestingCaseEditorDrawer";
+import { CASE_EDITOR_DRAWER } from "../cases/drawerKeys";
 
 export function useRunRowHandlers({
   scenarioSetId,

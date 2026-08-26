@@ -345,8 +345,8 @@ describe("the test cases table", () => {
     expect(runButton.querySelector("svg.lucide-play")).toBeInTheDocument();
   });
 
-  /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order" */
-  it("offers Edit, Duplicate, Open last run, Move to suite... and Archive in order", async () => {
+  /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order" */
+  it("offers Edit, Duplicate, Open last run, Move to suite..., History and Archive in order", async () => {
     renderPanel({
       groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
       lastResults: new Map([["case_1", makeResult()]]),
@@ -444,8 +444,7 @@ describe("the test cases table", () => {
   });
 
   /** @scenario "Move to suite... confirms a bulk move to another suite" */
-  /** @scenario "Move to suite... unfiles when 'No test suite' is picked" */
-  it("moves the selection to another suite and unfiles from the action bar", async () => {
+  it("moves the selection to another suite from the action bar", async () => {
     const filed = makeCase();
     const { props } = renderPanel({
       groups: groupCasesByFolder({

@@ -28,12 +28,17 @@ export type CasesPanelBodyProps = CasesPanelProps & {
   caseCount: number;
 };
 
-/** All cases across every group of the table, from the flat view. */
 function flattenGroupCases(props: CasesPanelBodyProps): TestCase[] {
   return props.groups.flatMap((group) => group.cases);
 }
 
-function useCaseSelection(flatCases: TestCase[], props: CasesPanelBodyProps) {
+function useCaseSelection({
+  flatCases,
+  props,
+}: {
+  flatCases: TestCase[];
+  props: CasesPanelBodyProps;
+}) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const toggleSelected = useCallback((scenarioId: string) => {
@@ -82,7 +87,7 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
     startMoveToSuite,
     clearSelection,
     handleMoveConfirm,
-  } = useCaseSelection(flatCases, props);
+  } = useCaseSelection({ flatCases, props });
 
   if (props.isLoading) return <CasesTableSkeleton />;
 

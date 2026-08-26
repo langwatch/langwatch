@@ -29,7 +29,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Play, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
@@ -53,8 +53,12 @@ import {
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 
-/** The key the suite editor drawer is opened under. */
-export const SUITE_EDITOR_DRAWER = "agentTestingSuiteEditor" as const;
+// The key lives in a component-free module so a static importer never pulls
+// this drawer's React and Chakra dependencies into its own chunk. The drawer
+// re-exports the key so existing importers stay unaffected.
+import { SUITE_EDITOR_DRAWER } from "./drawerKeys";
+
+export { SUITE_EDITOR_DRAWER };
 
 export type AgentTestingSuiteEditorDrawerProps = {
   /** The suite this drawer is open on. */
@@ -84,7 +88,7 @@ function useSuiteEditorForm({
   const [simulatorModel, setSimulatorModel] = useState<string | null>(null);
   const [judgeModel, setJudgeModel] = useState<string | null>(null);
   const [repeatCount, setRepeatCount] = useState(1);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
@@ -106,8 +110,8 @@ function useSuiteEditorForm({
     setJudgeModel,
     repeatCount,
     setRepeatCount,
-    pickerOpen,
-    setPickerOpen,
+    isPickerOpen,
+    setIsPickerOpen,
     problem,
     setProblem,
   };
@@ -124,6 +128,10 @@ function useSuiteEditorMutations({
 }) {
   const utils = api.useUtils();
   const callbacks = getFlowCallbacks(SUITE_EDITOR_DRAWER);
+  // Save & Run schedules the run in the mutation's hook-level onSuccess, so the
+  // scheduling survives the drawer unmount that `closeDrawer` triggers.
+  // A per-call onSuccess can be dropped by React Query v5 after unmount.
+  const shouldRunAfterSaveRef = useRef(false);
 
   const invalidate = useCallback(() => {
     void utils.suites.getById.invalidate({ projectId, id: suiteId });
@@ -131,25 +139,6 @@ function useSuiteEditorMutations({
     void utils.suites.getAll.invalidate();
     void utils.scenarios.getAll.invalidate({ projectId });
   }, [utils, projectId, suiteId]);
-
-  const updateMutation = api.suites.update.useMutation({
-    onSuccess: (saved) => {
-      invalidate();
-      toaster.create({ title: "Test suite updated", type: "success" });
-      callbacks?.onSaved?.(saved);
-      closeDrawer();
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save the test suite" }),
-  });
-
-  const moveMutation = api.scenarios.moveToFolder.useMutation({
-    onSuccess: () => {
-      invalidate();
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't move the test case" }),
-  });
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: () => {
@@ -160,7 +149,37 @@ function useSuiteEditorMutations({
       showErrorToast({ error, fallbackTitle: "Couldn't run the test suite" }),
   });
 
-  return { updateMutation, moveMutation, runMutation };
+  const updateMutation = api.suites.update.useMutation({
+    onSuccess: (saved) => {
+      invalidate();
+      toaster.create({ title: "Test suite updated", type: "success" });
+      callbacks?.onSaved?.(saved);
+      if (shouldRunAfterSaveRef.current) {
+        shouldRunAfterSaveRef.current = false;
+        runMutation.mutate({
+          projectId,
+          id: saved.id,
+          idempotencyKey: crypto.randomUUID(),
+        });
+        return;
+      }
+      closeDrawer();
+    },
+    onError: (error) => {
+      shouldRunAfterSaveRef.current = false;
+      showErrorToast({ error, fallbackTitle: "Couldn't save the test suite" });
+    },
+  });
+
+  const moveMutation = api.scenarios.moveToFolder.useMutation({
+    onSuccess: () => {
+      invalidate();
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't move the test case" }),
+  });
+
+  return { updateMutation, moveMutation, runMutation, shouldRunAfterSaveRef };
 }
 
 type SuiteEditorMutations = ReturnType<typeof useSuiteEditorMutations>;
@@ -171,14 +190,14 @@ function useSuiteEditorHandlers({
   suiteId,
   updateMutation,
   moveMutation,
-  runMutation,
+  shouldRunAfterSaveRef,
 }: {
   form: ReturnType<typeof useSuiteEditorForm>;
   projectId: string;
   suiteId: string;
   updateMutation: SuiteEditorMutations["updateMutation"];
   moveMutation: SuiteEditorMutations["moveMutation"];
-  runMutation: SuiteEditorMutations["runMutation"];
+  shouldRunAfterSaveRef: SuiteEditorMutations["shouldRunAfterSaveRef"];
 }) {
   const handleSave = useCallback(
     ({ shouldRunAfterSave }: { shouldRunAfterSave: boolean }) => {
@@ -188,30 +207,18 @@ function useSuiteEditorHandlers({
         return;
       }
       form.setProblem(null);
-      updateMutation.mutate(
-        {
-          projectId,
-          id: suiteId,
-          name: form.name.trim(),
-          labels: form.labels,
-          simulatorModel: form.simulatorModel,
-          judgeModel: form.judgeModel,
-          repeatCount: form.repeatCount,
-        },
-        {
-          onSuccess: (saved) => {
-            if (shouldRunAfterSave) {
-              runMutation.mutate({
-                projectId,
-                id: saved.id,
-                idempotencyKey: crypto.randomUUID(),
-              });
-            }
-          },
-        },
-      );
+      shouldRunAfterSaveRef.current = shouldRunAfterSave;
+      updateMutation.mutate({
+        projectId,
+        id: suiteId,
+        name: form.name.trim(),
+        labels: form.labels,
+        simulatorModel: form.simulatorModel,
+        judgeModel: form.judgeModel,
+        repeatCount: form.repeatCount,
+      });
     },
-    [form, projectId, suiteId, updateMutation, runMutation],
+    [form, projectId, suiteId, updateMutation, shouldRunAfterSaveRef],
   );
 
   const handleAddCases = useCallback(
@@ -219,7 +226,7 @@ function useSuiteEditorHandlers({
       for (const id of ids) {
         moveMutation.mutate({ projectId, scenarioId: id, folderId: suiteId });
       }
-      form.setPickerOpen(false);
+      form.setIsPickerOpen(false);
     },
     [moveMutation, projectId, suiteId, form],
   );
@@ -261,8 +268,19 @@ function useSuiteEditorState() {
     { enabled: isOpen && !!projectId },
   );
 
+  // Hydrate the form only once per opened suite. `useSuiteEditorForm` returns a
+  // fresh object every render, so a raw dependency on `form` would rewrite the
+  // typed values on every keystroke. The ref tracks which suiteId this drawer
+  // instance has already hydrated for, and resets when the drawer closes.
+  const hydratedForSuiteIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!isOpen || !suite) return;
+    if (!isOpen) {
+      hydratedForSuiteIdRef.current = null;
+      return;
+    }
+    if (!suite) return;
+    if (hydratedForSuiteIdRef.current === suite.id) return;
+    hydratedForSuiteIdRef.current = suite.id;
     form.setName(suite.name);
     form.setLabels(suite.labels);
     form.setSimulatorModel(suite.simulatorModel ?? null);
@@ -343,9 +361,9 @@ export function AgentTestingSuiteEditorDrawer(
       </Drawer.Content>
 
       <AddCasesPickerDialog
-        open={state.pickerOpen}
+        open={state.isPickerOpen}
         cases={state.casesNotInSuite}
-        onCancel={() => state.setPickerOpen(false)}
+        onCancel={() => state.setIsPickerOpen(false)}
         onConfirm={state.handleAddCases}
       />
     </Drawer.Root>
@@ -420,7 +438,7 @@ function SuiteEditorTabBody({
       {state.tab === "cases" && (
         <CasesTab
           cases={state.casesInSuite}
-          onAdd={() => state.setPickerOpen(true)}
+          onAdd={() => state.setIsPickerOpen(true)}
           onRemove={state.handleRemoveCase}
         />
       )}
@@ -477,11 +495,10 @@ function SuiteEditorFooter({
       </chakra.button>
       <SmallButton
         loading={isSaving}
-        onClick={() => onSave({ shouldRunAfterSave: true })}
-        data-testid="suite-editor-save-and-run"
+        onClick={() => onSave({ shouldRunAfterSave: false })}
+        data-testid="suite-editor-save"
       >
-        <Play size={13} />
-        Save &amp; Run
+        Save
       </SmallButton>
       <SmallButton
         variant="solid"
@@ -489,10 +506,11 @@ function SuiteEditorFooter({
         background={undefined}
         borderColor="transparent"
         loading={isSaving}
-        onClick={() => onSave({ shouldRunAfterSave: false })}
-        data-testid="suite-editor-save"
+        onClick={() => onSave({ shouldRunAfterSave: true })}
+        data-testid="suite-editor-save-and-run"
       >
-        Save
+        <Play size={13} />
+        Save &amp; Run
       </SmallButton>
     </Drawer.Footer>
   );
@@ -667,7 +685,12 @@ function ExecutionTab({
             max={MAX_REPEAT_COUNT}
             value={repeatCount}
             onChange={(event) =>
-              onRepeat(Math.max(1, Number(event.target.value) || 1))
+              onRepeat(
+                Math.min(
+                  MAX_REPEAT_COUNT,
+                  Math.max(1, Number(event.target.value) || 1),
+                ),
+              )
             }
           />
           <Text color={FG_MUTED}>

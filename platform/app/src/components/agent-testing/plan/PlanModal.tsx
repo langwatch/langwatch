@@ -35,7 +35,11 @@ export type PlanModalProps = {
 };
 
 /** What the drawer is called, given the plan it has open. */
-function planDrawerTitle(editor: ReturnType<typeof usePlanEditor>): string {
+function planDrawerTitle({
+  editor,
+}: {
+  editor: ReturnType<typeof usePlanEditor>;
+}): string {
   if (editor.isFixedScope) return "Edit test suite";
   return editor.isEditing ? "Edit run plan" : "New run plan";
 }
@@ -67,7 +71,7 @@ export function PlanModal(_props: PlanModalProps) {
           display="block"
         >
           <Drawer.Title fontSize="14px" fontWeight="semibold">
-            {planDrawerTitle(editor)}
+            {planDrawerTitle({ editor })}
           </Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
