@@ -22,6 +22,7 @@ const {
   askStateRef,
   signInMock,
   signOutMock,
+  passkeySignInMock,
   sessionRef,
   hardRedirectMock,
 } = vi.hoisted(() => ({
@@ -41,19 +42,19 @@ const {
   askStateRef: {
     current: { error: null as unknown, isPending: false, isSuccess: false },
   },
-  // `signIn.passkey` is what the rail's passkey button dials. A bare mock has
-  // no such property, so the call threw and the ceremony was torn down again
-  // in the same tick it went up — which made the scenario below a race
+  signInMock: vi.fn(),
+  signOutMock: vi.fn(),
+  // The rail's passkey button dials `authClient.signIn.passkey`, NOT the
+  // `signIn` export — so mocking `signIn` alone left the real better-auth
+  // client on that path. It threw, the catch ended the ceremony, and the panel
+  // was gone again in the same tick it went up: the scenario below was a race
   // against the error path rather than a claim about the ceremony.
   //
-  // A promise that never settles is the honest double: the scenario is about
-  // what the screen looks like WHILE the ceremony is running, and a real
-  // ceremony is outstanding for exactly as long as somebody is looking at
-  // their authenticator.
-  signInMock: Object.assign(vi.fn(), {
-    passkey: vi.fn(() => new Promise(() => undefined)),
-  }),
-  signOutMock: vi.fn(),
+  // A promise that never settles is the honest double. The scenario is about
+  // what the screen looks like WHILE a ceremony runs, and a real one is
+  // outstanding for exactly as long as somebody is looking at their
+  // authenticator.
+  passkeySignInMock: vi.fn(() => new Promise(() => undefined)),
   sessionRef: { current: { data: null as unknown } },
   hardRedirectMock: vi.fn(),
 }));
@@ -94,6 +95,10 @@ vi.mock("~/utils/auth-client", async (importOriginal) => {
     signIn: signInMock,
     signOut: signOutMock,
     useSession: () => sessionRef.current,
+    authClient: {
+      ...actual.authClient,
+      signIn: { ...actual.authClient?.signIn, passkey: passkeySignInMock },
+    },
   };
 });
 
