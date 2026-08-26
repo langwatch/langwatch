@@ -24,6 +24,34 @@ interface FetchCall {
 let capturedCalls: FetchCall[] = [];
 let responseQueue: Array<{ status: number; body: unknown }> = [];
 let warnings: string[] = [];
+let transcripts: TranscriptTable | null = null;
+
+/**
+ * A transcript table that answers the query it is actually sent, instead of a
+ * canned page.
+ *
+ * The cursor bugs worth testing here are ones a canned page cannot show. A
+ * queued response comes back whatever the `$filter` says, so a filter that
+ * re-reads rows it has already handed over — or walks in a circle over rows
+ * sharing a timestamp — looks exactly like a correct one. This holds rows,
+ * applies the filter the adapter built, sorts them the way the adapter asked,
+ * and pages them, so a run that fails to move forward fails to move forward
+ * here too.
+ */
+interface TranscriptTable {
+  rows: Array<Record<string, unknown>>;
+  /**
+   * What the server hands back per page, independently of `$top`. A page ending
+   * part-way through a group of same-instant rows is the whole point: it is
+   * what leaves a cursor pointing into the middle of one.
+   */
+  pageSize: number;
+  /**
+   * Aborted once a page has been served, to strand a run mid-walk the way a
+   * deadline does in production.
+   */
+  controller?: AbortController;
+}
 
 const ENVIRONMENT_URL = "https://org12345.crm.dynamics.com";
 const CREDENTIALS = {
@@ -39,6 +67,127 @@ const CONFIG = {
 };
 
 const BOT_ID = "cc7bc3b3-dfd8-4bd9-b637-eac033f399e2";
+
+/**
+ * Evaluate one OData `$filter` against one row.
+ *
+ * Deliberately generic over `and`, `or`, brackets and the comparison
+ * operators rather than looking for the predicate the adapter happens to build
+ * today. A matcher written to recognise the correct filter would report the
+ * incorrect one as "no rows match" and pass every test for the wrong reason;
+ * this one runs whatever the adapter emits and lets the rows say whether it
+ * was right.
+ */
+function evaluateFilter(filter: string, row: Record<string, unknown>): boolean {
+  const tokens = filter
+    .replace(/\(/g, " ( ")
+    .replace(/\)/g, " ) ")
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
+  let at = 0;
+
+  function compare(field: string, operator: string, literal: string): boolean {
+    const raw = row[field];
+    if (typeof raw !== "string") return false;
+    const value = literal.replace(/^'/, "").replace(/'$/, "");
+    const order =
+      field === "createdon"
+        ? Math.sign(Date.parse(raw) - Date.parse(value))
+        : stringOrder(raw, value);
+    if (operator === "eq") return order === 0;
+    if (operator === "ne") return order !== 0;
+    if (operator === "gt") return order > 0;
+    if (operator === "ge") return order >= 0;
+    if (operator === "lt") return order < 0;
+    if (operator === "le") return order <= 0;
+    throw new Error(`test bug: unknown filter operator ${operator}`);
+  }
+
+  function readFactor(): boolean {
+    if (tokens[at] === "(") {
+      at += 1;
+      const inner = readExpression();
+      if (tokens[at] !== ")") throw new Error("test bug: unbalanced filter");
+      at += 1;
+      return inner;
+    }
+    const field = tokens[at]!;
+    const operator = tokens[at + 1]!;
+    const literal = tokens[at + 2]!;
+    at += 3;
+    return compare(field, operator, literal);
+  }
+
+  function readTerm(): boolean {
+    let result = readFactor();
+    while (tokens[at] === "and") {
+      at += 1;
+      // Both sides are read before they are combined: short-circuiting would
+      // leave the right-hand tokens unconsumed and desynchronise the parse.
+      result = readFactor() && result;
+    }
+    return result;
+  }
+
+  function readExpression(): boolean {
+    let result = readTerm();
+    while (tokens[at] === "or") {
+      at += 1;
+      result = readTerm() || result;
+    }
+    return result;
+  }
+
+  const matched = readExpression();
+  if (at !== tokens.length)
+    throw new Error(`test bug: unread filter ${filter}`);
+  return matched;
+}
+
+function stringOrder(left: string, right: string): number {
+  if (left < right) return -1;
+  return left > right ? 1 : 0;
+}
+
+/** The order the adapter's `$orderby` asks for, applied by the fake server. */
+function byCursorOrder(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): number {
+  const byTime =
+    Date.parse(String(a.createdon)) - Date.parse(String(b.createdon));
+  if (byTime !== 0) return byTime;
+  return stringOrder(
+    String(a.conversationtranscriptid),
+    String(b.conversationtranscriptid),
+  );
+}
+
+function serveTranscriptPage(
+  url: string,
+  table: TranscriptTable,
+): Record<string, unknown> {
+  const parsed = new URL(url);
+  const filter = parsed.searchParams.get("$filter") ?? "";
+  const offset = Number(parsed.searchParams.get("$skiptoken") ?? "0");
+
+  const matching = table.rows
+    .filter((row) => evaluateFilter(filter, row))
+    .sort(byCursorOrder);
+  const page = matching.slice(offset, offset + table.pageSize);
+
+  const body: Record<string, unknown> = { value: page };
+  if (offset + page.length < matching.length) {
+    parsed.searchParams.set("$skiptoken", String(offset + page.length));
+    body["@odata.nextLink"] = parsed.toString();
+  }
+  // Aborted after the page, so this run keeps what it just read and stops
+  // before asking for the next one — a deadline landing mid-walk, which is how
+  // a cursor comes to rest inside a group of same-instant rows.
+  table.controller?.abort();
+  return body;
+}
 
 function transcriptRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -69,6 +218,7 @@ beforeEach(() => {
   capturedCalls = [];
   responseQueue = [];
   warnings = [];
+  transcripts = null;
   // The logger is captured because one of this adapter's promises is a
   // diagnostic one: the misconfiguration it has to survive is also the one it
   // has to name, and a warning nobody asserts is a warning that can be
@@ -86,6 +236,12 @@ beforeEach(() => {
     RedirectRefusedError,
     ssrfSafeFetch: async (url: string, init?: RequestInit) => {
       capturedCalls.push({ url, init });
+      if (transcripts && url.includes("/conversationtranscripts")) {
+        return new Response(
+          JSON.stringify(serveTranscriptPage(url, transcripts)),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
       const next = responseQueue.shift();
       if (!next) throw new Error("test bug: no queued response");
       return new Response(JSON.stringify(next.body), {
@@ -468,9 +624,33 @@ describe("given a cursor from a previous run", () => {
 
     const query = decodeURIComponent(transcriptCall().url);
     expect(query).toContain("createdon ge 2026-08-25T19:44:43Z");
-    // `ge` plus an explicit exclusion, not `gt`: rows written in the same
-    // instant would otherwise be skipped.
-    expect(query).toContain("conversationtranscriptid ne row-1");
+    // Everything strictly after the pair, never "at or after the timestamp,
+    // minus one id": the second is not a total order and walks in circles on
+    // a timestamp holding several rows.
+    expect(query).toContain(
+      "(createdon gt 2026-08-25T19:44:43Z or " +
+        "(createdon eq 2026-08-25T19:44:43Z and " +
+        "conversationtranscriptid gt row-1))",
+    );
+    expect(query).not.toContain("conversationtranscriptid ne");
+  });
+
+  it("asks for the order its continuation predicate assumes", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({ status: 200, body: { value: [] } });
+
+    await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    // The predicate above is only a continuation under exactly this sort. The
+    // two are asserted together because a change to either one alone silently
+    // starts skipping rows.
+    expect(decodeURIComponent(transcriptCall().url)).toContain(
+      "$orderby=createdon asc,conversationtranscriptid asc",
+    );
   });
 
   /**
@@ -534,6 +714,129 @@ describe("given a cursor from a previous run", () => {
       adapter.validateConfig(CONFIG),
     );
 
+    expect(result.cursor).toBe(cursor);
+  });
+});
+
+describe("given several conversations written in the same instant", () => {
+  // Two rows one second apart would tell us nothing: the timestamp alone
+  // separates them. These three share an instant between the first two, which
+  // is where a cursor that is not a total order starts going round in circles.
+  const SAME_INSTANT = "2026-08-25T19:44:43Z";
+  const LATER = "2026-08-25T19:45:12Z";
+  const ROWS = [
+    transcriptRow({
+      conversationtranscriptid: "row-a",
+      createdon: SAME_INSTANT,
+    }),
+    transcriptRow({
+      conversationtranscriptid: "row-b",
+      createdon: SAME_INSTANT,
+    }),
+    transcriptRow({ conversationtranscriptid: "row-c", createdon: LATER }),
+  ];
+
+  /**
+   * One run against the fake table, stopped after its first page.
+   *
+   * The stop is what makes this worth testing: a run that walks every page
+   * always ends on the last row and hides the problem. Stranded on `row-a`
+   * with `row-b` still to come, the next run has to continue past the whole
+   * pair, not merely past the id.
+   */
+  async function runStoppingAfterOnePage(
+    adapter: Awaited<ReturnType<typeof newAdapter>>,
+    cursor: string | null,
+  ) {
+    const controller = new AbortController();
+    queueSignInAndBots();
+    transcripts = { rows: ROWS, pageSize: 1, controller };
+
+    return adapter.runOnce(
+      { cursor, credentials: CREDENTIALS, signal: controller.signal },
+      adapter.validateConfig(CONFIG),
+    );
+  }
+
+  it("reaches every conversation exactly once across restarts", async () => {
+    const adapter = await newAdapter();
+    const seen: string[] = [];
+    let cursor: string | null = null;
+
+    for (let run = 0; run < 3; run += 1) {
+      const result = await runStoppingAfterOnePage(adapter, cursor);
+      seen.push(...result.events.map((event) => event.source_event_id));
+      cursor = result.cursor;
+    }
+
+    // Not a set: the failure this guards against is a run handing back a row
+    // it already delivered, and a set would swallow exactly that. With a
+    // cursor that keeps every same-instant row but the saved id, the third
+    // run answers with `row-a` again and the pair alternates forever without
+    // `row-c` ever being read.
+    expect(seen).toEqual(["row-a", "row-b", "row-c"]);
+  });
+
+  it("advances the cursor strictly forward on every restart", async () => {
+    const adapter = await newAdapter();
+    const cursors: unknown[] = [];
+    let cursor: string | null = null;
+
+    for (let run = 0; run < 3; run += 1) {
+      const result = await runStoppingAfterOnePage(adapter, cursor);
+      cursor = result.cursor;
+      cursors.push(JSON.parse(cursor!));
+    }
+
+    expect(cursors).toEqual([
+      { createdon: SAME_INSTANT, conversationtranscriptid: "row-a" },
+      { createdon: SAME_INSTANT, conversationtranscriptid: "row-b" },
+      { createdon: LATER, conversationtranscriptid: "row-c" },
+    ]);
+  });
+
+  it("resumes at the next row when a page ended between two of them", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    // A page that ended on `row-a`, leaving `row-b` unread at the same instant.
+    transcripts = { rows: ROWS, pageSize: 10 };
+
+    const result = await adapter.runOnce(
+      {
+        cursor: JSON.stringify({
+          createdon: SAME_INSTANT,
+          conversationtranscriptid: "row-a",
+        }),
+        credentials: CREDENTIALS,
+      },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.events.map((event) => event.source_event_id)).toEqual([
+      "row-b",
+      "row-c",
+    ]);
+    expect(JSON.parse(result.cursor!)).toEqual({
+      createdon: LATER,
+      conversationtranscriptid: "row-c",
+    });
+  });
+
+  it("delivers nothing more once the cursor is past the last row", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    transcripts = { rows: ROWS, pageSize: 10 };
+
+    const cursor = JSON.stringify({
+      createdon: LATER,
+      conversationtranscriptid: "row-c",
+    });
+    const result = await adapter.runOnce(
+      { cursor, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    expect(result.events).toHaveLength(0);
     expect(result.cursor).toBe(cursor);
   });
 });

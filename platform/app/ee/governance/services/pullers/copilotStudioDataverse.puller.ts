@@ -49,6 +49,19 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const PAGE_SIZE = 50;
 
 /**
+ * The order every transcript read asks for, and the order the continuation
+ * predicate in `buildFirstPageUrl` is written against.
+ *
+ * The two are one decision held in one place on purpose. A cursor of
+ * "(timestamp, id) of the last row read" only makes forward progress if the
+ * rows come back sorted by exactly that pair, in exactly this direction.
+ * Change the sort without changing the predicate and the run starts skipping
+ * rows or handing back rows it has already read; the constant is what stops
+ * the two drifting apart in separate edits.
+ */
+const TRANSCRIPT_ORDER_BY = "createdon asc,conversationtranscriptid asc";
+
+/**
  * Safety cap so a server that keeps handing back a next-page link cannot keep
  * one run going forever. The deadline and the abort signal are the real
  * bounds, but both are optional on the run options and a `while (nextLink)`
@@ -253,6 +266,29 @@ function odataQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
+/**
+ * Where a run picks up from, as OData.
+ *
+ * This is a lexicographic "everything after (T, I)" over the pair the rows are
+ * sorted by, and it has to be exactly that. The obvious shorter form — every
+ * row at or after T except the one already seen — is not a total order: on a
+ * timestamp holding several rows it re-reads the ones with smaller ids, so a
+ * run whose cursor is B hands back A, saves A, and the next run hands back B
+ * again. The pair alternates forever, the same transcripts are reprocessed
+ * every run, and no later row is ever reached.
+ *
+ * The leading `ge` says nothing the disjunction does not already say. It is
+ * kept because it is the plain range bound the server can seek `createdon` on,
+ * where the `or` on its own invites a scan of the window.
+ */
+function continuationFilters(cursor: Cursor): string[] {
+  return [
+    `createdon ge ${cursor.createdon}`,
+    `(createdon gt ${cursor.createdon} or (createdon eq ${cursor.createdon}` +
+      ` and conversationtranscriptid gt ${cursor.conversationtranscriptid}))`,
+  ];
+}
+
 function buildFirstPageUrl(params: {
   environmentUrl: string;
   config: CopilotStudioDataverseConfig;
@@ -262,18 +298,9 @@ function buildFirstPageUrl(params: {
   const { environmentUrl, config, cursor, now } = params;
   const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/conversationtranscripts`;
 
-  const since = cursor
-    ? cursor.createdon
-    : new Date(now - FIRST_RUN_LOOKBACK_MS).toISOString();
-
-  const filters = [`createdon ge ${since}`];
-  if (cursor) {
-    // `ge` plus an explicit exclusion of the row already seen. Using `gt`
-    // alone would skip every other row written in the same instant.
-    filters.push(
-      `conversationtranscriptid ne ${cursor.conversationtranscriptid}`,
-    );
-  }
+  const filters = cursor
+    ? continuationFilters(cursor)
+    : [`createdon ge ${new Date(now - FIRST_RUN_LOOKBACK_MS).toISOString()}`];
   if (config.botIds.length > 0) {
     const clause = config.botIds
       .map((id) => `_bot_conversationtranscriptid_value eq ${odataQuote(id)}`)
@@ -292,7 +319,7 @@ function buildFirstPageUrl(params: {
         "metadata,schematype,schemaversion,_bot_conversationtranscriptid_value",
     ],
     ["$filter", filters.join(" and ")],
-    ["$orderby", "createdon asc,conversationtranscriptid asc"],
+    ["$orderby", TRANSCRIPT_ORDER_BY],
     ["$top", String(PAGE_SIZE)],
     // No `$expand` here. The agent arrives as the raw lookup id and the run
     // reads the `bot` table once to put a name on it. Asking Dataverse to join
@@ -313,6 +340,54 @@ function buildFirstPageUrl(params: {
  */
 function botKey(id: string): string {
   return id.toLowerCase();
+}
+
+/** The agents on one page of the `bot` table, keyed by folded lookup id. */
+function readBotRows(rows: unknown[]): Map<string, BotRecord> {
+  const bots = new Map<string, BotRecord>();
+  for (const raw of rows) {
+    const parsed = botRowSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    const row = parsed.data;
+    bots.set(botKey(row.botid), {
+      botName: row.name ?? undefined,
+      botModifiedOn: row.modifiedon ?? undefined,
+    });
+  }
+  return bots;
+}
+
+/**
+ * Say so when the agent list came back short, in either of the two ways it can.
+ *
+ * Neither is an error — the conversations are the point and a name is a
+ * nicety — so the only thing standing between the customer and unnamed
+ * conversations with no explanation is a line in the log.
+ */
+function warnAboutIncompleteBotList(params: {
+  botCount: number;
+  hasMorePages: boolean;
+}): void {
+  const { botCount, hasMorePages } = params;
+
+  if (hasMorePages) {
+    logger.warn(
+      { read: botCount },
+      "copilot studio dataverse: more agents than one read returns; conversations belonging to the rest get no name",
+    );
+  }
+
+  // An empty list is the shape a misconfigured role arrives in, and it is
+  // the quiet one. A role that reads the agent table at the wrong depth is
+  // answered with 200 and no rows rather than a refusal, because the
+  // application user owns none of them — indistinguishable from a tenant
+  // that genuinely has no agents, except that a run reading conversations
+  // written by an agent has just been told there are none.
+  if (botCount === 0) {
+    logger.warn(
+      "copilot studio dataverse: the environment reports no agents at all; if conversations are arriving unnamed the credential most likely reads the agent table at the wrong depth",
+    );
+  }
 }
 
 function botFactsOf(params: {
@@ -608,64 +683,60 @@ export class CopilotStudioDataversePuller
     signal?: AbortSignal;
   }): Promise<Map<string, BotRecord>> {
     const { environmentUrl, token, signal } = params;
-    const bots = new Map<string, BotRecord>();
-    const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/bots`;
-    const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
 
     try {
-      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-      const response = await ssrfSafeFetch(`${base}?${query}`, {
-        method: "GET",
-        headers: dataverseHeaders(token),
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-        // Same reasoning as the transcript read: this request carries the
-        // token, and a redirect would hand it to whoever answers.
-        followRedirects: false,
+      const page = await this.fetchBotsPage({ environmentUrl, token, signal });
+      if (!page) return new Map();
+
+      const bots = readBotRows(page.value);
+      warnAboutIncompleteBotList({
+        botCount: bots.size,
+        hasMorePages: Boolean(page["@odata.nextLink"]),
       });
-      if (!response.ok) {
-        logger.warn(
-          { status: response.status },
-          "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
-        );
-        return bots;
-      }
-
-      const page = botsPageSchema.parse(await response.json());
-      for (const raw of page.value) {
-        const parsed = botRowSchema.safeParse(raw);
-        if (!parsed.success) continue;
-        const row = parsed.data;
-        bots.set(botKey(row.botid), {
-          botName: row.name ?? undefined,
-          botModifiedOn: row.modifiedon ?? undefined,
-        });
-      }
-
-      if (page["@odata.nextLink"]) {
-        logger.warn(
-          { read: bots.size },
-          "copilot studio dataverse: more agents than one read returns; conversations belonging to the rest get no name",
-        );
-      }
-
-      // An empty list is the shape a misconfigured role arrives in, and it is
-      // the quiet one. A role that reads the agent table at the wrong depth is
-      // answered with 200 and no rows rather than a refusal, because the
-      // application user owns none of them — indistinguishable from a tenant
-      // that genuinely has no agents, except that a run reading conversations
-      // written by an agent has just been told there are none.
-      if (bots.size === 0) {
-        logger.warn(
-          "copilot studio dataverse: the environment reports no agents at all; if conversations are arriving unnamed the credential most likely reads the agent table at the wrong depth",
-        );
-      }
+      return bots;
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : String(error) },
         "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
       );
+      return new Map();
     }
-    return bots;
+  }
+
+  /**
+   * The one read of the `bot` table, or null when the environment refused it.
+   *
+   * A refusal is null rather than a throw because it is the ordinary case
+   * here: the caller treats "no list" and "an unreadable list" the same way,
+   * and neither is worth an error count.
+   */
+  private async fetchBotsPage(params: {
+    environmentUrl: string;
+    token: string;
+    signal?: AbortSignal;
+  }): Promise<z.infer<typeof botsPageSchema> | null> {
+    const { environmentUrl, token, signal } = params;
+    const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/bots`;
+    const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+    const response = await ssrfSafeFetch(`${base}?${query}`, {
+      method: "GET",
+      headers: dataverseHeaders(token),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      // Same reasoning as the transcript read: this request carries the
+      // token, and a redirect would hand it to whoever answers.
+      followRedirects: false,
+    });
+
+    if (!response.ok) {
+      logger.warn(
+        { status: response.status },
+        "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
+      );
+      return null;
+    }
+    return botsPageSchema.parse(await response.json());
   }
 
   private async fetchPage(params: {
