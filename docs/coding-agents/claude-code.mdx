@@ -114,14 +114,14 @@ Everything above is telemetry: Claude Code keeps your own plan and your own prov
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Restart Claude Code. It reads `~/.claude/settings.json` at start, so a session that was already open when you ran `langwatch instrument claude` keeps its old configuration.
 
     Then run `langwatch instrument claude` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
   </Accordion>
 
   <Accordion title="The trace has no tool call tree, no latencies and no subagents">
-    `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on, and `OTEL_TRACES_EXPORTER` does nothing without it. Cost and tokens still arrive, so the session appears, but LangWatch has no structure to attach them to and every subagent folds into the main session.
+    `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on, and `OTEL_TRACES_EXPORTER` has no effect without it. Cost and tokens still arrive, so the session appears, but LangWatch has no structure to attach them to and every subagent folds into the main session.
   </Accordion>
 
   <Accordion title="The trace has no prompt">
@@ -141,7 +141,7 @@ Everything above is telemetry: Claude Code keeps your own plan and your own prov
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -177,7 +177,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
 claude
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
@@ -249,13 +249,13 @@ Split it across two files. The committed one decides the shape of the export:
 }
 ```
 
-Telemetry stays off until `CLAUDE_CODE_ENABLE_TELEMETRY` is set, so a fresh clone that carries only the committed file sends nothing.
+Telemetry stays off until `CLAUDE_CODE_ENABLE_TELEMETRY` is set, so a fresh clone that carries only the committed file sends no telemetry.
 
 <Warning>
   `OTEL_RESOURCE_ATTRIBUTES` is the one key that does not merge across the two files. The local file replaces the committed value outright, so carry every attribute you want in the local file or the missing ones are dropped from every span.
 </Warning>
 
-Two things catch people out. Claude Code reads the `env` block at launch, so a session that was already running keeps sending nothing until you restart it. And a `.gitignore` that covers all of `.claude/` stops `git add` from staging the committed file, so your own telemetry works while your teammates inherit none of it. A bare `!.claude/settings.json` negation does not fix that, because git does not descend into an excluded directory:
+Two things catch people out. Claude Code reads the `env` block at launch, so a session that was already running keeps sending no telemetry until you restart it. And a `.gitignore` that covers all of `.claude/` stops `git add` from staging the committed file, so your own telemetry works while your teammates inherit none of it. A bare `!.claude/settings.json` negation does not fix that, because git does not descend into an excluded directory:
 
 ```gitignore
 .claude/

@@ -69,7 +69,7 @@ The **Terminal** tab replays the session the way it looked in your terminal: you
   ![Claude Code terminal replay](/images/coding-agents/terminal-replay.png)
 </Frame>
 
-A tool call the agent was denied stays in the replay, marked as denied, so a session that produced nothing still shows where it stopped.
+A tool call the agent was denied stays in the replay, marked as denied, so a session that produced no output still shows where it stopped.
 
 ## Cost per pull request
 
@@ -103,13 +103,13 @@ You can point it at its own history too, through the [skills directory](https://
 
 Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
 
-This path costs nothing extra and adds two things the subscription path cannot give you. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
+This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
 
 Everything above this section looks the same on either path.
 
 ## Troubleshooting
 
-**Nothing appears after 30 seconds.** Claude Code flushes on an interval, so give the first turn a moment. If it stays empty, run `npx langwatch instrument claude`, which prints the file it wrote and the workspace the telemetry goes to.
+**No session appears after 30 seconds.** Claude Code flushes on an interval, so give the first turn a moment. If it stays empty, run `npx langwatch instrument claude`, which prints the file it wrote and the workspace the telemetry goes to.
 
 **Cost shows $0 while sessions land.** The model name on the span does not match the cost catalog. Current identifiers (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`) price correctly; a legacy alias returns no cost.
 

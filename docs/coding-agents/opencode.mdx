@@ -55,8 +55,8 @@ langwatch instrument opencode
 
 The command writes two things:
 
-- An `opencode` function in your shell start file, which applies the LangWatch settings to `opencode` runs and to nothing else. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
-- The `experimental.openTelemetry` flag in `~/.config/opencode/opencode.jsonc`. opencode reports nothing without it.
+- An `opencode` function in your shell start file, which applies the LangWatch settings to `opencode` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
+- The `experimental.openTelemetry` flag in `~/.config/opencode/opencode.jsonc`. opencode sends no telemetry without it.
 
 Open a new terminal after the command, or read the start file again, so the function is in place.
 
@@ -115,10 +115,10 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
     To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
   </Accordion>
 
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Open a new terminal. The `opencode` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
-    Then check that `experimental.openTelemetry` is `true` in `~/.config/opencode/opencode.jsonc`. opencode accepts the LangWatch settings and reports nothing while that flag is off.
+    Then check that `experimental.openTelemetry` is `true` in `~/.config/opencode/opencode.jsonc`. opencode accepts the LangWatch settings and sends no telemetry while that flag is off.
   </Accordion>
 
   <Accordion title="The command reports that it could not write the shell start file">
@@ -134,7 +134,7 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -170,7 +170,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"
 opencode
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. opencode appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 

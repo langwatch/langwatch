@@ -8924,7 +8924,7 @@ langwatch instrument codex
 Claude Code takes an `env` block in `~/.claude/settings.json`, Codex
 takes an `[otel]` block in `~/.codex/config.toml`, and the other tools
 take a scoped function in your shell start file, which applies to that
-tool and to nothing else. Add `--project <id-or-slug>` to send the
+tool and to no other command. Add `--project <id-or-slug>` to send the
 telemetry to a team project, or `--key <ingest-key>` on a machine that
 never logs in. See the [Claude Code integration
 guide](/coding-agents/claude-code).
@@ -16031,7 +16031,7 @@ How three projects resolve:
 | Project | Input | Output | Why |
 |---|---|---|---|
 | `billing-api`, a team project | Captured | Captured | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults. |
-| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; nothing sets input. |
+| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; no rule sets input. |
 | Dana's personal workspace (Dana is in HR) | Dropped | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
 
 All three projects also resolve **Essential** PII redaction and
@@ -16099,7 +16099,7 @@ scope.</Warning>
 
 | Level | What it redacts | How it runs |
 |---|---|---|
-| **Disabled** | Nothing | No scanning at all |
+| **Disabled** | None | No scanning at all |
 | **Essential** (default) | Emails, phone numbers, credit cards, IP addresses, IBANs, national IDs | Natively in the ingestion pipeline, fast, no external call |
 | **Strict** | Everything in Essential, plus person names and locations | Uses the deeper analysis service |
 
@@ -19580,7 +19580,7 @@ The **Terminal** tab replays the session the way it looked in your terminal: you
   ![Claude Code terminal replay](/images/coding-agents/terminal-replay.png)
 </Frame>
 
-A tool call the agent was denied stays in the replay, marked as denied, so a session that produced nothing still shows where it stopped.
+A tool call the agent was denied stays in the replay, marked as denied, so a session that produced no output still shows where it stopped.
 
 ## Cost per pull request
 
@@ -19614,13 +19614,13 @@ You can point it at its own history too, through the [skills directory](https://
 
 Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
 
-This path costs nothing extra and adds two things the subscription path cannot give you. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
+This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
 
 Everything above this section looks the same on either path.
 
 ## Troubleshooting
 
-**Nothing appears after 30 seconds.** Claude Code flushes on an interval, so give the first turn a moment. If it stays empty, run `npx langwatch instrument claude`, which prints the file it wrote and the workspace the telemetry goes to.
+**No session appears after 30 seconds.** Claude Code flushes on an interval, so give the first turn a moment. If it stays empty, run `npx langwatch instrument claude`, which prints the file it wrote and the workspace the telemetry goes to.
 
 **Cost shows $0 while sessions land.** The model name on the span does not match the cost catalog. Current identifiers (`claude-sonnet-4-6`, `claude-opus-4-7`, `claude-haiku-4-5`) price correctly; a legacy alias returns no cost.
 
@@ -19750,14 +19750,14 @@ Everything above is telemetry: Claude Code keeps your own plan and your own prov
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Restart Claude Code. It reads `~/.claude/settings.json` at start, so a session that was already open when you ran `langwatch instrument claude` keeps its old configuration.
 
     Then run `langwatch instrument claude` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
   </Accordion>
 
   <Accordion title="The trace has no tool call tree, no latencies and no subagents">
-    `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on, and `OTEL_TRACES_EXPORTER` does nothing without it. Cost and tokens still arrive, so the session appears, but LangWatch has no structure to attach them to and every subagent folds into the main session.
+    `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is missing. It is the flag that turns spans on, and `OTEL_TRACES_EXPORTER` has no effect without it. Cost and tokens still arrive, so the session appears, but LangWatch has no structure to attach them to and every subagent folds into the main session.
   </Accordion>
 
   <Accordion title="The trace has no prompt">
@@ -19777,7 +19777,7 @@ Everything above is telemetry: Claude Code keeps your own plan and your own prov
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -19813,7 +19813,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"
 claude
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. Claude Code appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
@@ -19885,13 +19885,13 @@ Split it across two files. The committed one decides the shape of the export:
 }
 ```
 
-Telemetry stays off until `CLAUDE_CODE_ENABLE_TELEMETRY` is set, so a fresh clone that carries only the committed file sends nothing.
+Telemetry stays off until `CLAUDE_CODE_ENABLE_TELEMETRY` is set, so a fresh clone that carries only the committed file sends no telemetry.
 
 <Warning>
   `OTEL_RESOURCE_ATTRIBUTES` is the one key that does not merge across the two files. The local file replaces the committed value outright, so carry every attribute you want in the local file or the missing ones are dropped from every span.
 </Warning>
 
-Two things catch people out. Claude Code reads the `env` block at launch, so a session that was already running keeps sending nothing until you restart it. And a `.gitignore` that covers all of `.claude/` stops `git add` from staging the committed file, so your own telemetry works while your teammates inherit none of it. A bare `!.claude/settings.json` negation does not fix that, because git does not descend into an excluded directory:
+Two things catch people out. Claude Code reads the `env` block at launch, so a session that was already running keeps sending no telemetry until you restart it. And a `.gitignore` that covers all of `.claude/` stops `git add` from staging the committed file, so your own telemetry works while your teammates inherit none of it. A bare `!.claude/settings.json` negation does not fix that, because git does not descend into an excluded directory:
 
 ```gitignore
 .claude/
@@ -20445,7 +20445,7 @@ LangWatch remembers the answer, so later runs do not ask again. Everything else 
 
 ## Set up a machine without starting Gemini CLI
 
-`langwatch instrument gemini` writes a `gemini` function into your shell start file (`~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`), which applies the LangWatch settings to that tool and to nothing else. A plain `gemini` run in a new terminal then sends its telemetry to LangWatch.
+`langwatch instrument gemini` writes a `gemini` function into your shell start file (`~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`), which applies the LangWatch settings to that tool and to no other command. A plain `gemini` run in a new terminal then sends its telemetry to LangWatch.
 
 ```bash
 langwatch instrument gemini
@@ -20504,7 +20504,7 @@ Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt 
     To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
   </Accordion>
 
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Open a new terminal. The `gemini` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
     Then run `langwatch instrument gemini` again and read what it prints. It names what it wrote and the destination the telemetry goes to.
@@ -20519,7 +20519,7 @@ Set `GEMINI_TELEMETRY_LOG_PROMPTS=false` in your own environment to keep prompt 
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -20547,7 +20547,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=gemini-cli"
 gemini
 ```
 
-The header takes an ingest key (`ik-lw-...`), which can create traces and nothing else. Keep a full project API key (`sk-lw-...`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-...`), which can create traces and no other requests. Keep a full project API key (`sk-lw-...`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 For a self-hosted instance, replace the endpoint host with the address of your instance and keep the `/api/otel` path. The exporters append the per-signal paths on their own.
 
@@ -20611,7 +20611,7 @@ For Copilot Chat inside Visual Studio Code, start the editor the same way:
 langwatch code
 ```
 
-The editor opens as usual, and every chat turn in it reports to LangWatch. Copilot Chat has no gateway option, so it asks nothing and always sends telemetry only.
+The editor opens as usual, and every chat turn in it reports to LangWatch. Copilot Chat has no gateway option, so it asks no question and always sends telemetry only.
 
 ## Set up a machine without starting the tool
 
@@ -20622,7 +20622,7 @@ langwatch instrument copilot
 langwatch instrument code
 ```
 
-Each command writes a function of the same name in your shell start file, which applies the LangWatch settings to that tool and to nothing else. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. Open a new terminal after the command, or read the start file again, so the function is in place.
+Each command writes a function of the same name in your shell start file, which applies the LangWatch settings to that tool and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. Open a new terminal after the command, or read the start file again, so the function is in place.
 
 <Note>
   The shell function needs zsh, bash or fish. On Windows, start the tool with `langwatch copilot` or `langwatch code` each time instead.
@@ -20691,17 +20691,17 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
     To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
   </Accordion>
 
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Open a new terminal. The `copilot` and `code` functions are read from the shell start file when a shell begins, so a terminal that was already open does not have them.
 
     Then check the Copilot version with `copilot --version`. Reporting needs 1.0.41 or later.
   </Accordion>
 
   <Accordion title="The traces stopped after a previous telemetry setup">
-    An earlier setup that wrote Copilot telemetry to a local file leaves `COPILOT_OTEL_EXPORTER_TYPE=file` in your environment. Copilot then writes everything to that file and sends nothing. Remove the variable from your shell start file, or set it to `otlp-http`.
+    An earlier setup that wrote Copilot telemetry to a local file leaves `COPILOT_OTEL_EXPORTER_TYPE=file` in your environment. Copilot then writes everything to that file and sends no telemetry. Remove the variable from your shell start file, or set it to `otlp-http`.
   </Accordion>
 
-  <Accordion title="Copilot Chat in Visual Studio Code reports nothing">
+  <Accordion title="Copilot Chat in Visual Studio Code sends no telemetry">
     Start the editor with `langwatch code`, or run `langwatch instrument code` and then open a new terminal before you start `code`. The extension reads the settings when the editor starts, so an editor that was already open keeps its old configuration.
   </Accordion>
 
@@ -20714,7 +20714,7 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -20741,7 +20741,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-cli"
 copilot
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 Copilot reports spans and metrics, and no separate log records, so there is no logs exporter to set. It sends over HTTP only: a `grpc` protocol value is accepted and then ignored.
 
@@ -20827,7 +20827,7 @@ For a self-hosted instance, add its address:
 langwatch instrument claude --key ik-lw-... --endpoint https://langwatch.your-company.internal
 ```
 
-An ingest key can create traces and nothing else, so a leaked key from a build log cannot read or change project data. Get one from the dashboard: the [ingestion template](/ai-governance/ingestion-templates) install drawer mints one for the tool, scoped to the project it should report to.
+An ingest key can create traces and no other requests, so a leaked key from a build log cannot read or change project data. Get one from the dashboard: the [ingestion template](/ai-governance/ingestion-templates) install drawer mints one for the tool, scoped to the project it should report to.
 
 ## CI
 
@@ -20973,7 +20973,7 @@ The agent moves the attribution itself. `langwatch ingest context`, run from ins
 
 The command finds the session itself. Codex keeps the transcript of a session open for as long as the session runs, and it starts the shell that runs the command, so the command looks up its own chain of parent processes and takes the session from the codex process it is running under. The lookup is exact: several codex sessions can work at the same time on one machine, and each one declares for itself.
 
-If the process chain cannot be read, a restrictive sandbox being the usual reason, the command falls back to reading which session wrote to its transcript most recently. That reading cannot tell two sessions apart when both are working at the same moment, so in that case it declares nothing and prints one line asking you to name the session. `--agent codex --session-id <id>` names one exactly, and always wins over both.
+If the process chain cannot be read, a restrictive sandbox being the usual reason, the command falls back to reading which session wrote to its transcript most recently. That reading cannot tell two sessions apart when both are working at the same moment, so in that case it declares no session and prints one line asking you to name the session. `--agent codex --session-id <id>` names one exactly, and always wins over both.
 
 Codex's default sandbox blocks both the reading of the process chain and network access, so under it the command falls back to the transcript reading and cannot send the record itself. It queues the declaration instead and says so in one line. The next turn delivers it: Codex runs the LangWatch session report from its own process, outside the sandbox, so the report goes out even when the agent's shell has no network. A queued declaration is sent after the report's own directory, which makes the declared checkout the session's current one. It is dropped unsent if it waits more than an hour, because the agent has by then usually switched to other work.
 
@@ -20995,7 +20995,7 @@ Everything above is telemetry: Codex keeps your own plan and your own login. Cho
 
 Content reaches LangWatch on one path only, and you can turn that path off. Codex's own OpenTelemetry export carries no conversation content; the `notify` program LangWatch installs does send it. Read both parts below before you decide.
 
-The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. Neither signal includes the prompt text, the tool output or the answer, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and nothing that was said.
+The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. Neither signal includes the prompt text, the tool output or the answer, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and no record of what was said.
 
 Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under. `langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said. It also reports the repository and branch the session worked in, read from the same transcript, which is what connects the session to its pull request. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
 
@@ -21014,7 +21014,7 @@ To collect the usage numbers and no content, remove the `notify` setting from `~
     To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
   </Accordion>
 
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Run `langwatch instrument codex` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
 
     Then check that `~/.codex/config.toml` holds a `[otel]` block between the two LangWatch marker lines.
@@ -21039,7 +21039,7 @@ To collect the usage numbers and no content, remove the `notify` setting from `~
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization = "Bearer <key>"`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization = "Bearer <key>"`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -21068,7 +21068,7 @@ protocol = "json"
 headers = { "Authorization" = "Bearer ik-lw-your-ingest-key" }
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 Then set the file to owner-only permissions, because it holds a key:
 
@@ -21145,8 +21145,8 @@ langwatch instrument opencode
 
 The command writes two things:
 
-- An `opencode` function in your shell start file, which applies the LangWatch settings to `opencode` runs and to nothing else. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
-- The `experimental.openTelemetry` flag in `~/.config/opencode/opencode.jsonc`. opencode reports nothing without it.
+- An `opencode` function in your shell start file, which applies the LangWatch settings to `opencode` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
+- The `experimental.openTelemetry` flag in `~/.config/opencode/opencode.jsonc`. opencode sends no telemetry without it.
 
 Open a new terminal after the command, or read the start file again, so the function is in place.
 
@@ -21205,10 +21205,10 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
     To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
   </Accordion>
 
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Open a new terminal. The `opencode` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
 
-    Then check that `experimental.openTelemetry` is `true` in `~/.config/opencode/opencode.jsonc`. opencode accepts the LangWatch settings and reports nothing while that flag is off.
+    Then check that `experimental.openTelemetry` is `true` in `~/.config/opencode/opencode.jsonc`. opencode accepts the LangWatch settings and sends no telemetry while that flag is off.
   </Accordion>
 
   <Accordion title="The command reports that it could not write the shell start file">
@@ -21224,7 +21224,7 @@ Everything above is telemetry: opencode keeps your own provider logins. The wrap
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -21260,7 +21260,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"
 opencode
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. opencode appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
 
@@ -21430,7 +21430,7 @@ By default, your sessions land in your **personal project**: one project, one ow
 
 ## What a teammate can see
 
-Nothing from your personal project. Teammates see your sessions only in a team project the tool was deliberately pinned to, under that project's access rules.
+None of your personal project is shared. Teammates see your sessions only in a team project the tool was deliberately pinned to, under that project's access rules.
 
 ## What an administrator can see
 
@@ -21652,7 +21652,7 @@ LangWatch reads pull request status (open, merged, closed) live from GitHub when
 ## Limits, exactly
 
 - **A session keeps the first repository it reported.** Later declarations for other branches of the same repository attribute in full, and the session's pull requests reflect every branch it declared. A declaration for a different repository does not move the session's row off the first repository.
-- **Work outside any checkout attaches to nothing.** For example, a session reviewing with `gh` commands from a home directory reports no repository, so its cost appears in [usage](/coding-agents/usage-analytics) but on no pull request.
+- **Work outside any checkout attaches to no repository.** For example, a session reviewing with `gh` commands from a home directory reports no repository, so its cost appears in [usage](/coding-agents/usage-analytics) but on no pull request.
 - **One declaration cannot be split.** A single turn that touches two repositories attributes to the one the agent declared last.
 
 ## Verify it
@@ -21664,7 +21664,7 @@ langwatch ingest context
 # Declared github.com/acme/shop@feat/checkout for claude_code session 6f2e...
 ```
 
-The command prints one line saying what it declared, or why it declared nothing. It never interrupts the session.
+The command prints one line saying what it declared, or why it declared no attribution. It never interrupts the session.
 
 **Also check:** [Pull request cost](/coding-agents/pull-requests) for what the join buys you, and each agent's setup page for agent-specific mechanics, for example [Codex in a sandbox](/coding-agents/openai-codex).
 
@@ -21686,7 +21686,7 @@ keywords:
 
 Coding-agent traces carry live credentials: a key pasted into a prompt, an `.env` file a tool read, a connection string in a stack trace. Redaction runs in the ingestion pipeline, before storage, and replaces each credential it recognizes with a `[SECRET]` marker. The text around the marker stays intact, and detection uses three layers, from exact vendor rules to context.
 
-There is nothing to set up. A [data privacy rule](/ai-governance/data-privacy#secrets-redaction) can turn redaction off for its scope.
+It is on by default. A [data privacy rule](/ai-governance/data-privacy#secrets-redaction) can turn redaction off for its scope.
 
 ## How detection works
 
@@ -36226,13 +36226,13 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 
 The URL and the header values render the same variables.
 
-For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs nothing else.
+For the response, set `outputPath` to where the reply text lives. If the endpoint answers `{"reply": "It ships on Tuesday."}`, set `outputPath` to `$.reply`. The platform reads the reply text at that path; the response needs no other fields.
 
 ## 4. Adopt the trace context
 
 The platform sends a W3C `traceparent` header on every call, one trace per conversation turn. When your server adopts it, the spans your agent produces land in that same trace, and the judge reads them before its verdict: tool calls, database writes, retrievals. A criterion like "the agent looked up the order before answering" then passes on evidence instead of on the reply's wording.
 
-With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you change nothing. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
+With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens and you keep the code unchanged. Without it, attach the extracted context in a middleware that runs before any tracing starts. Do not extract inside the handler body: a handler decorated with `@langwatch.trace()` opens its root span before the body runs, so an extraction there comes too late and the agent's spans land in a separate trace. The middleware placement covers every tracing style: decorators, `with langwatch.trace()`, autotrack, community instrumentations, and plain OpenTelemetry spans.
 
 
   ### Python

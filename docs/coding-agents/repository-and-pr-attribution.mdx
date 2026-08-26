@@ -41,7 +41,7 @@ LangWatch reads pull request status (open, merged, closed) live from GitHub when
 ## Limits, exactly
 
 - **A session keeps the first repository it reported.** Later declarations for other branches of the same repository attribute in full, and the session's pull requests reflect every branch it declared. A declaration for a different repository does not move the session's row off the first repository.
-- **Work outside any checkout attaches to nothing.** For example, a session reviewing with `gh` commands from a home directory reports no repository, so its cost appears in [usage](/coding-agents/usage-analytics) but on no pull request.
+- **Work outside any checkout attaches to no repository.** For example, a session reviewing with `gh` commands from a home directory reports no repository, so its cost appears in [usage](/coding-agents/usage-analytics) but on no pull request.
 - **One declaration cannot be split.** A single turn that touches two repositories attributes to the one the agent declared last.
 
 ## Verify it
@@ -53,6 +53,6 @@ langwatch ingest context
 # Declared github.com/acme/shop@feat/checkout for claude_code session 6f2e...
 ```
 
-The command prints one line saying what it declared, or why it declared nothing. It never interrupts the session.
+The command prints one line saying what it declared, or why it declared no attribution. It never interrupts the session.
 
 **Also check:** [Pull request cost](/coding-agents/pull-requests) for what the join buys you, and each agent's setup page for agent-specific mechanics, for example [Codex in a sandbox](/coding-agents/openai-codex).

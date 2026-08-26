@@ -54,7 +54,7 @@ For Copilot Chat inside Visual Studio Code, start the editor the same way:
 langwatch code
 ```
 
-The editor opens as usual, and every chat turn in it reports to LangWatch. Copilot Chat has no gateway option, so it asks nothing and always sends telemetry only.
+The editor opens as usual, and every chat turn in it reports to LangWatch. Copilot Chat has no gateway option, so it asks no question and always sends telemetry only.
 
 ## Set up a machine without starting the tool
 
@@ -65,7 +65,7 @@ langwatch instrument copilot
 langwatch instrument code
 ```
 
-Each command writes a function of the same name in your shell start file, which applies the LangWatch settings to that tool and to nothing else. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. Open a new terminal after the command, or read the start file again, so the function is in place.
+Each command writes a function of the same name in your shell start file, which applies the LangWatch settings to that tool and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`. Open a new terminal after the command, or read the start file again, so the function is in place.
 
 <Note>
   The shell function needs zsh, bash or fish. On Windows, start the tool with `langwatch copilot` or `langwatch code` each time instead.
@@ -134,17 +134,17 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
     To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
   </Accordion>
 
-  <Accordion title="Nothing arrives in LangWatch">
+  <Accordion title="No telemetry arrives in LangWatch">
     Open a new terminal. The `copilot` and `code` functions are read from the shell start file when a shell begins, so a terminal that was already open does not have them.
 
     Then check the Copilot version with `copilot --version`. Reporting needs 1.0.41 or later.
   </Accordion>
 
   <Accordion title="The traces stopped after a previous telemetry setup">
-    An earlier setup that wrote Copilot telemetry to a local file leaves `COPILOT_OTEL_EXPORTER_TYPE=file` in your environment. Copilot then writes everything to that file and sends nothing. Remove the variable from your shell start file, or set it to `otlp-http`.
+    An earlier setup that wrote Copilot telemetry to a local file leaves `COPILOT_OTEL_EXPORTER_TYPE=file` in your environment. Copilot then writes everything to that file and sends no telemetry. Remove the variable from your shell start file, or set it to `otlp-http`.
   </Accordion>
 
-  <Accordion title="Copilot Chat in Visual Studio Code reports nothing">
+  <Accordion title="Copilot Chat in Visual Studio Code sends no telemetry">
     Start the editor with `langwatch code`, or run `langwatch instrument code` and then open a new terminal before you start `code`. The extension reads the settings when the editor starts, so an editor that was already open keeps its old configuration.
   </Accordion>
 
@@ -157,7 +157,7 @@ Set `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` in your own envir
   </Accordion>
 
   <Accordion title="Authentication errors">
-    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and nothing else, so a key that works for ingestion still fails on other endpoints.
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
 
     On a machine with a login, run `langwatch login --device` again to refresh the session.
   </Accordion>
@@ -184,7 +184,7 @@ export OTEL_RESOURCE_ATTRIBUTES="service.name=copilot-cli"
 copilot
 ```
 
-The header takes an ingest key (`ik-lw-…`), which can create traces and nothing else. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
 
 Copilot reports spans and metrics, and no separate log records, so there is no logs exporter to set. It sends over HTTP only: a `grpc` protocol value is accepted and then ignored.
 
