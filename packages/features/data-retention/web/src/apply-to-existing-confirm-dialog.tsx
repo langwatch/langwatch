@@ -1,6 +1,6 @@
 import { Alert, Button, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "~/components/ui/dialog";
-import { INDEFINITE_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import { INDEFINITE_RETENTION_DAYS } from "@langwatch/data-retention-contract";
+import { Dialog } from "@langwatch/design-system/dialog";
 
 export function ApplyToExistingConfirmDialog({
   pending,

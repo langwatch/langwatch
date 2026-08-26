@@ -12,26 +12,26 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import {
   AddOverrideDrawer,
-  type RetentionEditTarget,
-} from "~/components/data-retention/AddOverrideDrawer";
-import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
-import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "~/components/data-retention/constants";
-import { formatDays } from "~/components/data-retention/format";
-import {
+  ApplyToExistingConfirmDialog,
+  BINDING_SCOPE_TIERS,
+  formatDays,
   groupRulesByScope,
+  RemoveScopeConfirmDialog,
+  RetentionAndUsageCard,
+  type RetentionEditTarget,
   type RetentionScopeGroup,
+  RetroactiveProgressCard,
   renderPolicyValue,
-} from "~/components/data-retention/grouping";
-import { RemoveScopeConfirmDialog } from "~/components/data-retention/RemoveScopeConfirmDialog";
-import { RetentionAndUsageCard } from "~/components/data-retention/RetentionAndUsageCard";
-import { RetroactiveProgressCard } from "~/components/data-retention/RetroactiveProgressCard";
-import SettingsLayout from "~/components/SettingsLayout";
-import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+  SCOPE_ICON,
+} from "@langwatch/data-retention-web";
 import { Menu } from "@langwatch/design-system/menu";
+import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import SettingsLayout from "~/components/SettingsLayout";
+import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
+import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { showErrorToast } from "~/features/errors";
@@ -153,6 +153,19 @@ function DataRetentionPage({
   // The scope-group pending removal — drives the confirm dialog so deletion is
   // a deliberate, explained action instead of a one-click trash button.
   const [removeTarget, setRemoveTarget] = useState<RetentionScopeGroup | null>(null);
+
+  // Fallback preview for the remove-confirm dialog: owned here (transport is
+  // an app concern) and passed down as controlled data so the dialog itself
+  // stays presentation-only.
+  const removePreviewQuery = api.dataRetention.previewScopeRemoval.useQuery(
+    {
+      projectId,
+      scope: removeTarget
+        ? { scopeType: removeTarget.scopeType, scopeId: removeTarget.scopeId }
+        : { scopeType: "PROJECT", scopeId: "" },
+    },
+    { enabled: !!removeTarget },
+  );
 
   const invalidate = () => utils.dataRetention.getRules.invalidate({ projectId });
 
@@ -474,12 +487,26 @@ function DataRetentionPage({
             onClose={closeDrawer}
             editTarget={editTarget}
             available={available}
-            currentOrganizationId={organizationId}
-            currentTeamId={teamId}
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isEnterprise={isEnterprise}
             isSaving={setForScope.isPending || triggerUpdate.isPending}
+            scopePicker={({ value, onChange }) => (
+              <ScopeChipPicker
+                value={value}
+                onChange={onChange}
+                organizationId={available.organization?.id}
+                organizationName={available.organization?.name}
+                availableTeams={available.teams}
+                availableProjects={available.projects}
+                label=""
+                currentOrganizationId={
+                  available.organization ? organizationId : undefined
+                }
+                currentTeamId={teamId}
+                currentProjectId={projectId}
+              />
+            )}
             onSave={async ({ scopes, retentionDays, applyToExisting }) => {
               const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
               const saveOverrides = async () => {
@@ -638,8 +665,12 @@ function DataRetentionPage({
 
         <RemoveScopeConfirmDialog
           group={removeTarget}
-          projectId={projectId}
           isRemoving={removeForScope.isPending}
+          preview={{
+            data: removePreviewQuery.data,
+            isLoading: removePreviewQuery.isLoading,
+            isError: removePreviewQuery.isError,
+          }}
           onCancel={() => setRemoveTarget(null)}
           onConfirm={async () => {
             if (!removeTarget) return;

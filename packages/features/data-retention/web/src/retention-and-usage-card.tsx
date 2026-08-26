@@ -1,8 +1,8 @@
 import { Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
-  RETENTION_CATEGORIES,
+  retentionCategories,
   type RetentionCategory,
-} from "~/server/data-retention/retentionPolicy.schema";
+} from "@langwatch/data-retention-contract";
 import { CATEGORY_LABELS } from "./constants";
 import { formatBytes, formatDays } from "./format";
 import { renderPolicySummary } from "./grouping";
@@ -43,7 +43,7 @@ export function RetentionAndUsageCard({
         <VStack gap={5} align="stretch">
           {summary === "Mixed" && (
             <VStack gap={2} align="stretch">
-              {RETENTION_CATEGORIES.map((category) => (
+              {retentionCategories.map((category) => (
                 <HStack key={category} justifyContent="space-between">
                   <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
                   <Text>

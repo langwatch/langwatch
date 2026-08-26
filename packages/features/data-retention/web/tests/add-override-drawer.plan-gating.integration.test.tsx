@@ -5,22 +5,15 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("~/components/settings/ScopeChipPicker", () => ({
-  ScopeChipPicker: () => <div data-testid="scope-chip-picker" />,
-}));
-
-import { AddOverrideDrawer, type RetentionEditTarget } from "../AddOverrideDrawer";
+import { AddOverrideDrawer, type RetentionEditTarget } from "../src/add-override-drawer";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const available = {
-  organization: { id: "org-1", name: "Acme" },
-  teams: [],
-  projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
-};
+const available = { projects: [{ id: "proj-1" }] };
+
+const scopePicker = () => <div data-testid="scope-chip-picker" />;
 
 function renderDrawer(props: Partial<React.ComponentProps<typeof AddOverrideDrawer>>) {
   return render(
@@ -29,13 +22,12 @@ function renderDrawer(props: Partial<React.ComponentProps<typeof AddOverrideDraw
         open
         onClose={() => {}}
         available={available}
-        currentOrganizationId="org-1"
-        currentTeamId={undefined}
         currentProjectId="proj-1"
         isPlatformAdmin={false}
         isEnterprise={false}
         isSaving={false}
         onSave={() => {}}
+        scopePicker={scopePicker}
         {...props}
       />
     </Wrapper>,

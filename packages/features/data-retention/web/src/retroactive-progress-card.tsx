@@ -1,13 +1,23 @@
 import { Button, Card, Heading, HStack, Progress, Text, VStack } from "@chakra-ui/react";
-import type { MutationProgress } from "~/server/data-retention/retroactive/retroactiveUpdate.service";
+import type { RetentionCategory } from "@langwatch/data-retention-contract";
 import { CATEGORY_LABELS } from "./constants";
+
+/** The fields the progress card reads off a ClickHouse mutation. The
+ *  canonical shape lives server-side (`MutationProgress`); this is the
+ *  narrow, browser-safe slice this presentation actually needs. */
+export type RetentionMutationProgress = {
+  mutationId: string;
+  table: string;
+  category: RetentionCategory | null;
+  partsToDo: number;
+};
 
 export function RetroactiveProgressCard({
   mutations,
   onCancel,
   isCancelling,
 }: {
-  mutations: MutationProgress[];
+  mutations: RetentionMutationProgress[];
   onCancel: (mutationId: string) => void;
   isCancelling: boolean;
 }) {

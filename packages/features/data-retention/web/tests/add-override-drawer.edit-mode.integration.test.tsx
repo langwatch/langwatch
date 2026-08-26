@@ -4,31 +4,25 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-// ScopeChipPicker pulls in data hooks we don't need here; the edit path renders
-// a read-only scope readout instead, so stub the picker to a marker.
-vi.mock("~/components/settings/ScopeChipPicker", () => ({
-  ScopeChipPicker: () => <div data-testid="scope-chip-picker" />,
-}));
-
-import { AddOverrideDrawer, type RetentionEditTarget } from "../AddOverrideDrawer";
+import { afterEach, describe, expect, it } from "vitest";
+import { AddOverrideDrawer, type RetentionEditTarget } from "../src/add-override-drawer";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const available = {
-  organization: { id: "org-1", name: "Acme" },
-  teams: [],
-  projects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
-};
+const available = { projects: [{ id: "proj-1" }] };
 
 const editTarget: RetentionEditTarget = {
   scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
   scopeName: "Acme",
   retentionDays: 91,
 };
+
+// The Add-mode path renders whatever the caller's render port returns; a
+// marker div is enough to prove the drawer defers scope selection to it
+// instead of rendering its own picker.
+const scopePicker = () => <div data-testid="scope-chip-picker" />;
 
 function renderDrawer(
   props: Partial<React.ComponentProps<typeof AddOverrideDrawer>> = {},
@@ -39,13 +33,12 @@ function renderDrawer(
         open
         onClose={() => {}}
         available={available}
-        currentOrganizationId="org-1"
-        currentTeamId={undefined}
         currentProjectId="proj-1"
         isPlatformAdmin={false}
         isEnterprise={true}
         isSaving={false}
         onSave={() => {}}
+        scopePicker={scopePicker}
         {...props}
       />
     </Wrapper>,

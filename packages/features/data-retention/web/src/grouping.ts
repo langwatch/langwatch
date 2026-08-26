@@ -1,13 +1,13 @@
-import type { ScopeTriadType } from "~/components/settings/ScopeChipPicker";
 import {
-  RETENTION_CATEGORIES,
+  retentionCategories,
   type RetentionCategory,
-} from "~/server/data-retention/retentionPolicy.schema";
+  type RetentionScopeType,
+} from "@langwatch/data-retention-contract";
 import { CATEGORY_LABELS } from "./constants";
 import { formatDays } from "./format";
 
 export type RetentionRuleRow = {
-  scopeType: ScopeTriadType;
+  scopeType: RetentionScopeType;
   scopeId: string;
   name: string;
   category: RetentionCategory;
@@ -15,7 +15,7 @@ export type RetentionRuleRow = {
 };
 
 export type RetentionScopeGroup = {
-  scopeType: ScopeTriadType;
+  scopeType: RetentionScopeType;
   scopeId: string;
   name: string;
   byCategory: Partial<Record<RetentionCategory, number>>;
@@ -56,11 +56,11 @@ export function groupRulesByScope(rules: RetentionRuleRow[]): RetentionScopeGrou
 export function renderPolicyValue(
   byCategory: Partial<Record<RetentionCategory, number>>,
 ): string {
-  const present = RETENTION_CATEGORIES.filter((c) => byCategory[c] !== undefined);
+  const present = retentionCategories.filter((c) => byCategory[c] !== undefined);
   if (present.length === 0) return "—";
   const values = present.map((c) => byCategory[c]!);
   const allSame = values.every((v) => v === values[0]);
-  if (allSame && present.length === RETENTION_CATEGORIES.length) {
+  if (allSame && present.length === retentionCategories.length) {
     return formatDays(values[0]!);
   }
   return present
@@ -75,11 +75,11 @@ export function renderPolicyValue(
 export function renderPolicySummary(
   byCategory: Partial<Record<RetentionCategory, number>>,
 ): string {
-  const present = RETENTION_CATEGORIES.filter((c) => byCategory[c] !== undefined);
+  const present = retentionCategories.filter((c) => byCategory[c] !== undefined);
   if (present.length === 0) return "—";
   const values = present.map((c) => byCategory[c]!);
   const allSame = values.every((v) => v === values[0]);
-  if (allSame && present.length === RETENTION_CATEGORIES.length) {
+  if (allSame && present.length === retentionCategories.length) {
     return formatDays(values[0]!);
   }
   return "Mixed";
