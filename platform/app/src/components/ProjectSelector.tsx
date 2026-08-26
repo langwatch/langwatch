@@ -22,13 +22,7 @@ interface ProjectGroup {
   projects: Project[];
 }
 
-const sortByName = ({
-  a,
-  b,
-}: {
-  a: { name: string };
-  b: { name: string };
-}) => {
+const sortByName = ({ a, b }: { a: { name: string }; b: { name: string } }) => {
   const first = a.name.toLowerCase();
   const second = b.name.toLowerCase();
   if (first < second) return -1;
