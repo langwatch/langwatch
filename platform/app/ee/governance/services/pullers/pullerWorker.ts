@@ -27,6 +27,7 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import {
   captureException,
   toError,
@@ -506,7 +507,12 @@ async function pulledUsageCostEnabled(
 ): Promise<boolean> {
   return await featureFlagService.isEnabled(
     "release_pulled_usage_cost_enabled",
-    { distinctId: organizationId, organizationId },
+    {
+      distinctId: organizationId,
+      // Pulled usage is priced for a whole organization.
+      projectId: NOT_TARGETED,
+      organizationId,
+    },
   );
 }
 

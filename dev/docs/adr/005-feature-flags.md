@@ -63,7 +63,7 @@ PostHog is **never** called on the SYSTEM path. PRODUCT keeps PostHog as the sou
 ### Adding a new flag
 
 1. Add a `FEATURE_FLAGS` entry with `scope: "SYSTEM" | "PRODUCT"`, `defaultValue`, `description`. For SYSTEM flags migrated from an existing env variable, set `legacyEnvVar` so the old name keeps working.
-2. Call `featureFlagService.isEnabled("your_new_flag_key", { distinctId, defaultValue?, projectId?, organizationId?, cacheTtlMs? })`. The key is type-checked against `FeatureFlagKey` via the shared `FeatureFlagServiceInterface`, so unregistered keys fail at compile time even when the service is dependency-injected.
+2. Call `featureFlagService.isEnabled("your_new_flag_key", { distinctId, projectId, organizationId, defaultValue?, cacheTtlMs? })`. The key is type-checked against `FeatureFlagKey` via the shared `FeatureFlagServiceInterface`, so unregistered keys fail at compile time even when the service is dependency-injected. `projectId` and `organizationId` are required: a rule that names a scope the read left out can never match, so an omitted field would turn a rollout into a silent no-op. A caller with no such scope passes `NOT_TARGETED` (`src/server/featureFlag/targeting.ts`).
 3. Flip from `/ops/feature-flags` at runtime without a redeploy. For PRODUCT flags, prefer flipping in PostHog directly so user targeting rules apply.
 
 ### Adding a new family
@@ -102,20 +102,33 @@ FeatureFlagService                                 env override
                     fallback to FeatureFlagStorePostgres on PostHog error
 ```
 
-## Targeting via personProperties
+## Targeting
 
-PRODUCT flags target users / projects / orgs through PostHog `personProperties`:
+Rules on a flag row name a project or an organization. The read states both, so a rule written for either one can match:
 
 ```typescript
 await featureFlagService.isEnabled("release_ui_simulations_menu_enabled", {
   distinctId: userId,
-  defaultValue: false,
   projectId: "proj_123",
   organizationId: "org_456",
+  defaultValue: false,
 });
 ```
 
-PostHog receives these as `personProperties.project_id` and `personProperties.organization_id` for release condition evaluation. SYSTEM flags ignore `projectId` / `organizationId` since they're cluster-wide.
+Both fields are required. A surface that has no such scope states the opt-out instead, and no rule naming that scope can match it:
+
+```typescript
+await featureFlagService.isEnabled("release_ui_ai_governance_enabled", {
+  distinctId: userId,
+  projectId: NOT_TARGETED, // an organization page holds no project
+  organizationId: "org_456",
+  defaultValue: false,
+});
+```
+
+The same rule holds on the client: `useFeatureFlag(flag, { projectId, organizationId, enabled? })` requires both ids. `undefined` is legal for an id that is still loading, and pairs with `enabled: false`. The tRPC input carries both fields as required and uses `null` for "no such scope", because JSON has no `undefined`.
+
+The server never derives one id from the other. A read that wants the organization of a project resolves it at the call site (`resolveOrganizationId`), so the context stays explicit.
 
 ## Environment Overrides
 

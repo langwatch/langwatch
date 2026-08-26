@@ -154,6 +154,51 @@ Feature: Internal feature flag system for system-level kill switches
       Then the flag resolves disabled from the row-level enabled value
       And PostHog is not consulted because the postgres row was present
 
+  Rule: A flag read states the project and the organization it is about
+
+    # A rule that names an organization can only match a read that carries
+    # that organization. A read that leaves the id out loses every rule
+    # written for it and falls through to the row-level default, which is how
+    # an organization rollout reached nobody in a customer report. The type of
+    # a flag read therefore holds both ids, and a caller with no such id says
+    # so instead of leaving the field out.
+
+    @unit
+    Scenario: a read that omits an id does not compile
+      Given a caller reads a feature flag
+      When the caller writes neither the project nor the organization
+      Then the code does not compile, because both fields are required
+
+    @unit
+    Scenario: a caller with no project of its own opts that scope out by name
+      Given a surface that exists outside any project, such as a screen shown
+            before a project is chosen
+      When it reads a flag
+      Then it states the opt-out value for the project
+      And the value it states is the one the flag module exports for this
+          purpose, so the choice is readable at the call site
+
+    @unit
+    Scenario: an opted-out scope matches no rule that names that scope
+      Given a flag with one rule that names a project
+      When the flag is read with the project scope opted out
+      Then the rule does not match
+      And the read falls through to the row-level default
+
+    @unit
+    Scenario: an id that is not known yet is written out, not left out
+      Given a caller whose organization is still loading
+      When it reads a flag
+      Then it writes the organization as not known yet
+      And it disables the read until the organization arrives, so the read
+          never resolves against an empty context by accident
+
+    @unit
+    Scenario: a read that carries the organization matches an organization rule
+      Given a flag that is off by default with one rule naming an organization
+      When the flag is read with that organization and with a project
+      Then the flag resolves enabled from the rule
+
   Rule: Every registered flag resolves from our own store, whatever its scope
 
     Scenario: a SYSTEM flag takes per-organization targeting like any other

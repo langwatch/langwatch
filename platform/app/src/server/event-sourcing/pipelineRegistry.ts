@@ -1223,6 +1223,9 @@ export class PipelineRegistry {
           {
             distinctId: "evaluator-settings-recovery",
             defaultValue: false,
+            // A pipeline-wide switch, flipped for the fleet and not per tenant.
+            projectId: NOT_TARGETED,
+            organizationId: NOT_TARGETED,
           },
         ),
       // ADR-040: offload oversized evaluator inputs to durable object storage
@@ -1243,7 +1246,13 @@ export class PipelineRegistry {
           try {
             disabled = await featureFlagService.isEnabled(
               "ops_evaluation_payload_offload_disabled",
-              { distinctId: "evaluation-inputs-offload", defaultValue: false },
+              {
+                distinctId: "evaluation-inputs-offload",
+                defaultValue: false,
+                // A pipeline-wide switch, flipped for the fleet.
+                projectId: NOT_TARGETED,
+                organizationId: NOT_TARGETED,
+              },
             );
           } catch {
             // Unreadable kill switch: stay on the default (offload enabled).
@@ -1807,6 +1816,7 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // Introspection — derived from the live EventSourcing runtime
 // ============================================================================
 
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { getApp } from "../app-layer/app";
 // StaticPipelineDefinition is already imported at the top of the file.
 

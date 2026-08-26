@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { absorbContextTarget } from "~/features/langy/stores/langyContextTargetStore";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TargetConfig } from "../types";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
@@ -25,7 +26,15 @@ type OptimizeHandler = ({
 }) => void;
 
 export const useOptimizeWithLangy = (): OptimizeHandler | undefined => {
-  const uiActionsEnabled = useFeatureFlag("release_langy_ui_actions");
+  const { project, organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const uiActionsEnabled = useFeatureFlag("release_langy_ui_actions", {
+    projectId: project?.id,
+    organizationId: organization?.id,
+    enabled: !!project?.id,
+  });
 
   const optimize = useCallback<OptimizeHandler>(({ target, name }) => {
     const slug = useEvaluationsV3Store.getState().experimentSlug;
