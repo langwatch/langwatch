@@ -8,6 +8,11 @@ import {
 } from "@chakra-ui/react";
 import type { SsoArrivalPolicy } from "@langwatch/identity";
 import { useState } from "react";
+import {
+  ARRIVAL_ANSWERS,
+  ARRIVAL_COPY,
+  type ArrivalAnswer,
+} from "~/features/sso/logic/arrivals";
 import { api } from "~/utils/api";
 import { InlineRefusal } from "./refusals";
 
@@ -30,28 +35,44 @@ import { InlineRefusal } from "./refusals";
  * here already means "anybody on a domain you proved and configured a provider
  * for" — never "anybody at all". Saying so is the difference between an
  * administrator choosing it and an administrator worrying about it.
+ *
+ * ONE QUESTION, TWO DOORS, ONE VOCABULARY. The overview's join policy asks
+ * the same three answers of the arrivals single sign-on does not catch, so
+ * the options wear the same words in both places — a reader who has answered
+ * one should recognise the other. What differs is the door, and each control
+ * says which one it is and where the other lives.
  */
-const OPTIONS: Array<{
-  value: SsoArrivalPolicy;
-  label: string;
-  help: string;
-}> = [
-  {
-    value: "admit",
-    label: "They join, on a domain you proved",
-    help: "The usual answer. Only addresses on a domain this connection proved ever reach it.",
-  },
-  {
-    value: "request",
-    label: "They wait for you",
-    help: "They keep the account they just signed in with, and you answer the request in your Directory.",
-  },
-  {
-    value: "refuse",
-    label: "Only people already here",
-    help: "Anybody else is turned away. Invitations still work.",
-  },
-];
+/**
+ * This setting's own enum, against the shared answers.
+ *
+ * The mapping is here rather than in the shared module because neither door
+ * should be typed in terms of the other: `admit` and `auto` are the same
+ * answer to the same question and they are still two different settings, and
+ * a shared module that knew both enums would be the place they eventually
+ * get confused.
+ */
+const POLICY_BY_ANSWER: Record<ArrivalAnswer, SsoArrivalPolicy> = {
+  closed: "refuse",
+  approve: "request",
+  open: "admit",
+};
+
+const ANSWER_BY_POLICY: Record<SsoArrivalPolicy, ArrivalAnswer> = {
+  refuse: "closed",
+  request: "approve",
+  admit: "open",
+};
+
+/**
+ * The answer this door recommends, said as a mark rather than by position.
+ *
+ * It used to be the words "The usual answer" on the first option, which made
+ * the ORDER carry the endorsement — and the other door, which orders the same
+ * three answers the same way but recommends none of them, inherited an
+ * emphasis nobody chose. Recommending it out loud lets both doors share one
+ * order without sharing one opinion.
+ */
+const RECOMMENDED: ArrivalAnswer = "open";
 
 export function ArrivalsSection({
   organizationId,
@@ -72,7 +93,6 @@ export function ArrivalsSection({
     },
   });
 
-  const chosen = OPTIONS.find((option) => option.value === selected);
   const unchanged = selected === policy;
 
   return (
@@ -91,28 +111,41 @@ export function ArrivalsSection({
         }
       >
         <VStack align="stretch" gap={3}>
-          {OPTIONS.map((option) => (
-            <RadioGroup.Item
-              key={option.value}
-              value={option.value}
-              disabled={!canManage || save.isPending}
-            >
-              <RadioGroup.ItemHiddenInput
-                data-testid={`arrivals-${option.value}`}
-              />
-              <RadioGroup.ItemIndicator />
-              <RadioGroup.ItemText>
-                <VStack align="start" gap={0}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    {option.label}
-                  </Text>
-                  <Text color="fg.muted" fontSize="xs">
-                    {option.help}
-                  </Text>
-                </VStack>
-              </RadioGroup.ItemText>
-            </RadioGroup.Item>
-          ))}
+          {ARRIVAL_ANSWERS.map((answer) => {
+            const value = POLICY_BY_ANSWER[answer];
+            const copy = ARRIVAL_COPY[answer];
+            return (
+              <RadioGroup.Item
+                key={value}
+                value={value}
+                disabled={!canManage || save.isPending}
+              >
+                <RadioGroup.ItemHiddenInput data-testid={`arrivals-${value}`} />
+                <RadioGroup.ItemIndicator />
+                <RadioGroup.ItemText>
+                  <VStack align="start" gap={0}>
+                    <HStack gap={2}>
+                      <Text fontSize="sm" fontWeight="medium">
+                        {copy.label}
+                      </Text>
+                      {answer === RECOMMENDED && (
+                        <Text
+                          color="fg.subtle"
+                          fontSize="xs"
+                          data-testid="arrivals-recommended"
+                        >
+                          Usually this one
+                        </Text>
+                      )}
+                    </HStack>
+                    <Text color="fg.muted" fontSize="xs">
+                      {copy.help}
+                    </Text>
+                  </VStack>
+                </RadioGroup.ItemText>
+              </RadioGroup.Item>
+            );
+          })}
         </VStack>
       </RadioGroup.Root>
 
@@ -120,7 +153,7 @@ export function ArrivalsSection({
           what it rests on, where it is being chosen. A reader deciding this
           is deciding how much they trust their own domain proof, and the
           proof is the thing that makes the answer safe. */}
-      {chosen?.value === "admit" && (
+      {selected === "admit" && (
         <Box
           borderLeftWidth="2px"
           borderColor="border.emphasized"
@@ -128,11 +161,21 @@ export function ArrivalsSection({
         >
           <Text color="fg.muted" fontSize="xs" lineHeight="1.6">
             Nobody approves each person, and nobody has to: the only addresses
-            that reach this connection are the ones on a domain you proved in
+            that reach this connection are the ones on a domain you verified in
             step 2. A domain whose proof lapses stops vouching for anybody new.
           </Text>
         </Box>
       )}
+
+      {/* WHICH DOOR THIS IS, and no pointer at the other one. It used to send
+          the reader to the Authentication overview for the join policy, which
+          is an exit ramp in the middle of a six-step journey — and the
+          overview was sending them back here, so the two made a loop. The
+          overview can see both doors and is where the pair gets explained;
+          this step, which can see one, names only the one it is. */}
+      <Text color="fg.subtle" fontSize="xs">
+        This answers people who sign in through your identity provider.
+      </Text>
 
       {canManage && !unchanged && (
         <HStack>
