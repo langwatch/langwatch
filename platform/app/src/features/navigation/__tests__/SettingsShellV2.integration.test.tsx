@@ -128,7 +128,11 @@ vi.mock("~/components/LoadingScreen", () => ({
 
 // Legacy mode renders through DashboardLayout, which mounts the nudge. This
 // suite asserts on settings navigation, not on the nudge's own contract.
-vi.mock("~/components/me/PasskeyNudge", () => ({ PasskeyNudge: () => null }));
+// The passkey nudge became the secure-account nudge, which offers a second
+// step as well and routes on its own.
+vi.mock("~/components/me/SecureAccountNudge", () => ({
+  SecureAccountNudge: () => null,
+}));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   usePublicEnv: () => ({

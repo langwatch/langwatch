@@ -151,8 +151,21 @@ describe("given the auth screens in either colour mode", () => {
       const styles = sourceOf("auth.css");
 
       expect(styles).toContain("@media (color-gamut: p3)");
-      expect(styles).toContain("--chakra-colors-auth-action:");
+      expect(styles).toContain("--chakra-colors-auth-ink:");
       expect(styles).toContain("color(display-p3");
+    });
+
+    /**
+     * The action pill is ink-on-paper, and paper-on-ink in dark. Both are
+     * neutral, so there is no wider version of them to reach for — and
+     * restating the old orange here would put the slab back on every
+     * wide-gamut display while leaving every other display correct, which is
+     * the kind of difference nobody reproduces from a bug report.
+     */
+    it("leaves the neutral action pill out of the wide-gamut block", () => {
+      const styles = sourceOf("auth.css");
+
+      expect(styles).not.toContain("--chakra-colors-auth-action:");
     });
   });
 });
