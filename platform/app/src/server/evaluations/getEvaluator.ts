@@ -58,3 +58,26 @@ export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
     }),
   ) as Evaluators[T]["settings"];
 };
+
+/**
+ * Which model roles an evaluator type's settings schema actually carries.
+ *
+ * Read off the same `settings` shape `getEvaluatorDefaultSettings` maps, so a
+ * caller resolves only the defaults the type will use. `ragas/faithfulness`
+ * has a `model` field and no `embeddings_model` one, so asking the cascade for
+ * an embeddings default before creating it refused the create over a model the
+ * evaluator never reads. A definition with no settings (a custom, workflow-
+ * derived evaluator) needs neither.
+ */
+export const getEvaluatorModelSettingFields = <T extends EvaluatorTypes>(
+  evaluator: EvaluatorDefinition<T> | CustomEvaluatorDefinition | undefined,
+): { model: boolean; embeddingsModel: boolean } => {
+  if (!evaluator || !("settings" in evaluator)) {
+    return { model: false, embeddingsModel: false };
+  }
+  const keys = Object.keys(evaluator.settings);
+  return {
+    model: keys.includes("model"),
+    embeddingsModel: keys.includes("embeddings_model"),
+  };
+};
