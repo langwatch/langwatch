@@ -378,9 +378,10 @@ This ADR is landing across slices. The first has shipped with it.
    Today's fold sweeps whatever heads exist **at fold time** and ignores the
    ids the fact names, so an identifier attached between the erase command's
    read and its apply is wiped anyway. Under routing, the list is decided at
-   COMMAND time, and slice 2 removes the lane that stopped an attach
-   interleaving with an erasure — so an identifier that arrives in that window
-   would never be routed the wipe and would keep its value permanently. The
+   COMMAND time — and erasure keeps the person's lane while ATTACH does not, so
+   the two can interleave where today they cannot. An identifier that arrives in
+   that window would never be routed the wipe and would keep its value
+   permanently. The
    erasure ceremony runs in `user.delete.before` and the write gate closes
    behind it, which makes the window small, and small is not closed. Slice 5
    must either have the per-identifier fold apply an erasure it sees for the
@@ -394,9 +395,9 @@ This ADR is landing across slices. The first has shipped with it.
 
 - Specs: [`specs/identity/identifier-aggregate.feature`](../../../specs/identity/identifier-aggregate.feature).
   `specs/identity/identifier-model.feature` keeps every scenario through this
-  slice, and two of its lines need rewriting later: "the command is staged onto
-  \"sam\"'s queue lane" at slice 2, and "folding the erasure wipes value and hash
-  fields from \"sam\"'s Identifier rows" at slice 3.
+  slice, and two of its lines need rewriting later: *the command is staged onto
+  sam's queue lane* at slice 2, and *folding the erasure wipes value and hash
+  fields from sam's Identifier rows* at slice 3.
 - [ADR-101](101-identity-pipeline-and-identifiers.md) §1, §3, §5 · [ADR-110](110-grant-aggregates-are-grants.md) · [ADR-116](116-account-linkage-is-event-truth.md) §6 · [ADR-119](119-an-account-is-never-left-with-one-way-in.md)
 - Framework mechanism: `projections/projectionRouter.ts` (the store key and the
   lane are both `key(event) ?? event.aggregateId`),
