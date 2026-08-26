@@ -203,6 +203,7 @@
     "@langwatch/suite-server": "workspace:*",
     "@langwatch/suite-web": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
+    "@langwatch/topic-server": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/trace-web": "workspace:*",

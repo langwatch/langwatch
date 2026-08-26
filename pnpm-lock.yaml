@@ -4199,6 +4199,9 @@ importers:
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../packages/system-migrations
+      '@langwatch/topic-server':
+        specifier: workspace:*
+        version: link:../../packages/features/topic/server
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../packages/features/trace/contract
