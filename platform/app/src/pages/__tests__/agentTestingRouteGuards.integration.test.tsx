@@ -64,6 +64,7 @@ vi.mock("~/hooks/usePreloadDrawer", () => ({
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), setFlowCallbacks: vi.fn() }),
+  setFlowCallbacks: vi.fn(),
 }));
 
 vi.mock("~/hooks/useSimulationUpdateListener", () => ({

@@ -341,43 +341,85 @@ function CaseRow({
         showMetricsInline={showMetricsInline}
       />
 
-      <HStack
-        gap={1}
-        justify="flex-end"
-        onClick={(event) => event.stopPropagation()}
-      >
-        {canManage && (
-          <RunCaseButton
-            caseName={testCase.name}
-            isRunning={isRunning}
-            onOpen={() => onRunCase(testCase)}
-          />
-        )}
-        {canManage && (
-          <SmallButton
-            aria-label={`Edit ${testCase.name}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit(testCase);
-            }}
-          >
-            <Pencil size={13} />
-            Edit
-          </SmallButton>
-        )}
-        <CaseRowActionsMenu
-          testCase={testCase}
-          canManage={canManage}
-          hasLastRun={!!lastResult}
-          onEdit={onEdit}
-          onHistory={onHistory}
-          onDuplicate={onDuplicate}
-          onStartMoveToSuite={onStartMoveToSuite}
-          onOpenLastRun={onOpenLastRun}
-          onArchive={onArchive}
-        />
-      </HStack>
+      <CaseRowActions
+        testCase={testCase}
+        canManage={canManage}
+        isRunning={isRunning}
+        hasLastRun={!!lastResult}
+        onRunCase={onRunCase}
+        onEdit={onEdit}
+        onHistory={onHistory}
+        onDuplicate={onDuplicate}
+        onStartMoveToSuite={onStartMoveToSuite}
+        onOpenLastRun={onOpenLastRun}
+        onArchive={onArchive}
+      />
     </Box>
+  );
+}
+
+function CaseRowActions({
+  testCase,
+  canManage,
+  isRunning,
+  hasLastRun,
+  onRunCase,
+  onEdit,
+  onHistory,
+  onDuplicate,
+  onStartMoveToSuite,
+  onOpenLastRun,
+  onArchive,
+}: {
+  testCase: TestCase;
+  canManage: boolean;
+  isRunning: boolean;
+  hasLastRun: boolean;
+  onRunCase: (testCase: TestCase) => void;
+  onEdit: (testCase: TestCase) => void;
+  onHistory: (testCase: TestCase) => void;
+  onDuplicate: (testCase: TestCase) => void;
+  onStartMoveToSuite: (scenarioId: string) => void;
+  onOpenLastRun: (testCase: TestCase) => void;
+  onArchive: (testCase: TestCase) => void;
+}) {
+  return (
+    <HStack
+      gap={1}
+      justify="flex-end"
+      onClick={(event) => event.stopPropagation()}
+    >
+      {canManage && (
+        <RunCaseButton
+          caseName={testCase.name}
+          isRunning={isRunning}
+          onOpen={() => onRunCase(testCase)}
+        />
+      )}
+      {canManage && (
+        <SmallButton
+          aria-label={`Edit ${testCase.name}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit(testCase);
+          }}
+        >
+          <Pencil size={13} />
+          Edit
+        </SmallButton>
+      )}
+      <CaseRowActionsMenu
+        testCase={testCase}
+        canManage={canManage}
+        hasLastRun={hasLastRun}
+        onEdit={onEdit}
+        onHistory={onHistory}
+        onDuplicate={onDuplicate}
+        onStartMoveToSuite={onStartMoveToSuite}
+        onOpenLastRun={onOpenLastRun}
+        onArchive={onArchive}
+      />
+    </HStack>
   );
 }
 

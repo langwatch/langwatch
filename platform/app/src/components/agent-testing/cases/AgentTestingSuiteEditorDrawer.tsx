@@ -71,20 +71,13 @@ const TABS: { id: SuiteTab; label: string }[] = [
   { id: "execution", label: "Execution" },
 ];
 
-export function AgentTestingSuiteEditorDrawer(
-  _props: AgentTestingSuiteEditorDrawerProps,
-) {
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
-  const { closeDrawer, drawerOpen } = useDrawer();
-  const params = useDrawerParams();
-  const utils = api.useUtils();
-
-  const isOpen = drawerOpen(SUITE_EDITOR_DRAWER);
-  const suiteId = params.suiteId ?? "";
-
-  const callbacks = getFlowCallbacks(SUITE_EDITOR_DRAWER);
-
+function useSuiteEditorForm({
+  isOpen,
+  suiteId,
+}: {
+  isOpen: boolean;
+  suiteId: string;
+}) {
   const [tab, setTab] = useState<SuiteTab>("general");
   const [name, setName] = useState("");
   const [labels, setLabels] = useState<string[]>([]);
@@ -94,41 +87,43 @@ export function AgentTestingSuiteEditorDrawer(
   const [pickerOpen, setPickerOpen] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const { data: suite, isLoading: isSuiteLoading } =
-    api.suites.getById.useQuery(
-      { projectId, id: suiteId },
-      { enabled: isOpen && !!projectId && !!suiteId },
-    );
-
-  const { data: scenarios } = api.scenarios.getAll.useQuery(
-    { projectId },
-    { enabled: isOpen && !!projectId },
-  );
-
   useEffect(() => {
     if (!isOpen) return;
     setTab("general");
     setProblem(null);
   }, [isOpen, suiteId]);
 
-  useEffect(() => {
-    if (!isOpen || !suite) return;
-    setName(suite.name);
-    setLabels(suite.labels);
-    setSimulatorModel(suite.simulatorModel ?? null);
-    setJudgeModel(suite.judgeModel ?? null);
-    setRepeatCount(suite.repeatCount);
-  }, [isOpen, suite]);
+  return {
+    tab,
+    setTab,
+    name,
+    setName,
+    labels,
+    setLabels,
+    simulatorModel,
+    setSimulatorModel,
+    judgeModel,
+    setJudgeModel,
+    repeatCount,
+    setRepeatCount,
+    pickerOpen,
+    setPickerOpen,
+    problem,
+    setProblem,
+  };
+}
 
-  const casesInSuite = useMemo(
-    () => (scenarios ?? []).filter((s) => s.folderId === suiteId),
-    [scenarios, suiteId],
-  );
-
-  const casesNotInSuite = useMemo(
-    () => (scenarios ?? []).filter((s) => s.folderId !== suiteId),
-    [scenarios, suiteId],
-  );
+function useSuiteEditorMutations({
+  projectId,
+  suiteId,
+  closeDrawer,
+}: {
+  projectId: string;
+  suiteId: string;
+  closeDrawer: () => void;
+}) {
+  const utils = api.useUtils();
+  const callbacks = getFlowCallbacks(SUITE_EDITOR_DRAWER);
 
   const invalidate = useCallback(() => {
     void utils.suites.getById.invalidate({ projectId, id: suiteId });
@@ -165,23 +160,43 @@ export function AgentTestingSuiteEditorDrawer(
       showErrorToast({ error, fallbackTitle: "Couldn't run the test suite" }),
   });
 
+  return { updateMutation, moveMutation, runMutation };
+}
+
+type SuiteEditorMutations = ReturnType<typeof useSuiteEditorMutations>;
+
+function useSuiteEditorHandlers({
+  form,
+  projectId,
+  suiteId,
+  updateMutation,
+  moveMutation,
+  runMutation,
+}: {
+  form: ReturnType<typeof useSuiteEditorForm>;
+  projectId: string;
+  suiteId: string;
+  updateMutation: SuiteEditorMutations["updateMutation"];
+  moveMutation: SuiteEditorMutations["moveMutation"];
+  runMutation: SuiteEditorMutations["runMutation"];
+}) {
   const handleSave = useCallback(
     ({ shouldRunAfterSave }: { shouldRunAfterSave: boolean }) => {
-      if (!name.trim()) {
-        setProblem("A test suite needs a name.");
-        setTab("general");
+      if (!form.name.trim()) {
+        form.setProblem("A test suite needs a name.");
+        form.setTab("general");
         return;
       }
-      setProblem(null);
+      form.setProblem(null);
       updateMutation.mutate(
         {
           projectId,
           id: suiteId,
-          name: name.trim(),
-          labels,
-          simulatorModel,
-          judgeModel,
-          repeatCount,
+          name: form.name.trim(),
+          labels: form.labels,
+          simulatorModel: form.simulatorModel,
+          judgeModel: form.judgeModel,
+          repeatCount: form.repeatCount,
         },
         {
           onSuccess: (saved) => {
@@ -196,17 +211,7 @@ export function AgentTestingSuiteEditorDrawer(
         },
       );
     },
-    [
-      name,
-      labels,
-      simulatorModel,
-      judgeModel,
-      repeatCount,
-      projectId,
-      suiteId,
-      updateMutation,
-      runMutation,
-    ],
+    [form, projectId, suiteId, updateMutation, runMutation],
   );
 
   const handleAddCases = useCallback(
@@ -214,9 +219,9 @@ export function AgentTestingSuiteEditorDrawer(
       for (const id of ids) {
         moveMutation.mutate({ projectId, scenarioId: id, folderId: suiteId });
       }
-      setPickerOpen(false);
+      form.setPickerOpen(false);
     },
-    [moveMutation, projectId, suiteId],
+    [moveMutation, projectId, suiteId, form],
   );
 
   const handleRemoveCase = useCallback(
@@ -226,14 +231,86 @@ export function AgentTestingSuiteEditorDrawer(
     [moveMutation, projectId],
   );
 
-  const isSaving =
-    updateMutation.isPending || moveMutation.isPending || runMutation.isPending;
+  return { handleSave, handleAddCases, handleRemoveCase };
+}
+
+function useSuiteEditorState() {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const { closeDrawer, drawerOpen } = useDrawer();
+  const params = useDrawerParams();
+
+  const isOpen = drawerOpen(SUITE_EDITOR_DRAWER);
+  const suiteId = params.suiteId ?? "";
+
+  const form = useSuiteEditorForm({ isOpen, suiteId });
+  const mutations = useSuiteEditorMutations({
+    projectId,
+    suiteId,
+    closeDrawer,
+  });
+
+  const { data: suite, isLoading: isSuiteLoading } =
+    api.suites.getById.useQuery(
+      { projectId, id: suiteId },
+      { enabled: isOpen && !!projectId && !!suiteId },
+    );
+
+  const { data: scenarios } = api.scenarios.getAll.useQuery(
+    { projectId },
+    { enabled: isOpen && !!projectId },
+  );
+
+  useEffect(() => {
+    if (!isOpen || !suite) return;
+    form.setName(suite.name);
+    form.setLabels(suite.labels);
+    form.setSimulatorModel(suite.simulatorModel ?? null);
+    form.setJudgeModel(suite.judgeModel ?? null);
+    form.setRepeatCount(suite.repeatCount);
+  }, [isOpen, suite, form]);
+
+  const casesInSuite = useMemo(
+    () => (scenarios ?? []).filter((s) => s.folderId === suiteId),
+    [scenarios, suiteId],
+  );
+  const casesNotInSuite = useMemo(
+    () => (scenarios ?? []).filter((s) => s.folderId !== suiteId),
+    [scenarios, suiteId],
+  );
+
+  const handlers = useSuiteEditorHandlers({
+    form,
+    projectId,
+    suiteId,
+    ...mutations,
+  });
+
+  return {
+    ...form,
+    ...handlers,
+    isOpen,
+    isSuiteLoading,
+    casesInSuite,
+    casesNotInSuite,
+    closeDrawer,
+    isSaving:
+      mutations.updateMutation.isPending ||
+      mutations.moveMutation.isPending ||
+      mutations.runMutation.isPending,
+  };
+}
+
+export function AgentTestingSuiteEditorDrawer(
+  _props: AgentTestingSuiteEditorDrawerProps,
+) {
+  const state = useSuiteEditorState();
 
   return (
     <Drawer.Root
-      open={isOpen}
+      open={state.isOpen}
       onOpenChange={({ open }) => {
-        if (!open) closeDrawer();
+        if (!open) state.closeDrawer();
       }}
       placement="end"
       size="md"
@@ -252,136 +329,172 @@ export function AgentTestingSuiteEditorDrawer(
           <Drawer.CloseTrigger />
         </Drawer.Header>
 
-        <HStack
-          gap={1}
-          paddingX={4}
-          borderBottomWidth="1px"
-          borderColor="border"
-        >
-          {TABS.map((entry) => (
-            <chakra.button
-              key={entry.id}
-              type="button"
-              onClick={() => setTab(entry.id)}
-              aria-pressed={tab === entry.id}
-              marginBottom="-1px"
-              paddingX={2.5}
-              paddingY={2}
-              fontSize="12.5px"
-              cursor="pointer"
-              appearance="none"
-              background="transparent"
-              borderRadius="0"
-              boxShadow="none"
-              borderWidth="0"
-              borderStyle="solid"
-              borderBottomWidth="2px"
-              borderBottomColor={tab === entry.id ? "fg" : "transparent"}
-              fontWeight={tab === entry.id ? "medium" : "normal"}
-              color={tab === entry.id ? "fg" : FG_MUTED}
-              _hover={{ color: "fg" }}
-              data-testid={`suite-editor-tab-${entry.id}`}
-            >
-              {entry.label}
-            </chakra.button>
-          ))}
-        </HStack>
+        <SuiteEditorTabStrip tab={state.tab} onTab={state.setTab} />
 
         <Drawer.Body paddingX={5} paddingY={4} overflowY="auto">
-          {isSuiteLoading ? (
-            <VStack align="stretch" gap={4}>
-              <Skeleton height="46px" />
-              <Skeleton height="60px" />
-              <Skeleton height="120px" />
-            </VStack>
-          ) : (
-            <VStack align="stretch" gap={4}>
-              {problem && <FieldError message={problem} />}
-              {tab === "general" && (
-                <GeneralTab
-                  name={name}
-                  onName={setName}
-                  labels={labels}
-                  onLabels={setLabels}
-                />
-              )}
-              {tab === "cases" && (
-                <CasesTab
-                  cases={casesInSuite}
-                  onAdd={() => setPickerOpen(true)}
-                  onRemove={handleRemoveCase}
-                />
-              )}
-              {tab === "models" && (
-                <ModelsTab
-                  simulatorModel={simulatorModel}
-                  judgeModel={judgeModel}
-                  onSimulator={setSimulatorModel}
-                  onJudge={setJudgeModel}
-                />
-              )}
-              {tab === "execution" && (
-                <ExecutionTab
-                  repeatCount={repeatCount}
-                  onRepeat={setRepeatCount}
-                />
-              )}
-            </VStack>
-          )}
+          <SuiteEditorTabBody state={state} />
         </Drawer.Body>
 
-        <Drawer.Footer
-          borderTopWidth="1px"
-          borderColor="border"
-          paddingX={5}
-          paddingY={3}
-          gap={2}
-        >
-          <Box flex={1} />
-          <chakra.button
-            type="button"
-            onClick={closeDrawer}
-            paddingX={3}
-            height="28px"
-            borderRadius="lg"
-            fontSize="12px"
-            fontWeight="medium"
-            color={FG_MUTED}
-            cursor="pointer"
-            boxShadow={QUIET_BUTTON_SHADOW}
-            _hover={{ background: "bg.muted", color: "fg" }}
-          >
-            Cancel
-          </chakra.button>
-          <SmallButton
-            loading={isSaving}
-            onClick={() => handleSave({ shouldRunAfterSave: true })}
-            data-testid="suite-editor-save-and-run"
-          >
-            <Play size={13} />
-            Save &amp; Run
-          </SmallButton>
-          <SmallButton
-            variant="solid"
-            colorPalette="blue"
-            background={undefined}
-            borderColor="transparent"
-            loading={isSaving}
-            onClick={() => handleSave({ shouldRunAfterSave: false })}
-            data-testid="suite-editor-save"
-          >
-            Save
-          </SmallButton>
-        </Drawer.Footer>
+        <SuiteEditorFooter
+          isSaving={state.isSaving}
+          onCancel={state.closeDrawer}
+          onSave={state.handleSave}
+        />
       </Drawer.Content>
 
       <AddCasesPickerDialog
-        open={pickerOpen}
-        cases={casesNotInSuite}
-        onCancel={() => setPickerOpen(false)}
-        onConfirm={handleAddCases}
+        open={state.pickerOpen}
+        cases={state.casesNotInSuite}
+        onCancel={() => state.setPickerOpen(false)}
+        onConfirm={state.handleAddCases}
       />
     </Drawer.Root>
+  );
+}
+
+function SuiteEditorTabStrip({
+  tab,
+  onTab,
+}: {
+  tab: SuiteTab;
+  onTab: (next: SuiteTab) => void;
+}) {
+  return (
+    <HStack gap={1} paddingX={4} borderBottomWidth="1px" borderColor="border">
+      {TABS.map((entry) => (
+        <chakra.button
+          key={entry.id}
+          type="button"
+          onClick={() => onTab(entry.id)}
+          aria-pressed={tab === entry.id}
+          marginBottom="-1px"
+          paddingX={2.5}
+          paddingY={2}
+          fontSize="12.5px"
+          cursor="pointer"
+          appearance="none"
+          background="transparent"
+          borderRadius="0"
+          boxShadow="none"
+          borderWidth="0"
+          borderStyle="solid"
+          borderBottomWidth="2px"
+          borderBottomColor={tab === entry.id ? "fg" : "transparent"}
+          fontWeight={tab === entry.id ? "medium" : "normal"}
+          color={tab === entry.id ? "fg" : FG_MUTED}
+          _hover={{ color: "fg" }}
+          data-testid={`suite-editor-tab-${entry.id}`}
+        >
+          {entry.label}
+        </chakra.button>
+      ))}
+    </HStack>
+  );
+}
+
+function SuiteEditorTabBody({
+  state,
+}: {
+  state: ReturnType<typeof useSuiteEditorState>;
+}) {
+  if (state.isSuiteLoading) {
+    return (
+      <VStack align="stretch" gap={4}>
+        <Skeleton height="46px" />
+        <Skeleton height="60px" />
+        <Skeleton height="120px" />
+      </VStack>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={4}>
+      {state.problem && <FieldError message={state.problem} />}
+      {state.tab === "general" && (
+        <GeneralTab
+          name={state.name}
+          onName={state.setName}
+          labels={state.labels}
+          onLabels={state.setLabels}
+        />
+      )}
+      {state.tab === "cases" && (
+        <CasesTab
+          cases={state.casesInSuite}
+          onAdd={() => state.setPickerOpen(true)}
+          onRemove={state.handleRemoveCase}
+        />
+      )}
+      {state.tab === "models" && (
+        <ModelsTab
+          simulatorModel={state.simulatorModel}
+          judgeModel={state.judgeModel}
+          onSimulator={state.setSimulatorModel}
+          onJudge={state.setJudgeModel}
+        />
+      )}
+      {state.tab === "execution" && (
+        <ExecutionTab
+          repeatCount={state.repeatCount}
+          onRepeat={state.setRepeatCount}
+        />
+      )}
+    </VStack>
+  );
+}
+
+function SuiteEditorFooter({
+  isSaving,
+  onCancel,
+  onSave,
+}: {
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: (opts: { shouldRunAfterSave: boolean }) => void;
+}) {
+  return (
+    <Drawer.Footer
+      borderTopWidth="1px"
+      borderColor="border"
+      paddingX={5}
+      paddingY={3}
+      gap={2}
+    >
+      <Box flex={1} />
+      <chakra.button
+        type="button"
+        onClick={onCancel}
+        paddingX={3}
+        height="28px"
+        borderRadius="lg"
+        fontSize="12px"
+        fontWeight="medium"
+        color={FG_MUTED}
+        cursor="pointer"
+        boxShadow={QUIET_BUTTON_SHADOW}
+        _hover={{ background: "bg.muted", color: "fg" }}
+      >
+        Cancel
+      </chakra.button>
+      <SmallButton
+        loading={isSaving}
+        onClick={() => onSave({ shouldRunAfterSave: true })}
+        data-testid="suite-editor-save-and-run"
+      >
+        <Play size={13} />
+        Save &amp; Run
+      </SmallButton>
+      <SmallButton
+        variant="solid"
+        colorPalette="blue"
+        background={undefined}
+        borderColor="transparent"
+        loading={isSaving}
+        onClick={() => onSave({ shouldRunAfterSave: false })}
+        data-testid="suite-editor-save"
+      >
+        Save
+      </SmallButton>
+    </Drawer.Footer>
   );
 }
 
@@ -566,6 +679,48 @@ function ExecutionTab({
   );
 }
 
+function AddCasesPickerList({
+  cases,
+  selected,
+  onToggle,
+}: {
+  cases: { id: string; name: string }[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  if (cases.length === 0) {
+    return (
+      <Text fontSize="12px" color={FG_MUTED}>
+        Every test case is already in this suite.
+      </Text>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={1}>
+      {cases.map((testCase) => (
+        <chakra.label
+          key={testCase.id}
+          display="flex"
+          gap={2}
+          paddingX={2.5}
+          paddingY={2}
+          borderRadius="md"
+          cursor="pointer"
+          _hover={{ background: "bg.muted" }}
+          data-testid={`suite-editor-picker-${testCase.name}`}
+        >
+          <chakra.input
+            type="checkbox"
+            checked={selected.has(testCase.id)}
+            onChange={() => onToggle(testCase.id)}
+          />
+          <Text fontSize="12.5px">{testCase.name}</Text>
+        </chakra.label>
+      ))}
+    </VStack>
+  );
+}
+
 /** The picker dialog for adding cases NOT currently in the suite. */
 function AddCasesPickerDialog({
   open,
@@ -621,34 +776,11 @@ function AddCasesPickerDialog({
           maxHeight="50vh"
           overflowY="auto"
         >
-          {cases.length === 0 ? (
-            <Text fontSize="12px" color={FG_MUTED}>
-              Every test case is already in this suite.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={1}>
-              {cases.map((testCase) => (
-                <chakra.label
-                  key={testCase.id}
-                  display="flex"
-                  gap={2}
-                  paddingX={2.5}
-                  paddingY={2}
-                  borderRadius="md"
-                  cursor="pointer"
-                  _hover={{ background: "bg.muted" }}
-                  data-testid={`suite-editor-picker-${testCase.name}`}
-                >
-                  <chakra.input
-                    type="checkbox"
-                    checked={selected.has(testCase.id)}
-                    onChange={() => toggle(testCase.id)}
-                  />
-                  <Text fontSize="12.5px">{testCase.name}</Text>
-                </chakra.label>
-              ))}
-            </VStack>
-          )}
+          <AddCasesPickerList
+            cases={cases}
+            selected={selected}
+            onToggle={toggle}
+          />
         </Dialog.Body>
         <Dialog.Footer
           borderTopWidth="1px"

@@ -33,11 +33,8 @@ function flattenGroupCases(props: CasesPanelBodyProps): TestCase[] {
   return props.groups.flatMap((group) => group.cases);
 }
 
-export function CasesPanelBody(props: CasesPanelBodyProps) {
+function useCaseSelection(flatCases: TestCase[], props: CasesPanelBodyProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const isSelectionMode = selectedIds.size > 0;
-
-  const flatCases = useMemo(() => flattenGroupCases(props), [props]);
 
   const toggleSelected = useCallback((scenarioId: string) => {
     setSelectedIds((current) => {
@@ -65,6 +62,27 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
     },
     [selectedIds, flatCases, props, clearSelection],
   );
+
+  return {
+    selectedIds,
+    isSelectionMode: selectedIds.size > 0,
+    toggleSelected,
+    startMoveToSuite,
+    clearSelection,
+    handleMoveConfirm,
+  };
+}
+
+export function CasesPanelBody(props: CasesPanelBodyProps) {
+  const flatCases = useMemo(() => flattenGroupCases(props), [props]);
+  const {
+    selectedIds,
+    isSelectionMode,
+    toggleSelected,
+    startMoveToSuite,
+    clearSelection,
+    handleMoveConfirm,
+  } = useCaseSelection(flatCases, props);
 
   if (props.isLoading) return <CasesTableSkeleton />;
 
