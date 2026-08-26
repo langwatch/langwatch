@@ -97,7 +97,7 @@ func TestDNSRegistryTakesTheNameLangWatchShows(t *testing.T) {
 		res := publish(s, "_langwatch-verification.acme1.test", "lw-verify-xyz")
 		require.Equal(t, http.StatusSeeOther, res.StatusCode)
 
-		t.Run("does not label an already-labelled name twice", func(t *testing.T) {
+		t.Run("does not label an already-labeled name twice", func(t *testing.T) {
 			_, doubled := s.verification.TXT(
 				"_langwatch-verification._langwatch-verification.acme1.test")
 			assert.False(t, doubled, "the label was applied to a name that had it")

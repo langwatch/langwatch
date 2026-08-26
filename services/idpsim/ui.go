@@ -86,7 +86,10 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
                  padding: .5rem 1.1rem; }
 button.primary:hover { filter: brightness(1.08); color: #fff; }
 form label { display: block; margin: .9rem 0 0; font-size: .875rem; color: var(--muted); }
-input[type=text], textarea {
+/* Every text field on these pages is a plain <input name=…>: the forms are
+   pasted into rather than typed, and none of them wanted a type attribute.
+   Selecting on [type=text] therefore styled none of them. */
+input:not([type]), input[type=text], textarea {
   width: 100%; margin-top: .3rem; padding: .5rem .6rem; border-radius: .4rem;
   border: 1px solid var(--line); background: var(--bg); color: var(--ink);
   font: inherit; font-size: .9rem;
@@ -117,6 +120,8 @@ th { color: var(--muted); font-weight: 600; font-size: .8rem; border-top: 0; }
              background: var(--panel); text-decoration: none; color: inherit; }
 .tenants a:hover { border-color: var(--accent); }
 .tenants strong { display: block; }
+.row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: 1.1rem 0 .3rem; }
+.row form { margin: 0; }
 .crumb { font-size: .85rem; color: var(--muted); margin-bottom: 1rem; }
 .new { border-color: var(--accent); }
 .new h2 { color: var(--accent); }
@@ -186,7 +191,8 @@ Verification DNS answers on <code>{{.DNSAddr}}</code> over UDP.{{end}}</p>
 </div>
 <h3>Control API</h3>
 <p class="hint mono">GET /control/state · POST /control/t/{n}/reset · POST /control/t/{n}/users ·
-POST /control/t/{n}/apps · POST /control/t/{n}/config · POST /control/t/{n}/scim-push ·
+POST /control/t/{n}/apps · POST /control/t/{n}/config · PUT /control/t/{n}/scim-target ·
+POST /control/t/{n}/scim-push · POST /control/t/{n}/scim-pull ·
 GET /control/t/{n}/activity · PUT /control/dns/txt · PUT /control/verification</p>
 {{end}}`
 
@@ -281,9 +287,74 @@ save, so the address has to be reachable from wherever the app is running.</p>
 <h2>Directory and domain</h2>
 <dl>
   <div class="field"><dt>SCIM base</dt><dd><span class="copy"><span class="val">{{.Tenant.BaseURL}}/scim/v2</span><button data-copy="{{.Tenant.BaseURL}}/scim/v2">copy</button></span></dd></div>
-  <div class="field"><dt>SCIM token</dt><dd><span class="copy"><span class="val">{{.Tenant.SCIMToken}}</span><button data-copy="{{.Tenant.SCIMToken}}">copy</button></span></dd></div>
+  <div class="field"><dt>SCIM token <span class="hint">— into this tenant</span></dt><dd><span class="copy"><span class="val">{{.Tenant.SCIMToken}}</span><button data-copy="{{.Tenant.SCIMToken}}">copy</button></span></dd></div>
   <div class="field"><dt>Domain proof</dt><dd>a TXT record on <code>{{.Tenant.Domain}}</code>{{if .DNSAddr}}, answered on <code>{{.DNSAddr}}</code>{{end}}, or the same token under <code>/.well-known/</code> over HTTP</dd></div>
 </dl>
+<p class="hint">That token guards this tenant's own directory, for provisioning
+<em>into</em> the simulator. Sending users the other way — the direction a real identity
+provider runs — uses LangWatch's token, below.</p>
+</section>
+
+{{/* Provisioning out. The whole panel exists because the credential is the
+     receiving side's: LangWatch mints it, or takes one the administrator
+     already had, and the identity provider presents it. A simulator that
+     generated its own would be handing out a key to a door it does not own,
+     which is why this is a box rather than a value to copy. */}}
+<section class="panel{{if .Outcome}} new{{end}}">
+<h2>Provision into LangWatch</h2>
+<p>Give this tenant LangWatch's SCIM address and the token LangWatch issued, and it
+provisions its users and groups the way Okta or Entra would.</p>
+<details>
+  <summary class="hint">Why you paste a token here instead of copying one</summary>
+  <p class="hint">SCIM runs one way: the identity provider sends its directory to the
+  application, so the application is the side that issues the credential. LangWatch mints
+  the token — or takes one you already had — and whoever provisions presents it. A token
+  invented here would open nothing.</p>
+  <p class="hint">This is also the one thing on the page with two of everything, so: the
+  token under <em>Directory and domain</em> is the way in, and this one is the way out.
+  Pasting that one here is refused rather than left to fail as an unauthorized push.</p>
+</details>
+{{if .Provisioning.Configured}}
+<dl>
+  <div class="field"><dt>Provisioning into</dt><dd><span class="copy"><span class="val">{{.Provisioning.BaseURL}}</span><button data-copy="{{.Provisioning.BaseURL}}">copy</button></span></dd></div>
+  <div class="field"><dt>With the token</dt><dd class="mono">{{.Provisioning.Token}} <span class="hint">— enough to tell it is the one you pasted</span></dd></div>
+</dl>
+<div class="row">
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/push"><button class="primary" type="submit">Push the directory</button></form>
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/pull"><button type="submit">Read it back</button></form>
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/delete"><button type="submit">Forget</button></form>
+</div>
+<p class="hint">Pushing sends every user then every group as a SCIM create. Reading back asks
+LangWatch what it holds now, which is the half that tells you what it made of them.</p>
+{{else}}
+<form method="post" action="{{.Tenant.BaseURL}}/provisioning">
+  <label>SCIM address
+    <input name="target" placeholder="https://app.your-worktree.langwatch.localhost/api/scim/v2" required>
+  </label>
+  <label>Token
+    <input name="token" placeholder="the token LangWatch issued" required autocomplete="off">
+  </label>
+  <p class="hint" style="margin-top:.6rem">Both are on LangWatch's SCIM setup screen. A trailing
+  <code>/Users</code> is trimmed, so the endpoint you were last looking at works too.</p>
+  <p style="margin-top:1.1rem"><button class="primary" type="submit">Connect</button></p>
+</form>
+{{end}}
+{{with .Outcome}}
+<p class="hint" style="margin-top:1.2rem">Last {{if eq .Kind "push"}}push{{else}}read-back{{end}}:
+<span class="pill {{if .Refused}}refused{{else}}ok{{end}}">{{if .Refused}}refused{{else}}ok{{end}}</span>
+{{.Summary}}.</p>
+{{if or .Users .Groups}}
+<table>
+<tr><th>Users LangWatch holds</th><th>Groups</th></tr>
+<tr><td>{{range .Users}}<div class="mono">{{.}}</div>{{else}}<span class="empty">none</span>{{end}}</td>
+    <td>{{range .Groups}}<div class="mono">{{.}}</div>{{else}}<span class="empty">none</span>{{end}}</td></tr>
+</table>
+{{end}}
+{{if .Failures}}
+<p class="hint">Refused by LangWatch:</p>
+{{range .Failures}}<div class="mono hint">{{.}}</div>{{end}}
+{{end}}
+{{end}}
 </section>
 
 <section class="panel">
@@ -406,6 +477,25 @@ func viewOf(t *Tenant) tenantView {
 		SAMLSignInURL: t.BaseURL + "/saml/sso",
 		Certificate:   t.CertificatePEM(),
 		Users:         t.Users(), Apps: t.Applications(),
+	}
+}
+
+// provisioningView is the tenant's connection as the page shows it: the
+// address in full, and only enough of the token to recognize it. The value is
+// LangWatch's rather than ours, and the reason to show any of it is answering
+// "is that the one I pasted?".
+type provisioningView struct {
+	Configured bool
+	BaseURL    string
+	Token      string
+}
+
+func provisioningViewOf(t *Tenant) provisioningView {
+	target := t.Provisioning()
+	return provisioningView{
+		Configured: target.Configured(),
+		BaseURL:    target.BaseURL,
+		Token:      maskedToken(target.Token),
 	}
 }
 
@@ -578,7 +668,9 @@ func (s *Server) handleTenantPage(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Tenant": viewOf(t),
 		"Root":   s.cfg.BaseURL, "DNSAddr": s.DNSAddr(),
-		"Records": s.publishedRecords(t.Domain),
+		"Records":      s.publishedRecords(t.Domain),
+		"Provisioning": provisioningViewOf(t),
+		"Outcome":      t.LastProvisioning(),
 	}
 	// ?registered=<client id> is where the registration POST lands, so the
 	// credentials are shown once, at the top, right after they are minted.
