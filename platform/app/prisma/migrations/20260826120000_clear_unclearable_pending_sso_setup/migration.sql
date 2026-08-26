@@ -23,6 +23,20 @@
 -- Idempotent: every row it selects it sets to false, so a second run matches
 -- nothing. The domain join mirrors the hook's own `extractEmailDomain`, which
 -- lowercases the domain before the lookup.
+--
+-- IRREVERSIBLE: the prior value of every row it touches is the constant `true`
+-- and is not recorded anywhere, so after this runs those rows are
+-- indistinguishable from users who were never flagged. A down step could only
+-- guess at the set, and re-flagging the wrong people would put the same
+-- undismissable banner back in front of them. Reapplying the flag is a
+-- deliberate operator action, not an automatic rollback.
+--
+-- Null and empty string both mean "no provider configured": the hook's guard
+-- is a falsy check (`!org.ssoProvider`), so an organization storing `''` lands
+-- in the identical unclearable state and has to be cleared with the same
+-- sweep. A whitespace-only value is deliberately NOT matched -- it is truthy
+-- in the hook, so those organizations are treated as having named a provider
+-- and their flags are still live.
 UPDATE "User"
 SET "pendingSsoSetup" = false
 WHERE "pendingSsoSetup" = true
@@ -30,5 +44,6 @@ WHERE "pendingSsoSetup" = true
     SELECT 1
     FROM "Organization"
     WHERE "Organization"."ssoDomain" = lower(split_part("User"."email", '@', 2))
-      AND "Organization"."ssoProvider" IS NULL
+      AND ("Organization"."ssoProvider" IS NULL
+        OR "Organization"."ssoProvider" = '')
   );
