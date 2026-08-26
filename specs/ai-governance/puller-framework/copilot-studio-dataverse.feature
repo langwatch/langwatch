@@ -67,11 +67,21 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     Then the piece numbered 2 comes before the piece numbered 10
 
   @integration
-  Scenario: A conversation missing its opening piece is marked incomplete
-    Given only the second piece of a conversation is available
+  Scenario: A conversation with a piece missing from the middle is marked incomplete
+    Given a conversation whose stored pieces skip one in the middle
     When the puller records it
     Then the trace is recorded and marked as incomplete
     And it is not presented as a whole conversation
+
+  @integration
+  Scenario: A later piece arriving on its own is not mistaken for a missing one
+    Given the opening piece of a conversation was read on an earlier run
+    And only a later piece is available on this run
+    When the puller records it
+    Then the trace is not marked as incomplete
+    # Pieces are written at different times, so a pull window can end between
+    # them. Marking every later piece would fire the flag on the ordinary case
+    # and leave it meaning nothing.
 
   # --- Identity: the same conversation pulled twice is the same conversation ---
 
@@ -148,16 +158,20 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   Scenario: The agent's model is recorded when it can be trusted
     Given the agent's settings have not changed since the conversation
     When the puller records the conversation
-    Then the trace names the model the agent was running
+    Then the trace claims nothing about which model answered
+    # Written expecting a model and revised on the evidence: the agent record
+    # in the environment carries a name, a language, an authentication mode
+    # and dates, and no model. There is nothing to read, so the trace says
+    # nothing rather than reporting a field no query can fill.
 
   @integration
-  Scenario: A model read after the fact is recorded but flagged
+  Scenario: A conversation whose agent was edited afterwards is flagged
     Given the agent's settings were changed after the conversation happened
     When the puller records the conversation
-    Then the trace names the model
-    And the trace marks that model as possibly not the one that answered
-    # The stored conversation does not say which model answered it. The only
-    # available answer is the agent's current setting, which is free to drift.
+    Then the trace marks that the agent has changed since
+    # The transcript records what was said, never which configuration said it.
+    # Anyone reading this trace as evidence of how the agent behaves needs to
+    # know the agent is no longer the one that produced it.
 
   @integration
   Scenario: An unfinished tool call still shows
