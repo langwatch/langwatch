@@ -4,15 +4,20 @@
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  *
  * The worker routes an event only when its source has an entry in
- * `CONVERSATION_ROUTING_PROFILES` (`pullers/pullerWorker.ts`) and the event's
- * action is the one that entry's profile names. A source type meeting
+ * `CONVERSATION_ROUTING_BY_SOURCE_TYPE` (`pullers/pullerWorker.ts`) and the
+ * event's action is the one that entry's profile names. A source type meeting
  * neither condition can carry a destination column that nothing ever reads.
  * The drawer must not offer a control with no effect, and this declaration
  * is what it asks — kept beside the catalog so a new adapter's author sees
  * it while adding their entry.
  *
- * That gate lives in server code this bundle must not import, so the two are
- * kept in step by declaration plus this test rather than a shared constant.
+ * What this test covers, precisely: the client-side declaration alone. That
+ * gate lives in server code this bundle must not import, so nothing here
+ * reads it — the two are one value written twice, and this file pins only
+ * one of the two copies. A server entry added or removed without the
+ * matching catalog edit passes every assertion below. Catching that needs a
+ * cross-side assertion in a test that may import both, and there is not one;
+ * saying so is better than a docblock implying a guard that is not here.
  */
 import { describe, expect, it } from "vitest";
 import {

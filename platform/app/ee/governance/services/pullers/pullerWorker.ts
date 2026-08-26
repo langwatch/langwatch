@@ -184,6 +184,109 @@ function resolvePullAdapter(params: {
   }
 }
 
+/**
+ * Run the adapter once under the job deadline, reporting a throw rather than
+ * letting it pass silently. Rethrows: a run that did not finish leaves the
+ * durable cursor where it was, so the window is retried rather than skipped.
+ */
+async function runAdapterOnce(params: {
+  adapter: PullerAdapter;
+  adapterId: string;
+  ingestionSourceId: string;
+  organizationId: string;
+  cursor: string | null;
+  credentials: Record<string, string>;
+  validatedConfig: unknown;
+}): Promise<PullResult> {
+  const {
+    adapter,
+    adapterId,
+    ingestionSourceId,
+    organizationId,
+    cursor,
+    credentials,
+    validatedConfig,
+  } = params;
+
+  try {
+    return await withDeadline(PER_JOB_DEADLINE_MS, (signal) =>
+      adapter.runOnce(
+        {
+          cursor,
+          credentials,
+          context: { organizationId, ingestionSourceId },
+          deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
+          signal,
+        },
+        validatedConfig,
+      ),
+    );
+  } catch (error) {
+    logger.error(
+      { ingestionSourceId, adapterId, error },
+      "adapter.runOnce threw — leaving the durable cursor unchanged",
+    );
+    await withScope(async (scope) => {
+      scope.setTag?.("worker", "ingestionPuller");
+      scope.setExtra?.("ingestionSourceId", ingestionSourceId);
+      captureException(toError(error));
+    });
+    throw error;
+  }
+}
+
+/**
+ * Decide whether a run that reported errors still counts as progress, and fail
+ * it when it does not.
+ *
+ * `errorCount > 0` means two different things, and the cursor the adapter
+ * handed back is what tells them apart.
+ *
+ *   - The cursor MOVED: the adapter deliberately stepped past input it could
+ *     not read (s3_polling does this for a malformed line and for an object it
+ *     could not fetch at all). Failing the run here would throw away both the
+ *     events it did collect and the advance, so the next run would re-read the
+ *     same unreadable object and the source would never make progress again.
+ *     That is a partial success: write, persist, and say so loudly.
+ *   - The cursor is UNCHANGED: the adapter could not make progress at all
+ *     (http_polling, anthropic_admin and databricks_genie all return the
+ *     incoming cursor when their transport fails). Nothing was read, so the run
+ *     fails and the outbox retries the same window.
+ *
+ * A null cursor is never an advance. It is the "no cursor yet / drained"
+ * sentinel, so persisting it against a non-null incoming cursor would rewind
+ * the source to the beginning rather than move it forward.
+ */
+function assertRunMadeProgress(params: {
+  result: PullResult;
+  incomingCursor: string | null;
+  ingestionSourceId: string;
+  adapterId: string;
+}): void {
+  const { result, incomingCursor, ingestionSourceId, adapterId } = params;
+  if (result.errorCount === 0) return;
+
+  const cursorAdvanced =
+    result.cursor !== null && result.cursor !== incomingCursor;
+  if (!cursorAdvanced) {
+    throw new Error(
+      `Ingestion pull adapter reported ${result.errorCount} error(s)`,
+    );
+  }
+
+  logger.warn(
+    {
+      ingestionSourceId,
+      adapterId,
+      errorCount: result.errorCount,
+      eventCount: result.events.length,
+      fromCursor: incomingCursor,
+      toCursor: result.cursor,
+    },
+    "adapter advanced past input it could not read — keeping the events it did collect and persisting the advance",
+  );
+}
+
 export async function runIngestionPull(params: {
   sourceId: string;
   cursor: string | null;
@@ -225,75 +328,22 @@ export async function runIngestionPull(params: {
 
   const credentials = decryptCredentials(pullConfig.credentials);
 
-  let result: PullResult;
-  try {
-    result = await withDeadline(PER_JOB_DEADLINE_MS, (signal) =>
-      adapter.runOnce(
-        {
-          cursor: params.cursor,
-          credentials,
-          context: {
-            organizationId: source.organizationId,
-            ingestionSourceId: source.id,
-          },
-          deadlineMs: Date.now() + PER_JOB_DEADLINE_MS,
-          signal,
-        },
-        validatedConfig,
-      ),
-    );
-  } catch (error) {
-    logger.error(
-      { ingestionSourceId, adapterId, error },
-      "adapter.runOnce threw — leaving the durable cursor unchanged",
-    );
-    await withScope(async (scope) => {
-      scope.setTag?.("worker", "ingestionPuller");
-      scope.setExtra?.("ingestionSourceId", ingestionSourceId);
-      captureException(toError(error));
-    });
-    throw error;
-  }
+  const result = await runAdapterOnce({
+    adapter,
+    adapterId,
+    ingestionSourceId,
+    organizationId: source.organizationId,
+    cursor: params.cursor,
+    credentials,
+    validatedConfig,
+  });
 
-  // `errorCount > 0` means two different things, and the cursor the adapter
-  // handed back is what tells them apart.
-  //
-  //   - The cursor MOVED: the adapter deliberately stepped past input it could
-  //     not read (s3_polling does this for a malformed line and for an object
-  //     it could not fetch at all). Failing the run here would throw away both
-  //     the events it did collect and the advance, so the next run would re-read
-  //     the same unreadable object and the source would never make progress
-  //     again. That is a partial success: write, persist, and say so loudly.
-  //   - The cursor is UNCHANGED: the adapter could not make progress at all
-  //     (http_polling, anthropic_admin and databricks_genie all return the
-  //     incoming cursor when their transport fails). Nothing was read, so the
-  //     run fails and the outbox retries the same window.
-  //
-  // A null cursor is never an advance. It is the "no cursor yet / drained"
-  // sentinel, so persisting it against a non-null incoming cursor would rewind
-  // the source to the beginning rather than move it forward.
-  const cursorAdvanced =
-    result.cursor !== null && result.cursor !== params.cursor;
-
-  if (result.errorCount > 0 && !cursorAdvanced) {
-    throw new Error(
-      `Ingestion pull adapter reported ${result.errorCount} error(s)`,
-    );
-  }
-
-  if (result.errorCount > 0) {
-    logger.warn(
-      {
-        ingestionSourceId,
-        adapterId,
-        errorCount: result.errorCount,
-        eventCount: result.events.length,
-        fromCursor: params.cursor,
-        toCursor: result.cursor,
-      },
-      "adapter advanced past input it could not read — keeping the events it did collect and persisting the advance",
-    );
-  }
+  assertRunMadeProgress({
+    result,
+    incomingCursor: params.cursor,
+    ingestionSourceId,
+    adapterId,
+  });
 
   if (result.events.length > 0) {
     await writePulledEvents({
@@ -445,20 +495,22 @@ interface ConversationRouting {
   }) => IExportTraceServiceRequest | null;
 }
 
-const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<string, ConversationRouting> =
-  new Map<SourceType, ConversationRouting>([
-    [
-      "databricks_genie",
-      { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest },
-    ],
-    [
-      "copilot_studio_dataverse",
-      {
-        profile: COPILOT_ROUTING_PROFILE,
-        map: mapCopilotEventsToTraceRequest,
-      },
-    ],
-  ]);
+const CONVERSATION_ROUTING_BY_SOURCE_TYPE: ReadonlyMap<
+  string,
+  ConversationRouting
+> = new Map<SourceType, ConversationRouting>([
+  [
+    "databricks_genie",
+    { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest },
+  ],
+  [
+    "copilot_studio_dataverse",
+    {
+      profile: COPILOT_ROUTING_PROFILE,
+      map: mapCopilotEventsToTraceRequest,
+    },
+  ],
+]);
 
 /**
  * The registry's only reader outside this module.
@@ -474,14 +526,14 @@ const CONVERSATION_ROUTING_PROFILES: ReadonlyMap<string, ConversationRouting> =
 export function conversationRoutingProfileFor(
   sourceType: string,
 ): ConversationRoutingProfile | undefined {
-  return CONVERSATION_ROUTING_PROFILES.get(sourceType)?.profile;
+  return CONVERSATION_ROUTING_BY_SOURCE_TYPE.get(sourceType)?.profile;
 }
 
 /**
  * ADR-088 v7 (Decisions 8–14): conversation-bearing pulled events additionally
  * flow through the standard trace door into the source's chosen destination
  * project. Aggregate pulls never route, and neither does a source with no
- * entry in `CONVERSATION_ROUTING_PROFILES`; a source that has one routes the
+ * entry in `CONVERSATION_ROUTING_BY_SOURCE_TYPE`; a source that has one routes the
  * events its own profile names as conversations.
  *
  * Tenancy + redaction (Decision 13): the destination project id is the tenant,
@@ -525,7 +577,7 @@ export async function routeConversationsToTraceDestination({
   // conversations at all — only the composer declines to offer the picker.
   // So the source type has to earn its way in here, and one we have no
   // conversation shape for routes nothing rather than being guessed at.
-  const routing = CONVERSATION_ROUTING_PROFILES.get(source.sourceType);
+  const routing = CONVERSATION_ROUTING_BY_SOURCE_TYPE.get(source.sourceType);
   if (!routing) return;
 
   const request = routing.map({
