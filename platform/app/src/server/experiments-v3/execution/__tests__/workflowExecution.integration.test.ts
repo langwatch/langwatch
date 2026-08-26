@@ -165,6 +165,7 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
     // Execute through the NLP backend
     await studioBackendPostEvent({
       projectId: project.id,
+      nlpLambda: getApp().nlpLambda,
       message: enrichedEvent,
       onEvent: (serverEvent) => {
         events.push(serverEvent);

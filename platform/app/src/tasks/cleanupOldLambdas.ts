@@ -10,49 +10,20 @@ import {
   LambdaClient,
   ListFunctionsCommand,
 } from "@aws-sdk/client-lambda";
+import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 
 const logger = createLogger("langwatch:cleanup-old-lambdas");
 
-type LangWatchLambdaConfig = {
-  AWS_ACCESS_KEY_ID: string;
-  AWS_SECRET_ACCESS_KEY: string;
-  AWS_REGION: string;
-  role_arn: string;
-  image_uri: string;
-  cache_bucket: string;
-};
+function hasErrorName(error: unknown, expectedName: string): boolean {
+  return error instanceof Error && error.name === expectedName;
+}
 
-const parseLambdaConfig = (): LangWatchLambdaConfig => {
-  const configStr = process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
-  if (!configStr) {
-    throw new Error("LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required");
-  }
-
-  try {
-    return JSON.parse(configStr) as LangWatchLambdaConfig;
-  } catch (error) {
-    throw new Error("Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + error);
-  }
-};
-
-const createAWSClients = () => {
-  const config = parseLambdaConfig();
-  const credentials = {
-    accessKeyId: config.AWS_ACCESS_KEY_ID,
-    secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
-  };
-
+const createAWSClients = (runtime: NlpLambdaRuntime) => {
   return {
-    lambda: new LambdaClient({
-      region: config.AWS_REGION,
-      credentials,
-    }),
-    logs: new CloudWatchLogsClient({
-      region: config.AWS_REGION,
-      credentials,
-    }),
-    region: config.AWS_REGION,
+    lambda: runtime.createLambdaClient(),
+    logs: runtime.createLogsClient(),
   };
 };
 
@@ -76,8 +47,8 @@ const getLastEventTime = async (
     }
 
     return null;
-  } catch (error: any) {
-    if (error.name === "ResourceNotFoundException") {
+  } catch (error) {
+    if (hasErrorName(error, "ResourceNotFoundException")) {
       logger.warn(`Log group not found: ${logGroupName}`);
       return null;
     }
@@ -96,8 +67,8 @@ const deleteLambdaFunction = async (
 
     await lambdaClient.send(command);
     logger.info(`Deleted Lambda function: ${functionName}`);
-  } catch (error: any) {
-    if (error.name === "ResourceNotFoundException") {
+  } catch (error) {
+    if (hasErrorName(error, "ResourceNotFoundException")) {
       logger.warn(`Lambda function not found: ${functionName}`);
     } else {
       throw error;
@@ -118,8 +89,8 @@ const deleteLogGroup = async (
 
     await logsClient.send(command);
     logger.info(`Deleted log group: ${logGroupName}`);
-  } catch (error: any) {
-    if (error.name === "ResourceNotFoundException") {
+  } catch (error) {
+    if (hasErrorName(error, "ResourceNotFoundException")) {
       logger.warn(`Log group not found: ${logGroupName}`);
     } else {
       throw error;
@@ -134,22 +105,23 @@ const checkLambdaExists = async (
   try {
     await lambdaClient.send(new GetFunctionCommand({ FunctionName: functionName }));
     return true;
-  } catch (error: any) {
-    if (error.name === "ResourceNotFoundException") {
+  } catch (error) {
+    if (hasErrorName(error, "ResourceNotFoundException")) {
       return false;
     }
     throw error;
   }
 };
 
-const getAllLambdaFunctions = async (lambda: LambdaClient): Promise<any[]> => {
-  const allFunctions: any[] = [];
+const getAllLambdaFunctions = async (
+  lambda: LambdaClient,
+): Promise<FunctionConfiguration[]> => {
+  const allFunctions: FunctionConfiguration[] = [];
   let marker: string | undefined;
 
   do {
-    const listCommand = new ListFunctionsCommand({
-      ...(marker ? { Marker: marker } : {}),
-    });
+    const input = marker === undefined ? {} : { Marker: marker };
+    const listCommand = new ListFunctionsCommand(input);
 
     const response = await lambda.send(listCommand);
 
@@ -166,8 +138,8 @@ const getAllLambdaFunctions = async (lambda: LambdaClient): Promise<any[]> => {
   return allFunctions;
 };
 
-export default async function execute() {
-  const { lambda, logs } = createAWSClients();
+export default async function execute(nlpLambda: NlpLambdaRuntime) {
+  const { lambda, logs } = createAWSClients(nlpLambda);
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 

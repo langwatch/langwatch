@@ -20,13 +20,14 @@ import type { EvaluationV3Event } from "../types";
 
 type OrchestratorInput = Omit<
   ProductionOrchestratorInput,
-  "modelProviders" | "workflows"
+  "modelProviders" | "nlpLambda" | "workflows"
 >;
 
 const runTestOrchestrator = (input: OrchestratorInput) =>
   runOrchestrator({
     ...input,
     modelProviders: getApp().modelProviders,
+    nlpLambda: getApp().nlpLambda,
     workflows: getApp().workflows,
   });
 

@@ -6,6 +6,7 @@ import type {
 import { randomUUID } from "@copilotkit/shared";
 import { createLogger } from "@langwatch/observability";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 import type z from "zod";
 import {
   buildWorkflowLlmConfig,
@@ -35,6 +36,7 @@ const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
 
 type PromptStudioAdapterParams = {
   projectId: string;
+  nlpLambda: NlpLambdaRuntime;
   modelProviders: ModelProviderService;
   workflows: WorkflowService;
 };
@@ -46,6 +48,7 @@ type PromptStudioAdapterParams = {
  */
 export class PromptStudioAdapter implements CopilotServiceAdapter {
   private projectId: string;
+  private nlpLambda: NlpLambdaRuntime;
   private modelProviders: ModelProviderService;
   private workflows: WorkflowService;
 
@@ -55,6 +58,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
    */
   constructor(params: PromptStudioAdapterParams) {
     this.projectId = params.projectId;
+    this.nlpLambda = params.nlpLambda;
     this.modelProviders = params.modelProviders;
     this.workflows = params.workflows;
   }
@@ -290,6 +294,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       try {
         await studioBackendPostEvent({
           projectId: this.projectId,
+          nlpLambda: this.nlpLambda,
           modelProviders: this.modelProviders,
           message: preparedEvent,
           onEvent: (serverEvent: StudioServerEvent) => {

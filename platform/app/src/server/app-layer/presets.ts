@@ -90,6 +90,8 @@ import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-c
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import { env } from "~/env.mjs";
+import { resolveNlpLambdaRuntimeConfig } from "~/runtime/api/nlp-lambda";
+import { createProcessNlpLambdaRuntime } from "~/server/app-layer/nlp-lambda.runtime";
 import {
   LangyTurnAccessStore,
   LangyTurnHandoffStore,
@@ -462,6 +464,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     skip: config.skipRedis,
   });
   const redisShutdown = RedisShutdownService.create();
+  const nlpLambda = createProcessNlpLambdaRuntime({
+    config: config.nlpLambda,
+    redis,
+  });
 
   const authzFeature = AuthzFeature.create({
     database: prisma,
@@ -727,7 +733,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       }),
     workflows,
     dispatchNlp: (input) =>
-      nlpgoFetch({
+      nlpgoFetch(nlpLambda, {
         projectId: input.projectId,
         path: "/studio/execute_sync",
         body: input.body,
@@ -2013,6 +2019,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const app = initializeApp({
     config,
+    nlpLambda,
     agents,
     dataset,
     annotations,
@@ -2202,8 +2209,13 @@ export function createTestApp(
   const config: AppConfig = {
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",
+    nlpLambda: resolveNlpLambdaRuntimeConfig({}),
     ...overrides?.config,
   };
+  const nlpLambda = createProcessNlpLambdaRuntime({
+    config: config.nlpLambda,
+    redis: null,
+  });
 
   const testCanonicalOrganizations = AppOrganizationRuntime.create({
     database: testPrisma,
@@ -2421,6 +2433,7 @@ export function createTestApp(
 
   return new App({
     config,
+    nlpLambda,
     agents,
     dataset: testDataset,
     annotations: PostgresAnnotationAdapter.create({

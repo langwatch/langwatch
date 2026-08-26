@@ -18,10 +18,6 @@ vi.mock("../../workflows/post_event/post-event", () => ({
   studioBackendPostEvent: vi.fn(),
 }));
 
-vi.mock("~/optimization_studio/server/lambda", () => ({
-  invokeLambda: vi.fn(),
-}));
-
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
@@ -47,6 +43,10 @@ import type {
 } from "@copilotkit/runtime";
 import { beforeEach, describe, expect, it } from "vitest";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
+import {
+  NlpLambdaRuntime,
+  resolveNlpLambdaRuntimeConfig,
+} from "~/runtime/api/nlp-lambda";
 import { testModelProviders } from "~/server/modelProviders/__tests__/model-provider-services.test-support";
 import { TestWorkflowService } from "~/server/workflows/__tests__/test-workflow.service";
 import { PromptStudioAdapter } from "./service-adapter";
@@ -57,6 +57,11 @@ type StreamEvent =
   | { type: "TextMessageStart"; messageId: string }
   | { type: "TextMessageContent"; messageId: string; content: string }
   | { type: "TextMessageEnd"; messageId: string };
+
+const nlpLambda = NlpLambdaRuntime.create({
+  config: resolveNlpLambdaRuntimeConfig({}),
+  redis: null,
+});
 
 /**
  * Minimal duck-typed stand-in for RuntimeEventSource. The real type is not
@@ -158,6 +163,7 @@ describe("PromptStudioAdapter", () => {
     );
     adapter = new PromptStudioAdapter({
       projectId: "proj-test",
+      nlpLambda,
       modelProviders: testModelProviders,
       workflows,
     });

@@ -6,7 +6,7 @@ void (async () => {
   loadEnvironment();
 
   const { initializeEnvironmentConfig } = await import("./env.mjs");
-  initializeEnvironmentConfig(process.env);
+  const environment = initializeEnvironmentConfig(process.env);
 
   const { createLogger } = await import("@langwatch/observability");
   const { tryGetApp } = await import("./server/app-layer/app");
@@ -30,7 +30,18 @@ void (async () => {
     }
     logger.info({ taskName }, "running");
     const script = await load();
-    await script.default(...args.slice(1));
+    if (taskName === "cleanupOldLambdas") {
+      const { resolveNlpLambdaRuntimeConfig } = await import("./runtime/api/nlp-lambda");
+      const { createProcessNlpLambdaRuntime } =
+        await import("./server/app-layer/nlp-lambda.runtime");
+      const nlpLambda = createProcessNlpLambdaRuntime({
+        config: resolveNlpLambdaRuntimeConfig(environment),
+        redis: null,
+      });
+      await script.default(nlpLambda);
+    } else {
+      await script.default(...args.slice(1));
+    }
   } catch (error) {
     logger.error({ error, taskName }, "failed");
     throw error;

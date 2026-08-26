@@ -334,6 +334,7 @@ secured.access(requires("workflows:create")).post(
         prisma,
         c.app.experiments,
         c.app.modelProviders,
+        c.app.nlpLambda,
         c.app.workflows,
       ).triggerEvaluation({
         projectId: project.id,

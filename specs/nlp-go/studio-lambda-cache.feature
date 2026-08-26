@@ -1,85 +1,43 @@
-Feature: getProjectLambdaArn — per-project ARN cache + single-flight
-  As an operator running langwatch-workers under heavy per-tenant event load
-  I want resolving a project's Lambda ARN to be cheap and burst-tolerant
-  So that a single chatty tenant cannot exhaust the regional AWS Lambda API
-  quota and stall every fold/subscriber for other tenants on the same pod.
-
-  # Background — why this exists
-  #
-  # invokeLambda() and nlpgoFetch() both resolve `langwatch_nlp-<projectId>`
-  # to an ARN before dispatching a studio/SSE call. Resolution does:
-  #   1. GetFunction (checkLambdaExists)
-  #   2. Optionally CreateFunction / UpdateFunctionCode
-  #   3. GetFunction again, in a 500ms poll loop, until State=Active
-  #
-  # When a single tenant emits a burst of N studio-bound events, the worker
-  # pool runs N concurrent getProjectLambdaArn() calls, each making 2-N
-  # GetFunction calls against the same function name. AWS Lambda's
-  # control-plane quota is regional and shared across every pod in the
-  # cluster. On 2026-05-11 at 11:46 AMS a single project's burst triggered
-  # cluster-wide CallerRateLimitExceeded (HTTP 429), each retry burning
-  # 4-12s of worker budget before failing, which stalled unrelated
-  # event-sourcing fold groups (e.g. traceSummary/<date>:other:)
-  # because workers were saturated on retry sleeps.
-  #
-  # The fix has two layers:
-  #
-  #   A. ARN cache via TtlCache (Redis-backed, with per-pod memory
-  #      fallback when Redis is unavailable): a successful resolution is
-  #      memoized per projectId. The cached value carries the image_uri
-  #      it was resolved under, so a deploy (which bumps image_uri)
-  #      auto-invalidates: readers treat an image_uri mismatch as a miss
-  #      and re-run the UpdateFunctionCode path. Redis-backed means the
-  #      first miss anywhere in the fleet warms every other pod.
-  #      Failures are NOT cached — a TooManyRequestsException must not
-  #      poison subsequent calls cluster-wide.
-  #
-  #   B. In-process single-flight (per pod): concurrent misses for the
-  #      same projectId share one in-flight Promise. The shared Redis
-  #      cache is great after the first writer lands, but a cold burst
-  #      on one pod can still race before that write completes; this
-  #      closes that per-pod window.
+Feature: Per-project NLP Lambda resolution
+  The process-owned NLP Lambda runtime resolves the Studio and nlpgo target.
+  It shares successful ARN resolutions across API and worker instances while
+  retaining an in-process single-flight for a cold burst.
 
   Background:
-    Given LANGWATCH_NLP_LAMBDA_CONFIG is set with image_uri "ecr/foo:v1"
-    And the in-process ARN cache is empty
+    Given the runtime has a deployment image and an injected ARN cache
 
-  @integration @unit
-  Scenario: First call hits AWS; subsequent calls within TTL serve from cache with zero AWS calls
-    When getProjectLambdaArn("projectA") is called
-    Then a Lambda resolution flow runs against AWS
-    And the returned ARN is the function's FunctionArn
-    When getProjectLambdaArn("projectA") is called 50 more times within the TTL
-    Then no additional Lambda SDK calls are issued
-    And every call returns the same ARN
+  @unit
+  Scenario: A successful resolution is shared for ten minutes
+    When the runtime resolves "projectA" from AWS
+    Then it stores the ARN and deployment image at "lambda_arn:projectA"
+    And the shared entry has a TTL of 600 seconds
+    And repeated local resolutions do not call AWS
+    And a fresh runtime instance returns the shared ARN without calling AWS
 
-  @integration @unit
-  Scenario: Concurrent burst for one project collapses into a single AWS resolution
-    Given the cache is empty for "projectA"
-    When getProjectLambdaArn("projectA") is invoked 100 times concurrently
-    Then exactly one Lambda resolution flow runs end-to-end
-    And all 100 callers receive the same ARN
-    And no caller waits longer than the single resolution would have taken
+  @unit
+  Scenario: A concurrent local miss has one AWS resolution
+    Given "projectA" has no cached ARN
+    When the runtime resolves "projectA" concurrently
+    Then all callers receive the same ARN
+    And one AWS resolution flow runs
 
-  @integration @unit
-  Scenario: A failed resolution does not poison the cache
-    Given the next GetFunction call will throw TooManyRequestsException
-    When getProjectLambdaArn("projectA") is called and rejects
-    And the next GetFunction call succeeds
-    And getProjectLambdaArn("projectA") is called again
-    Then the second call resolves to a valid ARN
-    And no stale failure result is returned from the cache
+  @unit
+  Scenario: Cache failures and malformed entries fall back to AWS
+    Given the cache read fails or its entry is malformed
+    When the runtime resolves "projectA"
+    Then it resolves the ARN from AWS
+    And a failed AWS resolution is not cached
 
-  @integration @unit
-  Scenario: Deploy bumps image_uri and the cache invalidates automatically
-    Given getProjectLambdaArn("projectA") resolved under image_uri "ecr/foo:v1"
-    When LANGWATCH_NLP_LAMBDA_CONFIG is replaced with image_uri "ecr/foo:v2"
-    And getProjectLambdaArn("projectA") is called
-    Then a fresh Lambda resolution flow runs (cache miss on image_uri key)
-    And the v1 cache entry is no longer used for future calls under v2
+  @unit
+  Scenario: An image change deletes a stale cached ARN before refresh
+    Given "projectA" has an ARN cached for image "ecr/foo:v1"
+    When a runtime configured for image "ecr/foo:v2" resolves "projectA"
+    Then it deletes the stale "lambda_arn:projectA" entry
+    And it stores the refreshed ARN with image "ecr/foo:v2"
 
-  @integration @unit
-  Scenario: Different projects do not share cache slots
-    When getProjectLambdaArn("projectA") and getProjectLambdaArn("projectB") both resolve
-    Then the cache holds two independent entries
-    And neither project's resolution shortcuts the other's
+  @unit
+  Scenario: Studio stream payloads retain Lambda Web Adapter behavior
+    Given a response stream begins with a JSON prelude and eight zero bytes
+    Then Studio receives only the bytes after the prelude
+    And a malformed JSON prelude keeps the legacy 200 status default
+    And a stream with no separator completes without emitting buffered bytes

@@ -13,18 +13,10 @@ Feature: Auto S3 staging for large nlpgo Lambda invoke payloads
     execute_flow / execute_component / execute_evaluation on /studio/execute_sync)
     regularly serialize past that cap.
 
-    The langevals HTTP path and the optimization-studio invoke path already stage
-    large bodies to S3 and pass a short-lived presigned GET URL via the
-    X-Payload-S3-URL header. The nlpgo invoke sender (lambdaFetch) is the gap:
-    the engine's receiver (readStudioRequestBody) already fetches the staged body
-    when the header is present, and the S3 bucket/credentials are already wired,
-    but the sender never staged, so oversized bodies were inlined and rejected.
-
-    # Bindings: platform/app/src/utils/__tests__/lambdaFetch.unit.test.ts
-    # Sender: platform/app/src/utils/lambdaFetch.ts (ARN branch)
-    # Caller: platform/app/src/server/nlpgo/nlpgoFetch.ts (passes projectId)
-    # Receiver (already wired): services/nlpgo/adapters/httpapi/staged_payload.go
-    #   (readStudioRequestBody), called by executeSyncHandler in handlers.go
+    The process-owned NLP Lambda runtime owns the ARN invoke envelope and
+    staging decision for both nlpgo and Studio. Composition injects the S3
+    staging port; utils/lambdaFetch is only a compatibility delegate. The nlpgo
+    receiver fetches X-Payload-S3-URL bodies through readStudioRequestBody.
 
   @unit
   Scenario: A small invoke is sent inline

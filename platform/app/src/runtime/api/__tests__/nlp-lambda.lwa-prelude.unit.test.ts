@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   concatBytes,
-  findLWAPreludeSeparator,
+  findLwaPreludeSeparator,
   LWA_PRELUDE_SEPARATOR_LEN,
-} from "../index";
+} from "../nlp-lambda";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -20,7 +20,7 @@ function buildLWAResponse(prelude: object, body: string | Uint8Array): Uint8Arra
   return concatBytes(concatBytes(preludeBytes, sep), bodyBytes);
 }
 
-describe("findLWAPreludeSeparator", () => {
+describe("findLwaPreludeSeparator", () => {
   it("finds the separator at the boundary between prelude JSON and SSE body", () => {
     // Mirrors the exact prod hex-dump shape from rchaves's project_MZZ
     // Lambda invoke (2026-04-29): prelude JSON, then 8 NULs, then the
@@ -33,7 +33,7 @@ describe("findLWAPreludeSeparator", () => {
       },
       'data: {"type":"is_alive_response"}\n\ndata: {"type":"done"}\n\n',
     );
-    const sepIdx = findLWAPreludeSeparator(buf);
+    const sepIdx = findLwaPreludeSeparator(buf);
     expect(sepIdx).toBeGreaterThan(0);
     // The 8 bytes at sepIdx must all be zero
     for (let j = 0; j < LWA_PRELUDE_SEPARATOR_LEN; j++) {
@@ -54,7 +54,7 @@ describe("findLWAPreludeSeparator", () => {
     const partial = enc.encode(
       '{"statusCode":200,"headers":{"content-type":"text/event-strea',
     );
-    expect(findLWAPreludeSeparator(partial)).toBe(-1);
+    expect(findLwaPreludeSeparator(partial)).toBe(-1);
   });
 
   it("returns -1 for a body-only buffer that contains no 8-zero run", () => {
@@ -63,7 +63,7 @@ describe("findLWAPreludeSeparator", () => {
     const body = enc.encode(
       'data: {"type":"is_alive_response"}\n\ndata: {"type":"done"}\n\n',
     );
-    expect(findLWAPreludeSeparator(body)).toBe(-1);
+    expect(findLwaPreludeSeparator(body)).toBe(-1);
   });
 
   it("recognises the separator even when followed immediately by body bytes (no padding)", () => {
@@ -71,7 +71,7 @@ describe("findLWAPreludeSeparator", () => {
       enc.encode('{"statusCode":200,"headers":{},"cookies":[]}'),
       concatBytes(new Uint8Array(LWA_PRELUDE_SEPARATOR_LEN), enc.encode("d")),
     );
-    const sepIdx = findLWAPreludeSeparator(tightlyPacked);
+    const sepIdx = findLwaPreludeSeparator(tightlyPacked);
     expect(sepIdx).toBeGreaterThan(0);
     expect(dec.decode(tightlyPacked.slice(sepIdx + LWA_PRELUDE_SEPARATOR_LEN))).toBe("d");
   });
@@ -95,7 +95,7 @@ describe("concatBytes", () => {
 });
 
 /**
- * The end-to-end behavior of invokeLambda's strip loop is hard to unit-
+ * The end-to-end behavior of invokeStudioNlp's strip loop is hard to unit-
  * test because it lives inside a ReadableStream constructor that AWS
  * SDK populates from an EventStream. Instead, we model the strip
  * algorithm here over the same primitives the production code uses
@@ -113,7 +113,7 @@ describe("concatBytes", () => {
  */
 describe("LWA prelude-strip end-to-end behavior", () => {
   /**
-   * Mirror of the strip loop in invokeLambda's ReadableStream start():
+   * Mirror of the strip loop in invokeStudioNlp's ReadableStream start():
    * accept successive chunks, return the stripped body bytes that
    * SHOULD be enqueued downstream.
    */
@@ -125,7 +125,7 @@ describe("LWA prelude-strip end-to-end behavior", () => {
       let bytes = chunk;
       if (!preludeStripped) {
         const merged = concatBytes(preludeBuffer, bytes);
-        const sepIdx = findLWAPreludeSeparator(merged);
+        const sepIdx = findLwaPreludeSeparator(merged);
         if (sepIdx === -1) {
           preludeBuffer = merged;
           continue;

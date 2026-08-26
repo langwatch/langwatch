@@ -99,6 +99,7 @@ const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   for await (const event of executeWorkflowCell({
     cell,
     projectId: "p1",
+    nlpLambda: getApp().nlpLambda,
     workflowDsl,
     datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
     modelProviders: getApp().modelProviders,

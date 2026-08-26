@@ -27,6 +27,10 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  NlpLambdaRuntime,
+  resolveNlpLambdaRuntimeConfig,
+} from "~/runtime/api/nlp-lambda";
 
 // Mock the feature flag service BEFORE importing the helper so the
 // FF check returns true regardless of PostHog state.
@@ -42,6 +46,7 @@ vi.mock("../../featureFlag/featureFlag.service", () => ({
 // (lambdaFetch's URL fallback is a string base URL).
 vi.mock("../../../utils/lambdaFetch", () => ({
   lambdaFetch: async (
+    _nlpLambda: unknown,
     baseURL: string,
     pathSuffix: string,
     init: { method: string; headers: Record<string, string>; body: string },
@@ -57,19 +62,17 @@ vi.mock("../../../utils/lambdaFetch", () => ({
   },
 }));
 
-// Mock getProjectLambdaArn to return our local nlpgo URL.
-vi.mock("../../../optimization_studio/server/lambda", () => ({
-  getProjectLambdaArn: async () => "http://127.0.0.1:5562",
-}));
-
 const NLPGO_PORT = 5562;
-// nlpgoFetch consults the mocked getProjectLambdaArn ONLY when
-// LANGWATCH_NLP_LAMBDA_CONFIG is set; otherwise it routes straight to
-// LANGWATCH_NLP_SERVICE from the ambient .env — typically a long-running
-// dev nlpgo that has none of this branch's Go code. Pin both paths at the
-// subprocess this test spawns so it exercises THIS worktree's engine.
+// The runtime adapter resolves this local target so the test exercises the
+// worktree's engine rather than an ambient long-running nlpgo process.
 process.env.LANGWATCH_NLP_SERVICE = `http://127.0.0.1:${NLPGO_PORT}`;
 delete process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
+const nlpLambda = NlpLambdaRuntime.create({
+  config: resolveNlpLambdaRuntimeConfig({
+    LANGWATCH_NLP_SERVICE: `http://127.0.0.1:${NLPGO_PORT}`,
+  }),
+  redis: null,
+});
 // /langwatch/src/server/nlpgo/__tests__  → up 5 = repo root.
 // Was 6 historically (landed at worktrees/ instead of the repo) which
 // silently broke `go run ./cmd/service` with "directory not found"
@@ -237,7 +240,7 @@ describe("nlpgoFetch end-to-end against live nlpgo subprocess", () => {
         },
       };
 
-      const res = await nlpgoFetch({
+      const res = await nlpgoFetch(nlpLambda, {
         projectId: "test-project",
         path: "/studio/execute_sync",
         body: event,
@@ -348,7 +351,7 @@ describe("vision signature node against live nlpgo subprocess", () => {
         state: {},
       };
 
-      const res = await nlpgoFetch({
+      const res = await nlpgoFetch(nlpLambda, {
         projectId: "test-project-vision",
         path: "/studio/execute_sync",
         body: {

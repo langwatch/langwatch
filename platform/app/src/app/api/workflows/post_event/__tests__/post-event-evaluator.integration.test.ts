@@ -31,22 +31,16 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
+import {
+  NlpLambdaRuntime,
+  resolveNlpLambdaRuntimeConfig,
+} from "~/runtime/api/nlp-lambda";
 
 vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
   featureFlagService: {
     isEnabled: vi.fn().mockResolvedValue(true),
   },
 }));
-
-vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../../../../optimization_studio/server/addEnvs")
-  >("../../../../../optimization_studio/server/addEnvs");
-  return {
-    ...actual,
-    getS3CacheKey: () => undefined,
-  };
-});
 
 // Per-owner port scheme: 5561X / 5562X range (production port + extra
 // trailing digit, makes the dev↔test connection obvious to readers).
@@ -366,8 +360,15 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
       };
 
       const events: StudioServerEvent[] = [];
+      const nlpLambda = NlpLambdaRuntime.create({
+        config: resolveNlpLambdaRuntimeConfig({
+          LANGWATCH_NLP_SERVICE: `http://127.0.0.1:${NLPGO_PORT}`,
+        }),
+        redis: null,
+      });
       await studioBackendPostEvent({
         projectId: "test-project",
+        nlpLambda,
         message: message as any,
         onEvent: (ev) => events.push(ev),
       });

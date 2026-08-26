@@ -74,6 +74,8 @@ secured
       const model = await getVercelAIModel({
         projectId,
         featureKey: "studio.autocomplete",
+        modelProviders: c.app.modelProviders,
+        managedProviders: c.app.managedProviders,
       });
 
       const copilot = new CompletionCopilot(undefined, {
@@ -230,6 +232,8 @@ secured
 
           void studioBackendPostEvent({
             projectId,
+            nlpLambda: c.app.nlpLambda,
+            modelProviders: c.app.modelProviders,
             message,
             onEvent: (serverEvent: StudioServerEvent) => {
               void stream.writeSSE({

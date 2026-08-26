@@ -9,6 +9,7 @@ import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type {
   Entry,
@@ -61,6 +62,7 @@ export class WorkflowEvaluationService {
     private readonly prisma: PrismaClient,
     private readonly experiments: ExperimentService,
     private readonly modelProviders: ModelProviderService,
+    private readonly nlpLambda: NlpLambdaRuntime,
     private readonly workflows: WorkflowService,
   ) {}
 
@@ -68,9 +70,16 @@ export class WorkflowEvaluationService {
     prisma: PrismaClient,
     experiments: ExperimentService,
     modelProviders: ModelProviderService,
+    nlpLambda: NlpLambdaRuntime,
     workflows: WorkflowService,
   ): WorkflowEvaluationService {
-    return new WorkflowEvaluationService(prisma, experiments, modelProviders, workflows);
+    return new WorkflowEvaluationService(
+      prisma,
+      experiments,
+      modelProviders,
+      nlpLambda,
+      workflows,
+    );
   }
 
   async triggerEvaluation({
@@ -265,6 +274,7 @@ export class WorkflowEvaluationService {
       loadedPrompts,
       loadedAgents,
       modelProviders: this.modelProviders,
+      nlpLambda: this.nlpLambda,
       workflows: this.workflows,
       loadedEvaluators,
       loadedWorkflows,

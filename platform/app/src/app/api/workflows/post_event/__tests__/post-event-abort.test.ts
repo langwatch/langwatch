@@ -12,20 +12,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import {
+  NlpLambdaRuntime,
+  resolveNlpLambdaRuntimeConfig,
+} from "~/runtime/api/nlp-lambda";
 
-vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../../../../optimization_studio/server/addEnvs")
-  >("../../../../../optimization_studio/server/addEnvs");
-  return { ...actual, getS3CacheKey: () => undefined };
+vi.mock("~/runtime/api/nlp-lambda", async () => {
+  const actual = await vi.importActual<typeof import("~/runtime/api/nlp-lambda")>(
+    "~/runtime/api/nlp-lambda",
+  );
+  return { ...actual, invokeStudioNlp: vi.fn(async () => currentReader) };
 });
 
 // Each test sets the reader the engine call returns, so we can model both a
 // blocked read and a clean completion.
 let currentReader: ReadableStreamDefaultReader<Uint8Array>;
-vi.mock("../../../../../optimization_studio/server/lambda", () => ({
-  invokeLambda: vi.fn(async () => currentReader),
-}));
+
+const nlpLambda = NlpLambdaRuntime.create({
+  config: resolveNlpLambdaRuntimeConfig({}),
+  redis: null,
+});
 
 const blockedCell = {
   type: "execute_component",
@@ -66,6 +72,7 @@ describe("studioBackendPostEvent abort during an in-flight read", () => {
       const { studioBackendPostEvent } = await import("../post-event");
       const done = studioBackendPostEvent({
         projectId: "p",
+        nlpLambda,
         message: blockedCell,
         onEvent,
         isAborted,
@@ -93,6 +100,7 @@ describe("studioBackendPostEvent abort during an in-flight read", () => {
       const { studioBackendPostEvent } = await import("../post-event");
       await studioBackendPostEvent({
         projectId: "p",
+        nlpLambda,
         message: blockedCell,
         onEvent,
         isAborted: vi.fn(async () => false),

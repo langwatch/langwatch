@@ -49,7 +49,7 @@ const oldLambdasCleanupHandler = async (c: CronContext) => {
   }
 
   try {
-    await cleanupOldLambdas();
+    await cleanupOldLambdas(c.app.nlpLambda);
     return c.json({ message: "Old lambdas deleted successfully" });
   } catch (error: any) {
     return c.json(

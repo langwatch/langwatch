@@ -177,6 +177,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
 
     await studioBackendPostEvent({
       projectId: project.id,
+      nlpLambda: getApp().nlpLambda,
       message: enrichedEvent,
       onEvent: (serverEvent) => {
         events.push(serverEvent);

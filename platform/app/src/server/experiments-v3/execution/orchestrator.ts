@@ -15,6 +15,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 import type {
   ComparisonEvaluatorConfig,
   EvaluationsV3State,
@@ -90,6 +91,7 @@ export type OrchestratorInput = {
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   modelProviders: ModelProviderService;
+  nlpLambda: NlpLambdaRuntime;
   workflows: WorkflowService;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
@@ -984,6 +986,7 @@ type CellEvaluatorContext = {
   targetNodes: Set<string>;
   config: ResultMapperConfig;
   modelProviders: ModelProviderService;
+  nlpLambda: NlpLambdaRuntime;
   workflows: WorkflowService;
   isAborted?: () => Promise<boolean>;
 };
@@ -1006,6 +1009,7 @@ async function* runOneCellEvaluator({
   targetNodes,
   config,
   modelProviders,
+  nlpLambda,
   workflows,
   isAborted,
 }: CellEvaluatorContext & {
@@ -1031,6 +1035,7 @@ async function* runOneCellEvaluator({
   const evaluatorEvents: StudioServerEvent[] = [];
   await studioBackendPostEvent({
     projectId,
+    nlpLambda,
     modelProviders,
     message: await workflows.enrichStudioEvent({
       event: evaluatorEvent,
@@ -1131,6 +1136,7 @@ async function* runCellEvaluators({
 export async function* executeCell(
   cell: ExecutionCell,
   projectId: string,
+  nlpLambda: NlpLambdaRuntime,
   datasetColumns: Array<{ id: string; name: string; type: string }>,
   loadedData: {
     prompt?: VersionedPrompt;
@@ -1223,6 +1229,7 @@ export async function* executeCell(
 
       await studioBackendPostEvent({
         projectId,
+        nlpLambda,
         modelProviders,
         message: enrichedEvent,
         isAborted,
@@ -1294,6 +1301,7 @@ export async function* executeCell(
         targetNodes,
         config: cellConfig,
         modelProviders,
+        nlpLambda,
         workflows,
         isAborted,
       });
@@ -1329,6 +1337,7 @@ export async function* executeWorkflowCell({
   resultMapperConfig,
   isAborted,
   modelProviders,
+  nlpLambda,
   workflows,
 }: {
   cell: ExecutionCell;
@@ -1339,6 +1348,7 @@ export async function* executeWorkflowCell({
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
   modelProviders: ModelProviderService;
+  nlpLambda: NlpLambdaRuntime;
   workflows: WorkflowService;
 }): AsyncGenerator<EvaluationV3Event> {
   yield {
@@ -1384,6 +1394,7 @@ export async function* executeWorkflowCell({
     const events: StudioServerEvent[] = [];
     await studioBackendPostEvent({
       projectId,
+      nlpLambda,
       modelProviders,
       message: enrichedEvent,
       isAborted,
@@ -1536,6 +1547,7 @@ export async function* executeWorkflowCell({
         targetNodes: new Set([cell.targetId]),
         config: resultMapperConfig ?? {},
         modelProviders,
+        nlpLambda,
         workflows,
         isAborted,
       });
@@ -1979,6 +1991,7 @@ export async function* runOrchestrator(
     concurrency: requestedConcurrency,
     seedTargetOutputs,
     modelProviders,
+    nlpLambda,
     workflows,
   } = input;
 
@@ -2369,11 +2382,13 @@ export async function* runOrchestrator(
                   resultMapperConfig,
                   isAborted: checkAbort,
                   modelProviders,
+                  nlpLambda,
                   workflows,
                 })
               : executeCell(
                   cell,
                   projectId,
+                  nlpLambda,
                   datasetColumns,
                   loadedData,
                   modelProviders,
@@ -2611,6 +2626,7 @@ export async function* runOrchestrator(
                 for await (const event of executeCell(
                   cell,
                   projectId,
+                  nlpLambda,
                   datasetColumns,
                   loadedData,
                   modelProviders,

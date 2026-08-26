@@ -32,6 +32,7 @@ secured.access(requires("prompts:view")).post(
       runtime,
       serviceAdapter: new PromptStudioAdapter({
         projectId: project.id,
+        nlpLambda: c.app.nlpLambda,
         modelProviders: c.app.modelProviders,
         workflows: c.app.workflows,
       }),

@@ -1,4 +1,4 @@
-import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 import { lambdaFetch } from "../../utils/lambdaFetch";
 
 /**
@@ -119,6 +119,7 @@ export interface NLPGOFetchResult<T> {
  * helper (see topicClustering.ts).
  */
 export async function nlpgoFetch<T = unknown>(
+  nlpLambda: NlpLambdaRuntime,
   opts: NLPGOFetchOptions,
 ): Promise<NLPGOFetchResult<T>> {
   const finalPath = "/go" + opts.path;
@@ -149,11 +150,9 @@ export async function nlpgoFetch<T = unknown>(
     headers.traceparent = formatTraceparent(opts.parentTrace);
   }
 
-  const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
-    ? await getProjectLambdaArn(opts.projectId)
-    : process.env.LANGWATCH_NLP_SERVICE!;
+  const functionArn = await nlpLambda.resolveTarget(opts.projectId);
 
-  const response = await lambdaFetch<T>(functionArn, finalPath, {
+  const response = await lambdaFetch<T>(nlpLambda, functionArn, finalPath, {
     method: "POST",
     headers,
     body: bodyStr,

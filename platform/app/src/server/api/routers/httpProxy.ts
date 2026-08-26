@@ -113,6 +113,7 @@ export const httpProxyRouter = createTRPCRouter({
           workflow,
           traceId,
           inputs: templateVariables,
+          nlpLambda: ctx.app.nlpLambda,
           modelProviders: ctx.app.modelProviders,
           workflows: ctx.app.workflows,
         });
@@ -204,6 +205,7 @@ const runNode = async ({
   workflow,
   traceId,
   inputs,
+  nlpLambda,
   modelProviders,
   workflows,
 }: {
@@ -212,6 +214,7 @@ const runNode = async ({
   workflow: StudioWorkflow;
   traceId: string;
   inputs: Record<string, unknown>;
+  nlpLambda: import("~/runtime/api/nlp-lambda").NlpLambdaRuntime;
   modelProviders: import("@langwatch/model-provider-contract").ModelProviderService;
   workflows: import("@langwatch/workflow-contract").WorkflowService;
 }): Promise<NonNullable<BaseComponent["execution_state"]>> => {
@@ -232,6 +235,7 @@ const runNode = async ({
   let state: BaseComponent["execution_state"];
   await studioBackendPostEvent({
     projectId,
+    nlpLambda,
     modelProviders,
     message: await workflows.enrichStudioEvent({ event, projectId }),
     onEvent: (serverEvent: StudioServerEvent) => {

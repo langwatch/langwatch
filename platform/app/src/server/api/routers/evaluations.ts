@@ -167,6 +167,7 @@ export const evaluationsRouter = createTRPCRouter({
       const warmupPromises = Array.from({ length: count }, () =>
         studioBackendPostEvent({
           projectId,
+          nlpLambda: ctx.app.nlpLambda,
           modelProviders: ctx.app.modelProviders,
           message: { type: "is_alive", payload: {} },
           onEvent: () => {

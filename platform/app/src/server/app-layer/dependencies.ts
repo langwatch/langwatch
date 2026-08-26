@@ -112,6 +112,7 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { TopicService } from "@langwatch/topic-contract";
+import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 
 export type DataRetentionDependencies = DataRetentionService & {
   /** Singular feature service: policy and trace-pin methods share one instance. */
@@ -135,6 +136,8 @@ export type OpsDependencies = OpsService & {
 
 export interface AppDependencies {
   config: AppConfig;
+  /** Process-owned NLP dispatch capability for API and worker transports. */
+  nlpLambda: NlpLambdaRuntime;
   /** One process-owned Agent capability shared by every transport. */
   agents: AgentService;
   /** One process-owned Dataset capability shared by REST, tRPC, and workers. */

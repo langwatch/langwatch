@@ -97,6 +97,7 @@ async function settleWithTimeout({
 
 export class App {
   readonly config: AppConfig;
+  readonly nlpLambda: AppDependencies["nlpLambda"];
   readonly agents: AppDependencies["agents"];
   readonly dataset: AppDependencies["dataset"];
   readonly annotations: AppDependencies["annotations"];
@@ -184,6 +185,7 @@ export class App {
 
   constructor(deps: AppDependencies) {
     this.config = deps.config;
+    this.nlpLambda = deps.nlpLambda;
     this.agents = deps.agents;
     this.dataset = deps.dataset;
     this.annotations = deps.annotations;

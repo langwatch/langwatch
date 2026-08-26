@@ -15,40 +15,43 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import {
+  NlpLambdaRuntime,
+  resolveNlpLambdaRuntimeConfig,
+} from "~/runtime/api/nlp-lambda";
 
-vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../../../../optimization_studio/server/addEnvs")
-  >("../../../../../optimization_studio/server/addEnvs");
+vi.mock("~/runtime/api/nlp-lambda", async () => {
+  const actual = await vi.importActual<typeof import("~/runtime/api/nlp-lambda")>(
+    "~/runtime/api/nlp-lambda",
+  );
   return {
     ...actual,
-    getS3CacheKey: () => undefined,
+    invokeStudioNlp: vi.fn(
+      async (
+        _nlpLambda: unknown,
+        _projectId: string,
+        _event: StudioClientEvent,
+        _s3CacheKey: string | undefined,
+        options: { path?: string } = {},
+      ) => {
+        capturedPaths.push(options.path ?? "/studio/execute");
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: {"type":"done"}\n\n'));
+            controller.close();
+          },
+        });
+        return stream.getReader();
+      },
+    ),
   };
 });
 
 const capturedPaths: string[] = [];
-vi.mock("../../../../../optimization_studio/server/lambda", () => ({
-  invokeLambda: vi.fn(
-    async (
-      _projectId: string,
-      _event: StudioClientEvent,
-      _s3CacheKey: string | undefined,
-      options: { path?: string } = {},
-    ) => {
-      capturedPaths.push(options.path ?? "/studio/execute");
-      // One valid `done` frame so studioBackendPostEvent's reader exits
-      // cleanly via its `serverEvent.type === "done"` short-circuit
-      // instead of logging a "Studio invalid response" error on close.
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode('data: {"type":"done"}\n\n'));
-          controller.close();
-        },
-      });
-      return stream.getReader();
-    },
-  ),
-}));
+const nlpLambda = NlpLambdaRuntime.create({
+  config: resolveNlpLambdaRuntimeConfig({}),
+  redis: null,
+});
 
 const minimalWorkflow = {
   workflow_id: "routing-test",
@@ -113,6 +116,7 @@ describe("studioBackendPostEvent routing", () => {
       const { studioBackendPostEvent } = await import("../post-event");
       await studioBackendPostEvent({
         projectId: "any-project",
+        nlpLambda,
         message: eventByType[eventType]!,
         onEvent: () => {},
       });

@@ -1,4 +1,8 @@
 import { getEnvironmentConfig } from "../../env.mjs";
+import {
+  resolveNlpLambdaRuntimeConfig,
+  type NlpLambdaRuntimeConfig,
+} from "~/runtime/api/nlp-lambda.config";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -38,6 +42,9 @@ export function roleSatisfiesRunIn({
 
 export interface AppConfig {
   nodeEnv: string;
+
+  /** Typed configuration for the process-owned NLP Lambda capability. */
+  nlpLambda: NlpLambdaRuntimeConfig;
 
   // Infrastructure
   databaseUrl: string;
@@ -91,6 +98,7 @@ export function createAppConfigFromEnv(overrides?: {
 
   return {
     nodeEnv: env.NODE_ENV,
+    nlpLambda: resolveNlpLambdaRuntimeConfig(env),
     databaseUrl: env.DATABASE_URL,
     clickhouseUrl: env.CLICKHOUSE_URL,
     redisUrl: env.REDIS_URL,

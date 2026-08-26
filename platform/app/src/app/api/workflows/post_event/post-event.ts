@@ -1,11 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
-import { invokeLambda } from "../../../../optimization_studio/server/lambda";
-import type {
-  StudioClientEvent,
-  StudioServerEvent,
-} from "@langwatch/workflow-contract";
+import { invokeStudioNlp, type NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
+import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import { stripUnsupportedLLMParamsFromWorkflow } from "../../../../server/workflows/stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:post_event");
@@ -67,10 +63,11 @@ const readChunkOrAbort = async (
 
 export const studioBackendPostEvent = async ({
   projectId,
-  message: message,
+  message,
   onEvent,
   isAborted,
   modelProviders,
+  nlpLambda,
 }: {
   projectId: string;
   message: StudioClientEvent;
@@ -78,6 +75,7 @@ export const studioBackendPostEvent = async ({
   /** Optional function to check if execution should be aborted */
   isAborted?: () => Promise<boolean>;
   modelProviders: ModelProviderService;
+  nlpLambda: NlpLambdaRuntime;
 }) => {
   let reader: ReadableStreamDefaultReader<Uint8Array>;
   try {
@@ -109,9 +107,9 @@ export const studioBackendPostEvent = async ({
       }
     }
 
-    const s3CacheKey = getS3CacheKey(projectId);
+    const s3CacheKey = nlpLambda.getStudioCacheKey(projectId);
 
-    reader = await invokeLambda(projectId, message, s3CacheKey, {
+    reader = await invokeStudioNlp(nlpLambda, projectId, message, s3CacheKey, {
       path: "/go/studio/execute",
       headers: { "X-LangWatch-Origin": "workflow" },
       supportsStaging: true,

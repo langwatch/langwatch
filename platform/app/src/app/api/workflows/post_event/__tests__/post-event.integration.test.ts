@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Live SSE end-to-end through the actual Studio "Run" path:
- *   studioBackendPostEvent → invokeLambda(path: /go/studio/execute)
+ *   studioBackendPostEvent → invokeStudioNlp(path: /go/studio/execute)
  *     → real nlpgo Go subprocess → real OpenAI provider call.
  *
  * Why this test exists:
@@ -27,6 +27,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
+import {
+  NlpLambdaRuntime,
+  resolveNlpLambdaRuntimeConfig,
+} from "~/runtime/api/nlp-lambda";
 
 // FF-on regardless of PostHog state.
 vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
@@ -34,17 +38,6 @@ vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
     isEnabled: vi.fn().mockResolvedValue(true),
   },
 }));
-
-// No S3 dependency for the test — use undefined cache key.
-vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../../../../optimization_studio/server/addEnvs")
-  >("../../../../../optimization_studio/server/addEnvs");
-  return {
-    ...actual,
-    getS3CacheKey: () => undefined,
-  };
-});
 
 // Per-owner port scheme (rchaves's call): use the 5561X / 5562X range.
 // Each port corresponds to a "real" production port + an extra trailing
@@ -78,9 +71,8 @@ async function waitForHealth(timeoutMs = 30_000): Promise<void> {
 beforeAll(async () => {
   if (!process.env.OPENAI_API_KEY) return;
 
-  // Point invokeLambda's URL-fallback branch (no LAMBDA_CONFIG) at our
-  // local nlpgo subprocess. invokeLambda does:
-  //   fetch(`${LANGWATCH_NLP_SERVICE}${path}`, ...)
+  // Point the explicit runtime's HTTP fallback (no Lambda deployment) at the
+  // local nlpgo subprocess.
   process.env.LANGWATCH_NLP_SERVICE = `http://127.0.0.1:${NLPGO_PORT}`;
   delete process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
 
@@ -148,6 +140,12 @@ describe("studioBackendPostEvent FF-gated SSE routing to nlpgo", () => {
     "execute_flow with FF on streams a real Studio workflow through /go/studio/execute and returns success",
     async () => {
       const { studioBackendPostEvent } = await import("../post-event");
+      const nlpLambda = NlpLambdaRuntime.create({
+        config: resolveNlpLambdaRuntimeConfig({
+          LANGWATCH_NLP_SERVICE: `http://127.0.0.1:${NLPGO_PORT}`,
+        }),
+        redis: null,
+      });
 
       const workflow = {
         workflow_id: "ts-postevent-e2e",
@@ -234,6 +232,7 @@ describe("studioBackendPostEvent FF-gated SSE routing to nlpgo", () => {
       const events: StudioServerEvent[] = [];
       await studioBackendPostEvent({
         projectId: "test-project",
+        nlpLambda,
         message: message as any,
         onEvent: (ev) => events.push(ev),
       });
