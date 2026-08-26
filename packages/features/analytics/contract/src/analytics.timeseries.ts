@@ -98,6 +98,8 @@ export type AnalyticsSeries = z.infer<typeof analyticsSeriesSchema>;
 export type AnalyticsTimeseriesInput = z.infer<typeof analyticsTimeseriesInputSchema>;
 export type AnalyticsTable = z.infer<typeof analyticsTableSchema>;
 export type AnalyticsTimeseriesBucket = z.infer<typeof analyticsTimeseriesBucketSchema>;
+/** Compatibility name for existing analytics consumers; the schema above is canonical. */
+export type TimeseriesBucket = AnalyticsTimeseriesBucket;
 export type AnalyticsTimeseriesResult = z.infer<typeof analyticsTimeseriesResultSchema>;
 
 export type AnalyticsFilterValue =
@@ -165,7 +167,7 @@ export function getMetricSource(metric: string): AnalyticsMetricSource | undefin
         metric.startsWith("topics.") ||
         metric.startsWith("traces.")
       ? "trace"
-      : undefined;
+      : void 0;
 }
 
 export function buildSeriesName(series: AnalyticsSeries, index: number): string {
