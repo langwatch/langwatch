@@ -50,10 +50,11 @@ void (async () => {
       const { createApp } = await import("./runtime/app");
       const { initializeInProcessApp, initializeWebApp } =
         await import("./server/app-layer/presets");
+      const composeApp = config.workersInProcess
+        ? initializeInProcessApp
+        : initializeWebApp;
       const appRuntime = await createApp({
-        initializeLegacy: config.workersInProcess
-          ? initializeInProcessApp
-          : initializeWebApp,
+        composeApp,
         resources,
       });
       const { startApp } = await import("./start");

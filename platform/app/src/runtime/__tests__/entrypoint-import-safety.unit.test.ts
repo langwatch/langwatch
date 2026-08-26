@@ -29,6 +29,9 @@ describe("executable import boundaries", () => {
 
     expect(start).toContain("await appRuntime.start();");
     expect(start).not.toMatch(/if \(!options\.appRuntime\).*appRuntime\.start/);
+    expect(server).toContain("const composeApp = config.workersInProcess");
+    expect(server).toContain("composeApp,");
+    expect(server).not.toContain("initializeLegacy:");
     expect(server).not.toContain("await appRuntime.start();");
   });
 
