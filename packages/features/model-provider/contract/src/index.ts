@@ -5,6 +5,8 @@ export * from "./model-provider-wire-format";
 export * from "./model-provider-credential";
 export * from "./model-provider-registry";
 export * from "./model-provider-routing-handle";
+export * from "./model-provider-display-names";
+export * from "./model-provider.compatibility";
 export * from "./model-cost";
 export * from "./custom-model";
 export * from "./codex-account";

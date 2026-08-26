@@ -24,7 +24,7 @@ import llmModelsRaw from "./model-catalog.json";
 import llmModelsOverlayRaw from "./model-catalog.overlay.json";
 import type { LLMModelEntry, LLMModelRegistry } from "./model-catalog.types";
 
-const pricingSchema = z
+export const modelPricingSchema = z
   .object({
     inputCostPerToken: z.number(),
     outputCostPerToken: z.number(),
@@ -42,12 +42,12 @@ const pricingSchema = z
   })
   .strict();
 
-const modelEntrySchema = z
+export const modelCatalogEntrySchema = z
   .object({
     id: z.string(),
     name: z.string(),
     provider: z.string(),
-    pricing: pricingSchema,
+    pricing: modelPricingSchema,
     contextLength: z.number(),
     maxCompletionTokens: z.number().nullable(),
     supportedParameters: z.array(z.string()),
@@ -75,12 +75,12 @@ const modelCatalogSchema = z
   .object({
     updatedAt: z.string(),
     modelCount: z.number(),
-    models: z.record(z.string(), modelEntrySchema),
+    models: z.record(z.string(), modelCatalogEntrySchema),
   })
   .strict();
 
 const modelCatalogOverlaySchema = z
-  .object({ models: z.record(z.string(), modelEntrySchema) })
+  .object({ models: z.record(z.string(), modelCatalogEntrySchema) })
   .loose();
 
 const base: LLMModelRegistry = modelCatalogSchema.parse(llmModelsRaw);

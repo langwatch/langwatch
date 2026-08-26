@@ -47,8 +47,13 @@ export const modelProviderSchema = z
     rateLimitTpm: z.number().int().nonnegative().nullable(),
     rateLimitRpd: z.number().int().nonnegative().nullable(),
     fallbackPriorityGlobal: z.number().int().nullable(),
+    rotationPolicy: z.literal("MANUAL").optional(),
     providerConfig: z.record(z.string(), z.unknown()).nullable(),
     deploymentMapping: z.record(z.string(), z.string()).nullable().optional(),
+    healthStatus: z.enum(["UNKNOWN", "HEALTHY", "DEGRADED", "CIRCUIT_OPEN"]).optional(),
+    circuitOpenedAt: z.date().nullable().optional(),
+    lastHealthCheckAt: z.date().nullable().optional(),
+    disabledAt: z.date().nullable().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
   })
@@ -317,6 +322,41 @@ export const modelDefaultResolveInputSchema = z
   .object({ projectId: z.string().min(1), featureKey: z.string().min(1) })
   .strict();
 export type ModelDefaultResolveInput = z.infer<typeof modelDefaultResolveInputSchema>;
+
+export const modelProviderResolutionScopeSchema = z.enum([
+  "project",
+  "team",
+  "organization",
+]);
+export type ModelProviderResolutionScope = z.infer<
+  typeof modelProviderResolutionScopeSchema
+>;
+export const modelProviderResolutionSourceSchema = z.enum([
+  "feature_override",
+  "role_default",
+]);
+export type ModelProviderResolutionSource = z.infer<
+  typeof modelProviderResolutionSourceSchema
+>;
+export const modelProviderResolutionFeatureSchema = z
+  .object({
+    key: z.string().min(1),
+    role: z.enum(["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"]),
+    displayName: z.string().min(1),
+    description: z.string(),
+  })
+  .strict();
+export const modelProviderResolutionSchema = z
+  .object({
+    model: z.string().min(1),
+    source: modelProviderResolutionSourceSchema,
+    scope: modelProviderResolutionScopeSchema,
+    feature: modelProviderResolutionFeatureSchema,
+  })
+  .strict();
+export type ModelProviderResolution = z.infer<typeof modelProviderResolutionSchema>;
+export const modelProviderAlternateResolutionSchema = modelProviderResolutionSchema;
+export type ModelProviderAlternateResolution = ModelProviderResolution;
 export const modelDefaultAssignmentInputSchema = z
   .object({
     scope: modelDefaultScopeSchema,

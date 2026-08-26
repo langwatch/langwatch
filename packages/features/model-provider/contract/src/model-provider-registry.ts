@@ -4,12 +4,13 @@ import { codexTokenKeysSchema } from "./codex-account";
 import type { CustomModelEntry } from "./custom-model";
 import type { ModelProviderScope } from "./model-provider";
 
-export type ParameterConstraint = {
-  min?: number;
-  max?: number;
-};
+export const parameterConstraintSchema = z
+  .object({ min: z.number().optional(), max: z.number().optional() })
+  .strict();
+export type ParameterConstraint = z.infer<typeof parameterConstraintSchema>;
 
-export type ParameterConstraints = Record<string, ParameterConstraint>;
+export const parameterConstraintsSchema = z.record(z.string(), parameterConstraintSchema);
+export type ParameterConstraints = z.infer<typeof parameterConstraintsSchema>;
 
 export type ModelProviderDefinition = {
   name: string;

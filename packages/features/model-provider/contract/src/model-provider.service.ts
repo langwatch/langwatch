@@ -28,6 +28,8 @@ import type {
   ModelProviderCodexStatusInput,
   ModelProviderCodexGatewayRefresh,
   ModelProviderCodexGatewayRefreshInput,
+  ModelProviderAlternateResolution,
+  ModelProviderResolution,
   ModelProviderWriteInput,
   TranslateInput,
   TranslateOutput,
@@ -87,6 +89,14 @@ export abstract class ModelProviderService {
   abstract tryGetResolvedDefault(
     input: ModelDefaultResolveInput,
   ): Promise<import("./model-provider").ModelDefaultEffective | null>;
+  abstract resolveModelForFeature(
+    input: ModelDefaultResolveInput,
+  ): Promise<ModelProviderResolution>;
+  abstract tryFindAlternateModel(input: {
+    projectId: string;
+    featureKey: string;
+    skipFromScope: ModelProviderResolution["scope"];
+  }): Promise<ModelProviderAlternateResolution | null>;
   abstract setDefault(input: ModelDefaultAssignmentInput): Promise<void>;
   abstract saveDefaultConfig(
     input: ModelDefaultConfigWriteInput,

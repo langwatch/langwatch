@@ -1,5 +1,131 @@
 import { HandledError } from "@langwatch/handled-error";
 import { ROUTING_HANDLE_RULE } from "./model-provider";
+import type { ModelRole } from "./catalog/model-feature-registry";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./catalog/codex-refusal-message";
+
+export const MODEL_NOT_CONFIGURED_CAUSE = "MODEL_NOT_CONFIGURED" as const;
+
+export class ModelNotConfiguredError extends HandledError {
+  declare readonly code: "model_not_configured";
+  readonly cause = MODEL_NOT_CONFIGURED_CAUSE;
+
+  constructor(
+    public readonly featureKey: string,
+    public readonly role: ModelRole,
+    public readonly featureDisplayName: string,
+    public readonly projectId: string,
+  ) {
+    super(
+      "model_not_configured",
+      `No model configured for "${featureKey}" (role: ${role}, project: ${projectId}).`,
+      { httpStatus: 400, meta: { featureKey, role, featureDisplayName, projectId } },
+    );
+    this.name = "ModelNotConfiguredError";
+  }
+}
+
+export const MODEL_PROVIDER_DISABLED_CAUSE = "MODEL_PROVIDER_DISABLED" as const;
+
+export type ModelProviderResolvedAlternate = {
+  scope: "project" | "team" | "organization";
+  model: string;
+  providerKey: string;
+  providerEnabled: boolean;
+};
+
+export class ModelProviderDisabledError extends HandledError {
+  declare readonly code: "model_provider_disabled";
+  readonly cause = MODEL_PROVIDER_DISABLED_CAUSE;
+
+  constructor(
+    public readonly featureKey: string,
+    public readonly featureDisplayName: string,
+    public readonly role: ModelRole,
+    public readonly projectId: string,
+    public readonly resolvedScope: "project" | "team" | "organization",
+    public readonly resolvedModel: string,
+    public readonly providerKey: string,
+    public readonly alternate: ModelProviderResolvedAlternate | null,
+  ) {
+    super(
+      "model_provider_disabled",
+      `Model "${resolvedModel}" is configured at ${resolvedScope} scope for "${featureKey}", but its provider "${providerKey}" is currently disabled.`,
+      {
+        httpStatus: 400,
+        meta: {
+          featureKey,
+          featureDisplayName,
+          role,
+          projectId,
+          resolvedScope,
+          resolvedModel,
+          providerKey,
+          alternate,
+        },
+      },
+    );
+    this.name = "ModelProviderDisabledError";
+  }
+
+  toResponseBody(): {
+    code: typeof MODEL_PROVIDER_DISABLED_CAUSE;
+    featureKey: string;
+    featureDisplayName: string;
+    role: ModelRole;
+    projectId: string;
+    resolvedScope: "project" | "team" | "organization";
+    resolvedModel: string;
+    providerKey: string;
+    alternate: ModelProviderResolvedAlternate | null;
+  } {
+    return {
+      code: this.cause,
+      featureKey: this.featureKey,
+      featureDisplayName: this.featureDisplayName,
+      role: this.role,
+      projectId: this.projectId,
+      resolvedScope: this.resolvedScope,
+      resolvedModel: this.resolvedModel,
+      providerKey: this.providerKey,
+      alternate: this.alternate,
+    };
+  }
+}
+
+export class ModelRestrictedForFeatureError extends HandledError {
+  declare readonly code: "model_restricted_for_feature";
+
+  readonly featureKey: string;
+  readonly role: ModelRole;
+  readonly featureDisplayName: string;
+  readonly projectId: string;
+  readonly restrictedModels: readonly string[];
+
+  constructor(input: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+    projectId: string;
+    restrictedModels: readonly string[];
+  }) {
+    const { featureKey, role, featureDisplayName, projectId, restrictedModels } = input;
+    const restrictedModel = restrictedModels[0] ?? "restricted model";
+    super(
+      "model_restricted_for_feature",
+      `"${restrictedModel}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be the model for "${featureKey}".`,
+      {
+        httpStatus: 400,
+        meta: { featureKey, role, featureDisplayName, projectId, restrictedModels },
+      },
+    );
+    this.name = "ModelRestrictedForFeatureError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+    this.projectId = projectId;
+    this.restrictedModels = restrictedModels;
+  }
+}
 
 export class ModelProviderNotFoundError extends HandledError {
   declare readonly code: "model_provider_not_found";
