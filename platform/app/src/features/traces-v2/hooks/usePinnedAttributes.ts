@@ -3,7 +3,7 @@ import {
   type PinnedAttribute,
   type PinnedAttributeSource,
   usePinnedAttributesStore,
-} from "../stores/pinnedAttributesStore";
+} from "@langwatch/trace-web";
 
 const EMPTY: PinnedAttribute[] = [];
 

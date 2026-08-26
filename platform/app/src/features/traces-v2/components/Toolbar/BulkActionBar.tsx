@@ -11,7 +11,7 @@ import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "../../stores/selectionStore";
+import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "@langwatch/trace-web";
 import { AddToAnnotationQueueDialog } from "../AddToAnnotationQueueDialog";
 
 interface BulkActionBarProps {

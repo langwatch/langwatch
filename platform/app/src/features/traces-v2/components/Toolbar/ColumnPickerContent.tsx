@@ -8,7 +8,7 @@ import { toaster } from "../../../../components/ui/toaster";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
 import { LENS_CAPABILITIES, type LensColumnOption } from "../../lens/capabilities";
 import { isEvalColumnId, parseEvalColumnId } from "../../lens/evalColumnId";
-import { type TimeColumnFormat, useTimeFormatStore } from "../../stores/timeFormatStore";
+import { type TimeColumnFormat, useTimeFormatStore } from "@langwatch/trace-web";
 import { useViewStore } from "../../stores/viewStore";
 import { evalColumnLabel } from "../TraceTable/evalColumns";
 import {

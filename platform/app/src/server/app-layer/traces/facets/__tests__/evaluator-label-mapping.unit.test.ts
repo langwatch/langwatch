@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FACET_REGISTRY } from "../../facet-registry";
 import { translateFilterToClickHouse } from "../../filter-to-clickhouse/ast";
-import { SEARCH_FIELDS } from "../../query-language/metadata";
+import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };

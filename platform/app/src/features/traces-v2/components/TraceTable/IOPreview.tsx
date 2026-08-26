@@ -15,8 +15,8 @@ import type { TraceMediaRef } from "~/shared/traces/media-refs";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
 import { collectMediaParts } from "~/shared/traces/mediaParts";
 import { useDensityTokens } from "../../hooks/useDensityTokens";
-import { useDensityStore } from "../../stores/densityStore";
-import { formatPreview } from "../../utils/previewFormatter";
+import { useDensityStore } from "@langwatch/trace-web";
+import { formatPreview } from "@langwatch/trace-web";
 import { tryParseChat } from "./chatContent";
 
 const COMFORTABLE_LABEL_WIDTH = "60px";

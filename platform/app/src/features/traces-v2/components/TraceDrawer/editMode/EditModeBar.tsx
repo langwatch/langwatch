@@ -6,9 +6,9 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useAnnotationSessionStore } from "../../../stores/annotationSessionStore";
+import { useAnnotationSessionStore } from "@langwatch/trace-web";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { useFocusSectionStore } from "@langwatch/trace-web";
 import {
   buildTraceEditPatch,
   summarizeTraceEdit,

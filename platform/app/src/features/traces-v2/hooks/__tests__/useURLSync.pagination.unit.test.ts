@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
 import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
-import { getPresetById } from "../../utils/timeRangePresets";
+import { getPresetById } from "@langwatch/trace-web";
 import { useURLSync } from "../useURLSync";
 
 const renderURLSync = () => renderHook(() => useURLSync(), { wrapper: BrowserRouter });

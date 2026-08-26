@@ -5,7 +5,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { EASTER_EGG_IMAGE_URL } from "./useKonamiEasterEgg";
+import { EASTER_EGG_IMAGE_URL } from "@langwatch/trace-web";
 
 // Mermaid is loaded via a true `await import()` inside the effect so it
 // stays in its own chunk. A top-level `import mermaid from "mermaid"`

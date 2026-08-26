@@ -16,14 +16,14 @@ import type { TimeRange } from "../stores/filterStore";
 import { useFilterStore } from "../stores/filterStore";
 import type { LensConfig } from "../stores/viewStore";
 import { getPersistedActiveLensId, useViewStore } from "../stores/viewStore";
-import { getPresetById } from "../utils/timeRangePresets";
-import type { BarStateOverrides, FragmentState } from "../utils/urlState";
+import { getPresetById } from "@langwatch/trace-web";
+import type { BarStateOverrides, FragmentState } from "@langwatch/trace-web";
 import {
   buildFragment,
   computeOverrides,
   isOverridesEmpty,
   parseFragment,
-} from "../utils/urlState";
+} from "@langwatch/trace-web";
 
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";
@@ -404,79 +404,13 @@ export function useURLSync(): void {
     return () => window.removeEventListener("popstate", onPopState);
   }, [applyFromFragment]);
 
-  // Re-apply when an IN-APP navigation lands on this page's own fragment —
-  // a deep link such as Langy's "View in Trace Explorer" button, built with
-  // `router.push(href)` to the same route this page is already showing.
-  //
-  // That case falls through every other trigger above: the mount effect only
-  // ever fires once, and `router.push` goes through React Router's history,
-  // not the browser's — it never dispatches `popstate` (only real back/forward
-  // does). So the fragment changed and NOTHING here read it, and 150ms later
-  // the write effect below overwrote it anyway with the state the store still
-  // held, since the store was never told. The link looked like it did nothing.
-  //
-  // `useLocation()` is the one thing that DOES observe this: React Router
-  // updates it for every navigation it performs, including a same-route,
-  // fragment-only `push`. Read fully via `applyFromFragment` (not applied
-  // here directly) so this goes through the exact same target-resolution and
-  // "already in sync" guard the mount and popstate paths use — a location
-  // change that denotes the state the store already holds (e.g. the trace
-  // drawer's own query-string-only navigation) is still a no-op.
-  //
-  // Gated on the fragment ACTUALLY changing, not just this effect running:
-  // every effect fires once on mount regardless of its deps, and firing here
-  // too would call `applyFromFragment` a second time back-to-back with the
-  // mount effect — with `isFirstApply` now (wrongly) false. That's not a
-  // harmless repeat: a bare URL's "say nothing about the window" is only a
-  // no-op on the FIRST apply (see `resolveTimeRange`); a second, spurious
-  // "not-first" apply of the exact same bare URL reads as a real
-  // return-with-no-opinion and snaps a time range the user had already chosen
-  // back to the default.
-  //
-  // Deliberately NOT gated on the fragment having changed. Two earlier attempts
-  // at that guard were both wrong, for the same underlying reason:
-  //
-  //   comparing `location.hash`        the writer above moves the fragment with
-  //                                    a RAW `history.replaceState`, which
-  //                                    React Router never observes — so its
-  //                                    copy goes stale the moment a filter is
-  //                                    edited, and the guard compares against a
-  //                                    value the page left behind.
-  //
-  //   comparing `window.location.hash` closer, but the ref only advances when
-  //                                    THIS effect applies. The writer moves the
-  //                                    real fragment without telling it, so the
-  //                                    ref still holds the pre-edit value; a push
-  //                                    back to that value reads as "unchanged".
-  //
-  // Both let the same sequence through: type a query, then follow a link back to
-  // the fragment you started on, and the deep link is silently dropped —
-  // reinstating the dead button this change exists to fix. No cache of "what the
-  // fragment was" can be trusted while something else mutates it unobserved.
-  //
-  // So don't keep one. `applyFromFragment` already decides correctly on its own:
-  // it reads `window.location.hash` live, and its in-sync check turns a fragment
-  // denoting the state the store already holds into a no-op — the same guard the
-  // `popstate` path above has always relied on. `location.key` is the trigger
-  // because it changes on every navigation React Router performs, including a
-  // push to a URL identical to the current one.
-  //
-  // The mount run is the one that must be skipped: every effect fires once on
-  // mount, and a second apply back-to-back with the mount effect would run with
-  // `isFirstApply` wrongly false. A bare URL's "say nothing about the window" is
-  // only a no-op on the FIRST apply (see `resolveTimeRange`); a spurious
-  // "not-first" apply of that same bare URL reads as a real
-  // return-with-no-opinion and snaps a time range the user already chose back to
-  // the default.
+  // React Router observes same-route fragment pushes but not the raw history
+  // writes used by the store. Re-read the live fragment for every router
+  // navigation and let `applyFromFragment` decide whether it is already in
+  // sync. Skip the mount run because the mount effect has already applied it.
   const location = useLocation();
   const hasSeenInitialLocation = useRef(false);
-  // Held behind a ref so the effect below can depend on `location.key` ALONE.
-  // `applyFromFragment` is a `useCallback` over store actions, and a store whose
-  // actions are not referentially stable across renders (any test double
-  // returning a fresh `vi.fn()` per selector call, for one) changes its identity
-  // every render. With it in the dep array, a plain re-render — no navigation at
-  // all — re-ran the apply and clobbered a lens the user had just picked.
-  // Navigation is the only thing that should re-read the fragment.
+  // A ref keeps unstable store actions out of the navigation-only dependency.
   const applyFromFragmentRef = useRef(applyFromFragment);
   useEffect(() => {
     applyFromFragmentRef.current = applyFromFragment;

@@ -7,7 +7,7 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { ConversationContext } from "../ConversationContext";

@@ -1,7 +1,7 @@
 import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { Ban, Minus } from "lucide-react";
 import { memo, useCallback } from "react";
-import { useFacetHoverStore } from "../../stores/facetHoverStore";
+import { useFacetHoverStore } from "@langwatch/trace-web";
 import { RowButton } from "./RowButton";
 import type { FacetItem, FacetValueState } from "./types";
 import { formatCount, paletteFromColor } from "./utils";

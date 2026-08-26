@@ -1,7 +1,7 @@
 import { Box, Flex } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { useSpanHoverStore } from "../../../stores/spanHoverStore";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
+import { useSpanHoverStore } from "@langwatch/trace-web";
 import {
   BAR_HEIGHT,
   GROUP_ROW_HEIGHT,

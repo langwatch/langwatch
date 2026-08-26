@@ -1,6 +1,6 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import {
   expandDeletedSpanIds,
   indexSpanPatches,

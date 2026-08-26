@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { SpanTreeCursor, TraceService } from "@langwatch/trace-contract";
+import { TraceQueryFieldValuesPort } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -19,6 +20,12 @@ const longTraceId = `trace-${nanoid()}`;
 
 let clickHouse: ClickHouseClient;
 let traces: TraceService;
+
+class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
+  async list() {
+    return { values: [] };
+  }
+}
 
 function spanIdFor(index: number): string {
   return `span-${String(index).padStart(4, "0")}`;
@@ -104,6 +111,7 @@ beforeAll(async () => {
   traces = AppTraceRuntime.create({
     resolveClient: async () => clickHouse,
     modelProviders: new TestModelProviderService(),
+    queryFieldValues: new EmptyQueryFieldValues(),
   }).build();
 
   await insertRows(

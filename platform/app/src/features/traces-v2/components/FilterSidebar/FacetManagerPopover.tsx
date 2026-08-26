@@ -43,8 +43,8 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useFacetLensStore } from "../../stores/facetLensStore";
-import type { NumericMode } from "../../stores/numericModeStore";
-import { useUIStore } from "../../stores/uiStore";
+import type { NumericMode } from "@langwatch/trace-web";
+import { useUIStore } from "@langwatch/trace-web";
 import {
   FACET_PERSPECTIVES,
   getFacetGroupId,

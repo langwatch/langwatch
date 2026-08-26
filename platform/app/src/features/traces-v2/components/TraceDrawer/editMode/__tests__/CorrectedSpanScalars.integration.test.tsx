@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import { CorrectedSpanScalars } from "../CorrectedSpanScalars";
 
 function detail(over: Partial<SpanDetail>): SpanDetail {

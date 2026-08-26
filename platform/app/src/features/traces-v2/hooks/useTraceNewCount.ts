@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
 import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
-import { useRefreshUIStore } from "../stores/refreshUIStore";
+import { useRefreshUIStore } from "@langwatch/trace-web";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useTraceListRefresh } from "./useTraceListRefresh";
 

@@ -12,7 +12,7 @@ import {
 } from "../../../../components/ui/menu";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
-import { useUIStore } from "../../stores/uiStore";
+import { useUIStore } from "@langwatch/trace-web";
 import {
   COST_LENS_IDS,
   type LensConfig,

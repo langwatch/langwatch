@@ -25,10 +25,10 @@ import {
   selectPeersMatching,
   usePresenceStore,
 } from "~/features/presence/stores/presenceStore";
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
-import { SPAN_TYPE_COLORS } from "../../utils/formatters";
+import { SPAN_TYPE_COLORS } from "@langwatch/trace-web";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { FlameView } from "@langwatch/trace-web";
 import { SequenceSkeleton } from "./sequenceView/SequenceSkeleton";

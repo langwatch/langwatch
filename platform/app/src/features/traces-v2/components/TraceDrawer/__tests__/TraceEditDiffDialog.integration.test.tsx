@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SpanDetail, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail, TraceHeader } from "@langwatch/trace-contract";
 import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 
 const header = vi.hoisted(() => ({

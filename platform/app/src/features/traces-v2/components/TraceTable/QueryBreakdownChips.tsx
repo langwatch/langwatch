@@ -2,7 +2,7 @@ import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { walkAST } from "~/server/app-layer/traces/query-language/walk";
+import { walkAST } from "@langwatch/trace-contract";
 import { useFilterStore } from "../../stores/filterStore";
 
 /**

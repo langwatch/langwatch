@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo } from "react";
-import { hashColor } from "../../utils/formatters";
+import { hashColor } from "@langwatch/trace-web";
 import { RowButton } from "./RowButton";
 import type { FacetValueState } from "./types";
 import { paletteFromColor } from "./utils";

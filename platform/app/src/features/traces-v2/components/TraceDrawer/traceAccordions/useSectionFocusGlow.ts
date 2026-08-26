@@ -1,5 +1,5 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { useFocusSectionStore } from "@langwatch/trace-web";
 
 /**
  * Wires an accordion stack to the cross-component focus pipeline:

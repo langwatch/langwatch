@@ -11,10 +11,10 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
-import { useSpanHoverStore } from "../../../stores/spanHoverStore";
-import { useSpanPulseStore } from "../../../stores/spanPulseStore";
-import { formatCost, formatDuration } from "../../../utils/formatters";
+import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
+import { useSpanHoverStore } from "@langwatch/trace-web";
+import { useSpanPulseStore } from "@langwatch/trace-web";
+import { formatCost, formatDuration } from "@langwatch/trace-web";
 import { AnchorCommentButton } from "../anchoredComments/AnchorCommentButton";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
 import { isSkillSpan } from "../transcript/skillInvocation";

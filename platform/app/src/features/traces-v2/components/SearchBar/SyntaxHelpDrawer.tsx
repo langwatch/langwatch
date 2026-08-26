@@ -28,9 +28,9 @@ import {
   FIELD_VALUES,
   SEARCH_FIELDS,
   type SearchFieldMeta,
-} from "~/server/app-layer/traces/query-language/metadata";
+} from "@langwatch/trace-contract";
 import { useFilterStore } from "../../stores/filterStore";
-import { useUIStore } from "../../stores/uiStore";
+import { useUIStore } from "@langwatch/trace-web";
 import { QueryPreview } from "./QueryPreview";
 
 interface Example {

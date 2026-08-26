@@ -9,7 +9,7 @@ import {
   type MediaPartData,
   mediaRefToMediaData,
 } from "~/shared/traces/mediaParts";
-import { formatDuration, formatRelativeTime } from "../../../utils/formatters";
+import { formatDuration, formatRelativeTime } from "@langwatch/trace-web";
 import { extractSystemText } from "../transcript/parsing";
 import type { ParsedTurn } from "./types";
 

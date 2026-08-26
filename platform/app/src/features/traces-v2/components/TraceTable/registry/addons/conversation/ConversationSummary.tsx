@@ -1,11 +1,7 @@
 import { Circle, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, GitBranch, Zap } from "lucide-react";
 import type React from "react";
-import {
-  formatCost,
-  formatTokens,
-  formatWallClock,
-} from "../../../../../utils/formatters";
+import { formatCost, formatTokens, formatWallClock } from "@langwatch/trace-web";
 import type { ConversationGroup } from "../../../conversationGroups";
 
 interface SummaryProps {

@@ -1,5 +1,5 @@
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { formatDuration } from "../../../utils/formatters";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
+import { formatDuration } from "@langwatch/trace-web";
 import {
   buildSpanTree,
   type SpanWithChildren,

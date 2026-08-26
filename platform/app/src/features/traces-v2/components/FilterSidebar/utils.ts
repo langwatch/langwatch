@@ -1,6 +1,6 @@
 import { HelpCircle, type LucideIcon } from "lucide-react";
-import { formatBytes } from "../../utils/formatters";
-import { ORIGIN_DISPLAY, originLabel } from "../../utils/originDisplay";
+import { formatBytes } from "@langwatch/trace-web";
+import { ORIGIN_DISPLAY, originLabel } from "@langwatch/trace-web";
 import {
   FACET_ICONS,
   FACET_LABELS,

@@ -47,7 +47,7 @@ vi.mock("../../AddToAnnotationQueueDialog", () => ({
   AddToAnnotationQueueDialog: () => null,
 }));
 
-import { useSelectionStore } from "../../../stores/selectionStore";
+import { useSelectionStore } from "@langwatch/trace-web";
 import { BulkActionBar } from "../BulkActionBar";
 
 const renderBar = (namesById: Record<string, string | undefined> = {}) =>

@@ -3,19 +3,25 @@ import {
   spanTreeInputSchema,
   spanTreeNodeSchema,
   spanTreePageSchema,
+  traceQueryFieldCatalogueInputSchema,
+  traceQueryFieldCatalogueOutputSchema,
   TraceService as TraceServiceContract,
   type SpanTreeNode,
   type SpanTreeDeltaInput,
   type SpanTreePage,
   type SpanTreeInput,
+  type TraceQueryFieldCatalogueInput,
 } from "@langwatch/trace-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 
+import type { TraceQueryFieldValuesPort } from "../ports/query-field-values.port";
 import { TraceRepository, type TraceSpanSummaryRecord } from "../ports/trace.port";
+import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service";
 
 type TraceComposition = {
   repository: TraceRepository;
   modelProviders: ModelProviderService;
+  queryFieldValues: TraceQueryFieldValuesPort;
 };
 
 function gateCosts(nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] {
@@ -27,8 +33,13 @@ function gateCosts(nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] 
 }
 
 export class TraceService extends TraceServiceContract {
+  private readonly queryFieldCatalogue: TraceQueryFieldCatalogueService;
+
   private constructor(private readonly composition: TraceComposition) {
     super();
+    this.queryFieldCatalogue = TraceQueryFieldCatalogueService.create(
+      composition.queryFieldValues,
+    );
   }
 
   static create(composition: TraceComposition): TraceService {
@@ -78,6 +89,12 @@ export class TraceService extends TraceServiceContract {
         parsed.canSeeCosts,
       ),
     );
+  }
+
+  async buildQueryFieldCatalogue(input: TraceQueryFieldCatalogueInput): Promise<string> {
+    const parsed = traceQueryFieldCatalogueInputSchema.parse(input);
+    const catalogue = await this.queryFieldCatalogue.build(parsed);
+    return traceQueryFieldCatalogueOutputSchema.parse(catalogue);
   }
 
   private price({ costInput, cost, ...node }: TraceSpanSummaryRecord): SpanTreeNode {

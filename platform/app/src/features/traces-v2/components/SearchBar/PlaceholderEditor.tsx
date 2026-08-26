@@ -1,10 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useMemo } from "react";
-import {
-  removeNodeAtLocation,
-  swapOperatorAtLocation,
-} from "~/server/app-layer/traces/query-language/mutations";
+import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
 import { useFacetValueLabelResolver } from "../../hooks/useFacetValueLabels";
 import { buildDecorationPlan, chipOverlayLabel, type TokenRef } from "./filterHighlight";
 

@@ -4,21 +4,18 @@ import {
   analyzeOrGroups,
   buildFacetStateLookup,
   getFacetValues,
-} from "~/server/app-layer/traces/query-language/queries";
+} from "@langwatch/trace-contract";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
-import { useDensityStore } from "../../../stores/densityStore";
+import { useDensityStore } from "@langwatch/trace-web";
 import { applyLensOrder, useFacetLensStore } from "../../../stores/facetLensStore";
-import {
-  selectVisibilityFor,
-  useFacetVisibilityStore,
-} from "../../../stores/facetVisibilityStore";
+import { selectVisibilityFor, useFacetVisibilityStore } from "@langwatch/trace-web";
 import { useFilterStore } from "../../../stores/filterStore";
 import {
   type NumericMode,
   selectNumericModesFor,
   useNumericModeStore,
-} from "../../../stores/numericModeStore";
-import { hashColor } from "../../../utils/formatters";
+} from "@langwatch/trace-web";
+import { hashColor } from "@langwatch/trace-web";
 import {
   ATTRIBUTES_SECTION_KEY,
   COMFORTABLE_DEFAULT_SECTIONS,

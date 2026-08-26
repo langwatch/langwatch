@@ -6,7 +6,7 @@ import {
   PiiIncompleteNotice,
 } from "~/components/ui/ContentPrivacyMarkers";
 import { RedactedField } from "~/components/ui/RedactedField";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";

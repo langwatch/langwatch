@@ -13,7 +13,7 @@ import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons
 import { useColorMode } from "~/components/ui/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/trace-contract";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import { ShikiCodeBlock } from "./markdownView";

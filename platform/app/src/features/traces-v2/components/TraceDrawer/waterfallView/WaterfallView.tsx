@@ -5,16 +5,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import type {
-  LangwatchSignalBucket,
-  SpanTreeNode,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { LangwatchSignalBucket, SpanTreeNode } from "@langwatch/trace-contract";
 import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
-import { useSpanPulseStore } from "../../../stores/spanPulseStore";
-import { formatDuration } from "../../../utils/formatters";
+import { useSpanPulseStore } from "@langwatch/trace-web";
+import { formatDuration } from "@langwatch/trace-web";
 import { GroupRow } from "./GroupRow";
 import { GroupTimelineBar, TimelineBar } from "./TimelineBar";
 import { TreeRow } from "./TreeRow";

@@ -11,7 +11,7 @@ import type React from "react";
 import { useCallback, useMemo } from "react";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
-import { getColumnSizingKey, useColumnSizingStore } from "../../stores/columnSizingStore";
+import { getColumnSizingKey, useColumnSizingStore } from "@langwatch/trace-web";
 import { useFilterStore } from "../../stores/filterStore";
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";

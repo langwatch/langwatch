@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type React from "react";
-import { useDensityStore } from "../stores/densityStore";
+import { useDensityStore } from "@langwatch/trace-web";
 
 export const DensityProvider: React.FC<{ children: React.ReactNode }> = ({
   children,

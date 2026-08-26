@@ -24,7 +24,7 @@ import {
   matchPreset,
   PRESET_GROUPS,
   type TimeRangePreset,
-} from "../../utils/timeRangePresets";
+} from "@langwatch/trace-web";
 
 export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const timeRange = useFilterStore((s) => s.timeRange);

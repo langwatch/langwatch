@@ -6,10 +6,7 @@ import { Text as TiptapText } from "@tiptap/extension-text";
 import { TextSelection } from "@tiptap/pm/state";
 import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  removeNodeAtLocation,
-  swapOperatorAtLocation,
-} from "~/server/app-layer/traces/query-language/mutations";
+import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
 import { AutoUppercaseOperators } from "./autoUppercaseOperators";
 import {
   applyAcceptToEditor,
@@ -18,8 +15,8 @@ import {
   readEditorContext,
 } from "./editorDocument";
 import { FilterHighlight } from "./filterHighlight";
-import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
-import { handleKey } from "./handleKey";
+import { getSuggestionState, type SuggestionState } from "@langwatch/trace-web";
+import { handleKey } from "@langwatch/trace-web";
 import { searchBarPlaceholder } from "./PlaceholderEditor";
 import {
   buildSuggestionUI,
@@ -28,7 +25,7 @@ import {
   navigateSuggestion,
   type SuggestionUIState,
 } from "./suggestionUI";
-import { useLatestRef } from "./useLatestRef";
+import { useLatestRef } from "@langwatch/trace-web";
 
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);

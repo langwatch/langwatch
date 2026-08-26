@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useFilterStore } from "../stores/filterStore";
-import { useSelectionStore } from "../stores/selectionStore";
+import { useSelectionStore } from "@langwatch/trace-web";
 import { useViewStore } from "../stores/viewStore";
 
 /**

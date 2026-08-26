@@ -11,7 +11,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 const mocks = vi.hoisted(() => ({
   comments: [] as AnnotationByTrace[],

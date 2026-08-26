@@ -8,7 +8,7 @@ import { useFilterStore } from "../../stores/filterStore";
 import { AiQueryComposer } from "./AiQueryComposer";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
 import { FloatingAiErrorRow } from "./FloatingAiErrorRow";
-import type { FloatRect } from "./useFloatRect";
+import type { FloatRect } from "@langwatch/trace-web";
 
 interface FloatingAiBarProps {
   rect: FloatRect | null;

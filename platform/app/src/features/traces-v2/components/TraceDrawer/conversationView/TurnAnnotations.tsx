@@ -7,10 +7,7 @@ import { Popover } from "~/components/ui/popover";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../stores/annotationQueueSessionStore";
+import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-web";
 import {
   openTraceEditorFromConversation,
   tracePartitionHint,

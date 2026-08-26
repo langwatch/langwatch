@@ -12,7 +12,7 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/trace-contract";
 import type { EvalChipDisplay } from "~/utils/evaluationResults";
 import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useConversationAnnotations } from "../../hooks/useConversationAnnotations";

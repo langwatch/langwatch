@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import type React from "react";
 import { useEffect } from "react";
 import { useTraceListRefresh } from "../../hooks/useTraceListRefresh";
-import { useRefreshUIStore } from "../../stores/refreshUIStore";
+import { useRefreshUIStore } from "@langwatch/trace-web";
 import { AuroraSvg } from "./AuroraSvg";
 
 const FADE_MASK =

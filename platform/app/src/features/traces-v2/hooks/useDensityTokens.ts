@@ -1,4 +1,4 @@
-import { useDensityStore } from "../stores/densityStore";
+import { useDensityStore } from "@langwatch/trace-web";
 
 /**
  * All density-dependent sizing in one place.

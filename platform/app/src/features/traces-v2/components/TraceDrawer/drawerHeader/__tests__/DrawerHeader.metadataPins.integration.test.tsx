@@ -113,8 +113,8 @@ vi.mock("../../editMode/EditedOriginalToggle", () => ({
 
 vi.mock("../../RawJsonDialog", () => ({ RawJsonDialog: () => null }));
 
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { usePinnedAttributesStore } from "../../../../stores/pinnedAttributesStore";
+import type { TraceHeader } from "@langwatch/trace-contract";
+import { usePinnedAttributesStore } from "@langwatch/trace-web";
 import { DrawerHeader } from "../DrawerHeader";
 
 function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {

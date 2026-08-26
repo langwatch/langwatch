@@ -8,8 +8,8 @@ import {
   formatDuration,
   formatRelativeTime,
   formatTokens,
-} from "../../../../../utils/formatters";
-import { formatPreview } from "../../../../../utils/previewFormatter";
+} from "@langwatch/trace-web";
+import { formatPreview } from "@langwatch/trace-web";
 import { MonoCell } from "../../../MonoCell";
 import { ROW_STYLES, rowVariantFor, StatusDot } from "../../../StatusRow";
 import { Td, Tr } from "../../../TablePrimitives";

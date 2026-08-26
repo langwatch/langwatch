@@ -1,10 +1,10 @@
 import { Box, Circle, Flex, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useTraceSpanTree } from "../../../../../hooks/useTraceSpanTree";
 import type { TraceEvalResult, TraceListItem } from "../../../../../types/trace";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../../../../utils/formatters";
+import { formatDuration, SPAN_TYPE_COLORS } from "@langwatch/trace-web";
 import { Td, Tr } from "../../../TablePrimitives";
 import { evalChipColor, formatEvalScore } from "../../sharedChips";
 import type { AddonDef } from "../../types";

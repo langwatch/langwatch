@@ -4,7 +4,7 @@ const ChakraButton = chakra("button");
 
 import type React from "react";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useSelectionStore } from "../../../../stores/selectionStore";
+import { useSelectionStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../../../../types/trace";
 import type { ConversationGroup } from "../../conversationGroups";
 import { withoutPlaceholderTraceIds } from "../../skeletonPlaceholders";

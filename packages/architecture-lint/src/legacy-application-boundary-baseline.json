@@ -505,9 +505,6 @@
       "platform/app/src/components/gateway/eligibleModelProviders.ts": [
         "~/server/modelProviders/registry"
       ],
-      "platform/app/src/components/gateway/tracesHrefForKey.ts": [
-        "~/server/app-layer/traces/query-language/mutations"
-      ],
       "platform/app/src/components/gateway/virtualKeyTagsField.ts": [
         "~/server/gateway/virtualKey.config"
       ],
@@ -986,10 +983,6 @@
       "platform/app/src/features/automations/components/SubjectSection.tsx": [
         "~/server/filters/types"
       ],
-      "platform/app/src/features/automations/logic/conditionQuery.ts": [
-        "~/server/app-layer/traces/query-language/metadata",
-        "~/server/app-layer/traces/query-language/parse"
-      ],
       "platform/app/src/features/automations/logic/draftReducer.ts": [
         "~/server/app-layer/automations/graph-alert.builder",
         "~/server/app-layer/automations/report.builder",
@@ -1050,9 +1043,6 @@
         "~/server/app-layer/langy/execution/githubCommand",
         "~/server/app-layer/langy/execution/langwatchCommand"
       ],
-      "platform/app/src/features/langy/logic/traceExplorerLink.ts": [
-        "~/server/app-layer/traces/query-language/mutations"
-      ],
       "platform/app/src/features/langy/stores/langyDevLog.ts": [
         "~/server/app-layer/langy/streaming/langyTokenBuffer"
       ],
@@ -1111,52 +1101,14 @@
       "platform/app/src/features/traces-v2/components/ExportConfigDialog.tsx": [
         "~/server/export/types"
       ],
-      "platform/app/src/features/traces-v2/components/FilterSidebar/constants.ts": [
-        "~/server/app-layer/traces/query-language/metadata"
-      ],
-      "platform/app/src/features/traces-v2/components/FilterSidebar/EvaluatorDrilldown.tsx": [
-        "~/server/app-layer/traces/query-language/evaluatorGroup"
-      ],
-      "platform/app/src/features/traces-v2/components/FilterSidebar/hooks/useFilterSidebarData.ts": [
-        "~/server/app-layer/traces/query-language/queries"
-      ],
-      "platform/app/src/features/traces-v2/components/FilterSidebar/routeToggleViaOrGroups.ts": [
-        "~/server/app-layer/traces/query-language/queries"
-      ],
-      "platform/app/src/features/traces-v2/components/FilterSidebar/SectionRenderer.tsx": [
-        "~/server/app-layer/traces/query-language/queries"
-      ],
       "platform/app/src/features/traces-v2/components/SearchBar/ErrorBannerDetail.tsx": [
         "~/server/app-layer/traces/ai-query"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/filterHighlight.ts": [
-        "~/server/app-layer/traces/query-language/metadata",
-        "~/server/app-layer/traces/query-language/parse"
       ],
       "platform/app/src/features/traces-v2/components/SearchBar/FloatingAiErrorRow.tsx": [
         "~/server/app-layer/traces/ai-query"
       ],
-      "platform/app/src/features/traces-v2/components/SearchBar/PlaceholderEditor.tsx": [
-        "~/server/app-layer/traces/query-language/mutations"
-      ],
       "platform/app/src/features/traces-v2/components/SearchBar/SearchBar.tsx": [
-        "~/server/app-layer/traces/ai-query",
-        "~/server/app-layer/traces/query-language/metadata"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/SuggestionDropdown.tsx": [
-        "~/server/app-layer/traces/query-language/metadata"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/suggestionItems.ts": [
-        "~/server/app-layer/traces/query-language/metadata"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/suggestionUI.ts": [
-        "~/server/app-layer/traces/query-language/metadata"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/SyntaxHelpDrawer.tsx": [
-        "~/server/app-layer/traces/query-language/metadata"
-      ],
-      "platform/app/src/features/traces-v2/components/SearchBar/useFilterEditor.ts": [
-        "~/server/app-layer/traces/query-language/mutations"
+        "~/server/app-layer/traces/ai-query"
       ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/anchoredComments/TraceCommentList.tsx": [
         "~/server/annotations/annotationAnchorLabel"
@@ -1345,9 +1297,6 @@
       "platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/WaterfallView.tsx": [
         "~/server/api/routers/tracesV2.schemas"
       ],
-      "platform/app/src/features/traces-v2/components/TraceTable/QueryBreakdownChips.tsx": [
-        "~/server/app-layer/traces/query-language/walk"
-      ],
       "platform/app/src/features/traces-v2/components/TraceTable/registry/addons/trace/ExpandedPeekAddon.tsx": [
         "~/server/api/routers/tracesV2.schemas"
       ],
@@ -1419,11 +1368,7 @@
         "~/server/annotations/annotationAnchor"
       ],
       "platform/app/src/features/traces-v2/stores/filterStore.ts": [
-        "~/server/app-layer/traces/ai-query",
-        "~/server/app-layer/traces/query-language/evaluatorGroup",
-        "~/server/app-layer/traces/query-language/mutations",
-        "~/server/app-layer/traces/query-language/parse",
-        "~/server/app-layer/traces/query-language/queries"
+        "~/server/app-layer/traces/ai-query"
       ],
       "platform/app/src/features/traces-v2/stores/traceEditStore.ts": [
         "~/server/tracer/spanIOStringify",

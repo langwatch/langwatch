@@ -1,5 +1,5 @@
 import { Text } from "@chakra-ui/react";
-import { formatRelativeTime } from "../../../../../utils/formatters";
+import { formatRelativeTime } from "@langwatch/trace-web";
 import type { ConversationGroup } from "../../../conversationGroups";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";

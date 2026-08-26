@@ -6,7 +6,7 @@ import type { TraceEditOverlayPatch } from "~/server/traces/edit-overlay/traceEd
 import { applyOverlayToSpansFull, useSpansFullCanonical } from "../../hooks/useSpansFull";
 import { useTraceHeaderCanonical } from "../../hooks/useTraceHeader";
 import { SegmentedToggle } from "./SegmentedToggle";
-import { computeLineDiff, type DiffLine, diffStat } from "./terminalView/diff";
+import { computeLineDiff, type DiffLine, diffStat } from "@langwatch/trace-web";
 
 type DiffTab = "trace" | "spans";
 

@@ -1,7 +1,7 @@
 import { Text } from "@chakra-ui/react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatTokens } from "../../../../../utils/formatters";
+import { formatTokens } from "@langwatch/trace-web";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 

@@ -1,5 +1,5 @@
 export { AnsiText } from "./AnsiText";
-export { computeLineDiff, type DiffLine, diffStat } from "./diff";
+export { computeLineDiff, type DiffLine, diffStat } from "@langwatch/trace-web";
 export { ansiColorToken, CLAUDE_MARK_GRADIENT, TERMINAL_TOKENS } from "./palette";
 export { deriveSessionBanner, type SessionBanner } from "./sessionBanner";
 export { TerminalDiff } from "./TerminalDiff";

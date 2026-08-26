@@ -15,10 +15,11 @@
  */
 import type { LiqeQuery, ParserAst, TagToken } from "liqe";
 import {
+  parse,
   SEARCH_FIELDS,
+  stripAtSigils,
   type SearchFieldMeta,
-} from "~/server/app-layer/traces/query-language/metadata";
-import { parse, stripAtSigils } from "~/server/app-layer/traces/query-language/parse";
+} from "@langwatch/trace-contract";
 
 /** Comparators the builder exposes. Categorical / text / existence fields get
  *  `is` / `is_not`; range fields get the numeric comparators plus `between`. */

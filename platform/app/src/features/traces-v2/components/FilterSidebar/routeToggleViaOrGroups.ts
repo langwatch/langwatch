@@ -1,4 +1,4 @@
-import type { OrGroupAnalysis } from "~/server/app-layer/traces/query-language/queries";
+import type { OrGroupAnalysis } from "@langwatch/trace-contract";
 
 export interface ToggleRouting {
   /**

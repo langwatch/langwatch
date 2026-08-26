@@ -31,16 +31,31 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   }),
 }));
 
-vi.mock("../../../stores/uiStore", () => ({
-  useUIStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      toggleSidebar: vi.fn(),
-      facetManagerOpen: false,
-      setFacetManagerOpen: mockSetFacetManagerOpen,
-      sidebarCollapsed: false,
-      sidebarWidth: null,
-    }),
-}));
+vi.mock("@langwatch/trace-web", async (importOriginal) => {
+  const traceWeb = await importOriginal<typeof import("@langwatch/trace-web")>();
+
+  return {
+    ...traceWeb,
+    useUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
+      selector({
+        toggleSidebar: vi.fn(),
+        facetManagerOpen: false,
+        setFacetManagerOpen: mockSetFacetManagerOpen,
+        sidebarCollapsed: false,
+        sidebarWidth: null,
+      }),
+    useDensityStore: (selector: (state: Record<string, unknown>) => unknown) =>
+      selector({ density: "comfortable" }),
+    useFacetVisibilityStore: (selector: (state: Record<string, unknown>) => unknown) =>
+      selector({
+        showFacet: vi.fn(),
+        hideFacet: vi.fn(),
+        resetAll: vi.fn(),
+        hydrateFromStorage: vi.fn(),
+      }),
+    selectVisibilityFor: () => ({ hidden: [], shown: [] }),
+  };
+});
 
 vi.mock("../../../stores/filterStore", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
@@ -61,11 +76,6 @@ vi.mock("../../../stores/viewStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/densityStore", () => ({
-  useDensityStore: (selector: (s: unknown) => unknown) =>
-    selector({ density: "comfortable" }),
-}));
-
 vi.mock("../../../stores/facetLensStore", () => ({
   useFacetLensStore: (selector: (s: unknown) => unknown) =>
     selector({
@@ -77,25 +87,19 @@ vi.mock("../../../stores/facetLensStore", () => ({
   applyLensOrder: (keys: string[]) => keys,
 }));
 
-vi.mock("../../../stores/facetVisibilityStore", () => ({
-  useFacetVisibilityStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      showFacet: vi.fn(),
-      hideFacet: vi.fn(),
-      resetAll: vi.fn(),
-      hydrateFromStorage: vi.fn(),
-    }),
-  selectVisibilityFor: () => ({ hidden: [], shown: [] }),
-}));
+vi.mock("@langwatch/trace-contract", async (importOriginal) => {
+  const contract = await importOriginal<typeof import("@langwatch/trace-contract")>();
 
-vi.mock("~/server/app-layer/traces/query-language/queries", () => ({
-  analyzeOrGroups: () => ({ groups: [], fieldToGroupIds: new Map() }),
-  buildFacetStateLookup: () => new Map(),
-  getFacetValues: () => ({
-    include: new Set<string>(),
-    exclude: new Set<string>(),
-  }),
-}));
+  return {
+    ...contract,
+    analyzeOrGroups: () => ({ groups: [], fieldToGroupIds: new Map() }),
+    buildFacetStateLookup: () => new Map(),
+    getFacetValues: () => ({
+      include: new Set<string>(),
+      exclude: new Set<string>(),
+    }),
+  };
+});
 
 vi.mock("../SectionRenderer", () => ({
   SectionRenderer: () => <div data-testid="section-renderer" />,

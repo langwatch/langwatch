@@ -24,7 +24,7 @@ import {
   safeDetectFormat,
   stringifyForCopy,
   tryParseJson,
-} from "./attributeFormat";
+} from "@langwatch/trace-web";
 import { FormatSelect } from "./FormatSelect";
 import { safePrettyJson } from "./JsonHighlight";
 import { ShikiCodeBlock } from "./markdownView";

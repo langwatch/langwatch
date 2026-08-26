@@ -13,9 +13,9 @@ import {
   type SequenceSpanType,
   type SequenceViewProps,
 } from "./types";
-import { useKonamiEasterEgg } from "./useKonamiEasterEgg";
+import { useKonamiEasterEgg } from "@langwatch/trace-web";
 import { useMermaidRenderer } from "./useMermaidRenderer";
-import { useViewportZoom } from "./useViewportZoom";
+import { useViewportZoom } from "@langwatch/trace-web";
 
 const TYPE_LABELS: Record<SequenceSpanType, string> = {
   agent: "Agents",

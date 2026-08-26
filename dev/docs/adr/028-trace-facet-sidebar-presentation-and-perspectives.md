@@ -30,7 +30,7 @@ alternatives:
    tool — users want to tick the specific values that exist. The backend only
    returns `{min, max}` for range facets today and explicitly throws "Cannot
    drill into range facet", so there is no value list to tick. The query
-   language grammar (`server/app-layer/traces/query-language/grammar.ts`)
+   language grammar (`packages/features/trace/contract/src/trace-query-grammar.ts`)
    supports only continuous `[from TO to]` ranges — there is no numeric set
    syntax (`spans IN (1,3,7)`).
 

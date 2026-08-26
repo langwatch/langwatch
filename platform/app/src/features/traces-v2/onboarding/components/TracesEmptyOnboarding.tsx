@@ -8,8 +8,8 @@ import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useOpenTraceDrawer } from "../../hooks/useOpenTraceDrawer";
-import type { Density } from "../../stores/densityStore";
-import { useUIStore } from "../../stores/uiStore";
+import type { Density } from "@langwatch/trace-web";
+import { useUIStore } from "@langwatch/trace-web";
 import { findStageDef } from "../chapters/onboardingJourneyConfig";
 import {
   ARRIVAL_PREVIEW_TRACES,

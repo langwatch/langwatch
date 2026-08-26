@@ -4,7 +4,7 @@ import {
   FIELD_VALUES,
   SEARCH_FIELDS,
   type SearchFieldGroup,
-} from "~/server/app-layer/traces/query-language/metadata";
+} from "@langwatch/trace-contract";
 
 // Field mode is uncapped — the dropdown's 240px scroll handles overflow.
 // Value mode keeps a top-N because facet enumerations can run to hundreds.

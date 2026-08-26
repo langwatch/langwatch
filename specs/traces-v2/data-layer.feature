@@ -167,8 +167,8 @@ Rule: Search autocomplete
 
 Rule: Strongly typed filter field registry
   Every filterable field is defined once in `SEARCH_FIELDS`
-  (`server/app-layer/traces/query-language/metadata.ts`). The registry drives
-  autocomplete, sidebar facets, AST validation, and ClickHouse query translation.
+  (`packages/features/trace/contract/src/trace-query-metadata.ts`). The registry
+  drives autocomplete, sidebar facets, AST validation, and ClickHouse query translation.
 
   Scenario: Unknown field rejected at parse time
     When the user types "modle:gpt-4o" in the search bar

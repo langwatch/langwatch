@@ -1,5 +1,5 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
-import { formatCost } from "../../utils/formatters";
+import { formatCost } from "@langwatch/trace-web";
 import { TooltipRow } from "./TooltipRow";
 
 interface CostBreakdownTooltipContentProps {

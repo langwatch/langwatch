@@ -25,6 +25,11 @@ id to persistence. A missing trace returns an empty page with a null cursor.
 The app's tRPC names and response shapes do not change. Browser code may use
 the Trace contract but does not fetch or reshape the response.
 
+The contract also owns the portable Trace query language: field metadata,
+grammar, parsing, analysis and mutations. Browser callers execute these pure
+operations locally. Live categorical samples are read through `TraceService`;
+the server keeps the facet source behind a private composition port.
+
 ## Dependencies
 
 `TraceService` receives the Trace repository and the complete Model Provider
@@ -65,10 +70,12 @@ before crossing the transport boundary, including nullish field behaviour.
 
 ## Consequences
 
-This slice does not move headers, full/detail reads, list/search, projections,
-eventing, overlays, evaluations, enrichment, resources, logs, or signals.
-The browser package contains only dependency-free display helpers and cannot
-fetch, authorize, compose, or reshape a trace response. It also owns the
+Portable response schemas now live in the Trace contract and the legacy router
+schema module is only a re-export. This slice does not move the corresponding
+header, full/detail, list/search, resource or signal reads, nor projections,
+eventing, overlays, evaluations, enrichment or logs.
+The browser package contains only display behaviour and cannot fetch,
+authorize, compose, or reshape a trace response. It also owns the
 transport-neutral loaded-row find behaviour and the flame-graph presentation.
 The app supplies loaded span rows, selection callbacks, its Kbd skin, and
 shortcut composition; a small `TraceFlameSpan` input keeps the response schema

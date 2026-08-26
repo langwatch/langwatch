@@ -11,17 +11,10 @@ import {
   type UseTextTranslationResult,
   useTextTranslation,
 } from "../../../hooks/useTextTranslation";
-import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../stores/annotationQueueSessionStore";
+import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../../../types/trace";
-import {
-  formatCost,
-  formatDuration,
-  formatRelativeTimeAgo,
-} from "../../../utils/formatters";
-import { isTerminalOrigin } from "../../../utils/terminalOrigin";
+import { formatCost, formatDuration, formatRelativeTimeAgo } from "@langwatch/trace-web";
+import { isTerminalOrigin } from "@langwatch/trace-web";
 import {
   Bubble,
   type BubbleSide,

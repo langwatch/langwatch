@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useDrawerStore } from "../stores/drawerStore";
 import { type ShortcutContext, TRACE_DRAWER_SHORTCUTS } from "./traceDrawerShortcutTable";
 import type { ConversationContextResult } from "./useConversationContext";

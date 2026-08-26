@@ -18,11 +18,11 @@ import {
   selectPeersMatching,
   usePresenceStore,
 } from "~/features/presence/stores/presenceStore";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../utils/formatters";
+import { formatDuration, SPAN_TYPE_COLORS } from "@langwatch/trace-web";
 import { OverflowMenu } from "../shared/OverflowMenu";
 
 /**

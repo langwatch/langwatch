@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { LuSearch } from "react-icons/lu";
-import { useUIStore } from "../../stores/uiStore";
+import { useUIStore } from "@langwatch/trace-web";
 import { useAskLangyFromSearch } from "../SearchBar/useAskLangyFromSearch";
 import {
   KeyboardShortcutsHelp,

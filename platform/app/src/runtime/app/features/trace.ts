@@ -2,12 +2,14 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { TraceService } from "@langwatch/trace-contract";
 import {
   ClickHouseTraceAdapter,
+  type TraceQueryFieldValuesPort,
   type TraceClickHouseResolver,
 } from "@langwatch/trace-server";
 
 export type AppTraceRuntimeOptions = {
   resolveClient: TraceClickHouseResolver;
   modelProviders: ModelProviderService;
+  queryFieldValues: TraceQueryFieldValuesPort;
 };
 
 /** App composition for the process-owned Trace service. */

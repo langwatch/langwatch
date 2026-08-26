@@ -3,6 +3,11 @@ import { ModelProviderService } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  TraceQueryFieldValuesPort,
+  type TraceQueryFieldValuesInput,
+  type TraceQueryFieldValuesResult,
+} from "../src/ports/query-field-values.port";
+import {
   TraceRepository,
   type TraceSpanSummaryRecord,
   type TraceSpanPage,
@@ -140,11 +145,41 @@ class FakeModelProviderService extends ModelProviderService {
   }
 }
 
-const service = (rows: SpanTreeNode[] = [node]) =>
+class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
+  async list(): Promise<TraceQueryFieldValuesResult> {
+    return { values: [] };
+  }
+}
+
+const service = (
+  rows: SpanTreeNode[] = [node],
+  queryFieldValues: TraceQueryFieldValuesPort = new EmptyQueryFieldValues(),
+) =>
   TraceService.create({
     repository: new FakeTraceRepository(rows.map(record)),
     modelProviders: new FakeModelProviderService(),
+    queryFieldValues,
   });
+
+class CharacterizedQueryFieldValues extends TraceQueryFieldValuesPort {
+  readonly calls: TraceQueryFieldValuesInput[] = [];
+
+  async list(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
+    this.calls.push(input);
+
+    if (input.facetKey === "model") {
+      throw new Error("model facet unavailable");
+    }
+
+    if (input.facetKey === "status") {
+      return {
+        values: [{ value: "warning" }, { value: "custom" }],
+      };
+    }
+
+    return { values: [] };
+  }
+}
 
 describe("TraceService span-tree read", () => {
   it("returns the complete characterized page and cursor", async () => {
@@ -197,6 +232,7 @@ describe("TraceService span-tree read", () => {
       TraceService.create({
         repository: new InvalidTraceRepository(),
         modelProviders: new FakeModelProviderService(),
+        queryFieldValues: new EmptyQueryFieldValues(),
       }).getSpanTreePage({
         projectId: "project_1",
         traceId: "trace_1",
@@ -212,6 +248,7 @@ describe("TraceService span-tree read", () => {
     const result = await TraceService.create({
       repository: new FakeTraceRepository([record({ ...node, cost: null })]),
       modelProviders: new FakeModelProviderService(0.12),
+      queryFieldValues: new EmptyQueryFieldValues(),
     }).getSpanTreePage({
       projectId: "project_1",
       traceId: "trace_1",
@@ -226,6 +263,7 @@ describe("TraceService span-tree read", () => {
     const priced = await TraceService.create({
       repository: new FakeTraceRepository([record({ ...node, cost: null })]),
       modelProviders: new FakeModelProviderService(0.12),
+      queryFieldValues: new EmptyQueryFieldValues(),
     }).getSpanTreeDelta({
       projectId: "project_1",
       traceId: "trace_1",
@@ -242,5 +280,33 @@ describe("TraceService span-tree read", () => {
       canSeeCosts: false,
     });
     expect(redacted).toEqual([{ ...node, cost: null }]);
+  });
+});
+
+describe("TraceService query field catalogue", () => {
+  it("merges live values before static values and degrades one failed facet", async () => {
+    const fieldValues = new CharacterizedQueryFieldValues();
+    const catalogue = await service([], fieldValues).buildQueryFieldCatalogue({
+      projectId: "project_1",
+      timeRange: { from: 100, to: 200 },
+    });
+
+    expect(catalogue).toContain(
+      "- status (categorical): Status — e.g. warning, custom, error, ok",
+    );
+    expect(catalogue).toContain("- model (categorical): Model");
+    expect(catalogue).not.toContain("- model (categorical): Model — e.g.");
+    expect(fieldValues.calls.length).toBeGreaterThan(1);
+    expect(fieldValues.calls).toEqual(
+      expect.arrayContaining([
+        {
+          projectId: "project_1",
+          timeRange: { from: 100, to: 200 },
+          facetKey: "status",
+          limit: 20,
+          offset: 0,
+        },
+      ]),
+    );
   });
 });

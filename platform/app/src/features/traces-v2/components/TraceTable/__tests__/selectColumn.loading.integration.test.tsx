@@ -15,7 +15,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useSelectionStore } from "../../../stores/selectionStore";
+import { useSelectionStore } from "@langwatch/trace-web";
 import type { TraceListItem } from "../../../types/trace";
 import { traceSelectColumnDef } from "../selectColumn";
 import { buildTracePlaceholderRows } from "../skeletonPlaceholders";

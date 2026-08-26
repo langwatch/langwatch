@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { getFieldSuggestions, getValueSuggestions } from "../suggestionItems";
 
 describe("getFieldSuggestions", () => {

@@ -22,6 +22,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "liqe": "^3.8.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {

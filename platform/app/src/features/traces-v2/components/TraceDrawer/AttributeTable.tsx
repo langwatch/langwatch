@@ -4,11 +4,11 @@ import { LuCheck, LuCopy, LuEye, LuLock, LuPin, LuPinOff } from "react-icons/lu"
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { RestrictedAttribute } from "~/server/api/routers/tracesV2.schemas";
+import type { RestrictedAttribute } from "@langwatch/trace-contract";
 import { compileAttributePattern } from "~/server/data-privacy/attributePatternMatcher";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";
-import type { PinnedAttributeSource } from "../../stores/pinnedAttributesStore";
+import type { PinnedAttributeSource } from "@langwatch/trace-web";
 import {
   API_KEY_ATTRIBUTE_LABEL,
   API_KEY_ID_ATTRIBUTE,
@@ -16,7 +16,7 @@ import {
 } from "./ApiKeyAttribute";
 import { AttributeValue } from "./AttributeValue";
 import { AnchorCommentButton } from "./anchoredComments/AnchorCommentButton";
-import { sameAttributeValue } from "./attributeValueEquality";
+import { sameAttributeValue } from "@langwatch/trace-web";
 import { FormatSelect } from "./FormatSelect";
 import { PinnedAwareJsonView } from "./JsonHighlight";
 

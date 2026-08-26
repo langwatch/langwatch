@@ -2,11 +2,8 @@ import { Badge, Box, Button, chakra, HStack, Icon, Text, VStack } from "@chakra-
 import { BookOpen } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
-import {
-  SEARCH_FIELDS,
-  type SearchFieldMeta,
-} from "~/server/app-layer/traces/query-language/metadata";
-import { useUIStore } from "../../stores/uiStore";
+import { SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
+import { useUIStore } from "@langwatch/trace-web";
 import {
   FACET_GROUPS,
   type FacetGroupDef,
@@ -14,7 +11,7 @@ import {
   getFacetGroupId,
 } from "../FilterSidebar/constants";
 import { getFacetIcon } from "../FilterSidebar/utils";
-import type { SuggestionState } from "./getSuggestionState";
+import type { SuggestionState } from "@langwatch/trace-web";
 import type { SuggestionRow, SuggestionUIState } from "./suggestionUI";
 
 interface SuggestionDropdownProps {

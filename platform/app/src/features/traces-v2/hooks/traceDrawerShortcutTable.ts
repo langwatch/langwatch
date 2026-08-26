@@ -1,6 +1,6 @@
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import type { useDrawerStore } from "../stores/drawerStore";
-import { isTerminalOrigin } from "../utils/terminalOrigin";
+import { isTerminalOrigin } from "@langwatch/trace-web";
 import type { useTraceDrawerNavigation } from "./useTraceDrawerNavigation";
 
 type DrawerStoreState = ReturnType<typeof useDrawerStore.getState>;

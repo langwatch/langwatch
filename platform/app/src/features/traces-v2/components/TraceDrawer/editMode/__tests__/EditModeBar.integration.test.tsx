@@ -47,7 +47,7 @@ vi.mock("~/features/errors", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-import { useAnnotationSessionStore } from "../../../../stores/annotationSessionStore";
+import { useAnnotationSessionStore } from "@langwatch/trace-web";
 import { useDrawerStore } from "../../../../stores/drawerStore";
 import { useTraceEditStore } from "../../../../stores/traceEditStore";
 import { EditModeBar } from "../EditModeBar";

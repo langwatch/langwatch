@@ -3,7 +3,7 @@ import { AArrowDown, AArrowUp } from "lucide-react";
 import type React from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
-import { type Density, useDensityStore } from "../../stores/densityStore";
+import { type Density, useDensityStore } from "@langwatch/trace-web";
 
 // Icons map "visual height of letter" to "row height" — the up-arrow
 // "A↑" reads as "tighter rows, taller letters poking up" = compact,

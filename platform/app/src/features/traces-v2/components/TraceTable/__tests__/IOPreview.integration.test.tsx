@@ -15,11 +15,15 @@ import { IOPreview } from "../IOPreview";
 
 // Compact vs comfortable is gated by the density store; force compact so
 // the row path under test is the one in the screenshot.
-vi.mock("../../../stores/densityStore", () => ({
-  useDensityStore: (selector: (s: { density: string }) => unknown) =>
-    selector({ density: "compact" }),
-  getDrawerDensityTokens: () => ({}),
-}));
+vi.mock("@langwatch/trace-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-web")>();
+
+  return {
+    ...actual,
+    useDensityStore: (selector: (state: { density: string }) => unknown) =>
+      selector({ density: "compact" }),
+  };
+});
 
 vi.mock("../../../hooks/useDensityTokens", () => ({
   useDensityTokens: () => ({ ioFontSize: "11px" }),

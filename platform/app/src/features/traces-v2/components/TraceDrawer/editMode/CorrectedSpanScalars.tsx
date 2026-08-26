@@ -1,5 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import type { TraceEditSpanField } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import { CorrectedScalar } from "./CorrectedField";
 

@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
 import type { PageCursor } from "../../stores/filterStore";
-import { useRefreshUIStore } from "../../stores/refreshUIStore";
+import { useRefreshUIStore } from "@langwatch/trace-web";
 import { RefreshProgressBar } from "../TracesPage/RefreshProgressBar";
 import { ColumnEducationDialog } from "./ColumnEducationDialog";
 import { NewTracesScrollUpIndicator } from "./NewTracesScrollUpIndicator";

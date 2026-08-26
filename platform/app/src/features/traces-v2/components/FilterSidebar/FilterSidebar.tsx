@@ -33,7 +33,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
-import { useUIStore } from "../../stores/uiStore";
+import { useUIStore } from "@langwatch/trace-web";
 import { useViewStore } from "../../stores/viewStore";
 import { FacetManagerPopover } from "./FacetManagerPopover";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";

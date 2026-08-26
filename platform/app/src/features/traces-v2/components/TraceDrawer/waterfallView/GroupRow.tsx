@@ -2,7 +2,7 @@ import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "@langwatch/trace-web";
 import { isSkillSpan } from "../transcript/skillInvocation";
 import {
   GROUP_ROW_HEIGHT,

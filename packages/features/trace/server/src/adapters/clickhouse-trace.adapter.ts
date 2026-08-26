@@ -6,6 +6,8 @@ import {
   type TraceClickHouseResolver,
 } from "../ports/clickhouse.port";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository";
+import { TraceQueryFieldValuesPort } from "../ports/query-field-values.port";
+import { NullQueryFieldValuesAdapter } from "./null-query-field-values.adapter";
 import {
   TraceRepository,
   type TraceSpanPage,
@@ -16,9 +18,10 @@ import { TraceService } from "../services/trace.service";
 export type ClickHouseTraceAdapterOptions = {
   resolveClient: TraceClickHouseResolver;
   modelProviders: ModelProviderService;
+  queryFieldValues: TraceQueryFieldValuesPort;
 };
 
-/** Composes concrete ClickHouse repositories without exposing private ports. */
+/** Composes the Trace service from its ClickHouse and query-value boundaries. */
 export class ClickHouseTraceAdapter {
   private constructor(private readonly options: ClickHouseTraceAdapterOptions) {}
 
@@ -31,6 +34,7 @@ export class ClickHouseTraceAdapter {
     return TraceService.create({
       repository: new NullTraceRepository(),
       modelProviders,
+      queryFieldValues: NullQueryFieldValuesAdapter.create(),
     });
   }
 
@@ -40,6 +44,7 @@ export class ClickHouseTraceAdapter {
         ResolverTraceClickHousePort.create(this.options.resolveClient),
       ),
       modelProviders: this.options.modelProviders,
+      queryFieldValues: this.options.queryFieldValues,
     });
   }
 }

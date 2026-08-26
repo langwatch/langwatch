@@ -8,7 +8,7 @@ import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext"
 import { useFilterStore } from "../../stores/filterStore";
 import { AiPromptInput } from "../ai/AiPromptInput";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
-import type { FloatRect } from "./useFloatRect";
+import type { FloatRect } from "@langwatch/trace-web";
 
 interface FloatingLangyBarProps {
   rect: FloatRect | null;

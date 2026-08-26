@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parse } from "~/server/app-layer/traces/query-language/parse";
-import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { analyzeOrGroups, parse } from "@langwatch/trace-contract";
 import { routeToggleViaOrGroups } from "../routeToggleViaOrGroups";
 
 describe("routeToggleViaOrGroups", () => {

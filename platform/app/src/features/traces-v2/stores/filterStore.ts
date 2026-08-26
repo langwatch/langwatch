@@ -2,31 +2,25 @@ import type { LiqeQuery } from "liqe";
 import { create } from "zustand";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import {
-  removeEvaluatorScoreRangeInQuery,
-  setEvaluatorScoreRangeInQuery,
-  toggleEvaluatorSubFilterInQuery,
-} from "~/server/app-layer/traces/query-language/evaluatorGroup";
-import {
   addSameFieldOrValue,
   addToOrGroupAtLocation,
-  removeFacetValueFromQuery,
-  removeFieldFromQuery,
-  removeImplicitTermFromQuery,
-  setFacetValueAtLocation,
-  setRangeInQuery,
-  swapOperatorAtLocation,
-  toggleFacetInQuery,
-} from "~/server/app-layer/traces/query-language/mutations";
-import {
+  getFacetValueState,
   isEmptyAST,
   ParseError,
   parse,
+  removeFacetValueFromQuery,
+  removeEvaluatorScoreRangeInQuery,
+  removeFieldFromQuery,
+  removeImplicitTermFromQuery,
   serialize,
-} from "~/server/app-layer/traces/query-language/parse";
-import {
-  getFacetValueState,
+  setEvaluatorScoreRangeInQuery,
+  setFacetValueAtLocation,
+  setRangeInQuery,
+  swapOperatorAtLocation,
+  toggleEvaluatorSubFilterInQuery,
+  toggleFacetInQuery,
   validateAst,
-} from "~/server/app-layer/traces/query-language/queries";
+} from "@langwatch/trace-contract";
 
 export interface TimeRange {
   from: number;

@@ -10,7 +10,7 @@
  * A caller reading a period of its own passes it, so the list it lands on
  * covers the same days as the numbers it was reading.
  */
-import { escapeValue } from "~/server/app-layer/traces/query-language/mutations";
+import { escapeValue } from "@langwatch/trace-contract";
 
 const TRACE_VIRTUAL_KEY_ATTRIBUTE = "trace.attribute.langwatch.virtual_key_id";
 

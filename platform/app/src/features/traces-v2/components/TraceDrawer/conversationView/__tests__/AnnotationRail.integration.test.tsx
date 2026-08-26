@@ -114,10 +114,7 @@ vi.mock("../ChatTurnRow", () => ({
 
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useAnnotationDraftStore } from "../../../../stores/annotationDraftStore";
-import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../stores/annotationQueueSessionStore";
+import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-web";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { AnnotatedTurnRow } from "../AnnotatedTurnRow";
 import type { ParsedTurn, TurnLayout } from "../types";

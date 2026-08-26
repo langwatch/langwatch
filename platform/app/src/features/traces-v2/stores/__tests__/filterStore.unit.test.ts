@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
+import { analyzeOrGroups } from "@langwatch/trace-contract";
 import { useFilterStore } from "../filterStore";
 
 const TRANSLATION = {

@@ -10,7 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { useColumnEducationStore } from "../../stores/columnEducationStore";
+import { useColumnEducationStore } from "@langwatch/trace-web";
 
 /**
  * One-off teaching dialog that fires the first time the operator tries

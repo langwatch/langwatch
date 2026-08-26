@@ -107,7 +107,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
-} from "./tracesV2.schemas";
+} from "@langwatch/trace-contract";
 
 // ---------------------------------------------------------------------------
 // Shared input fragments
@@ -1354,11 +1354,14 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return generateTraceQueryFromPrompt({
         projectId: input.projectId,
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+        modelProviders: ctx.app.modelProviders,
+        managedProviders: ctx.app.managedProviders,
+        traces: ctx.app.traces.tree,
       });
     }),
 
@@ -1375,11 +1378,14 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return generateTraceAction({
         projectId: input.projectId,
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+        modelProviders: ctx.app.modelProviders,
+        managedProviders: ctx.app.managedProviders,
+        traces: ctx.app.traces.tree,
       });
     }),
 

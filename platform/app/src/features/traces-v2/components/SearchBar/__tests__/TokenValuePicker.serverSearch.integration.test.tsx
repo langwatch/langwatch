@@ -53,10 +53,15 @@ vi.mock("../../../stores/filterStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/uiStore", () => ({
-  useUIStore: (selector: (s: unknown) => unknown) =>
-    selector({ setSyntaxHelpOpen: vi.fn() }),
-}));
+vi.mock("@langwatch/trace-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-web")>();
+
+  return {
+    ...actual,
+    useUIStore: (selector: (state: unknown) => unknown) =>
+      selector({ setSyntaxHelpOpen: vi.fn() }),
+  };
+});
 
 import { TokenValuePicker } from "../TokenValuePicker";
 

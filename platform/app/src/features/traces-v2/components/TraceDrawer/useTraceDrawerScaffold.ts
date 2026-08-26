@@ -1,6 +1,6 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 import { getTopDrawer, useDrawer } from "~/hooks/useDrawer";
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { useConversationContext } from "../../hooks/useConversationContext";
 import { useConversationPrefetch } from "../../hooks/useConversationPrefetch";

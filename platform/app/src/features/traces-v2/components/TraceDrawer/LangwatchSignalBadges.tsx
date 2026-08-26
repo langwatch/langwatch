@@ -11,7 +11,7 @@ import {
   LuUser,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
+import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 
 interface SignalDisplay {
   icon: IconType;

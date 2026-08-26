@@ -1,4 +1,4 @@
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 export interface SpanWithChildren extends SpanTreeNode {
   children: SpanWithChildren[];

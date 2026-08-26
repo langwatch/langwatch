@@ -4,8 +4,8 @@ import {
   type FocusSection,
   isFocusSection,
   useFocusSectionStore,
-} from "../stores/focusSectionStore";
-import { useSpanPulseStore } from "../stores/spanPulseStore";
+} from "@langwatch/trace-web";
+import { useSpanPulseStore } from "@langwatch/trace-web";
 
 /** A comment's anchor as it comes back from a read. */
 export interface AnnotationAnchorTarget {

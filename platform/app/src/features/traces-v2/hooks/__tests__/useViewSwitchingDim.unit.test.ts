@@ -41,18 +41,20 @@ vi.mock("../../stores/viewStore", () => ({
     }),
 }));
 
-vi.mock("../../stores/densityStore", () => ({
-  useDensityStore: (selector: (s: unknown) => unknown) =>
-    selector({ density: mockDensity }),
-}));
+vi.mock("@langwatch/trace-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-web")>();
 
-vi.mock("../../stores/refreshUIStore", () => ({
-  useRefreshUIStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      pulse: vi.fn(),
-      setReplacingData: mockSetReplacingData,
-    }),
-}));
+  return {
+    ...actual,
+    useDensityStore: (selector: (state: unknown) => unknown) =>
+      selector({ density: mockDensity }),
+    useRefreshUIStore: (selector: (state: unknown) => unknown) =>
+      selector({
+        pulse: vi.fn(),
+        setReplacingData: mockSetReplacingData,
+      }),
+  };
+});
 
 // ─── Module under test ────────────────────────────────────────────────────────
 import { useViewSwitchingDim } from "../useViewSwitchingDim";

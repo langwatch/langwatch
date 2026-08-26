@@ -1,4 +1,4 @@
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import {
   COLLAPSE_TIMELINE_BELOW_PX,
   type FlatRow,

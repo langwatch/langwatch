@@ -1,5 +1,5 @@
 import type React from "react";
-import { useFacetHoverStore } from "../../stores/facetHoverStore";
+import { useFacetHoverStore } from "@langwatch/trace-web";
 
 /**
  * Escape characters that would break a CSS attribute-value string.

@@ -6,7 +6,7 @@ import {
   type QueryBuilderCategoricalDef,
   TABLE_TIME_COLUMNS,
 } from "../../facet-registry";
-import { SEARCH_FIELDS } from "../../query-language/metadata";
+import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 const baseCtx = {
   tenantId: "tenant-X",

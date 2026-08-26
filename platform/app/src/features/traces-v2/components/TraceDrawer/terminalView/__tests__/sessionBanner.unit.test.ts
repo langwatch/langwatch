@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import { deriveSessionBanner } from "../sessionBanner";
 
 function modelSpan(model: string, atMs: number): SpanDetail {

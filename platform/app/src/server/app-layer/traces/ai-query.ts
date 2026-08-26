@@ -2,13 +2,16 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import {
+  isEmptyAST,
+  parse,
+  QUERY_SYNTAX_DOC,
+  type TraceService,
+  validateAst,
+} from "@langwatch/trace-contract";
 import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { buildFieldsBlock } from "./query-language/fieldCatalogue";
-import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
-import { isEmptyAST, parse } from "./query-language/parse";
-import { validateAst } from "./query-language/queries";
 
 const logger = createLogger("langwatch:ai-query");
 
@@ -19,6 +22,7 @@ export interface AiQueryInput {
   timeRange: { from: number; to: number };
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
+  traces: TraceService;
 }
 
 export type AiQueryResult =
@@ -158,7 +162,10 @@ const aiActionSchema = z.discriminatedUnion("kind", [
 export async function generateTraceQueryFromPrompt(
   input: AiQueryInput,
 ): Promise<AiQueryResult> {
-  const fieldsBlock = await buildFieldsBlock(input);
+  const fieldsBlock = await input.traces.buildQueryFieldCatalogue({
+    projectId: input.projectId,
+    timeRange: input.timeRange,
+  });
   const systemPrompt = buildSystemPrompt(fieldsBlock);
   const messages: ModelMessage[] = [{ role: "user", content: input.prompt }];
 
@@ -246,7 +253,10 @@ function sanitizeLlmOutput(raw: string): string {
  * know how to word.
  */
 export async function generateTraceAction(input: AiQueryInput): Promise<AiActionResult> {
-  const fieldsBlock = await buildFieldsBlock(input);
+  const fieldsBlock = await input.traces.buildQueryFieldCatalogue({
+    projectId: input.projectId,
+    timeRange: input.timeRange,
+  });
   const systemPrompt = buildActionSystemPrompt(fieldsBlock);
 
   const model = await getVercelAIModel({

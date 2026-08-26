@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FACET_REGISTRY } from "../../facet-registry";
-import { FIELD_VALUES } from "../../query-language/metadata";
+import { FIELD_VALUES } from "@langwatch/trace-contract";
 
 /**
  * Regression contract for the "Errored pill filtered the wrong bucket"

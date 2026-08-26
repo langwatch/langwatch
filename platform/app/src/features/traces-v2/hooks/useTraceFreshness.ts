@@ -4,7 +4,7 @@ import { useSSESubscription } from "~/hooks/useSSESubscription";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { api } from "~/utils/api";
 import { useDrawerStore } from "../stores/drawerStore";
-import { useRowPulseStore } from "../stores/rowPulseStore";
+import { useRowPulseStore } from "@langwatch/trace-web";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useVisibleTraceIds } from "./useVisibleTraceIds";
 

@@ -35,7 +35,7 @@ import { TracePresenceAvatars } from "~/features/presence/components/TracePresen
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/trace-contract";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useSpanTree } from "../../../hooks/useSpanTree";
@@ -44,7 +44,7 @@ import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFilterStore } from "../../../stores/filterStore";
-import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { useFocusSectionStore } from "@langwatch/trace-web";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import {
   formatAbsoluteTime,
@@ -53,8 +53,8 @@ import {
   formatRelativeTimeAgo,
   formatTokens,
   STATUS_COLORS,
-} from "../../../utils/formatters";
-import { isTerminalOrigin } from "../../../utils/terminalOrigin";
+} from "@langwatch/trace-web";
+import { isTerminalOrigin } from "@langwatch/trace-web";
 import { guardTraceEditExit } from "../../../utils/traceEditMode";
 import { AddToAnnotationQueueDialog } from "../../AddToAnnotationQueueDialog";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";

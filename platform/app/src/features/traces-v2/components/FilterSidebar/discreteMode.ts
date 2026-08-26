@@ -1,4 +1,4 @@
-import type { NumericMode } from "../../stores/numericModeStore";
+import type { NumericMode } from "@langwatch/trace-web";
 import type { RangeSectionData } from "./types";
 
 /**

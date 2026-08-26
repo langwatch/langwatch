@@ -1,7 +1,7 @@
 import { Box, VStack } from "@chakra-ui/react";
 import type { ReactElement } from "react";
 import { LuPin } from "react-icons/lu";
-import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
+import type { PinnedAttribute } from "@langwatch/trace-web";
 import { Chip } from "../Chip";
 import { PinnedMetricPill } from "./MetricPill";
 

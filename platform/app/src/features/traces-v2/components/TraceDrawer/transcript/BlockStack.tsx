@@ -2,7 +2,7 @@ import { Box, Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuFileText, LuWrench } from "react-icons/lu";
 import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
-import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
+import { splitLeadingContextBlocks } from "@langwatch/trace-web";
 import { RenderedMarkdown } from "../markdownView";
 import { CommentableBlock } from "./messageComments";
 import { asMarkdownBody, parseContentBlocks, withBlockKeys } from "./parsing";

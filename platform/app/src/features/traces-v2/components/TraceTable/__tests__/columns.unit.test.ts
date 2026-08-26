@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timeColumnSizing } from "../../../stores/timeFormatStore";
+import { timeColumnSizing } from "@langwatch/trace-web";
 import { getTraceColumnDef } from "../columns";
 
 describe("getTraceColumnDef", () => {

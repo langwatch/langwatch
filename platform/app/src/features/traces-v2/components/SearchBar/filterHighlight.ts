@@ -10,10 +10,10 @@ import type {
   UnaryOperatorToken,
 } from "liqe";
 import {
+  parse as cachedParse,
   SCENARIO_FIELDS,
   SEARCH_FIELDS,
-} from "~/server/app-layer/traces/query-language/metadata";
-import { parse as cachedParse } from "~/server/app-layer/traces/query-language/parse";
+} from "@langwatch/trace-contract";
 
 /**
  * The grammar's actual operator vocabulary — anything else uppercase-shaped

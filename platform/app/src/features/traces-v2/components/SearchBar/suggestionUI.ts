@@ -1,5 +1,5 @@
-import type { SearchFieldGroup } from "~/server/app-layer/traces/query-language/metadata";
-import type { SuggestionState } from "./getSuggestionState";
+import type { SearchFieldGroup } from "@langwatch/trace-contract";
+import type { SuggestionState } from "@langwatch/trace-web";
 import { getFieldSuggestions, getValueSuggestions } from "./suggestionItems";
 
 /**

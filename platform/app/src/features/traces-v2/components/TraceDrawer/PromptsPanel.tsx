@@ -20,20 +20,16 @@ import {
 import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
-import type {
-  SpanDetail,
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
 import { useSpansFull } from "../../hooks/useSpansFull";
-import { formatDuration } from "../../utils/formatters";
+import { formatDuration } from "@langwatch/trace-web";
 import {
   extractPromptReference,
   type PromptReference,
   parseTracePromptIds,
   promptReferenceKey,
-} from "../../utils/promptAttributes";
+} from "@langwatch/trace-web";
 
 interface PromptsPanelProps {
   trace: TraceHeader;

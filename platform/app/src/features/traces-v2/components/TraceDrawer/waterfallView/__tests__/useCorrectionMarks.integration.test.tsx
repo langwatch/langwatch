@@ -30,7 +30,7 @@ vi.mock("../../../../stores/traceEditStore", () => ({
     selector({ overlayView: harness.overlayView, basePatch: null }),
 }));
 
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useCorrectionMarks } from "../useCorrectionMarks";
 
 const SPANS = [

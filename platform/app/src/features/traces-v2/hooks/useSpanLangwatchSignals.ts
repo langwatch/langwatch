@@ -1,6 +1,6 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
-import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schemas";
+import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import { asSharedQueryResult, useSharedTrace } from "../context/SharedTraceContext";

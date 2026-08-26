@@ -45,7 +45,7 @@ vi.mock("../../../stores/drawerStore", () => ({
     selector({ setViewMode: mocks.setViewMode }),
 }));
 
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/trace-contract";
 import { TraceHeaderChips } from "../TraceHeaderChips";
 
 function annotation(over: Record<string, unknown> = {}) {

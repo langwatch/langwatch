@@ -32,9 +32,9 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
-import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/metadata";
-import { STATUS_COLORS } from "../../utils/formatters";
-import { ORIGIN_DISPLAY } from "../../utils/originDisplay";
+import { FIELD_VALUES } from "@langwatch/trace-contract";
+import { STATUS_COLORS } from "@langwatch/trace-web";
+import { ORIGIN_DISPLAY } from "@langwatch/trace-web";
 
 /** Section key for the trace-level Attributes block (reads `Attributes` map on `trace_summaries`). */
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";

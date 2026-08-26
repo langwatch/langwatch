@@ -12,7 +12,7 @@ import {
 import { type ReactNode, useState } from "react";
 import { LuCircleAlert, LuCircleSlash, LuQuote } from "react-icons/lu";
 import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "~/server/app-layer/evaluations/azure-safety-env";
-import { formatCost, formatDuration } from "../../../utils/formatters";
+import { formatCost, formatDuration } from "@langwatch/trace-web";
 import { RunHistorySparkline } from "./RunHistorySparkline";
 import { useEvalInputs } from "./useEvalInputs";
 import {

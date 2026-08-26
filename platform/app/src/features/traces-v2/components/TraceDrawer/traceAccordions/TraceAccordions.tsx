@@ -1,6 +1,6 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
 import { memo } from "react";
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { SpanAccordions } from "./SpanAccordions";
 import { useSyncSectionPresence } from "./sectionPresence";
 import { TraceSummaryAccordions } from "./TraceSummaryAccordions";

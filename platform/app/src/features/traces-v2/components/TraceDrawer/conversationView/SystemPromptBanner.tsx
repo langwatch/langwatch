@@ -2,7 +2,7 @@ import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Settings2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { formatPreview } from "../../../utils/previewFormatter";
+import { formatPreview } from "@langwatch/trace-web";
 
 const SYSTEM_PROMPT_LONG_THRESHOLD = 280;
 

@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
@@ -65,7 +65,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { useSpanHoverStore } from "../../../../stores/spanHoverStore";
+import { useSpanHoverStore } from "@langwatch/trace-web";
 import { TreeRow } from "../TreeRow";
 import type { WaterfallTreeNode } from "../types";
 

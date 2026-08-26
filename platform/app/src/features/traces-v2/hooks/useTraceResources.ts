@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   InstrumentationScope,
   SpanResourceInfoDto,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/trace-contract";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";

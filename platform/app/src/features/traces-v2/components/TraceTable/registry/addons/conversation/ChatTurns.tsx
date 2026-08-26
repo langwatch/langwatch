@@ -4,7 +4,7 @@ import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatDuration } from "../../../../../utils/formatters";
+import { formatDuration } from "@langwatch/trace-web";
 import { SystemPromptBanner } from "../../../../TraceDrawer/conversationView/SystemPromptBanner";
 import { TraceIdPeek } from "../../../../TraceIdPeek";
 import { findMessageContent, parseSystemPrompt } from "../../../chatContent";

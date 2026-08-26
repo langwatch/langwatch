@@ -1,8 +1,8 @@
 import { Badge, Text } from "@chakra-ui/react";
 import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatTokens } from "../../../../../utils/formatters";
-import { originColorPalette, originLabel } from "../../../../../utils/originDisplay";
+import { formatTokens } from "@langwatch/trace-web";
+import { originColorPalette, originLabel } from "@langwatch/trace-web";
 import { MonoCell } from "../../../MonoCell";
 import { StatusIndicator } from "../../../StatusRow";
 import type { CellDef } from "../../types";

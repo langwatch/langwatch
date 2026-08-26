@@ -1,8 +1,18 @@
-import type { TraceClickHouseClient, TraceClickHouseResolver } from "../src";
+import {
+  TraceQueryFieldValuesPort,
+  type TraceClickHouseClient,
+  type TraceClickHouseResolver,
+} from "../src";
 import { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ClickHouseTraceAdapter } from "../src";
 import { ClickHouseTraceSpanRepository } from "../src/repositories/clickhouse/trace-span.repository";
 import { describe, expect, it } from "vitest";
+
+class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
+  async list() {
+    return { values: [] };
+  }
+}
 
 const resolver =
   (
@@ -122,6 +132,7 @@ describe("ClickHouseTraceAdapter", () => {
     const service = ClickHouseTraceAdapter.create({
       resolveClient: resolver(calls),
       modelProviders: new StaticModelProviders(),
+      queryFieldValues: new EmptyQueryFieldValues(),
     }).build();
 
     const page = await service.getSpanTreePage({
@@ -148,6 +159,7 @@ describe("ClickHouseTraceAdapter", () => {
     const service = ClickHouseTraceAdapter.create({
       resolveClient: resolver(calls, ""),
       modelProviders,
+      queryFieldValues: new EmptyQueryFieldValues(),
     }).build();
 
     const page = await service.getSpanTreePage({

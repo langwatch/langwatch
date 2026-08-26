@@ -5,7 +5,7 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useFacetLensStore } from "../../stores/facetLensStore";
-import { dedupeByValue } from "../../utils/dedupeByValue";
+import { dedupeByValue } from "@langwatch/trace-web";
 import { MAX_EXPANDED_FACETS, MAX_VISIBLE_FACETS } from "./constants";
 import { FacetRow } from "./FacetRow";
 import { NoneFacetRow } from "./NoneFacetRow";

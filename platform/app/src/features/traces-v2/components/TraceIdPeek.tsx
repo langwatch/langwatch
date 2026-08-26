@@ -20,7 +20,7 @@ import {
   formatDuration,
   formatTokens,
   STATUS_COLORS,
-} from "../utils/formatters";
+} from "@langwatch/trace-web";
 
 interface TracePreviewHoverCardProps {
   traceId: string;

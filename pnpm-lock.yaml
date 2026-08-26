@@ -3164,6 +3164,9 @@ importers:
 
   packages/features/trace/contract:
     dependencies:
+      liqe:
+        specifier: ^3.8.7
+        version: 3.8.7
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -3202,6 +3205,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -3211,6 +3217,9 @@ importers:
       react:
         specifier: ^19.2.7
         version: 19.2.8
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
       zustand:
         specifier: ^4.5.7
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)

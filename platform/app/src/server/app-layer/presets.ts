@@ -56,6 +56,7 @@ import {
 } from "~/runtime/app/features/automation";
 import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
 import { AppTraceRuntime } from "~/runtime/app/features/trace";
+import { AppTraceQueryFieldValuesAdapter } from "~/runtime/app/features/trace-query-field-values.adapter";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { AppModelProviderRuntime } from "~/runtime/app/features/model-provider";
 import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
@@ -1883,6 +1884,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ? AppTraceRuntime.create({
         resolveClient: resolveClickHouseClient,
         modelProviders,
+        queryFieldValues: AppTraceQueryFieldValuesAdapter.create(traceList),
       }).build()
     : AppTraceRuntime.createNull(modelProviders);
 

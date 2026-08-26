@@ -7,7 +7,7 @@ import {
   formatISOTimestamp,
   formatLocalWithZone,
   resolveViewerTimeZone,
-} from "../../../../../utils/formatters";
+} from "@langwatch/trace-web";
 import { useVerboseRelativeTime } from "../../../../../utils/useRelativeTime";
 
 /**

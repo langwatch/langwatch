@@ -1,4 +1,4 @@
-import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail } from "@langwatch/trace-contract";
 
 /**
  * Claude Code's real tool span, and the `tool.output` span event it carries

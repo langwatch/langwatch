@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useDensityStore } from "../stores/densityStore";
+import { useDensityStore } from "@langwatch/trace-web";
 import { useFilterStore } from "../stores/filterStore";
-import { useRefreshUIStore } from "../stores/refreshUIStore";
+import { useRefreshUIStore } from "@langwatch/trace-web";
 import { useViewStore } from "../stores/viewStore";
 
 interface DimInputs {

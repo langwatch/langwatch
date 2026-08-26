@@ -19,11 +19,15 @@ import { ROW_STYLES } from "../../../../StatusRow";
 import { IOPreviewAddon } from "../IOPreviewAddon";
 
 // Force the compact path — that's the density the IO preview row renders in.
-vi.mock("../../../../../../stores/densityStore", () => ({
-  useDensityStore: (selector: (s: { density: string }) => unknown) =>
-    selector({ density: "compact" }),
-  getDrawerDensityTokens: () => ({}),
-}));
+vi.mock("@langwatch/trace-web", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-web")>();
+
+  return {
+    ...actual,
+    useDensityStore: (selector: (state: { density: string }) => unknown) =>
+      selector({ density: "compact" }),
+  };
+});
 
 vi.mock("../../../../../../hooks/useDensityTokens", () => ({
   useDensityTokens: () => ({ ioFontSize: "11px" }),

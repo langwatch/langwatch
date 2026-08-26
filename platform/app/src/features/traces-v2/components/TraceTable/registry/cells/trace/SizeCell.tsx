@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatBytes } from "../../../../../utils/formatters";
+import { formatBytes } from "@langwatch/trace-web";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 

@@ -1,6 +1,6 @@
 import type React from "react";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatISOTimestamp } from "../../../../../utils/formatters";
+import { formatISOTimestamp } from "@langwatch/trace-web";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 import { TimeHoverCard } from "./TimeHoverCard";

@@ -5,7 +5,7 @@ import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useTraceEditSession } from "../../hooks/useTraceEditSession";
 import { useTraceQueryArgs } from "../../hooks/useTraceQueryArgs";
 import { useDrawerStore } from "../../stores/drawerStore";

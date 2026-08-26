@@ -1,13 +1,13 @@
 import { useDrawer } from "~/hooks/useDrawer";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/trace-contract";
 import {
   type ScenarioChipData,
   useScenarioChipData,
 } from "../components/TraceDrawer/ScenarioChip";
 import { useDrawerStore } from "../stores/drawerStore";
 import { useFilterStore } from "../stores/filterStore";
-import { useFocusSectionStore } from "../stores/focusSectionStore";
-import { parseSdkInfo, type SdkInfo } from "../utils/sdkInfo";
+import { useFocusSectionStore } from "@langwatch/trace-web";
+import { parseSdkInfo, type SdkInfo } from "@langwatch/trace-web";
 import { usePromptByHandle } from "./usePromptByHandle";
 import { type RichEval, useTraceEvaluations } from "./useTraceEvaluations";
 

@@ -7,7 +7,7 @@ import {
   EVALUATOR_LABEL_FIELD,
   EVALUATOR_VERDICT_FIELD,
   readEvaluatorGroupFromAst,
-} from "~/server/app-layer/traces/query-language/evaluatorGroup";
+} from "@langwatch/trace-contract";
 import { RowButton } from "./RowButton";
 import { commitRange, RangeEndpointInput, stepForSpan } from "./rangeControls";
 import type { FacetItem } from "./types";

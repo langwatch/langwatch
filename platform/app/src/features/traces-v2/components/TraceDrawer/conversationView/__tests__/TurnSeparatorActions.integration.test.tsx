@@ -53,10 +53,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../stores/annotationQueueSessionStore";
+import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-web";
 import { useDrawerStore } from "../../../../stores/drawerStore";
 import { useTraceEditStore } from "../../../../stores/traceEditStore";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";

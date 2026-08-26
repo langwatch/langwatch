@@ -19,7 +19,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 import { useDrawerStore } from "../../../../stores/drawerStore";
-import { useFocusSectionStore } from "../../../../stores/focusSectionStore";
+import { useFocusSectionStore } from "@langwatch/trace-web";
 import { TraceCommentList } from "../TraceCommentList";
 
 const TRACE_ID = "trace-1";

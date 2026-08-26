@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 import {
   buildTree,
   countDescendants,

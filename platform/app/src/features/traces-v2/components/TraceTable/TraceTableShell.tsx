@@ -17,10 +17,7 @@ import { flexRender, type Header, type Table } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import {
-  COLUMN_DRAG_THRESHOLD_PX,
-  useColumnEducationStore,
-} from "../../stores/columnEducationStore";
+import { COLUMN_DRAG_THRESHOLD_PX, useColumnEducationStore } from "@langwatch/trace-web";
 import { ColumnResizeGrip } from "./ColumnResizeGrip";
 import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
 import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";

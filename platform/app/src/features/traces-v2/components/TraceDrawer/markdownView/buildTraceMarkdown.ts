@@ -2,9 +2,9 @@ import type {
   SpanDetail as FullSpan,
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/trace-contract";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import { formatCost, formatDuration } from "../../../utils/formatters";
+import { formatCost, formatDuration } from "@langwatch/trace-web";
 import type { MarkdownConfig } from "./types";
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);

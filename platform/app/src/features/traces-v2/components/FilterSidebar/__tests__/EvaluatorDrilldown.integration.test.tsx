@@ -20,7 +20,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { EMPTY_AST, parse } from "~/server/app-layer/traces/query-language/parse";
+import { EMPTY_AST, parse } from "@langwatch/trace-contract";
 import { EvaluatorDrilldown } from "../EvaluatorDrilldown";
 import type { FacetItem } from "../types";
 

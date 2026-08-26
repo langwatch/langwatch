@@ -3,7 +3,7 @@ import { useCallback } from "react";
 import { LuArrowUpRight, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
-import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
+import type { PinnedAttribute } from "@langwatch/trace-web";
 import { TooltipRow } from "../../shared/TooltipRow";
 import { Chip, type ChipTone } from "../Chip";
 

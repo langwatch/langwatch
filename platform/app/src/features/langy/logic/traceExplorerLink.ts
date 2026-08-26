@@ -1,69 +1,16 @@
 /**
- * Carrying the agent's trace search into the Trace Explorer — and, for the
- * follow-up chips, into the automation drawer as an alert's subject
- * (`buildAutomationHref`). One reader, one quoting rule, every destination.
- *
- * When Langy answers "34 traces errored overnight", the user's next move is to
- * go look at them. That link has exactly one job and it is easy to get subtly
- * wrong: it must land them on THE SAME RESULT SET the card just showed them, not
- * on a naked, unfiltered explorer that happens to be full of traces. A link that
- * silently changes the question is worse than no link.
- *
- * Two grammars have to be bridged, and they are not the same grammar:
- *
- *   THE CLI ran `langwatch trace search -q <text> --start-date <d> --end-date <d>
- *   --limit <n>`. Its `--query` is the legacy free-text search field
- *   (`sharedFiltersInputSchema.query`) — plain text, matched against trace
- *   content. Its dates are epoch-ms or ISO.
- *
- *   THE EXPLORER keeps its state in the URL FRAGMENT, not the query string:
- *   `/<project>/traces#<lensId>?q=&from=&to=&page=` (see
- *   `traces-v2/utils/urlState.ts`). Its `q` is not free text — it is a liqe
- *   expression, compiled to ClickHouse by `filter-to-clickhouse/ast.ts`.
- *
- * The bridge is the one place those two meet, so it is worth being precise:
- *
- *   query  A bare/quoted term in liqe parses as an `ImplicitField`, and
- *          `translateTag` sends exactly that to `translateFreeText`. So free
- *          text in, free text out: the CLI's `--query` becomes a QUOTED literal
- *          in `q`. Quoting is not incidental — it is what guarantees fidelity.
- *          `--query 'status:error'` was free text to the CLI, and quoting keeps
- *          it free text in the Explorer instead of silently promoting it to a
- *          field filter that means something else entirely.
- *          `traceExplorerLink.unit.test.ts` runs the built `q` through the
- *          Explorer's REAL parser and asserts it comes back as an implicit
- *          free-text term, so this claim is checked rather than asserted.
- *
- *   dates  A window the agent NAMED is carried as ABSOLUTE `from`/`to` epoch-ms.
- *          A preset ("24h") re-computes against `now` on arrival, so a link
- *          opened ten minutes later would quietly query a different window than
- *          the agent pinned. Absolute is the only faithful option there.
- *          A window the agent did NOT name is a different case, and gets the
- *          opposite treatment for the same reason — see
- *          `CLI_DEFAULT_WINDOW_PRESET`. The CLI's own default is a ROLLING last
- *          day, so a rolling preset is what preserves it; emitting nothing at
- *          all drops the user into the Explorer's 30d default and turns a
- *          one-day question into a thirty-day one.
- *
- *   origin `--origin a,b` becomes `(origin:a OR origin:b)`, AND-ed onto the free
- *          text. It is a real Explorer field, so this one crosses intact. A
- *          filter that fails to cross does not make the link merely imprecise:
- *          it makes the Explorer answer a WIDER question than the card did, with
- *          bigger numbers that read as a correction rather than a discrepancy.
- *
- *   limit  CANNOT BE EXPRESSED. The fragment encodes `page`, never `pageSize`
- *          (`buildFragment` has no branch for it), so the CLI's `--limit 25` has
- *          nowhere to go. The Explorer therefore shows every trace in the
- *          window, of which the agent's result was the first N. That is a
- *          SUPERSET, never a different set — the traces on the card are all
- *          there, at the top. The card says "34 found — showing 3" so the user
- *          already knows the sample was a sample.
+ * Preserve a Langy trace search when crossing from the CLI grammar into the
+ * Explorer's liqe URL fragment. Free text is quoted so field-like text remains
+ * free text. Named windows stay absolute; the unnamed CLI default stays a
+ * rolling day. Origins remain an OR group. The CLI limit cannot be represented
+ * by the Explorer fragment, so the destination may contain the same result set
+ * plus later rows.
  */
 
 // The Explorer's own value-quoting rule. Imported rather than reimplemented so
 // a model id with a slash, or an origin with a space, is escaped here exactly
 // as the filter sidebar would escape it.
-import { escapeValue } from "~/server/app-layer/traces/query-language/mutations";
+import { escapeValue } from "@langwatch/trace-contract";
 
 /** The CLI's `trace search` arguments, normalized. */
 export interface TraceSearchQuery {

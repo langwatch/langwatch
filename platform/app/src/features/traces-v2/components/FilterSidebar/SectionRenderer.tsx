@@ -3,11 +3,8 @@ import type { LiqeQuery } from "liqe";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
 import { memo } from "react";
-import {
-  getFacetValueState,
-  getRangeValue,
-} from "~/server/app-layer/traces/query-language/queries";
-import type { NumericMode } from "../../stores/numericModeStore";
+import { getFacetValueState, getRangeValue } from "@langwatch/trace-contract";
+import type { NumericMode } from "@langwatch/trace-web";
 import { AttributesSection } from "./AttributesSection";
 import { NONE_TOGGLE_VALUE } from "./constants";
 import { EvaluatorDrilldown } from "./EvaluatorDrilldown";

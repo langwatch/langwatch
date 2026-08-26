@@ -5,7 +5,7 @@ import { TraceMediaPart } from "~/components/traces/TraceMediaPart";
 import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
 import { RedactedField } from "~/components/ui/RedactedField";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { SpanTreeNode, TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { changedTraceMetadataKeys } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import {
   mediaRefBelongsToSide,
@@ -22,7 +22,7 @@ import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceHeaderCanonical } from "../../../hooks/useTraceHeader";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { useFocusSectionStore } from "@langwatch/trace-web";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { type AttributeComments, AttributeTable } from "../AttributeTable";
 import { commentCountsBySection } from "../anchoredComments/sectionComments";

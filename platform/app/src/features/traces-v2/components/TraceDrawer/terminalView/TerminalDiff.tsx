@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { memo, useMemo } from "react";
-import { computeLineDiff, type DiffLine, diffStat } from "./diff";
+import { computeLineDiff, type DiffLine, diffStat } from "@langwatch/trace-web";
 import { DIFF_TOKENS, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
 
 interface TerminalDiffProps {

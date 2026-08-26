@@ -4,7 +4,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { type TraceOverlayView, useTraceEditStore } from "../../../stores/traceEditStore";
-import { formatAbsoluteTime } from "../../../utils/formatters";
+import { formatAbsoluteTime } from "@langwatch/trace-web";
 import { SegmentedToggle } from "../SegmentedToggle";
 import { TraceEditDiffDialog } from "../TraceEditDiffDialog";
 
