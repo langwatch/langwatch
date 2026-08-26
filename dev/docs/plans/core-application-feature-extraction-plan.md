@@ -154,7 +154,7 @@ shuffle. Tests, ADRs, specs and developer documentation move with the owner.
 |  18 | queued      | Infrastructure and config             | Move Prisma schema/migrations/client lifecycle, boot config, storage, mail and process instrumentation to named packages/process apps. Delete global Prisma, global App and import-time environment access.                                                                                                                                                                                                                                                                                                                                                                   |
 |  19 | queued      | Repository support                    | Move feature specs/docs/tests to owners; E2E to `dev/tests/e2e`; build/start/seed/ops scripts to their app, infrastructure package or contributor tooling; public product assets to UI and repository artwork to `.github/assets`.                                                                                                                                                                                                                                                                                                                                            |
 |  20 | queued      | Feature Flag                          | Move the 20-file store/service/rules/cache implementation and its 59 named callers into the singular `feature-flag` package. It is the raw, powerful encapsulation for definitions, targeting, evaluation, persistence, cache invalidation, Ops controls and browser guards. Expose one canonical service; callers supply authorised context and consume decisions rather than storing flags or reimplementing evaluation.                                                                                                                                                    |
-|  21 | queued      | Delete the workspace                  | Move the remaining package/config/build files, update workspace filters, CI, Docker, Helm and self-host staging, then delete `platform/app` and its migration baselines.                                                                                                                                                                                                                                                                                                                                                                                                      |
+|  21 | queued      | Delete and rebase                     | Move the remaining package/config/build files, update workspace filters, CI, Docker, Helm and self-host staging, then delete `platform/app` and its migration baselines. Fetch and rebase the finished branch onto fresh `origin/main`, resolve conflicts according to the new ownership map rather than restoring displaced app code, and rerun the complete deletion/parity proof before merge.                                                                                                                                                                             |
 
 The immediate integration order is **06, 05, 04, 02, 03, 01**. Telemetry and
 Trace are the largest active cuts, so they land as independent reviewed
@@ -224,6 +224,12 @@ Every batch records:
 5. the remaining domain search results, which must be either zero or named
    process composition moving in that same batch; and
 6. one small commit containing only that reviewed slice.
+
+After all batches, fetch and rebase onto current `origin/main`. Conflict
+resolution must preserve the feature/package owners and absorb new upstream
+behaviour into them; it must not recreate compatibility implementations under
+`platform/app`. Rerun the full workspace, parity and deletion proof on the
+rebased commit.
 
 The final proof is deliberately dull:
 
