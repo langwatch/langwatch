@@ -68,6 +68,41 @@ describe("given a verified address that matches no organization", () => {
   });
 });
 
+describe("given a lookup that has not answered yet", () => {
+  afterEach(() => cleanup());
+
+  describe("when the join step is reached", () => {
+    /** @scenario The step waits for its own answer before sending anybody anywhere */
+    it("decides nothing and sends nobody on to workspace creation", async () => {
+      const { container, onCreateWorkspace, onJoinOrganization, rerender } =
+        renderStep({ lookup: undefined });
+
+      expect(container.innerHTML).toBe("");
+      // The bug this pins: an absent answer used to read as "nothing to
+      // offer", and the caller's reaction to that is to navigate away — so
+      // clicking "Ask to join" redirected home before the lookup returned.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(onCreateWorkspace).not.toHaveBeenCalled();
+      expect(onJoinOrganization).not.toHaveBeenCalled();
+
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <JoinBeforeCreateInterstitial
+            verifiedEmail="sam@acme.com"
+            lookup={openToAcme}
+            onCreateWorkspace={onCreateWorkspace}
+            onJoinOrganization={onJoinOrganization}
+            onAlreadyJoined={vi.fn()}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(await screen.findByTestId("join-before-create")).toBeTruthy();
+      expect(onCreateWorkspace).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given an organization open to requests from the domain", () => {
   afterEach(() => cleanup());
 

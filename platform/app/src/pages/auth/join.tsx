@@ -1,9 +1,11 @@
+import { Button, VStack } from "@chakra-ui/react";
 import { useCallback, useRef } from "react";
+import { AuthCard } from "~/components/auth/AuthCard";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { AuthShell, JoinBeforeCreateInterstitial } from "~/features/auth";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import type { JoinableOrganization } from "~/features/auth/logic/joinBeforeCreate";
-import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { hardRedirect } from "~/utils/hardRedirect";
@@ -19,10 +21,10 @@ import { hardRedirect } from "~/utils/hardRedirect";
  * organization", which hands over to the workspace-creation flow that has
  * always owned that. Nothing is minted on the way past.
  *
- * Three server answers reach it: nothing to offer (render nothing, carry on),
- * an organization that admits this address automatically (admit them, then
- * land them inside), and organizations open to a request (offer them, join
- * leading).
+ * Four states reach it: the lookup still in flight (wait — decide nothing),
+ * nothing to offer (render nothing, carry on), an organization that admits
+ * this address automatically (admit them, then land them inside), and
+ * organizations open to a request (offer them, join leading).
  */
 export default function Join() {
   const { data: session } = useRequiredSession();
@@ -87,6 +89,43 @@ export default function Join() {
 
   if (!email) return <LoadingScreen />;
 
+  // Nothing is decided until BOTH answers are in.
+  //
+  // The interstitial reacts to "nothing to offer" by navigating away, and to a
+  // null `pendingOrganizationId` by offering a join this person may already
+  // have asked for. Both of those are the in-flight state of a query, not an
+  // answer, so acting on either mid-flight is acting on a guess. This is what
+  // made "Ask to join" look inert: the page redirected home before the lookup
+  // it exists to render had returned.
+  if (lookup.isPending || mine.isPending) return <LoadingScreen />;
+
+  // A lookup we could not make is not a lookup that found nothing. Say so and
+  // leave the explicit choice, rather than quietly carrying on to workspace
+  // creation as though this person had no colleagues here.
+  if (lookup.isError) {
+    return (
+      <AuthShell>
+        <JoinStage />
+        <AuthCard title="We couldn't check for your colleagues">
+          <VStack width="full" align="stretch" gap="14px">
+            <HandledErrorAlert
+              error={lookup.error}
+              fallbackTitle="We couldn't check for your colleagues"
+              onRetry={() => void lookup.refetch()}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={continueToWorkspaceCreation}
+            >
+              Create a new organization instead
+            </Button>
+          </VStack>
+        </AuthCard>
+      </AuthShell>
+    );
+  }
+
   // The last step of sign-up, so it is still sign-up's ground. This page was
   // the setup layout — a grey field and a plain panel with a sign-out button
   // pinned to the corner — which put a change of surface between confirming an
@@ -111,7 +150,7 @@ export default function Join() {
 /**
  * Where the ground is, said from a component of its own.
  *
- * The interstitial renders nothing at all in two of its four outcomes, so it
+ * The interstitial renders nothing at all in three of its five outcomes, so it
  * cannot be the thing that publishes: a hook has to run unconditionally, and
  * the step that says "carry on to workspace creation" is drawing no card for
  * the ground to sit behind.

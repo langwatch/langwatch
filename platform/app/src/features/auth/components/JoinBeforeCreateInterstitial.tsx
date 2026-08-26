@@ -70,10 +70,13 @@ export function JoinBeforeCreateInterstitial({
     if (joinedAutomatically) onAlreadyJoined?.(joinedAutomatically);
   }, [joinedAutomatically, onAlreadyJoined]);
 
-  // Both of these render nothing at all. "Nothing to offer" carries on to
-  // workspace creation exactly as sign-up did before this step existed;
-  // "already joined" skips the step entirely, because there is no choice left
-  // to make.
+  // Three of these render nothing at all, and only two of them are a decision.
+  // "Nothing to offer" carries on to workspace creation exactly as sign-up did
+  // before this step existed; "already joined" skips the step entirely,
+  // because there is no choice left to make. "Pending" is neither — the server
+  // has not answered, so nothing has been decided and nobody may be sent
+  // anywhere on the strength of it.
+  if (decision.outcome === "pending") return null;
   if (decision.outcome === "create_workspace") return null;
   if (decision.outcome === "already_joined") return null;
 

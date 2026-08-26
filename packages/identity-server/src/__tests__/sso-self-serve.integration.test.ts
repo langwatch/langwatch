@@ -1448,3 +1448,101 @@ async function approveByOperator(domain: string): Promise<void> {
     domain,
   });
 }
+
+/**
+ * The tenancy rail (audit follow-up).
+ *
+ * `connectionId` is caller input on every self-serve surface, and the tRPC
+ * permission is checked against the caller's OWN `organizationId` — so a verb
+ * that resolves a connection by id alone lets an administrator of one
+ * organization drive another's. Five verbs did.
+ *
+ * Two tests, and they are different in kind. The first is behavioural: the
+ * verbs that were blind must now refuse. The second is structural, and it is
+ * the one that keeps this fixed — it says there is exactly ONE way to read a
+ * connection in each file, and that way takes an organization. A verb added
+ * next year cannot be blind without failing it.
+ */
+describe("given a connection that belongs to another organization", () => {
+  beforeEach(() => {
+    seedOwnActiveConnection({ verifiedDomains: ["acme.com"] });
+    context.set(HOSTED_OPTED_IN);
+  });
+
+  const notFound = (error: unknown) =>
+    expect((error as { code: string }).code).toBe("sso_domain_proof_not_found");
+
+  describe("when an administrator of a different organization names it", () => {
+    it("refuses to claim a domain onto it", async () => {
+      await selfServe
+        .claimDomain({
+          organizationId: OTHER_ORG,
+          connectionId: CONNECTION,
+          domain: "evil.test",
+          actor: ANA,
+        })
+        .then(refused, notFound);
+    });
+
+    it("refuses to mint a proof on it", async () => {
+      await selfServe
+        .proveDomain({
+          organizationId: OTHER_ORG,
+          connectionId: CONNECTION,
+          domain: "acme.com",
+          actor: ANA,
+        })
+        .then(refused, notFound);
+    });
+
+    it("refuses to drive its record check", async () => {
+      await selfServe
+        .checkDomainRecord({
+          organizationId: OTHER_ORG,
+          connectionId: CONNECTION,
+          domain: "acme.com",
+          actor: ANA,
+        })
+        .then(refused, notFound);
+    });
+
+    it("refuses to drive its file check", async () => {
+      await selfServe
+        .checkDomainFile({
+          organizationId: OTHER_ORG,
+          connectionId: CONNECTION,
+          domain: "acme.com",
+          actor: ANA,
+        })
+        .then(refused, notFound);
+    });
+
+    it("answers the same refusal a connection that does not exist answers", async () => {
+      const foreign = await selfServe
+        .claimDomain({
+          organizationId: OTHER_ORG,
+          connectionId: CONNECTION,
+          domain: "evil.test",
+          actor: ANA,
+        })
+        .then(refused, (error) => error as Error);
+      const missing = await selfServe
+        .claimDomain({
+          organizationId: OTHER_ORG,
+          connectionId: "ssoc_nothing_here",
+          domain: "evil.test",
+          actor: ANA,
+        })
+        .then(refused, (error) => error as Error);
+
+      // Not an existence oracle: connection ids are not secret, so "not
+      // yours" and "not there" have to be one sentence.
+      expect(foreign.message).toBe(
+        missing.message.replace("ssoc_nothing_here", CONNECTION),
+      );
+      expect((foreign as { code: string }).code).toBe(
+        (missing as { code: string }).code,
+      );
+    });
+  });
+});

@@ -990,14 +990,36 @@ export class SsoConnectionGuards {
     ];
   }
 
+  /**
+   * The aggregate this command may act on, or a refusal.
+   *
+   * TWO questions, and the order matters. First, does this connection belong
+   * to the organization the command names — because `connectionId` is caller
+   * input on every self-serve verb, and the tRPC permission is checked
+   * against the caller's OWN `organizationId`. A guard that only asked "is
+   * this transition legal" would let an administrator of one organization
+   * drive another's connection, and every verb would have to remember to ask
+   * separately. Asking it HERE is what makes it impossible to forget: every
+   * command carries `organizationId` on `commandIdentitySchema`, so there is
+   * no shape that reaches this function without one.
+   *
+   * A connection owned by somebody else answers exactly what a connection
+   * that does not exist answers. The refusal must not be an existence
+   * oracle — "not yours" and "not there" are the same sentence on purpose.
+   */
   private async require(
-    data: { connectionId: string },
+    data: { connectionId: string; organizationId: string },
     command: SsoConnectionCommandType,
   ): Promise<SsoConnectionState> {
     const state = await this.connections.findConnection({
       connectionId: data.connectionId,
     });
     if (!state) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId} does not exist`,
+      );
+    }
+    if (state.organizationId !== data.organizationId) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId} does not exist`,
       );

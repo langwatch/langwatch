@@ -591,12 +591,10 @@ export class SsoSelfServeService {
     actor: SelfServeActor;
   }): Promise<{ alreadyLive: boolean }> {
     await this.requireAvailable({ organizationId });
-    const state = await this.requireConnection({ connectionId });
-    if (state.organizationId !== organizationId) {
-      throw new SsoDomainProofNotFoundError(
-        `connection ${connectionId} is not organization ${organizationId}'s`,
-      );
-    }
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
     if (state.state === "ACTIVE") return { alreadyLive: true };
 
     if (state.verifiedDomains.length === 0) {
@@ -660,12 +658,10 @@ export class SsoSelfServeService {
     actor: SelfServeActor;
   }): Promise<void> {
     await this.requireAvailable({ organizationId });
-    const state = await this.requireConnection({ connectionId });
-    if (state.organizationId !== organizationId) {
-      throw new SsoDomainProofNotFoundError(
-        `connection ${connectionId} is not organization ${organizationId}'s`,
-      );
-    }
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
     await this.deps.connections().setArrivalPolicy({
       ...this.command({ organizationId, connectionId, actor }),
       policy,
@@ -890,6 +886,13 @@ export class SsoSelfServeService {
     actor: SelfServeActor;
   }): Promise<{ waitsForReview: boolean; disputed: boolean }> {
     const availability = await this.requireAvailable({ organizationId });
+    // Resolved before the command so a foreign connection answers the same
+    // sentence every other verb answers. The guard refuses it independently —
+    // that is the rail, and it is what caught this verb — but it refuses with
+    // a transition code, and "whose connection is this" is not a question
+    // about transitions. One refusal, one code, from the surface a customer
+    // is actually holding.
+    await this.requireOrganizationConnection({ organizationId, connectionId });
     await this.deps.connections().claimDomain({
       ...this.command({ organizationId, connectionId, actor }),
       domain,
@@ -1010,7 +1013,10 @@ export class SsoSelfServeService {
     actor: SelfServeActor;
   }): Promise<{ proved: true }> {
     await this.requireAvailable({ organizationId });
-    const state = await this.requireConnection({ connectionId });
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
     const normalized = normalizeDomain(domain);
     const pending = state.pendingVerification;
     if (!pending || pending.domain !== normalized) {
@@ -1083,7 +1089,10 @@ export class SsoSelfServeService {
     actor: SelfServeActor;
   }): Promise<{ proved: true }> {
     await this.requireAvailable({ organizationId });
-    const state = await this.requireConnection({ connectionId });
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
     const normalized = normalizeDomain(domain);
     const pending = state.pendingVerification;
     if (!pending || pending.domain !== normalized) {
@@ -1168,7 +1177,10 @@ export class SsoSelfServeService {
     connectionId: string;
     domain: string;
   }): Promise<void> {
-    const state = await this.requireConnection({ connectionId });
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
     const claim = domainClaimFor({
       state,
       domain: normalizeDomain(domain),
@@ -1289,8 +1301,22 @@ export class SsoSelfServeService {
     });
   }
 
-  /** The connection, and proof it is this organization's: a caller naming
-   *  another tenant's connection reads the same not-found every miss does. */
+  /**
+   * The connection, and proof it is this organization's.
+   *
+   * There is deliberately NO organization-blind sibling to this method. There
+   * was one, and five verbs reached for it because it was the shorter call —
+   * `connectionId` is caller input on every self-serve surface and the tRPC
+   * permission is checked against the caller's own `organizationId`, so those
+   * five let an administrator of one organization drive another's connection.
+   * The fix is not to add the check five more times; it is that the only way
+   * to resolve a connection here requires naming who is asking.
+   *
+   * Both misses answer the same sentence. "Not yours" and "not there" must be
+   * indistinguishable, or the refusal is an existence oracle for connection
+   * ids — which are not secret (the unauthenticated sign-in router returns one
+   * for any domain that routes).
+   */
   private async requireOrganizationConnection({
     organizationId,
     connectionId,
@@ -1298,22 +1324,8 @@ export class SsoSelfServeService {
     organizationId: string;
     connectionId: string;
   }): Promise<SsoConnectionState> {
-    const state = await this.requireConnection({ connectionId });
-    if (state.organizationId !== organizationId) {
-      throw new SsoDomainProofNotFoundError(
-        `connection ${connectionId} does not exist`,
-      );
-    }
-    return state;
-  }
-
-  private async requireConnection({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<SsoConnectionState> {
     const state = await this.deps.reads.findConnection({ connectionId });
-    if (!state) {
+    if (!state || state.organizationId !== organizationId) {
       throw new SsoDomainProofNotFoundError(
         `connection ${connectionId} does not exist`,
       );

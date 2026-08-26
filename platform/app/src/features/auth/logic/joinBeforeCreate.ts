@@ -58,6 +58,19 @@ export interface JoinableOrganization {
 }
 
 export type JoinBeforeCreateDecision =
+  /**
+   * The server has not answered yet, so there is no decision to act on.
+   *
+   * Distinct from `create_workspace` on purpose, and the distinction is the
+   * whole of a bug this used to have: "we have not asked yet" and "we asked
+   * and there is nothing" both used to answer `create_workspace`, and the
+   * caller's reaction to `create_workspace` is to NAVIGATE AWAY. So a person
+   * who clicked "Ask to join" was redirected off the join page before the
+   * lookup they came to read had returned, every time — the click looked like
+   * it did nothing. Rendering nothing while in flight is right; leaving is
+   * not, and the outcome has to say which one it means.
+   */
+  | { outcome: "pending" }
   /** Nothing to offer: sign-up continues to workspace creation. */
   | { outcome: "create_workspace" }
   /** At least one organization will take them. Joining leads, creating stays
@@ -87,7 +100,9 @@ export function resolveJoinBeforeCreate({
   pendingOrganizationId,
 }: JoinBeforeCreateInput): JoinBeforeCreateDecision {
   if (!verified) return { outcome: "create_workspace" };
-  if (!lookup) return { outcome: "create_workspace" };
+  // NOT `create_workspace`: an absent answer is a question still in flight,
+  // and the caller reacts to `create_workspace` by leaving the page.
+  if (!lookup) return { outcome: "pending" };
 
   const domain = joinDomainOf(verifiedEmail);
   if (!domain || isPublicEmailDomain(domain)) {

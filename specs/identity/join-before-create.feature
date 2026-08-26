@@ -109,6 +109,24 @@ Feature: Join before create - the choice happens before an organization is minte
     Then a soft notice says "acme" is already here and offers joining instead
     And creating the organization is still available and still completes
 
+  @integration
+  Scenario: The step waits for its own answer before sending anybody anywhere
+    Given "sam" has a verified "acme.com" address
+    And the lookup for that domain has not answered yet
+    When the join step is reached
+    Then nothing is offered and nothing is decided
+    And "sam" is not sent on to workspace creation
+    And the offer appears as soon as the answer arrives
+
+  @integration
+  Scenario: A lookup that failed is not read as having found nothing
+    Given "sam" has a verified "acme.com" address
+    And the lookup for that domain fails
+    When the join step is reached
+    Then "sam" is told the check could not be made
+    And creating an organization stays available as an explicit choice
+    And "sam" is not sent on to workspace creation automatically
+
   # ── What the operator can see ──────────────────────────────────────────
 
   @unit
