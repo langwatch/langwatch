@@ -34754,9 +34754,9 @@ That answer exists only behind the auth wall, so the scenario passing is the pro
 
 ## Reusing one login across the rows of a run
 
-Rows are isolated and run in parallel. By default each row logs in on its own.
+Rows are isolated and run in parallel, so by default each row logs in on its own. You can use the **agent cache** to store the login credential after the first row and read it back on every row that follows, so the run authenticates once instead of once per row.
 
-The **agent cache** stores what an agent produced, encrypted at rest, with automatic expiry. The agent writes its session after login and reads it back on each row. No setup is needed: the platform gives each run a scoped credential inside the sandbox, so no `langwatch.setup()` call or LangWatch secret is required.
+The cache is encrypted at rest and entries expire on their own. The platform gives each run a scoped credential inside the sandbox, so no `langwatch.setup()` call or LangWatch secret is required.
 
 This code is executed on every commit against the real runtime:
 
@@ -34897,9 +34897,9 @@ def secret(name):
 
 ### Tuning the TTL
 
-`SESSION_TTL_SECONDS` is what the target promises. `REFRESH_MARGIN_SECONDS` is how much of that the agent gives up so a stored session is never about to lapse. Set the margin between the duration of your slowest row and `SESSION_TTL_SECONDS`.
+`SESSION_TTL_SECONDS` is the session lifetime the target system returns. `REFRESH_MARGIN_SECONDS` is subtracted from it so a stored session is never about to expire when a row reads it. Set the margin between the duration of your slowest row and `SESSION_TTL_SECONDS`.
 
-The agent also treats a `401` as a stale session: it logs in again and retries once, so a session the target ended early costs one login instead of the run.
+The agent also treats a `401` as an expired session: it logs in again and retries once, so an early expiration costs one extra login instead of failing the run.
 
 ### Cache limits
 
