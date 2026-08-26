@@ -1,5 +1,5 @@
 /**
- * The test cases of a project, and the rules that group and filter them.
+ * The scenarios of a project, and the rules that group and filter them.
  *
  * Everything here is pure, so the grouping and the aggregates can be read and
  * tested without a router or a query.
@@ -13,7 +13,7 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import type { SuiteTarget } from "~/server/suites/types";
 
-/** A test case as the table reads it. */
+/** A scenario as the table reads it. */
 export type TestCase = {
   id: string;
   name: string;
@@ -54,7 +54,7 @@ export type CaseGroup = {
 };
 
 /**
- * The rows of the All test cases surface: the real test suites as folder rows
+ * The rows of the All scenarios surface: the real test suites as folder rows
  * on top, and the cases filed in no test suite as loose rows at the root.
  */
 export type CasesRoot = {
@@ -104,27 +104,32 @@ function bucketCasesByFolder(cases: TestCase[]): {
 }
 
 /**
- * The rows of the All test cases surface, as a GitHub repo root reads: the
+ * The rows of the All scenarios surface, as a GitHub repo root reads: the
  * real test suites as folder rows on top, and the cases filed in no test
  * suite as loose rows at the root.
  *
- * A suite that holds none of the listed cases is left out, so a label filter
- * hides the headings it empties. Cases that name a folder the rail no longer
- * lists read as loose, so nothing drops off the table.
+ * With `includeEmpty` on, every listed test suite draws its own folder row,
+ * even one that holds no case yet, so a person can open the empty suite from
+ * the table. With it off, a suite that holds none of the listed cases is
+ * left out, so a label filter hides the headings it empties. Cases that name
+ * a folder the rail no longer lists read as loose, so nothing drops off the
+ * table.
  */
 export function groupCasesByFolder({
   cases,
   suites,
+  includeEmpty = false,
 }: {
   cases: TestCase[];
   suites: TestSuiteEntry[];
+  includeEmpty?: boolean;
 }): CasesRoot {
   const { byFolder, unfiled } = bucketCasesByFolder(cases);
 
   const folderGroups: CaseGroup[] = [];
   for (const suite of suites) {
-    const held = byFolder.get(suite.id);
-    if (!held || held.length === 0) continue;
+    const held = byFolder.get(suite.id) ?? [];
+    if (held.length === 0 && !includeEmpty) continue;
     folderGroups.push({ id: suite.id, name: suite.name, cases: held });
     byFolder.delete(suite.id);
   }

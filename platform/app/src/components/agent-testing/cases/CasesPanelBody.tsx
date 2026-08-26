@@ -105,7 +105,7 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
     );
   }
 
-  if (props.caseCount === 0) {
+  if (props.caseCount === 0 && props.folderGroups.length === 0) {
     return props.projectHasNoCases ? (
       <FirstCaseEmptyState
         canManage={props.canManage}

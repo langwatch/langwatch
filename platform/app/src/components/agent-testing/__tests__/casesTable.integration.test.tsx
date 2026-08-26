@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The table of test cases: how the rows group, what a row says, and what its
+ * The table of scenarios: how the rows group, what a row says, and what its
  * Run button and row menu do.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -88,7 +88,7 @@ function panelProps(
 ): React.ComponentProps<typeof CasesPanel> {
   return {
     selection: { kind: "all" },
-    title: "All test cases",
+    title: "All scenarios",
     folderGroups: [],
     looseCases: [],
     externalCases: [],
@@ -142,13 +142,13 @@ async function openRowMenu(caseName: string) {
   return user;
 }
 
-describe("the test cases table", () => {
+describe("the scenarios table", () => {
   afterEach(cleanup);
 
   // --- Grouping ---
 
-  /** @scenario "All test cases lists the test suites on top and the loose cases below" */
-  /** @scenario "All test cases lists the loose cases below the folder rows" */
+  /** @scenario "All scenarios lists the test suites on top and the loose cases below" */
+  /** @scenario "All scenarios lists the loose cases below the folder rows" */
   it("lists the suites as folder rows on top and the loose cases below", () => {
     const cases = [
       makeCase(),
@@ -193,6 +193,56 @@ describe("the test cases table", () => {
     ]);
   });
 
+  /** @scenario "Empty suites render as folder rows in the All scenarios view" */
+  it("lists an empty suite as a folder row so it can be opened from the table", () => {
+    renderPanel({
+      ...groupCasesByFolder({
+        cases: [makeCase({ folderId: null, id: "case_stray", name: "Stray" })],
+        suites: [REFUNDS, CHECKOUT],
+        includeEmpty: true,
+      }),
+    });
+
+    expect(groupHeadings()).toEqual([
+      "folder-header-row-Checkout",
+      "folder-header-row-Refunds",
+    ]);
+    const refunds = screen.getByTestId("folder-header-row-Refunds");
+    expect(within(refunds).getByLabelText("0 scenarios")).toBeInTheDocument();
+    expect(screen.getByTestId("case-row-Stray")).toBeInTheDocument();
+  });
+
+  /** @scenario "An All scenarios surface with only empty suites still lists them" */
+  it("lists empty suites even when the project holds no case at all", () => {
+    renderPanel({
+      ...groupCasesByFolder({
+        cases: [],
+        suites: [REFUNDS],
+        includeEmpty: true,
+      }),
+      projectHasNoCases: true,
+    });
+
+    expect(screen.getByTestId("folder-header-row-Refunds")).toBeInTheDocument();
+    // The first-case empty state hides itself so the folder is not buried.
+    expect(
+      screen.queryByTestId("agent-testing-first-case-empty"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The case row carries the file-check-corner icon at the leading edge" */
+  it("draws the file-check-corner icon at the leading edge of a case row", () => {
+    renderPanel({
+      folderGroups: [],
+      looseCases: [makeCase()],
+    });
+
+    const row = screen.getByTestId("case-row-Double charge");
+    expect(
+      row.querySelector("svg.lucide-file-check-corner"),
+    ).toBeInTheDocument();
+  });
+
   /** @scenario "Clicking a suite folder row opens that suite" */
   it("navigates to the suite when its folder row is clicked", async () => {
     const user = userEvent.setup();
@@ -217,13 +267,13 @@ describe("the test cases table", () => {
     });
 
     expect(screen.getByText("Test suites")).toBeInTheDocument();
-    expect(screen.getByText("2 cases")).toBeInTheDocument();
+    expect(screen.getByText("2 scenarios")).toBeInTheDocument();
   });
 
   /** @scenario "Zero suites renders no folder rows and no Test suites section header" */
   it("renders only loose case rows and no Test suites header when zero suites", () => {
     renderPanel({
-      title: "All test cases",
+      title: "All scenarios",
       ...groupCasesByFolder({
         cases: [makeCase({ folderId: null })],
         suites: [],
@@ -257,7 +307,7 @@ describe("the test cases table", () => {
     });
 
     const heading = screen.getByTestId("folder-header-row-Refunds");
-    expect(within(heading).getByLabelText("3 test cases")).toBeInTheDocument();
+    expect(within(heading).getByLabelText("3 scenarios")).toBeInTheDocument();
     expect(within(heading).queryByText("100%")).not.toBeInTheDocument();
     expect(
       within(heading).queryByTestId("run-metrics-summary"),
@@ -307,7 +357,7 @@ describe("the test cases table", () => {
     expect(critical.className).not.toEqual(billing.className);
   });
 
-  /** @scenario "The cases table shows the test case column and the row actions, and no last result" */
+  /** @scenario "The cases table shows the scenario column and the row actions, and no last result" */
   it("has no LAST RESULT column header and no per-row result cell", () => {
     renderPanel({
       folderGroups: [],
@@ -606,8 +656,8 @@ describe("the test cases table", () => {
     );
   });
 
-  /** @scenario "All test cases reads Last full run at" */
-  it("reads Last full run at in the All test cases view", () => {
+  /** @scenario "All scenarios reads Last full run at" */
+  it("reads Last full run at in the All scenarios view", () => {
     renderPanel({
       folderGroups: [],
       looseCases: [makeCase()],

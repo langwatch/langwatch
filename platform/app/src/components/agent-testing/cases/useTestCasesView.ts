@@ -1,5 +1,5 @@
 /**
- * What the Test cases tab shows for the current selection: the suite it names,
+ * What the Scenarios tab shows for the current selection: the suite it names,
  * the rows under it, the label filter, and the cases of an external set.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -47,8 +47,16 @@ function useCaseGroups({
     () =>
       selection.kind === "suite"
         ? { folderGroups: [], looseCases: visibleCases }
-        : groupCasesByFolder({ cases: visibleCases, suites }),
-    [selection, visibleCases, suites],
+        : groupCasesByFolder({
+            cases: visibleCases,
+            suites,
+            // On the All scenarios surface, every suite gets a folder row,
+            // even one that holds no case yet, so a person can open it from
+            // the table. A label filter is a scope on the cases themselves,
+            // so an empty folder under a filter still drops off.
+            includeEmpty: activeLabels.length === 0,
+          }),
+    [selection, visibleCases, suites, activeLabels.length],
   );
 }
 
