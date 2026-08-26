@@ -1,8 +1,12 @@
 import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
+  IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
+  IDENTIFIER_DETACHED_EVENT_TYPE,
+  IDENTIFIER_VERIFIED_EVENT_TYPE,
   type IdentifierFact,
   type IdentityFact,
   type IdentityHeads,
+  LINK_PROPOSED_EVENT_TYPE,
   PRIMARY_CHANGED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
 } from "./facts";
@@ -21,23 +25,15 @@ import { reduceIdentifier } from "./identifier-aggregate";
  * from a partial replay window) is folded conservatively rather than
  * dropped.
  *
- * The fold RULES live one file over, in `reduceIdentifier`, which folds a
- * single identifier's head (ADR-127: an identifier is an aggregate). What is
- * left here is DELIVERY — which heads are handed a given fact — and that is
- * the only thing the aggregate split changes:
- *
- *   here                      a per-identifier fold
- *   ─────────────────────     ──────────────────────────────────────
- *   every head, always        only the streams `identityStreamsFor`
- *                             routes the fact to
- *
- * Two deliveries are wider than the fact's own identifier, and they are the
- * two cross-identifier invariants the shared stream used to enforce: a
- * promotion reaches every other head, so exactly one PRIMARY stands, and an
- * erasure reaches every head rather than the ids the writer listed. Under
- * per-identifier aggregates neither sweep is possible, so both move into the
- * facts a command states (`primaryChangeFacts`, `userErasureFacts`) — the
- * rules below do not move, and that is what lets the two reducers agree.
+ * The RULES live one file over, in `reduceIdentifier` (ADR-127: an identifier
+ * is an aggregate). What is left here is DELIVERY — which heads are handed a
+ * given fact — and today that is every head, always. Two of those deliveries
+ * are wider than the fact's own identifier, and they are the two invariants a
+ * per-identifier fold cannot hold: a promotion reaches every other head so
+ * exactly one PRIMARY stands, and an erasure reaches every head rather than
+ * only the ids the fact names. Both move into the facts a command states when
+ * the fold splits; until then, this is what runs, and it is what ran before
+ * the rules moved files.
  */
 
 function deliver({
@@ -53,7 +49,12 @@ function deliver({
   for (const identifierId of identifierIds) {
     const head = identifiers[identifierId] ?? null;
     const folded = reduceIdentifier({ identifierId, head, fact });
-    if (folded === head || folded === null) continue;
+    if (folded === head) continue;
+    // No identity fact deletes a head — a detach is a tombstone, an erasure
+    // keeps the row — so `reduceIdentifier` returns null only for a head that
+    // was already absent, which the line above has caught. The day one does,
+    // this is the line that has to delete the key rather than skip it.
+    if (folded === null) continue;
     identifiers = { ...identifiers, [identifierId]: folded };
   }
   return identifiers === heads.identifiers ? heads : { ...heads, identifiers };
@@ -68,9 +69,9 @@ export function reduceIdentity({
 }): IdentityHeads {
   switch (fact.type) {
     case IDENTIFIER_ATTACHED_EVENT_TYPE:
-    case "lw.identity.identifier_verified":
-    case "lw.identity.identifier_dead_ended":
-    case "lw.identity.identifier_detached":
+    case IDENTIFIER_VERIFIED_EVENT_TYPE:
+    case IDENTIFIER_DEAD_ENDED_EVENT_TYPE:
+    case IDENTIFIER_DETACHED_EVENT_TYPE:
       return deliver({
         heads,
         identifierIds: [fact.data.identifierId],
@@ -95,16 +96,18 @@ export function reduceIdentity({
       });
     }
     case USER_ERASED_EVENT_TYPE:
-      // Every head, not only the ids the fact names — the writer's list is
-      // the audit record, not the sweep's bound (the member_offboarded
-      // discipline). Domains survive; the rows remain as tombstones replay
-      // reproduces.
+      // Every head, not only the ids the fact names: today the list on the
+      // fact is the writer's audit record and this delivery is the sweep's
+      // bound (the member_offboarded discipline). Under a per-identifier fold
+      // there is no such delivery and the list becomes the bound, which is why
+      // `userErasureFacts` reads the whole person to build it. Domains survive;
+      // the rows remain as tombstones replay reproduces.
       return deliver({
         heads,
         identifierIds: Object.keys(heads.identifiers),
         fact,
       });
-    case "lw.identity.link_proposed":
+    case LINK_PROPOSED_EVENT_TYPE:
       // A proposal changes no head, on purpose: it states that a link was NOT
       // made and needs a human. The identifier arrives only when someone
       // confirms it, through the ordinary attach ceremony — so a fold that

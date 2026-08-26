@@ -85,11 +85,17 @@ Feature: An identifier is an aggregate - one stream per identifier
     And no standing PRIMARY is left for the fold to find later
 
   @unit
-  Scenario: Erasure routes one fact per identifier the person actually holds
+  Scenario: Erasure names every identifier the person actually holds
     When an erasure is stated for "sam"
-    Then the fact is routed to the stream of every identifier the heads carry
+    Then it names every head the projection carries, tombstones included
+    And the names come from a read of the whole person, never from a caller's list
+    And that list is what bounds the wipe once the fold keys per identifier
+
+  @unit
+  Scenario: An erasure is routed to every identifier it names, and to the person
+    When an erasure naming two identifiers is routed
+    Then it is routed to both identifier streams
     And to the person's own stream, so an erasure with no identifiers is still recorded
-    And the routed list comes from a read of the whole person, not from a caller's list
 
   @unit
   Scenario: An erased stream keeps its row, its domain and its dates
@@ -107,7 +113,7 @@ Feature: An identifier is an aggregate - one stream per identifier
   Scenario: Folding one identifier's stream never reads another identifier
     When the head of "work" folds its whole stream
     Then every state it reaches is decided by that stream alone
-    And no fact naming another identifier changes it
+    And a fact about "personal" that was routed to "personal" never reaches it
 
   @unit
   Scenario: A verify for a head that does not exist yet folds to nothing
@@ -134,8 +140,64 @@ Feature: An identifier is an aggregate - one stream per identifier
     Then every head equals the head the per-user reducer produces
     And the two reducers can therefore replace each other one identifier at a time
 
+  # Routing answers a STREAM, and a stream is either an identifier or the
+  # person. Both are prefixed KSUIDs, so only the shape of the answer stops a
+  # per-identifier fold being handed a person's stream by mistake.
   @unit
-  Scenario: The tenant is still the person
+  Scenario: A stream says which kind it is
     When any identity fact is routed
-    Then the tenant of every stream is the user, whatever the aggregate id is
-    And erasure over the log is still one tenant scan, covering both streams
+    Then each stream it names says whether it is an identifier or the person
+
+  @unit
+  Scenario: A dead end takes an attached identifier out of use
+    Given the head of "work" is ATTACHED
+    When a dead end for "work" is folded
+    Then the head is DEAD_END
+    And a dead end for a head in any other state moves nothing
+
+  @unit
+  Scenario: A promotion of a head that cannot take PRIMARY moves nothing
+    Given the head of "work" is ATTACHED, DEAD_END or DETACHED
+    When a primary change promoting "work" is folded
+    Then the head is returned exactly as it was
+
+  # Two facts are folded by a head they do not name, and they are the two that
+  # carry a person-level invariant: a promotion demotes whoever is standing, and
+  # an erasure wipes whatever it is delivered to. Every other fact is ignored
+  # unless it names this head - so a mis-routed attach, verify, dead end or
+  # detach cannot move it, and routing is not the only thing keeping the streams
+  # apart.
+  @unit
+  Scenario: A lifecycle fact naming another identifier is ignored by this head
+    Given the head of "work" is handed an attach, verify, dead end or detach for "personal"
+    When it folds it
+    Then the head is returned exactly as it was
+
+  @unit
+  Scenario: A proposal moves no head, on whichever stream it is folded
+    When a link proposal is folded against an identifier's head
+    Then the head is returned exactly as it was
+
+  @unit
+  Scenario: Erasure folds the same both ways only because the fact names every head
+    Given an erasure that names only some of the identifiers "sam" holds
+    When the history is folded per-identifier and per-person
+    Then the two disagree, because the per-person fold sweeps what the fact omits
+    And that is why the command reads the whole person to build the list
+
+  # Two histories fold differently, and both need a partial replay window to
+  # exist at all - no command can state either shape. ADR-127 records them; these
+  # pin them, so the boundary is asserted rather than assumed.
+  @unit
+  Scenario: A promotion whose promoted head is absent still demotes the previous
+    Given a promotion naming "personal" as previous, with "work" absent from the window
+    When the history is folded per-identifier and per-person
+    Then the per-person fold leaves "personal" PRIMARY, because the promotion never took
+    And the per-identifier fold demotes it, because one head cannot see the other
+
+  @unit
+  Scenario: A promotion naming no previous leaves an older PRIMARY standing
+    Given "personal" is PRIMARY and a promotion of "work" names no previous
+    When the history is folded per-identifier and per-person
+    Then the per-person fold demotes "personal" by sweeping for it
+    And the per-identifier fold never routes the fact to "personal", so two stand

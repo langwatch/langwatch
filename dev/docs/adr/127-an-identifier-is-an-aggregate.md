@@ -4,9 +4,11 @@
 
 **Status:** Proposed
 
-**Amends:** [ADR-101](101-identity-pipeline-and-identifiers.md) §1's aggregate
-choice (`aggregateId = userId`). Its TENANCY choice (`tenantId = userId`) is
-untouched, and so is everything else in it.
+**Amends:** [ADR-101](101-identity-pipeline-and-identifiers.md) — §1's aggregate
+choice (`aggregateId = userId`) and, with it, §2's per-user queue lane, the
+per-user projection cursor and the read-your-writes wait built on it. §1's
+TENANCY choice (`tenantId = userId`) stands, restated here deliberately rather
+than by omission.
 
 **Builds on:** [ADR-110](110-grant-aggregates-are-grants.md) — a grant is an
 aggregate, the organization is the tenant of every event and the aggregate of
@@ -60,10 +62,12 @@ The pipeline's own docblock argues the shared aggregate is a CORRECTNESS
 property rather than a tidiness one: two-step verification rides the same
 aggregate, so a person's identifier commands and their factor commands land in
 one lane and cannot interleave. That mechanism is real. What it currently
-guards is not: `mfa-guards.ts` never reads an identifier, `guards.ts`'s detach
-never reads a factor, and ADR-119's "one way in" counts verified identifiers
-and passkeys — never a second factor. The lane serialises two families that
-share a person and, today, no invariant.
+guards is not: `mfa-guards.ts` never reads an identifier, and `guards.ts`'s
+detach counts VERIFIED and PRIMARY heads and refuses a passkey-only remainder
+without reading a factor at all. (ADR-119 states the "one way in" principle and
+says the detach guards are D07's; the rule as built lives in
+`guards.ts` and `specs/identity/passkeys.feature`.) The lane serialises two
+families that share a person and, today, no invariant.
 
 ## Decision
 
@@ -85,10 +89,19 @@ identity fact, and the aggregate of what is genuinely about the person.**
 
 **The aggregate TYPE does not change, and that is deliberate.** The type is the
 event log's partition key and the store rejects, at append, any event whose type
-differs from the one its pipeline declares (#7406); renaming it would repartition
-a log that already carries live events. `authz_grant` already carries both grants
-and roles for exactly this reason (ADR-110). What names the entity is the
-aggregate ID.
+differs from the one its pipeline declares (`validateEventAggregateType`, #7406);
+renaming it would repartition a log that already carries live events. The
+aggregate ID is checked by nothing — no layer compares an event's id to its
+command's — so it is free to name the entity while the type keeps naming the
+partition.
+
+The authz pipeline is the precedent, and it is worth stating precisely because
+it differs from its own ADR: ADR-110's decision box draws `authz_grant` and
+`authz_role` as two types, but what shipped declares ONE
+(`pipelines/authz-grants/schemas/constants.ts`: "ONE aggregate TYPE for both
+families, and it is not cosmetic … a separate `authz_role` type would have to
+come with a pipeline of its own"). Grants and roles are told apart by their
+aggregate ids under a shared type, which is exactly the shape below.
 
 **The tenant does not change either.** `tenantId = userId` stays, which keeps
 erasure a single tenant scan across both the old streams and the new ones
@@ -116,11 +129,45 @@ Both moves are ADR-110's principal-filter rule in identity's terms:
 enumerated.* The reads already exist — `markPrimary` and `eraseUser` both call
 `findHeads({ userId })` before they state anything.
 
+**A fact that names two streams is appended twice.** An event carries one
+aggregate id, so routing a fact to N streams means N events: the same payload, N
+aggregate ids, N `<commandId>:<index>` idempotency keys. A promotion that demotes
+somebody is two rows in the log where it was one; an erasure for a person holding
+three identifiers is four. That is the price of every stream hearing what it
+needs, it is bounded by the identifiers a person holds, and the alternative —
+picking one of the streams — is the legacy gap below, reproduced on new events.
+It also means `awaitFold` waits on every stream a command's facts were routed
+to, not one.
+
 The FOLD RULES do not move. `reduceIdentifier` folds one head; `reduceIdentity`
 is now that same function plus a DELIVERY decision (hand every fact to every
 head), and a per-identifier fold is the same function plus a different delivery
 (hand each stream what `identityStreamsFor` routes to it). On the facts a
 command states, the two agree, and a test pins that.
+
+### What one head cannot see
+
+"On the facts a command states" is doing real work in that sentence, and the
+exceptions are worth stating rather than discovering. A per-person fold could
+read across heads; a per-identifier fold cannot, so two histories fold
+differently — and both are reachable only from a partial replay window, because
+`primaryChangeFacts` cannot state either shape.
+
+| history | per person | per identifier |
+|---|---|---|
+| a promotion naming a previous, where the promoted head is absent or ineligible in the window | nothing moves: the demotion was conditional on the promotion taking | the previous is demoted, so the person ends with no PRIMARY |
+| a promotion naming NO previous, while another head stands PRIMARY | the standing head is demoted — the fold swept for it | the fact is never routed to that head, so two stand |
+
+Both are degradations rather than corruptions, and they fall on the safe side of
+different lines: no PRIMARY means the legacy email field falls back to the most
+recently VERIFIED identifier, which the D01 read fork already specifies; two
+PRIMARY is the one that matters, and it is a *legacy* fact's shape — every fact
+stated from here on names each standing holder. The remedy for it, if it ever
+shows, is a parity check over the projection ("exactly one PRIMARY per person"),
+not a change to the fold: a rule that repaired state the fact did not name is
+precisely the sweep a bounded aggregate gives up.
+
+Tests pin both divergences, so the boundary is asserted rather than assumed.
 
 **A third invariant needed no move.** Address uniqueness was already outside the
 aggregate: `IdentifierReservation` is a row-truth lock claimed before any fact is
@@ -134,6 +181,43 @@ Nothing today reads across them (above), so nothing breaks on the day this
 lands. What this ADR forbids is acquiring such a coupling later and relying on
 the lane for it: a cross-family invariant is enforced by a read and a refusal in
 a guard, the way uniqueness is, never by two things happening to share a queue.
+
+### The lane is not the aggregate
+
+Splitting the aggregate splits the queue lane with it, and two guards are
+currently relying on that lane without saying so. `markPrimary` and
+`detachIdentifier` both read the WHOLE person and refuse on what they read: one
+finds every standing PRIMARY, the other counts the ways in that would remain
+(ADR-119's strands guard, `guards.ts`). Today those reads are decisive because
+every command a person can run is serialised behind them. Per identifier they
+are not: two concurrent promotions each see no standing PRIMARY and both state
+`previousIdentifierId: null`, leaving two heads PRIMARY; two concurrent detaches
+each see the other still VERIFIED and between them strand the account. That is
+the same class ADR-116 §6 already settled once — *a read cannot decide a race* —
+and it is why address uniqueness has a row-truth lock rather than a guard.
+
+So the aggregate moves and **the lane does not follow it blindly**. A command's
+aggregate id names only its queue lane; the events it states carry their own
+(nothing in the framework ties them together). The rule that falls out:
+
+```
+  command            lane           because
+  attach_identifier  identifier     its cross-person race is decided by the
+  verify_identifier  identifier     address lock, not by a read
+  mark_primary       PERSON         its guard reads every head and refuses
+  detach_identifier  PERSON         its guard reads every head and refuses
+  erase_user         PERSON         it is about the person
+  propose_link       PERSON         it is about the person
+  (two-step, D06)    PERSON         unchanged
+```
+
+The concurrency this ADR is for is the concurrency it actually gains: attaches
+and verifies, which are the ceremonies that happen at volume and the ones the
+backfill fans out. Promotion and detach are rare, deliberate, one-at-a-time acts,
+and keeping them on the person's lane costs nothing anybody will notice. If they
+ever need to fan out, the answer is a row-truth claim in the shape of
+`IdentifierReservation`, not a wider lane — but that is a decision to take when
+there is a reason, not now.
 
 ### The existing log is not rewritten
 
@@ -175,12 +259,15 @@ than discovered later:
   land after the erasure service, or (b) carry a one-off sweep that re-states an
   erasure per identifier for every already-erased user. (b) is cheap and is the
   recommended slice.
-- **A legacy `primary_changed` that names no previous** cannot demote anybody on
-  replay, because the demotion was the fold's sweep and the fact does not name
-  its target. A from-scratch rebuild of such a history can therefore leave two
-  heads PRIMARY where the live projection has one. Reachable only from a
-  partial-window replay in the first place; the remedy, if it ever shows, is a
-  parity check on the projection rather than a change to the log.
+- **A legacy `primary_changed` cannot deliver its demotion half at all** — and
+  this is every legacy promotion, not only the ones naming no previous. One event
+  keys to one stream, so a fact naming both a promoted and a previous identifier
+  reaches the promoted one and the demotion is unreplayable. A from-scratch
+  rebuild of such a history therefore leaves the old holder PRIMARY alongside the
+  new one. The remedy is the projection parity check ("exactly one PRIMARY per
+  person"), which is worth having anyway; the alternative — re-stating each legacy
+  promotion as a pair — is a log rewrite for a state the live projection already
+  holds correctly.
 
 ### What the write gate and the D01 backfill do
 
@@ -215,8 +302,10 @@ some identifier's stream would be a lie about what they say.
 ADR-110 did, and it worked there because the grants migration was the switch and
 nothing was finalized behind it. Here the migration is mid-rollout with finalized
 users behind a terminal status, and `finalized` short-circuits the runner. A
-version-gated key needs no operator action, no second copy of any fact, and no
-window in which a person's history is half in one place and half in another.
+version-gated key needs no operator action, no restatement of any fact already in
+the log, and no window in which a person's history is half in one place and half
+in another. (New facts do fan out into one event per stream, above — that is the
+routing working, not a copy of history.)
 
 **What we give up** is a lane that was serialising two families with no shared
 invariant, and the ability to add such an invariant later without doing the work
@@ -235,12 +324,18 @@ properly. We take that knowingly.
   of the wiring.
 - The ops event explorer's "look up one aggregate" stops returning a person's
   whole identity history in one query. It is still one query — by TENANT, which
-  is the person — and the unimplemented
-  `specs/identity/platform-ops-identity-lookup.feature` should be written against
-  the tenant rather than the aggregate.
+  is the person — and `platform-ops-identity-lookup.feature`'s "the most recent
+  identity history is shown newest first" (still `@unimplemented`) is the line
+  that has to be a tenant-scoped read rather than an aggregate one.
 - Read-your-writes (`ledger.awaitFold`) currently watches one cursor for the
   person. It becomes a watch on the streams the command's facts were routed to,
   and a command whose facts touch two streams waits for both.
+- **`User.email` needs an owner.** ADR-101 §3 and ADR-116 §6 have the fold
+  polyfill it from the PRIMARY identifier — a person-level column written by what
+  is about to become a per-identifier fold, and under per-identifier lanes two
+  streams could write it at once. Nothing writes it today, so this is a slice-3
+  design item rather than a live defect: the promoted identifier's stream should
+  own the write, because it is the only stream that knows it just became PRIMARY.
 - Erasure over the log stays a single tenant scan, because the tenant did not
   move. When the erasure service is finally written, it must scan by TENANT and
   not by aggregate, or it will wipe one identifier's history and leave the rest.
@@ -256,25 +351,44 @@ This ADR is landing across slices. The first has shipped with it.
    the live fold is byte-for-byte what it was; the two sweeps moved into the
    guards. Nothing is rewired, so nothing changes in production.
 2. **The envelope and the lanes** — `identityEventsFor` stamps the routed
-   aggregate id per fact, the six identity commands' `getAggregateId` answers the
-   identifier (attach derives it from the payload, exactly as the guard does),
-   MFA's stays the person.
+   aggregate id per fact and emits one event per routed stream; `attachIdentifier`
+   and `verifyIdentifier` take a per-identifier lane (attach derives the id from
+   the payload, exactly as the guard does); `markPrimary`, `detachIdentifier`,
+   `eraseUser`, `proposeLink` and every MFA command keep the person's lane, for
+   the reason in "The lane is not the aggregate".
 3. **The fold and the cursor** — `IdentityStateFoldProjection` folds one head,
    declares the version-gated `key(event)`, and `PrismaIdentityProjectionRepository`
    loads and stores one identifier; the `IdentityProjectionCursor` migration; the
    address-lock release and the `Account` projection re-derived per identifier
    rather than per person.
 4. **The ledger's wait** — `awaitFold` over the routed streams.
-5. **The erasure sweep** — a one-off restatement of a per-identifier erasure for
-   every already-erased person, and the fold-key gate's legacy branch documented
-   against it.
+5. **The erasure sweep, and the snapshot it depends on** — a one-off
+   restatement of a per-identifier erasure for every already-erased person, and
+   the fold-key gate's legacy branch documented against it.
+
+   This slice also carries a requirement the per-person fold met for free.
+   Today's fold sweeps whatever heads exist **at fold time** and ignores the
+   ids the fact names, so an identifier attached between the erase command's
+   read and its apply is wiped anyway. Under routing, the list is decided at
+   COMMAND time, and slice 2 removes the lane that stopped an attach
+   interleaving with an erasure — so an identifier that arrives in that window
+   would never be routed the wipe and would keep its value permanently. The
+   erasure ceremony runs in `user.delete.before` and the write gate closes
+   behind it, which makes the window small, and small is not closed. Slice 5
+   must either have the per-identifier fold apply an erasure it sees for the
+   person's tenant to its head regardless of the stated list, or refuse an
+   attach for a person whose erasure has been stated. Naming it here so it is
+   designed rather than discovered.
 6. **Replay and ops** — replay parity for a mixed-version history; the ops
    lookup re-pointed at the tenant.
 
 ## References
 
-- Specs: [`specs/identity/identifier-aggregate.feature`](../../../specs/identity/identifier-aggregate.feature),
-  `specs/identity/identifier-model.feature` (D01, unchanged by this ADR)
+- Specs: [`specs/identity/identifier-aggregate.feature`](../../../specs/identity/identifier-aggregate.feature).
+  `specs/identity/identifier-model.feature` keeps every scenario through this
+  slice, and two of its lines need rewriting later: "the command is staged onto
+  \"sam\"'s queue lane" at slice 2, and "folding the erasure wipes value and hash
+  fields from \"sam\"'s Identifier rows" at slice 3.
 - [ADR-101](101-identity-pipeline-and-identifiers.md) §1, §3, §5 · [ADR-110](110-grant-aggregates-are-grants.md) · [ADR-116](116-account-linkage-is-event-truth.md) §6 · [ADR-119](119-an-account-is-never-left-with-one-way-in.md)
 - Framework mechanism: `projections/projectionRouter.ts` (the store key and the
   lane are both `key(event) ?? event.aggregateId`),

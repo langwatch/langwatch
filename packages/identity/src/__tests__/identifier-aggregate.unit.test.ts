@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { IdentityFact, IdentityHeads } from "../facts";
+import type {
+  IdentifierFact,
+  IdentityFact,
+  IdentityHeads,
+} from "../facts";
 import { emptyIdentityHeads } from "../facts";
 import {
   type IdentifierHead,
@@ -110,14 +114,39 @@ function proposed(): IdentityFact {
   };
 }
 
+function deadEnded(identifierId: string, occurredAt = T0 + 6): IdentityFact {
+  return {
+    type: "lw.identity.identifier_dead_ended",
+    occurredAt,
+    data: { identifierId, reason: "verification_failed", actor: ACTOR },
+  };
+}
+
+/** The identifier streams one fact is routed to. */
+function identifierStreamIds(fact: IdentityFact): string[] {
+  return identityStreamsFor({ fact, userId: USER })
+    .filter((stream) => stream.kind === "identifier")
+    .map((stream) => stream.identifierId);
+}
+
 /** The whole history of one stream, folded the way its own aggregate would. */
-function foldStream(identifierId: string, facts: IdentityFact[]): IdentifierHead {
+function foldStream(
+  identifierId: string,
+  facts: IdentityFact[],
+): IdentifierHead {
   return facts
-    .filter((fact) => identityStreamsFor({ fact, userId: USER }).includes(identifierId))
+    .filter((fact) => identifierStreamIds(fact).includes(identifierId))
     .reduce<IdentifierHead>(
       (head, fact) => reduceIdentifier({ identifierId, head, fact }),
       null,
     );
+}
+
+/** One head, in whatever state a case needs it. */
+function headIn(state: IdentifierFact["state"]): IdentifierFact {
+  const head = foldUser([attached("idf_work")]).identifiers.idf_work;
+  if (!head) throw new Error("the fixture attach produced no head");
+  return { ...head, state };
 }
 
 function foldUser(facts: IdentityFact[]): IdentityHeads {
@@ -146,7 +175,9 @@ describe("identityStreamsFor", () => {
         } satisfies IdentityFact,
       ];
       for (const fact of facts) {
-        expect(identityStreamsFor({ fact, userId: USER })).toEqual(["idf_work"]);
+        expect(identityStreamsFor({ fact, userId: USER })).toEqual([
+          { kind: "identifier", identifierId: "idf_work" },
+        ]);
       }
     });
   });
@@ -158,10 +189,7 @@ describe("identityStreamsFor", () => {
         identifierId: "idf_work",
         previousIdentifierId: "idf_personal",
       });
-      expect(identityStreamsFor({ fact, userId: USER })).toEqual([
-        "idf_work",
-        "idf_personal",
-      ]);
+      expect(identifierStreamIds(fact)).toEqual(["idf_work", "idf_personal"]);
     });
   });
 
@@ -169,7 +197,7 @@ describe("identityStreamsFor", () => {
     /** @scenario "A first primary change routes one stream only" */
     it("routes the promotion to one stream", () => {
       const fact = primaryChanged({ identifierId: "idf_work" });
-      expect(identityStreamsFor({ fact, userId: USER })).toEqual(["idf_work"]);
+      expect(identifierStreamIds(fact)).toEqual(["idf_work"]);
     });
   });
 
@@ -177,32 +205,54 @@ describe("identityStreamsFor", () => {
     /** @scenario "A proposal names no identifier, so it stays on the person's stream" */
     it("routes a link proposal to the person's stream alone", () => {
       expect(identityStreamsFor({ fact: proposed(), userId: USER })).toEqual([
-        USER,
+        { kind: "person", userId: USER },
       ]);
     });
 
-    /** @scenario "Erasure routes one fact per identifier the person actually holds" */
-    it("routes an erasure to the person and to every identifier it names", () => {
+    /** @scenario "An erasure is routed to every identifier it names, and to the person" */
+    it("routes an erasure to the person first, then to each identifier", () => {
       const fact = erased(["idf_work", "idf_personal"]);
       expect(identityStreamsFor({ fact, userId: USER })).toEqual([
-        USER,
-        "idf_work",
-        "idf_personal",
+        { kind: "person", userId: USER },
+        { kind: "identifier", identifierId: "idf_work" },
+        { kind: "identifier", identifierId: "idf_personal" },
       ]);
     });
   });
 
   describe("when any fact is routed", () => {
-    /** @scenario "The tenant is still the person" */
-    it("decides an aggregate id and never a tenant", () => {
-      // The routing table answers with aggregate ids only. The tenant is the
-      // user for every one of them, which is what keeps erasure a single
-      // tenant scan over both the old streams and the new ones.
-      const streams = [
-        ...identityStreamsFor({ fact: attached("idf_work"), userId: USER }),
-        ...identityStreamsFor({ fact: proposed(), userId: USER }),
-      ];
-      expect(streams).toEqual(["idf_work", USER]);
+    /** @scenario "A stream says which kind it is" */
+    it("says of each stream whether it is an identifier or the person", () => {
+      // Both are prefixed KSUIDs, so the shape of the answer is the only thing
+      // that stops a per-identifier fold being handed a person's stream.
+      const kinds = [
+        attached("idf_work"),
+        verified("idf_work"),
+        primaryChanged({ identifierId: "idf_work" }),
+        erased(["idf_work"]),
+        proposed(),
+      ].flatMap((fact) =>
+        identityStreamsFor({ fact, userId: USER }).map((stream) => stream.kind),
+      );
+      expect(kinds).toEqual([
+        "identifier",
+        "identifier",
+        "identifier",
+        "person",
+        "identifier",
+        "person",
+      ]);
+    });
+
+    it("names a stream once, however often the fact repeats it", () => {
+      // A shape no command states: `primaryChangeFacts` excludes the identifier
+      // being promoted. A malformed legacy fact would otherwise be appended
+      // twice onto one stream.
+      const fact = primaryChanged({
+        identifierId: "idf_work",
+        previousIdentifierId: "idf_work",
+      });
+      expect(identifierStreamIds(fact)).toEqual(["idf_work"]);
     });
   });
 });
@@ -251,6 +301,91 @@ describe("reduceIdentifier", () => {
       ]);
       expect(head?.state).toBe("DETACHED");
       expect(head?.value).toBe("sam@acme.com");
+    });
+  });
+
+  describe("when a dead end is folded", () => {
+    /** @scenario "A dead end takes an attached identifier out of use" */
+    it("takes an ATTACHED head out of use and leaves any other state alone", () => {
+      const attachedHead = headIn("ATTACHED");
+      expect(
+        reduceIdentifier({
+          identifierId: "idf_work",
+          head: attachedHead,
+          fact: deadEnded("idf_work"),
+        })?.state,
+      ).toBe("DEAD_END");
+      for (const state of ["VERIFIED", "PRIMARY", "DETACHED", "DEAD_END"] as const) {
+        const head = headIn(state);
+        expect(
+          reduceIdentifier({
+            identifierId: "idf_work",
+            head,
+            fact: deadEnded("idf_work"),
+          }),
+        ).toBe(head);
+      }
+    });
+  });
+
+  describe("when a promotion names a head that cannot take PRIMARY", () => {
+    /** @scenario "A promotion of a head that cannot take PRIMARY moves nothing" */
+    it("returns the head exactly as it was", () => {
+      for (const state of ["ATTACHED", "DEAD_END", "DETACHED"] as const) {
+        const head = headIn(state);
+        expect(
+          reduceIdentifier({
+            identifierId: "idf_work",
+            head,
+            fact: primaryChanged({ identifierId: "idf_work" }),
+          }),
+        ).toBe(head);
+      }
+    });
+  });
+
+  describe("when a fact naming another identifier reaches this head", () => {
+    /** @scenario "A lifecycle fact naming another identifier is ignored by this head" */
+    it("returns the head exactly as it was, without relying on the routing", () => {
+      const head = headIn("VERIFIED");
+      const foreign = [
+        attached("idf_personal"),
+        verified("idf_personal"),
+        deadEnded("idf_personal"),
+        detached("idf_personal"),
+      ];
+      for (const fact of foreign) {
+        expect(reduceIdentifier({ identifierId: "idf_work", head, fact })).toBe(
+          head,
+        );
+      }
+    });
+
+    it("creates no head from an attach that names somebody else", () => {
+      expect(
+        reduceIdentifier({
+          identifierId: "idf_work",
+          head: null,
+          fact: attached("idf_personal"),
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when a link proposal is folded against a head", () => {
+    /** @scenario "A proposal moves no head, on whichever stream it is folded" */
+    it("returns the head exactly as it was", () => {
+      const head = headIn("VERIFIED");
+      expect(
+        reduceIdentifier({ identifierId: "idf_work", head, fact: proposed() }),
+      ).toBe(head);
+      expect(
+        reduceIdentifier({
+          identifierId: "idf_work",
+          head: null,
+          fact: proposed(),
+        }),
+      ).toBeNull();
     });
   });
 
@@ -336,6 +471,7 @@ describe("reduceIdentifier", () => {
       }
     });
 
+    /** @scenario "Erasure folds the same both ways only because the fact names every head" */
     it("agrees on an erased history too, once the erasure names every head", () => {
       const heads = foldUser([
         attached("idf_google", { provider: "google", state: "VERIFIED" }),
@@ -355,6 +491,75 @@ describe("reduceIdentifier", () => {
         );
       }
       expect(perUser.identifiers.idf_email?.value).toBeNull();
+    });
+  });
+});
+
+describe("what one head cannot see", () => {
+  // Two histories fold differently, and ADR-127 names both. Neither can be
+  // stated by a command — `primaryChangeFacts` cannot produce either shape —
+  // so both need a partial replay window to exist at all. They are pinned here
+  // rather than left to be discovered, because a per-identifier fold that
+  // agreed everywhere would mean the split had changed nothing.
+
+  describe("when a promotion's own head is outside the window", () => {
+    /** @scenario "A promotion whose promoted head is absent still demotes the previous" */
+    it("demotes the previous per identifier, where the person's fold demotes nobody", () => {
+      const history = [
+        attached("idf_personal", { state: "VERIFIED" }),
+        primaryChanged({ identifierId: "idf_personal" }),
+        // The attach of idf_work is not in the window; the promotion of it is.
+        primaryChanged({
+          identifierId: "idf_work",
+          previousIdentifierId: "idf_personal",
+          occurredAt: T0 + 7,
+        }),
+      ];
+      // The person's fold makes the demotion conditional on the promotion
+      // taking, and it did not take.
+      expect(foldUser(history).identifiers.idf_personal?.state).toBe("PRIMARY");
+      // One head cannot check that, so it demotes and the person is left with
+      // no PRIMARY — which the read fork answers from the most recently
+      // VERIFIED identifier.
+      expect(foldStream("idf_personal", history)?.state).toBe("VERIFIED");
+      expect(foldStream("idf_work", history)).toBeNull();
+    });
+  });
+
+  describe("when a promotion names no previous and somebody is standing", () => {
+    /** @scenario "A promotion naming no previous leaves an older PRIMARY standing" */
+    it("leaves two PRIMARY per identifier, where the person's fold sweeps one away", () => {
+      const history = [
+        attached("idf_personal", { state: "VERIFIED" }),
+        attached("idf_work", { state: "VERIFIED", occurredAt: T0 + 1 }),
+        primaryChanged({ identifierId: "idf_personal" }),
+        // The shape the old guard could state: it named only the first
+        // standing PRIMARY it found, and null when it found none.
+        primaryChanged({ identifierId: "idf_work", occurredAt: T0 + 8 }),
+      ];
+      const perUser = foldUser(history);
+      expect(perUser.identifiers.idf_personal?.state).toBe("VERIFIED");
+      expect(perUser.identifiers.idf_work?.state).toBe("PRIMARY");
+      // The fact is never routed to idf_personal, so its stream never hears.
+      expect(foldStream("idf_personal", history)?.state).toBe("PRIMARY");
+      expect(foldStream("idf_work", history)?.state).toBe("PRIMARY");
+    });
+  });
+
+  describe("when an erasure names fewer identifiers than the person holds", () => {
+    /** @scenario "Erasure folds the same both ways only because the fact names every head" */
+    it("leaves the unnamed head's address standing per identifier", () => {
+      const history = [
+        attached("idf_a"),
+        attached("idf_b", { value: "sam@b.dev", occurredAt: T0 + 1 }),
+        erased(["idf_a"]),
+      ];
+      // The person's fold sweeps every head and ignores the list.
+      expect(foldUser(history).identifiers.idf_b?.value).toBeNull();
+      // One head only hears what the fact names — which is why the command
+      // builds that list from a read of the whole person.
+      expect(foldStream("idf_b", history)?.value).toBe("sam@b.dev");
+      expect(foldStream("idf_a", history)?.value).toBeNull();
     });
   });
 });
@@ -424,15 +629,36 @@ describe("primaryChangeFacts", () => {
         actor: ACTOR,
       });
       expect(
-        facts.map((fact) => fact.data.previousIdentifierId).sort(),
-      ).toEqual(["idf_a", "idf_b"]);
+        [...facts].sort((left, right) =>
+          String(left.data.previousIdentifierId).localeCompare(
+            String(right.data.previousIdentifierId),
+          ),
+        ),
+      ).toEqual([
+        {
+          type: "lw.identity.primary_changed",
+          data: {
+            identifierId: "idf_new",
+            previousIdentifierId: "idf_a",
+            actor: ACTOR,
+          },
+        },
+        {
+          type: "lw.identity.primary_changed",
+          data: {
+            identifierId: "idf_new",
+            previousIdentifierId: "idf_b",
+            actor: ACTOR,
+          },
+        },
+      ]);
     });
   });
 });
 
 describe("userErasureFacts", () => {
   describe("when the person holds identifiers the caller never listed", () => {
-    /** @scenario "Erasure routes one fact per identifier the person actually holds" */
+    /** @scenario "Erasure names every identifier the person actually holds" */
     it("names every head the projection carries, tombstones included", () => {
       const heads = foldUser([
         attached("idf_a"),

@@ -301,6 +301,7 @@ export {
 } from "./identifier";
 export {
   type IdentifierHead,
+  type IdentityStream,
   identityStreamsFor,
   primaryChangeFacts,
   reduceIdentifier,
