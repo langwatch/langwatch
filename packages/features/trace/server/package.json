@@ -21,6 +21,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*"
   },

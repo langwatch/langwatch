@@ -5552,6 +5552,11 @@
       "kind": "legacy-implementation"
     },
     {
+      "feature": "trace",
+      "file": "platform/app/src/runtime/app/features/trace.ts",
+      "kind": "composition"
+    },
+    {
       "feature": "user",
       "file": "platform/app/src/app/api/user-avatar/[[...route]]/app.ts",
       "kind": "transport"

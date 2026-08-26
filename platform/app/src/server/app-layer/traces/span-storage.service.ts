@@ -16,8 +16,6 @@ import type {
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
-  SpanSummaryPage,
-  SpanSummaryPageCursor,
   SpanSummaryRow,
   TraceEventRollup,
   TraceEventRollupParams,
@@ -49,7 +47,6 @@ type Since = ByTraceId & { sinceStartTimeMs: number };
  * (end time, duration, status, cost) are picked up too — a start-keyed poll
  * only ever sees brand-new spans.
  */
-type SinceUpdated = ByTraceId & { sinceUpdatedAtMs: number };
 
 /**
  * Read-side visibility gate. Read routes pass the caller's plan cutoff
@@ -235,16 +232,6 @@ export class SpanStorageService {
       await this.repository.findSpansSince(params),
       params.visibilityCutoffMs,
     );
-  }
-
-  async getSpanSummariesPage(
-    params: ByTraceId & { limit: number; cursor?: SpanSummaryPageCursor },
-  ): Promise<SpanSummaryPage> {
-    return this.repository.findSpanSummariesPage(params);
-  }
-
-  async getSpanSummariesSince(params: SinceUpdated): Promise<SpanSummaryRow[]> {
-    return this.repository.findSpanSummariesSince(params);
   }
 
   async getModelUsageStats(params: {

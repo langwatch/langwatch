@@ -1,4 +1,7 @@
+import { spanTreeNodeSchema, type SpanTreeNode } from "@langwatch/trace-contract";
 import { z } from "zod";
+
+export { spanTreeNodeSchema, type SpanTreeNode };
 
 // ---------------------------------------------------------------------------
 // Scoped output models – one per drawer use-case
@@ -155,69 +158,6 @@ export const traceHeaderSchema = z.object({
 });
 
 export type TraceHeader = z.infer<typeof traceHeaderSchema>;
-
-/**
- * Span tree node: lightweight per-span data for waterfall / flame / span-list.
- * Returned by `tracesV2.spanTree`.
- */
-export const spanTreeNodeSchema = z.object({
-  spanId: z.string(),
-  parentSpanId: z.string().nullable(),
-  name: z.string(),
-  type: z.string().nullable(),
-  startTimeMs: z.number(),
-  endTimeMs: z.number(),
-  durationMs: z.number(),
-  status: z.enum(["ok", "error", "unset"]),
-  model: z.string().nullable(),
-  /**
-   * Tool display name (`gen_ai.tool.name` ?? claude's `tool_name`) for tool
-   * spans — lets the waterfall label WHICH tool ran without a spanDetail
-   * call. Null for non-tool spans.
-   */
-  toolName: z.string().nullish(),
-  /**
-   * USD cost — `gen_ai.usage.cost` when the SDK reported one, otherwise
-   * computed server-side from token counts × model pricing (same cascade
-   * the trace-level fold uses). Null when neither yields a value.
-   * `.nullish()` so older clients (or sample fixtures) that don't set
-   * the field at all stay compatible; readers should treat `undefined`
-   * and `null` identically.
-   */
-  cost: z.number().nullish(),
-  /** Token usage counts — surfaced so the waterfall's model pill can
-   * show the input/output/cache breakdown without a spanDetail call. */
-  inputTokens: z.number().nullish(),
-  outputTokens: z.number().nullish(),
-  cacheReadTokens: z.number().nullish(),
-  cacheCreationTokens: z.number().nullish(),
-  /**
-   * Row version (ms) — when the span was last projected, NOT span timing.
-   * The live delta poll takes its high-water mark from this: `startTimeMs`
-   * never moves when a span is updated in place (end time, duration, status,
-   * cost), so it cannot serve as the mark. `.nullish()` for preview-mode
-   * fixtures that carry no version — the mark then reads as 0 and corrects
-   * itself on the first server-sourced row.
-   */
-  updatedAtMs: z.number().nullish(),
-});
-
-export type SpanTreeNode = z.infer<typeof spanTreeNodeSchema>;
-
-/**
- * Cursor for the paged span-tree read (`tracesV2.spanTreePaginated`): the
- * next page starts strictly after `(startTimeMs, spanId)` in
- * `(StartTimeMs ASC, SpanId ASC)` order. Keyed rather than offset-based so
- * pages stay stable while spans are still being ingested.
- */
-export const spanTreeCursorSchema = z.object({
-  // Bound to a ClickHouse Int64 param — reject Infinity / floats / negatives
-  // so a hand-crafted cursor can't turn into an unparseable bind and a 500.
-  startTimeMs: z.number().int().min(0),
-  spanId: z.string().min(1).max(128),
-});
-
-export type SpanTreeCursor = z.infer<typeof spanTreeCursorSchema>;
 
 /**
  * Per-span LangWatch instrumentation signals — fetched via

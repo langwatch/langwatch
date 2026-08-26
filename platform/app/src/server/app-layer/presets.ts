@@ -55,6 +55,7 @@ import {
   createAppAutomationEmailCaps,
 } from "~/runtime/app/features/automation";
 import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
+import { AppTraceRuntime } from "~/runtime/app/features/trace";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { AppModelProviderRuntime } from "~/runtime/app/features/model-provider";
 import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
@@ -1887,7 +1888,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "SessionGroupsService",
   );
 
+  const traceTree = clickhouseEnabled
+    ? AppTraceRuntime.create({
+        resolveClient: resolveClickHouseClient,
+        modelProviders,
+      }).build()
+    : AppTraceRuntime.createNull(modelProviders);
+
   const traces = {
+    tree: traceTree,
     summary: traceSummary,
     list: traceList,
     sessionGroups,
@@ -2457,6 +2466,7 @@ export function createTestApp(
     secrets: AppSecretRuntime.create({ database: testPrisma }),
     traces: (() => {
       return {
+        tree: AppTraceRuntime.createNull(modelProviders),
         summary: traced(
           new TraceSummaryService(new NullTraceSummaryRepository()),
           "TraceSummaryService",

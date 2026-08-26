@@ -1,6 +1,7 @@
 import {
   spanTreeDeltaInputSchema,
   spanTreeInputSchema,
+  spanTreeNodeSchema,
   spanTreePageSchema,
   TraceService as TraceServiceContract,
   type SpanTreeNode,
@@ -17,8 +18,13 @@ type TraceComposition = {
   modelProviders: ModelProviderService;
 };
 
-const gateCosts = (nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] =>
-  canSeeCosts ? nodes : nodes.map((node) => ({ ...node, cost: null }));
+function gateCosts(nodes: SpanTreeNode[], canSeeCosts: boolean): SpanTreeNode[] {
+  if (canSeeCosts) {
+    return nodes;
+  }
+
+  return nodes.map((node) => ({ ...node, cost: null }));
+}
 
 export class TraceService extends TraceServiceContract {
   private constructor(private readonly composition: TraceComposition) {
@@ -66,14 +72,19 @@ export class TraceService extends TraceServiceContract {
       traceId: parsed.traceId,
       sinceUpdatedAtMs: parsed.sinceUpdatedAtMs,
     });
-    return gateCosts(
-      rows.map((row) => this.price(row)),
-      parsed.canSeeCosts,
+    return spanTreeNodeSchema.array().parse(
+      gateCosts(
+        rows.map((row) => this.price(row)),
+        parsed.canSeeCosts,
+      ),
     );
   }
 
   private price({ costInput, cost, ...node }: TraceSpanSummaryRecord): SpanTreeNode {
-    if (cost !== null) return { ...node, cost };
+    if (cost !== null) {
+      return { ...node, cost };
+    }
+
     const computed = this.composition.modelProviders.estimateCost(costInput);
     return { ...node, cost: computed > 0 ? computed : null };
   }

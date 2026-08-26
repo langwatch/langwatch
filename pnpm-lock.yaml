@@ -3147,6 +3147,9 @@ importers:
 
   packages/features/trace/server:
     dependencies:
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -4023,6 +4026,12 @@ importers:
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../packages/system-migrations
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/trace/contract
+      '@langwatch/trace-server':
+        specifier: workspace:*
+        version: link:../../packages/features/trace/server
       '@langwatch/trace-web':
         specifier: workspace:*
         version: link:../../packages/features/trace/web

@@ -22,17 +22,24 @@ Feature: Trace span-tree read service
     When the Trace service reads the span tree
     Then the persistence adapter retries without the occurrence-time bound
 
-  Scenario: Compatibility routes wait for complete characterization
+  Scenario: A live waterfall receives row-version updates
+    Given a span closes after its initial projection
+    When the Trace service reads updates after the prior row version
+    Then it returns the updated span in start-time order
+    And the query is not bounded by occurrence time
+
+  Scenario: Full compatibility routes wait for complete characterization
     Given the existing drawer response has resource, evaluation, redaction, enrichment, event, link, and blob fields
-    When the Trace package is introduced
-    Then existing REST and tRPC routes remain authoritative
-    And migration waits for a complete byte-and-field characterization fixture
+    When the Trace package owns the paged tree and delta routes
+    Then whole-tree, shared, REST and full-detail routes remain authoritative in the app
+    And their migration waits for a complete byte-and-field characterization fixture
 
   Scenario: Cost fallback remains owned by one canonical implementation
     Given a span has no persisted positive cost but has custom, cache, audio, model, or guardrail pricing inputs
-    When the Trace package is introduced without the canonical cost calculator
-    Then no existing route migrates to the package
-    And the package keeps all fallback source attributes available for the canonical move
+    When the Trace service reads the span for a viewer who can see costs
+    Then a persisted positive cost wins unchanged
+    And otherwise it delegates to the canonical ModelProviderService estimateCost
+    And the span-tree response shape remains unchanged
 
   Scenario: Browser presentation remains transport-neutral
     Given the browser display toolkit formats trace previews, costs, and terminal output

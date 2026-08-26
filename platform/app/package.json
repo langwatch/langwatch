@@ -200,6 +200,8 @@
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-server": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui": "workspace:*",
     "@langwatch/user-contract": "workspace:*",

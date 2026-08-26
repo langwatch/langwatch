@@ -16,9 +16,9 @@ import { getClientIp } from "~/utils/getClientIp";
 import { getUserProtectionsForProject } from "../utils";
 import type { SharedTraceDto } from "./sharedTrace.schemas";
 import { SHARE_MAX_FULL_SPANS, sharedTraceDtoSchema } from "./sharedTrace.schemas";
+import { mapLegacySpanSummaryToTreeNode } from "./trace-tree.legacy.mapper";
 import {
   deriveTraceDropPrivacy,
-  mapSpanSummaryToTreeNode,
   mapSpansToDetailDtos,
   mapTraceSummaryToHeader,
   redactV2Content,
@@ -266,7 +266,7 @@ export const sharedTraceRouter = createTRPCRouter({
 
       // Span waterfall (spend stripped).
       const spanTree = gateTreeCost({
-        nodes: summaryRows.map(mapSpanSummaryToTreeNode),
+        nodes: summaryRows.map(mapLegacySpanSummaryToTreeNode),
         protections,
       });
 

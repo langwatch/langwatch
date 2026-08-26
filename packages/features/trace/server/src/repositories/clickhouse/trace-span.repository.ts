@@ -1,6 +1,7 @@
 import type { SpanTreeCursor } from "@langwatch/trace-contract";
+import { EventUtils } from "@langwatch/eventing";
 
-import type { TraceClickHouseResolver } from "../../adapters/clickhouse.types";
+import type { TraceClickHousePort } from "../../ports/clickhouse.port";
 import {
   TraceRepository,
   type TraceSpanPage,
@@ -43,14 +44,23 @@ type SpanSummaryRow = {
 };
 
 const numberOrNull = (value: string | number | null | undefined): number | null => {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === void 0 || value === "") {
+    return null;
+  }
+
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
 const mapStatus = (value: number | string | null): "ok" | "error" | "unset" => {
-  if (value === null) return "unset";
-  if (Number(value) === 2) return "error";
+  if (value === null) {
+    return "unset";
+  }
+
+  if (Number(value) === 2) {
+    return "error";
+  }
+
   return Number(value) === 1 ? "ok" : "unset";
 };
 
@@ -77,26 +87,26 @@ const mapSummary = (row: SpanSummaryRow) => {
     updatedAtMs: Number(row.UpdatedAtMs),
     costInput: {
       attrs: {
-        "gen_ai.response.model": row.ResponseModel || undefined,
-        "gen_ai.request.model": row.Model || undefined,
-        "gen_ai.usage.cache_read.input_tokens": row.CacheReadTokens || undefined,
-        "gen_ai.usage.cache_creation.input_tokens": row.CacheCreationTokens || undefined,
+        "gen_ai.response.model": row.ResponseModel || void 0,
+        "gen_ai.request.model": row.Model || void 0,
+        "gen_ai.usage.cache_read.input_tokens": row.CacheReadTokens || void 0,
+        "gen_ai.usage.cache_creation.input_tokens": row.CacheCreationTokens || void 0,
         "gen_ai.usage.cache_creation_1h.input_tokens":
-          row.CacheCreation1hTokens || undefined,
-        "gen_ai.usage.input_chars": row.InputChars || undefined,
-        "gen_ai.usage.audio_seconds": row.AudioSeconds || undefined,
-        "gen_ai.usage.input_audio_tokens": row.InputAudioTokens || undefined,
-        "gen_ai.usage.output_audio_tokens": row.OutputAudioTokens || undefined,
-        "langwatch.model.inputCostPerToken": row.CustomInputRate || undefined,
-        "langwatch.model.outputCostPerToken": row.CustomOutputRate || undefined,
-        "langwatch.model.cacheReadCostPerToken": row.CustomCacheReadRate || undefined,
+          row.CacheCreation1hTokens || void 0,
+        "gen_ai.usage.input_chars": row.InputChars || void 0,
+        "gen_ai.usage.audio_seconds": row.AudioSeconds || void 0,
+        "gen_ai.usage.input_audio_tokens": row.InputAudioTokens || void 0,
+        "gen_ai.usage.output_audio_tokens": row.OutputAudioTokens || void 0,
+        "langwatch.model.inputCostPerToken": row.CustomInputRate || void 0,
+        "langwatch.model.outputCostPerToken": row.CustomOutputRate || void 0,
+        "langwatch.model.cacheReadCostPerToken": row.CustomCacheReadRate || void 0,
         "langwatch.model.cacheCreationCostPerToken":
-          row.CustomCacheCreationRate || undefined,
+          row.CustomCacheCreationRate || void 0,
         "langwatch.model.cacheCreation1hCostPerToken":
-          row.CustomCacheCreation1hRate || undefined,
-        "langwatch.span.cost": row.LwSpanCost || undefined,
+          row.CustomCacheCreation1hRate || void 0,
+        "langwatch.span.cost": row.LwSpanCost || void 0,
       },
-      model: row.ResponseModel || row.Model || undefined,
+      model: row.ResponseModel || row.Model || void 0,
       promptTokens: numberOrNull(row.InputTokens),
       completionTokens: numberOrNull(row.OutputTokens),
     },
@@ -146,12 +156,12 @@ const dedupInTuple = (extraInnerWhere: string): string => `
 
 /** Concrete, tenant-scoped span-tree persistence for ClickHouse. */
 export class ClickHouseTraceSpanRepository extends TraceRepository {
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+  private constructor(private readonly clickhouse: TraceClickHousePort) {
     super();
   }
 
-  static create(resolveClient: TraceClickHouseResolver): ClickHouseTraceSpanRepository {
-    return new ClickHouseTraceSpanRepository(resolveClient);
+  static create(clickhouse: TraceClickHousePort): ClickHouseTraceSpanRepository {
+    return new ClickHouseTraceSpanRepository(clickhouse);
   }
 
   async findSummaryPage(input: {
@@ -161,18 +171,27 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     cursor?: SpanTreeCursor;
     occurredAtMs?: number;
   }): Promise<TraceSpanPage> {
-    if (input.cursor) return this.queryPage(input, undefined);
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseTraceSpanRepository.findSummaryPage",
+    );
+
+    if (input.cursor) {
+      return this.queryPage(input, void 0);
+    }
 
     const occurredAtMs =
       input.occurredAtMs ??
       (await this.resolveTraceOccurredAtMs(input.tenantId, input.traceId));
-    if (occurredAtMs === undefined) return this.queryPage(input, undefined);
+    if (occurredAtMs === void 0) {
+      return this.queryPage(input, void 0);
+    }
 
     const bounded = await this.queryPage(
       input,
       occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
     );
-    return bounded.rows.length > 0 ? bounded : this.queryPage(input, undefined);
+    return bounded.rows.length > 0 ? bounded : this.queryPage(input, void 0);
   }
 
   async findSummarySince(input: {
@@ -180,7 +199,12 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     traceId: string;
     sinceUpdatedAtMs: number;
   }): Promise<TraceSpanSummaryRecord[]> {
-    const client = await this.resolveClient(input.tenantId);
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseTraceSpanRepository.findSummarySince",
+    );
+
+    const client = await this.clickhouse.resolve(input.tenantId);
     // Deliberately unbounded by the occurred-at hint: a live trace can run
     // past any fixed window. `UpdatedAt` is not the partition key, but the
     // tenant/trace prefix remains selective and preserves the old route's
@@ -217,12 +241,12 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     },
     lowerBoundMs: number | undefined,
   ): Promise<TraceSpanPage> {
-    const client = await this.resolveClient(input.tenantId);
+    const client = await this.clickhouse.resolve(input.tenantId);
     const cursor = input.cursor
       ? "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64}) AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})"
       : "";
     const timeFilter =
-      lowerBoundMs !== undefined
+      lowerBoundMs !== void 0
         ? "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})"
         : "";
     const result = await client.query({
@@ -246,7 +270,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
               cursorSpan: input.cursor.spanId,
             }
           : {}),
-        ...(lowerBoundMs !== undefined
+        ...(lowerBoundMs !== void 0
           ? {
               fromMs: lowerBoundMs,
             }
@@ -279,9 +303,9 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     traceId: string;
     sinceMs?: number;
   }): Promise<number | undefined> {
-    const client = await this.resolveClient(input.tenantId);
+    const client = await this.clickhouse.resolve(input.tenantId);
     const windowPredicate =
-      input.sinceMs === undefined
+      input.sinceMs === void 0
         ? ""
         : "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})";
     const result = await client.query({
@@ -293,7 +317,7 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
           ${windowPredicate}
       `,
       query_params:
-        input.sinceMs === undefined
+        input.sinceMs === void 0
           ? { tenantId: input.tenantId, traceId: input.traceId }
           : {
               tenantId: input.tenantId,
@@ -304,6 +328,6 @@ export class ClickHouseTraceSpanRepository extends TraceRepository {
     });
     const row = (await result.json<{ occurredAtMs: string | number | null }>())[0];
     const value = numberOrNull(row?.occurredAtMs);
-    return value !== null && value > 0 ? value : undefined;
+    return value !== null && value > 0 ? value : void 0;
   }
 }

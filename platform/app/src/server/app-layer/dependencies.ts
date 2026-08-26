@@ -107,6 +107,7 @@ import type { TraceRequestCollectionService } from "./traces/trace-request-colle
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { UsageService } from "./usage/usage.service";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { TraceService } from "@langwatch/trace-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -164,6 +165,8 @@ export interface AppDependencies {
   secrets: SecretService;
 
   traces: {
+    /** The feature-owned viewer-safe, cursor-paged span tree. */
+    tree: TraceService;
     summary: TraceSummaryService;
     list: TraceListService;
     /** Sessions lens: server-side per-conversation rollups (specs/traces-v2/sessions-lens.feature). */

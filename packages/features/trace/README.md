@@ -1,8 +1,9 @@
 # Trace
 
-Trace owns portable read contracts and the first server implementation: the
-viewer-safe, cursor-paged span tree. `trace_summaries` supplies trace lookup
-and summary data; `trace_analytics` remains the lighter analytical source and
+Trace owns portable read contracts and the live server implementation for the
+viewer-safe, cursor-paged span tree and row-version delta. Both read
+`stored_spans`; `trace_summaries` supplies other trace lookup/summary data,
+`trace_analytics` remains the lighter analytical source, and
 `trace_analytics_rollup` the time-series source.
 
 ## Journey
@@ -18,9 +19,9 @@ event/link mapping, offloaded event-log resolution, and the IO extractor. The
 next move must compose all of those once behind the same `TraceService`; it
 must not point a route at a partial replacement.
 
-The duplicate legacy `server/traces` full-span ClickHouse repository has been
-removed. The app-layer span-storage repository is now the single full-span
-reader until that complete migration.
+The app-layer span-storage repository remains the single full-span and
+whole-tree-anchor reader until that complete migration. It no longer owns the
+paged tree or row-version delta queries.
 
 ## Browser display toolkit
 

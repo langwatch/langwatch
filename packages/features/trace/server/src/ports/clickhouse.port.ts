@@ -11,3 +11,7 @@ export interface TraceClickHouseClient {
 export type TraceClickHouseResolver = (
   tenantId: string,
 ) => Promise<TraceClickHouseClient>;
+
+export abstract class TraceClickHousePort {
+  abstract resolve(tenantId: string): Promise<TraceClickHouseClient>;
+}

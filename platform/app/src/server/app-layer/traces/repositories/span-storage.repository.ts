@@ -37,8 +37,8 @@ export function clampSpanReadLimit(
  * payloads — so the ceiling is generous, but it exists because traces have
  * been seen with 20k–100k+ spans and an unbounded read materializes every
  * row in ClickHouse and Node at once. The complete view of huge traces is
- * the cursor-paged span-tree read (`findSpanSummariesPage`), which never
- * needs more than one page in memory.
+ * the Trace feature's cursor-paged span-tree read, which never needs more
+ * than one page in memory.
  */
 export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 
@@ -86,28 +86,6 @@ export interface TraceEventRollupParams {
    * partitions rather than scanning every week including the cold tier.
    */
   timeRange: { from: number; to: number };
-}
-
-/**
- * Cursor for keyed span-summary pagination: the page starts strictly after
- * `(startTimeMs, spanId)` in `(StartTimeMs ASC, SpanId ASC)` order. Keyed
- * instead of offset-based so pages stay stable while spans are still being
- * ingested, and so ClickHouse never scans-and-discards `offset` rows.
- */
-export interface SpanSummaryPageCursor {
-  startTimeMs: number;
-  spanId: string;
-}
-
-/**
- * One page of the keyed span-summary walk. `hasMore` is derived from an
- * over-fetched `limit + 1`-th row, so exhaustion is known without a follow-up
- * empty fetch — the extra fetch would both waste a round trip and (on the
- * repository side) be indistinguishable from a missed partition hint.
- */
-export interface SpanSummaryPage {
-  rows: SpanSummaryRow[];
-  hasMore: boolean;
 }
 
 export interface SpanSummaryRow {
@@ -333,33 +311,6 @@ export interface SpanStorageRepository {
   findSpanResourcesByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]>;
-  /**
-   * One page of span summaries in `(StartTimeMs, SpanId)` order, starting
-   * strictly after `cursor` (or from the beginning when omitted). Callers
-   * derive the next cursor from the last row when `hasMore` is set; a page
-   * with `hasMore: false` is authoritative end-of-trace.
-   */
-  findSpanSummariesPage(
-    params: {
-      tenantId: string;
-      traceId: string;
-      limit: number;
-      cursor?: SpanSummaryPageCursor;
-    } & OccurredAtHint,
-  ): Promise<SpanSummaryPage>;
-  /**
-   * Spans of a trace whose row version is newer than `sinceUpdatedAtMs`.
-   * Keyed on the row version, not the span start: an in-place update (end
-   * time, duration, status, cost) keeps the span's start time, so a
-   * start-keyed poll would never observe it.
-   */
-  findSpanSummariesSince(
-    params: {
-      tenantId: string;
-      traceId: string;
-      sinceUpdatedAtMs: number;
-    } & OccurredAtHint,
-  ): Promise<SpanSummaryRow[]>;
   findSpansPaginated(
     params: {
       tenantId: string;
@@ -482,27 +433,6 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
   async findSpanResourcesByTraceId(
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]> {
-    return [];
-  }
-
-  async findSpanSummariesPage(
-    _params: {
-      tenantId: string;
-      traceId: string;
-      limit: number;
-      cursor?: SpanSummaryPageCursor;
-    } & OccurredAtHint,
-  ): Promise<SpanSummaryPage> {
-    return { rows: [], hasMore: false };
-  }
-
-  async findSpanSummariesSince(
-    _params: {
-      tenantId: string;
-      traceId: string;
-      sinceUpdatedAtMs: number;
-    } & OccurredAtHint,
-  ): Promise<SpanSummaryRow[]> {
     return [];
   }
 

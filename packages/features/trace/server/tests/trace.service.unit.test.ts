@@ -75,6 +75,15 @@ class FakeModelProviderService extends ModelProviderService {
   getForProject(): Promise<Record<string, never>> {
     return Promise.resolve({});
   }
+  tryGetProviderForProject(): Promise<never> {
+    throw new Error("not used");
+  }
+  tryFindRowServingModel(): Promise<never> {
+    throw new Error("not used");
+  }
+  getExecutionProviders(): Promise<never> {
+    throw new Error("not used");
+  }
   upsert(): Promise<never> {
     throw new Error("not used");
   }
@@ -88,6 +97,9 @@ class FakeModelProviderService extends ModelProviderService {
     return Promise.resolve({ connected: false });
   }
   getCodexStatus(): Promise<never> {
+    throw new Error("not used");
+  }
+  refreshCodexForGateway(): Promise<never> {
     throw new Error("not used");
   }
   isManagedProvider(): boolean {

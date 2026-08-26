@@ -1,7 +1,7 @@
 import type { TraceClickHouseClient, TraceClickHouseResolver } from "../src";
 import { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ClickHouseTraceAdapter } from "../src";
-import { ClickHouseTraceSpanRepository } from "../src/repositories/clickhouse/clickhouse.trace-span.repository";
+import { ClickHouseTraceSpanRepository } from "../src/repositories/clickhouse/trace-span.repository";
 import { describe, expect, it } from "vitest";
 
 const resolver =
@@ -51,6 +51,15 @@ class StaticModelProviders extends ModelProviderService {
   getForProject(): Promise<Record<string, never>> {
     return Promise.resolve({});
   }
+  tryGetProviderForProject(): Promise<never> {
+    throw new Error("not used");
+  }
+  tryFindRowServingModel(): Promise<never> {
+    throw new Error("not used");
+  }
+  getExecutionProviders(): Promise<never> {
+    throw new Error("not used");
+  }
   upsert(): Promise<never> {
     throw new Error("not used");
   }
@@ -64,6 +73,9 @@ class StaticModelProviders extends ModelProviderService {
     return Promise.resolve({ connected: false });
   }
   getCodexStatus(): Promise<never> {
+    throw new Error("not used");
+  }
+  refreshCodexForGateway(): Promise<never> {
     throw new Error("not used");
   }
   isManagedProvider(): boolean {
@@ -180,10 +192,27 @@ describe("ClickHouseTraceAdapter", () => {
 });
 
 describe("ClickHouseTraceSpanRepository page parity", () => {
+  it("rejects a blank tenant before issuing a ClickHouse read", async () => {
+    let queryCount = 0;
+    const repository = ClickHouseTraceSpanRepository.create({
+      resolve: async (): Promise<TraceClickHouseClient> => ({
+        query: async () => {
+          queryCount += 1;
+          return { json: async <T>() => [] as T[] };
+        },
+      }),
+    });
+
+    await expect(
+      repository.findSummaryPage({ tenantId: " ", traceId: "trace_1", limit: 1 }),
+    ).rejects.toThrow("TenantId must be a non-empty string");
+    expect(queryCount).toBe(0);
+  });
+
   it("uses the live cursor without constraining latest-version election", async () => {
     const calls: Array<{ sql: string; params?: Record<string, unknown> }> = [];
-    const repository = ClickHouseTraceSpanRepository.create(
-      async (): Promise<TraceClickHouseClient> => ({
+    const repository = ClickHouseTraceSpanRepository.create({
+      resolve: async (): Promise<TraceClickHouseClient> => ({
         query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push({ sql: input.query, params: input.query_params });
           return {
@@ -211,7 +240,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
           };
         },
       }),
-    );
+    });
 
     const page = await repository.findSummaryPage({
       tenantId: "project_1",
@@ -222,10 +251,18 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
 
     expect(calls).toHaveLength(1);
     const call = calls[0]!;
-    expect(call.params).toMatchObject({ cursorStart: 10, cursorSpan: "span_1" });
+    expect(call.params).toMatchObject({
+      cursorStart: 10,
+      cursorSpan: "span_1",
+      limit: 2,
+    });
     expect(call.sql).toContain(
       "(toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStart:Int64}, {cursorSpan:String})",
     );
+    expect(call.sql).toContain(
+      "AND StartTime >= fromUnixTimestamp64Milli({cursorStart:Int64})",
+    );
+    expect(call.sql).not.toContain("StartTime <=");
     const innerElection = call.sql.slice(
       call.sql.indexOf("SELECT TenantId, TraceId, SpanId, max(UpdatedAt)"),
     );
@@ -244,8 +281,8 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
 
   it("retries an empty first hinted page without the occurrence bound", async () => {
     const calls: string[] = [];
-    const repository = ClickHouseTraceSpanRepository.create(
-      async (): Promise<TraceClickHouseClient> => ({
+    const repository = ClickHouseTraceSpanRepository.create({
+      resolve: async (): Promise<TraceClickHouseClient> => ({
         query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push(input.query);
           const rows =
@@ -274,7 +311,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
           return { json: async <T>() => rows as T[] };
         },
       }),
-    );
+    });
 
     const page = await repository.findSummaryPage({
       tenantId: "project_1",
@@ -289,13 +326,36 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
     expect(page.rows).toHaveLength(1);
   });
 
+  it("treats an empty cursor page as the end without an unbounded retry", async () => {
+    let queryCount = 0;
+    const repository = ClickHouseTraceSpanRepository.create({
+      resolve: async (): Promise<TraceClickHouseClient> => ({
+        query: async () => {
+          queryCount += 1;
+          return { json: async <T>() => [] as T[] };
+        },
+      }),
+    });
+
+    const page = await repository.findSummaryPage({
+      tenantId: "project_1",
+      traceId: "trace_1",
+      limit: 1,
+      cursor: { startTimeMs: 10, spanId: "span_1" },
+      occurredAtMs: 100,
+    });
+
+    expect(page).toEqual({ rows: [], hasMore: false });
+    expect(queryCount).toBe(1);
+  });
+
   it("uses the live row-version delta query without an occurrence window", async () => {
     const calls: Array<{
       sql: string;
       params?: Record<string, unknown>;
     }> = [];
-    const repository = ClickHouseTraceSpanRepository.create(
-      async (): Promise<TraceClickHouseClient> => ({
+    const repository = ClickHouseTraceSpanRepository.create({
+      resolve: async (): Promise<TraceClickHouseClient> => ({
         query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
           calls.push({ sql: input.query, params: input.query_params });
           return {
@@ -323,7 +383,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
           };
         },
       }),
-    );
+    });
 
     const rows = await repository.findSummarySince({
       tenantId: "project_1",

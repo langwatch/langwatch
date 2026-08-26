@@ -1,6 +1,10 @@
 import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import {
+  spanTreeDeltaTransportInputSchema,
+  spanTreeTransportInputSchema,
+} from "@langwatch/trace-contract";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -39,11 +43,7 @@ import {
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "~/server/app-layer/traces/log-content-derivation";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
-import type {
-  SpanSummaryPage,
-  SpanSummaryRow,
-  TraceEventRollup,
-} from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { TraceEventRollup } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
@@ -99,16 +99,15 @@ import {
   gateTreeCost,
 } from "./tracesV2.gates";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
+import { mapLegacySpanSummaryToTreeNode } from "./trace-tree.legacy.mapper";
 import type {
   ContentPrivacy,
   SpanDetail,
   SpanLangwatchSignals,
-  SpanTreeCursor,
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
 } from "./tracesV2.schemas";
-import { spanTreeCursorSchema } from "./tracesV2.schemas";
 
 // ---------------------------------------------------------------------------
 // Shared input fragments
@@ -213,31 +212,6 @@ export function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader 
 }
 
 /**
- * Maps one repository span-summary page onto the wire shape of
- * `tracesV2.spanTreePaginated`. `nextCursor` comes from the repository's
- * over-fetch-derived `hasMore` — never from comparing the page length to the
- * requested limit, which would misread a repository-clamped page as final.
- */
-export function mapSpanSummaryPage(page: SpanSummaryPage): {
-  nodes: SpanTreeNode[];
-  nextCursor: SpanTreeCursor | null;
-} {
-  const last = page.hasMore ? page.rows.at(-1) : undefined;
-  if (page.hasMore && !last) {
-    // A null cursor here would read as end-of-trace and silently drop every
-    // remaining span — fail loudly instead if a repository ever breaks the
-    // "hasMore implies rows" invariant.
-    throw new Error(
-      "span-summary page reported hasMore without any rows to key the cursor from",
-    );
-  }
-  return {
-    nodes: page.rows.map(mapSpanSummaryToTreeNode),
-    nextCursor: last ? { startTimeMs: last.startTimeMs, spanId: last.spanId } : null,
-  };
-}
-
-/**
  * Trace-level DROP banner. A `drop` disposition strips the category at
  * ingestion, so the computed content was never stored and is empty. The check
  * uses the ORIGINAL computed content (the pre-redaction header), not the
@@ -268,31 +242,6 @@ export async function deriveTraceDropPrivacy(
     // Skip the drop derivation on resolver/cache/db failure.
     return null;
   }
-}
-
-export function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
-  let status: SpanTreeNode["status"] = "unset";
-  if (row.statusCode === 2) status = "error";
-  else if (row.statusCode === 1) status = "ok";
-
-  return {
-    spanId: row.spanId,
-    parentSpanId: row.parentSpanId,
-    name: row.spanName,
-    type: row.spanType,
-    startTimeMs: row.startTimeMs,
-    endTimeMs: row.startTimeMs + row.durationMs,
-    durationMs: row.durationMs,
-    status,
-    model: row.model,
-    toolName: row.toolName,
-    cost: row.cost,
-    inputTokens: row.inputTokens,
-    outputTokens: row.outputTokens,
-    cacheReadTokens: row.cacheReadTokens,
-    cacheCreationTokens: row.cacheCreationTokens,
-    updatedAtMs: row.updatedAtMs,
-  };
 }
 
 function mapSpanToDetail(
@@ -1632,39 +1581,17 @@ export const tracesV2Router = createTRPCRouter({
    * `nextCursor` is null on the final page.
    */
   spanTreePaginated: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        traceId: z.string(),
-        limit: z.number().int().min(1).max(1000).default(200),
-        cursor: spanTreeCursorSchema.optional(),
-        ...spanReadHintShape,
-      }),
-    )
+    .input(spanTreeTransportInputSchema)
     .permission("traces:view")
-    .query(
-      async ({
-        input,
-        ctx,
-      }): Promise<{
-        nodes: SpanTreeNode[];
-        nextCursor: SpanTreeCursor | null;
-      }> => {
-        const app = getApp();
-        const protections = await getUserProtectionsForProject(ctx, {
-          projectId: input.projectId,
-        });
-        const page = await app.traces.spans.getSpanSummariesPage({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-          limit: input.limit,
-          cursor: input.cursor,
-          ...occurredAtFromInput(input),
-        });
-        const { nodes, nextCursor } = mapSpanSummaryPage(page);
-        return { nodes: gateTreeCost({ nodes, protections }), nextCursor };
-      },
-    ),
+    .query(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      return ctx.app.traces.tree.getSpanTreePage({
+        ...input,
+        canSeeCosts: protections.canSeeCosts === true,
+      });
+    }),
 
   /**
    * Spans of a live trace whose row version is newer than `sinceUpdatedAtMs`.
@@ -1674,29 +1601,15 @@ export const tracesV2Router = createTRPCRouter({
    * with it the waterfall's time scale, frozen at first projection.
    */
   spanTreeDelta: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        traceId: z.string(),
-        sinceUpdatedAtMs: z.number().int().min(0),
-        ...spanReadHintShape,
-      }),
-    )
+    .input(spanTreeDeltaTransportInputSchema)
     .permission("traces:view")
-    .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
-      const app = getApp();
+    .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      const rows = await app.traces.spans.getSpanSummariesSince({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        sinceUpdatedAtMs: input.sinceUpdatedAtMs,
-        ...occurredAtFromInput(input),
-      });
-      return gateTreeCost({
-        nodes: rows.map(mapSpanSummaryToTreeNode),
-        protections,
+      return ctx.app.traces.tree.getSpanTreeDelta({
+        ...input,
+        canSeeCosts: protections.canSeeCosts === true,
       });
     }),
 
@@ -1728,7 +1641,7 @@ export const tracesV2Router = createTRPCRouter({
         ...occurredAtFromInput(input),
       });
       return gateTreeCost({
-        nodes: rows.map(mapSpanSummaryToTreeNode),
+        nodes: rows.map(mapLegacySpanSummaryToTreeNode),
         protections,
       });
     }),
