@@ -35,6 +35,7 @@ import {
 import { showErrorToast } from "~/features/errors";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";
+import { passkeyLabel as labelFor } from "./passkeyAuthenticators";
 import { useLastWayInWarning } from "./useLastWayInWarning";
 
 /** What the plugin stores per credential, of the parts this screen reads. */
@@ -43,6 +44,8 @@ interface HeldPasskey {
   name?: string | null;
   createdAt: string | Date;
   transports?: string | null;
+  /** The authenticator MODEL, never a device or a person. Names the row. */
+  aaguid?: string | null;
 }
 
 /**
@@ -70,12 +73,20 @@ function isSecurityKey(passkey: HeldPasskey): boolean {
  * What to call one in a list of them.
  *
  * A passkey registered from the sign-up screen is labelled with the address it
- * was created for; one added from settings carries whatever the browser chose,
- * which is often nothing. "Passkey" is the honest fallback — better than an
- * id, and it is exactly why renaming exists.
+ * was created for — the only string that ceremony had — so somebody holding
+ * three of them reads three copies of their own email and cannot tell the work
+ * laptop from the phone they no longer own. Renaming has always been here;
+ * nobody used it, because the list gave them nothing to rename FROM.
+ *
+ * The authenticator's own name is that starting point, and it is derived
+ * rather than stored: nothing is written at registration, so a lookup that
+ * learns a new authenticator improves every row that already exists.
  */
-function passkeyLabel(passkey: HeldPasskey): string {
-  return passkey.name?.trim() || "Passkey";
+function passkeyLabel(
+  passkey: HeldPasskey,
+  accountAddress?: string | null,
+): string {
+  return labelFor(passkey, { accountAddress });
 }
 
 /**

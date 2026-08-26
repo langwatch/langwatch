@@ -411,9 +411,11 @@ describe("given a connection that is already on", () => {
 
     const { container } = draw();
 
-    expect(container.textContent).toContain(
-      "The connection is on, and sign-in has not moved to it yet",
-    );
+    // The summary's own status chip is what says the connection is on and
+    // not routing; a full-width coloured banner under it was the same fact
+    // twice, in the loudest treatment on the page, about an ordinary state.
+    // What the banner alone carried is the part the chip cannot fit.
+    expect(container.textContent).toContain("On, not routing yet");
     expect(container.textContent).toContain(
       "Everyone still signs in the way they do today.",
     );
@@ -428,10 +430,11 @@ describe("given a connection that is already on", () => {
 
     const { container } = draw();
 
-    expect(container.textContent).toContain("Single sign-on is on");
-    expect(container.textContent).toContain(
-      "now sign in through your identity provider",
-    );
+    // The status chip carries it. A success banner repeating a settled state
+    // is the loudest treatment on the page spent on the case where nothing
+    // needs doing.
+    expect(container.textContent).toContain("Active");
+    expect(container.textContent).not.toContain("On, not routing yet");
   });
 });
 

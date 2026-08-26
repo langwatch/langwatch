@@ -43,58 +43,51 @@ export function SettingRow({
   "data-testid"?: string;
 }) {
   return (
-    <HStack
+    /*
+     * TWO EQUAL COLUMNS, AND THE VALUE STARTS AT THE SAME PLACE EVERY TIME.
+     *
+     * This was a flex row with the value pushed to the right edge, which
+     * sounds tidier and is not: the value's left edge then depended on how
+     * long the value was, so a column of six answers started in six different
+     * places and could not be scanned at all. Worse, a long value and a long
+     * name fought over the same space and the name lost, wrapping one word
+     * per line.
+     *
+     * A half-and-half grid fixes both. The name gets a column that cannot be
+     * squeezed, the value gets a column that starts on a fixed line, and a
+     * value too long for it wraps inside its own half instead of pushing
+     * anything.
+     */
+    <Box
+      display="grid"
+      gridTemplateColumns="1fr 1fr"
+      alignItems="center"
+      gap={6}
       width="full"
-      gap={4}
-      // Tight enough that six rows read as one table rather than as six
-      // paragraphs: a settings card earns its place by how many questions it
-      // answers in a glance, and every row of padding is one fewer.
-      paddingY={1.5}
-      // CENTRED for the ordinary row, where a name sits level with the badge
-      // beside it. Tall rows are handled by the value's own alignment below —
-      // centring a three-line value against a one-line name is what made this
-      // list look accidental.
-      align="center"
+      paddingY={2.5}
       data-testid={testId}
     >
-      {/*
-       * THE NAME COLUMN NEVER COLLAPSES. It used to take flex={1} against a
-       * value that refused to shrink, so a long value squeezed the name until
-       * it wrapped one word per line — "Members / it / manages" beside a
-       * sentence that then overlapped it. The name is the thing being scanned
-       * down, so it gets a floor and the value gets whatever is left.
-       */}
-      <VStack
-        align="start"
-        gap={0.5}
-        flex="1 1 auto"
-        minWidth="10rem"
-        maxWidth={children ? "60%" : "full"}
-      >
+      <Box minWidth={0}>
         <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
           {label}
         </Text>
         {hint && (
-          <Text fontSize="11.5px" lineHeight="1.5" color="fg.muted">
+          <Text
+            fontSize="11.5px"
+            lineHeight="1.5"
+            color="fg.muted"
+            marginTop={0.5}
+          >
             {hint}
           </Text>
         )}
-      </VStack>
+      </Box>
       {children && (
-        <HStack
-          gap={2}
-          // Shrinkable and right-aligned: a long value wraps inside its own
-          // column instead of pushing the name out of the row.
-          flex="0 1 auto"
-          minWidth={0}
-          justify="end"
-          align="center"
-          textAlign="end"
-        >
+        <HStack gap={2} minWidth={0} align="center">
           {children}
         </HStack>
       )}
-    </HStack>
+    </Box>
   );
 }
 

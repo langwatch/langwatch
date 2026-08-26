@@ -1,5 +1,5 @@
 import { Button, SimpleGrid, Text, VStack } from "@chakra-ui/react";
-import { ArrowLeft, Settings2 } from "lucide-react";
+import { ChevronDown, Settings2 } from "lucide-react";
 import { useSearchParams } from "react-router";
 import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -28,11 +28,12 @@ const MANAGE_CONNECTION = "connection";
  * move between them — the connection's own state says which question the
  * reader is asking.
  *
- * MANAGING IS STILL ONE PAGE. The journey does not go away when the
+ * MANAGING IS THE SAME PAGE, UNFOLDED. The journey does not go away when the
  * connection goes live: domains are claimed later, break-glass grants expire,
- * a test sign-in is worth running again. It moves BEHIND the overview, one
- * quiet control away, and the address carries which one you are looking at so
- * a link to it opens where it was sent from.
+ * a test sign-in is worth running again. It used to REPLACE the overview,
+ * which made one navigation entry into two pages and took the cards away from
+ * a reader who pressed it. It unfolds under them instead, and the address
+ * still carries whether it is open so a link opens where it was sent from.
  *
  * A REFUSAL IS NOT A SCREEN. An organization that cannot set single sign-on
  * up yet still reads the page: the cards say what a connection would give
@@ -82,6 +83,9 @@ export function AuthenticationSettings({
 
   const data = setup.data;
   const connection = data?.connection ?? null;
+  /** Whether the journey is unfolded under the cards. Lives in the address so
+   *  a link to it opens where it was sent from. */
+  const managing = searchParams.get(MANAGE_PARAM) === MANAGE_CONNECTION;
 
   // Setting it up is not this organization's to do yet. The reason goes above
   // the cards rather than instead of them.
@@ -126,23 +130,6 @@ export function AuthenticationSettings({
     );
   }
 
-  if (searchParams.get(MANAGE_PARAM) === MANAGE_CONNECTION) {
-    return (
-      <VStack align="stretch" gap={4} width="full">
-        <Button
-          alignSelf="start"
-          size="sm"
-          variant="ghost"
-          onClick={() => showManage(false)}
-        >
-          <ArrowLeft size={14} />
-          Back to the overview
-        </Button>
-        <SingleSignOnSetup organizationId={organizationId} />
-      </VStack>
-    );
-  }
-
   return (
     <VStack align="stretch" gap={4} width="full">
       <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4} width="full">
@@ -156,20 +143,36 @@ export function AuthenticationSettings({
         />
       </SimpleGrid>
 
-      {/* THE WAY TO CHANGE OR END IT, NAMED. "Manage connection" is a door
-          with nothing written on it: an administrator who came to turn their
-          identity provider off, re-check a domain, or hand over new
-          credentials had no way of knowing any of that was behind it, and a
-          control nobody can predict the contents of is one nobody presses. */}
+      {/* IT OPENS OUT OF THE PAGE RATHER THAN REPLACING IT. Managing a live
+          connection used to swap the whole screen for the journey, with a
+          "back to the overview" control at the top — two pages behind one
+          navigation entry, and a reader who pressed it lost the cards they
+          were reading from. It is a disclosure now: the cards stay, the
+          journey unfolds under them, and the address still carries which one
+          you are looking at so a link opens where it was sent from.
+
+          THE DOOR IS NAMED. "Manage connection" is a door with nothing
+          written on it: an administrator who came to turn their identity
+          provider off, re-check a domain, or hand over new credentials had no
+          way of knowing any of that was behind it. */}
       <VStack align="start" gap={0} width="full">
-        <Button size="sm" variant="ghost" onClick={() => showManage(true)}>
-          <Settings2 size={14} />
-          Manage or turn off this connection
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-expanded={managing}
+          onClick={() => showManage(!managing)}
+        >
+          {managing ? <ChevronDown size={14} /> : <Settings2 size={14} />}
+          {managing ? "Done managing" : "Manage or turn off this connection"}
         </Button>
-        <Text fontSize="xs" color="fg.muted" paddingLeft={3}>
-          Domains, test sign-in, break-glass, removal.
-        </Text>
+        {!managing && (
+          <Text fontSize="xs" color="fg.muted" paddingLeft={3}>
+            Domains, test sign-in, break-glass, removal.
+          </Text>
+        )}
       </VStack>
+
+      {managing && <SingleSignOnSetup organizationId={organizationId} />}
 
       <OrganizationPolicyCard
         organizationId={organizationId}

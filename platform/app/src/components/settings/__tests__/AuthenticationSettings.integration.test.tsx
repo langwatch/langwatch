@@ -419,7 +419,7 @@ describe("the organization's authentication page", () => {
     });
 
     /** @scenario "Managing a live connection stays on the same page" */
-    it("reveals the setup journey in place, with a way back", async () => {
+    it("unfolds the setup journey under the cards rather than replacing them", async () => {
       const user = userEvent.setup();
       await open();
 
@@ -432,11 +432,12 @@ describe("the organization's authentication page", () => {
       );
 
       expect(screen.getByText(/prove a domain is yours/i)).toBeTruthy();
-      expect(screen.queryByTestId("single-sign-on-card")).toBeNull();
+      // THE CARDS STAY. Replacing them made one navigation entry into two
+      // pages and took the overview away from the reader who pressed it.
+      expect(screen.getByTestId("single-sign-on-card")).toBeTruthy();
 
-      await user.click(
-        screen.getByRole("button", { name: /back to the overview/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /done managing/i }));
+      expect(screen.queryByText(/prove a domain is yours/i)).toBeNull();
       expect(screen.getByTestId("single-sign-on-card")).toBeTruthy();
     });
   });

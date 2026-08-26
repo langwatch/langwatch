@@ -51,8 +51,8 @@ export function SettingsCard({
        the smallest that still separates the card from its neighbour; the
        density comes from the rows inside, not from the box. */
     <Card.Root width="full" height="full" data-testid={testId}>
-      <Card.Body paddingX={3.5} paddingY={2.5}>
-        <VStack align="stretch" gap={1.5} height="full">
+      <Card.Body paddingX={4} paddingY={3.5}>
+        <VStack align="stretch" gap={2} height="full">
           <VStack align="stretch" gap={0.5}>
             <HStack width="full" gap={2} align="center">
               {tone && <StatusDot tone={tone} />}

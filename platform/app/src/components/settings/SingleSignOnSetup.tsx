@@ -426,34 +426,22 @@ function ConnectionSummary({
               )}
             </VStack>
           </HStack>
-          {goLive?.activated &&
-            (goLive.routingSwitchedOn ? (
-              <Alert.Root status="success">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>Single sign-on is on</Alert.Title>
-                  <Alert.Description>
-                    People with an address at your proved domains now sign in
-                    through your identity provider.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert.Root>
-            ) : (
-              <Alert.Root status="info">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>
-                    The connection is on, and sign-in has not moved to it yet
-                  </Alert.Title>
-                  <Alert.Description>
-                    Everyone still signs in the way they do today. Talk to us
-                    when you are ready for us to switch your organization over —
-                    we do it one organization at a time, so it can be undone
-                    immediately.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert.Root>
-            ))}
+          {/* THE CHIP ALREADY SAID THIS. A full-width coloured banner under a
+              summary whose own status chip reads "On, not routing yet" is the
+              same fact twice, in the loudest treatment on the page, about a
+              state that is ordinary rather than wrong — and it pushed the
+              checklist somebody came to work through below the fold.
+
+              What the banner alone carried is the one thing the chip cannot
+              fit: that the move is ours to make and reversible. That is a
+              line, and it sits where the state it qualifies is. */}
+          {goLive?.activated && !goLive.routingSwitchedOn && (
+            <Text fontSize="xs" color="fg.muted" lineHeight="1.6">
+              Everyone still signs in the way they do today. Talk to us when you
+              are ready for us to switch your organization over — one
+              organization at a time, and it can be undone immediately.
+            </Text>
+          )}
         </VStack>
       </Card.Body>
     </Card.Root>
