@@ -5,7 +5,7 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { BlobToolbar } from "@langwatch/ops-web";
 
-import { BlobStoreBody } from "./BlobStoreBody";
+import { BlobStoreBody } from "@langwatch/ops-web";
 import { DeletePayloadDialog } from "./DeletePayloadDialog";
 import { RunCleanupDialog } from "./RunCleanupDialog";
 import { useBlobListing } from "./useBlobListing";

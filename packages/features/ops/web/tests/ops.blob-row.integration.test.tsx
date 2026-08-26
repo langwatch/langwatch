@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
-import { BlobRow } from "../BlobRow";
+import { BlobRow } from "../src/ops.blob-row";
 
 const blob = (overrides: Partial<OpsBlobSummary> = {}): OpsBlobSummary => ({
   queueName: "trace-processing",

@@ -3113,22 +3113,7 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/blobs/BlobRow.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/blobs/BlobStoreBody.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/blobs/BlobStoreContent.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/blobs/BlobTable.tsx",
       "kind": "page-shell"
     },
     {

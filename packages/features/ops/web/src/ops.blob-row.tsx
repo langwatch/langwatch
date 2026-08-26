@@ -1,10 +1,10 @@
 import { Badge, Button, Table, Text } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
 
-import { formatBytes } from "@langwatch/ops-web";
 import { Menu } from "@langwatch/design-system/menu";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
-import { formatLeaseLapse, formatTtl, sweepOutcomeLabel } from "@langwatch/ops-web";
+import { formatLeaseLapse, formatTtl, sweepOutcomeLabel } from "./blob-formatters";
+import { formatBytes } from "./formatters";
 
 export function BlobRow({
   blob,
