@@ -54,19 +54,20 @@ export function AgentTestingHeader({
   openPlan,
 }: AgentTestingHeaderProps) {
   return (
-    <PageLayout.Header height="auto" paddingX={5} alignItems="flex-end" gap={4}>
+    <PageLayout.Header>
       {/* The middle column takes the width of the tabs, so the tabs sit in the
           centre of the page and not in the centre of what is left of it. The
-          right column stays empty and balances the title on the left. */}
+          right column stays empty and balances the title on the left. Every
+          page title in the product is the same size, so the header carries no
+          padding or alignment override of its own: the defaults set by
+          PageLayout.Header rule. */}
       <Grid
         width="full"
         templateColumns="1fr auto 1fr"
-        alignItems="flex-end"
+        alignItems="center"
         gap={4}
       >
-        <GridItem paddingY={2} minWidth={0}>
-          {/* The title keeps the standard page heading size: every page title
-              in the product is the same size, by design-system rule. */}
+        <GridItem minWidth={0}>
           <HStack gap={2} minWidth={0} alignItems="baseline">
             <PageLayout.Heading>
               {openPlan?.name ?? "Agent Testing"}
