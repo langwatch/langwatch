@@ -42,7 +42,8 @@ const NAME = "b957a08c-0000-4000-8000-000000000001_dacfd251-bot";
 const CHANNEL_ID = "3237db76-f6f8-03f7-72fc-c309292eefdc";
 const AAD_OBJECT_ID = "f6481ec4-e30f-4bf3-954f-2a8f29bb1c4a";
 
-function userMessage(id: string, text: string, ms: number) {
+function userMessage(params: { id: string; text: string; ms: number }) {
+  const { id, text, ms } = params;
   return {
     id,
     type: "message",
@@ -56,7 +57,8 @@ function userMessage(id: string, text: string, ms: number) {
   };
 }
 
-function agentMessage(id: string, text: string, ms: number) {
+function agentMessage(params: { id: string; text: string; ms: number }) {
+  const { id, text, ms } = params;
   return {
     id,
     type: "message",
@@ -66,12 +68,25 @@ function agentMessage(id: string, text: string, ms: number) {
   };
 }
 
-function toolCall(
-  id: string,
-  ms: number,
-  status: "Started" | "Completed",
-  callId = "call-1",
-) {
+function toolCall(params: {
+  id: string;
+  ms: number;
+  status: "Started" | "Completed";
+  callId?: string;
+  /**
+   * A real `Completed` trace carries none. Defaulted on so the common case
+   * stays short, and turned off where a test needs the completion to be as
+   * bare as the wire makes it.
+   */
+  filledParameters?: Record<string, unknown> | null;
+}) {
+  const {
+    id,
+    ms,
+    status,
+    callId = "call-1",
+    filledParameters = { skill: "search-before-answer" },
+  } = params;
   return {
     id,
     type: "event",
@@ -83,7 +98,7 @@ function toolCall(
       toolName: "skill",
       toolDisplayName: "search-before-answer",
       toolCallStatus: status,
-      filledParameters: { skill: "search-before-answer" },
+      filledParameters,
     },
   };
 }
@@ -154,21 +169,21 @@ function attrsOf(span: { attributes?: { key: string; value: unknown }[] }) {
 }
 
 const CHAT = [
-  agentMessage(
-    "d4628de6-730d-401d-849a-0eb8f66ddbf5",
-    "Hello! How can I help?",
-    1_787_685_274_483,
-  ),
-  userMessage(
-    "c1955eab-a6c8-42ea-9c72-6ff22994543d",
-    "How do I reset my laptop?",
-    1_787_685_284_913,
-  ),
-  agentMessage(
-    "a1111111-1111-4111-8111-111111111111",
-    "Hold the power button for ten seconds.",
-    1_787_685_290_000,
-  ),
+  agentMessage({
+    id: "d4628de6-730d-401d-849a-0eb8f66ddbf5",
+    text: "Hello! How can I help?",
+    ms: 1_787_685_274_483,
+  }),
+  userMessage({
+    id: "c1955eab-a6c8-42ea-9c72-6ff22994543d",
+    text: "How do I reset my laptop?",
+    ms: 1_787_685_284_913,
+  }),
+  agentMessage({
+    id: "a1111111-1111-4111-8111-111111111111",
+    text: "Hold the power button for ten seconds.",
+    ms: 1_787_685_290_000,
+  }),
 ];
 
 describe("given a Copilot conversation stored in one row", () => {
@@ -279,21 +294,33 @@ describe("given a conversation Microsoft stored across several rows", () => {
   it("orders piece 2 before piece 10", () => {
     const two = transcriptRow({
       activities: [
-        userMessage("b2222222-2222-4222-8222-222222222222", "second", 2000),
+        userMessage({
+          id: "b2222222-2222-4222-8222-222222222222",
+          text: "second",
+          ms: 2000,
+        }),
       ],
       batchId: 2,
       transcriptId: "row-2",
     });
     const ten = transcriptRow({
       activities: [
-        userMessage("b1010101-1010-4010-8010-101010101010", "tenth", 3000),
+        userMessage({
+          id: "b1010101-1010-4010-8010-101010101010",
+          text: "tenth",
+          ms: 3000,
+        }),
       ],
       batchId: 10,
       transcriptId: "row-10",
     });
     const zero = transcriptRow({
       activities: [
-        userMessage("b0000000-0000-4000-8000-000000000000", "first", 1000),
+        userMessage({
+          id: "b0000000-0000-4000-8000-000000000000",
+          text: "first",
+          ms: 1000,
+        }),
       ],
       batchId: 0,
       transcriptId: "row-0",
@@ -307,9 +334,14 @@ describe("given a conversation Microsoft stored across several rows", () => {
     const said = spans
       .map((s) => attrsOf(s)["langwatch.input"] as string | undefined)
       .filter((v): v is string => typeof v === "string");
-    expect(said.findIndex((v) => v.includes("second"))).toBeLessThan(
-      said.findIndex((v) => v.includes("tenth")),
-    );
+    // Both are required to be present before they are compared: `findIndex`
+    // answers -1 for something absent, so `-1 < 0` would report success for
+    // the exact regression this guards — batch 2 dropping out entirely.
+    const secondAt = said.findIndex((v) => v.includes("second"));
+    const tenthAt = said.findIndex((v) => v.includes("tenth"));
+    expect(secondAt).toBeGreaterThanOrEqual(0);
+    expect(tenthAt).toBeGreaterThanOrEqual(0);
+    expect(secondAt).toBeLessThan(tenthAt);
   });
 
   /**
@@ -321,16 +353,16 @@ describe("given a conversation Microsoft stored across several rows", () => {
   it("pairs the answer with the question even when a row stores them out of order", () => {
     const jumbled = transcriptRow({
       activities: [
-        agentMessage(
-          "a9999999-9999-4999-8999-999999999999",
-          "Hold the power button.",
-          2_000,
-        ),
-        userMessage(
-          "b8888888-8888-4888-8888-888888888888",
-          "How do I reset it?",
-          1_000,
-        ),
+        agentMessage({
+          id: "a9999999-9999-4999-8999-999999999999",
+          text: "Hold the power button.",
+          ms: 2_000,
+        }),
+        userMessage({
+          id: "b8888888-8888-4888-8888-888888888888",
+          text: "How do I reset it?",
+          ms: 1_000,
+        }),
       ],
     });
     const turns = turnSpansOf([copilotEvent(jumbled)]);
@@ -347,11 +379,11 @@ describe("given a conversation Microsoft stored across several rows", () => {
     // return anything, which in practice left the later message first.
     const withUndateable = transcriptRow({
       activities: [
-        agentMessage(
-          "a9999999-9999-4999-8999-999999999999",
-          "Hold the power button.",
-          2_000,
-        ),
+        agentMessage({
+          id: "a9999999-9999-4999-8999-999999999999",
+          text: "Hold the power button.",
+          ms: 2_000,
+        }),
         {
           id: "d6666666-6666-4666-8666-666666666666",
           type: "message",
@@ -359,11 +391,11 @@ describe("given a conversation Microsoft stored across several rows", () => {
           from: { id: CHANNEL_ID, role: 0 },
           text: "undateable",
         },
-        userMessage(
-          "b8888888-8888-4888-8888-888888888888",
-          "How do I reset it?",
-          1_000,
-        ),
+        userMessage({
+          id: "b8888888-8888-4888-8888-888888888888",
+          text: "How do I reset it?",
+          ms: 1_000,
+        }),
       ],
     });
     const turns = turnSpansOf([copilotEvent(withUndateable)]);
@@ -590,24 +622,24 @@ describe("given a tool call the agent ran", () => {
         transcriptRow({
           activities: [
             ...CHAT,
-            toolCall(
-              "f5555555-5555-4555-8555-555555555555",
-              1_787_685_286_000,
-              "Started",
-              "call-a",
-            ),
-            toolCall(
-              "f6666666-6666-4666-8666-666666666666",
-              1_787_685_287_000,
-              "Started",
-              "call-b",
-            ),
-            toolCall(
-              "f7777777-7777-4777-8777-777777777777",
-              1_787_685_288_000,
-              "Completed",
-              "call-a",
-            ),
+            toolCall({
+              id: "f5555555-5555-4555-8555-555555555555",
+              ms: 1_787_685_286_000,
+              status: "Started",
+              callId: "call-a",
+            }),
+            toolCall({
+              id: "f6666666-6666-4666-8666-666666666666",
+              ms: 1_787_685_287_000,
+              status: "Started",
+              callId: "call-b",
+            }),
+            toolCall({
+              id: "f7777777-7777-4777-8777-777777777777",
+              ms: 1_787_685_288_000,
+              status: "Completed",
+              callId: "call-a",
+            }),
           ],
         }),
       ),
@@ -632,11 +664,11 @@ describe("given a tool call the agent ran", () => {
         transcriptRow({
           activities: [
             ...CHAT,
-            toolCall(
-              "f5555555-5555-4555-8555-555555555555",
-              1_787_685_286_000,
-              "Started",
-            ),
+            toolCall({
+              id: "f5555555-5555-4555-8555-555555555555",
+              ms: 1_787_685_286_000,
+              status: "Started",
+            }),
           ],
         }),
       ),
@@ -651,10 +683,48 @@ describe("given a tool call the agent ran", () => {
     );
     expect(tool!.parentSpanId).toBe(asked!.spanId);
   });
+
+  /**
+   * A completion stored above the start it belongs to, which is what a raw
+   * activity list can look like. The span still opens at the start: the list
+   * is time-ordered before any of this runs, so storage order cannot decide
+   * which trace seeds the call.
+   */
+  it("opens at the start even when the completion is stored above it", () => {
+    const spans = spansOf([
+      copilotEvent(
+        transcriptRow({
+          activities: [
+            ...CHAT,
+            toolCall({
+              id: "f6666666-6666-4666-8666-666666666666",
+              ms: 1_787_685_288_000,
+              status: "Completed",
+              filledParameters: null,
+            }),
+            toolCall({
+              id: "f5555555-5555-4555-8555-555555555555",
+              ms: 1_787_685_286_000,
+              status: "Started",
+            }),
+          ],
+        }),
+      ),
+    ]);
+    const tool = spans.find(
+      (s: { name: string }) => s.name === "copilot_studio.tool_call",
+    );
+
+    expect(tool).toBeDefined();
+    // A completion carries no `filledParameters`, so this is also what says
+    // the start seeded the call rather than the completion.
+    expect(attrsOf(tool!).full_command).toContain("search-before-answer");
+    expect(tool!.startTimeUnixNano).toBe(String(1_787_685_286_000 * 1_000_000));
+  });
 });
 
 describe("given what the agent was running", () => {
-  /** @scenario "The agent's model is recorded when it can be trusted" */
+  /** @scenario "The trace claims nothing about which model answered" */
   it("says nothing about a model, because the bot row carries none", () => {
     const spans = spansOf([
       copilotEvent(transcriptRow({ activities: CHAT }), {
@@ -723,36 +793,36 @@ describe("given a conversation held while designing the agent", () => {
 
 describe("given a multi-turn conversation", () => {
   const MULTI_TURN_CHAT = [
-    userMessage(
-      "a1000000-1000-4000-8000-100000000001",
-      "Tell me about France.",
-      1_787_685_280_000,
-    ),
-    agentMessage(
-      "a1000000-1000-4000-8000-100000000002",
-      "France is a country in Western Europe.",
-      1_787_685_282_000,
-    ),
-    userMessage(
-      "a1000000-1000-4000-8000-100000000003",
-      "What is the capital?",
-      1_787_685_284_000,
-    ),
-    agentMessage(
-      "a1000000-1000-4000-8000-100000000004",
-      "Paris is the capital of France.",
-      1_787_685_286_000,
-    ),
-    userMessage(
-      "a1000000-1000-4000-8000-100000000005",
-      "What about Chile?",
-      1_787_685_288_000,
-    ),
-    agentMessage(
-      "a1000000-1000-4000-8000-100000000006",
-      "Santiago is the capital of Chile.",
-      1_787_685_290_000,
-    ),
+    userMessage({
+      id: "a1000000-1000-4000-8000-100000000001",
+      text: "Tell me about France.",
+      ms: 1_787_685_280_000,
+    }),
+    agentMessage({
+      id: "a1000000-1000-4000-8000-100000000002",
+      text: "France is a country in Western Europe.",
+      ms: 1_787_685_282_000,
+    }),
+    userMessage({
+      id: "a1000000-1000-4000-8000-100000000003",
+      text: "What is the capital?",
+      ms: 1_787_685_284_000,
+    }),
+    agentMessage({
+      id: "a1000000-1000-4000-8000-100000000004",
+      text: "Paris is the capital of France.",
+      ms: 1_787_685_286_000,
+    }),
+    userMessage({
+      id: "a1000000-1000-4000-8000-100000000005",
+      text: "What about Chile?",
+      ms: 1_787_685_288_000,
+    }),
+    agentMessage({
+      id: "a1000000-1000-4000-8000-100000000006",
+      text: "Santiago is the capital of Chile.",
+      ms: 1_787_685_290_000,
+    }),
   ];
 
   const spans = spansOf([

@@ -194,7 +194,7 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # misconfiguration produces unnamed conversations and total silence.
 
   @integration
-  Scenario: The agent's model is recorded when it can be trusted
+  Scenario: The trace claims nothing about which model answered
     Given the agent's settings have not changed since the conversation
     When the puller records the conversation
     Then the trace claims nothing about which model answered

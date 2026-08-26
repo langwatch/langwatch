@@ -249,9 +249,9 @@ interface ConversationGroup {
   /** Batch numbers seen, in the order applied. */
   batches: number[];
   /** True when the opening batch is absent, so the start is missing. */
-  incomplete: boolean;
+  isIncomplete: boolean;
   /** True when the conversation happened while designing the agent. */
-  designMode: boolean;
+  isDesignMode: boolean;
 }
 
 /** True when the batch numbers held skip one, e.g. 0 and 2 with no 1. */
@@ -431,8 +431,8 @@ function conversationGroupOf(params: {
     // that a conversation truncated at the front by the 30-day cleanup
     // reads as complete; `transcript_batches` still shows how many pieces
     // this is built from.
-    incomplete: hasBatchGap(batches),
-    designMode: isDesignModeConversation(activities),
+    isIncomplete: hasBatchGap(batches),
+    isDesignMode: isDesignModeConversation(activities),
   };
 }
 
@@ -608,7 +608,7 @@ interface ToolCall {
   arguments: string | null;
   startMs: number;
   endMs: number;
-  finished: boolean;
+  isFinished: boolean;
 }
 
 /**
@@ -628,7 +628,7 @@ interface ToolCallTrace {
   name: string;
   arguments: string | null;
   ms: number;
-  completed: boolean;
+  isCompleted: boolean;
 }
 
 /** The most human of the names the trace carries. */
@@ -676,7 +676,7 @@ function toolCallTraceOf(activity: Activity): ToolCallTrace | null {
       ? JSON.stringify(value.filledParameters)
       : null,
     ms,
-    completed: (value.toolCallStatus ?? "").toLowerCase() === "completed",
+    isCompleted: (value.toolCallStatus ?? "").toLowerCase() === "completed",
   };
 }
 
@@ -688,8 +688,14 @@ export function toolCallsOf(activities: Activity[]): ToolCall[] {
 
     const existing = byCallId.get(trace.callId);
     if (existing) {
+      // The first trace for a call seeds it, and that is safe here only
+      // because of what runs before: this walks `group.activities`, which is
+      // already time-ordered, and `toolCallTraceOf` refuses any trace it
+      // cannot date. An undated trace therefore never reaches this map, and
+      // among dated ones the earliest is always seen first — so the seed is
+      // the start, never a completion that happened to be stored above it.
       existing.endMs = Math.max(existing.endMs, trace.ms);
-      if (trace.completed) existing.finished = true;
+      if (trace.isCompleted) existing.isFinished = true;
       continue;
     }
     byCallId.set(trace.callId, {
@@ -698,7 +704,7 @@ export function toolCallsOf(activities: Activity[]): ToolCall[] {
       arguments: trace.arguments,
       startMs: trace.ms,
       endMs: trace.ms,
-      finished: trace.completed,
+      isFinished: trace.isCompleted,
     });
   }
   return [...byCallId.values()].sort((a, b) => a.startMs - b.startMs);
@@ -749,10 +755,10 @@ function conversationAttrs(params: {
       stringAttr("copilot_studio.transcript_batches", group.batches.join(",")),
     );
   }
-  if (group.incomplete) {
+  if (group.isIncomplete) {
     attrs.push(stringAttr("copilot_studio.conversation_incomplete", "true"));
   }
-  if (group.designMode) {
+  if (group.isDesignMode) {
     // The conversation happened while someone was building the agent rather
     // than using it. Recorded and labelled instead of filtered, because the
     // person testing their agent is exactly who wants to read the transcript.
@@ -840,7 +846,7 @@ function toolSpan(params: {
   if (call.arguments) {
     attrs.push(stringAttr("full_command", call.arguments));
   }
-  if (!call.finished) {
+  if (!call.isFinished) {
     // The tool started and never reported finishing. Common enough that the
     // validation script calls it normal, so it renders marked rather than
     // being held back or dropped.

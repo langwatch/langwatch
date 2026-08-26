@@ -793,7 +793,10 @@ describe("given several conversations written in the same instant", () => {
       conversationtranscriptid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       createdon: SAME_INSTANT,
     }),
-    transcriptRow({ conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", createdon: LATER }),
+    transcriptRow({
+      conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      createdon: LATER,
+    }),
   ];
 
   /**
@@ -834,7 +837,11 @@ describe("given several conversations written in the same instant", () => {
     // cursor that keeps every same-instant row but the saved id, the third
     // run answers with `row-a` again and the pair alternates forever without
     // `row-c` ever being read.
-    expect(seen).toEqual(["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"]);
+    expect(seen).toEqual([
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    ]);
   });
 
   it("advances the cursor strictly forward on every restart", async () => {
@@ -849,9 +856,18 @@ describe("given several conversations written in the same instant", () => {
     }
 
     expect(cursors).toEqual([
-      { createdon: SAME_INSTANT, conversationtranscriptid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
-      { createdon: SAME_INSTANT, conversationtranscriptid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
-      { createdon: LATER, conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
+      {
+        createdon: SAME_INSTANT,
+        conversationtranscriptid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      },
+      {
+        createdon: SAME_INSTANT,
+        conversationtranscriptid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+      {
+        createdon: LATER,
+        conversationtranscriptid: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      },
     ]);
   });
 
