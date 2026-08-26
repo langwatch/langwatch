@@ -62,7 +62,7 @@ describe("workflowStoreCore - branch convergence on connect", () => {
     /** @scenario Mutually exclusive branch outputs can converge on one input */
     it("accepts the second, converging connection", () => {
       store.setState({
-        nodes: forkNodes as unknown as Node[],
+        nodes: forkNodes,
         edges: [...forkEdges, edge("c1", "codeA", "out", "end", "answer")],
       });
 
@@ -87,7 +87,7 @@ describe("workflowStoreCore - branch convergence on connect", () => {
           node("x", "code"),
           node("y", "code"),
           node("end", "end"),
-        ] as unknown as Node[],
+        ],
         edges: [
           edge("e1", "entry", "q", "x", "in"),
           edge("e2", "entry", "q", "y", "in"),
@@ -110,7 +110,7 @@ describe("workflowStoreCore - branch convergence on connect", () => {
   describe("when the input has no source yet", () => {
     it("accepts the first connection unchanged", () => {
       store.setState({
-        nodes: forkNodes as unknown as Node[],
+        nodes: forkNodes,
         edges: forkEdges,
       });
 

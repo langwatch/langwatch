@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
 import { describeError, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import {
   type EvaluationV3Event,
   type ExecutionRequest,

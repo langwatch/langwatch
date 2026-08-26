@@ -38,7 +38,7 @@ import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-co
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
-} from "../utils/datasetUtils";
+} from "@langwatch/workflow-web";
 import { getEntryInputs } from "@langwatch/workflow-contract";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState } from "./History";

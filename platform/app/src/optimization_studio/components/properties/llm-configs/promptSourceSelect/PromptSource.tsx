@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { PromptSelectionButton } from "@langwatch/workflow-web";
 
 import { PromptListDrawer } from "~/components/prompts/PromptListDrawer";
-import { PromptSelectionButton } from "./ui/PromptSelectButton";
 
 type PromptSourceProps = {
   selectedPromptId?: string;

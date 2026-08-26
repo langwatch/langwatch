@@ -5,7 +5,7 @@ import { DatasetPreview } from "~/components/datasets/DatasetPreview";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "~/prompts";
-import { transposeColumnsFirstToRowsFirstWithId } from "../../../optimization_studio/utils/datasetUtils";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
 
 /**

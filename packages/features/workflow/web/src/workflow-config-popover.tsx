@@ -1,9 +1,9 @@
 import { Button, HStack, PopoverTrigger, Spacer, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { X } from "react-feather";
 import { Popover } from "@langwatch/design-system/popover";
 
-export function ConfigModal({
+export function WorkflowConfigPopover({
   open,
   onClose,
   title,
@@ -14,7 +14,7 @@ export function ConfigModal({
   onClose: () => void;
   title: string;
   unstyled?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const [localIsOpen, setLocalIsOpen] = useState(open);
 

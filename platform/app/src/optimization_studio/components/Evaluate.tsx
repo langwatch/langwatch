@@ -32,7 +32,7 @@ import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Entry } from "@langwatch/workflow-contract";
-import { trainTestSplit } from "../utils/datasetUtils";
+import { trainTestSplit } from "@langwatch/workflow-web";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { VersionToBeUsed } from "./VersionToBeUsed";
 

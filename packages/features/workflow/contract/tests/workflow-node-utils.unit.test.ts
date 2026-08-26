@@ -2,9 +2,8 @@
  * @vitest-environment node
  */
 
-import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { Field } from "@langwatch/workflow-contract";
+import type { Field, StudioEdge, StudioNode } from "@langwatch/workflow-contract";
 import { getInputsOutputs, getMappingSurfaceInputs } from "@langwatch/workflow-contract";
 
 // ---------------------------------------------------------------------------
@@ -24,7 +23,7 @@ interface EndInput {
 interface BuildWorkflowOptions {
   entryOutputs: EntryOutput[];
   endInputs?: EndInput[];
-  edges?: Edge[];
+  edges?: StudioEdge[];
 }
 
 function buildWorkflow({
@@ -32,10 +31,10 @@ function buildWorkflow({
   endInputs = [],
   edges = [],
 }: BuildWorkflowOptions): {
-  nodes: Node[];
-  edges: Edge[];
+  nodes: StudioNode[];
+  edges: StudioEdge[];
 } {
-  const nodes: Node[] = [
+  const nodes: StudioNode[] = [
     {
       id: "entry",
       type: "entry",
@@ -71,7 +70,11 @@ function buildWorkflow({
   return { nodes, edges };
 }
 
-function makeEdge(identifier: string, targetNodeId: string, edgeIndex: number): Edge {
+function makeEdge(
+  identifier: string,
+  targetNodeId: string,
+  edgeIndex: number,
+): StudioEdge {
   return {
     id: `edge-${edgeIndex}`,
     source: "entry",
@@ -80,10 +83,6 @@ function makeEdge(identifier: string, targetNodeId: string, edgeIndex: number): 
     targetHandle: `inputs.${identifier}`,
   };
 }
-
-// ---------------------------------------------------------------------------
-// getInputsOutputs — entry inputs
-// ---------------------------------------------------------------------------
 
 describe("getMappingSurfaceInputs", () => {
   describe("when entry node has wired fields", () => {
@@ -171,10 +170,6 @@ describe("getMappingSurfaceInputs", () => {
     });
   });
 });
-
-// ---------------------------------------------------------------------------
-// getInputsOutputs — end outputs (regression guard, end side is unaffected)
-// ---------------------------------------------------------------------------
 
 describe("getInputsOutputs", () => {
   describe("when end node declares inputs", () => {

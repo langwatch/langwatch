@@ -2,9 +2,13 @@
  * @vitest-environment node
  */
 
-import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { Component, StudioWorkflow } from "@langwatch/workflow-contract";
+import type {
+  Component,
+  StudioEdge,
+  StudioNode,
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import {
   canAutoMapAllFields,
   getWorkflowEntryOutputs,
@@ -17,15 +21,18 @@ describe("workflowFields", () => {
       id: string,
       type: string,
       behaveAs?: "evaluator",
-    ): Node<Component> =>
-      ({
-        id,
-        type,
-        position: { x: 0, y: 0 },
-        data: { behave_as: behaveAs },
-      }) as Node<Component>;
+    ): StudioNode<Component> => ({
+      id,
+      type,
+      position: { x: 0, y: 0 },
+      data: { behave_as: behaveAs },
+    });
 
-    const createEdge = (source: string, target: string, sourceHandle: string): Edge => ({
+    const createEdge = (
+      source: string,
+      target: string,
+      sourceHandle: string,
+    ): StudioEdge => ({
       id: `${source}-${target}`,
       source,
       target,
@@ -33,8 +40,8 @@ describe("workflowFields", () => {
     });
 
     it("returns false when output has no edges (unused)", () => {
-      const edges: Edge[] = [];
-      const nodes: Node<Component>[] = [createNode("entry", "entry")];
+      const edges: StudioEdge[] = [];
+      const nodes = [createNode("entry", "entry")];
 
       const result = isOutputConnectedToNonEvaluator("input", edges, nodes);
 
@@ -42,11 +49,8 @@ describe("workflowFields", () => {
     });
 
     it("returns false when output only connects to evaluator node", () => {
-      const nodes: Node<Component>[] = [
-        createNode("entry", "entry"),
-        createNode("eval1", "evaluator"),
-      ];
-      const edges: Edge[] = [createEdge("entry", "eval1", "outputs.input")];
+      const nodes = [createNode("entry", "entry"), createNode("eval1", "evaluator")];
+      const edges = [createEdge("entry", "eval1", "outputs.input")];
 
       const result = isOutputConnectedToNonEvaluator("input", edges, nodes);
 
@@ -54,11 +58,11 @@ describe("workflowFields", () => {
     });
 
     it("returns false when output only connects to node with behave_as evaluator", () => {
-      const nodes: Node<Component>[] = [
+      const nodes = [
         createNode("entry", "entry"),
         createNode("custom1", "custom", "evaluator"),
       ];
-      const edges: Edge[] = [createEdge("entry", "custom1", "outputs.input")];
+      const edges = [createEdge("entry", "custom1", "outputs.input")];
 
       const result = isOutputConnectedToNonEvaluator("input", edges, nodes);
 
@@ -66,11 +70,8 @@ describe("workflowFields", () => {
     });
 
     it("returns true when output connects to non-evaluator node", () => {
-      const nodes: Node<Component>[] = [
-        createNode("entry", "entry"),
-        createNode("sig1", "signature"),
-      ];
-      const edges: Edge[] = [createEdge("entry", "sig1", "outputs.input")];
+      const nodes = [createNode("entry", "entry"), createNode("sig1", "signature")];
+      const edges = [createEdge("entry", "sig1", "outputs.input")];
 
       const result = isOutputConnectedToNonEvaluator("input", edges, nodes);
 
@@ -78,12 +79,12 @@ describe("workflowFields", () => {
     });
 
     it("returns true when output connects to both evaluator and non-evaluator nodes", () => {
-      const nodes: Node<Component>[] = [
+      const nodes = [
         createNode("entry", "entry"),
         createNode("sig1", "signature"),
         createNode("eval1", "evaluator"),
       ];
-      const edges: Edge[] = [
+      const edges = [
         createEdge("entry", "sig1", "outputs.input"),
         createEdge("entry", "eval1", "outputs.input"),
       ];
@@ -94,12 +95,12 @@ describe("workflowFields", () => {
     });
 
     it("returns false when multiple evaluator nodes receive same output", () => {
-      const nodes: Node<Component>[] = [
+      const nodes = [
         createNode("entry", "entry"),
         createNode("eval1", "evaluator"),
         createNode("eval2", "evaluator"),
       ];
-      const edges: Edge[] = [
+      const edges = [
         createEdge("entry", "eval1", "outputs.input"),
         createEdge("entry", "eval2", "outputs.input"),
       ];
@@ -110,12 +111,12 @@ describe("workflowFields", () => {
     });
 
     it("checks correct output identifier", () => {
-      const nodes: Node<Component>[] = [
+      const nodes = [
         createNode("entry", "entry"),
         createNode("sig1", "signature"),
         createNode("eval1", "evaluator"),
       ];
-      const edges: Edge[] = [
+      const edges = [
         createEdge("entry", "sig1", "outputs.input"),
         createEdge("entry", "eval1", "outputs.expected_output"),
       ];

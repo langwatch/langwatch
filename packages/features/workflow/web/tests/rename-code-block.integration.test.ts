@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
+import { fieldSchema } from "@langwatch/workflow-contract";
 import { store as storeCreator, type WorkflowStore } from "@langwatch/workflow-web";
 
 function makeCodeNode({
@@ -26,7 +27,7 @@ function makeCodeNode({
       outputs,
       parameters: [{ identifier: "code", type: "code", value: code }],
     },
-  } as Node;
+  };
 }
 
 function makeEdge({
@@ -54,7 +55,7 @@ describe("rename code blocks", () => {
   let testStore: StoreApi<WorkflowStore>;
 
   beforeEach(() => {
-    testStore = createStore<WorkflowStore>(storeCreator as any);
+    testStore = createStore<WorkflowStore>(storeCreator);
   });
 
   describe("when renaming a code block via setNode", () => {
@@ -95,9 +96,8 @@ describe("rename code blocks", () => {
 
       const state = testStore.getState();
       const node = state.nodes.find((n) => n.id === "data_processor");
-      const codeParam = (node?.data.parameters as any[])?.find(
-        (p: any) => p.identifier === "code",
-      );
+      const parameters = fieldSchema.array().parse(node?.data.parameters);
+      const codeParam = parameters.find((parameter) => parameter.identifier === "code");
       expect(codeParam?.value).toContain("class DataProcessor(dspy.Module):");
     });
 
@@ -181,9 +181,8 @@ describe("rename code blocks", () => {
 
       const state = testStore.getState();
       const duplicate = state.nodes.find((n) => n.id !== "code1");
-      const codeParam = (duplicate?.data.parameters as any[])?.find(
-        (p: any) => p.identifier === "code",
-      );
+      const parameters = fieldSchema.array().parse(duplicate?.data.parameters);
+      const codeParam = parameters.find((parameter) => parameter.identifier === "code");
       expect(codeParam?.value).not.toContain("class Code1(dspy.Module):");
     });
 

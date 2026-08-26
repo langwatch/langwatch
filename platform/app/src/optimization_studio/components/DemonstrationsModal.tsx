@@ -14,7 +14,7 @@ import {
   fieldsToDatasetColumns,
   inMemoryDatasetToNodeDataset,
   transposeColumnsFirstToRowsFirstWithId,
-} from "../utils/datasetUtils";
+} from "@langwatch/workflow-web";
 
 export function DemonstrationsModal({
   open,

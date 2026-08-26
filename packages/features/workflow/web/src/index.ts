@@ -20,6 +20,8 @@ export * from "./utils/code-signature";
 export * from "./utils/evaluate-api-snippet";
 export * from "./utils/agent-node-data";
 export * from "./studio-dataset.utils";
+export { PromptSelectionButton } from "./prompt-selection-button";
+export { WorkflowConfigPopover } from "./workflow-config-popover";
 export * from "./code-agent-config";
 export * from "./llm-signature-node-factory";
 export * from "./code/python-providers";

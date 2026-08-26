@@ -1532,7 +1532,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       // This test uses the EXACT format from a real frontend request
       // Including the transposeColumnsFirstToRowsFirstWithId and JSON parsing steps
       const { transposeColumnsFirstToRowsFirstWithId } =
-        await import("~/optimization_studio/utils/datasetUtils");
+        await import("@langwatch/workflow-web");
 
       const datasetColumns: DatasetColumn[] = [
         { id: "input_0", name: "input", type: "string" },

@@ -39,7 +39,7 @@ import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Entry } from "@langwatch/workflow-contract";
 import { OPTIMIZERS } from "@langwatch/workflow-web";
-import { trainTestSplit } from "../utils/datasetUtils";
+import { trainTestSplit } from "@langwatch/workflow-web";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
 
 import { AddModelProviderKey } from "./AddModelProviderKey";

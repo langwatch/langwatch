@@ -37,7 +37,7 @@ import {
   datasetColumnsToFields,
   inMemoryDatasetToNodeDataset,
   transposeColumnsFirstToRowsFirstWithId,
-} from "../utils/datasetUtils";
+} from "@langwatch/workflow-web";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },

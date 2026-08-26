@@ -2,8 +2,7 @@
 // These components provide a reusable interface for defining and mapping variables
 // across Evaluations V3, Optimization Studio, and Prompt Playground.
 
-// Re-export from datasetUtils for convenience
-export { datasetColumnTypeToFieldType } from "~/optimization_studio/utils/datasetUtils";
+export { datasetColumnTypeToFieldType } from "@langwatch/workflow-web";
 export {
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,

@@ -10,7 +10,7 @@ import type { Entry } from "@langwatch/workflow-contract";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   transposeColumnsFirstToRowsFirstWithId,
-} from "../utils/datasetUtils";
+} from "@langwatch/workflow-web";
 
 export const useGetDatasetData = ({
   dataset,

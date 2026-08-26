@@ -9,7 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Agent } from "@langwatch/agent-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
 import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";

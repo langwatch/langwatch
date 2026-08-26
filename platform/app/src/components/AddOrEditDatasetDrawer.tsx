@@ -19,7 +19,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/utils/datasetUtils";
+import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web";
 import {
   type DatasetColumns,
   type DatasetRecordForm,

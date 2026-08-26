@@ -17,19 +17,18 @@ const node = (
   id: string,
   type: string,
   inputs: { identifier: string; type: string }[] = [],
-): Node =>
-  ({
-    id,
-    type,
-    position: { x: 0, y: 0 },
-    data: { name: id, inputs },
-  }) as unknown as Node;
+): Node => ({
+  id,
+  type,
+  position: { x: 0, y: 0 },
+  data: { name: id, inputs },
+});
 
 const baseNodes = [
   node("entry", "entry"),
   node("gate", "if_else"),
   node("codeA", "code"),
-] as unknown as Node[];
+];
 
 describe("workflowStoreCore - branch gate connections", () => {
   let store: StoreApi<WorkflowStore>;
@@ -71,7 +70,7 @@ describe("workflowStoreCore - branch gate connections", () => {
           node("entry", "entry"),
           node("gate", "if_else"),
           node("codeA", "code", [{ identifier: "gate", type: "bool" }]),
-        ] as unknown as Node[],
+        ],
         edges: [],
       });
 
@@ -95,7 +94,7 @@ describe("workflowStoreCore - branch gate connections", () => {
           node("entry", "entry"),
           node("gate", "if_else"),
           node("codeA", "code", [{ identifier: "question", type: "str" }]),
-        ] as unknown as Node[],
+        ],
         edges: [],
       });
 

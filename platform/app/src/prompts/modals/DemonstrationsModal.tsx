@@ -6,7 +6,7 @@ import type { PromptConfigFormValues } from "~/prompts";
 import {
   transposeColumnsFirstToRowsFirstWithId,
   transpostRowsFirstToColumnsFirstWithoutId,
-} from "../../optimization_studio/utils/datasetUtils";
+} from "@langwatch/workflow-web";
 
 type Demonstrations = PromptConfigFormValues["version"]["configData"]["demonstrations"];
 
