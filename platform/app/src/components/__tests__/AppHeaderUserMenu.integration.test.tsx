@@ -79,9 +79,7 @@ describe("AppHeaderUserMenu", () => {
       const user = userEvent.setup();
       renderMenu();
 
-      await user.click(
-        screen.getByRole("button", { name: /Open user menu/i }),
-      );
+      await user.click(screen.getByRole("button", { name: /Open user menu/i }));
       const trigger = await screen.findByText(/^Navigation \(/);
       expect(trigger.textContent).toContain("Product switcher");
 

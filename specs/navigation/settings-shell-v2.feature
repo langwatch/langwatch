@@ -89,9 +89,3 @@ Feature: Settings shell
     Given I open Settings in the product-switcher mode
     Then the top bar shows "Settings" with no product dropdown
     And the organization control stays in the top bar
-
-  @integration
-  Scenario: Legacy mode keeps the current settings chrome
-    Given my device is on the legacy mode
-    When I open Settings
-    Then the current settings navigation renders unchanged

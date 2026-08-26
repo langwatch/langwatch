@@ -1,8 +1,8 @@
 import { Box, HStack, type StackProps } from "@chakra-ui/react";
 import { NavigationV2Shell } from "../features/navigation/shell/NavigationV2Shell";
 import { useNavigationMode } from "../features/navigation/useNavigationMode";
-import { useRequiredSession } from "../hooks/useRequiredSession";
 import { usePublicEnv } from "../hooks/usePublicEnv";
+import { useRequiredSession } from "../hooks/useRequiredSession";
 import Head from "../utils/compat/next-head";
 import { AppHeaderUserMenu } from "./AppHeaderUserMenu";
 import { DashboardPageBody } from "./DashboardPageBody";

@@ -67,5 +67,4 @@ describe("sidebar menu density", () => {
       });
     });
   });
-
 });

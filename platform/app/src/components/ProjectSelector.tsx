@@ -7,10 +7,10 @@ import {
   type Project,
   type Team,
 } from "~/generated/prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { useRouter } from "~/utils/compat/next-router";
 import { buildProjectSwitchHref } from "~/utils/routes";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { Link } from "./ui/link";

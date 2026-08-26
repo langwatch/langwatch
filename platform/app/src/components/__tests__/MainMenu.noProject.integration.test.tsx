@@ -82,7 +82,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   </MemoryRouter>
 );
 
-const renderMenu = () => render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
+const renderMenu = () =>
+  render(<MainMenuSections showExpanded />, { wrapper: Wrapper });
 
 /** The grouped destinations only mount once their group is open. */
 const expandSimulations = async (user: ReturnType<typeof userEvent.setup>) => {

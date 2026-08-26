@@ -122,5 +122,4 @@ describe("useNavigationV2Tracking", () => {
       ).toEqual({ label: "Back", href: "/" });
     });
   });
-
 });
