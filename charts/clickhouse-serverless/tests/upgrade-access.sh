@@ -227,11 +227,17 @@ ac_unmeasured() {
 ac_assert_eq() {
   local label="$1" actual="$2" expected="$3"
   echo -e "${CYAN}[MEASURED ${CURRENT_AC}]${NC} $(ts) ${label}: got '${actual}', expected '${expected}'"
+  # NOTE: ac_fail RETURNS under KEEP_GOING instead of exiting, so each branch
+  # must return explicitly or the trailing pass() below would print a green
+  # line for the assertion that just went red. `return 0` (not 1) because
+  # `set -e` would abort the whole run on a non-zero return from a bare call.
   if [[ -z "${actual//[[:space:]]/}" ]]; then
     ac_fail "${label}: measured value is EMPTY (plan §5.2) — expected '${expected}'"
+    return 0
   fi
   if [[ "$actual" != "$expected" ]]; then
     ac_fail "${label}: expected '${expected}', got '${actual}'"
+    return 0
   fi
   pass "${CURRENT_AC} ${label}"
 }
@@ -239,13 +245,16 @@ ac_assert_eq() {
 ac_assert_contains() {
   local label="$1" haystack="$2" needle="$3"
   echo -e "${CYAN}[MEASURED ${CURRENT_AC}]${NC} $(ts) ${label}: looking for '${needle}' in:"
+  # See ac_assert_eq: ac_fail returns under KEEP_GOING, so return explicitly.
   if [[ -z "${haystack//[[:space:]]/}" ]]; then
     echo "    | <empty>"
     ac_fail "${label}: measured value is EMPTY (plan §5.2) — expected it to contain '${needle}'"
+    return 0
   fi
   printf '%s\n' "$haystack" | sed 's/^/    | /'
   if [[ "$haystack" != *"$needle"* ]]; then
     ac_fail "${label}: expected output to contain '${needle}'"
+    return 0
   fi
   pass "${CURRENT_AC} ${label}"
 }
@@ -269,14 +278,17 @@ all_image_pods() { ch_pods; keeper_pods; }
 # unreachable pod FAILS the AC and must not be recorded as "not reachable,
 # noted" — otherwise the AC passes precisely when the cluster is broken.
 require_all_pods_ready() {
-  local pod
+  local pod all_ready="yes"
   for pod in $(ch_pods); do
     if ! kc wait pod "$pod" --for=condition=Ready --timeout=120s >/dev/null 2>&1; then
       measure_allow_empty "pod $pod state (unreachable)" kc get pod "$pod" -o wide
+      # ac_fail returns under KEEP_GOING, so record it and suppress the summary
+      # pass below — "all pods Ready" must never print after one was not.
+      all_ready="no"
       ac_fail "pod ${pod} is not Ready — AC8 precondition. An unreachable pod FAILS this AC."
     fi
   done
-  pass "${CURRENT_AC} all ${REPLICAS} ClickHouse pods Ready"
+  [[ "$all_ready" == "yes" ]] && pass "${CURRENT_AC} all ${REPLICAS} ClickHouse pods Ready"
 }
 
 probe_query() {
@@ -470,23 +482,30 @@ ac7a_replicated_mode() {
 ac7b_config_merged() {
   local label="$1"
   ac "AC7b" "the keeper-backed access config actually merged (${label})"
-  local pod cfg
+  local pod cfg pod_ok
   for pod in $(ch_pods); do
     cfg="$(kc exec "$pod" -- cat /var/lib/clickhouse/preprocessed_configs/config.xml 2>&1)" || true
     echo -e "${CYAN}[MEASURED AC7b]${NC} $(ts) ${pod} preprocessed config, user_directories section:"
     printf '%s\n' "$cfg" | grep -A 12 '<user_directories' | sed 's/^/    | /' || echo "    | <no user_directories element>"
-    [[ -n "${cfg//[[:space:]]/}" ]] \
-      || ac_fail "${pod}: preprocessed config capture is EMPTY (plan §5.2)"
+    # ac_fail returns under KEEP_GOING, so track the verdict per pod: without
+    # this, a pod that failed one of the checks below still printed the green
+    # "applied the keeper-backed access configuration" line.
+    pod_ok="yes"
+    if [[ -z "${cfg//[[:space:]]/}" ]]; then
+      ac_fail "${pod}: preprocessed config capture is EMPTY (plan §5.2)"
+      continue
+    fi
     grep -qE '<user_directories[^>]+replace=' <<< "$cfg" \
-      || ac_fail "${pod}: merged config has no <user_directories> carrying a replace attribute"
+      || { ac_fail "${pod}: merged config has no <user_directories> carrying a replace attribute"; pod_ok="no"; }
     grep -q '<replicated>' <<< "$cfg" \
-      || ac_fail "${pod}: merged config has no <replicated> user directory"
+      || { ac_fail "${pod}: merged config has no <replicated> user directory"; pod_ok="no"; }
     grep -q '<zookeeper_path>/clickhouse/langwatch/access/</zookeeper_path>' <<< "$cfg" \
-      || ac_fail "${pod}: replicated user directory does not point at /clickhouse/langwatch/access/"
+      || { ac_fail "${pod}: replicated user directory does not point at /clickhouse/langwatch/access/"; pod_ok="no"; }
     if grep -q '<local_directory>' <<< "$cfg"; then
       ac_fail "${pod}: default <local_directory> survived the merge — @replace did not take effect"
+      pod_ok="no"
     fi
-    pass "AC7b ${pod} applied the keeper-backed access configuration"
+    [[ "$pod_ok" == "yes" ]] && pass "AC7b ${pod} applied the keeper-backed access configuration"
   done
 }
 
@@ -688,7 +707,7 @@ p1_3_seed() {
 
   ac "P1.3" "baseline capture — must be non-empty on the seed pod (AC1, AC8)"
   capture_entities "${RUN_DIR}/baseline" "baseline@${OLD_TAG}"
-  local cls verdict
+  local cls verdict seeded_ok="yes"
   BASELINE_VERDICTS=""
   for cls in $CLASSES; do
     verdict="$(classify_capture "${RUN_DIR}/baseline" "$cls")"
@@ -703,10 +722,14 @@ p1_3_seed() {
     # unrunnable. AC8's post-upgrade bar is UNCHANGED: present on EVERY pod, any
     # divergence a FAIL, asserted in p1_4_upgrade.
     if ! grep -q "$(probe_marker "$cls")" "${RUN_DIR}/baseline/${pod0}.${cls}" 2>/dev/null; then
+      # ac_fail returns under KEEP_GOING, so record the verdict rather than
+      # letting the green summary line below print over the top of it.
+      seeded_ok="no"
       ac_fail "baseline for entity class '${cls}' is absent on the seed pod ${pod0} (distribution verdict '${verdict}') — seeding itself failed, so every downstream assertion would be measuring nothing"
     fi
   done
-  pass "P1.3 baseline non-empty on seed pod ${pod0} for all five classes"
+  [[ "$seeded_ok" == "yes" ]] \
+    && pass "P1.3 baseline non-empty on seed pod ${pod0} for all five classes"
 
   ac "P1.3" "baseline distribution across replicas — old-binary before-state (recorded, not gated)"
   printf '%s' "$BASELINE_VERDICTS" | sed 's/^/    | /'
@@ -754,7 +777,7 @@ ac12_analyse() {
   ac "AC12" "the mixed-version window answers queries inside a bounded envelope"
   measure "AC12 sample log (epoch|queryRC|terminating|distinctImageIDs|readyPods)" cat "$log"
 
-  local mixed last_terminating=0 epoch rc term dist
+  local mixed last_terminating=0 epoch rc term dist envelope_ok="yes"
   mixed="$(awk -F'|' '$4 >= 2' "$log" | wc -l | tr -d ' ')"
   ac_assert_eq "samples observing 2+ distinct imageIDs (a genuinely mixed window)" \
     "$([[ "$mixed" -ge 1 ]] && echo yes || echo no)" "yes"
@@ -768,10 +791,14 @@ ac12_analyse() {
          && [[ $((epoch - last_terminating)) -le "$AC12_RECOVERY_S" ]]; then
         continue
       fi
+      # ac_fail returns under KEEP_GOING; without this the green envelope line
+      # below printed even though a failure fell outside the envelope.
+      envelope_ok="no"
       ac_fail "distributed query failed at epoch ${epoch} with no pod Terminating and more than ${AC12_RECOVERY_S}s after the last Terminating sample (distinct imageIDs=${dist}). AC12's envelope permits failure only inside the rolling window."
     fi
   done < "$log"
-  pass "AC12 every query failure fell inside the permitted rolling-restart envelope"
+  [[ "$envelope_ok" == "yes" ]] \
+    && pass "AC12 every query failure fell inside the permitted rolling-restart envelope"
 }
 
 # ─── AC8 / AC9 / AC22 / AC23 / AC18 / AC26 ───────────────────────────────────
@@ -839,13 +866,20 @@ ac22_absence_with_positive_control() {
     measure_allow_empty "denial case '${name}' for ${PROBE_USER} on ${target}" \
       probe_query "$target" "$query"
     local err="$MEASURED"
+    # Each `continue` below is because ac_fail RETURNS under KEEP_GOING: once a
+    # case has a terminal verdict, running the remaining assertions on it only
+    # emits duplicate reds for the same single defect.
     if [[ "$MEASURED_RC" -eq 0 ]]; then
       ac_fail "denial case '${name}' SUCCEEDED — ${PROBE_USER} is not denied. Output: ${err}"
+      continue
     fi
-    [[ -n "${err//[[:space:]]/}" ]] \
-      || ac_fail "denial case '${name}' produced an EMPTY error (plan §5.2) — a silent denial is not evidence of enforcement"
+    if [[ -z "${err//[[:space:]]/}" ]]; then
+      ac_fail "denial case '${name}' produced an EMPTY error (plan §5.2) — a silent denial is not evidence of enforcement"
+      continue
+    fi
     if grep -qE 'AUTHENTICATION_FAILED|Code: 516|UNKNOWN_USER' <<< "$err"; then
       ac_fail "denial case '${name}' returned an authentication/unknown-user error, not ACCESS_DENIED. A permission error from a nonexistent user is not evidence of enforcement. Verbatim: ${err}"
+      continue
     fi
     ac_assert_contains "denial case '${name}' names ACCESS_DENIED" "$err" "ACCESS_DENIED"
     ac_assert_contains "denial case '${name}' pins error code 497" "$err" "Code: 497"
@@ -857,12 +891,18 @@ ac18_cluster_secret() {
   measure "clusterSecret after upgrade" \
     kc get secret "$FULLNAME" -o jsonpath='{.data.clusterSecret}'
   local after="$MEASURED"
-  [[ -n "${CLUSTER_SECRET_BEFORE//[[:space:]]/}" ]] \
-    || ac_fail "clusterSecret BEFORE was never captured — nothing to compare against"
+  # ac_fail returns under KEEP_GOING; without these guards the green
+  # "byte-identical" line printed directly underneath its own failure.
+  if [[ -z "${CLUSTER_SECRET_BEFORE//[[:space:]]/}" ]]; then
+    ac_fail "clusterSecret BEFORE was never captured — nothing to compare against"
+    ac_unmeasured "AC18 is UNMEASURED: with no before-value there is nothing to compare the after-value to."
+    return 0
+  fi
   if [[ "$after" != "$CLUSTER_SECRET_BEFORE" ]]; then
     ac_fail "clusterSecret CHANGED across the upgrade. before='${CLUSTER_SECRET_BEFORE}' after='${after}'. Inter-node auth is broken cluster-wide while SHOW USERS on pod-0 still looks perfect."
+  else
+    pass "AC18 clusterSecret byte-identical across the upgrade"
   fi
-  pass "AC18 clusterSecret byte-identical across the upgrade"
 
   # --dry-run=server, never plain --dry-run: plain --dry-run is client-side in
   # Helm 3, `lookup` returns empty, the chart mints a fresh randAlphaNum 48, and
@@ -879,26 +919,30 @@ ac23_propagation_bound() {
   if [[ "$PROPAGATION_TIMEOUT_S" -gt "$PROPAGATION_CAP_S" ]]; then
     ac_fail "PROPAGATION_TIMEOUT_S=${PROPAGATION_TIMEOUT_S} exceeds the AC23 cap of ${PROPAGATION_CAP_S}s. A self-chosen threshold with no cap is satisfiable by writing 600."
   fi
-  local pod0 probe_name start elapsed worst=0 other seen
+  local pod0 probe_name start elapsed worst=0 other seen converged
   pod0="$(ch_pods | head -1)"
   probe_name="up_prop_$(date -u +%s)"
   start="$(date -u +%s)"
   ch_query "$pod0" "CREATE USER ${probe_name} IDENTIFIED WITH no_password"
   for other in $(ch_pods | tail -n +2); do
     seen=""
+    converged="no"
     while :; do
       elapsed=$(( $(date -u +%s) - start ))
       seen="$(ch_query "$other" "SELECT count() FROM system.users WHERE name = '${probe_name}'" 2>/dev/null || echo "")"
       echo "    | $(ts) t+${elapsed}s ${other}: system.users count for ${probe_name} = '${seen:-<error>}'"
-      [[ "$seen" == "1" ]] && break
+      if [[ "$seen" == "1" ]]; then converged="yes"; break; fi
       if [[ "$elapsed" -ge "$PROPAGATION_TIMEOUT_S" ]]; then
         ch_query "$pod0" "DROP USER IF EXISTS ${probe_name}" >/dev/null 2>&1 || true
+        # ac_fail returns under KEEP_GOING: break the poll and suppress the
+        # "converged" line, which would otherwise print for a timeout.
         ac_fail "${other} did not see ${probe_name} within the enforced bound of ${PROPAGATION_TIMEOUT_S}s (elapsed ${elapsed}s). Last measured value: '${seen:-<error>}'."
+        break
       fi
       sleep 1
     done
     [[ "$elapsed" -gt "$worst" ]] && worst="$elapsed"
-    pass "AC23 ${other} converged in ${elapsed}s"
+    [[ "$converged" == "yes" ]] && pass "AC23 ${other} converged in ${elapsed}s"
   done
   ch_query "$pod0" "DROP USER IF EXISTS ${probe_name}" >/dev/null 2>&1 || true
   info "AC23 worst measured propagation: ${worst}s (bound ${PROPAGATION_TIMEOUT_S}s, cap ${PROPAGATION_CAP_S}s)"
@@ -925,9 +969,13 @@ ac26_idempotency() {
   measure "restart counts before the second upgrade" restart_counts
   local restarts_before="$MEASURED"
   measure "pod identities (uid@created) before the second upgrade" pod_identities
-  local identities_before="$MEASURED"
+  local identities_before="$MEASURED" idempotent="yes"
 
-  upgrade_to_tag "$NEW_TAG" || ac_fail "the second, identical helm upgrade FAILED"
+  if ! upgrade_to_tag "$NEW_TAG"; then
+    ac_fail "the second, identical helm upgrade FAILED"
+    ac_unmeasured "the rest of AC26 (pod identity and restart-count comparison) is UNMEASURED — the second upgrade never completed, so there is no after-state to compare."
+    return 0
+  fi
   wait_topology_ready
 
   measure "restart counts after the second upgrade" restart_counts
@@ -935,6 +983,7 @@ ac26_idempotency() {
   measure "pod identities (uid@created) after the second upgrade" pod_identities
   local identities_after="$MEASURED"
   if [[ "$identities_after" != "$identities_before" ]]; then
+    idempotent="no"
     ac_fail "the second identical upgrade REPLACED pods — the StatefulSet re-rolled. before:
 ${identities_before}
 after:
@@ -947,21 +996,25 @@ ${restarts_before}
 after:
 ${restarts_after}
 That is a FAIL, not a cosmetic difference: it means every upgrade is two rolling restarts."
+    idempotent="no"
   fi
-  pass "AC26 no pod restarts and no pod replacement beyond the first pass"
+  [[ "$idempotent" == "yes" ]] \
+    && pass "AC26 no pod restarts and no pod replacement beyond the first pass"
 
   capture_entities "${RUN_DIR}/post-second" "post-second-upgrade@${NEW_TAG}"
-  local pod cls
+  local pod cls no_drift="yes"
   for pod in $(ch_pods); do
     for cls in $CLASSES; do
       measure_allow_empty "diff first vs second upgrade pass, ${cls} on ${pod}" \
         diff -u "${RUN_DIR}/post-upgrade/${pod}.${cls}" "${RUN_DIR}/post-second/${pod}.${cls}"
       if [[ "$MEASURED_RC" -ne 0 ]]; then
         ac_fail "a second identical upgrade changed entity class '${cls}' on ${pod} — duplicated or drifted access entities. Diff printed verbatim above."
+        no_drift="no"
       fi
     done
   done
-  pass "AC26 no duplicated or drifted access entities after the second pass"
+  [[ "$no_drift" == "yes" ]] \
+    && pass "AC26 no duplicated or drifted access entities after the second pass"
 }
 
 # ─── P1.4 — the upgrade ──────────────────────────────────────────────────────
@@ -1059,8 +1112,11 @@ p1_5_rollback() {
 
   ac "AC15a" "helm rollback to the old revision replays the stored manifests"
   measure "helm history before rollback" hc history "$RELEASE"
-  hc rollback "$RELEASE" "${OLD_REVISION:-1}" --wait --timeout "${TIMEOUT}s" \
-    || ac_fail "helm rollback to revision ${OLD_REVISION:-1} FAILED"
+  if ! hc rollback "$RELEASE" "${OLD_REVISION:-1}" --wait --timeout "${TIMEOUT}s"; then
+    ac_fail "helm rollback to revision ${OLD_REVISION:-1} FAILED"
+    ac_unmeasured "the whole of P1.5 (AC15a and AC15b) is UNMEASURED — the rollback never completed, so the cluster never reached the state these ACs describe."
+    return 0
+  fi
   wait_topology_ready
   ac7a_replicated_mode "after helm rollback"
   ac20_image_digest "$OLD_IMAGE_ID" "after helm rollback"
@@ -1074,7 +1130,11 @@ p1_5_rollback() {
   upgrade_to_tag "$NEW_TAG" >/dev/null || harness_error "could not return to ${NEW_TAG} before AC15b"
   wait_topology_ready
   ac "AC15b" "downgrade via helm upgrade --set image.tag=${OLD_TAG}"
-  upgrade_to_tag "$OLD_TAG" || ac_fail "helm upgrade back to ${OLD_TAG} FAILED"
+  if ! upgrade_to_tag "$OLD_TAG"; then
+    ac_fail "helm upgrade back to ${OLD_TAG} FAILED"
+    ac_unmeasured "the rest of AC15b is UNMEASURED — the downgrade never completed, so the cluster is not on ${OLD_TAG} and any access-state reading would describe the wrong release."
+    return 0
+  fi
   wait_topology_ready
   ac7a_replicated_mode "after helm upgrade to ${OLD_TAG}"
   ac20_image_digest "$OLD_IMAGE_ID" "after helm upgrade to ${OLD_TAG}"
@@ -1158,19 +1218,25 @@ p1_6_keeper_quorum() {
     ac_unmeasured "skipping the ${PROBE_USER} recovery poll — precondition absent (see above). Keeper quorum WAS restored to ${REPLICAS} replicas and the pods went Ready; what is unmeasured is whether a surviving SQL user would regain function, because no SQL user survived to ask."
     return 0
   fi
-  local start elapsed out
+  local start elapsed out recovered="no"
   start="$(date -u +%s)"
   while :; do
     elapsed=$(( $(date -u +%s) - start ))
     out="$(probe_query "$target" "SELECT 1" 2>&1 || true)"
     echo "    | $(ts) t+${elapsed}s ${PROBE_USER} SELECT 1 -> '${out}'"
-    [[ "$out" == "1" ]] && break
+    if [[ "$out" == "1" ]]; then recovered="yes"; break; fi
     if [[ "$elapsed" -ge "$KEEPER_RECOVERY_TIMEOUT_S" ]]; then
+      # ac_fail RETURNS under KEEP_GOING rather than exiting, so this loop must
+      # break itself. Without the break it polls forever past its own budget,
+      # and without the `recovered` flag the pass() below would print green for
+      # the timeout it just reported red.
       ac_fail "${PROBE_USER} did not recover within ${KEEPER_RECOVERY_TIMEOUT_S}s of quorum restoration, with no manual step taken. Last observed: '${out}'."
+      break
     fi
     sleep 5
   done
-  pass "AC19 full function returned ${elapsed}s after quorum restoration, no manual step"
+  [[ "$recovered" == "yes" ]] \
+    && pass "AC19 full function returned ${elapsed}s after quorum restoration, no manual step"
 }
 
 # ─── P1.7 — the 1 -> 3 transition (AC11, AC25) ───────────────────────────────
