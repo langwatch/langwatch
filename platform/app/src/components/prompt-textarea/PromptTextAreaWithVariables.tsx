@@ -23,7 +23,10 @@ import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
 import { useTemplateLogicMenu } from "./hooks/useTemplateLogicMenu";
 import { useTextareaResize } from "./hooks/useTextareaResize";
 import { useVariableMenu } from "./hooks/useVariableMenu";
-import { extractLiquidVariables, tokenizeLiquidTemplate } from "./liquidTokenizer";
+import {
+  extractLiquidVariables,
+  tokenizeLiquidTemplate,
+} from "@langwatch/prompt-contract";
 import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
   findJustCompletedVariable,

@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { TabIdProvider } from "@langwatch/prompt-web";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -9,7 +10,6 @@ import {
   getStoreForTesting,
   type TabData,
 } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
-import { TabIdProvider } from "../../prompt-browser/ui/TabContext";
 import { PromptPlaygroundChatProvider } from "../PromptPlaygroundChatContext";
 import { SyncedChatInput } from "../SyncedChatInput";
 

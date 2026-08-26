@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractLiquidVariables } from "../liquidTokenizer";
+import { extractLiquidVariables } from "@langwatch/prompt-contract";
 
 describe("extractLiquidVariables()", () => {
   describe("when text contains variables inside Liquid tags", () => {

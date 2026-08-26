@@ -11,9 +11,9 @@
  * - Proceed button triggers onProceed callback
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "@langwatch/scenario-web";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../ScenarioWelcomeScreen";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

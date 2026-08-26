@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
+import { useScenarioLabelFilter as useLabelFilter } from "@langwatch/scenario-web";
 import { describe, expect, it } from "vitest";
-import { useLabelFilter } from "../useLabelFilter";
 
 describe("useLabelFilter()", () => {
   describe("allLabels extraction", () => {

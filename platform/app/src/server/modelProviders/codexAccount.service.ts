@@ -1,11 +1,11 @@
 import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
 import {
   CODEX_OAUTH_CLIENT_ID,
   CODEX_OAUTH_ISSUER,
   CODEX_VERIFICATION_URL,
   type CodexTokenKeys,
-} from "./codexAccount.schema";
+} from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 
 /**
  * Sign in with your OpenAI account for the Codex provider, so requests bill

@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
+import { useScenarioSelection } from "@langwatch/scenario-web";
 import { describe, expect, it } from "vitest";
-import { useScenarioSelection } from "../useScenarioSelection";
 
 describe("useScenarioSelection()", () => {
   describe("toggle()", () => {

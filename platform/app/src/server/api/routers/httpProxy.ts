@@ -12,8 +12,8 @@ import {
   LATEST_SPEC_VERSION,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
+import { buildHttpNodeParameters } from "@langwatch/agent-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
-import { buildHttpNodeParameters } from "~/server/agents/http-node";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   buildTraceparentHeader,

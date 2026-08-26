@@ -1,6 +1,6 @@
+import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
 import type { Evaluation } from "~/server/tracer/types";
 import { safeJsonParse } from "~/utils/safeJsonParse";
-import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
  * ClickHouse evaluation_runs row shape (PascalCase, matching the table schema).

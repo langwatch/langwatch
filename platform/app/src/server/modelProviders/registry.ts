@@ -1,6 +1,6 @@
 import { z } from "zod";
+import { codexTokenKeysSchema } from "@langwatch/model-provider-contract";
 import type { ModelProvider } from "~/generated/prisma/client";
-import { codexTokenKeysSchema } from "./codexAccount.schema";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";
 import type { CustomModelEntry } from "./customModel.schema";
 import type { LLMModelEntry } from "./llmModels.types";

@@ -23,10 +23,12 @@ import {
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import type { App } from "~/server/app-layer/app";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { getInputsOutputs } from "@langwatch/workflow-contract";
+import {
+  getInputsOutputs,
+  normalizeWorkflowLlmParameters,
+} from "@langwatch/workflow-contract";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
@@ -1105,10 +1107,7 @@ async function hydrateLlmParameters({
       // Use existing value if present, otherwise fall back to default_llm or { model }.
       // Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
       const rawBaseValue = existingValue ?? defaultLlm ?? { model };
-      // Cast through unknown then to the expected intersection type — rawBaseValue is opaque
-      // Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
+      const normalizedBase = normalizeWorkflowLlmParameters(rawBaseValue);
 
       // Guarantee top-level `model` — partial existingValue (e.g. only `temperature`) would
       // otherwise pass through without one, diverging from addEnvs.ts which derives model via

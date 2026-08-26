@@ -29,7 +29,7 @@ type HttpNodeData = {
 };
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import { buildHttpNodeParameters } from "~/server/agents/http-node";
+import { buildHttpNodeParameters } from "@langwatch/agent-contract";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import { buildWorkflowLlmConfig } from "@langwatch/workflow-contract";

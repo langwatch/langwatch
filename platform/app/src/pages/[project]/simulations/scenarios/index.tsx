@@ -3,27 +3,27 @@
 // Internal pages don't need to be server rendering
 
 import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
+import {
+  ScenarioArchiveDialog,
+  ScenarioBatchActionBar as BatchActionBar,
+  ScenarioEmptyState,
+  ScenarioLabelFilter as LabelFilterDropdown,
+  ScenarioWelcomeModal,
+  ScenarioWelcomeScreen,
+  useNewScenarioFlow,
+  useScenarioLabelFilter as useLabelFilter,
+  useScenarioSelection,
+} from "@langwatch/scenario-web";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { BatchActionBar } from "~/components/scenarios/BatchActionBar";
-import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
-import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
-import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
-import {
-  ScenarioWelcomeModal,
-  ScenarioWelcomeScreen,
-} from "~/components/scenarios/ScenarioWelcomeScreen";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import type { Scenario } from "~/generated/prisma/client";
-import { useLabelFilter } from "~/hooks/scenarios/useLabelFilter";
-import { useNewScenarioFlow } from "~/hooks/scenarios/useNewScenarioFlow";
-import { useScenarioSelection } from "~/hooks/scenarios/useScenarioSelection";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";

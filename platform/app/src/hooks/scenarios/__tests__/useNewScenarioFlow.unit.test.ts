@@ -12,8 +12,8 @@
  * - Dismiss welcome modal via onOpenChange
  */
 import { act, renderHook } from "@testing-library/react";
+import { useNewScenarioFlow } from "@langwatch/scenario-web";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useNewScenarioFlow } from "../useNewScenarioFlow";
 
 const WELCOME_SEEN_KEY = "langwatch:scenarios:welcomeSeen";
 

@@ -12,16 +12,20 @@
  * render for real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { TabIdProvider, useIsOverflowing, useTabId } from "@langwatch/prompt-web";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Tab } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptTabStrip } from "../PromptTabStrip";
 import { usePromptBrowserTabController } from "../tab/usePromptBrowserTabController";
 import { DraggableTabsBrowser } from "../ui/DraggableTabsBrowser";
-import { useTabId } from "../ui/TabContext";
-import { useIsOverflowing } from "../useIsOverflowing";
 
-vi.mock("../useIsOverflowing", () => ({ useIsOverflowing: vi.fn() }));
+vi.mock("@langwatch/prompt-web", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/prompt-web")>(
+    "@langwatch/prompt-web",
+  );
+  return { ...actual, useIsOverflowing: vi.fn() };
+});
 
 vi.mock("../switcher/PromptTabSwitcher", () => ({
   PromptTabSwitcher: ({ isStripOverflowing }: { isStripOverflowing: boolean }) => (

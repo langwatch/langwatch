@@ -122,7 +122,7 @@ describe.skipIf(!hasCredentialsSecret)(
       // failure it reproduces is the REPORTED one (the litellm-params
       // codex backstop), not a different failure like "provider not
       // found" that would happen to also mark the prefetch unsuccessful.
-      // codexTokenKeysSchema (codexAccount.schema.ts) requires the full
+      // The Codex token schema requires the full
       // claims-derived key set, not just the two token fields — mirrors
       // CodexAccountService.toKeys().
       await ModelProviderService.create(prisma).updateModelProvider({

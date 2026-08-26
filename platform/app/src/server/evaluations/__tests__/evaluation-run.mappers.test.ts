@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
 import type { Evaluation } from "~/server/tracer/types";
 import type { ClickHouseEvaluationRunRow } from "../evaluation-run.mappers";
 import {
@@ -7,7 +8,6 @@ import {
   mapEsEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
 } from "../evaluation-run.mappers";
-import type { TraceEvaluation } from "../evaluation-run.types";
 
 // ---------------------------------------------------------------------------
 // Fixtures

@@ -22,9 +22,9 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { TabIdProvider } from "@langwatch/prompt-web";
 import React from "react";
 import { PromptBrowserTab } from "../tab/PromptBrowserTab";
-import { TabIdProvider } from "./TabContext";
 
 // Context for managing drag state and callbacks
 /**
