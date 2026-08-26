@@ -188,6 +188,18 @@ Feature: Going live with your own identity provider, without asking us
     Then the operational projection subscribes to every member
     And subscribes to nothing outside the union
 
+  # The answers are three and the provisioning question is two: an arrival is
+  # provisioned unless the answer is that nobody new gets in. Asking for
+  # approval provisions too, because the request an administrator answers has
+  # to be ABOUT somebody. The fold read this as "only admit provisions", so
+  # the middle answer routed sign-ins and then dropped every arrival.
+  @unit
+  Scenario: Each answer says whether an arrival is provisioned
+    Given the three answers a connection can give about who it admits
+    Then joining automatically and asking for approval both provision the
+    arrival
+    And only refusing provisions nobody
+
   @unit
   Scenario: An arrival on a connection that asks keeps the account and waits
     Given a connection whose answer is that arrivals wait for approval

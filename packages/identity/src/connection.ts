@@ -1153,10 +1153,20 @@ export function reduceSsoConnection({
       // learn the new one. It is a derived copy, never a second source of
       // truth: `arrivalPolicy` is what a reader asks, through
       // `ssoArrivalPolicy` below.
+      //
+      // NOT `=== "admit"`, which is what it said and what silently broke the
+      // middle answer. `allowsJit` asks "may an unmatched subject be
+      // provisioned", and `request` provisions: the account is created and a
+      // request to join stands beside it, because an administrator answering
+      // a request needs somebody to answer ABOUT. Only `refuse` provisions
+      // nobody, so only `refuse` is false here. With `=== "admit"`, an
+      // organization that chose "they ask, you approve" got a connection that
+      // routed sign-ins and then provisioned nothing — no account, no
+      // request, and nobody to approve.
       return {
         ...touched,
         arrivalPolicy: fact.data.policy,
-        allowsJit: fact.data.policy === "admit",
+        allowsJit: fact.data.policy !== "refuse",
       };
   }
 }

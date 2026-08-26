@@ -68,11 +68,18 @@ export const joinResolverSchema = z.object({
 export type JoinResolver = z.infer<typeof joinResolverSchema>;
 
 /**
- * How the requester's domain was matched. One value today; the field exists
- * because a second rule (a claimed-and-verified connection domain, say) would
- * otherwise be indistinguishable on the audit page from this one.
+ * How the requester's domain was matched. The second rule this field was
+ * built for is here: `sso-connection-domain` is somebody who arrived THROUGH
+ * a connection, on a domain that connection proved, and whose answer to "who
+ * gets in" was that arrivals wait for approval. Nobody typed a request — the
+ * sign-in made it — so the audit page must be able to say which of the two
+ * this was, and an administrator reading a queue must be able to tell a
+ * colleague who asked from a colleague their identity provider sent.
  */
-export const JOIN_MATCH_KINDS = ["verified-identifier-domain"] as const;
+export const JOIN_MATCH_KINDS = [
+  "verified-identifier-domain",
+  "sso-connection-domain",
+] as const;
 export const joinMatchKindSchema = z.enum(JOIN_MATCH_KINDS);
 export type JoinMatchKind = z.infer<typeof joinMatchKindSchema>;
 

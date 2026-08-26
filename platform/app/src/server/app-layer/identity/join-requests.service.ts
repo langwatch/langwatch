@@ -307,6 +307,57 @@ export class JoinRequestsService {
   }
 
   /**
+   * Somebody arrived through a connection whose answer is that arrivals wait.
+   *
+   * NOT `request()` above, and the difference is which door decided. That one
+   * re-derives the offer from the caller's own verified address and refuses
+   * an organization that never offered, because the caller is a person typing
+   * an organization's name. Here nobody typed anything: they signed in
+   * through an identity provider, on a domain that connection PROVED, and the
+   * connection's own arrivals answer already said they may come in but not
+   * unapproved. Re-asking the organization's join policy would be asking the
+   * wrong door about the wrong population — an organization closed to
+   * strangers off the internet has said nothing about its own staff.
+   *
+   * Best-effort by return value rather than by exception: the account exists
+   * either way, and a sign-in that worked must not be turned into a failure
+   * because the queue refused a duplicate.
+   */
+  async requestFromSsoArrival({
+    userId,
+    organizationId,
+    domain,
+  }: {
+    userId: string;
+    organizationId: string;
+    domain: string;
+  }): Promise<{ joinRequestId: string } | null> {
+    const joinRequestId = newJoinRequestId();
+    const occurredAtMs = this.now();
+    await this.deps.requests.requestJoin({
+      tenantId: organizationId,
+      organizationId,
+      joinRequestId,
+      commandId: newJoinRequestCommandId(),
+      occurredAtMs,
+      // The sign-in made this, not a person, and the audit page says so.
+      actor: { type: "system", id: null },
+      userId,
+      domain,
+      matchedVia: "sso-connection-domain",
+      expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
+    });
+
+    await this.deps.notifier.requestArrived({
+      joinRequestId,
+      organizationId,
+      requesterUserId: userId,
+      domain,
+    });
+    return { joinRequestId };
+  }
+
+  /**
    * Ask one organization to let you in.
    *
    * The organization has to have been OFFERED — the service re-derives that

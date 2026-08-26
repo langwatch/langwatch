@@ -3,6 +3,7 @@ import {
   type SsoConnectionCommand,
   type SsoConnectionFactInput,
   type SsoSelfServeContext,
+  type SsoConnectionLifecycleState,
 } from "@langwatch/identity";
 import { beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "../crypto/pkce";
@@ -28,7 +29,6 @@ import {
 import {
   StubBreakGlassReads,
   StubMembers,
-  StubRouting,
   StubTestSignIns,
 } from "./support/in-memory-self-serve";
 
@@ -164,16 +164,6 @@ const refused = (): never => {
 };
 
 let connections: InMemoryConnections;
-/**
- * Whether the organization is actually being SENT to the connection.
- *
- * Held as a variable rather than built inline because it is the one seam a
- * removal reads: a teardown owes its grace to the people signing in through
- * the connection, so an organization routing off it gets the week and one
- * that is not gets a deadline of now. A scenario about either says which it
- * is by flipping this.
- */
-let routing: StubRouting;
 let breakGlass: StubBreakGlassBindings;
 let licenseAuthority: StubLicenseAuthority;
 let context: StubContext;
@@ -188,7 +178,6 @@ let selfServe: SsoSelfServeService;
 
 beforeEach(() => {
   connections = new InMemoryConnections();
-  routing = new StubRouting(false);
   breakGlass = new StubBreakGlassBindings(true);
   licenseAuthority = new StubLicenseAuthority(true);
   context = new StubContext(SELF_HOSTED_LICENSED);
@@ -237,7 +226,6 @@ beforeEach(() => {
     testSignIns: new StubTestSignIns(),
     breakGlass: new StubBreakGlassReads(),
     members: new StubMembers(),
-    routing,
     now: () => clock,
   });
 });
@@ -1158,7 +1146,6 @@ describe("self-serve single sign-on setup", () => {
         testSignIns: new StubTestSignIns(),
         breakGlass: new StubBreakGlassReads(),
         members: new StubMembers(),
-        routing: new StubRouting(false),
         now: () => clock,
       });
       connectionService = new SsoConnectionService(
@@ -1277,10 +1264,9 @@ describe("removing a connection from the setup page", () => {
   /** @scenario "An administrator removes their own live connection on teardown's terms" */
   it("schedules a live connection's removal with teardown's grace, and answers another organization as if it did not exist", async () => {
     const graceMs = 7 * 24 * 60 * 60 * 1000;
+    // The grace exists for the people signing in through the connection, and
+    // a connection that is ON is what is carrying them.
     seedOwnActiveConnection();
-    // The grace exists for the people signing in through the connection, so
-    // it is only owed while the organization is being sent to it.
-    routing.set(true);
 
     await selfServe.removeConnection({
       organizationId: ORG,
@@ -1310,11 +1296,11 @@ describe("removing a connection from the setup page", () => {
       );
   });
 
-  /** @scenario "A removal nothing routes off is scheduled for now, not next week" */
-  it("schedules a removal nothing routes off for the moment of the ask", async () => {
-    seedOwnActiveConnection();
-    // Nobody is being sent to it, so the week protects nobody.
-    routing.set(false);
+  /** @scenario "A removal of a connection that is carrying nobody is scheduled for now" */
+  it("schedules a removal of a connection that carries nobody for the moment of the ask", async () => {
+    // Paused, so sign-in through it is already off and nobody is being sent
+    // to it. The week would protect nobody.
+    seedOwnActiveConnection({ state: "SUSPENDED" });
 
     await selfServe.removeConnection({
       organizationId: ORG,
@@ -1384,12 +1370,13 @@ describe("taking a domain back out", () => {
  *  walked through activation, because these tests are about leaving. */
 function seedOwnActiveConnection({
   verifiedDomains = [],
-}: { verifiedDomains?: string[] } = {}): void {
+  state = "ACTIVE",
+}: { verifiedDomains?: string[]; state?: SsoConnectionLifecycleState } = {}): void {
   connections.seed({
     connectionId: CONNECTION,
     organizationId: ORG,
     type: "oidc",
-    state: "ACTIVE",
+    state,
     claimedDomains: [],
     domainClaims: [],
     approvedDomains: [],

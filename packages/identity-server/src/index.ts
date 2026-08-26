@@ -175,6 +175,7 @@ export {
   grandfatheredSsoConnectionId,
   newSsoBreakGlassBindingId,
   newSsoConnectionCommandId,
+  looksLikeSsoConnectionId,
   newSsoConnectionId,
 } from "./sso-connection-id";
 export type { SsoConnectionLedger } from "./sso-connection-ledger";

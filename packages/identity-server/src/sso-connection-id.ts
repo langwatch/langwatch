@@ -17,6 +17,23 @@ export function newSsoConnectionId(): string {
   return generate("ssoc").toString();
 }
 
+/**
+ * Whether a string is SHAPED like a connection id.
+ *
+ * A pre-filter and never the decision: what settles it is the row. better-auth
+ * stores the connection id as an account's provider, so every OAuth account
+ * the deployment mints — google, github, the brokered one — passes the same
+ * seam as a connection arrival, and asking the database about each of them is
+ * a round trip to learn "no". The prefix is a persisted contract stated at the
+ * top of this file, so reading it here costs nothing and commits to nothing.
+ *
+ * The environment prefixes ksuids (`local_ssoc_...`), and `ssocmd_` is a
+ * different form, so the underscore on both sides is load-bearing.
+ */
+export function looksLikeSsoConnectionId(value: string): boolean {
+  return /(?:^|_)ssoc_/.test(value);
+}
+
 /** A live ops or self-service action's command id. */
 export function newSsoConnectionCommandId(): string {
   return generate("ssocmd").toString();
