@@ -157,7 +157,11 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         targetName: "gpt-5-mini",
       });
       expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
-      expect(outcome).toEqual({ nextCursor: null, eventCount: 2 });
+      expect(outcome).toEqual({
+        nextCursor: null,
+        eventCount: 2,
+        errorCount: 0,
+      });
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
