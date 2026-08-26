@@ -135,9 +135,9 @@ type Pool struct {
 	piBinaryPath       string
 	runner             app.Runner
 	// agentsTemplate is the shared /workspace/AGENTS.md read ONCE at New; each
-	// spawn only does the per-worker ${LANGWATCH_ENDPOINT} ReplaceAll and never a
-	// disk read. Empty if the file was unreadable at startup — a spawn then fails
-	// with a clear error rather than crash-looping the whole service at boot.
+	// spawn writes these bytes through unchanged and never reads disk for them.
+	// Always populated: New fails when the file is unreadable, so no Pool
+	// reaches a spawn without the system prompt it has to write.
 	agentsTemplate string
 
 	telemetry *telemetry.Telemetry
@@ -182,8 +182,8 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 		return nil, fmt.Errorf("mkdir sessions root: %w", err)
 	}
 	// AGENTS.md + skills are EMBEDDED in the binary (internal/assets), not seeded
-	// into /workspace by the entrypoint. Read the template once (only the per-worker
-	// ${LANGWATCH_ENDPOINT} ReplaceAll runs at spawn) and materialize the skills tree
+	// into /workspace by the entrypoint. Read the template once (a spawn writes it
+	// through unchanged) and materialize the skills tree
 	// onto disk under WorkspaceRoot/skills so each worker's opencode can discover it;
 	// setupWorkerHome symlinks each worker home at that path. Both are fatal on
 	// failure — a manager that can't provide the system prompt or skills must not

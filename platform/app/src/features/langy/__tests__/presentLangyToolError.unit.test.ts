@@ -254,6 +254,57 @@ describe("presentLangyToolError", () => {
     });
   });
 
+  describe("given a Python traceback and no structured failure", () => {
+    const traceback = [
+      "Traceback (most recent call last):",
+      '  File "/app/langwatch_nlp/count.py", line 42, in count_rows',
+      "    payload = json.loads(response.text)",
+      '  File "/usr/lib/python3.11/json/__init__.py", line 346, in loads',
+      "    return _default_decoder.decode(s)",
+      "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    ].join("\n");
+
+    it("names what failed", () => {
+      expect(present(traceback, "Counting traces").title).toBe(
+        "Counting traces failed",
+      );
+    });
+
+    /** @scenario "A traceback is kept out of the card body" */
+    it("says the step couldn't be completed", () => {
+      expect(present(traceback, "Counting traces").message).toBe(
+        "This step couldn't be completed.",
+      );
+    });
+
+    /** @scenario "A traceback is kept out of the card body" */
+    it("adds no detail line taken from the traceback", () => {
+      expect(present(traceback, "Counting traces").detail).toBeUndefined();
+    });
+
+    it("keeps the whole traceback for the disclosure", () => {
+      expect(present(traceback, "Counting traces").raw).toContain(
+        "JSONDecodeError",
+      );
+    });
+
+    it("keeps an exception line out of the body even with no frames", () => {
+      const bare =
+        "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)";
+      expect(present(bare, "Counting traces").detail).toBeUndefined();
+      expect(present(bare, "Counting traces").raw).toBe(bare);
+    });
+
+    it("keeps a JavaScript stack out of the body too", () => {
+      const stack = [
+        "TypeError: Cannot read properties of undefined (reading 'rows')",
+        "    at countRows (/app/dist/count.js:12:31)",
+        "    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)",
+      ].join("\n");
+      expect(present(stack, "Counting traces").detail).toBeUndefined();
+    });
+  });
+
   describe("given a failure with no structure at all", () => {
     const stderr = "✖ Failed to reach the API: socket hang up (ECONNRESET)";
 
@@ -261,6 +312,7 @@ describe("presentLangyToolError", () => {
       expect(present(stderr).title).toBe("Creating scenario failed");
     });
 
+    /** @scenario "A one-line failure sentence is still shown as a detail" */
     it("shows the text it was given rather than swallowing it", () => {
       expect(present(stderr).detail).toBe(
         "Failed to reach the API: socket hang up (ECONNRESET)",

@@ -368,6 +368,7 @@ export {
   type IdentityEventType,
   type IdentityFact,
   type IdentityFactInput,
+  type IdentityFactInputOf,
   type IdentityFactOf,
   type IdentityHeads,
   identifierAttachedPayloadSchema,
@@ -406,6 +407,14 @@ export {
   normalizeDomain,
   normalizeIdentifierValue,
 } from "./identifier";
+export {
+  type IdentifierHead,
+  type IdentityStream,
+  identityStreamsFor,
+  primaryChangeFacts,
+  reduceIdentifier,
+  userErasureFacts,
+} from "./identifier-aggregate";
 export {
   type MatchableEmail,
   matchableEmailsOf,

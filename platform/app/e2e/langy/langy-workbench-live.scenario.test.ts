@@ -66,6 +66,7 @@ describe("Langy on a workbench the user is watching", () => {
     /** @scenario The loop runs in the page the user has open */
     /** @scenario The user closes the page mid-loop and the loop carries on */
     /** @scenario Langy never says the page shows something it does not */
+    /** @scenario Langy says where each change happened */
     it(
       "drives the open page, then carries on once the user steps away",
       async () => {

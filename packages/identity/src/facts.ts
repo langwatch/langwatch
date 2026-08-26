@@ -273,6 +273,13 @@ export type IdentityFactOf<T extends IdentityEventType> = Extract<
   { type: T }
 >;
 
+/** The same narrowing on a fact a command has decided but nobody has stamped
+ *  yet — what a guard returns when it states exactly one kind of fact. */
+export type IdentityFactInputOf<T extends IdentityEventType> = Extract<
+  IdentityFactInput,
+  { type: T }
+>;
+
 /** One identifier as the projection knows it — one row of `Identifier`. */
 export interface IdentifierFact {
   identifierId: string;

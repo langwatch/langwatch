@@ -9,36 +9,31 @@
  * 3. Schema drift — if a CH column is renamed, the cast silently succeeds
  *    and the bug surfaces downstream.
  *
- * Each test feeds the mock CH client responses with realistic type
- * variations and asserts the repository returns properly typed values.
+ * Each test builds a repository whose injected resolver hands back a mock
+ * ClickHouse client serving the given rows, through the same constructor
+ * contract production uses.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ActivityMonitorClickHouseRepository } from "../activityMonitor.clickhouse.repository";
 
-function mockCh(rows: unknown[]) {
-  return {
+function makeRepo(rows: unknown[]) {
+  const ch = {
     query: vi.fn(async () => ({
       json: async () => rows,
     })),
   } as never;
+  return new ActivityMonitorClickHouseRepository(async () => ch);
 }
 
 describe("ActivityMonitorClickHouseRepository", () => {
-  let repo: ActivityMonitorClickHouseRepository;
-
-  beforeEach(() => {
-    repo = new ActivityMonitorClickHouseRepository();
-  });
-
   describe("when CH returns string-typed numerics (risk #1: silent type mismatch)", () => {
     it("coerces summary spend strings to numbers", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         { thisSpend: "1.5", prevSpend: "0.75", thisUsers: "3" },
       ]);
 
       const row = await repo.findSummarySpend({
-        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -51,12 +46,11 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("coerces window count strings to numbers", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         { c24: "42", c7: "200", c30: "800", lastMs: "1700000000000" },
       ]);
 
       const row = await repo.findTracedEventWindowCounts({
-        ch,
         tenantId: "t",
         sourceId: "s",
         since24h: 0,
@@ -74,7 +68,7 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("coerces pushed event numeric fields from CH number to typed output", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         {
           eventId: "e1",
           eventType: "otel_generic",
@@ -89,7 +83,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findPushedEventsForSource({
-        ch,
         tenantId: "t",
         sourceId: "s",
         beforeMs: Date.now(),
@@ -105,12 +98,11 @@ describe("ActivityMonitorClickHouseRepository", () => {
 
   describe("when CH returns nulls (risk #2: null propagation)", () => {
     it("defaults null summary values to 0", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         { thisSpend: null, prevSpend: null, thisUsers: null },
       ]);
 
       const row = await repo.findSummarySpend({
-        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -120,7 +112,7 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("defaults null mostUsedTarget to null (preserved nullable)", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         {
           actor: "user@test.com",
           spendUsdStr: "1.00",
@@ -131,7 +123,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findSpendByUser({
-        ch,
         tenantId: "t",
         windowStart: 0,
         sortBy: "spend",
@@ -144,10 +135,9 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("defaults null window count lastMs to null (preserved nullable)", async () => {
-      const ch = mockCh([{ c24: 0, c7: 0, c30: 0, lastMs: null }]);
+      const repo = makeRepo([{ c24: 0, c7: 0, c30: 0, lastMs: null }]);
 
       const row = await repo.findLoggedEventWindowCounts({
-        ch,
         tenantId: "t",
         sourceId: "s",
         since24h: 0,
@@ -160,10 +150,9 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("returns empty summary when CH returns no rows", async () => {
-      const ch = mockCh([]);
+      const repo = makeRepo([]);
 
       const row = await repo.findSummarySpend({
-        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -173,10 +162,9 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("returns undefined when window count has no rows", async () => {
-      const ch = mockCh([]);
+      const repo = makeRepo([]);
 
       const row = await repo.findPulledEventWindowCounts({
-        ch,
         tenantId: "t",
         sourceId: "s",
         since24h: 0,
@@ -190,13 +178,12 @@ describe("ActivityMonitorClickHouseRepository", () => {
 
   describe("when CH returns unexpected shapes (risk #3: schema drift)", () => {
     it("falls back to zero when summary columns are renamed", async () => {
-      const ch = mockCh([{ wrong_column: "value" }]);
+      const repo = makeRepo([{ wrong_column: "value" }]);
 
       // thisSpend/prevSpend/thisUsers are all chNumeric with .catch(0),
       // so a missing field falls back to 0 rather than throwing.
       // This is intentional: individual field defaults are the first defense.
       const row = await repo.findSummarySpend({
-        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -209,13 +196,12 @@ describe("ActivityMonitorClickHouseRepository", () => {
       // fast via .parse() rather than silently default, proving risk #3
       // (schema drift) is actually caught, not just the per-field
       // defaulting exercised above.
-      const ch = mockCh([
+      const repo = makeRepo([
         { spendUsdStr: "1.00", requests: "5", lastActivityMs: "0" },
       ]);
 
       await expect(
         repo.findSpendByUser({
-          ch,
           tenantId: "t",
           windowStart: 0,
           sortBy: "spend",
@@ -227,12 +213,11 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("catches NaN from garbage numeric input", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         { thisSpend: "not-a-number", prevSpend: {}, thisUsers: undefined },
       ]);
 
       const row = await repo.findSummarySpend({
-        ch,
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
@@ -245,7 +230,7 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("defaults missing optional fields on pushed event rows", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         {
           eventId: "e1",
           // eventType, actor, target all missing
@@ -255,7 +240,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findPushedEventsForSource({
-        ch,
         tenantId: "t",
         sourceId: "s",
         beforeMs: Date.now(),
@@ -270,7 +254,7 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("defaults missing optional fields on pulled event rows", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         {
           eventId: "e1",
           // all optional fields missing
@@ -280,7 +264,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findPulledEventsForSource({
-        ch,
         tenantId: "t",
         sourceId: "s",
         beforeMs: Date.now(),
@@ -295,7 +278,7 @@ describe("ActivityMonitorClickHouseRepository", () => {
 
   describe("when CH returns well-typed data (happy path)", () => {
     it("passes through spend-by-user rows unchanged", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         {
           actor: "alice@acme.com",
           spendUsdStr: "42.50",
@@ -306,7 +289,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findSpendByUser({
-        ch,
         tenantId: "t",
         windowStart: 0,
         sortBy: "spend",
@@ -327,13 +309,12 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("passes through source event counts", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         { sourceId: "src-1", c: "42" },
         { sourceId: "src-2", c: "7" },
       ]);
 
       const rows = await repo.countTracedEventsBySource({
-        ch,
         tenantId: "t",
         sourceIds: ["src-1", "src-2"],
         since: 0,
@@ -344,7 +325,7 @@ describe("ActivityMonitorClickHouseRepository", () => {
     });
 
     it("passes through spend-over-time rows", async () => {
-      const ch = mockCh([
+      const repo = makeRepo([
         {
           bucketMs: "1700000000000",
           groupKey: "team-1",
@@ -353,7 +334,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findSpendOverTime({
-        ch,
         tenantId: "t",
         windowStart: 0,
         groupBy: "team",

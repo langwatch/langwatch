@@ -183,6 +183,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Secrets
     "secrets:view",
     "secrets:manage",
+    // Agent cache
+    "agentCache:view",
+    "agentCache:manage",
     // Team
     "team:view",
     "team:manage",
@@ -268,6 +271,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Secrets
     "secrets:view",
     "secrets:manage",
+    // Agent cache
+    "agentCache:view",
+    "agentCache:manage",
     // Team
     "team:view",
     // AI Gateway (member: can manage own VKs + see budgets, cannot delete budgets)

@@ -134,6 +134,83 @@ describe("native skill generation", () => {
     });
   });
 
+  // A skill body reaches the customer: the agent reads it as tool output, and
+  // the reader sees that output in the tool card. So anything in a skill that
+  // describes the machine WE run on is a leak, and an address is the shape it
+  // took: an answer about where scenario results live carried a worker-side
+  // host, which says how the product is wired and nothing about the question.
+  //
+  // Naming a variable the CUSTOMER sets in their own `.env` is the opposite,
+  // and these skills are meant to do it. `LANGWATCH_ENDPOINT` is how the agent
+  // learns a project is self-hosted, and `LANGWATCH_API_KEY` is how it works at
+  // all; a skill that will not say the names cannot tell the agent where to
+  // look. The rule is about what the agent SAYS, not what it reads, and the
+  // place to enforce that is the operating contract, which forbids naming a
+  // path, a variable or an address of ours in an answer (see the langyagent
+  // assets test). Here we only pin that no such address is baked into the text.
+  describe("given a skill body a customer can end up reading", () => {
+    // A home directory or a machine-local root. No skill has a reason to name
+    // one: the agent's own workspace path means nothing to the reader.
+    const HOST_PATH =
+      /(\/Users\/[a-z0-9._-]+|\/home\/[a-z0-9._-]+|\/root\/|\/private\/tmp\/|\/var\/folders\/)/i;
+
+    // An address only the worker can reach: a loopback host or the container
+    // alias for one. A placeholder like `https://lw.acme.internal` is NOT one
+    // of these. That is how the setup skill teaches the shape of a self-hosted
+    // endpoint the customer will type in, and forbidding it would take the
+    // example away for nothing: the reader cannot reach ours because it is
+    // loopback, not because it ends in a particular word.
+    //
+    // A bare `localhost:3000` counts too: it names the same worker port that
+    // `http://localhost:3000` does, and a disclosure that drops the scheme
+    // would otherwise pass. It needs a port, so the word on its own, in prose
+    // saying a self-hosted instance can run locally, still passes.
+    //
+    // The bare form skips anything already carrying a scheme, because the
+    // scheme is what tells the two apart. The voice examples hand the reader
+    // `ws://localhost:8765/stream` for the Pipecat bot THEY run, which is a
+    // placeholder like `https://lw.acme.internal` and not an address of ours.
+    // Only http and https loopback is ours to forbid outright.
+    const LOOPBACK_HOST = String.raw`localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal`;
+    const WORKER_SIDE_ADDRESS = new RegExp(
+      `(https?://(${LOOPBACK_HOST})|(?<!://)\\b(${LOOPBACK_HOST}):\\d{2,5}\\b)`,
+      "i",
+    );
+
+    /** @scenario "A skill never hands the customer a path from the machine it runs on" */
+    it("names no path from the machine the agent runs on", () => {
+      for (const skill of skills) {
+        const body = renderSkill(skill);
+        const found = body.match(HOST_PATH);
+        expect(found?.[0], `${skill.slug}: names a host path`).toBeUndefined();
+      }
+    });
+
+    /** @scenario "A skill never hands the customer an address only the worker can reach" */
+    it("names no worker-side address", () => {
+      for (const skill of skills) {
+        const found = renderSkill(skill).match(WORKER_SIDE_ADDRESS);
+        expect(
+          found?.[0],
+          `${skill.slug}: names an address the reader cannot reach`,
+        ).toBeUndefined();
+      }
+    });
+
+    // The regression this pins is the over-correction, not the leak: the first
+    // fix for the leak stripped the variable names out of the setup guidance
+    // too, and an agent told only that "the CLI resolves it" has nothing to go
+    // and check.
+    /** @scenario "The setup guidance still names the variables the agent has to find" */
+    it("keeps the endpoint and key variable names in the setup guidance", () => {
+      const setup = skills.find((skill) => skill.slug === "setup-lw");
+      expect(setup, "setup-lw is not in the shipped set").toBeDefined();
+      const body = renderSkill(setup!);
+      expect(body).toContain("LANGWATCH_API_KEY");
+      expect(body).toContain("LANGWATCH_ENDPOINT");
+    });
+  });
+
   // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
   // a skill that isn't in the shipped image teaches the model to hallucinate.
   // The image's skill set is the root-compiled native set Docker overlays into

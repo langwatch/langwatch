@@ -486,9 +486,65 @@ describe("markPrimary guard", () => {
         occurredAtMs: T0 + 2000,
         actor: ACTOR,
       });
+      expect(facts).toHaveLength(1);
       expect(facts[0]!.data).toMatchObject({
         identifierId: "idf_work",
         previousIdentifierId: "idf_personal",
+      });
+    });
+
+    /** @scenario "Exactly one PRIMARY survives, whoever was standing" */
+    it("names every standing PRIMARY, so no demotion is left to a fold", async () => {
+      // Two standing PRIMARY is only reachable from a partial replay window.
+      // The old guard named the first it found and left the rest to the fold's
+      // sweep; a per-identifier fold has no sweep, so the command names them
+      // all (ADR-127).
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({ identifierId: "idf_work", state: "VERIFIED" }),
+          fact({ identifierId: "idf_a", state: "PRIMARY", value: "sam@a.dev" }),
+          fact({ identifierId: "idf_b", state: "PRIMARY", value: "sam@b.dev" }),
+        ),
+      );
+      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+        tenantId: USER,
+        userId: USER,
+        commandId: "idcmd_p2",
+        identifierId: "idf_work",
+        occurredAtMs: T0 + 2000,
+        actor: ACTOR,
+      });
+      expect(facts).toHaveLength(2);
+      expect(
+        facts.map((emitted) => emitted.data).sort((left, right) =>
+          JSON.stringify(left).localeCompare(JSON.stringify(right)),
+        ),
+      ).toMatchObject([
+        { identifierId: "idf_work", previousIdentifierId: "idf_a" },
+        { identifierId: "idf_work", previousIdentifierId: "idf_b" },
+      ]);
+    });
+  });
+
+  describe("when nobody holds PRIMARY", () => {
+    /** @scenario "A first primary change routes one stream only" */
+    it("states one promotion naming no previous", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(USER, headsWith(fact({ identifierId: "idf_work", state: "VERIFIED" })));
+      const facts = await new IdentityGuards(heads, users, new InMemoryReservations()).markPrimary({
+        tenantId: USER,
+        userId: USER,
+        commandId: "idcmd_p3",
+        identifierId: "idf_work",
+        occurredAtMs: T0 + 2000,
+        actor: ACTOR,
+      });
+      expect(facts).toHaveLength(1);
+      expect(facts[0]!.data).toMatchObject({
+        identifierId: "idf_work",
+        previousIdentifierId: null,
       });
     });
 

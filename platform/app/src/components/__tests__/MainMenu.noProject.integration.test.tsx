@@ -37,8 +37,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Every flag reads on, except the one that replaces the Simulations group
+// with Agent Testing: this file pins the grouped destinations. The real hook
+// answers false for it here anyway, because it is asked only for a project
+// and this account has none.
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true }),
+  useFeatureFlag: (flag: string) => ({
+    enabled: flag !== "release_ui_agent_testing_v2_enabled",
+  }),
 }));
 
 vi.mock("~/hooks/useOpsPermission", () => ({

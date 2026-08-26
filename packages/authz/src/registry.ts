@@ -186,6 +186,12 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "create", "update", "delete", "manage"],
     scopes: ["project", "team", "organization"],
   },
+  agentCache: {
+    // The per-project cache an agent writes its own run state into. `view`
+    // reads an entry, `manage` writes and deletes one.
+    actions: ["view", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
   // D05. Seeing a connection and changing one are two permissions, because
   // they are two jobs: a security reviewer reads which domains route and who
   // proved them; an IT administrator sets the thing up. Org-tier only, like

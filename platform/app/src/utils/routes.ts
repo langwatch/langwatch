@@ -167,6 +167,25 @@ export const projectRoutes = {
     path: "/[project]/simulations",
     title: "Simulations",
   },
+  agent_testing: {
+    path: "/[project]/agent-testing",
+    title: "Agent Testing",
+  },
+  agent_testing_suite: {
+    path: "/[project]/agent-testing/suites/[suiteSlug]",
+    title: "Test Suite",
+    parent: "agent_testing",
+  },
+  agent_testing_results: {
+    path: "/[project]/agent-testing/results",
+    title: "Results",
+    parent: "agent_testing",
+  },
+  agent_testing_plan: {
+    path: "/[project]/agent-testing/results/[planSlug]",
+    title: "Run Plan",
+    parent: "agent_testing_results",
+  },
   agents: {
     path: "/[project]/agents",
     title: "Agents",

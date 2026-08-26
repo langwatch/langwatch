@@ -19,6 +19,7 @@ import {
   runParameterValuesSchema,
 } from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
+import { runNoteSchema, withNote } from "~/server/scenarios/run-note";
 import {
   encryptRunSecretValues,
   type RunSecretCiphertext,
@@ -53,6 +54,8 @@ const runScenarioSchema = projectSchema.extend({
    * scenario's own default for that name.
    */
   parameters: runParameterValuesSchema.optional(),
+  /** One short line describing why this run was started. */
+  note: runNoteSchema,
 });
 
 /**
@@ -77,6 +80,12 @@ async function resolveParametersForRun({
 }): Promise<{
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
+  /**
+   * The scenario's version at this read, stamped onto the queued run so it
+   * says which state of the scenario it ran. Undefined only when the read
+   * found no scenario, in which case the prefetch refuses the run anyway.
+   */
+  scenarioVersion: number | undefined;
 }> {
   const scenarios = await ScenarioService.create(prisma).getRunConfigByIds({
     ids: [scenarioId],
@@ -91,6 +100,8 @@ async function resolveParametersForRun({
     secretParameters: encryptRunSecretValues(
       forScenario?.secretParameters ?? {},
     ),
+    scenarioVersion: scenarios.find((scenario) => scenario.id === scenarioId)
+      ?.version,
   };
 }
 
@@ -114,6 +125,8 @@ async function queueRun({
   target,
   parameters,
   secretParameters,
+  note,
+  scenarioVersion,
 }: {
   projectId: string;
   scenarioId: string;
@@ -124,9 +137,19 @@ async function queueRun({
   target: z.infer<typeof simulationTargetSchema>;
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
+  note: string | undefined;
+  scenarioVersion: number | undefined;
 }): Promise<void> {
   const secretParameterNames = Object.keys(secretParameters);
   const metadata = {
+    // The reserved namespace records the target this run was pointed at and
+    // the scenario version it was queued from, the same way a suite run does.
+    langwatch: {
+      targetReferenceId: target.referenceId,
+      targetType: target.type,
+      ...(scenarioVersion !== undefined ? { scenarioVersion } : {}),
+    },
+    ...withNote(note),
     ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
     ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
   };
@@ -138,7 +161,7 @@ async function queueRun({
       batchRunId,
       scenarioSetId: setId,
       name,
-      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+      metadata,
       ...(secretParameterNames.length > 0 ? { secretParameters } : {}),
       target: { type: target.type, referenceId: target.referenceId },
       occurredAt: Date.now(),
@@ -174,12 +197,13 @@ export const simulationRunnerRouter = createTRPCRouter({
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = input.batchRunId ?? generateBatchRunId();
 
-      const { parameters, secretParameters } = await resolveParametersForRun({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-        values: input.parameters,
-      });
+      const { parameters, secretParameters, scenarioVersion } =
+        await resolveParametersForRun({
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+          scenarioId: input.scenarioId,
+          values: input.parameters,
+        });
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();
@@ -233,6 +257,8 @@ export const simulationRunnerRouter = createTRPCRouter({
         target: input.target,
         parameters,
         secretParameters,
+        note: input.note,
+        scenarioVersion,
       });
 
       // No explicit job scheduling — the execution subscriber picks up the queued

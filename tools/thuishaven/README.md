@@ -139,7 +139,13 @@ ever dropped silently.
 **Logs.** The supervisor captures every service's output to per-service,
 size-capped files whether the stack runs attached or detached — so `haven
 logs` works from any terminal, filters by plain argument, and still reads
-after a crash or a `down`.
+after a crash or a `down`. Capture is built to keep going: a line longer than
+1 MiB (the api lane prints its errors as one-line JSON, so a stack dump is one
+line) is split across captured lines instead of ending the read, the pipe is
+drained to EOF before the child is reaped so nothing buffered is lost, and a
+log file that cannot be written or rotated is retried a few seconds later
+rather than dropped for the life of the process. A rotation that cannot happen
+degrades to appending past the cap, never to silence.
 
 **The hub.** Bare `haven` opens the interactive machine view. The header is
 the machine's real memory picture from one process listing, every process
@@ -225,7 +231,11 @@ fall back to when a worktree doesn't need its own data.
 
 **Agent mode.** `--agent` (or `HAVEN_AGENT=1`, `NO_COLOR`, or a non-TTY stdout)
 switches to plain, colourless, redraw-free output — zero token waste when an AI
-agent drives haven. `haven status --json` is the machine-readable inventory.
+agent drives haven. `haven status --json` is the machine-readable inventory:
+`stacks` is always a list (`[]` when nothing is registered, never `null`), each
+stack carries `live` (its launcher process is running), and each service carries
+`listening` (something accepts connections on the port its hostname routes to).
+A listed stack is a registered stack, which is not the same as a running one.
 
 ## Design
 
@@ -244,6 +254,19 @@ A single **daemon** (auto-spawned by the first `haven up`) hosts the dashboard +
 telemetry fan-out, holds the cross-worktree registry (`~/.langwatch/portless/
 registry/*.json`), and **reaps** stacks whose launcher has exited or whose
 heartbeat has gone stale (`HAVEN_IDLE_TTL`) — pulling routes down with them.
+
+**A dead stack deregisters, it never respawns.** Every 10s the daemon compares
+each registered stack against its launcher process. When the launcher is gone
+(an out-of-memory kill from the OS, a closed terminal, a crashed `pnpm dev`) it
+removes every hostname the stack could own (the four per-worktree services, any
+service the stack recorded, and the `clickhouse` + `postgres` aliases) and then
+drops the registry entry. The hostname then gets portless's own "no route"
+answer. Leaving the route up is the failure this closes: the kernel reissues the
+loopback port to the next process that asks, and the hostname starts serving an
+unrelated worktree's dev server, which answers HTML 404s to `/api/*` and reads
+like an auth or routing bug rather than a dead stack. haven does not restart
+what it did not start; `haven up` is the recovery, and it deregisters the dead
+entry's routes before it provisions.
 
 The resolved config lands in `platform/app/.env.portless`, which every TS entry
 point loads **last with `override: true`** so it beats anything pinned in `.env`

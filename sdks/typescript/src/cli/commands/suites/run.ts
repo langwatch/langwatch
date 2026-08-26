@@ -10,26 +10,28 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { fetchBatchRuns, tallyBatchRuns } from "../../utils/batchRunProgress";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+import { parseRunNoteFlag } from "../../utils/runNote";
 
 export const runSuiteCommand = async ({
   id,
   options,
 }: {
   id: string;
-  options: { wait?: boolean; format?: string; param?: string[] };
+  options: { wait?: boolean; format?: string; param?: string[]; note?: string };
 }): Promise<void> => {
   await resolveCredentials();
 
   const parameters = parseRunParameterFlags({ pairs: options.param });
+  const note = parseRunNoteFlag({ note: options.note });
 
   const service = new SuitesApiService();
   const spinner = createSpinner(`Scheduling suite run "${id}"...`).start();
 
   try {
-    const result = await service.run(id, { parameters });
+    const result = await service.run(id, { parameters, note });
 
     spinner.succeed(
-      `Suite run scheduled: ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId})`,
+      `Suite run scheduled: ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
     // JSON first: the skipped-archived details are already inside the document,
@@ -54,6 +56,9 @@ export const runSuiteCommand = async ({
       console.log();
       console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
       console.log(`  ${chalk.gray("Jobs:")}         ${result.jobCount}`);
+      if (note) {
+        console.log(`  ${chalk.gray("Note:")}         ${note}`);
+      }
       console.log();
       console.log(
         chalk.gray(

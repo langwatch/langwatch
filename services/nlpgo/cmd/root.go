@@ -74,7 +74,14 @@ func Root(ctx context.Context, _ []string) error {
 
 	httpExec := httpblock.New(httpblock.Options{SSRF: ssrfOpts})
 	codeExec, err := codeblock.New(codeblock.Options{
-		Python: cfg.Engine.SandboxPython,
+		Python: resolveSandboxPython(cfg.Engine.SandboxPython, os.Getenv),
+		// The instance a code node's LangWatch SDK calls. It is the same URL
+		// the evaluator blocks call back on, and it is injected only next to
+		// a run's own sandbox key.
+		SandboxEndpoint: resolveLangWatchBaseURL(
+			cfg.Engine.LangWatchBaseURL,
+			os.Getenv,
+		),
 	})
 	if err != nil {
 		return err
@@ -149,6 +156,32 @@ func resolveLangWatchBaseURL(explicit string, getenv func(string) string) string
 		return explicit
 	}
 	return strings.TrimRight(getenv("LANGWATCH_ENDPOINT"), "/")
+}
+
+// resolveSandboxPython returns the interpreter a code block subprocess runs.
+//
+// The config hydrator prefixes every field of EngineConfig, so the name that
+// reaches `cfg.Engine.SandboxPython` is `NLPGO_ENGINE_SANDBOX_PYTHON`. Both
+// runtime images set the unprefixed `SANDBOX_PYTHON` next to the PYTHONPATH
+// that holds the sandbox libraries, so that setting selected nothing: the
+// images ran on whatever `python3` resolved to, which happens to be the same
+// 3.11 the variable names. It stays true only while the image keeps a
+// `python3` alias beside the interpreter, and it silently ignores an operator
+// who points the documented variable at their own interpreter.
+//
+// Same shape and same class of miss as resolveLangWatchBaseURL above, so the
+// same answer: the prefixed setting wins, the unprefixed one is honored, and
+// the default applies when neither is set.
+//
+// `getenv` is injected so tests don't need to mutate process env.
+func resolveSandboxPython(explicit string, getenv func(string) string) string {
+	if explicit != "" && explicit != nlpgo.DefaultSandboxPython {
+		return explicit
+	}
+	if fromEnv := strings.TrimSpace(getenv("SANDBOX_PYTHON")); fromEnv != "" {
+		return fromEnv
+	}
+	return nlpgo.DefaultSandboxPython
 }
 
 // splitCSV splits "a,b,c" into ["a","b","c"], trimming whitespace and

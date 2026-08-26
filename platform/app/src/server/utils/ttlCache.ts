@@ -50,16 +50,23 @@ export class TtlCache<T> {
     return this.memoryGet(key);
   }
 
-  async set(key: string, value: T): Promise<void> {
+  /**
+   * Write `key`. `ttlMs` overrides the cache's own lifetime for this entry
+   * only, in both Redis and the memory fallback, so a caller that knows how
+   * long its value stays good can say so.
+   */
+  async set(key: string, value: T, ttlMs?: number): Promise<void> {
+    const lifetimeMs = ttlMs ?? this.ttlMs;
+
     // Always shadow-write to memory so fallback is warm if Redis goes down later
-    this.memory.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
 
     const r = this.redis;
     if (!r) return;
     try {
       await r.setex(
         `${this.prefix}${key}`,
-        this.ttlSeconds,
+        Math.ceil(lifetimeMs / 1000),
         JSON.stringify(value),
       );
     } catch {

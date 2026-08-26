@@ -795,9 +795,14 @@ const presentations = {
     // Distinct from `no_provider_configured` (nothing connected at all) and
     // from `llm_model_not_set` (a workflow node with an empty field): here a
     // provider exists but nothing has chosen which model to use.
+    //
+    // Names Default Models rather than "your project's model settings": the
+    // default is almost always written at the organization scope, which is
+    // where the onboarding seed lands it, so pointing at the project sent
+    // people to a page that was not the one holding the value.
     title: "Choose a model first",
     describe: () =>
-      "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
+      "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
   model_restricted_for_feature: {
     // Distinct from `model_not_configured`: a model IS set, but it's
@@ -1716,6 +1721,11 @@ const presentations = {
         : `${rejected} None of its scenarios declare parameters.`;
     },
   },
+  scenario_folder_not_found: {
+    title: "That test suite isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a test suite again.",
+  },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
     describe: (error) => {
@@ -1781,6 +1791,18 @@ const presentations = {
           : `${scenarioFieldLabel(error)} reads a secret parameter.`;
       return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
     },
+  },
+  scenario_stale_version: {
+    // Nothing was written: the save is refused before the update, so the copy
+    // can promise the customer's own edit is still theirs to redo.
+    title: "This test case changed since you loaded it",
+    describe: () =>
+      "Reload to pick up the latest version, then make your change again.",
+  },
+  scenario_version_not_found: {
+    title: "That version is not available",
+    describe: () =>
+      "It may have been removed. Open the history to see what this test case still has.",
   },
   // ---- billing ----
   billing_customer_email_required: {
@@ -2295,6 +2317,15 @@ const presentations = {
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
   },
+  storage_not_writable: {
+    // fault: platform. Storage for this deployment was never provisioned, so
+    // retrying changes nothing and there is no customer-side setting to fix.
+    // Which directory and which variables an operator has to set are in the
+    // tips and in the server log, not here.
+    title: "Storage for this workspace isn't set up",
+    describe: () =>
+      "Nothing was saved. An administrator has to set up storage before rows can be added.",
+  },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the
@@ -2370,6 +2401,21 @@ const presentations = {
   suite_invalid_target_references: {
     title: "This run plan points at targets that no longer exist",
     describe: () => "Edit the plan to remove them.",
+  },
+  suite_scope_empty: {
+    title: "This run plan covers no test case",
+    describe: () =>
+      "Its scope matches nothing right now. Widen it in the plan, then run again.",
+  },
+  suite_scope_not_allowed: {
+    title: "A test suite takes no scope",
+    describe: () =>
+      "It runs the test cases filed in it. File cases into it to change what it covers.",
+  },
+  suite_targets_required: {
+    title: "Choose an agent to run against",
+    describe: () =>
+      "This suite has no agent or prompt to test yet. Pick one in the run dialog, then run again.",
   },
 
   // ---- automations & notifications ----
@@ -3139,6 +3185,15 @@ const presentations = {
   cache_rule_not_found: {
     title: "Cache rule not found",
     describe: () => "It may have been archived by someone else.",
+  },
+  cache_entry_not_found: {
+    // One answer for every way a read comes back empty: never written, past
+    // its lifetime, dropped, or written before the instance's encryption key
+    // changed. The next step is the same in all of them, so the copy names it
+    // and says nothing about which one happened.
+    title: "No cache entry with that name",
+    describe: () =>
+      "The entry was never stored, or its lifetime has passed. Produce the value again and store it.",
   },
   budget_not_found: {
     title: "Budget not found",

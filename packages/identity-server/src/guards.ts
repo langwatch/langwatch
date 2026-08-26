@@ -20,9 +20,9 @@ import {
   LINK_PROPOSED_EVENT_TYPE,
   type MarkPrimaryCommandData,
   normalizeIdentifierValue,
-  PRIMARY_CHANGED_EVENT_TYPE,
+  primaryChangeFacts,
   type ProposeLinkCommandData,
-  USER_ERASED_EVENT_TYPE,
+  userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity";
 import {
@@ -364,19 +364,13 @@ export class IdentityGuards {
       normalizedValue: head.value,
       verb: "mark_primary",
     });
-    const previous = Object.values(heads.identifiers).find(
-      (candidate) => candidate.state === "PRIMARY",
-    );
-    return [
-      {
-        type: PRIMARY_CHANGED_EVENT_TYPE,
-        data: {
-          identifierId,
-          previousIdentifierId: previous?.identifierId ?? null,
-          actor,
-        },
-      },
-    ];
+    // One fact per stream that has to move (ADR-127): the promotion, and a
+    // demotion naming each identifier standing PRIMARY. The fold sweeps for
+    // those itself today and a per-identifier fold cannot, so the command
+    // names them here, while it can still read the whole person. For the one
+    // standing PRIMARY a person actually has, this states exactly what it
+    // stated before.
+    return primaryChangeFacts({ heads, identifierId, actor });
   }
 
   async detachIdentifier(
@@ -413,21 +407,16 @@ export class IdentityGuards {
   async eraseUser(data: EraseUserCommandData): Promise<IdentityFactInput[]> {
     const { userId, actor } = data;
     const heads = await this.heads.findHeads({ userId });
-    // The fact is the record that erasure happened; the ids are the writer's
-    // audit list, not the sweep's bound (the fold wipes every head). The
-    // event-log mutation that wipes the user's PRIOR events, the protocol-row
-    // deletions, and the userHashKey shred are the erasure service's
-    // side-effects — sequenced around this command, not inside it.
-    return [
-      {
-        type: USER_ERASED_EVENT_TYPE,
-        data: {
-          userId,
-          erasedIdentifierIds: Object.keys(heads.identifiers),
-          actor,
-        },
-      },
-    ];
+    // The ids are read from the WHOLE person rather than taken from a caller.
+    // Today the fold sweeps every head and the list is the writer's audit
+    // record; once the fold keys per identifier (ADR-127 slice 3) the list
+    // BECOMES the sweep's bound, and a list built from anything narrower than
+    // the whole person would leave an address behind — ADR-110's
+    // principal-filter rule in identity's terms. The event-log mutation that
+    // wipes the user's PRIOR events, the protocol-row deletions, and the
+    // userHashKey shred are the erasure service's side-effects — sequenced
+    // around this command, not inside it.
+    return userErasureFacts({ heads, userId, actor });
   }
 
   /**

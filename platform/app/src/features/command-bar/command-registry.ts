@@ -41,6 +41,7 @@ import {
   Users,
   Workflow,
 } from "lucide-react";
+import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 import type { Command } from "./types";
 
 /**
@@ -88,6 +89,19 @@ export const navigationCommands: Command[] = [
     path: "/[project]/traces",
   },
   {
+    id: "nav-agent-testing",
+    label: "Agent Testing",
+    description: "Test cases and their results",
+    icon: FlaskConical,
+    category: "navigation",
+    keywords: ["test", "cases", "agent", "simulation", "scenario", "run"],
+    path: "/[project]/agent-testing",
+    featureFlag: {
+      flag: "release_ui_agent_testing_v2_enabled",
+      enabled: true,
+    },
+  },
+  {
     id: "nav-simulations",
     label: "Simulations",
     description: "Simulation runs",
@@ -95,6 +109,12 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["test", "run", "execute"],
     path: "/[project]/simulations",
+    // Agent Testing replaces this destination. The two lead to the same runs
+    // by different routes, so exactly one of them is offered.
+    featureFlag: {
+      flag: "release_ui_agent_testing_v2_enabled",
+      enabled: false,
+    },
   },
   {
     id: "nav-scenarios",
@@ -104,6 +124,10 @@ export const navigationCommands: Command[] = [
     category: "navigation",
     keywords: ["test", "simulation", "scenario"],
     path: "/[project]/simulations/scenarios",
+    featureFlag: {
+      flag: "release_ui_agent_testing_v2_enabled",
+      enabled: false,
+    },
   },
   {
     id: "nav-online-evaluations",
@@ -804,6 +828,7 @@ const topLevelNavIds = new Set([
   "nav-analytics",
   "nav-traces",
   "nav-traces-v2",
+  "nav-agent-testing",
   "nav-simulations",
   "nav-online-evaluations",
   "nav-experiments",
@@ -833,6 +858,33 @@ export const allStaticCommands: Command[] = [
   ...supportCommands,
   ...themeCommands,
 ];
+
+/**
+ * Values of the release flags the command list reads, as resolved for the
+ * person using it. A flag missing from the map has not answered yet.
+ */
+export type CommandFeatureFlagValues = Partial<
+  Record<FrontendFeatureFlag, boolean>
+>;
+
+/**
+ * Drops the commands whose release flag does not hold the value they need.
+ * A command with no flag is always offered, and a flag that has not answered
+ * yet keeps its command out until it does, so the bar never lists two routes
+ * to the same work while the flag is in flight.
+ */
+export function filterCommandsByFeatureFlags({
+  commands,
+  flags,
+}: {
+  commands: Command[];
+  flags: CommandFeatureFlagValues;
+}): Command[] {
+  return commands.filter((command) => {
+    if (!command.featureFlag) return true;
+    return flags[command.featureFlag.flag] === command.featureFlag.enabled;
+  });
+}
 
 /**
  * Filter commands by query string.

@@ -10,7 +10,7 @@
  * Pairs with: activityMonitor.service.ts (orchestration + PG queries)
  * Spec: specs/ai-gateway/governance/folds.feature
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 import {
   ATTR_INGESTION_SOURCE_ID,
@@ -21,22 +21,23 @@ import {
 } from "./activityMonitor.clickhouse.schemas";
 
 export class ActivityMonitorHealthClickHouseRepository {
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
   /** Traced-event window counts (24h/7d/30d) for one source, from `trace_summaries`. */
   async findTracedEventWindowCounts({
-    ch,
     tenantId,
     sourceId,
     since24h,
     since7d,
     since30d,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     since24h: number;
     since7d: number;
     since30d: number;
   }): Promise<WindowCountChRow | undefined> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT
@@ -75,20 +76,19 @@ export class ActivityMonitorHealthClickHouseRepository {
 
   /** Logged-record window counts (24h/7d/30d) for one source, from `stored_log_records`. */
   async findLoggedEventWindowCounts({
-    ch,
     tenantId,
     sourceId,
     since24h,
     since7d,
     since30d,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     since24h: number;
     since7d: number;
     since30d: number;
   }): Promise<WindowCountChRow | undefined> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT
@@ -120,20 +120,19 @@ export class ActivityMonitorHealthClickHouseRepository {
 
   /** Pulled OCSF-event window counts (24h/7d/30d) for one source. */
   async findPulledEventWindowCounts({
-    ch,
     tenantId,
     sourceId,
     since24h,
     since7d,
     since30d,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     since24h: number;
     since7d: number;
     since30d: number;
   }): Promise<WindowCountChRow | undefined> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT

@@ -11,7 +11,7 @@
  * Pairs with: activityMonitor.service.ts (orchestration + PG queries)
  * Spec: specs/ai-gateway/governance/folds.feature
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 import {
   ATTR_INGESTION_SOURCE_ID,
@@ -36,21 +36,22 @@ import {
 } from "./activityMonitor.clickhouse.schemas";
 
 export class ActivityMonitorSpendClickHouseRepository {
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
   /**
    * Summary aggregation: total spend in current + previous windows, active
    * user count. Returns a single row (CH aggregates always produce one).
    */
   async findSummarySpend({
-    ch,
     tenantId,
     thisStart,
     prevStart,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     thisStart: number;
     prevStart: number;
   }): Promise<SummarySpendChRow> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT
@@ -99,7 +100,6 @@ export class ActivityMonitorSpendClickHouseRepository {
    * subquery's Float64 spendUsd column.
    */
   async findSpendByUser({
-    ch,
     tenantId,
     windowStart,
     sortBy,
@@ -107,7 +107,6 @@ export class ActivityMonitorSpendClickHouseRepository {
     limit,
     offset,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     windowStart: number;
     sortBy: SpendSortField;
@@ -115,6 +114,7 @@ export class ActivityMonitorSpendClickHouseRepository {
     limit: number;
     offset: number;
   }): Promise<SpendByUserChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     // Fails closed: SORT_FIELD_TO_AGG_EXPR is Record<SpendSortField, string>
     // so this is exhaustive at compile time, but sortBy crosses a tRPC
     // boundary — an erased/loosened type upstream must never turn into an
@@ -174,14 +174,15 @@ export class ActivityMonitorSpendClickHouseRepository {
    * aggregates the whole org's AI spend.
    */
   async findSpendByDepartment({
-    ch,
     tenantIds,
     windowStart,
   }: {
-    ch: ClickHouseClient;
     tenantIds: string[];
     windowStart: number;
   }): Promise<SpendByDepartmentChRow[]> {
+    // Multi-tenant read across the org's projects; the shared client serves
+    // every project, so resolving by any one of them routes identically.
+    const ch = await this.resolveClient(tenantIds[0] ?? "");
     const result = await ch.query({
       query: `
         SELECT
@@ -217,16 +218,15 @@ export class ActivityMonitorSpendClickHouseRepository {
    * up by team via a PG join (CH only sees sourceId).
    */
   async findSpendByTeamSource({
-    ch,
     tenantId,
     thisStart,
     prevStart,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     thisStart: number;
     prevStart: number;
   }): Promise<SpendByTeamSourceChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT
@@ -273,16 +273,15 @@ export class ActivityMonitorSpendClickHouseRepository {
    * spend-over-time stacked-area chart.
    */
   async findSpendOverTime({
-    ch,
     tenantId,
     windowStart,
     groupBy,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     windowStart: number;
     groupBy: SpendOverTimeGroupBy;
   }): Promise<SpendOverTimeChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     const groupExpr =
       groupBy === "team"
         ? `ts.Attributes[{sourceKey:String}]`
