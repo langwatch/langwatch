@@ -337,7 +337,7 @@ export const goErrorCodes = {
    * ErrProviderConnectionFailed — means the request never got to the provider:
    * DNS failure, connection refused, transport error. Retryable and the
    * provider's (or the network's) fault, unlike the config and credential
-   * codes above, which repeat identically forever.
+   * codes above, which repeat identically on every attempt.
    *
    * Deliberately not "provider_unreachable": that slug is already an app code,
    * thrown when a credential CHECK finds nothing answering
@@ -355,7 +355,7 @@ export const goErrorCodes = {
    * signer cannot retrieve. The request never reaches the provider, so there
    * is no upstream verdict to forward and no retry that can help: every
    * credential in the chain fails the same way. Terminal and the customer's to
-   * fix, which is why it must not wear provider_timeout's retryable 504.
+   * fix, so it must not carry provider_timeout's retryable 504.
    *
    * @source services/aigateway/domain/errors.go
    */
