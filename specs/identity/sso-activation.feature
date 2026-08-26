@@ -177,6 +177,17 @@ Feature: Going live with your own identity provider, without asking us
     Then the pipeline declares a sender for every one of them
     And declares no sender the ledger cannot reach
 
+  # The same defect from the other side: the projection subscribes to a LIST
+  # of events, and an event in the wire union but not in the list is stored
+  # and never folded — the save succeeds, the read never changes, and no
+  # error is raised anywhere. Five events sat in that gap, the arrivals
+  # answer among them.
+  @unit
+  Scenario: Every fact the aggregate can state is one the projection folds
+    Given the wire union of connection events
+    Then the operational projection subscribes to every member
+    And subscribes to nothing outside the union
+
   @unit
   Scenario: An arrival on a connection that asks keeps the account and waits
     Given a connection whose answer is that arrivals wait for approval
