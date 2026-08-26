@@ -1,8 +1,8 @@
 import { Box, HStack, Icon, Menu, Text } from "@chakra-ui/react";
 import { LuEye, LuEyeOff } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { usePresencePreferencesStore } from "@langwatch/presence-web";
 import { usePresenceFeatureEnabled } from "~/features/presence/hooks/usePresenceFeatureEnabled";
-import { usePresencePreferencesStore } from "~/features/presence/stores/presencePreferencesStore";
 
 /**
  * Presence-broadcast toggle rendered inside the avatar dropdown.

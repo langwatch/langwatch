@@ -5,10 +5,7 @@ export {
 } from "./presence-avatar-stack";
 export { PresenceMarker, type PresenceMarkerProps } from "./presence-marker";
 export { PresenceSection, type PresenceSectionProps } from "./presence-section";
-export {
-  SectionPresenceDot,
-  type SectionPresenceDotProps,
-} from "./section-presence-dot";
+export { SectionPresenceDot, type SectionPresenceDotProps } from "./section-presence-dot";
 export {
   TracePresenceAvatars,
   type TracePresenceAvatarsProps,

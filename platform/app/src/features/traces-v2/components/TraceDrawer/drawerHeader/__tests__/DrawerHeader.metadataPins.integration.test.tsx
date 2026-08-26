@@ -48,7 +48,7 @@ vi.mock("~/components/me/usePersonalFeatureGate", () => ({
   }),
 }));
 
-vi.mock("~/features/presence/components/TracePresenceAvatars", () => ({
+vi.mock("@langwatch/presence-web", () => ({
   TracePresenceAvatars: () => null,
 }));
 

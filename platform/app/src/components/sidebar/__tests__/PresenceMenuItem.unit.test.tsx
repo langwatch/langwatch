@@ -16,7 +16,7 @@ vi.mock("~/features/presence/hooks/usePresenceFeatureEnabled", () => ({
   usePresenceFeatureEnabled: usePresenceFeatureEnabledMock,
 }));
 
-vi.mock("~/features/presence/stores/presencePreferencesStore", () => ({
+vi.mock("@langwatch/presence-web", () => ({
   usePresencePreferencesStore: usePresencePreferencesStoreMock,
 }));
 

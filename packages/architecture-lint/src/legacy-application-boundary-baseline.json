@@ -1058,30 +1058,6 @@
         "../../../../../server/modelProviders/registry",
         "~/server/scopes/scope.types"
       ],
-      "platform/app/src/features/presence/components/PresenceAvatar.tsx": [
-        "~/server/app-layer/presence/types"
-      ],
-      "platform/app/src/features/presence/components/PresenceAvatarStack.tsx": [
-        "~/server/app-layer/presence/types"
-      ],
-      "platform/app/src/features/presence/components/PresenceMarker.tsx": [
-        "~/server/app-layer/presence/types"
-      ],
-      "platform/app/src/features/presence/hooks/usePeerCursors.ts": [
-        "~/server/app-layer/presence/types"
-      ],
-      "platform/app/src/features/presence/hooks/usePresence.ts": [
-        "~/server/app-layer/presence/types"
-      ],
-      "platform/app/src/features/presence/hooks/useTracesV2Presence.ts": [
-        "~/server/app-layer/presence/types"
-      ],
-      "platform/app/src/features/presence/stores/presenceStore.ts": [
-        "~/server/app-layer/presence/types"
-      ],
-      "platform/app/src/features/presence/utils/sessionColor.ts": [
-        "~/server/app-layer/presence/types"
-      ],
       "platform/app/src/features/simulations/sort-scenario-sets.ts": [
         "~/server/scenarios/internal-set-id",
         "~/server/scenarios/scenario-event.types"

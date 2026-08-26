@@ -4138,36 +4138,6 @@
     },
     {
       "feature": "presence",
-      "file": "platform/app/src/features/presence/components/PresenceAvatar.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/components/PresenceAvatarStack.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/components/PresenceMarker.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/components/PresenceSection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/components/SectionPresenceDot.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/components/TracePresenceAvatars.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
       "file": "platform/app/src/features/presence/hooks/useCursorBroadcast.ts",
       "kind": "page-shell"
     },
@@ -4188,33 +4158,8 @@
     },
     {
       "feature": "presence",
-      "file": "platform/app/src/features/presence/hooks/useTabSessionId.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
       "file": "platform/app/src/features/presence/hooks/useTracesV2Presence.ts",
       "kind": "page-shell"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/stores/presencePreferencesStore.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/stores/presenceStore.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/stores/sectionTrackerStore.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "presence",
-      "file": "platform/app/src/features/presence/utils/sessionColor.ts",
-      "kind": "legacy-implementation"
     },
     {
       "feature": "presence",

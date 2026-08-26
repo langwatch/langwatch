@@ -1,10 +1,10 @@
 import { Box, Text } from "@chakra-ui/react";
+import { presenceUserColor, presenceUserDisplayName } from "@langwatch/presence-web";
 import { memo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useCursorBroadcast } from "../hooks/useCursorBroadcast";
 import { type PeerCursor, usePeerCursors } from "../hooks/usePeerCursors";
 import { usePresenceFeatureEnabled } from "../hooks/usePresenceFeatureEnabled";
-import { presenceUserColor, presenceUserDisplayName } from "../utils/sessionColor";
 
 interface PeerCursorOverlayProps {
   /**

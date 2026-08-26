@@ -44,10 +44,7 @@ describe("given the presence avatar stack", () => {
 
   describe("when peer count exceeds max", () => {
     it("collapses the overflow into a +N badge", () => {
-      renderStack(
-        [session("a", "Alice"), session("b", "Bob"), session("c", "Cy")],
-        2,
-      );
+      renderStack([session("a", "Alice"), session("b", "Bob"), session("c", "Cy")], 2);
       expect(screen.getByText("+1")).toBeInTheDocument();
     });
   });

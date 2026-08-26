@@ -179,6 +179,7 @@
     "@langwatch/presence-server": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/presence-web": "workspace:*",
     "@langwatch/project-server": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/prompt-server": "workspace:*",

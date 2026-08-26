@@ -1,8 +1,7 @@
 import { Accordion, Badge, Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { PresenceSection, SectionPresenceDot } from "@langwatch/presence-web";
 import { type ReactNode, useRef } from "react";
 import { LuChevronDown, LuMessageSquare } from "react-icons/lu";
-import { PresenceSection } from "~/features/presence/components/PresenceSection";
-import { SectionPresenceDot } from "~/features/presence/components/SectionPresenceDot";
 import { getDrawerDensityTokens, useDensityStore } from "@langwatch/trace-web";
 import { useSectionPresenceStore } from "./sectionPresence";
 

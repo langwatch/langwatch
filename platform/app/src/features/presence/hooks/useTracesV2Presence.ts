@@ -5,7 +5,7 @@ import type { PresenceLocation } from "@langwatch/presence-contract";
 import {
   selectMostVisibleSection,
   useSectionTrackerStore,
-} from "../stores/sectionTrackerStore";
+} from "@langwatch/presence-web";
 import { usePresence } from "./usePresence";
 import { usePresenceFeatureEnabled } from "./usePresenceFeatureEnabled";
 

@@ -12,7 +12,9 @@ import {
   usePresenceStore,
 } from "../src/presence-store";
 
-function session(overrides: Partial<PresenceSession> & { sessionId: string }): PresenceSession {
+function session(
+  overrides: Partial<PresenceSession> & { sessionId: string },
+): PresenceSession {
   return {
     projectId: "project-1",
     user: { id: overrides.sessionId, name: "Someone", image: null },
@@ -51,11 +53,17 @@ describe("given the presence store", () => {
     it("upserts that session by id", () => {
       usePresenceStore.getState().applyEvent({
         kind: "join",
-        session: session({ sessionId: "a", location: { lens: "traces", route: { traceId: "t1" } } }),
+        session: session({
+          sessionId: "a",
+          location: { lens: "traces", route: { traceId: "t1" } },
+        }),
       });
       usePresenceStore.getState().applyEvent({
         kind: "update",
-        session: session({ sessionId: "a", location: { lens: "traces", route: { traceId: "t2" } } }),
+        session: session({
+          sessionId: "a",
+          location: { lens: "traces", route: { traceId: "t2" } },
+        }),
       });
 
       const state = usePresenceStore.getState();
@@ -93,8 +101,14 @@ describe("given the presence store", () => {
       usePresenceStore.getState().applyEvent({
         kind: "snapshot",
         sessions: [
-          session({ sessionId: "a", location: { lens: "traces", route: { traceId: "t1" } } }),
-          session({ sessionId: "b", location: { lens: "traces", route: { traceId: "t2" } } }),
+          session({
+            sessionId: "a",
+            location: { lens: "traces", route: { traceId: "t1" } },
+          }),
+          session({
+            sessionId: "b",
+            location: { lens: "traces", route: { traceId: "t2" } },
+          }),
         ],
       });
 

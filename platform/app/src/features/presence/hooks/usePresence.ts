@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
 import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
+import {
+  usePresencePreferencesStore,
+  usePresenceStore,
+  useTabSessionId,
+} from "@langwatch/presence-web";
 import { api } from "~/utils/api";
-import { usePresencePreferencesStore } from "../stores/presencePreferencesStore";
-import { usePresenceStore } from "../stores/presenceStore";
-import { useTabSessionId } from "./useTabSessionId";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const LOCATION_DEBOUNCE_MS = 250;

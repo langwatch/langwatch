@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
 import {
+  PresenceMarker,
   selectPeersMatching,
   usePresenceStore,
-} from "~/features/presence/stores/presenceStore";
+} from "@langwatch/presence-web";
 import type { DrawerViewMode } from "../../stores/drawerStore";
 
 interface ModeSwitchProps {

@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
+import { usePresencePreferencesStore, useTabSessionId } from "@langwatch/presence-web";
 import { api } from "~/utils/api";
-import { usePresencePreferencesStore } from "../stores/presencePreferencesStore";
-import { useTabSessionId } from "./useTabSessionId";
 
 const SEND_INTERVAL_MS = 66; // ~15 Hz — imperceptible vs 30 Hz, half the traffic
 
