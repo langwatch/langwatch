@@ -1540,8 +1540,8 @@ describe("given a connection that belongs to another organization", () => {
       expect(foreign.message).toBe(
         missing.message.replace("ssoc_nothing_here", CONNECTION),
       );
-      expect((foreign as { code: string }).code).toBe(
-        (missing as { code: string }).code,
+      expect((foreign as unknown as { code: string }).code).toBe(
+        (missing as unknown as { code: string }).code,
       );
     });
   });

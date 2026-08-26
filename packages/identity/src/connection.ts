@@ -811,6 +811,39 @@ export function emptySsoConnection({
  * A connection past VERIFIED (ACTIVE, SUSPENDED, on its way out) keeps its
  * state — routing is not re-decided by tidying a domain list.
  */
+/**
+ * The lifecycle state after a fact about ONE DOMAIN.
+ *
+ * A connection's lifecycle and its domains are two different things, and past
+ * VERIFIED only the lifecycle verbs may move the lifecycle. Claiming a second
+ * domain on a LIVE connection stated `state: "CLAIMED"`, which
+ * `routingStateOf` reads as INACTIVE — so an administrator adding a
+ * subsidiary's domain stopped everybody on the already-proved domain from
+ * being routed to their identity provider, and getting back required proving
+ * the new domain and activating again. Nothing said so.
+ *
+ * The same set `stateAfterWithdrawal` uses, for the same reason: withdrawal
+ * already knew that a domain leaving must not un-live a connection, and every
+ * other domain fact needed to know it too.
+ */
+function lifecycleAfterDomainFact(
+  state: { state: SsoConnectionLifecycleState },
+  proposed: SsoConnectionLifecycleState,
+): SsoConnectionLifecycleState {
+  return LIFECYCLE_BEYOND_VERIFIED.includes(state.state)
+    ? state.state
+    : proposed;
+}
+
+/** Past these, a domain fact never moves the lifecycle. */
+const LIFECYCLE_BEYOND_VERIFIED: SsoConnectionLifecycleState[] = [
+  "ACTIVE",
+  "SUSPENDED",
+  "TEARDOWN_PENDING",
+  "TORN_DOWN",
+  "DISCARDED",
+];
+
 function stateAfterWithdrawal(state: {
   state: SsoConnectionLifecycleState;
   verifiedDomains: string[];
@@ -818,14 +851,7 @@ function stateAfterWithdrawal(state: {
   pendingVerification: { domain: string } | null;
   domainClaims: SsoDomainClaim[];
 }): SsoConnectionLifecycleState {
-  const beyondVerified: SsoConnectionLifecycleState[] = [
-    "ACTIVE",
-    "SUSPENDED",
-    "TEARDOWN_PENDING",
-    "TORN_DOWN",
-    "DISCARDED",
-  ];
-  if (beyondVerified.includes(state.state)) return state.state;
+  if (LIFECYCLE_BEYOND_VERIFIED.includes(state.state)) return state.state;
   if (state.verifiedDomains.length > 0) return "VERIFIED";
   if (state.pendingVerification !== null) return "VERIFICATION_PENDING";
   if (state.approvedDomains.length > 0) return "APPROVED";
@@ -959,7 +985,7 @@ export function reduceSsoConnection({
     case DOMAIN_CLAIMED_EVENT_TYPE:
       return {
         ...touched,
-        state: "CLAIMED",
+        state: lifecycleAfterDomainFact(state, "CLAIMED"),
         claimedDomains: withDomain(state.claimedDomains, fact.data.domain),
         domainClaims: withClaim(state.domainClaims, {
           domain: fact.data.domain,
@@ -977,7 +1003,7 @@ export function reduceSsoConnection({
     case DOMAIN_CLAIM_APPROVED_EVENT_TYPE:
       return {
         ...touched,
-        state: "APPROVED",
+        state: lifecycleAfterDomainFact(state, "APPROVED"),
         claimedDomains: without(state.claimedDomains, fact.data.domain),
         approvedDomains: withDomain(state.approvedDomains, fact.data.domain),
         domainClaims: decideClaim(state.domainClaims, {
@@ -992,7 +1018,7 @@ export function reduceSsoConnection({
     case DOMAIN_CLAIM_REJECTED_EVENT_TYPE:
       return {
         ...touched,
-        state: "REJECTED",
+        state: lifecycleAfterDomainFact(state, "REJECTED"),
         claimedDomains: without(state.claimedDomains, fact.data.domain),
         domainClaims: decideClaim(state.domainClaims, {
           domain: fact.data.domain,
@@ -1035,7 +1061,7 @@ export function reduceSsoConnection({
     case VERIFICATION_REQUESTED_EVENT_TYPE:
       return {
         ...touched,
-        state: "VERIFICATION_PENDING",
+        state: lifecycleAfterDomainFact(state, "VERIFICATION_PENDING"),
         pendingVerification: {
           domain: fact.data.domain,
           method: fact.data.method,
@@ -1049,7 +1075,7 @@ export function reduceSsoConnection({
     case DOMAIN_ATTESTED_EVENT_TYPE:
       return {
         ...touched,
-        state: "VERIFIED",
+        state: lifecycleAfterDomainFact(state, "VERIFIED"),
         approvedDomains: without(state.approvedDomains, fact.data.domain),
         verifiedDomains: withDomain(state.verifiedDomains, fact.data.domain),
         domainVerifications: withVerification(state.domainVerifications, {
@@ -1069,7 +1095,7 @@ export function reduceSsoConnection({
     case DOMAIN_VERIFIED_EVENT_TYPE:
       return {
         ...touched,
-        state: "VERIFIED",
+        state: lifecycleAfterDomainFact(state, "VERIFIED"),
         approvedDomains: without(state.approvedDomains, fact.data.domain),
         verifiedDomains: withDomain(state.verifiedDomains, fact.data.domain),
         domainVerifications: withVerification(state.domainVerifications, {

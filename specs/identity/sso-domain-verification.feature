@@ -402,6 +402,15 @@ Feature: Proving a domain by publishing a record
     Then it is refused with the code "sso_connection_invalid_transition"
     And the way to stop routing it is removing the connection itself, which is graced and strand-checked
 
+  # ── Adding a domain while the connection is live ───────────────────────
+
+  @unit
+  Scenario: Adding a domain never takes a live connection off the air
+    Given "acme.com" is proved on an ACTIVE connection and people sign in through it
+    When "ana" adds "acme.co.uk" and it moves through claim, approval and proof
+    Then the connection stays ACTIVE at every step, and sign-in on "acme.com" is never interrupted
+    And only activating, suspending or tearing down moves the connection's own state
+
   # ── Somebody else got there first ──────────────────────────────────────
 
   @integration
