@@ -5,6 +5,7 @@ import {
   type NavigationMode,
   useNavigationModeStore,
 } from "~/features/navigation/navigationModeStore";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
@@ -68,7 +69,11 @@ export function AppHeaderUserMenu({
   // show the menu entry while the page it links to 404s.
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
+    {
+      projectId: NOT_TARGETED,
+      organizationId: organization?.id,
+      enabled: !!organization?.id,
+    },
   );
 
   // The navigation-mode preference lives on the device (see

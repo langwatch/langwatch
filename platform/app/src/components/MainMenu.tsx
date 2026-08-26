@@ -1,6 +1,7 @@
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import type React from "react";
 import type { Project } from "~/generated/prisma/client";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -101,6 +102,7 @@ function useCodingAgentLinks(): CodingAgentLinks {
   const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
+      projectId: NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
@@ -199,7 +201,11 @@ function TestSection({
   // holding both would give a person two links to the same work.
   const { enabled: agentTestingEnabled } = useFeatureFlag(
     "release_ui_agent_testing_v2_enabled",
-    { projectId: project?.id, enabled: !!project?.id },
+    {
+      projectId: project?.id,
+      organizationId: NOT_TARGETED,
+      enabled: !!project?.id,
+    },
   );
 
   return (

@@ -55,8 +55,53 @@ export const GENIE_PROVENANCE_SOURCE = "databricks_genie" as const;
  */
 export const GENIE_AGENT_MODEL = "databricks/genie" as const;
 
-/** The puller action this mapper understands. Aggregate pulls never route. */
+/** The action Genie's own profile counts as a conversation. */
 export const GENIE_QUERY_ACTION = "genie_query" as const;
+
+/**
+ * Every agent a routing profile is allowed to name.
+ *
+ * Decision 14(d) rests on the agent identity never resolving in the pricing
+ * table, which held for free while it was one constant nobody outside this
+ * file could reach. Now that a profile carries it, a free-form string would
+ * hand that property away: a source naming `openai/gpt-4o` would put a real
+ * price on a conversation nobody was charged for. Keeping the set closed
+ * moves the question to review time — adding an agent here is the moment to
+ * check the name cannot match a price.
+ */
+export const KNOWN_AGENT_IDENTITIES = [
+  GENIE_AGENT_MODEL,
+  "microsoft/copilot-studio",
+] as const;
+
+export type KnownAgentIdentity = (typeof KNOWN_AGENT_IDENTITIES)[number];
+
+/**
+ * What one source contributes to the shape of a routed conversation.
+ *
+ * These four were Databricks constants while Genie was the only source that
+ * routed. They travel with the source now so a second source's conversations
+ * are not filed under a product the customer does not have — and, in the case
+ * of `conversationAction`, so that one source's events can never be rendered
+ * as another's.
+ */
+export interface ConversationRoutingProfile {
+  /** The puller action that marks an event as a conversation to route. */
+  conversationAction: string;
+  /** Product label for the agent that answered. Never a priced model. */
+  agentModel: KnownAgentIdentity;
+  /** Value of `langwatch.source` — where this conversation came from. */
+  provenanceSource: string;
+  /** OTLP scope name for the batch this source produces. */
+  scopeName: string;
+}
+
+export const GENIE_ROUTING_PROFILE: ConversationRoutingProfile = {
+  conversationAction: GENIE_QUERY_ACTION,
+  agentModel: GENIE_AGENT_MODEL,
+  provenanceSource: GENIE_PROVENANCE_SOURCE,
+  scopeName: "langwatch.ingestion.databricks_genie",
+};
 
 /**
  * The wire shape (verified against the 35-message capture,
@@ -192,6 +237,8 @@ export interface GenieRoutingOrigin {
   ingestionSourceId: string;
   organizationId: string;
   sourceType: string;
+  /** What this source contributes to the conversations it routes. */
+  profile: ConversationRoutingProfile;
 }
 
 function originAttrs(origin: GenieRoutingOrigin) {
@@ -203,7 +250,7 @@ function originAttrs(origin: GenieRoutingOrigin) {
       origin.organizationId,
     ),
     stringAttr("langwatch.ingestion_source.source_type", origin.sourceType),
-    stringAttr(PROVENANCE_ATTR_SOURCE, GENIE_PROVENANCE_SOURCE),
+    stringAttr(PROVENANCE_ATTR_SOURCE, origin.profile.provenanceSource),
   ];
 }
 
@@ -228,15 +275,30 @@ function extraString(
 }
 
 /**
- * Map one run's Genie events to a single OTLP trace request. Returns null
- * when nothing routes (no conversation-bearing events in the batch).
+ * Map one run's conversation events to a single OTLP trace request. Returns
+ * null when nothing routes (no conversation-bearing events in the batch).
+ *
+ * The action filter is the last guard standing between a source's events and
+ * a customer's trace project: `routeConversationsToTraceDestination` runs for
+ * every source, the destination column is written without any check of the
+ * source type, and `mapMessage` below builds a span for whatever it is given.
+ * Without this line an Anthropic Admin source that acquired a destination
+ * would have its billing rows rendered as messages someone said.
  */
-export function mapGenieEventsToTraceRequest(
-  events: NormalizedPullEvent[],
-  origin: GenieRoutingOrigin,
-): IExportTraceServiceRequest | null {
-  const spans = events
-    .filter((event) => event.action === GENIE_QUERY_ACTION)
+export function mapGenieEventsToTraceRequest({
+  events,
+  origin,
+}: {
+  events: NormalizedPullEvent[];
+  origin: GenieRoutingOrigin;
+}): IExportTraceServiceRequest | null {
+  // `action` is typed as a string but arrives from a puller's own mapping, so
+  // an event that never set one reads as undefined at runtime. Requiring a
+  // non-empty action on both sides keeps two absences from matching each
+  // other and routing an event nothing ever claimed.
+  const wanted = origin.profile.conversationAction;
+  const spans = (wanted ? events : [])
+    .filter((event) => !!event.action && event.action === wanted)
     .filter((event) => isSettledForRouting(event))
     .flatMap((event) => mapMessage(event, origin));
   if (spans.length === 0) return null;
@@ -246,7 +308,7 @@ export function mapGenieEventsToTraceRequest(
         resource: { attributes: [], droppedAttributesCount: 0 },
         scopeSpans: [
           {
-            scope: { name: "langwatch.ingestion.databricks_genie" },
+            scope: { name: origin.profile.scopeName },
             spans,
           },
         ],
@@ -413,7 +475,10 @@ function rootAttributesOf(
       JSON.stringify({ type: "chat_messages", value: [assistantMessage] }),
     ),
     // Agent identity, not a priced model (Decision 14(d) pins no price match).
-    stringAttr("gen_ai.request.model", GENIE_AGENT_MODEL),
+    // Now that the value varies, `KNOWN_AGENT_IDENTITIES` is what keeps it
+    // true — at compile time only. Every profile is a code literal the
+    // compiler checks, so nothing re-checks this at runtime.
+    stringAttr("gen_ai.request.model", frame.origin.profile.agentModel),
     stringAttr("databricks.genie.message_id", frame.messageId),
     stringAttr("databricks.genie.conversation_id", frame.conversationId),
     ...originAttrs(frame.origin),

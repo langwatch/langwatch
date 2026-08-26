@@ -441,9 +441,10 @@ secured.access(directUploadSessionAuth).put(
     // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
     // Notes on the non-obvious ones: UploadNotPendingError (→ 409) means no
     // pending row owns this staging key (fabricated/replayed uploadId or already
-    // finalized — an orphan write); StorageNotWritableError (→ 500, not the
-    // 409 fallback) means the local-FS root isn't writable, so the browser must
-    // NOT mistake it for "no object storage" and fall back.
+    // finalized, an orphan write); StorageNotWritableError is handled
+    // (`storage_not_writable`, 500, platform fault) and answers with its own
+    // code, so the browser must NOT mistake it for "no object storage" and
+    // fall back.
     await service.writeStagedUpload({
       projectId: auth.projectId,
       uploadId,

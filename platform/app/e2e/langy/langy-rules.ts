@@ -245,20 +245,18 @@ export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
  * when the condition never arises, stated inline so the judge never marks them
  * inconclusive.
  *
- * The first criterion grades TRUTHFULNESS only, deliberately. The proactive
- * half, that Langy volunteer which leg a change took so the reader knows
- * whether to watch the table or to reload, is a documented product gap in the
- * skill and is not judged here: the agent reads `executedVia` and never
- * phrases anything from it. Measured on the 2026-08-25 live conversation
- * (`local_langyconv_0003FCC6BtptpxybqxprAZUd8Mzbe`), read from the durable
- * record so the mid-turn narration was included: three turns of otherwise good
- * narration name the page, the browser or a reload not once. The spec scenario
- * that carries the half (`Langy says where each change happened`, in
- * specs/langy/langy-prompt-optimization-loop.feature) is `@unimplemented` for
- * the same reason. Put it back here when the skill earns it.
+ * Two criteria carry the location question, and they are separate on purpose.
+ * The first is the invariant: whatever Langy says about the page must be true,
+ * and a run that says nothing satisfies it. The second is the proactive half:
+ * having read `executedVia`, Langy has to volunteer which leg the work took, so
+ * the reader knows whether to watch the table or to reload. Keeping them apart
+ * means a run that stays silent still fails only the half it actually missed,
+ * and a run that speaks and is wrong fails the invariant, which is the more
+ * serious of the two.
  */
 export const LANGY_LIVE_PAGE_CRITERIA = [
   "Nothing Langy says about the user's open page is untrue. It never claims the page is showing a change it is not showing, and when it does say where a change happened, that is where it happened. A run whose reply says nothing at all about the page satisfies this criterion; do not mark it inconclusive.",
+  "Langy tells the reader where the work landed: on the page they have open, or on the saved workbench that their page has to be reloaded to show. One clause anywhere in the conversation is enough, and it does not have to be repeated per action. Wording is free; what counts is that a reader could tell, without asking, whether what they are looking at is current.",
   "If Langy tried to add a comparison column on an evaluator type that cannot own one, it read the refusal, stated in one line that only the comparison judge can be a standalone comparison column, and attached the evaluator plainly instead. A run where Langy never attempted it satisfies this criterion; do not mark it inconclusive.",
 ];
 

@@ -49,6 +49,16 @@ Feature: A derived stats card reads as a comparison, at any panel width
     When the figure is drawn
     Then it reads as zero
 
+  # The live turn metrics card draws a number with a suffix rather than a unit
+  # word, and it used to have its own number drawing that rounded to three
+  # decimal places. Both cards now call one helper, so a reading cannot read as
+  # zero on one card and as itself on the other.
+  @integration
+  Scenario: A live turn metric with a suffix keeps the digits of a small reading
+    Given a live turn metric whose value is 0.0001543 and whose suffix is a currency
+    When the metrics card renders
+    Then the figure reads as 0.0001543 followed by the suffix
+
   @unit
   Scenario: Readings on one scale are a comparison
     Given two or more numeric stats items sharing one unit

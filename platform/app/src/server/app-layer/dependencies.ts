@@ -15,6 +15,7 @@ import type { UsageLimitService } from "../../../ee/billing/notifications/usage-
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { BillableEventsClickHouseRepository } from "../../../ee/billing/services/billableEvents.clickhouse.repository";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { ActivityMonitorClickHouseRepository } from "../../../ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -274,6 +275,9 @@ export interface AppDependencies {
     kpis: GovernanceKpisClickHouseRepository | undefined;
     /** The /me dashboard's spend/token/model rollups. */
     personalUsage: PersonalUsageClickHouseRepository | undefined;
+    /** The /governance activity-monitor read side (spend rollups, per-source
+     *  events and health). Undefined on a deployment without ClickHouse. */
+    activityMonitor: ActivityMonitorClickHouseRepository | undefined;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */

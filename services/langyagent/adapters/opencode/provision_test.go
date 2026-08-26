@@ -13,6 +13,47 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/internal/workerenv"
 )
 
+// A stand-in for the embedded AGENTS.md. It carries no placeholder, because
+// the provision renders nothing into the template: whatever is in the prompt
+// can reach the user in a reply.
+const agentsTemplateFixture = "# AGENTS\nOperating contract.\n"
+
+// The prompt used to be rendered per worker, which put the worker's own
+// endpoint into the one paragraph that forbids giving the user internal
+// addresses. The substitution is gone, so the template must arrive intact.
+//
+// @scenario "The prompt reaches the worker exactly as it was written"
+func TestProvision_WritesTheAgentsTemplateUnchanged(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+		t.Fatalf("mkdir shared skills: %v", err)
+	}
+	err := NewAgent(0).Provision(ProvisionInput{
+		Home:          home,
+		WorkspaceRoot: workspace,
+		Creds: domain.Credentials{
+			LangwatchAPIKey:   "sk-lw-test-key",
+			LLMVirtualKey:     "vk-test",
+			GatewayBaseURL:    "https://gateway.test",
+			LangwatchEndpoint: "https://app.test",
+		},
+		UID:            0,
+		AgentsTemplate: agentsTemplateFixture,
+		Runner:         localunsafe.Runner{},
+	})
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(home, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	if string(got) != agentsTemplateFixture {
+		t.Errorf("AGENTS.md = %q, want the template written through unchanged (%q)", got, agentsTemplateFixture)
+	}
+}
+
 func TestWorkerBaseEnv_AllowsOnlyExplicitKeys(t *testing.T) {
 	for k, v := range map[string]string{
 		"LANGY_INTERNAL_SECRET": "must-not-leak",
@@ -413,7 +454,7 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 		WorkspaceRoot:  workspace,
 		Creds:          creds,
 		UID:            0,
-		AgentsTemplate: "# AGENTS\n${LANGWATCH_ENDPOINT}\n",
+		AgentsTemplate: agentsTemplateFixture,
 		Runner:         localunsafe.Runner{},
 	})
 	if err != nil {

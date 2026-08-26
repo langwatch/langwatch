@@ -1,10 +1,15 @@
+/**
+ * The workbench's saved versions, as a list.
+ *
+ * It is rendered inside the popover the history button anchors
+ * (`VersionHistoryButton`). The list owns the query, the current badge and the
+ * two-step restore; the popover only gives it a place to sit.
+ */
 import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useCan } from "~/hooks/useCan";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -211,7 +216,7 @@ function VersionRow({
   );
 }
 
-function VersionList({
+export function VersionList({
   experimentId,
   experimentSlug,
   onRestored,
@@ -294,40 +299,5 @@ function VersionList({
         this list is lost.
       </Text>
     </>
-  );
-}
-
-export function VersionHistoryDrawer({
-  experimentId,
-  experimentSlug,
-}: {
-  experimentId: string;
-  experimentSlug: string;
-}) {
-  const { closeDrawer } = useDrawer();
-
-  return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="md"
-      onOpenChange={closeDrawer}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Text fontWeight="semibold" fontSize="lg">
-            Version history
-          </Text>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VersionList
-            experimentId={experimentId}
-            experimentSlug={experimentSlug}
-            onRestored={closeDrawer}
-          />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
   );
 }

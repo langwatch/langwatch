@@ -61,8 +61,11 @@ const SMALL_MAGNITUDE_SIGNIFICANT_DIGITS = 6;
  * A reading as a reader should see it. Small magnitudes keep significant
  * digits rather than decimal places, so they never read as zero; everything
  * else keeps the grouped, three-decimal drawing that suits a whole number.
+ *
+ * This is the one rule for drawing a number a reader sees on a card, shared
+ * with the live turn metrics of `StreamingStatCard`.
  */
-const formatNumber = (value: number): string => {
+export const formatStatNumber = (value: number): string => {
   // `toLocaleString` keeps the sign of negative zero, so a reading of -0 would
   // be drawn as "-0". Zero is zero to a reader.
   const reading = value === 0 ? 0 : value;
@@ -81,7 +84,7 @@ export const formatStatFigure = ({
   value: string | number;
   unit?: string;
 }): string => {
-  const number = typeof value === "number" ? formatNumber(value) : value;
+  const number = typeof value === "number" ? formatStatNumber(value) : value;
   const resolved = resolveStatUnit(unit);
   if (!resolved) return number;
   return `${number}${resolved.isSpaced ? " " : ""}${resolved.display}`;
