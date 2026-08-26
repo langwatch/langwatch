@@ -95,8 +95,16 @@ export const copilotStudioDataversePullConfigSchema = z.object({
    * Which agents to read. Empty means every agent the credential can see,
    * which is what most customers want and what silently starts covering an
    * agent the day someone creates one.
+   *
+   * Required to be a uuid because the id is written into the `$filter` as a
+   * bare `Edm.Guid` literal, which is the only form Dataverse accepts for a
+   * lookup column. Bare means unquoted, and unquoted means an id that is not a
+   * guid would be read as part of the filter expression rather than as a value
+   * — so the shape that makes the query correct is the same shape that keeps
+   * anything else out of it. A malformed id is refused here, where the source
+   * says why, instead of arriving as an opaque HTTP 400 on every run.
    */
-  botIds: z.array(z.string()).default([]),
+  botIds: z.array(z.string().uuid()).default([]),
 });
 
 export type CopilotStudioDataverseConfig = z.infer<
@@ -261,11 +269,6 @@ async function resolveEnvironmentToken(params: {
   return parsed.data.access_token;
 }
 
-/** OData string literals escape a single quote by doubling it. */
-function odataQuote(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
 /**
  * Where a run picks up from, as OData.
  *
@@ -302,8 +305,15 @@ function buildFirstPageUrl(params: {
     ? continuationFilters(cursor)
     : [`createdon ge ${new Date(now - FIRST_RUN_LOOKBACK_MS).toISOString()}`];
   if (config.botIds.length > 0) {
+    // Bare, not quoted. The lookup column is an `Edm.Guid`, and Dataverse
+    // refuses to compare one against a string literal: a quoted id answers
+    // every run with "a binary operator with incompatible types was detected",
+    // an HTTP 400 that names neither the filter nor the column. The schema
+    // requires these to be uuids, which is what makes writing them unquoted
+    // safe. Contrast the transcript id in `continuationFilters`, which is the
+    // same column type and already bare for the same reason.
     const clause = config.botIds
-      .map((id) => `_bot_conversationtranscriptid_value eq ${odataQuote(id)}`)
+      .map((id) => `_bot_conversationtranscriptid_value eq ${id}`)
       .join(" or ");
     filters.push(`(${clause})`);
   }

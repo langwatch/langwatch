@@ -90,7 +90,21 @@ function evaluateFilter(filter: string, row: Record<string, unknown>): boolean {
   function compare(field: string, operator: string, literal: string): boolean {
     const raw = row[field];
     if (typeof raw !== "string") return false;
-    const value = literal.replace(/^'/, "").replace(/'$/, "");
+    // Every column this adapter filters on is a guid or a datetime, and
+    // Dataverse refuses to compare either against a string literal — "a binary
+    // operator with incompatible types was detected", answered as an HTTP 400
+    // that names neither the column nor the filter. So a quote here is the
+    // adapter emitting a query the real server would reject, and the double
+    // has to say so rather than quietly stripping it: a double more permissive
+    // than the server it stands in for is how the agent-id filter shipped
+    // broken behind a full green suite.
+    if (literal.startsWith("'") || literal.endsWith("'")) {
+      throw new Error(
+        `Dataverse would refuse "${field} ${operator} ${literal}": a quoted ` +
+          "literal against a non-string column",
+      );
+    }
+    const value = literal;
     const order =
       field === "createdon"
         ? Math.sign(Date.parse(raw) - Date.parse(value))
@@ -602,6 +616,50 @@ describe("given a run against an environment holding one conversation", () => {
     // asking further back only spends the run on rows that are not there.
     expect(days).toBeGreaterThan(29);
     expect(days).toBeLessThan(31);
+  });
+});
+
+describe("given a config naming which agents to read", () => {
+  const SECOND_BOT_ID = "5f1b0a2e-1111-4000-8000-0000000000ab";
+
+  it("names each agent id in the filter as a bare guid", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    transcripts = { rows: [transcriptRow()], pageSize: 10 };
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig({ ...CONFIG, botIds: [BOT_ID, SECOND_BOT_ID] }),
+    );
+
+    // The row still arrives: the filter the adapter built is one the server
+    // ran, rather than one it refused. This is the half a `toContain` on the
+    // URL cannot see — a quoted id reads perfectly well as a string and is
+    // answered with an HTTP 400.
+    expect(result.errorCount).toBe(0);
+    expect(result.events).toHaveLength(1);
+
+    const query = decodeURIComponent(transcriptCall().url);
+    expect(query).toContain(
+      `(_bot_conversationtranscriptid_value eq ${BOT_ID} or ` +
+        `_bot_conversationtranscriptid_value eq ${SECOND_BOT_ID})`,
+    );
+    // The column is an `Edm.Guid`. Dataverse compares one against a guid
+    // literal and refuses to compare it against a string, so the quotes that
+    // would be right for a name are the whole failure here.
+    expect(query).not.toContain(`eq '${BOT_ID}'`);
+  });
+
+  it("refuses an agent id that is not a guid at validation rather than at run time", async () => {
+    const adapter = await newAdapter();
+
+    // Whatever someone typed, it cannot go into the filter unquoted, and it
+    // cannot go in quoted either. Saying so here names the field; letting it
+    // through spends a run to be told "incompatible types" by a server that
+    // mentions no field at all.
+    expect(() =>
+      adapter.validateConfig({ ...CONFIG, botIds: ["engineering-agent"] }),
+    ).toThrow();
   });
 });
 
