@@ -147,6 +147,36 @@ describe("given a response steering the next page somewhere else", () => {
     expect(result.errorCount).toBe(1);
   });
 
+  /** @scenario "A next page cannot move the token to another tenant" */
+  it("refuses a next-page link to a different Dataverse environment", async () => {
+    const adapter = await newAdapter();
+    queueSignIn();
+    responseQueue.push({
+      status: 200,
+      body: {
+        value: [transcriptRow()],
+        // A real Power Platform address, served by Microsoft, passing every
+        // suffix the allowlist holds — and belonging to somebody else.
+        "@odata.nextLink":
+          "https://org99999.crm.dynamics.com/api/data/v9.2/conversationtranscripts?$skiptoken=x",
+      },
+    });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    // The sign-in and the first page, and nothing after: the request that
+    // would have followed this link carries the bearer token.
+    expect(capturedCalls).toHaveLength(2);
+    for (const call of capturedCalls) {
+      expect(call.url).not.toContain("org99999");
+    }
+    expect(result.events).toHaveLength(1);
+    expect(result.errorCount).toBe(1);
+  });
+
   it("follows a next-page link that stays on the environment host", async () => {
     const adapter = await newAdapter();
     queueSignIn();

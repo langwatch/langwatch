@@ -32,6 +32,7 @@ import { COPILOT_CONVERSATION_ACTION } from "./copilotStudioTraceMapper";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   isDataverseEnvironmentOrigin,
+  isSameDataverseEnvironment,
 } from "./dataverseEnvironment";
 import type {
   NormalizedPullEvent,
@@ -367,21 +368,27 @@ function runIsOver(options: PullRunOptions): boolean {
 }
 
 /**
- * Whether the server pointed the walk at a host that is not the customer's
+ * Whether the server pointed the walk at a URL that is not the customer's own
  * environment, in which case the walk stops where it is.
  *
  * The next page is a URL out of the response body, and the request that
  * follows it carries the access token. `followRedirects: false` stops the
  * server bouncing the credential somewhere else, and this is the same hop by
- * another name — the host allowlist has to hold for every request that
- * carries the secret, not only the first.
+ * another name — the check has to hold for every request that carries the
+ * secret, not only the first.
+ *
+ * It is the configured environment that is required here, not merely a host
+ * Microsoft serves. Every tenant's environment is a Microsoft host, so a
+ * suffix check alone would let a link move the token from this customer's
+ * environment to somebody else's.
  */
 function refusesNextLink(params: {
   link: string | null;
+  environmentUrl: string;
   walk: TranscriptWalk;
 }): boolean {
-  const { link, walk } = params;
-  if (!link || isDataverseEnvironmentOrigin(link)) return false;
+  const { link, environmentUrl, walk } = params;
+  if (!link || isSameDataverseEnvironment(link, environmentUrl)) return false;
   walk.errorCount += 1;
   logger.error(
     "copilot studio dataverse: refusing a next-page link outside the environment host",
@@ -476,7 +483,15 @@ export class CopilotStudioDataversePuller
       readPageRows({ page, walk });
 
       const nextLink = page["@odata.nextLink"] ?? null;
-      if (refusesNextLink({ link: nextLink, walk })) break;
+      if (
+        refusesNextLink({
+          link: nextLink,
+          environmentUrl: config.environmentUrl,
+          walk,
+        })
+      ) {
+        break;
+      }
       url = nextLink;
     }
 

@@ -49,6 +49,16 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     # The customer therefore consents to Dataverse access only. No directory
     # permission is requested, and none is needed.
 
+  @unit
+  Scenario: A next page cannot move the token to another tenant
+    Given the puller is reading from the customer's environment
+    When a response offers a next page at a different Power Platform environment
+    Then the puller stops rather than following it
+    And the rows it already read are kept
+    # Every tenant's environment is a Microsoft address, so "is this a
+    # Dataverse host" is not the question worth asking of a URL the run is
+    # about to send the access token to.
+
   # --- Stitching a chopped conversation back together ---
 
   @integration

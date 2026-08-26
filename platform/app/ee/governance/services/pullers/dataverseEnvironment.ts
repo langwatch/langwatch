@@ -40,6 +40,31 @@ const DATAVERSE_ENVIRONMENT_HOST_SUFFIXES = [
   ".dynamics.cn", // China, operated by 21Vianet
 ] as const;
 
+/**
+ * Whether a URL is the very environment the source is configured against.
+ *
+ * `isDataverseEnvironmentOrigin` answers a broader question — whether Microsoft
+ * serves this host at all — and every tenant's environment passes it. That is
+ * the right check for an address an admin typed, and the wrong one for a URL
+ * the walk is about to send the token to: a link to another tenant's
+ * environment is a Microsoft address, and forwarding the credential there is
+ * still forwarding it to a stranger.
+ */
+export function isSameDataverseEnvironment(
+  value: string,
+  environmentUrl: string,
+): boolean {
+  if (!isDataverseEnvironmentOrigin(value)) return false;
+  try {
+    // `origin` normalises scheme, host case and default ports, so a link that
+    // differs from the configured address only in those respects still counts
+    // as the same environment.
+    return new URL(value).origin === new URL(environmentUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
 export function isDataverseEnvironmentOrigin(value: string): boolean {
   let url: URL;
   try {
