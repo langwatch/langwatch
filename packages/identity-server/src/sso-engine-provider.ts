@@ -1,5 +1,6 @@
 import type { SsoConnectionState } from "@langwatch/identity";
 import type { SsoCredentialStore } from "./sso-credential-store";
+import { withoutTrailingSlashes } from "./trailing-slash";
 import {
   discoveryEndpointFor,
   parseSamlIdpConfig,
@@ -203,7 +204,7 @@ export function serviceProviderDetailsFor({
   baseUrl: string;
   connectionId: string | null;
 }): SsoServiceProviderDetails {
-  const auth = `${baseUrl.replace(/\/+$/, "")}/api/auth`;
+  const auth = `${withoutTrailingSlashes(baseUrl)}/api/auth`;
   // Before a connection exists there is nothing to key the per-provider paths
   // on, so the placeholder says what will replace it. An administrator
   // reading the screen before they register is being shown the SHAPE, and a

@@ -5,6 +5,7 @@ import {
   SsoSamlMetadataInvalidError,
 } from "@langwatch/identity";
 import { z } from "zod";
+import { withoutTrailingSlashes } from "./trailing-slash";
 
 /**
  * What an administrator hands over to register their identity provider, and
@@ -165,7 +166,7 @@ export async function validateOidcRegistration({
  * to one address.
  */
 export function discoveryEndpointFor({ issuer }: { issuer: string }): string {
-  return `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`;
+  return `${withoutTrailingSlashes(issuer)}/.well-known/openid-configuration`;
 }
 
 /**

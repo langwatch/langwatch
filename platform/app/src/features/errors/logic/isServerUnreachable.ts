@@ -66,7 +66,7 @@ export function isServerUnreachable(error: unknown): boolean {
 function messageOf(error: unknown): string | null {
   if (typeof error === "string") return error.toLowerCase();
   if (error instanceof Error) return error.message.toLowerCase();
-  if (typeof error === "object" && error !== null && "message" in error) {
+  if (error && typeof error === "object" && "message" in error) {
     const { message } = error as { message?: unknown };
     return typeof message === "string" ? message.toLowerCase() : null;
   }
@@ -78,7 +78,7 @@ function messageOf(error: unknown): string | null {
  * transport failure has none of it — no HTTP status, no code, no shape.
  */
 function carriesAResponse(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
+  if (!error || typeof error !== "object") return false;
   const { data } = error as { data?: unknown };
   if (typeof data !== "object" || data === null) return false;
   const { httpStatus, code } = data as {
