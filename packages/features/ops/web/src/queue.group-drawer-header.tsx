@@ -1,5 +1,5 @@
 import { Button, HStack, Spacer, Text } from "@chakra-ui/react";
-import { LuCopy, LuExternalLink } from "react-icons/lu";
+import { Copy, ExternalLink } from "lucide-react";
 
 export function GroupDrawerHeader({
   groupId,
@@ -24,20 +24,20 @@ export function GroupDrawerHeader({
         onClick={onCopyGroupId}
         flexShrink={0}
       >
-        <LuCopy size={12} />
+        <Copy size={12} />
       </Button>
       <Spacer />
       {tracesUrl && (
         <Button size="2xs" variant="outline" asChild flexShrink={0}>
           <a href={tracesUrl} target="_blank" rel="noreferrer">
-            Traces <LuExternalLink size={11} />
+            Traces <ExternalLink size={11} />
           </a>
         </Button>
       )}
       {logsUrl && (
         <Button size="2xs" variant="outline" asChild flexShrink={0}>
           <a href={logsUrl} target="_blank" rel="noreferrer">
-            Logs <LuExternalLink size={11} />
+            Logs <ExternalLink size={11} />
           </a>
         </Button>
       )}

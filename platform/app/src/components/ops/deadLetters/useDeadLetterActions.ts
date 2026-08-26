@@ -4,7 +4,7 @@ import {
   mutationOutcomeHandlers,
 } from "~/components/ops/shared/mutationOutcome";
 import { api } from "~/utils/api";
-import type { DeadLetterMessage } from "./DeadLettersCard";
+import type { DeadLetterMessage } from "@langwatch/ops-web";
 
 /** Which bulk act is awaiting confirmation, if any. */
 export type BulkDeadLetterAction = "redrive" | "discard" | null;

@@ -1,15 +1,18 @@
 import { CodeBlock } from "@chakra-ui/react";
 import { useState } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { GroupDetailContent, GroupDrawerHeader } from "@langwatch/ops-web";
 import { Drawer } from "~/components/ui/drawer";
-import { useShikiAdapter } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
+import { useShikiAdapter } from "@langwatch/trace-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
-import { grafanaGroupLogsUrl, grafanaGroupTracesUrl } from "~/utils/grafanaLinks";
+import {
+  grafanaGroupLogsUrl,
+  grafanaGroupTracesUrl,
+  grafanaTraceUrl,
+} from "~/utils/grafanaLinks";
 import { GroupActionConfirms, GroupDrawerActions } from "./GroupActionConfirms";
-import { GroupDetailContent } from "./GroupDetailContent";
-import { GroupDrawerHeader } from "./GroupDrawerHeader";
 import { useGroupActions } from "./useGroupActions";
 
 interface Props {
@@ -76,7 +79,9 @@ export function GroupDetailDrawer({ queueName = "", groupId = "" }: Props) {
               onJobsPageChange={setJobsPage}
               jobFilter={jobFilter}
               onJobFilterChange={setJobFilter}
-              grafana={grafana}
+              traceUrlForTraceId={(traceId) =>
+                grafana ? grafanaTraceUrl(traceId, grafana) : null
+              }
               now={detailQuery.dataUpdatedAt || undefined}
             />
           </CodeBlock.AdapterProvider>

@@ -22,16 +22,20 @@ export function readJobContext(
   data: Record<string, unknown> | null,
 ): JobContextInfo | null {
   const ctx = data?.__context;
-  if (!ctx || typeof ctx !== "object") return null;
-  const rec = ctx as Record<string, unknown>;
+  if (!isRecord(ctx)) return null;
+
   const info: JobContextInfo = {
-    traceId: readString(rec, "traceId"),
-    projectId: readString(rec, "projectId"),
-    userId: readString(rec, "userId"),
-    organizationId: readString(rec, "organizationId"),
+    traceId: readString(ctx, "traceId"),
+    projectId: readString(ctx, "projectId"),
+    userId: readString(ctx, "userId"),
+    organizationId: readString(ctx, "organizationId"),
   };
   const hasAny = info.traceId ?? info.projectId ?? info.userId ?? info.organizationId;
   return hasAny ? info : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** The routing identity of a job, read from its machinery fields. */

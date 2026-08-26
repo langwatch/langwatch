@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { api } from "~/utils/api";
-import type { PausedSchedule } from "./PausedSchedulesSection";
+import type { PausedSchedule } from "@langwatch/ops-web";
 
 /** How many switched-off schedules the panel lists before it says so. */
 const PAGE_SIZE = 50;

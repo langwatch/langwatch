@@ -1,13 +1,10 @@
 import { Badge, Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { formatBytes, formatTimeAgo } from "@langwatch/ops-web";
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
-import { PinnedAwareJsonView } from "~/features/traces-v2/components/TraceDrawer/JsonHighlight";
-import { type GrafanaDeepLinkConfig, grafanaTraceUrl } from "~/utils/grafanaLinks";
-import { middleEllipsis } from "../clusterGroups";
-import { type JobContextInfo, readJobContext, readJobKind } from "./jobContext";
-
-const NO_PINNED_KEYS: ReadonlySet<string> = new Set();
+import { formatBytes, formatTimeAgo } from "./formatters";
+import { JsonViewer } from "./json-viewer";
+import { middleEllipsis } from "./queue.cluster-groups";
+import { type JobContextInfo, readJobContext, readJobKind } from "./queue.job-context";
 
 function ContextRow({
   label,
@@ -148,16 +145,16 @@ function JobContextRows({
 export function GroupJobCard({
   job,
   now,
-  grafana,
+  traceUrlForTraceId,
 }: {
   job: JobEntry;
   now: number;
-  grafana?: GrafanaDeepLinkConfig | null;
+  traceUrlForTraceId?: (traceId: string) => string | null;
 }) {
   const [showJson, setShowJson] = useState(false);
   const context = readJobContext(job.data);
   const traceHref =
-    context?.traceId && grafana ? grafanaTraceUrl(context.traceId, grafana) : null;
+    context?.traceId && traceUrlForTraceId ? traceUrlForTraceId(context.traceId) : null;
 
   return (
     <Card.Root variant="outline">
@@ -178,10 +175,7 @@ export function GroupJobCard({
             maxHeight="280px"
             overflow="auto"
           >
-            <PinnedAwareJsonView
-              content={JSON.stringify(job.data)}
-              pinnedKeys={NO_PINNED_KEYS}
-            />
+            <JsonViewer data={job.data} maxHeight="280px" />
           </Box>
         )}
       </Card.Body>

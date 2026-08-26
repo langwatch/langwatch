@@ -1,18 +1,14 @@
-import {
-  Box,
-  Collapsible,
-  HStack,
-  IconButton,
-  Spinner,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Collapsible, HStack, IconButton, Table, Text } from "@chakra-ui/react";
+import type { ParkedTenant } from "@langwatch/ops-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
-import type { DashboardData } from "@langwatch/ops-contract";
-import { middleEllipsis } from "@langwatch/ops-web";
-import { formatCount, formatTimeAgo } from "@langwatch/ops-web";
-import { api } from "~/utils/api";
+import { formatCount, formatTimeAgo } from "./formatters";
+import { middleEllipsis } from "./queue.cluster-groups";
+
+export type ParkedGroupsRender = (
+  tenant: Pick<ParkedTenant, "tenantId" | "queueName">,
+) => ReactNode;
 
 /**
  * Which tenants are parked, and how badly.
@@ -29,7 +25,12 @@ import { api } from "~/utils/api";
 export function ParkedTenantsSection({
   parkedTenants,
   parkedTenantsBound,
-}: Pick<DashboardData, "parkedTenants" | "parkedTenantsBound">) {
+  renderParkedGroups,
+}: {
+  parkedTenants: ParkedTenant[];
+  parkedTenantsBound: { total: number; included: number };
+  renderParkedGroups?: ParkedGroupsRender;
+}) {
   if (parkedTenants.length === 0) return null;
 
   return (
@@ -73,6 +74,7 @@ export function ParkedTenantsSection({
                 queueName={tenant.queueName}
                 groupCount={tenant.groupCount}
                 oldestParkedMs={tenant.oldestParkedMs}
+                renderParkedGroups={renderParkedGroups}
               />
             ))}
           </Table.Body>
@@ -87,11 +89,13 @@ function ParkedTenantRow({
   queueName,
   groupCount,
   oldestParkedMs,
+  renderParkedGroups,
 }: {
   tenantId: string;
   queueName: string;
   groupCount: number;
   oldestParkedMs: number | null;
+  renderParkedGroups?: ParkedGroupsRender;
 }) {
   const [open, setOpen] = useState(false);
   // The disclosed content is a SIBLING row, not a descendant of the button, so
@@ -138,89 +142,12 @@ function ParkedTenantRow({
           <Table.Cell colSpan={5} padding={0}>
             <Collapsible.Root open>
               <Collapsible.Content id={panelId}>
-                <ParkedGroupList queueName={queueName} tenantId={tenantId} />
+                {renderParkedGroups?.({ tenantId, queueName })}
               </Collapsible.Content>
             </Collapsible.Root>
           </Table.Cell>
         </Table.Row>
       )}
     </>
-  );
-}
-
-/**
- * A tenant's parked groups, read live rather than from the snapshot.
- *
- * A parking storm holds far too many groups to ship in a snapshot every pod
- * reads, so the members are fetched only for the tenant an operator opened.
- */
-function ParkedGroupList({
-  queueName,
-  tenantId,
-}: {
-  queueName: string;
-  tenantId: string;
-}) {
-  const query = api.ops.listParkedGroups.useQuery(
-    { queueName, tenantId, page: 1, pageSize: 20 },
-    { refetchInterval: 10_000 },
-  );
-
-  if (query.isLoading) {
-    return (
-      <HStack paddingX={6} paddingY={3} gap={2}>
-        <Spinner size="xs" />
-        <Text textStyle="xs" color="fg.muted">
-          Loading parked groups
-        </Text>
-      </HStack>
-    );
-  }
-
-  // A failed read is not an empty result. Rendering "nothing is parked any
-  // more" over an error tells the operator the problem resolved itself during
-  // the incident that broke the query.
-  if (query.isError) {
-    return (
-      <Text textStyle="xs" color="red.500" paddingX={6} paddingY={3}>
-        Could not load this tenant's parked groups. The count above still stands — do not
-        read this as cleared.
-      </Text>
-    );
-  }
-
-  const groups = query.data?.groups ?? [];
-  if (groups.length === 0) {
-    return (
-      <Text textStyle="xs" color="fg.muted" paddingX={6} paddingY={3}>
-        This tenant dropped below its limit — nothing is parked any more.
-      </Text>
-    );
-  }
-
-  return (
-    <Box paddingX={6} paddingY={2} background="bg.subtle">
-      {query.data && query.data.total > groups.length && (
-        <Text textStyle="xs" color="fg.muted" paddingBottom={1}>
-          Showing {groups.length} of {formatCount(query.data.total)} parked groups
-        </Text>
-      )}
-      {groups.map((group) => (
-        <HStack key={group.groupId} gap={3} paddingY={1}>
-          <Text fontFamily="mono" textStyle="xs" title={group.groupId} flex="1" truncate>
-            {middleEllipsis(group.groupId, 64)}
-          </Text>
-          <Text textStyle="xs" color="fg.muted">
-            {group.pipelineName ?? "—"}
-          </Text>
-          <Text textStyle="xs" color="fg.muted" minWidth="70px">
-            {group.pendingJobs} pending
-          </Text>
-          <Text textStyle="xs" color="fg.muted" minWidth="70px">
-            {formatTimeAgo(group.oldestJobMs)}
-          </Text>
-        </HStack>
-      ))}
-    </Box>
   );
 }

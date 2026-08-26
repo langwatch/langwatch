@@ -5,11 +5,12 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DeadLetterAttemptHistory,
   type DeadLetterMessage,
   DeadLetterSummary,
   DeadLettersEmpty,
   DeadLettersTable,
-} from "../DeadLettersCard";
+} from "../src/ops.dead-letter-card";
 
 // The expanded row's attempt history reads through the tRPC client; the
 // fixtures here stand in for the ops.listOutboxAttempts read.
@@ -36,16 +37,6 @@ const listOutboxAttemptsQuery = vi.fn((_input: unknown) => ({
     },
   ],
 }));
-vi.mock("~/utils/api", () => ({
-  api: {
-    ops: {
-      listOutboxAttempts: {
-        useQuery: (input: unknown) => listOutboxAttemptsQuery(input),
-      },
-    },
-  },
-}));
-
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 
 /** Repeating-pattern fixtures, not credentials: a realistic ULID or trace id
@@ -73,6 +64,11 @@ function makeMessage(overrides: Partial<DeadLetterMessage> = {}): DeadLetterMess
 
 function renderWithChakra(ui: React.ReactElement) {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+}
+
+function renderAttemptHistory({ id, projectId }: { id: string; projectId: string }) {
+  const query = listOutboxAttemptsQuery({ outboxId: id, projectId });
+  return <DeadLetterAttemptHistory isPending={query.isPending} attempts={query.data} />;
 }
 
 afterEach(cleanup);
@@ -218,6 +214,7 @@ describe("DeadLettersCard", () => {
           onToggle={vi.fn()}
           onRedrive={vi.fn()}
           onDiscard={vi.fn()}
+          renderAttemptHistory={renderAttemptHistory}
         />,
       );
 
@@ -239,6 +236,7 @@ describe("DeadLettersCard", () => {
           onToggle={vi.fn()}
           onRedrive={vi.fn()}
           onDiscard={vi.fn()}
+          renderAttemptHistory={renderAttemptHistory}
         />,
       );
 

@@ -10,10 +10,15 @@ import {
 } from "@chakra-ui/react";
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";
+import {
+  DeadLetterAttemptHistory,
+  DeadLetterSummary,
+  DeadLettersEmpty,
+  DeadLettersTable,
+} from "@langwatch/ops-web";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
-import { DeadLetterSummary, DeadLettersEmpty, DeadLettersTable } from "./DeadLettersCard";
 import { useDeadLetterActions } from "./useDeadLetterActions";
 
 const PAGE_SIZE = 25;
@@ -97,6 +102,9 @@ export function DeadLettersContent() {
         onToggle={(id) => setExpandedId(expandedId === id ? null : id)}
         onRedrive={actions.onRedrive}
         onDiscard={actions.onDiscard}
+        renderAttemptHistory={({ id, projectId }) => (
+          <DeadLetterAttemptHistoryForMessage outboxId={id} projectId={projectId} />
+        )}
       />
       <Pager page={page} total={total} shown={messages.length} onPage={setPage} />
       <BulkConfirms
@@ -106,6 +114,20 @@ export function DeadLettersContent() {
         processName={processName}
       />
     </VStack>
+  );
+}
+
+function DeadLetterAttemptHistoryForMessage({
+  outboxId,
+  projectId,
+}: {
+  outboxId: string;
+  projectId: string;
+}) {
+  const query = api.ops.listOutboxAttempts.useQuery({ outboxId, projectId });
+
+  return (
+    <DeadLetterAttemptHistory isPending={query.isPending} attempts={query.data ?? []} />
   );
 }
 

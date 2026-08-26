@@ -3198,22 +3198,7 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/dashboard/paused/ParkedTenantsSection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/dashboard/paused/PausedCard.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/dashboard/paused/PausedSchedulesSection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/dashboard/paused/PausedSubscribersSection.tsx",
       "kind": "page-shell"
     },
     {
@@ -3488,32 +3473,7 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/queues/groupDetail/GroupDetailContent.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/queues/groupDetail/GroupDetailDrawer.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/queues/groupDetail/GroupDrawerHeader.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/queues/groupDetail/GroupJobCard.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/queues/groupDetail/GroupJobsSection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/queues/groupDetail/jobContext.ts",
       "kind": "page-shell"
     },
     {

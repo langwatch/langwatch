@@ -1,5 +1,7 @@
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
-import { Link } from "~/components/ui/link";
+import type { ReactNode } from "react";
+
+export const PAUSED_SCHEDULES_HREF = "/ops/event-sourcing/schedules";
 
 /** A schedule the operator switched off, named by what it fires. */
 export interface PausedSchedule {
@@ -21,10 +23,12 @@ export interface PausedSchedule {
 export function PausedSchedulesSection({
   schedules,
   total,
+  renderSchedulesLink,
 }: {
   schedules: PausedSchedule[];
   /** Every switched-off schedule in the fleet; `schedules` is one page of it. */
   total: number;
+  renderSchedulesLink?: (href: string) => ReactNode;
 }) {
   if (schedules.length === 0) return null;
 
@@ -42,9 +46,11 @@ export function PausedSchedulesSection({
         <Text textStyle="xs" color="fg.muted">
           these will not fire until an operator turns them back on
         </Text>
-        <Link href="/ops/event-sourcing/schedules" fontSize="xs" color="fg.muted">
-          Schedules
-        </Link>
+        {renderSchedulesLink ? (
+          renderSchedulesLink(PAUSED_SCHEDULES_HREF)
+        ) : (
+          <a href={PAUSED_SCHEDULES_HREF}>Schedules</a>
+        )}
       </HStack>
       <Table.ScrollArea>
         <Table.Root

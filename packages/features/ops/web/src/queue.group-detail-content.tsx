@@ -8,18 +8,18 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { formatTimeAgo } from "@langwatch/ops-web";
 import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
-import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";
-import { GroupStateBadge } from "../GroupStateBadge";
+import type { ReactNode } from "react";
+import { formatTimeAgo } from "./formatters";
+import { GroupStateBadge } from "./queue.group-state-badge";
 import {
   classifyGroup,
   describeNextRun,
   type GroupClassification,
-} from "../pipelineUtils";
-import { GroupJobsSection } from "./GroupJobsSection";
+} from "./queue.pipeline-utils";
+import { GroupJobsSection } from "./queue.group-jobs-section";
 
-function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
+function DetailField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <VStack align="start" gap={0}>
       <Text textStyle="xs" color="fg.muted">
@@ -32,17 +32,17 @@ function DetailField({ label, children }: { label: string; children: React.React
 
 function GroupStatusRow({
   detail,
-  c,
+  classification,
   now,
 }: {
   detail: GroupInfo;
-  c: GroupClassification;
+  classification: GroupClassification;
   now: number;
 }) {
   return (
     <HStack gap={4} flexWrap="wrap">
       <DetailField label="Status">
-        <GroupStateBadge c={c} />
+        <GroupStateBadge c={classification} />
       </DetailField>
       <DetailField label="Pipeline">
         <Text textStyle="sm">{detail.pipelineName ?? "—"}</Text>
@@ -52,16 +52,19 @@ function GroupStatusRow({
           {detail.pendingJobs}
         </Text>
       </DetailField>
-      {c.attempt > 0 && (
+      {classification.attempt > 0 && (
         <DetailField label="Attempts">
           <Text textStyle="sm" fontFamily="mono" color="orange.500">
-            {c.attempt}
+            {classification.attempt}
           </Text>
         </DetailField>
       )}
       <DetailField label="Next run">
-        <Text textStyle="sm" color={c.state === "retrying" ? "orange.500" : undefined}>
-          {describeNextRun(c, now)}
+        <Text
+          textStyle="sm"
+          color={classification.state === "retrying" ? "orange.500" : undefined}
+        >
+          {describeNextRun(classification, now)}
         </Text>
       </DetailField>
       {detail.activeJobId && (
@@ -164,7 +167,7 @@ export function GroupDetailContent({
   onJobsPageChange,
   jobFilter = "",
   onJobFilterChange,
-  grafana,
+  traceUrlForTraceId,
   now = Date.now(),
 }: {
   detail: GroupInfo | null;
@@ -176,7 +179,7 @@ export function GroupDetailContent({
   onJobsPageChange?: (page: number) => void;
   jobFilter?: string;
   onJobFilterChange?: (filter: string) => void;
-  grafana?: GrafanaDeepLinkConfig | null;
+  traceUrlForTraceId?: (traceId: string) => string | null;
   now?: number;
 }) {
   if (isLoading) {
@@ -197,11 +200,11 @@ export function GroupDetailContent({
     );
   }
 
-  const c = classifyGroup(detail, now);
+  const classification = classifyGroup(detail, now);
 
   return (
     <VStack align="stretch" gap={4}>
-      <GroupStatusRow detail={detail} c={c} now={now} />
+      <GroupStatusRow detail={detail} classification={classification} now={now} />
       <GroupTimingRow detail={detail} now={now} />
       <GroupErrorSection detail={detail} now={now} />
       <GroupJobsSection
@@ -213,7 +216,7 @@ export function GroupDetailContent({
         onPageChange={onJobsPageChange}
         filter={jobFilter}
         onFilterChange={onJobFilterChange}
-        grafana={grafana}
+        traceUrlForTraceId={traceUrlForTraceId}
       />
     </VStack>
   );

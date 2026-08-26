@@ -1,8 +1,7 @@
 import { Button, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
-import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";
-import { GroupJobCard } from "./GroupJobCard";
-import { jobMatchesFilter } from "./jobContext";
+import { GroupJobCard } from "./queue.group-job-card";
+import { jobMatchesFilter } from "./queue.job-context";
 
 function JobsPager({
   page,
@@ -42,19 +41,24 @@ function JobsList({
   total,
   filter,
   now,
-  grafana,
+  traceUrlForTraceId,
 }: {
   visible: JobEntry[];
   total: number;
   filter: string;
   now: number;
-  grafana?: GrafanaDeepLinkConfig | null;
+  traceUrlForTraceId?: (traceId: string) => string | null;
 }) {
   if (visible.length > 0) {
     return (
       <VStack align="stretch" gap={2}>
         {visible.map((job) => (
-          <GroupJobCard key={job.jobId} job={job} now={now} grafana={grafana} />
+          <GroupJobCard
+            key={job.jobId}
+            job={job}
+            now={now}
+            traceUrlForTraceId={traceUrlForTraceId}
+          />
         ))}
       </VStack>
     );
@@ -77,7 +81,7 @@ export function GroupJobsSection({
   onPageChange,
   filter,
   onFilterChange,
-  grafana,
+  traceUrlForTraceId,
 }: {
   jobs: { jobs: JobEntry[]; total: number } | null;
   jobsLoading: boolean;
@@ -87,13 +91,13 @@ export function GroupJobsSection({
   onPageChange?: (page: number) => void;
   filter: string;
   onFilterChange?: (filter: string) => void;
-  grafana?: GrafanaDeepLinkConfig | null;
+  traceUrlForTraceId?: (traceId: string) => string | null;
 }) {
   const total = jobs?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(total, page * pageSize);
-  const visible = (jobs?.jobs ?? []).filter((j) => jobMatchesFilter(j, filter));
+  const visible = (jobs?.jobs ?? []).filter((job) => jobMatchesFilter(job, filter));
 
   return (
     <VStack align="stretch" gap={1.5}>
@@ -124,7 +128,7 @@ export function GroupJobsSection({
           total={total}
           filter={filter}
           now={now}
-          grafana={grafana}
+          traceUrlForTraceId={traceUrlForTraceId}
         />
       )}
     </VStack>

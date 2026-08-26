@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PausedCard } from "../PausedCard";
+import { PausedCard } from "../src/ops.paused-card";
 
 /**
  * The merged "what is switched off" panel.
@@ -16,17 +16,6 @@ import { PausedCard } from "../PausedCard";
  */
 
 const mockPausedSchedules = vi.fn();
-
-vi.mock("~/utils/api", () => ({
-  api: {
-    ops: {
-      listPausedSchedules: { useQuery: () => mockPausedSchedules() },
-      listParkedGroups: {
-        useQuery: () => ({ data: undefined, isLoading: true }),
-      },
-    },
-  },
-}));
 
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0);
 
@@ -61,15 +50,20 @@ const renderCard = (
     Pick<DashboardData, "parkedTenants" | "parkedTenantsBound" | "pausedKeys">
   > = {},
 ) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <PausedCard
-        parkedTenants={props.parkedTenants ?? []}
-        parkedTenantsBound={props.parkedTenantsBound ?? { total: 0, included: 0 }}
-        pausedKeys={props.pausedKeys ?? []}
-      />
-    </ChakraProvider>,
-  );
+  (() => {
+    const schedulesResult = mockPausedSchedules();
+    return render(
+      <ChakraProvider value={defaultSystem}>
+        <PausedCard
+          parkedTenants={props.parkedTenants ?? []}
+          parkedTenantsBound={props.parkedTenantsBound ?? { total: 0, included: 0 }}
+          pausedKeys={props.pausedKeys ?? []}
+          schedules={schedulesResult.data?.schedules ?? []}
+          schedulesTotal={schedulesResult.data?.total ?? 0}
+        />
+      </ChakraProvider>,
+    );
+  })();
 
 beforeEach(() => {
   mockPausedSchedules.mockReturnValue(pausedSchedulesResult([]));
