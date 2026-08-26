@@ -140,7 +140,16 @@ export async function runIngestionPull(params: {
   sourceId: string;
   cursor: string | null;
   pulledUsage?: PulledUsageDispatcher;
-}): Promise<{ nextCursor: string | null; eventCount: number }> {
+}): Promise<{
+  nextCursor: string | null;
+  eventCount: number;
+  /**
+   * Items the adapter could not read on a run that still made progress. Zero on
+   * a clean run; a run that reported errors WITHOUT advancing its cursor throws
+   * instead of returning, so a nonzero value here always means partial success.
+   */
+  errorCount: number;
+}> {
   registerBuiltInPullers();
 
   const ingestionSourceId = params.sourceId;
@@ -157,7 +166,7 @@ export async function runIngestionPull(params: {
       { ingestionSourceId, status: source.status },
       "IngestionSource not active, skipping",
     );
-    return { nextCursor: params.cursor, eventCount: 0 };
+    return { nextCursor: params.cursor, eventCount: 0, errorCount: 0 };
   }
 
   const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
@@ -221,9 +230,43 @@ export async function runIngestionPull(params: {
     throw error;
   }
 
-  if (result.errorCount > 0) {
+  // `errorCount > 0` means two different things, and the cursor the adapter
+  // handed back is what tells them apart.
+  //
+  //   - The cursor MOVED: the adapter deliberately stepped past input it could
+  //     not read (s3_polling does this for a malformed line and for an object
+  //     it could not fetch at all). Failing the run here would throw away both
+  //     the events it did collect and the advance, so the next run would re-read
+  //     the same unreadable object and the source would never make progress
+  //     again. That is a partial success: write, persist, and say so loudly.
+  //   - The cursor is UNCHANGED: the adapter could not make progress at all
+  //     (http_polling, anthropic_admin and databricks_genie all return the
+  //     incoming cursor when their transport fails). Nothing was read, so the
+  //     run fails and the outbox retries the same window.
+  //
+  // A null cursor is never an advance. It is the "no cursor yet / drained"
+  // sentinel, so persisting it against a non-null incoming cursor would rewind
+  // the source to the beginning rather than move it forward.
+  const cursorAdvanced =
+    result.cursor !== null && result.cursor !== params.cursor;
+
+  if (result.errorCount > 0 && !cursorAdvanced) {
     throw new Error(
       `Ingestion pull adapter reported ${result.errorCount} error(s)`,
+    );
+  }
+
+  if (result.errorCount > 0) {
+    logger.warn(
+      {
+        ingestionSourceId,
+        adapterId,
+        errorCount: result.errorCount,
+        eventCount: result.events.length,
+        fromCursor: params.cursor,
+        toCursor: result.cursor,
+      },
+      "adapter advanced past input it could not read — keeping the events it did collect and persisting the advance",
     );
   }
 
@@ -254,7 +297,11 @@ export async function runIngestionPull(params: {
     },
     "puller run done",
   );
-  return { nextCursor: result.cursor, eventCount: result.events.length };
+  return {
+    nextCursor: result.cursor,
+    eventCount: result.events.length,
+    errorCount: result.errorCount,
+  };
 }
 
 /** The IngestionSource fields the write paths below actually read. */
