@@ -16,13 +16,17 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
-import type { Context } from "hono";
+import { type Context, Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
 import { canonicalErrorFor } from "~/app/api/shared/canonical-error";
-import { RequestValidationError } from "~/server/api/validation";
+import {
+  RequestValidationError,
+  validator as zValidator,
+} from "~/server/api/validation";
 import {
   methodNotFound,
+  recordRpcId,
   RPC_CODES,
   rpcErrorBody,
   rpcIdOf,
@@ -209,6 +213,124 @@ describe("given the id is read back off the request context", () => {
   /** A body-shaped id is not a legal JSON-RPC id and must not be echoed. */
   it("refuses a non-scalar id rather than echoing it", () => {
     expect(rpcIdOf(contextWith({ rpcId: { nested: true } }))).toBeUndefined();
+  });
+});
+
+/**
+ * The id has to survive the validator, not just the handler.
+ *
+ * This is a regression suite for a real bug: the id was originally recorded
+ * inside the route handler, which runs only AFTER the envelope validator has
+ * passed. That records it exactly when it is least needed — a malformed
+ * envelope, an unknown method or a batch never reaches the handler, so those
+ * refusals answered with no `id` at all, and a client multiplexing calls over
+ * one connection could not tell which of its outstanding requests had failed.
+ *
+ * Driven through a real middleware chain rather than a stubbed context,
+ * because the bug was entirely one of ORDERING — a stub cannot express it, and
+ * the assertion that missed it the first time was written against a stub.
+ */
+describe("given a request is refused before the handler runs", () => {
+  /** The real chain shape: id-recorder, then validator, then handler. */
+  function door() {
+    const app = new Hono();
+    app.onError((error, c) => {
+      const { status, body } = canonicalErrorFor(error, {});
+      return c.json(
+        rpcErrorBody({ error, canonical: body as never, c }),
+        status as never,
+      );
+    });
+    app.post(
+      "/",
+      recordRpcId,
+      zValidator("json", queryRpcRequestSchema),
+      (c) => c.json(rpcResultBody({ id: c.req.valid("json").id, result: null })),
+    );
+    return app;
+  }
+
+  const send = async (body: unknown) => {
+    const response = await door().request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    });
+    return {
+      status: response.status,
+      body: (await response.json()) as Record<string, any>,
+    };
+  };
+
+  it.each([
+    [
+      "an unknown method",
+      { jsonrpc: "2.0", id: "call-7", method: "query.nope" },
+    ],
+    [
+      "params of the wrong shape for the envelope",
+      { jsonrpc: "2.0", id: "call-7", method: 42 },
+    ],
+    [
+      "the wrong protocol version",
+      { jsonrpc: "1.0", id: "call-7", method: "query.run" },
+    ],
+  ])("still echoes the id when refused for %s", async (_label, request) => {
+    const { status, body } = await send(request);
+
+    expect(status).toBe(400);
+    expect(
+      body.id,
+      "the refusal dropped its id, so the client cannot match it to a call",
+    ).toBe("call-7");
+  });
+
+  it("echoes a numeric id too, without coercing it to a string", async () => {
+    const { body } = await send({ jsonrpc: "2.0", id: 7, method: "query.nope" });
+    expect(body.id).toBe(7);
+  });
+
+  /**
+   * A batch is refused, but it is still a JSON document with no top-level id —
+   * so there is nothing to echo, and nothing must be invented.
+   */
+  it("omits the id for a batch, which has none to salvage", async () => {
+    const { status, body } = await send([
+      { jsonrpc: "2.0", id: 1, method: "query.schema" },
+    ]);
+
+    expect(status).toBe(400);
+    expect(body).not.toHaveProperty("id");
+  });
+
+  it("survives a body that is not JSON at all, without masking the refusal", async () => {
+    const { status, body } = await send("this is not json");
+
+    expect(status).toBeGreaterThanOrEqual(400);
+    expect(status).toBeLessThan(500);
+    expect(body).not.toHaveProperty("id");
+  });
+
+  it("does not echo a non-scalar id, which is not a legal JSON-RPC id", async () => {
+    const { body } = await send({
+      jsonrpc: "2.0",
+      id: { nested: true },
+      method: "query.nope",
+    });
+    expect(body).not.toHaveProperty("id");
+  });
+
+  /** The success path must keep working through the added middleware. */
+  it("still answers a well-formed call, id intact", async () => {
+    const { status, body } = await send({
+      jsonrpc: "2.0",
+      id: "call-7",
+      method: "query.schema",
+    });
+
+    expect(status).toBe(200);
+    expect(body.id).toBe("call-7");
+    expect(body.result).toBeNull();
   });
 });
 

@@ -83,9 +83,8 @@ import {
 import {
   methodNotFound,
   type QueryRpcVariables,
-  RPC_ID_KEY,
+  recordRpcId,
   rpcResultBody,
-  type RpcId,
 } from "./rpc";
 import {
   lwqlQuerySchema,
@@ -311,14 +310,13 @@ export function registerQueryRoutes(
         // integrator to branch on something that will never arrive.
       },
     }),
+    // Ahead of the validator on purpose: the failures that most need an id to
+    // be matched back to a call are the ones the validator rejects, and a
+    // handler runs too late to have recorded it. See `recordRpcId`.
+    recordRpcId,
     zValidator("json", queryRpcRequestSchema),
     async (c) => {
       const { id, method, params } = c.req.valid("json");
-
-      // Recorded before anything can throw, so the error handler can echo the
-      // id on a failure — a JSON-RPC reply the client cannot match to its call
-      // is a reply it cannot use.
-      c.set(RPC_ID_KEY, (id ?? null) as RpcId);
 
       const handler = METHODS[method];
       // Unreachable while the envelope schema enumerates the methods, but the

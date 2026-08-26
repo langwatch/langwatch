@@ -12,7 +12,7 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 
 /**
  * The reserved JSON-RPC codes.
@@ -62,6 +62,42 @@ export interface QueryRpcVariables {
   /** Keep in step with {@link RPC_ID_KEY}. */
   rpcId: RpcId;
 }
+
+/**
+ * Records the request's id BEFORE anything can reject the request.
+ *
+ * This has to run ahead of the envelope validator, and that ordering is the
+ * whole point of it existing as middleware rather than a line in the handler.
+ * A handler only runs once validation has passed, so an id recorded there is
+ * recorded exactly when it is least needed: the failures that most need to be
+ * matched back to a call — a malformed envelope, an unknown method, a batch —
+ * are precisely the ones that never reach the handler. Without this, those
+ * refusals answer with no `id`, and a client multiplexing calls over one
+ * connection cannot tell which of its outstanding requests just failed.
+ *
+ * Reading the body here is free: Hono caches the parsed body on the request,
+ * so the validator downstream re-reads the cache rather than the stream.
+ *
+ * Anything unparseable is passed through untouched. This middleware's job is
+ * to salvage an id when one exists, never to be the thing that rejects a
+ * request — that judgement belongs to the schema, which produces a far better
+ * diagnosis than "something went wrong early".
+ */
+export const recordRpcId: MiddlewareHandler = async (c, next) => {
+  try {
+    const body: unknown = await c.req.json();
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      const id: unknown = (body as Record<string, unknown>).id;
+      if (typeof id === "string" || typeof id === "number" || id === null) {
+        c.set(RPC_ID_KEY as never, id as never);
+      }
+    }
+  } catch {
+    // Not JSON, or no body at all. There is no id to salvage, and the
+    // validator is about to say so precisely.
+  }
+  await next();
+};
 
 /**
  * The id to echo on a reply, or `undefined` when we never got far enough to
