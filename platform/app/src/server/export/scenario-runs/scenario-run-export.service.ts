@@ -17,7 +17,7 @@ import { traced } from "~/server/app-layer/tracing";
 import {
   categorizeRunStatus,
   type RunStatusCategory,
-} from "~/server/scenarios/scenario-run-category";
+} from "@langwatch/scenario-contract";
 import { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } from "./csv-serializer";
 import type {
   ScenarioRunExportProgress,

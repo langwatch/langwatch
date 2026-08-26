@@ -1,6 +1,6 @@
 import type { SubscriberSpec } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { isSuiteSetId } from "../../../../suites/suite-set-id";
+import { isSuiteSetId } from "@langwatch/suite-contract";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
 import type {
   SimulationProcessingEvent,

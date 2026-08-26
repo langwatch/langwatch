@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { getSuiteSetId } from "@langwatch/suite-contract";
 
 import { SIMULATION_RUN_EVENT_TYPES } from "../../schemas/constants";
 import type { SimulationProcessingEvent } from "../../schemas/events";

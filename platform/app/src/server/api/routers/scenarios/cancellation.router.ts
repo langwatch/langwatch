@@ -10,11 +10,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import type { App } from "~/server/app-layer/app";
-import type { CancellationServiceDeps } from "~/server/scenarios/cancellation";
-import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenarios:cancellation");
@@ -31,36 +28,6 @@ const cancelBatchRunSchema = projectSchema.extend({
   batchRunId: z.string(),
 });
 
-function createGetRunsForBatch(
-  app: Pick<App, "simulations">,
-): CancellationServiceDeps["getRunsForBatch"] {
-  const simulations = app.simulations;
-
-  return async (params) => {
-    const result = await simulations.getRunDataForBatchRun(params);
-    return result.changed ? result.runs : [];
-  };
-}
-
-const services = new WeakMap<App, ScenarioCancellationService>();
-
-function serviceFor(app: App): ScenarioCancellationService {
-  const cached = services.get(app);
-  if (cached) return cached;
-  const service = new ScenarioCancellationService({
-    getRunsForBatch: createGetRunsForBatch(app),
-    dispatchCancelRequested: async ({ tenantId, scenarioRunId, occurredAt }) => {
-      await app.simulations.cancelRun({
-        tenantId,
-        scenarioRunId,
-        occurredAt,
-      });
-    },
-  });
-  services.set(app, service);
-  return service;
-}
-
 export const cancellationRouter = createTRPCRouter({
   cancelJob: protectedProcedure
     .input(cancelJobSchema)
@@ -75,7 +42,7 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel job request received",
       );
 
-      return serviceFor(ctx.app).cancelJob(input);
+      return ctx.app.scenarios.cancelJob(input);
     }),
 
   cancelBatchRun: protectedProcedure
@@ -91,6 +58,6 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel batch run request received",
       );
 
-      return serviceFor(ctx.app).cancelBatchRun(input);
+      return ctx.app.scenarios.cancelBatchRun(input);
     }),
 });

@@ -21,10 +21,19 @@ const { mockBroadcastToTenant } = vi.hoisted(() => ({
   mockBroadcastToTenant: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
+vi.mock("~/server/app-layer/app", async () => {
+  const { ScenarioClockPort, ScenarioTabRegistryService } =
+    await import("@langwatch/scenario-server");
+  class TestClock extends ScenarioClockPort {
+    now(): Date {
+      return new Date();
+    }
+  }
+  const scenarioTabs = ScenarioTabRegistryService.create({
+    store: null,
+    clock: new TestClock(),
+  });
+  const testApp = {
     broadcast: {
       broadcastToTenant: mockBroadcastToTenant,
       broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),
@@ -38,8 +47,13 @@ vi.mock("~/server/app-layer/app", () => ({
     usageLimits: {
       notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
     },
-  }),
-}));
+    scenarioTabs,
+  };
+  return {
+    tryGetApp: () => testApp,
+    getApp: () => testApp,
+  };
+});
 
 // The integration postgres schema does not seed the role bindings the test
 // project would need to pass the RBAC grain, so the permission gate is
@@ -59,8 +73,10 @@ import { app } from "~/app/api/scenario-events/[[...route]]/app";
 import {
   isScenarioTabNavigatePayload,
   SCENARIO_TAB_NAVIGATE_EVENT,
-} from "~/server/scenarios/browser-tab/scenario-tab-events";
-import { scenarioTabRegistry } from "~/server/scenarios/browser-tab/scenario-tab-registry";
+} from "@langwatch/scenario-contract";
+import { getApp } from "~/server/app-layer/app";
+
+const scenarioTabRegistry = getApp().scenarioTabs;
 
 const BASE_HOST = "https://test.langwatch.ai";
 
@@ -179,7 +195,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       // Nothing parked either: a tab that opens later must not be yanked to a
       // run the SDK already showed in its own browser tab.
       await expect(
-        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
+        scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey }),
       ).resolves.toBeNull();
     });
   });
@@ -250,7 +266,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       });
 
       await expect(
-        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
+        scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey }),
       ).resolves.toBe(
         `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-parked`,
       );

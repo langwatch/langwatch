@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import type { BatchSummary } from "~/server/scenarios/scenario-event.types";
+import type { BatchSummary } from "@langwatch/scenario-contract";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";

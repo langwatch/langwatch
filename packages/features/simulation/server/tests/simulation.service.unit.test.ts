@@ -29,7 +29,7 @@ class RecordingExecutionPort extends SimulationExecutionPort {
 
 describe("SimulationService", () => {
   it("delegates run reads through Simulation's own repository", async () => {
-    const service = new SimulationService(
+    const service = SimulationService.create(
       new NullSimulationRepository(),
       new RecordingExecutionPort(),
     );
@@ -44,7 +44,7 @@ describe("SimulationService", () => {
 
   it("validates and dispatches execution through Simulation's port", async () => {
     const execution = new RecordingExecutionPort();
-    const service = new SimulationService(new NullSimulationRepository(), execution);
+    const service = SimulationService.create(new NullSimulationRepository(), execution);
 
     await service.queueRun({
       tenantId: "project_1",

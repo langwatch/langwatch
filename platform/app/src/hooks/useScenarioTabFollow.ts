@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { SCENARIO_TAB_QUERY_PARAM } from "~/server/scenarios/browser-tab/scenario-tab-events";
+import { SCENARIO_TAB_QUERY_PARAM } from "@langwatch/scenario-contract";
 import { useRouter } from "~/utils/compat/next-router";
 
 /**

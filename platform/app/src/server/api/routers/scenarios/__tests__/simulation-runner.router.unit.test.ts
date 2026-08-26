@@ -12,13 +12,11 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock dependencies before importing the router
-vi.mock("~/server/scenarios/execution/data-prefetcher", () => ({
-  createDataPrefetcherDependencies: vi.fn().mockReturnValue({}),
-  prefetchScenarioData: vi.fn(),
-}));
+const mockPrefetchScenarioData = vi.fn();
+const mockResolveRunParameters = vi.fn();
 
-vi.mock("~/server/scenarios/scenario.ids", () => ({
+vi.mock("@langwatch/scenario-contract", async (importOriginal) => ({
+  ...(await importOriginal()),
   generateBatchRunId: vi.fn().mockReturnValue("batch_test_123"),
 }));
 
@@ -26,7 +24,7 @@ vi.mock("~/server/scenarios/scenario.ids", () => ({
 // anything, which is the router's only database read. Stubbed here so this
 // suite stays a unit test of the router's own decisions.
 const mockGetRunConfigByIds = vi.fn<
-  (params: { ids: string[]; projectId: string }) => Promise<unknown[]>
+  (params: { ids: string[]; projectId: string }) => Promise<ScenarioRunConfig[]>
 >(async ({ ids }) =>
   ids.map((id) => ({
     id,
@@ -38,18 +36,23 @@ const mockGetRunConfigByIds = vi.fn<
 );
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsService } = await import("~/test-utils/appPermissionsMock");
+  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
+  const authz = appPermissionsMock();
   return {
     // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
+    tryGetApp: authz.tryGetApp,
     getApp: vi.fn().mockReturnValue({
-      permissions: appPermissionsService(),
+      ...authz.getApp(),
       simulations: {
         queueRun: (...args: unknown[]) => mockQueueRun(...args),
       },
       scenarios: {
-        getRunConfigByIds: (params: { ids: string[]; projectId: string }) =>
+        getRunConfigs: (params: { ids: string[]; projectId: string }) =>
           mockGetRunConfigByIds(params),
+        resolveRunParameters: (...args: unknown[]) => mockResolveRunParameters(...args),
+      },
+      scenarioExecution: {
+        prefetch: (...args: unknown[]) => mockPrefetchScenarioData(...args),
       },
     }),
   };
@@ -82,20 +85,22 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Import mocked functions after mocking
-import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
+import {
+  getOnPlatformSetId,
+  resolveRunParameters,
+  type ResolveScenarioRunParametersInput,
+  type ScenarioRunConfig,
+  ScenarioNotFoundError,
+} from "@langwatch/scenario-contract";
 import { createInnerTRPCContext } from "../../../trpc";
 import { simulationRunnerRouter } from "../simulation-runner.router";
-
-const mockPrefetchScenarioData = vi.mocked(prefetchScenarioData);
 
 function createTestCaller() {
   const ctx = createInnerTRPCContext({
     session: {
       user: { id: "user_test_123" },
       expires: "2099-01-01",
-    } as any,
+    },
   });
   return simulationRunnerRouter.createCaller({
     ...ctx,
@@ -115,6 +120,24 @@ describe("simulationRunnerRouter.run", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQueueRun.mockResolvedValue(undefined);
+    mockResolveRunParameters.mockImplementation(
+      async (input: ResolveScenarioRunParametersInput) => {
+        const scenarios = await mockGetRunConfigByIds({
+          ids: [input.scenarioId],
+          projectId: input.projectId,
+        });
+        const resolved = await resolveRunParameters({
+          scenarios,
+          values: input.values,
+        });
+        const values = resolved.get(input.scenarioId);
+        if (!values) {
+          throw new ScenarioNotFoundError(input.scenarioId);
+        }
+
+        return values;
+      },
+    );
     caller = createTestCaller();
   });
 
@@ -413,20 +436,6 @@ describe("simulationRunnerRouter.run", () => {
 
     describe("when run is called with explicit setId", () => {
       it("preserves the user-provided set ID in queueRun", async () => {
-        const inputWithSetId = {
-          ...defaultInput,
-          setId: "production-tests",
-        };
-        await caller.run(inputWithSetId);
-
-        expect(mockQueueRun).toHaveBeenCalledWith(
-          expect.objectContaining({
-            scenarioSetId: "production-tests",
-          }),
-        );
-      });
-
-      it("dispatches queueRun with user-provided set ID", async () => {
         const inputWithSetId = {
           ...defaultInput,
           setId: "production-tests",

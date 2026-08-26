@@ -1,11 +1,13 @@
 import { on } from "node:events";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import type { SimulationService } from "@langwatch/simulation-contract";
-import { z } from "zod/v4";
+import type {
+  SimulationBatchRunData,
+  SimulationService,
+} from "@langwatch/simulation-contract";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
-import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
+import { startScenarioTabPresence } from "@langwatch/scenario-contract";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 
@@ -37,7 +39,7 @@ const dateRangeFields = {
  * (when scenarioSetId is provided) or all suites (when absent).
  *
  * Returns data from ClickHouse. Pending items are visible immediately
- * because SuiteRunService dispatches simulation startRun commands at
+ * because Suite execution dispatches simulation startRun commands at
  * scheduling time (before queued jobs begin processing).
  *
  * Real-time updates are delivered via SSE (onSimulationUpdate subscription).
@@ -398,7 +400,10 @@ export const scenarioEventsRouter = createTRPCRouter({
 
       const presence =
         tabKey && tabId
-          ? await startScenarioTabPresence({ projectId, tabKey, tabId })
+          ? await startScenarioTabPresence({
+              registration: { projectId, tabKey, tabId },
+              registry: opts.ctx.app.scenarioTabs,
+            })
           : null;
 
       if (presence?.parkedNavigate) {
@@ -441,9 +446,9 @@ export const scenarioEventsRouter = createTRPCRouter({
  * When `runTimestamps` is absent, returns the result unchanged (backward compatible).
  */
 export function filterRunsByTimestamp(
-  result: BatchRunDataResult,
+  result: SimulationBatchRunData,
   runTimestamps?: Record<string, number>,
-): BatchRunDataResult {
+): SimulationBatchRunData {
   if (!result.changed || !runTimestamps) return result;
 
   const filtered = result.runs.filter((run) => {

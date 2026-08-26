@@ -1,6 +1,17 @@
+import {
+  ScenarioExecutionService,
+  type ScenarioExecutionJob,
+  type ScenarioExecutionPrefetchInput,
+  type ScenarioExecutionPrefetchResult,
+  type ScenarioExecutionPreparation,
+  type ScenarioUnsuccessfulExecutionInput,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { StalledHistoricalRun } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
 import { backfillStalledRuns } from "../backfillStalledSimulationRuns";
+
+vi.mock("~/server/app-layer/app", () => ({ getApp: vi.fn() }));
+vi.mock("~/server/app-layer/presets", () => ({ initializeDefaultApp: vi.fn() }));
 
 function makeRun(overrides: Partial<StalledHistoricalRun> = {}): StalledHistoricalRun {
   return {
@@ -18,8 +29,28 @@ function makeFinder(runs: StalledHistoricalRun[]) {
   return { findStalledRuns: vi.fn().mockResolvedValue(runs) };
 }
 
-function makeEmitter() {
-  return { ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined) };
+class TestScenarioExecutionService extends ScenarioExecutionService {
+  readonly finishUnsuccessfulRun = vi.fn((_input: ScenarioUnsuccessfulExecutionInput) =>
+    Promise.resolve(),
+  );
+
+  submit(_input: ScenarioExecutionJob): Promise<void> {
+    throw new Error("submit unexpectedly called in backfill tests");
+  }
+
+  cancel(_input: { projectId: string; scenarioRunId: string }): Promise<void> {
+    throw new Error("cancel unexpectedly called in backfill tests");
+  }
+
+  prefetch(
+    _input: ScenarioExecutionPrefetchInput,
+  ): Promise<ScenarioExecutionPrefetchResult> {
+    throw new Error("prefetch unexpectedly called in backfill tests");
+  }
+
+  prepare(_input: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation {
+    throw new Error("prepare unexpectedly called in backfill tests");
+  }
 }
 
 describe("backfillStalledRuns", () => {
@@ -34,17 +65,17 @@ describe("backfillStalledRuns", () => {
           status: "QUEUED",
         }),
       ];
-      const emitter = makeEmitter();
+      const execution = new TestScenarioExecutionService();
 
       const outcome = await backfillStalledRuns({
         finder: makeFinder(runs),
-        emitter,
+        execution,
         dryRun: false,
       });
 
       expect(outcome).toEqual({ found: 2, closed: 2, failed: 0 });
-      expect(emitter.ensureFailureEventsEmitted).toHaveBeenCalledTimes(2);
-      expect(emitter.ensureFailureEventsEmitted).toHaveBeenCalledWith({
+      expect(execution.finishUnsuccessfulRun).toHaveBeenCalledTimes(2);
+      expect(execution.finishUnsuccessfulRun).toHaveBeenCalledWith({
         projectId: "tenant-2",
         scenarioId: "scenario-1",
         setId: "set-1",
@@ -60,50 +91,50 @@ describe("backfillStalledRuns", () => {
         makeRun({ scenarioRunId: "run-2" }),
         makeRun({ scenarioRunId: "run-3" }),
       ];
-      const emitter = makeEmitter();
-      emitter.ensureFailureEventsEmitted.mockRejectedValueOnce(
+      const execution = new TestScenarioExecutionService();
+      execution.finishUnsuccessfulRun.mockRejectedValueOnce(
         new Error("event store unavailable"),
       );
 
       const outcome = await backfillStalledRuns({
         finder: makeFinder(runs),
-        emitter,
+        execution,
         dryRun: false,
       });
 
       expect(outcome).toEqual({ found: 3, closed: 2, failed: 1 });
-      expect(emitter.ensureFailureEventsEmitted).toHaveBeenCalledTimes(3);
+      expect(execution.finishUnsuccessfulRun).toHaveBeenCalledTimes(3);
     });
   });
 
   describe("when running in dry-run mode", () => {
     /** @scenario "The backfill dry run measures the population without writing" */
     it("reports the population and writes nothing", async () => {
-      const emitter = makeEmitter();
+      const execution = new TestScenarioExecutionService();
 
       const outcome = await backfillStalledRuns({
         finder: makeFinder([makeRun(), makeRun({ scenarioRunId: "run-2" })]),
-        emitter,
+        execution,
         dryRun: true,
       });
 
       expect(outcome).toEqual({ found: 2, closed: 0, failed: 0 });
-      expect(emitter.ensureFailureEventsEmitted).not.toHaveBeenCalled();
+      expect(execution.finishUnsuccessfulRun).not.toHaveBeenCalled();
     });
   });
 
   describe("when no stalled runs exist", () => {
     it("reports zero without emitting", async () => {
-      const emitter = makeEmitter();
+      const execution = new TestScenarioExecutionService();
 
       const outcome = await backfillStalledRuns({
         finder: makeFinder([]),
-        emitter,
+        execution,
         dryRun: false,
       });
 
       expect(outcome).toEqual({ found: 0, closed: 0, failed: 0 });
-      expect(emitter.ensureFailureEventsEmitted).not.toHaveBeenCalled();
+      expect(execution.finishUnsuccessfulRun).not.toHaveBeenCalled();
     });
   });
 });

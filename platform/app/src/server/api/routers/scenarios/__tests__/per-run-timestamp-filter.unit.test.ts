@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type {
-  BatchRunDataResult,
-  ScenarioRunData,
-} from "~/server/scenarios/scenario-event.types";
+  SimulationBatchRunData,
+  SimulationRunData,
+} from "@langwatch/simulation-contract";
 import { filterRunsByTimestamp } from "../scenario-events.router";
 
-function createRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
+function createRun(overrides: Partial<SimulationRunData> = {}): SimulationRunData {
   return {
     scenarioId: "scenario-1",
     batchRunId: "batch-1",
@@ -26,7 +26,7 @@ function createRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
 describe("filterRunsByTimestamp()", () => {
   describe("when result has not changed", () => {
     it("returns the unchanged result as-is", () => {
-      const result: BatchRunDataResult = { changed: false, lastUpdatedAt: 500 };
+      const result: SimulationBatchRunData = { changed: false, lastUpdatedAt: 500 };
       const out = filterRunsByTimestamp(result, { "run-1": 100 });
       expect(out).toEqual({ changed: false, lastUpdatedAt: 500 });
     });
@@ -35,7 +35,7 @@ describe("filterRunsByTimestamp()", () => {
   describe("when runTimestamps is not provided", () => {
     it("returns the original result unchanged (backward compatible)", () => {
       const runs = [createRun({ scenarioRunId: "run-1", timestamp: 1000 })];
-      const result: BatchRunDataResult = {
+      const result: SimulationBatchRunData = {
         changed: true,
         lastUpdatedAt: 1000,
         runs,
@@ -51,7 +51,7 @@ describe("filterRunsByTimestamp()", () => {
         createRun({ scenarioRunId: "run-1", timestamp: 2000 }),
         createRun({ scenarioRunId: "run-2", timestamp: 1000 }),
       ];
-      const result: BatchRunDataResult = {
+      const result: SimulationBatchRunData = {
         changed: true,
         lastUpdatedAt: 2000,
         runs,
@@ -76,7 +76,7 @@ describe("filterRunsByTimestamp()", () => {
         createRun({ scenarioRunId: "run-1", timestamp: 1000 }),
         createRun({ scenarioRunId: "run-2", timestamp: 1000 }),
       ];
-      const result: BatchRunDataResult = {
+      const result: SimulationBatchRunData = {
         changed: true,
         lastUpdatedAt: 1000,
         runs,
@@ -99,7 +99,7 @@ describe("filterRunsByTimestamp()", () => {
         createRun({ scenarioRunId: "run-1", timestamp: 1000 }),
         createRun({ scenarioRunId: "run-2", timestamp: 2000 }),
       ];
-      const result: BatchRunDataResult = {
+      const result: SimulationBatchRunData = {
         changed: true,
         lastUpdatedAt: 2000,
         runs,

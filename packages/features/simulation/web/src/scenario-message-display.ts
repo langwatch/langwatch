@@ -1,10 +1,10 @@
-import type { ScenarioMessageSnapshotEvent } from "@langwatch/scenario-contract";
+import type { SimulationMessage } from "@langwatch/simulation-contract";
 import { visitContentPart } from "@langwatch/trace-contract";
 import { coerceContentToArray } from "./coerce-content-to-array";
 import type { MediaPartData } from "./media-parts";
 import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallback";
 
-type RawMessage = ScenarioMessageSnapshotEvent["messages"][number];
+type RawMessage = SimulationMessage;
 
 export type DisplayItem =
   | {
@@ -41,7 +41,7 @@ export interface StreamingMessage {
 }
 
 export function flattenMessages(
-  messages: ScenarioMessageSnapshotEvent["messages"],
+  messages: SimulationMessage[],
   streamingMessages?: StreamingMessage[],
 ): DisplayItem[] {
   const items: DisplayItem[] = [];

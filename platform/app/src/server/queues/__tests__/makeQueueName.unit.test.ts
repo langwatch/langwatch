@@ -10,7 +10,7 @@
  * @see specs/background/redis-cluster-compatibility.feature
  */
 import { describe, expect, it } from "vitest";
-import { SCENARIO_QUEUE } from "~/server/scenarios/scenario.constants";
+import { SCENARIO_QUEUE } from "@langwatch/scenario-contract";
 import { makeQueueName } from "../makeQueueName";
 
 /**

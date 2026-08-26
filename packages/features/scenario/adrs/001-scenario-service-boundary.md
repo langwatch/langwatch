@@ -26,7 +26,7 @@ composition root creates one `ScenarioService` and injects it into App. REST,
 tRPC, workers and suite code consume only that contract; none construct a
 repository or import the adapter.
 
-## Boundaries
+## Public surfaces and transports
 
 This slice owns authored scenario definitions, archive state, names, reference
 classification, input mapping, templating, and the compact configuration read
@@ -35,10 +35,41 @@ Its web package owns portable library controls, table state, onboarding,
 archive confirmation, target selection, the controlled form and parameter
 controls. Application composition retains routes, tRPC, project context,
 drawer submission and Langy row integration through explicit render ports.
-It does not own child-process execution, simulator runs, Eventing process
-managers, suite orchestration, exports, trace metrics or page composition.
-Those remain their current feature/application owners until each can consume
-the service contract instead of persistence directly.
+Child-process execution is the separate worker lifecycle recorded in
+[ADR-002](./002-scenario-execution-isolation.md). Simulation owns its run process
+manager; Suite owns orchestration; Trace owns ingest-lag measurement. Scenario
+does not own exports, trace analytics or page composition.
+
+## Dependencies
+
+Scenario consumes complete Agent, Model Provider, Project, Prompt, Secret,
+Simulation, Suite, Trace and Workflow contracts. It imports no foreign
+repository or feature server implementation.
+
+## Persistence
+
+The private Prisma repository scopes every definition query by project. Run
+state and execution intents remain in Simulation and Eventing stores.
+
+## Runtime and registration
+
+Boot creates one Scenario service. REST, tRPC, Suite and workers receive that
+instance; no handler constructs another.
+
+## Environment and configuration
+
+Scenario packages read no environment module. Worker composition injects typed
+execution, Redis and child-process configuration.
+
+## Errors
+
+Required reads throw `ScenarioNotFoundError`; only explicit `try*` discovery may
+return null. Parameter validation throws portable handled domain errors.
+
+## Contracts and validation
+
+Zod 4 schemas define portable inputs, persisted values and transport payloads.
+Generated Prisma types remain private to the repository adapter.
 
 ## Consequences
 

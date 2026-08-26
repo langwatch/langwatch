@@ -10,20 +10,12 @@ import {
   type ScenarioService,
 } from "@langwatch/scenario-contract";
 import { TRPCError } from "@trpc/server";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import type { App } from "~/server/app-layer/app";
-import {
-  createDataPrefetcherDependencies,
-  prefetchScenarioData,
-} from "~/server/scenarios/execution/data-prefetcher";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
-import {
-  encryptRunSecretValues,
-  type RunSecretCiphertext,
-} from "~/server/scenarios/run-secret-values";
-import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
+import { getOnPlatformSetId } from "@langwatch/scenario-contract";
+import type { RunSecretCiphertext } from "@langwatch/scenario-contract";
+import { generateBatchRunId } from "@langwatch/scenario-contract";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { projectSchema } from "./schemas";
 
@@ -77,24 +69,13 @@ async function resolveParametersForRun({
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
 }> {
-  const configs = await scenarios.getRunConfigs({
-    ids: [scenarioId],
-    projectId,
-  });
-  const resolved = await resolveRunParameters({ scenarios: configs, values });
-  const forScenario = resolved.get(scenarioId);
-  return {
-    parameters: forScenario?.parameters ?? {},
-    // Encrypted here, before the validation prefetch and before the queued
-    // command: neither is allowed to hold a readable credential.
-    secretParameters: encryptRunSecretValues(forScenario?.secretParameters ?? {}),
-  };
+  return scenarios.resolveRunParameters({ projectId, scenarioId, values });
 }
 
 /**
  * Dispatches the queued command, which is what writes QUEUED state to
  * ClickHouse before the execution job is scheduled, the same order
- * SuiteRunService.startRun uses. The resolved parameters travel on the
+ * Suite execution port uses. The resolved parameters travel on the
  * metadata, which is the only channel that carries them into execution.
  *
  * The secret values travel beside the metadata rather than inside it, so the
@@ -180,12 +161,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         values: input.parameters,
       });
 
-      // Validate early - prefetch data to catch configuration errors before scheduling
-      const deps = createDataPrefetcherDependencies({
-        app: ctx.app,
-        prisma: ctx.prisma,
-      });
-      const prefetchResult = await prefetchScenarioData({
+      const prefetchResult = await ctx.app.scenarioExecution.prefetch({
         context: {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
@@ -195,7 +171,6 @@ export const simulationRunnerRouter = createTRPCRouter({
           secretParameters,
         },
         target: input.target,
-        deps,
       });
 
       if (!prefetchResult.success) {

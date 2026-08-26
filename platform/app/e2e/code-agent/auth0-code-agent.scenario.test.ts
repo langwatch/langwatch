@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { SerializedCodeAgentAdapter } from "../../src/server/scenarios/execution/serialized-adapters/code-agent.adapter";
+import { SerializedCodeAgentAdapter } from "@langwatch/scenario-server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

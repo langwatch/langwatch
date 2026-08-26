@@ -1,8 +1,8 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { buildFailureResults } from "~/server/scenarios/scenario-failure-results";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { buildFailureResults } from "@langwatch/scenario-contract";
 import type { FinishRunCommandData } from "../schemas/commands";
 import { finishRunCommandDataSchema } from "../schemas/commands";
 import {

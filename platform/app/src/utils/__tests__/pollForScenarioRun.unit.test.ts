@@ -4,11 +4,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type {
   BatchRunDataResult,
   ScenarioRunData,
-} from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/scenario-contract";
 import { pollForScenarioRun } from "../pollForScenarioRun";
 
 type FetchBatchRunData = (params: {

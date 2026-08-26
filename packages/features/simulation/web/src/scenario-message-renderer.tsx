@@ -1,7 +1,7 @@
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { Settings } from "react-feather";
-import type { ScenarioMessageSnapshotEvent } from "@langwatch/scenario-contract";
+import type { SimulationMessage } from "@langwatch/simulation-contract";
 import type { MediaPartData } from "./media-parts";
 import { MediaPart } from "./media-part";
 import type { AudioPlaybackProps } from "./use-sequential-audio-playback";
@@ -41,7 +41,7 @@ export interface ScenarioBubbleProps {
 }
 
 export interface ScenarioMessageRendererProps {
-  messages: ScenarioMessageSnapshotEvent["messages"];
+  messages: SimulationMessage[];
   streamingMessages?: StreamingMessage[];
   variant: "grid" | "drawer";
   /** Project that owns the stored objects in this message thread. Forwarded to MediaPart for server-side probes. */

@@ -1,8 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { BatchRunDataResult } from "@langwatch/scenario-contract";
 import { pollForScenarioRun } from "../pollForScenarioRun";
 import { shouldRetryQuery } from "../queryRetryPolicy";
 

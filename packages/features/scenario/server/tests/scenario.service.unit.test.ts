@@ -6,9 +6,57 @@ import {
   type ScenarioRunConfig,
   type ScenarioUpdateInput,
 } from "@langwatch/scenario-contract";
+import { SimulationService } from "@langwatch/simulation-contract";
 import { describe, expect, it } from "vitest";
 import { ScenarioRepository } from "../src/repositories/scenario.repository";
 import { ScenarioService } from "../src/services/scenario.service";
+import { ScenarioClockPort } from "../src/ports/scenario-clock.port";
+import { ScenarioIdPort } from "../src/ports/scenario-id.port";
+import { ScenarioSecretCipherPort } from "../src/ports/scenario-secret-cipher.port";
+
+const simulations = Object.create(SimulationService.prototype) as SimulationService;
+
+class TestScenarioId extends ScenarioIdPort {
+  constructor(private readonly value: string) {
+    super();
+  }
+  next(): string {
+    return this.value;
+  }
+}
+
+class TestScenarioClock extends ScenarioClockPort {
+  constructor(private readonly value: Date = new Date(0)) {
+    super();
+  }
+  now(): Date {
+    return this.value;
+  }
+}
+
+class TestScenarioSecretCipher extends ScenarioSecretCipherPort {
+  encrypt(value: string): string {
+    return `encrypted:${value}`;
+  }
+
+  decrypt(value: string): string {
+    return value.replace(/^encrypted:/, "");
+  }
+}
+
+function serviceOptions(
+  repository: ScenarioRepository,
+  id: string,
+  clock = new TestScenarioClock(),
+) {
+  return {
+    repository,
+    simulations,
+    ids: new TestScenarioId(id),
+    clock,
+    secretCipher: new TestScenarioSecretCipher(),
+  };
+}
 
 class MemoryScenarioRepository extends ScenarioRepository {
   readonly rows = new Map<string, Scenario>();
@@ -115,10 +163,7 @@ class MemoryScenarioRepository extends ScenarioRepository {
 describe("ScenarioService", () => {
   it("keeps reads project-scoped and only makes optional reads nullable", async () => {
     const repository = new MemoryScenarioRepository();
-    const service = ScenarioService.create({
-      repository,
-      generateId: () => "scenario_1",
-    });
+    const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     await service.create({
       projectId: "project-a",
       name: "Refund flow",
@@ -142,11 +187,9 @@ describe("ScenarioService", () => {
     const repository = new MemoryScenarioRepository();
     const first = new Date("2026-01-01T00:00:00.000Z");
     const later = new Date("2026-01-02T00:00:00.000Z");
-    const service = ScenarioService.create({
-      repository,
-      generateId: () => "scenario_1",
-      now: () => first,
-    });
+    const service = ScenarioService.create(
+      serviceOptions(repository, "scenario_1", new TestScenarioClock(first)),
+    );
     await service.create({
       projectId: "project-a",
       name: "Refund flow",
@@ -156,11 +199,9 @@ describe("ScenarioService", () => {
     });
 
     const archived = await service.archive({ id: "scenario_1", projectId: "project-a" });
-    const retried = await ScenarioService.create({
-      repository,
-      generateId: () => "unused",
-      now: () => later,
-    }).archive({ id: "scenario_1", projectId: "project-a" });
+    const retried = await ScenarioService.create(
+      serviceOptions(repository, "unused", new TestScenarioClock(later)),
+    ).archive({ id: "scenario_1", projectId: "project-a" });
 
     expect(archived.archivedAt).toEqual(first);
     expect(retried.archivedAt).toEqual(first);
@@ -168,10 +209,7 @@ describe("ScenarioService", () => {
 
   it("keeps run configuration parameter JSON project-scoped", async () => {
     const repository = new MemoryScenarioRepository();
-    const service = ScenarioService.create({
-      repository,
-      generateId: () => "scenario_1",
-    });
+    const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     await service.create({
       projectId: "project-a",
       name: "Refund flow",
@@ -208,19 +246,31 @@ describe("ScenarioService", () => {
       },
     ]);
     await expect(
+      service.resolveRunParameters({
+        projectId: "project-a",
+        scenarioId: "scenario_1",
+      }),
+    ).resolves.toEqual({
+      parameters: { region: "eu-central" },
+      secretParameters: {},
+    });
+    await expect(
       service.getRunConfigs({
         ids: ["scenario_1"],
         projectId: "project-b",
       }),
     ).resolves.toEqual([]);
+    await expect(
+      service.resolveRunParameters({
+        projectId: "project-b",
+        scenarioId: "scenario_1",
+      }),
+    ).rejects.toBeInstanceOf(ScenarioNotFoundError);
   });
 
   it("persists model selections through the canonical update boundary", async () => {
     const repository = new MemoryScenarioRepository();
-    const service = ScenarioService.create({
-      repository,
-      generateId: () => "scenario_1",
-    });
+    const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     await service.create({
       projectId: "project-a",
       name: "Refund flow",
@@ -248,12 +298,60 @@ describe("ScenarioService", () => {
     });
   });
 
+  it("resolves a suite's scenarios together and encrypts secret values", async () => {
+    const service = ScenarioService.create(
+      serviceOptions(new MemoryScenarioRepository(), "scenario_1"),
+    );
+
+    await expect(
+      service.resolveRunParametersForScenarios({
+        scenarios: [
+          {
+            id: "scenario_1",
+            name: "Refund flow",
+            situation: "A {{ params.region }} customer asks for help",
+            criteria: [],
+            parameters: [
+              { name: "region", defaultValue: "eu" },
+              { name: "api_token", secret: true },
+            ],
+          },
+        ],
+        values: { api_token: "token-live" },
+      }),
+    ).resolves.toEqual([
+      {
+        scenarioId: "scenario_1",
+        parameters: { region: "eu" },
+        secretParameters: { api_token: "encrypted:token-live" },
+      },
+    ]);
+  });
+
+  it("rejects an unknown suite parameter before returning schedulable values", async () => {
+    const service = ScenarioService.create(
+      serviceOptions(new MemoryScenarioRepository(), "scenario_1"),
+    );
+
+    await expect(
+      service.resolveRunParametersForScenarios({
+        scenarios: [
+          {
+            id: "scenario_1",
+            name: "Refund flow",
+            situation: "A customer asks for help",
+            criteria: [],
+            parameters: [{ name: "region", defaultValue: "eu" }],
+          },
+        ],
+        values: { accountTier: "platinum" },
+      }),
+    ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
+  });
+
   it("archives valid batch members while reporting missing members independently", async () => {
     const repository = new MemoryScenarioRepository();
-    const service = ScenarioService.create({
-      repository,
-      generateId: () => "scenario_1",
-    });
+    const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
     await service.create({
       projectId: "project-a",
       name: "Refund flow",

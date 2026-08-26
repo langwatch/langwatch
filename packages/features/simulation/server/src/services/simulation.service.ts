@@ -17,6 +17,37 @@ import {
   simulationTextMessageEndSchema,
   simulationTextMessageStartSchema,
 } from "@langwatch/simulation-contract";
+import type {
+  SimulationAllSuitesInput,
+  SimulationBatchHistory,
+  SimulationBatchHistoryInput,
+  SimulationBatchRunData,
+  SimulationBatchRunInput,
+  SimulationBatchSummary,
+  SimulationBatchSummaryInput,
+  SimulationCancelRun,
+  SimulationDeleteRun,
+  SimulationExportFilterInput,
+  SimulationExportRunsInput,
+  SimulationExternalSetCountInput,
+  SimulationExternalSetSummary,
+  SimulationAllSuitesRunData,
+  SimulationExportRun,
+  SimulationLastUpdatedInput,
+  SimulationProjectDateRangeInput,
+  SimulationProjectIdsInput,
+  SimulationFinishRun,
+  SimulationMessageSnapshot,
+  SimulationQueueRun,
+  SimulationRunData,
+  SimulationScenarioRunInput,
+  SimulationScenarioSetInput,
+  SimulationScenarioSetRunsInput,
+  SimulationSetData,
+  SimulationStartRun,
+  SimulationTextMessageEnd,
+  SimulationTextMessageStart,
+} from "@langwatch/simulation-contract";
 import type { SimulationExecutionPort } from "../ports/simulation-execution.port";
 import type { SimulationRepository } from "../repositories/simulation.repository";
 
@@ -29,7 +60,7 @@ export class SimulationService extends SimulationServiceContract {
     return new SimulationService(repository, execution);
   }
 
-  constructor(
+  private constructor(
     private readonly repository: SimulationRepository,
     private readonly execution: SimulationExecutionPort,
   ) {
@@ -37,46 +68,46 @@ export class SimulationService extends SimulationServiceContract {
   }
 
   async getScenarioSetsData(
-    input: Parameters<SimulationRepository["getScenarioSetsData"]>[0],
-  ) {
+    input: SimulationProjectDateRangeInput,
+  ): Promise<SimulationSetData[]> {
     return simulationSetDataSchema
       .array()
       .parse(await this.repository.getScenarioSetsData(input));
   }
 
   async tryGetScenarioRunData(
-    input: Parameters<SimulationRepository["tryGetScenarioRunData"]>[0],
-  ) {
+    input: SimulationScenarioRunInput,
+  ): Promise<SimulationRunData | null> {
     const run = await this.repository.tryGetScenarioRunData(input);
     return run === null ? null : simulationRunDataSchema.parse(run);
   }
 
   async getBatchHistoryForScenarioSet(
-    input: Parameters<SimulationRepository["getBatchHistoryForScenarioSet"]>[0],
-  ) {
+    input: SimulationBatchHistoryInput,
+  ): Promise<SimulationBatchHistory> {
     return simulationBatchHistorySchema.parse(
       await this.repository.getBatchHistoryForScenarioSet(input),
     );
   }
 
   async tryGetBatchSummary(
-    input: Parameters<SimulationRepository["tryGetBatchSummary"]>[0],
-  ) {
+    input: SimulationBatchSummaryInput,
+  ): Promise<SimulationBatchSummary | null> {
     const summary = await this.repository.tryGetBatchSummary(input);
     return summary === null ? null : simulationBatchSummarySchema.parse(summary);
   }
 
   async getRunDataForBatchRun(
-    input: Parameters<SimulationRepository["getRunDataForBatchRun"]>[0],
-  ) {
+    input: SimulationBatchRunInput,
+  ): Promise<SimulationBatchRunData> {
     return simulationBatchRunDataSchema.parse(
       await this.repository.getRunDataForBatchRun(input),
     );
   }
 
   async getRunDataForScenarioSet(
-    input: Parameters<SimulationRepository["getRunDataForScenarioSet"]>[0],
-  ) {
+    input: SimulationScenarioSetRunsInput,
+  ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }> {
     const result = await this.repository.getRunDataForScenarioSet(input);
     return {
       ...result,
@@ -85,64 +116,64 @@ export class SimulationService extends SimulationServiceContract {
   }
 
   async getAllRunDataForScenarioSet(
-    input: Parameters<SimulationRepository["getAllRunDataForScenarioSet"]>[0],
-  ) {
+    input: SimulationScenarioSetInput,
+  ): Promise<SimulationRunData[]> {
     return simulationRunDataSchema
       .array()
       .parse(await this.repository.getAllRunDataForScenarioSet(input));
   }
 
   getBatchRunCountForScenarioSet(
-    input: Parameters<SimulationRepository["getBatchRunCountForScenarioSet"]>[0],
-  ) {
+    input: SimulationExternalSetCountInput,
+  ): Promise<number> {
     return this.repository.getBatchRunCountForScenarioSet(input);
   }
 
   async getExternalSetSummaries(
-    input: Parameters<SimulationRepository["getExternalSetSummaries"]>[0],
-  ) {
+    input: SimulationProjectDateRangeInput,
+  ): Promise<SimulationExternalSetSummary[]> {
     return simulationExternalSetSummarySchema
       .array()
       .parse(await this.repository.getExternalSetSummaries(input));
   }
 
   async getInternalSuiteSummaries(
-    input: Parameters<SimulationRepository["getInternalSuiteSummaries"]>[0],
-  ) {
+    input: SimulationProjectDateRangeInput,
+  ): Promise<SimulationExternalSetSummary[]> {
     return simulationExternalSetSummarySchema
       .array()
       .parse(await this.repository.getInternalSuiteSummaries(input));
   }
 
   async getRunDataForAllSuites(
-    input: Parameters<SimulationRepository["getRunDataForAllSuites"]>[0],
-  ) {
+    input: SimulationAllSuitesInput,
+  ): Promise<SimulationAllSuitesRunData> {
     return simulationAllSuitesRunDataSchema.parse(
       await this.repository.getRunDataForAllSuites(input),
     );
   }
 
-  getLastUpdatedAt(input: Parameters<SimulationRepository["findLastUpdatedAt"]>[0]) {
+  getLastUpdatedAt(input: SimulationLastUpdatedInput): Promise<number> {
     return this.repository.findLastUpdatedAt(input);
   }
 
-  getRunIdsForSet(input: Parameters<SimulationRepository["findAllRunIdsForSet"]>[0]) {
+  getRunIdsForSet(
+    input: SimulationScenarioSetInput,
+  ): Promise<{ runIds: string[]; reachedCap: boolean }> {
     return this.repository.findAllRunIdsForSet(input);
   }
 
-  getDistinctExternalSetIds(
-    input: Parameters<SimulationRepository["getDistinctExternalSetIds"]>[0],
-  ) {
+  getDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>> {
     return this.repository.getDistinctExternalSetIds(input);
   }
 
-  countRunsForExport(input: Parameters<SimulationRepository["countRunsForExport"]>[0]) {
+  countRunsForExport(input: SimulationExportFilterInput): Promise<number> {
     return this.repository.countRunsForExport(input);
   }
 
   async findRunsForExport(
-    input: Parameters<SimulationRepository["findRunsForExport"]>[0],
-  ) {
+    input: SimulationExportRunsInput,
+  ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }> {
     const result = await this.repository.findRunsForExport(input);
     return {
       ...result,
@@ -150,35 +181,35 @@ export class SimulationService extends SimulationServiceContract {
     };
   }
 
-  queueRun(input: Parameters<SimulationExecutionPort["queueRun"]>[0]) {
+  queueRun(input: SimulationQueueRun): Promise<void> {
     return this.execution.queueRun(simulationQueueRunSchema.parse(input));
   }
 
-  startRun(input: Parameters<SimulationExecutionPort["startRun"]>[0]) {
+  startRun(input: SimulationStartRun): Promise<void> {
     return this.execution.startRun(simulationStartRunSchema.parse(input));
   }
 
-  messageSnapshot(input: Parameters<SimulationExecutionPort["messageSnapshot"]>[0]) {
+  messageSnapshot(input: SimulationMessageSnapshot): Promise<void> {
     return this.execution.messageSnapshot(simulationMessageSnapshotSchema.parse(input));
   }
 
-  textMessageStart(input: Parameters<SimulationExecutionPort["textMessageStart"]>[0]) {
+  textMessageStart(input: SimulationTextMessageStart): Promise<void> {
     return this.execution.textMessageStart(simulationTextMessageStartSchema.parse(input));
   }
 
-  textMessageEnd(input: Parameters<SimulationExecutionPort["textMessageEnd"]>[0]) {
+  textMessageEnd(input: SimulationTextMessageEnd): Promise<void> {
     return this.execution.textMessageEnd(simulationTextMessageEndSchema.parse(input));
   }
 
-  finishRun(input: Parameters<SimulationExecutionPort["finishRun"]>[0]) {
+  finishRun(input: SimulationFinishRun): Promise<void> {
     return this.execution.finishRun(simulationFinishRunSchema.parse(input));
   }
 
-  cancelRun(input: Parameters<SimulationExecutionPort["cancelRun"]>[0]) {
+  cancelRun(input: SimulationCancelRun): Promise<void> {
     return this.execution.cancelRun(simulationCancelRunSchema.parse(input));
   }
 
-  deleteRun(input: Parameters<SimulationExecutionPort["deleteRun"]>[0]) {
+  deleteRun(input: SimulationDeleteRun): Promise<void> {
     return this.execution.deleteRun(simulationDeleteRunSchema.parse(input));
   }
 }

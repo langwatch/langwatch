@@ -1,3 +1,4 @@
+import { ScenarioService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 import { AppSuiteExecutionPort } from "../suite-execution.adapter";
 
@@ -6,6 +7,33 @@ function suiteRuns() {
     startRun: vi.fn().mockResolvedValue(undefined),
     queueRun: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+function scenarioService(
+  resolveRunParametersForScenarios: ScenarioService["resolveRunParametersForScenarios"] = vi
+    .fn()
+    .mockResolvedValue([
+      {
+        scenarioId: "scenario_1",
+        parameters: { account_tier: "gold" },
+        secretParameters: {},
+      },
+    ]),
+): ScenarioService {
+  return Object.assign(Object.create(ScenarioService.prototype), {
+    resolveRunParametersForScenarios,
+  });
+}
+
+function executionPort(options: {
+  runs: ReturnType<typeof suiteRuns>;
+  scenarios?: ScenarioService;
+}): AppSuiteExecutionPort {
+  return AppSuiteExecutionPort.create({
+    startSuiteRun: options.runs.startRun,
+    queueSimulationRun: options.runs.queueRun,
+    scenarios: options.scenarios ?? scenarioService(),
+  });
 }
 
 function input(
@@ -34,14 +62,26 @@ function input(
 }
 
 describe("AppSuiteExecutionPort", () => {
-  it("resolves defaults and caller values before recording the run", async () => {
+  it("records parameters resolved by the scenario service", async () => {
     const runs = suiteRuns();
-    const port = AppSuiteExecutionPort.create({
-      startSuiteRun: runs.startRun,
-      queueSimulationRun: runs.queueRun,
+    const resolve = vi.fn().mockResolvedValue([
+      {
+        scenarioId: "scenario_1",
+        parameters: { account_tier: "platinum" },
+        secretParameters: {},
+      },
+    ]);
+    const port = executionPort({
+      runs,
+      scenarios: scenarioService(resolve),
     });
 
     await port.execute(input({ parameters: { account_tier: "platinum" } }));
+
+    expect(resolve).toHaveBeenCalledWith({
+      scenarios: input().scenarioConfigs,
+      values: { account_tier: "platinum" },
+    });
 
     expect(runs.startRun.mock.calls[0]?.[0]).toEqual({
       tenantId: "project_1",
@@ -71,43 +111,37 @@ describe("AppSuiteExecutionPort", () => {
     );
   });
 
-  it("rejects an invalid parameter before scheduling anything", async () => {
+  it("does not schedule when scenario parameter resolution fails", async () => {
     const runs = suiteRuns();
-    const port = AppSuiteExecutionPort.create({
-      startSuiteRun: runs.startRun,
-      queueSimulationRun: runs.queueRun,
-    });
+    const scenarios = scenarioService(
+      vi.fn().mockRejectedValue({ code: "scenario_parameter_unknown" }),
+    );
+    const port = executionPort({ runs, scenarios });
 
     await expect(
       port.execute(input({ parameters: { accountTier: "platinum" } })),
     ).rejects.toMatchObject({ code: "scenario_parameter_unknown" });
     expect(runs.startRun).not.toHaveBeenCalled();
+    expect(runs.queueRun).not.toHaveBeenCalled();
   });
 
-  it("encrypts secrets and keeps them out of the plain run parameters", async () => {
+  it("keeps encrypted secrets out of the plain run parameters", async () => {
     const runs = suiteRuns();
-    const port = AppSuiteExecutionPort.create({
-      startSuiteRun: runs.startRun,
-      queueSimulationRun: runs.queueRun,
+    const scenarios = scenarioService(
+      vi.fn().mockResolvedValue([
+        {
+          scenarioId: "scenario_1",
+          parameters: { account_tier: "gold" },
+          secretParameters: { api_token: "encrypted-token" },
+        },
+      ]),
+    );
+    const port = executionPort({
+      runs,
+      scenarios,
     });
 
-    await port.execute(
-      input({
-        scenarioConfigs: [
-          {
-            id: "scenario_1",
-            name: "Refund flow",
-            situation: "A customer asks for help",
-            criteria: [],
-            parameters: [
-              { name: "account_tier", defaultValue: "gold" },
-              { name: "api_token", secret: true },
-            ],
-          },
-        ],
-        parameters: { api_token: "tok-live-1" },
-      }),
-    );
+    await port.execute(input({ parameters: { api_token: "tok-live-1" } }));
 
     const call = runs.queueRun.mock.calls[0]?.[0];
     if (!call) throw new Error("The scheduler was not called");
@@ -115,7 +149,7 @@ describe("AppSuiteExecutionPort", () => {
     const encrypted = call.secretParameters;
     expect(plain).toEqual({ account_tier: "gold" });
     expect(encrypted).toEqual(expect.objectContaining({ api_token: expect.any(String) }));
-    expect(encrypted?.api_token).not.toContain("tok-live-1");
+    expect(encrypted?.api_token).toBe("encrypted-token");
     expect(call.metadata).toEqual({
       langwatch: { targetReferenceId: "agent_1" },
       parameters: { account_tier: "gold" },
@@ -125,10 +159,13 @@ describe("AppSuiteExecutionPort", () => {
 
   it("passes client ids and filtered work unchanged to the scheduler", async () => {
     const runs = suiteRuns();
-    const port = AppSuiteExecutionPort.create({
-      startSuiteRun: runs.startRun,
-      queueSimulationRun: runs.queueRun,
-    });
+    const scenarios = scenarioService(
+      vi.fn().mockResolvedValue([
+        { scenarioId: "scenario_1", parameters: {}, secretParameters: {} },
+        { scenarioId: "scenario_2", parameters: {}, secretParameters: {} },
+      ]),
+    );
+    const port = executionPort({ runs, scenarios });
 
     await port.execute(
       input({
@@ -158,10 +195,7 @@ describe("AppSuiteExecutionPort", () => {
   it("continues returning scheduled work when an individual queue dispatch fails", async () => {
     const runs = suiteRuns();
     runs.queueRun.mockRejectedValueOnce(new Error("queue unavailable"));
-    const port = AppSuiteExecutionPort.create({
-      startSuiteRun: runs.startRun,
-      queueSimulationRun: runs.queueRun,
-    });
+    const port = executionPort({ runs });
 
     await expect(port.execute(input())).resolves.toMatchObject({
       jobCount: 1,

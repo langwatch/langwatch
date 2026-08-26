@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { getApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import type { StalledRunFinder } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
@@ -6,7 +7,6 @@ import {
   BACKFILL_STALE_THRESHOLD_MS,
   getStalledRunFindersByInstance,
 } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
-import { ScenarioFailureHandler } from "~/server/scenarios/scenario-failure-handler";
 
 const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
 
@@ -34,23 +34,6 @@ const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
  */
 
 /**
- * Emits the terminal failure event for a stalled run. Structurally satisfied
- * by ScenarioFailureHandler — the backfill reuses the exact path in-process
- * child failures use, so each run becomes a real finished(ERROR) event and
- * the downstream projections run.
- */
-export interface StalledRunFailureEmitter {
-  ensureFailureEventsEmitted(params: {
-    projectId: string;
-    scenarioId: string;
-    setId: string;
-    batchRunId: string;
-    scenarioRunId: string;
-    error: string;
-  }): Promise<void>;
-}
-
-/**
  * Closes every stalled run the finder surfaces. Each run is handled
  * independently — one failing emit does not abort the rest. With `dryRun`
  * the population is only counted and sampled, nothing is written; that mode
@@ -58,13 +41,13 @@ export interface StalledRunFailureEmitter {
  */
 export async function backfillStalledRuns({
   finder,
-  emitter,
+  execution,
   dryRun,
   now = Date.now(),
   thresholdMs = BACKFILL_STALE_THRESHOLD_MS,
 }: {
   finder: StalledRunFinder;
-  emitter: StalledRunFailureEmitter;
+  execution: ScenarioExecutionService;
   dryRun: boolean;
   now?: number;
   thresholdMs?: number;
@@ -87,7 +70,7 @@ export async function backfillStalledRuns({
   let failed = 0;
   for (const run of runs) {
     try {
-      await emitter.ensureFailureEventsEmitted({
+      await execution.finishUnsuccessfulRun({
         projectId: run.tenantId,
         scenarioId: run.scenarioId,
         setId: run.scenarioSetId,
@@ -112,10 +95,9 @@ export default async function execute(...args: string[]) {
   initializeDefaultApp();
   // Composition side effect: the App builds the event-sourcing pipelines the
   // failure handler dispatches through.
-  getApp();
+  const app = getApp();
 
   const dryRun = args.includes("--dry-run");
-  const emitter = ScenarioFailureHandler.create();
   const finders = await getStalledRunFindersByInstance();
 
   if (finders.length === 0) {
@@ -125,7 +107,11 @@ export default async function execute(...args: string[]) {
 
   const totals = { found: 0, closed: 0, failed: 0 };
   for (const { target, finder } of finders) {
-    const outcome = await backfillStalledRuns({ finder, emitter, dryRun });
+    const outcome = await backfillStalledRuns({
+      finder,
+      execution: app.scenarioExecution,
+      dryRun,
+    });
     logger.info({ target, dryRun, ...outcome }, "Swept ClickHouse instance");
     totals.found += outcome.found;
     totals.closed += outcome.closed;

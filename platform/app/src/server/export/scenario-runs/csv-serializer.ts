@@ -20,7 +20,7 @@
 
 import Parse from "papaparse";
 import type { SimulationExportRun } from "@langwatch/simulation-contract";
-import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import { categorizeRunStatus } from "@langwatch/scenario-contract";
 
 /**
  * The columns a person reads, shortest and highest-signal first so the useful

@@ -1,15 +1,15 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
-import type { SimulationReadClient } from "../src/adapters/clickhouse.simulation.adapter";
+import type { SimulationReadClient } from "../src/adapters/clickhouse-simulation.adapter";
 import {
   RUN_ID_CAP,
   SimulationClickHouseRepository,
-} from "../src/repositories/clickhouse/simulation.clickhouse.repository";
+} from "../src/repositories/clickhouse/simulation-clickhouse.repository";
 import {
   type SimulationWindowFragment,
-  SimulationWindowedRead,
+  SimulationWindowedReadPort,
   type SimulationWindowedReadInput,
-} from "../src/repositories/clickhouse/simulation-windowed-read.port";
+} from "../src/ports/simulation-windowed-read.port";
 
 type QueryCall = {
   query: string;
@@ -32,7 +32,7 @@ class FixtureClient {
   };
 }
 
-class FixtureWindowedRead extends SimulationWindowedRead {
+class FixtureWindowedRead extends SimulationWindowedReadPort {
   readonly inputs: SimulationWindowedReadInput<unknown>[] = [];
 
   constructor(private readonly window: SimulationWindowFragment | null = null) {
@@ -269,14 +269,14 @@ describe("SimulationClickHouseRepository", () => {
 
   it("calculates valid page bounds and renders the stable window clause", () => {
     expect(
-      SimulationClickHouseRepository.startedAtBoundsForPage([
+      SimulationClickHouseRepository.tryStartedAtBoundsForPage([
         { MinStartedAt: "3000", MaxStartedAt: "5000" },
         { MinStartedAt: "1000", MaxStartedAt: "9000" },
       ]),
     ).toEqual({ minMs: 1000, maxMs: 9000 });
-    expect(SimulationClickHouseRepository.startedAtBoundsForPage([])).toBeNull();
+    expect(SimulationClickHouseRepository.tryStartedAtBoundsForPage([])).toBeNull();
     expect(
-      SimulationClickHouseRepository.startedAtBoundsForPage([
+      SimulationClickHouseRepository.tryStartedAtBoundsForPage([
         { MinStartedAt: "0", MaxStartedAt: "NaN" },
       ]),
     ).toBeNull();

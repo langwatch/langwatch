@@ -6,6 +6,37 @@ import type {
   ScenarioRunConfig,
   ScenarioUpdateInput,
 } from "./scenario";
+import type { RunParameterValues } from "./scenario.parameters";
+import type { RunSecretCiphertext } from "./run-secret-ciphertext";
+
+export interface CancelScenarioRunInput {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+  scenarioRunId: string;
+  scenarioId: string;
+}
+
+export interface CancelScenarioBatchInput {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+}
+
+export type ResolveScenarioRunParametersInput = {
+  projectId: string;
+  scenarioId: string;
+  values?: RunParameterValues;
+};
+
+export type ResolvedScenarioRunParameters = {
+  parameters: RunParameterValues;
+  secretParameters: RunSecretCiphertext;
+};
+
+export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParameters & {
+  scenarioId: string;
+};
 
 export abstract class ScenarioService {
   abstract create(input: ScenarioCreateInput): Promise<Scenario>;
@@ -32,4 +63,16 @@ export abstract class ScenarioService {
     ids: string[];
     projectId: string;
   }): Promise<{ id: string; name: string }[]>;
+  abstract resolveRunParameters(
+    input: ResolveScenarioRunParametersInput,
+  ): Promise<ResolvedScenarioRunParameters>;
+  abstract resolveRunParametersForScenarios(input: {
+    scenarios: ScenarioRunConfig[];
+    values?: RunParameterValues;
+  }): Promise<ResolvedScenarioRunParametersForScenario[]>;
+  abstract cancelJob(input: CancelScenarioRunInput): Promise<{ cancelled: boolean }>;
+  abstract cancelBatchRun(input: CancelScenarioBatchInput): Promise<{
+    cancelledCount: number;
+    skippedCount: number;
+  }>;
 }

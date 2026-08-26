@@ -111,7 +111,13 @@ function buildMessageRestJson(messageFields: Record<string, unknown>): string {
   // location for content parts on ChatMessage) is already preserved via the
   // ...restFields spread below; only `content` needs the special-case to
   // bypass the flat-string column.
-  const { id, role, content, trace_id, ...restFields } = messageFields;
+  const {
+    id: _id,
+    role: _role,
+    content,
+    trace_id: _traceId,
+    ...restFields
+  } = messageFields;
   const rest: Record<string, unknown> = { ...restFields };
   if (Array.isArray(content)) {
     rest.content = content;

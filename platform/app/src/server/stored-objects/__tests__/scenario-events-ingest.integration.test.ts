@@ -12,7 +12,7 @@
  *
  * The handler mounts authentication via the real authMiddleware (X-Auth-Token),
  * so a real Prisma project is created in beforeAll. Heavy non-auth dependencies
- * (getApp, createStoredObjectsService) are mocked to keep these tests scoped to
+ * (getApp and its process services) are mocked to keep these tests scoped to
  * the storage path.
  */
 import { nanoid } from "nanoid";
@@ -32,14 +32,20 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 // onError handler turns that into a 500 — masking the route logic entirely.
 // Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const { mockGetRunIdsForSet, mockDeleteRun, mockMessageSnapshot } = vi.hoisted(() => ({
+const {
+  mockGetRunIdsForSet,
+  mockDeleteRun,
+  mockMessageSnapshot,
+  mockStoreFromBytes,
+  mockGetById,
+} = vi.hoisted(() => ({
   mockGetRunIdsForSet: vi
     .fn()
     .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
   mockDeleteRun: vi.fn().mockResolvedValue(undefined),
-  // Hoisted so tests can assert the REWRITTEN payload reaches dispatch —
-  // the seam between "route returned 201" and "the user sees the turn".
   mockMessageSnapshot: vi.fn().mockResolvedValue(undefined),
+  mockStoreFromBytes: vi.fn(),
+  mockGetById: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -67,6 +73,15 @@ vi.mock("~/server/app-layer/app", () => ({
     usageLimits: {
       notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
     },
+    storedObjects: {
+      storeFromBytes: mockStoreFromBytes,
+      getById: mockGetById,
+      deleteOwnedBy: vi.fn(),
+    },
+    scenarioTabs: {
+      hasLiveTab: vi.fn().mockResolvedValue(false),
+      setPendingNavigate: vi.fn().mockResolvedValue(undefined),
+    },
   }),
 }));
 
@@ -86,19 +101,6 @@ vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
     },
   };
 });
-
-// We spy on createStoredObjectsService to control whether PUT throws.
-// The factory module is mocked so we can replace the returned service per test.
-const mockStoreFromBytes = vi.fn();
-const mockGetById = vi.fn();
-
-vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
-  createStoredObjectsService: vi.fn(() => ({
-    storeFromBytes: mockStoreFromBytes,
-    getById: mockGetById,
-    deleteOwnedBy: vi.fn(),
-  })),
-}));
 
 // Logger — shared mock so tests can inspect the structured log entries the
 // route emits (e.g. AC34: the ingest log line must list every stored_objects
@@ -154,7 +156,7 @@ vi.mock("~/env.mjs", () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from "~/app/api/scenario-events/[[...route]]/app";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventType } from "@langwatch/scenario-contract";
 
 // ---------------------------------------------------------------------------
 // Test fixtures

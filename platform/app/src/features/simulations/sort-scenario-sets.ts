@@ -6,8 +6,8 @@
  * @see specs/scenarios/internal-set-namespace.feature
  */
 
-import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
-import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
+import { isOnPlatformSet } from "@langwatch/scenario-contract";
+import type { ScenarioSetData } from "@langwatch/scenario-contract";
 
 /**
  * Sorts scenario sets with internal sets pinned to the top.

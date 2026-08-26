@@ -27,9 +27,44 @@ CSV streaming remains an API composer because it owns HTTP/backpressure and
 serialization policy. It receives `SimulationService`; it never receives or
 reconstructs the private repository.
 
-Scenario definitions, Suite run planning and the Eventing process manager keep
-their own lifecycle ownership. They collaborate through services or the
-execution port rather than creating another Simulation persistence path.
+Simulation also owns the deterministic `simulation_run_execution` process,
+wakes and intents. Intent execution calls the complete Scenario execution and
+Simulation services; worker composition only registers the process.
+
+## Public surfaces and transports
+
+Existing REST URLs, tRPC names and Eventing type/version/key values remain
+unchanged. Transports delegate to the composed service.
+
+## Dependencies
+
+Simulation consumes Scenario through `@langwatch/scenario-contract`. It does
+not import Scenario server code or foreign repositories.
+
+## Persistence
+
+ClickHouse access remains private to the Simulation repository. Process state
+and intent delivery remain in Eventing's durable stores.
+
+## Runtime and registration
+
+Boot composes one Simulation service. Worker composition registers the process
+and binds its retry-safe intent executors once.
+
+## Environment and configuration
+
+The packages read no environment modules. Composition injects store and
+execution capabilities.
+
+## Errors
+
+Required reads and commands return or throw. Only genuine optional reads use a
+`try*` name. Intent failures propagate so the outbox can retry them.
+
+## Contracts and validation
+
+Zod 4 schemas define the existing Simulation events, process state, wakes and
+intent payloads. Their wire names and versions are unchanged.
 
 ## Consequences
 

@@ -3,20 +3,19 @@ import {
   type SuiteRunResult,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import type { ScenarioRunConfig } from "@langwatch/scenario-contract";
 import { SuiteExecutionPort } from "@langwatch/suite-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
-import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
-import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
-import { getSuiteSetId } from "~/server/suites/suite-set-id";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import {
-  encryptRunSecretValues,
+  generateBatchRunId,
   type RunSecretCiphertext,
-} from "~/server/scenarios/run-secret-values";
+  type ScenarioRunConfig,
+  type ScenarioService,
+} from "@langwatch/scenario-contract";
+import { getSuiteSetId } from "@langwatch/suite-contract";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:suite-run:service");
 
@@ -42,16 +41,21 @@ function withSecretParameters(
 }
 
 /**
- * Application composition for suite execution. The feature service validates
- * suite references; this adapter resolves run-only parameters and records the
- * event-sourced work through the existing scheduler.
+ * Application composition for recording a validated Suite run through the
+ * existing event-sourced scheduler. Scenario owns parameter resolution and
+ * encryption; this adapter only maps its result onto durable commands.
  */
 export class AppSuiteExecutionPort extends SuiteExecutionPort {
   static create(options: {
     startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
     queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
+    scenarios: ScenarioService;
   }): AppSuiteExecutionPort {
-    return new AppSuiteExecutionPort(options.startSuiteRun, options.queueSimulationRun);
+    return new AppSuiteExecutionPort(
+      options.startSuiteRun,
+      options.queueSimulationRun,
+      options.scenarios,
+    );
   }
 
   private constructor(
@@ -61,6 +65,7 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     private readonly queueSimulationRunCommand: (
       data: QueueRunCommandData,
     ) => Promise<void>,
+    private readonly scenarios: ScenarioService,
   ) {
     super();
   }
@@ -78,23 +83,17 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     batchRunId?: string;
     parameters?: SuiteRunParameters;
   }): Promise<SuiteRunResult> {
-    const resolved = await resolveRunParameters({
+    const scenarioParameters = await this.scenarios.resolveRunParametersForScenarios({
       scenarios: input.scenarioConfigs,
       values: input.parameters,
     });
     const parametersByScenarioId = new Map(
-      [...resolved].map(([scenarioId, parameters]) => [
-        scenarioId,
-        parameters.parameters,
-      ]),
+      scenarioParameters.map((resolved) => [resolved.scenarioId, resolved.parameters]),
     );
     const secretParametersByScenarioId = new Map<string, RunSecretCiphertext>(
-      [...resolved]
-        .filter(([, parameters]) => Object.keys(parameters.secretParameters).length > 0)
-        .map(([scenarioId, parameters]) => [
-          scenarioId,
-          encryptRunSecretValues(parameters.secretParameters),
-        ]),
+      scenarioParameters
+        .filter((resolved) => Object.keys(resolved.secretParameters).length > 0)
+        .map((resolved) => [resolved.scenarioId, resolved.secretParameters]),
     );
     const batchRunId = input.batchRunId ?? generateBatchRunId();
     const setId = getSuiteSetId(input.suiteId);

@@ -21,7 +21,7 @@ import {
   SimulationExecutionPort,
 } from "@langwatch/simulation-server";
 import { describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { ScenarioRunExportService } from "../scenario-run-export.service";
 import type { ScenarioRunExportRequest } from "../types";
 

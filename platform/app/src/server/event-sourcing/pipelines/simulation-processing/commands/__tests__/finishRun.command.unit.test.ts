@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   decodeScenarioError,
   ScenarioInfraErrorCode,
-} from "~/server/scenarios/scenario-infra-error";
+} from "@langwatch/scenario-contract";
 import type { FinishRunCommandData } from "../../schemas/commands";
 import {
   SIMULATION_EVENT_VERSIONS,

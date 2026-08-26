@@ -3,12 +3,12 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   isScenarioTabNavigatePayload,
   type ScenarioTabNavigatePayload,
-} from "~/server/scenarios/browser-tab/scenario-tab-events";
-import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
+} from "@langwatch/scenario-contract";
+import { DEFAULT_SET_ID } from "@langwatch/scenario-contract";
 import {
   isTerminalStatus,
   type ScenarioRunStatus,
-} from "~/server/scenarios/scenario-event.enums";
+} from "@langwatch/scenario-contract";
 import { api } from "~/utils/api";
 import {
   type CompactStreamingEvent,

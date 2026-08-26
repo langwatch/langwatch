@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
+import { runSecretCiphertextSchema } from "@langwatch/scenario-contract";
 import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 
 export const queueRunCommandDataSchema = z.object({

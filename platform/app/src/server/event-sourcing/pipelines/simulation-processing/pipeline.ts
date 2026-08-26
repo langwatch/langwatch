@@ -4,6 +4,7 @@ import {
   defineEvents,
   definePipeline,
   type FoldProjectionStore,
+  type ProcessManagerApplier,
 } from "@langwatch/eventing";
 import {
   CancelRunCommand,
@@ -16,11 +17,7 @@ import {
   TextMessageStartCommand,
 } from "./commands";
 import { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
-import {
-  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
-  type SimulationRunExecutionDispatchDeps,
-  simulationRunExecutionPM,
-} from "./process-manager";
+import type { SimulationService } from "@langwatch/simulation-contract";
 import {
   SimulationRunMetricsMapProjection,
   type SimulationRunMetricsProjectionRecord,
@@ -51,8 +48,11 @@ export interface SimulationProcessingPipelineDeps {
   /** Pre-constructed with `loadPriorEvents` for ECST backfill. */
   finishRunCommand: FinishRunCommand;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
-  /** Dispatch deps for the simulationRunExecution process manager (ADR-052). */
-  simulationRunExecution: SimulationRunExecutionDispatchDeps;
+  scenarioRunExecution: {
+    name: string;
+    process: ProcessManagerApplier<SimulationProcessingEvent>;
+  };
+  simulations: SimulationService;
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
@@ -116,10 +116,7 @@ export function createSimulationProcessingPipeline(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
     )
-    .withProcessManager(
-      SIMULATION_RUN_EXECUTION_PROCESS_NAME,
-      simulationRunExecutionPM(deps.simulationRunExecution),
-    )
+    .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
     .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)

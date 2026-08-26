@@ -182,8 +182,8 @@ const ENTRIES = [
   { name: "workers", entry: "src/workers.ts" },
   { name: "task", entry: "src/task.ts" },
   {
-    // Spawned per scenario run (src/server/scenarios/execution/
-    // child-process-spawn.ts), as a FRESH process every time, so whatever this
+    // Spawned per scenario run by the Scenario server child-process adapter,
+    // as a FRESH process every time, so whatever this
     // entry resolves from disk at boot is paid once per simulation.
     //
     // That is why the scenario SDK is inlined here and nowhere else: left
@@ -196,7 +196,7 @@ const ENTRIES = [
     // two registries and drop every span while still exiting 0.
     // @see specs/scenarios/pre-compiled-child-process.feature
     name: "scenario-child-process",
-    entry: "src/server/scenarios/execution/scenario-child-process.ts",
+    entry: "src/runtime/worker/scenario-child-process.ts",
     inlineAll: true,
   },
 ];

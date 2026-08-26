@@ -3,7 +3,7 @@ import {
   type ScenarioMessageRendererProps as FeatureScenarioMessageRendererProps,
   type StreamingMessage,
 } from "@langwatch/simulation-web";
-import type { ScenarioMessageSnapshotEvent } from "@langwatch/scenario-contract";
+import type { SimulationMessage } from "@langwatch/simulation-contract";
 import { Bubble } from "~/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble";
 import { getDisplayRoleVisuals } from "~/features/traces-v2/components/TraceDrawer/scenarioRoles";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
@@ -11,7 +11,7 @@ import { RunTurnSeparator } from "./RunTurnSeparator";
 import { MediaPart } from "./MediaPart";
 
 export interface ScenarioMessageRendererProps {
-  messages: ScenarioMessageSnapshotEvent["messages"];
+  messages: SimulationMessage[];
   streamingMessages?: StreamingMessage[];
   variant: "grid" | "drawer";
   projectId: string;

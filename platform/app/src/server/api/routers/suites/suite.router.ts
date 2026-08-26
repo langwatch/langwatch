@@ -5,11 +5,11 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { runParameterValuesSchema } from "@langwatch/scenario-contract";
-import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
-import { extractSuiteId } from "~/server/suites/suite-set-id";
+import type { SuiteRunSummary } from "@langwatch/scenario-contract";
+import { tryExtractSuiteId } from "@langwatch/suite-contract";
 import {
   createSuiteSchema,
   projectSchema,
@@ -148,7 +148,7 @@ export const suiteRouter = createTRPCRouter({
 
       const result: Record<string, SuiteRunSummary> = {};
       for (const summary of summaries) {
-        const suiteId = extractSuiteId(summary.scenarioSetId);
+        const suiteId = tryExtractSuiteId(summary.scenarioSetId);
         if (!suiteId) continue;
         result[suiteId] = {
           passedCount: summary.passedCount,

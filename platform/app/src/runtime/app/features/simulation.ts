@@ -2,7 +2,7 @@ import type { SimulationService } from "@langwatch/simulation-contract";
 import {
   SimulationClickHouseAdapter,
   SimulationExecutionPort,
-  SimulationWindowedRead,
+  SimulationWindowedReadPort,
   type SimulationReadClient,
   type SimulationWindowedReadInput,
 } from "@langwatch/simulation-server";
@@ -65,7 +65,7 @@ export class AppSimulationExecutionPort extends SimulationExecutionPort {
 }
 
 /** Reuses the process-wide ClickHouse windowing policy and its telemetry. */
-export class AppSimulationWindowedRead extends SimulationWindowedRead {
+export class AppSimulationWindowedRead extends SimulationWindowedReadPort {
   query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result> {
     return queryWindowed(input);
   }

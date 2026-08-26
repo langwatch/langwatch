@@ -1,7 +1,7 @@
 import Parse from "papaparse";
 import type { SimulationExportRun } from "@langwatch/simulation-contract";
 import { describe, expect, it } from "vitest";
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } from "../csv-serializer";
 
 function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {

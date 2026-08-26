@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type { App } from "~/server/app-layer/app";
@@ -8,14 +8,12 @@ import { bodyLimit } from "~/server/routes/_lib/body-limit";
 import {
   SCENARIO_TAB_NAVIGATE_EVENT,
   type ScenarioTabNavigatePayload,
-} from "~/server/scenarios/browser-tab/scenario-tab-events";
-import { scenarioTabRegistry } from "~/server/scenarios/browser-tab/scenario-tab-registry";
-import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
-import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
+} from "@langwatch/scenario-contract";
+import { DEFAULT_SET_ID } from "@langwatch/scenario-contract";
+import { ScenarioEventType } from "@langwatch/scenario-contract";
+import type { ScenarioEvent } from "@langwatch/scenario-contract";
+import { responseSchemas, scenarioEventSchema } from "@langwatch/scenario-contract";
 import { extractInlineMediaFromEvent } from "~/server/stored-objects/content-extractor";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { encodeContent, encodeEnd, encodeStart } from "~/utils/streaming-event-codec";
 import { blockTraceUsageExceededMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -71,14 +69,13 @@ secured.access(requires("scenarios:create")).post(
 
     // Extract inline media bytes, externalize to stored objects, and rewrite
     // the event payload to reference them by URL before dispatch.
-    const service = createStoredObjectsService({ projectId: project.id });
     const { rewrittenEvent: rawRewritten, refs } = await extractInlineMediaFromEvent({
       event: validatedEvent,
       projectId: project.id,
       ownerKind: "scenario_run",
       ownerId: validatedEvent.scenarioRunId,
       purpose: "scenario_event",
-      service,
+      service: c.app.storedObjects,
     });
 
     // Cast back to the typed ScenarioEvent — the rewrite only touches content
@@ -186,7 +183,7 @@ secured.access(requires("scenarios:create")).post(
       scenarioSetId || DEFAULT_SET_ID,
     )}/${encodeURIComponent(batchRunId)}`;
 
-    const hasLiveTab = await scenarioTabRegistry.hasLiveTab({
+    const hasLiveTab = await c.app.scenarioTabs.hasLiveTab({
       projectId: project.id,
       tabKey,
     });
@@ -203,7 +200,7 @@ secured.access(requires("scenarios:create")).post(
 
     // Parked before the broadcast so a tab reconnecting right now cannot slip
     // between the two and miss a run we already reported as delivered.
-    await scenarioTabRegistry.setPendingNavigate({
+    await c.app.scenarioTabs.setPendingNavigate({
       projectId: project.id,
       tabKey,
       url,

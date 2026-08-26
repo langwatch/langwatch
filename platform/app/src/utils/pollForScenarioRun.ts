@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { BatchRunDataResult } from "@langwatch/scenario-contract";
 
 const logger = createLogger("pollForScenarioRun");
 

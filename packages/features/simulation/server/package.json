@@ -21,7 +21,11 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/simulation-contract": "workspace:*"
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/simulation-contract": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

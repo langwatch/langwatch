@@ -15,8 +15,8 @@ import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { app } from "../[[...route]]/app";
 
 function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {

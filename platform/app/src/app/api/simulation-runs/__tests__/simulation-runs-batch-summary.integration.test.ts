@@ -14,7 +14,7 @@ import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
-import type { BatchSummary } from "~/server/scenarios/scenario-event.types";
+import type { BatchSummary } from "@langwatch/scenario-contract";
 import { app } from "../[[...route]]/app";
 
 function makeSummary(overrides: Partial<BatchSummary> = {}): BatchSummary {

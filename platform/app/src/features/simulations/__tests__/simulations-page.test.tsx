@@ -9,7 +9,7 @@
  * @see specs/scenarios/internal-set-namespace.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioSetData } from "@langwatch/scenario-contract";
 import { sortScenarioSets } from "../sort-scenario-sets";
 
 describe("sortScenarioSets()", () => {
