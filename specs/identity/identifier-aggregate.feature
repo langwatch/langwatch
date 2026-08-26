@@ -26,16 +26,25 @@ Feature: An identifier is an aggregate - one stream per identifier
   #
   # A shared stream was carrying two things. One was SERIALISATION - the
   # queue keys its lane on the aggregate id - and that is what we are
-  # deliberately giving up. The other was two cross-identifier SWEEPS the
-  # reducer performed on state no per-identifier fold can see: demoting every
-  # standing PRIMARY, and wiping every head on erasure. Both survive by being
-  # ROUTED rather than swept: the command reads the person's heads - a filter
-  # over the projection, ADR-110's answer to the same problem in offboarding -
-  # and states one fact per stream that has to move.
+  # deliberately giving up, for the ceremonies that happen at volume. It is
+  # NOT given up for the two commands whose guards read the whole person and
+  # refuse on what they read (a promotion, a detach): a command's aggregate id
+  # names only its lane, the events it states carry their own, and those two
+  # keep the person's lane. A read cannot decide a race - ADR-116 §6 settled
+  # that once already, with the address lock.
+  #
+  # The other thing was two cross-identifier SWEEPS the reducer performed on
+  # state no per-identifier fold can see: demoting every standing PRIMARY, and
+  # wiping every head on erasure. Both survive by being ROUTED rather than
+  # swept: the command reads the person's heads - a filter over the projection,
+  # ADR-110's answer to the same problem in offboarding - and states one fact
+  # per stream that has to move. A fact naming two streams is appended twice,
+  # because an event carries one aggregate id.
   #
   # This file specifies the routing and the per-identifier fold, which is the
-  # domain half. Wiring it (the envelope, the command lanes, the per-identifier
-  # cursor, the restatement of the existing log) is the slices ADR-127 lists.
+  # domain half. Wiring it - the envelope, the command lanes, the per-identifier
+  # cursor, and the version-gated fold key that lets the existing log stay
+  # exactly as it was written - is the slices ADR-127 lists.
 
   Background:
     Given a user "sam" who holds identifiers "work" and "personal"
