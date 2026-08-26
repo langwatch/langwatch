@@ -148,7 +148,7 @@ three-key dimension map.
 Clamping the window forward to an epoch parsed out of the error prose was
 rejected. It discards every day below the floor rather than partially
 attributing it, and it makes an English sentence load-bearing: a reworded or
-localised message leaves the parse with no fallback, and the framework does
+localized message leaves the parse with no fallback, and the framework does
 not advance a cursor on error, so the source would retry the identical
 failing request forever. Dropping a dimension needs no regex and cannot
 wedge.
@@ -287,7 +287,7 @@ extra: {
 {
   adapter: "openai_admin",
   report: "cost",
-  startingAt?: string,   // ISO instant; clamped forward per Decision 8
+  startingAt?: string,   // ISO instant; the backfill origin
   schedule: string,      // default "0 * * * *"
   credentials: { token } // Admin API key, encrypted at rest
 }

@@ -210,13 +210,15 @@ Feature: OpenAI Admin cost puller
       # both surfaces records the same spend twice, and they disagree with each
       # other besides.
 
-    @integration
+    @integration @unimplemented
     Scenario: Adding a second source for the same organization warns the admin
       Given an organization that already has an `openai_admin` source
       When an admin begins configuring another one
       Then the form warns that the spend would be counted twice
       # Not refused: the same exposure exists on every provider adapter, and a
       # guard built only here would hide it everywhere else.
+      # The static catalog blurb warns unconditionally; this scenario describes
+      # a conditional check that is not yet built.
 
   Rule: The credential is handled like a credential
 

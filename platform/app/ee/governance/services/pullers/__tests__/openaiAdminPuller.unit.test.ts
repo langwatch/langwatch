@@ -169,7 +169,8 @@ describe("given an OpenAI Admin cost source", () => {
         observedAt: OBSERVED_AT,
       });
 
-      expect(record?.costNanoUsd).toBeGreaterThan(0);
+      // 0.0000001234 USD × 1e9 = 123.4 → 123 nanoUsd (truncated).
+      expect(record?.costNanoUsd).toBe(123);
     });
 
     /** @scenario "Spend is called an estimate, not the invoice" */
@@ -509,7 +510,7 @@ describe("given an OpenAI Admin cost source", () => {
       );
 
       const result = await new OpenAiAdminPuller().runOnce(
-        { ...RUN_OPTIONS, deadlineMs: Date.now() + 5 },
+        { ...RUN_OPTIONS, deadlineMs: Date.now() + 200 },
         CONFIG,
       );
 

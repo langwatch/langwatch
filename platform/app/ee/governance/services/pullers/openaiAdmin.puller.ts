@@ -522,10 +522,11 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         return {
           events,
           cursor: encodeCursor({
-            // A window that returned no bucket at all keeps the start it was
-            // given rather than the looked-back one, for the same reason the
-            // deadline path does.
-            startingAt: watermark ?? cursor.storedStart,
+            // The stored start never moves backwards: a retracted window
+            // whose newest bucket predates the stored start must not rewind
+            // the source. laterOf picks the later of the two.
+            startingAt:
+              laterOf(watermark, cursor.storedStart) ?? cursor.storedStart,
             page: null,
             query,
             watermark: null,
