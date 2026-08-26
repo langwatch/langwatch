@@ -1,5 +1,4 @@
 import {
-  GovernanceCliSessionInventoryService,
   type CliSession,
   type CliTokenRecord,
   type CliUserInput,
@@ -12,12 +11,11 @@ import {
 import type { CliTokenStorePort } from "../ports/cli-token-store.port";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
 
-export class DefaultGovernanceCliSessionInventoryService extends GovernanceCliSessionInventoryService {
+export class DefaultGovernanceCliSessionInventoryService {
   private constructor(
     private readonly store: CliTokenStorePort | undefined,
     private readonly diagnostics: GovernanceDiagnosticsPort | undefined,
   ) {
-    super();
   }
 
   static create(options: {

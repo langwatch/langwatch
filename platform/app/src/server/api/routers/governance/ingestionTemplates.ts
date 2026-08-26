@@ -41,8 +41,8 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionTemplates;
-      return await service.listForUser({
+      const service = ctx.app.governance;
+      return await service.templateListForUser({
         organizationId: input.organizationId,
       });
     }),
@@ -56,8 +56,8 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionTemplates;
-      return await service.listForOrgAdmin({
+      const service = ctx.app.governance;
+      return await service.templateListForOrgAdmin({
         organizationId: input.organizationId,
       });
     }),
@@ -71,8 +71,8 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionTemplates;
-      return service.getByIdForOrg({
+      const service = ctx.app.governance;
+      return service.templateGetByIdForOrg({
         id: input.id,
         organizationId: input.organizationId,
       });
@@ -100,8 +100,8 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionTemplates;
-      return await service.createOrgTemplate({
+      const service = ctx.app.governance;
+      return await service.templateCreateOrg({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,
         sourceType: input.sourceType,
@@ -132,8 +132,8 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionTemplates;
-      return await service.updateOttlRules({
+      const service = ctx.app.governance;
+      return await service.templateUpdateOttlRules({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,
         id: input.id,
@@ -149,8 +149,8 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionTemplates;
-      await service.archiveOrgTemplate({
+      const service = ctx.app.governance;
+      await service.templateArchiveOrg({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,
         id: input.id,
@@ -174,8 +174,8 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionTemplates;
-      return await service.cloneFromPlatform({
+      const service = ctx.app.governance;
+      return await service.templateCloneFromPlatform({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,
         sourceTemplateId: input.sourceTemplateId,

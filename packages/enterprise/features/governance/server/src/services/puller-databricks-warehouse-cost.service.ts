@@ -94,6 +94,22 @@ export const WAREHOUSE_COST_SETTLING_LAG_MS = 2 * 60 * 60 * 1000;
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
+type WarehouseCostWindow = {
+  fromMs: number;
+  toMs: number;
+};
+
+type WarehouseCostChunkInput = WarehouseCostWindow & {
+  /** Overridden only to re-ask a refused chunk in smaller pieces. */
+  chunkMs?: number;
+};
+
+type WarehouseCostReadFloorInput = {
+  sinceMs: number;
+  nowMs: number;
+  costEnabled: boolean;
+};
+
 /**
  * How much of the window one cost request asks about.
  *
@@ -200,19 +216,14 @@ function warehouseCostChunks({
   fromMs,
   toMs,
   chunkMs = WAREHOUSE_COST_CHUNK_MS,
-}: {
-  fromMs: number;
-  toMs: number;
-  /** Overridden only to re-ask a refused chunk in smaller pieces. */
-  chunkMs?: number;
-}): Array<{ fromMs: number; toMs: number }> {
+}: WarehouseCostChunkInput): WarehouseCostWindow[] {
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return [];
 
   const start = Math.floor(fromMs / ONE_HOUR_MS) * ONE_HOUR_MS;
   const end = Math.ceil(toMs / ONE_HOUR_MS) * ONE_HOUR_MS;
   if (end <= start) return [];
 
-  const chunks: Array<{ fromMs: number; toMs: number }> = [];
+  const chunks: WarehouseCostWindow[] = [];
   for (let at = start; at < end; at += chunkMs) {
     chunks.push({
       fromMs: at,
@@ -241,10 +252,7 @@ function warehouseCostChunks({
  * splitting further would spend the run's whole budget chasing an answer that a
  * day-sized question already failed to get.
  */
-function warehouseCostPieces(chunk: {
-  fromMs: number;
-  toMs: number;
-}): Array<{ fromMs: number; toMs: number }> {
+function warehouseCostPieces(chunk: WarehouseCostWindow): WarehouseCostWindow[] {
   const pieces = warehouseCostChunks({
     fromMs: chunk.fromMs,
     toMs: chunk.toMs,
@@ -662,11 +670,7 @@ function costReadFloorMs({
   sinceMs,
   nowMs,
   costEnabled,
-}: {
-  sinceMs: number;
-  nowMs: number;
-  costEnabled: boolean;
-}): number {
+}: WarehouseCostReadFloorInput): number {
   if (!costEnabled) return sinceMs;
   return Math.min(sinceMs, nowMs - WAREHOUSE_COST_SETTLING_LAG_MS);
 }
@@ -724,29 +728,26 @@ export class DatabricksWarehouseCostService {
     return new DatabricksWarehouseCostService();
   }
 
-  chunks(
-    input: Parameters<typeof warehouseCostChunks>[0],
-  ): ReturnType<typeof warehouseCostChunks> {
+  chunks(input: WarehouseCostChunkInput): WarehouseCostWindow[] {
     return warehouseCostChunks(input);
   }
 
-  pieces(
-    input: Parameters<typeof warehouseCostPieces>[0],
-  ): ReturnType<typeof warehouseCostPieces> {
+  pieces(input: WarehouseCostWindow): WarehouseCostWindow[] {
     return warehouseCostPieces(input);
   }
 
-  allocate(
-    input: Parameters<typeof allocateWarehouseCost>[0],
-  ): ReturnType<typeof allocateWarehouseCost> {
+  allocate(input: { rows: WarehouseCostRow[] }): WarehouseCostAllocation {
     return allocateWarehouseCost(input);
   }
 
-  costReadFloor(input: Parameters<typeof costReadFloorMs>[0]): number {
+  costReadFloor(input: WarehouseCostReadFloorInput): number {
     return costReadFloorMs(input);
   }
 
-  merge(input: Parameters<typeof mergeWarehouseCost>[0]): void {
+  merge(input: {
+    into: Map<string, WarehousePricedStatement>;
+    from: Map<string, WarehousePricedStatement>;
+  }): void {
     mergeWarehouseCost(input);
   }
 }

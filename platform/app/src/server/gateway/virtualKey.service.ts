@@ -11,7 +11,7 @@
  * `scopeResolver.ts`); the service does not own a per-VK provider chain.
  */
 
-import { AppGovernanceSignalsService } from "~/runtime/app/features/governance/governance-signals.adapter";
+import { AppGovernanceSignalsService } from "@langwatch/enterprise-api/governance/governance-signals.adapter";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -232,7 +232,7 @@ export class VirtualKeyService {
     private readonly changeEvents: ChangeEventRepository,
     private readonly auditLog: GatewayAuditAdapter,
   ) {
-    this.governanceSignals = AppGovernanceSignalsService.create({ prisma });
+    this.governanceSignals = AppGovernanceSignalsService.disabled();
   }
 
   static create(prisma: PrismaClient): VirtualKeyService {
@@ -246,6 +246,17 @@ export class VirtualKeyService {
 
   async getAll(organizationId: string): Promise<VirtualKeyWithScopes[]> {
     return this.repository.findAllInOrganization(organizationId);
+  }
+
+  async listActiveForPrincipal(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<VirtualKeyWithScopes[]> {
+    const keys = await this.repository.findAllInOrganization(input.organizationId);
+
+    return keys.filter(
+      (key) => key.principalUserId === input.userId && key.status !== "REVOKED",
+    );
   }
 
   /** One page of the organization's keys, newest first. */

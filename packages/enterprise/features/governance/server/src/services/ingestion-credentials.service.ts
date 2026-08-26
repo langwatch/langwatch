@@ -7,7 +7,7 @@ export class IngestionCredentialsService {
     return new IngestionCredentialsService(encryption);
   }
 
-  constructor(private readonly encryption: GovernanceEncryptionPort) {}
+  private constructor(private readonly encryption: GovernanceEncryptionPort) {}
 
   isEncrypted(value: unknown): value is string {
     return typeof value === "string" && value.startsWith(ENCRYPTED_PREFIX);

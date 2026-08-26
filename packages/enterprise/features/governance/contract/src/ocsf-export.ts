@@ -40,7 +40,3 @@ export const governanceOcsfExportInputSchema = z
   })
   .strict();
 export type GovernanceOcsfExportInput = z.infer<typeof governanceOcsfExportInputSchema>;
-
-export abstract class GovernanceOcsfExportService {
-  abstract list(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage>;
-}

@@ -59,14 +59,3 @@ export const personalUsageBreakdownSchema = z
   })
   .strict();
 export type PersonalUsageBreakdown = z.infer<typeof personalUsageBreakdownSchema>;
-
-export abstract class GovernancePersonalUsageService {
-  abstract summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary>;
-
-  abstract dailyBuckets(input: PersonalUsageQueryInput): Promise<PersonalUsageBucket[]>;
-
-  abstract breakdownByModel(
-    input: PersonalUsageQueryInput,
-    limit?: number,
-  ): Promise<PersonalUsageBreakdown[]>;
-}

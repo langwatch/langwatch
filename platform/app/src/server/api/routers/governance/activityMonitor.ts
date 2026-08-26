@@ -40,8 +40,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.summary({
+      const service = ctx.app.governance;
+      return await service.activitySummary({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
       });
@@ -68,8 +68,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.spendByUser({
+      const service = ctx.app.governance;
+      return await service.activitySpendByUser({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
         limit: input.limit,
@@ -101,8 +101,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.spendByTeam({
+      const service = ctx.app.governance;
+      return await service.activitySpendByTeam({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
         limit: input.limit,
@@ -131,8 +131,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.spendByDepartment({
+      const service = ctx.app.governance;
+      return await service.activitySpendByDepartment({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
       });
@@ -158,8 +158,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.spendOverTime({
+      const service = ctx.app.governance;
+      return await service.activitySpendOverTime({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
         groupBy: input.groupBy,
@@ -174,8 +174,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.ingestionSourcesHealth({
+      const service = ctx.app.governance;
+      return await service.activityIngestionSourcesHealth({
         organizationId: input.organizationId,
       });
     }),
@@ -196,8 +196,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.recentAnomalies({
+      const service = ctx.app.governance;
+      return await service.activityRecentAnomalies({
         organizationId: input.organizationId,
         limit: input.limit,
       });
@@ -220,8 +220,8 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.eventsForSource(input);
+      const service = ctx.app.governance;
+      return await service.activityEventsForSource(input);
     }),
 
   /**
@@ -238,7 +238,7 @@ export const activityMonitorRouter = createTRPCRouter({
     .permission("activityMonitor:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.activity;
-      return await service.sourceHealthMetrics(input);
+      const service = ctx.app.governance;
+      return await service.activitySourceHealthMetrics(input);
     }),
 });

@@ -1,6 +1,5 @@
 import {
   PersonalWorkspaceMissingError,
-  GovernanceIngestionKeyService,
   type IngestionKeyMintCommand,
   type IssuedIngestionKey,
   type PersonalIngestionKey,
@@ -11,13 +10,12 @@ import type {
   IngestionKeyRepository,
 } from "../ports/ingestion-source-key.port";
 
-export class IngestionKeyService extends GovernanceIngestionKeyService {
+export class IngestionKeyService {
   private constructor(
     private readonly repository: IngestionKeyRepository,
     private readonly issuer: IngestionKeyIssuerPort,
     private readonly organizations: OrganizationService,
   ) {
-    super();
   }
 
   static create(options: {

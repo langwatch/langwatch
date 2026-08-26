@@ -1,4 +1,10 @@
 export { GatewayService } from "./services/gateway.service";
 export { PrismaGatewayAdapter } from "./adapters/prisma.gateway.adapter";
+export { GatewayBudgetClickHouseRepository } from "./gateway-budget-clickhouse.repository";
+export { budgetPeriodFloorMs, currentPeriodStart } from "./gatewayPeriod";
+export { budgetAppliesToProvider, resolveApplicableBudgets } from "./gatewayResolution";
+export { ChangeEventRepository } from "./repositories/gateway-change-event.repository";
+export { nanoUsdToDecimalString } from "./gatewayWireMoney";
 export type * from "./services/gateway.service";
+export type * from "./gateway-budget-clickhouse.repository";
 export * from "./gatewayErrors";

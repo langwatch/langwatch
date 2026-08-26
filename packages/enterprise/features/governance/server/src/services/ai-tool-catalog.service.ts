@@ -3,7 +3,6 @@ import {
   ASSISTANT_KIND_TO_TOOL_SLUG,
   AiToolDepartmentScopeError,
   AiToolEntryNotFoundError,
-  GovernanceAiToolCatalogService,
   PLATFORM_TOOL_POLICY_DEFAULTS,
   PLATFORM_TOOL_SLUGS,
   aiToolConfigEnvelopeSchema,
@@ -34,14 +33,12 @@ import type {
   AiToolSlugPort,
 } from "../ports/ai-tool-catalog.port";
 
-export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatalogService {
+export class DefaultGovernanceAiToolCatalogService {
   private constructor(
     private readonly repository: AiToolCatalogRepository,
     private readonly slugs: AiToolSlugPort,
     private readonly providers: AiToolProviderCatalogPort,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
     repository: AiToolCatalogRepository;
@@ -222,12 +219,11 @@ export class DefaultGovernanceAiToolCatalogService extends GovernanceAiToolCatal
   async resolveToolPolicy(
     input: AiToolMemberInput & { slug: PlatformToolSlug },
   ): Promise<PlatformToolPolicy> {
-    return (
-      await this.resolveToolPolicyMap({
-        organizationId: input.organizationId,
-        userId: input.userId,
-      })
-    )[input.slug];
+    const policies = await this.resolveToolPolicyMap({
+      organizationId: input.organizationId,
+      userId: input.userId,
+    });
+    return policies[input.slug];
   }
 
   async resolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog> {

@@ -135,8 +135,7 @@ async function main() {
     throw new Error(`no device_code for user_code ${userCode}`);
   }
 
-  const service = initializeDefaultApp({ processRole: "web" }).governance
-    .personalVirtualKeys;
+  const service = initializeDefaultApp({ processRole: "web" }).governance;
 
   // Try ensureDefault first; if the user already has a default personal VK
   // (the secret was minted in a prior login + only the hash is stored,
@@ -146,7 +145,7 @@ async function main() {
   // any prior device but THIS device gets its own secret.
   let issued;
   try {
-    issued = await service.ensureDefault({
+    issued = await service.personalVirtualKeyEnsureDefault({
       userId: user.id,
       organizationId,
       displayName: user.name ?? args.email,
@@ -172,7 +171,7 @@ async function main() {
       );
     }
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    issued = await service.issue({
+    issued = await service.personalVirtualKeyIssue({
       userId: user.id,
       organizationId,
       personalProjectId: personalProjectRows[0].id,

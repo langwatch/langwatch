@@ -13,17 +13,17 @@
 
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { projectFactory } from "~/factories/project.factory";
 import {
   type Organization,
   OrganizationUserRole,
-  type Project,
   RoleBindingScopeType,
   type Team,
   TeamUserRole,
   type User,
 } from "~/generated/prisma/client";
-import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -50,6 +50,7 @@ describe("Feature: Governance REST API", () => {
   let patToken: string;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
   let api: ApiHelpers;
+  let testApp: App;
 
   const platformIds: string[] = [];
   const orgTemplateIds: string[] = [];
@@ -66,17 +67,14 @@ describe("Feature: Governance REST API", () => {
     "Content-Type": "application/json",
   });
 
+  const request = (path: string, init?: RequestInit) =>
+    app.request(path, init, appContextBindingsFor(testApp));
+
   beforeEach(async () => {
-    await resetApp();
     mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
-    globalForApp.__langwatch_app = createTestApp({
-      planProvider: PlanProviderService.create({
-        getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-      }),
-      usageLimits: {
-        notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
-        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
-      } as any,
+    const planProvider: PlanProvider = { getActivePlan: mockGetActivePlan };
+    testApp = createTestApp({
+      planProvider: PlanProviderService.create(planProvider),
     });
 
     const suffix = nanoid(8);
@@ -93,16 +91,12 @@ describe("Feature: Governance REST API", () => {
       },
     });
 
-    // Fishery's generic-inference is brittle on partial overrides; the
-    // existing dashboards-rest-api integration test has the same cast.
-    const projectInput = (
-      projectFactory.build as unknown as (override: Partial<Project>) => Project
-    )({ slug: nanoid() });
+    const projectInput = projectFactory.build({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
         ...projectInput,
         teamId: testTeam.id,
-      } as unknown as Parameters<typeof prisma.project.create>[0]["data"],
+      },
     });
 
     testApiKey = testProject.apiKey;
@@ -132,7 +126,7 @@ describe("Feature: Governance REST API", () => {
       },
     });
 
-    const apiKeyResult = await getApp().apiKeys.create({
+    const apiKeyResult = await testApp.apiKeys.create({
       name: `gov-pat-${suffix}`,
       userId: testUser.id,
       organizationId: testOrganization.id,
@@ -153,24 +147,37 @@ describe("Feature: Governance REST API", () => {
     };
 
     api = {
-      get: (path) => app.request(path, { headers: patHeaders }),
+      get: (path) =>
+        app.request(path, { headers: patHeaders }, appContextBindingsFor(testApp)),
       post: (path, body) =>
-        app.request(path, {
-          method: "POST",
-          headers: createAuthHeaders(),
-          body: JSON.stringify(body),
-        }),
+        app.request(
+          path,
+          {
+            method: "POST",
+            headers: createAuthHeaders(),
+            body: JSON.stringify(body),
+          },
+          appContextBindingsFor(testApp),
+        ),
       patch: (path, body) =>
-        app.request(path, {
-          method: "PATCH",
-          headers: createAuthHeaders(),
-          body: JSON.stringify(body),
-        }),
+        app.request(
+          path,
+          {
+            method: "PATCH",
+            headers: createAuthHeaders(),
+            body: JSON.stringify(body),
+          },
+          appContextBindingsFor(testApp),
+        ),
       delete: (path) =>
-        app.request(path, {
-          method: "DELETE",
-          headers: patHeaders,
-        }),
+        app.request(
+          path,
+          {
+            method: "DELETE",
+            headers: patHeaders,
+          },
+          appContextBindingsFor(testApp),
+        ),
     };
   });
 
@@ -221,12 +228,12 @@ describe("Feature: Governance REST API", () => {
 
   describe("Authentication", () => {
     it("returns 401 without X-Auth-Token", async () => {
-      const res = await app.request("/api/governance/ingestion-templates");
+      const res = await request("/api/governance/ingestion-templates");
       expect(res.status).toBe(401);
     });
 
     it("returns 401 with an invalid X-Auth-Token", async () => {
-      const res = await app.request("/api/governance/ingestion-templates", {
+      const res = await request("/api/governance/ingestion-templates", {
         headers: { "X-Auth-Token": "not-a-real-key" },
       });
       expect(res.status).toBe(401);
@@ -235,14 +242,14 @@ describe("Feature: Governance REST API", () => {
 
   describe("when authenticated with a legacy project key", () => {
     it("still reads the user-facing template list (public read)", async () => {
-      const res = await app.request("/api/governance/ingestion-templates", {
+      const res = await request("/api/governance/ingestion-templates", {
         headers: { "X-Auth-Token": testApiKey },
       });
       expect(res.status).toBe(200);
     });
 
     it("rejects the admin template list with 403 user_token_required", async () => {
-      const res = await app.request("/api/governance/ingestion-templates/admin", {
+      const res = await request("/api/governance/ingestion-templates/admin", {
         headers: { "X-Auth-Token": testApiKey },
       });
       expect(res.status).toBe(403);
@@ -251,7 +258,7 @@ describe("Feature: Governance REST API", () => {
     });
 
     it("rejects creating an org template with 403 user_token_required", async () => {
-      const res = await app.request("/api/governance/ingestion-templates", {
+      const res = await request("/api/governance/ingestion-templates", {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,

@@ -19,7 +19,6 @@
  * Spec: specs/ai-gateway/governance/cli-ingest-debug.feature
  */
 
-import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -482,8 +481,8 @@ describe("GET /api/auth/cli/governance/*", () => {
       });
 
       // Mint a live key via the service so we can verify it appears in the list
-      const service = IngestionKeyService.create(prisma);
-      await service.ensureForPersonalProject({
+      const service = getApp().governance;
+      await service.ingestionKeyEnsureForPersonalProject({
         userId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
         sourceType: "codex",
@@ -491,7 +490,7 @@ describe("GET /api/auth/cli/governance/*", () => {
       });
 
       // Mint a second key then revoke it immediately — it must not appear
-      const revokedResult = await service.ensureForPersonalProject({
+      const revokedResult = await service.ingestionKeyEnsureForPersonalProject({
         userId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
         sourceType: "claude_code",

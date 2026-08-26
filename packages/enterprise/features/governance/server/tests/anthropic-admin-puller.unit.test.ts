@@ -2,7 +2,7 @@ import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { AnthropicAdminPuller } from "../src/adapters/anthropic-admin-puller.anthropic-admin-puller.adapter";
+import { AnthropicAdminPuller } from "../src/adapters/anthropic-admin-puller.adapter";
 import {
   GovernanceHttpPort,
   type GovernanceHttpResponse,

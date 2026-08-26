@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaIngestionTemplateRepository } from "../src/repositories/prisma/prisma.ingestion-template.repository";
+import { PrismaIngestionTemplateRepository } from "../src/repositories/prisma/prisma-ingestion-template.repository";
 
 describe("PrismaIngestionTemplateRepository", () => {
   it("maps persistence rows to the strict public contract", async () => {

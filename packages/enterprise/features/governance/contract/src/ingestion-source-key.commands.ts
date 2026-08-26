@@ -32,22 +32,3 @@ export const personalIngestionKeySchema = z
   })
   .strict();
 export type PersonalIngestionKey = z.infer<typeof personalIngestionKeySchema>;
-
-export abstract class GovernanceIngestionKeyService {
-  abstract ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
-
-  abstract issueForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
-
-  abstract ensureForPersonalProject(input: {
-    userId: string;
-    organizationId: string;
-    sourceType: string;
-    ingestionTemplateId?: string | null;
-    createdByDeviceLabel?: string | null;
-  }): Promise<IssuedIngestionKey>;
-
-  abstract listForPersonalProject(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<PersonalIngestionKey[]>;
-}

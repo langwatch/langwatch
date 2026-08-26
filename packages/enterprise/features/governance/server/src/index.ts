@@ -1,22 +1,15 @@
-export * from "@langwatch/enterprise-governance-contract";
-export * from "./adapters/ingestion-pull.ingestion-pull.adapter";
-export * from "./adapters/postgres.admin-workspace-view-audit.adapter";
-export * from "./adapters/postgres.ai-tool-catalog.adapter";
-export * from "./adapters/postgres.anomaly-rule.adapter";
-export * from "./adapters/postgres.department.adapter";
-export * from "./adapters/postgres.spend-spike-anomaly.adapter";
-export * from "./adapters/postgres.governance.adapter";
-export * from "./adapters/postgres.governance-setup-state.adapter";
-export * from "./adapters/postgres.ingestion-pull-lifecycle.adapter";
-export * from "./adapters/postgres.ingestion-source-activity.adapter";
-export * from "./adapters/postgres.ingestion-source.adapter";
-export * from "./adapters/postgres.ocsf-export.adapter";
-export * from "./adapters/postgres.personal-virtual-key.adapter";
-export * from "./adapters/postgres.routing-policy.adapter";
-export * from "./adapters/postgres.ingestion-pull-run-projection.adapter";
-export * from "./adapters/postgres.ingestion-template.adapter";
-export * from "./adapters/pulled-usage.pulled-usage.adapter";
+export { GovernanceService } from "@langwatch/enterprise-governance-contract";
+export {
+  PostgresGovernanceInstallationAdapter,
+  type GovernanceInstallationOptions,
+} from "./adapters/postgres-governance-installation.adapter";
+
+// Process and eventing boundaries. Domain collaborators remain private to the
+// installation adapter and are never application capabilities.
+export * from "./adapters/governance-events.adapter";
 export * from "./ports/gateway-debit.port";
+export * from "./ports/governance-budget-overview.port";
+export * from "./ports/governance-eventing.port";
 export * from "./ports/ingestion-source-activity.port";
 export * from "./ports/admin-workspace-view-audit.port";
 export * from "./ports/ai-tool-catalog.port";
@@ -46,45 +39,54 @@ export * from "./ports/pulled-usage-rate.port";
 export * from "./ports/quarantine-fill.port";
 export * from "./ports/routing-policy.port";
 export * from "./ports/spend-spike-anomaly.port";
-export * from "./projections/ingestion-pull-run-status-eventing.projection";
-export * from "./projections/ingestion-pull-run-status.projection";
-export * from "./services/canonical-cost-extractor.service";
-export * from "./services/ingestion-source-activity.service";
-export * from "./services/admin-workspace-view-audit.service";
-export * from "./services/ai-tool-catalog.service";
-export * from "./services/built-in-puller-registry.service";
-export * from "./services/cli-session-inventory.service";
-export * from "./services/cli-token-revocation.service";
-export * from "./services/cli-bootstrap.service";
-export * from "./services/anomaly-rule.service";
-export * from "./services/department.service";
-export * from "./services/anomaly-alert-dispatcher.service";
-export * from "./processes/gateway-debit.process";
-export * from "./processes/governance-event-delivery.process";
-export * from "./services/governance-policy.service";
-export * from "./services/governance-signal.service";
-export * from "./services/governance-setup-state.service";
-export * from "./services/ingestion-credentials.service";
-export * from "./services/ingestion-source-key.service";
-export * from "./services/ingestion-source-secret.service";
-export * from "./services/ingestion-source.service";
-export * from "./processes/ingestion-pull.process";
-export * from "./services/ingestion-pull-lifecycle.service";
-export * from "./services/ingestion-pull-worker.service";
-export * from "./services/ocsf-export.service";
-export * from "./services/personal-usage.service";
-export * from "./services/personal-virtual-key.service";
-export * from "./services/ingestion-pull.service";
-export * from "./services/ingestion-template.service";
-export * from "./services/pull-destination.service";
-export * from "./processes/pulled-usage-ledger.process";
-export * from "./services/pulled-usage-pricing.service";
-export * from "./services/pulled-usage-record.service";
-export * from "./services/puller-registry.service";
-export * from "./services/quarantine-fill.service";
-export * from "./services/routing-policy.service";
-export * from "./services/spend-spike-anomaly-evaluator.service";
-export * from "./subscribers/governance-kpis.subscriber";
-export * from "./subscribers/governance-ocsf.subscriber";
 export * from "./ports/governance-subscriber.port";
-export * from "./subscribers/trace-alert-trigger-match.subscriber";
+
+export { IngestionPullEventingAdapter } from "./adapters/ingestion-pull.adapter";
+export { PostgresAnomalyRuleAdapter } from "./adapters/postgres-anomaly-rule.adapter";
+export { PostgresDepartmentAdapter } from "./adapters/postgres-department.adapter";
+export { PostgresSpendSpikeAnomalyAdapter } from "./adapters/postgres-spend-spike-anomaly.adapter";
+export { PostgresIngestionSourceActivityAdapter } from "./adapters/postgres-ingestion-source-activity.adapter";
+export { PostgresIngestionSourceAdapter } from "./adapters/postgres-ingestion-source.adapter";
+export { PostgresIngestionPullLifecycleAdapter } from "./adapters/postgres-ingestion-pull-lifecycle.adapter";
+export { PostgresIngestionPullSourceAdapter } from "./adapters/postgres-ingestion-pull-source.adapter";
+export { PostgresIngestionPullRunProjectionAdapter } from "./adapters/postgres-ingestion-pull-run-projection.adapter";
+export { PostgresIngestionTemplateAdapter } from "./adapters/postgres-ingestion-template.adapter";
+export { PulledUsageEventingAdapter } from "./adapters/pulled-usage.adapter";
+
+export {
+  GATEWAY_DEBITS_PROCESS_NAME,
+  GatewayDebitProcess,
+} from "./processes/gateway-debit.process";
+export { GovernanceEventDeliveryProcess } from "./processes/governance-event-delivery.process";
+export { IngestionPullProcess } from "./processes/ingestion-pull.process";
+export { PulledUsageLedgerProcess } from "./processes/pulled-usage-ledger.process";
+
+export { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service";
+export { PullerRegistryService } from "./services/puller-registry.service";
+export { AnthropicAdminPuller } from "./adapters/anthropic-admin-puller.adapter";
+export { ClaudeComplianceReferencePuller } from "./adapters/claude-compliance-puller.adapter";
+export { CopilotStudioReferencePuller } from "./adapters/copilot-studio-puller.adapter";
+export { DatabricksGeniePuller } from "./adapters/databricks-genie-puller.adapter";
+export { HttpPollingPullerAdapter } from "./adapters/http-poller.adapter";
+export { OpenAiComplianceReferencePuller } from "./adapters/openai-compliance-puller.adapter";
+export { S3PollingPullerAdapter } from "./adapters/s3-puller.adapter";
+export { AnomalyRuleService } from "./services/anomaly-rule.service";
+export { DepartmentService } from "./services/department.service";
+export { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service";
+export { GovernanceSignalService } from "./services/governance-signal.service";
+export { IngestionCredentialsService } from "./services/ingestion-credentials.service";
+export { IngestionSecretConfiguration } from "./services/ingestion-source-secret.service";
+export { IngestionSecretService } from "./services/ingestion-source-secret.service";
+export { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service";
+export { IngestionPullService } from "./services/ingestion-pull.service";
+export { IngestionPullWorkerService } from "./services/ingestion-pull-worker.service";
+export { PullDestinationService } from "./services/pull-destination.service";
+export { PulledUsagePricingService } from "./services/pulled-usage-pricing.service";
+export { PulledUsageRecordService } from "./services/pulled-usage-record.service";
+export { GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS } from "./subscribers/governance-ocsf.subscriber";
+export {
+  GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+  GovernanceKpisSubscriber,
+} from "./subscribers/governance-kpis.subscriber";
+export { GovernanceOcsfSubscriber } from "./subscribers/governance-ocsf.subscriber";
+export { TraceAlertTriggerMatchSubscriber } from "./subscribers/trace-alert-trigger-match.subscriber";

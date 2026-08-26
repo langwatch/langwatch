@@ -1,9 +1,6 @@
+import { Buffer } from "node:buffer";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ProjectService,
-  type InternalProject,
-  type InternalProjectQuery,
-} from "@langwatch/project-contract";
+import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 import { GovernanceDiagnosticsPort } from "../src/ports/governance-diagnostics.port";
 import {
@@ -21,6 +18,7 @@ import {
 } from "../src/services/ingestion-source-secret.service";
 import { IngestionSourceService } from "../src/services/ingestion-source.service";
 import { PullDestinationService } from "../src/services/pull-destination.service";
+import { TestProjectService } from "./support/test-project-service";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
 
@@ -70,7 +68,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
   });
 }
 
-class FakeProjects extends ProjectService {
+class FakeProjects extends TestProjectService {
   tryFindInternal = vi.fn(
     async (_input: InternalProjectQuery): Promise<InternalProject | null> => null,
   );
@@ -169,5 +167,27 @@ describe("IngestionSourceService", () => {
       _rotation: { priorHash: "old", expiresAt: NOW + 1_000 },
       visible: "new",
     });
+  });
+
+  it("refuses a stored encrypted credential replay before changing the source", async () => {
+    const { service, repository } = harness();
+    repository.row = source({
+      parserConfig: {
+        credentials: "enc:v1:c2VjcmV0",
+        workspaceUrl: "https://safe.example.test",
+      },
+    });
+
+    await expect(
+      service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: {
+          credentials: "enc:v1:c2VjcmV0",
+          workspaceUrl: "https://attacker.example.test",
+        },
+      }),
+    ).rejects.toThrow("Credentials cannot be submitted in their stored form");
+    expect(repository.updateInput).toBeNull();
   });
 });

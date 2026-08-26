@@ -9,7 +9,6 @@
  * `scim_token_not_found`, which a provisioning tool treats as already done.
  */
 
-import { createScimTokenService } from "~/runtime/app/features/scim";
 import type { EndpointVariables, ServiceContext } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -25,11 +24,7 @@ const { service, guard } = createManagementService({
 });
 
 /** The handler context: the framework's variables plus the family's provider. */
-type ScimTokensContext = ServiceContext<
-  EndpointVariables & {
-    scimTokens: ReturnType<typeof createScimTokenService>;
-  }
->;
+type ScimTokensContext = ServiceContext<EndpointVariables>;
 
 const tokenSummarySchema = z.object({
   id: z.string(),
@@ -50,7 +45,7 @@ const organizationOf = (c: Context): Organization =>
 // ── handlers ─────────────────────────────────────────────────────────────────
 
 const listTokensHandler = async (c: ScimTokensContext) => {
-  const tokens = await c.get("scimTokens").list({
+  const tokens = await c.app.scim.listTokens({
     organizationId: organizationOf(c).id,
   });
   return { tokens };
@@ -61,7 +56,7 @@ const createTokenHandler = async (
   input: z.infer<typeof createTokenSchema>,
 ) => {
   const organization = organizationOf(c);
-  const created = await c.get("scimTokens").generate({
+  const created = await c.app.scim.generateToken({
     organizationId: organization.id,
     ...(input.description !== undefined ? { description: input.description } : {}),
   });
@@ -81,7 +76,7 @@ const createTokenHandler = async (
 const revokeTokenHandler = async (c: ScimTokensContext) => {
   const params = c.get("params") as z.infer<typeof idParamsSchema>;
   const organization = organizationOf(c);
-  await c.get("scimTokens").revoke({
+  await c.app.scim.revokeToken({
     organizationId: organization.id,
     tokenId: params.id,
   });
@@ -97,9 +92,6 @@ const revokeTokenHandler = async (c: ScimTokensContext) => {
 // ── service wiring ───────────────────────────────────────────────────────────
 
 export const app = service
-  .provide({
-    scimTokens: () => createScimTokenService(),
-  })
   .registerRoute("get", "/", MANAGEMENT_API_VERSION, listTokensHandler, (b) =>
     guard("organization:manage")(b)
       .withOutput(z.object({ tokens: z.array(tokenSummarySchema) }))

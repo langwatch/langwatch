@@ -54,14 +54,3 @@ export function cliAccessTokenKey(token: string): string {
 export function cliRefreshTokenKey(token: string): string {
   return `lwcli:refresh:${token}`;
 }
-
-export abstract class GovernanceCliTokenRevocationService {
-  abstract revokeForUser(input: CliUserInput): Promise<{ revokedCount: number }>;
-}
-
-export abstract class GovernanceCliSessionInventoryService {
-  abstract listForUser(input: CliUserInput): Promise<CliSession[]>;
-  abstract revokeSession(
-    input: RevokeCliSessionInput,
-  ): Promise<{ revokedTokens: number }>;
-}

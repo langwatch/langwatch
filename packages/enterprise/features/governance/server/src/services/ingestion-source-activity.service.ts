@@ -1,4 +1,3 @@
-import { GovernanceActivityMonitorService } from "@langwatch/enterprise-governance-contract";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorPagedWindowQuery,
@@ -15,9 +14,8 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import type { ActivityMonitorRepository } from "../ports/ingestion-source-activity.port";
 
-export class ActivityMonitorService extends GovernanceActivityMonitorService {
+export class ActivityMonitorService {
   private constructor(private readonly repository: ActivityMonitorRepository) {
-    super();
   }
 
   static create(repository: ActivityMonitorRepository): ActivityMonitorService {

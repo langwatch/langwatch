@@ -1,5 +1,4 @@
 import {
-  GovernancePersonalUsageService,
   type PersonalUsageBreakdown,
   type PersonalUsageBucket,
   type PersonalUsageQueryInput,
@@ -14,12 +13,11 @@ import type {
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 
-export class DefaultGovernancePersonalUsageService extends GovernancePersonalUsageService {
+export class DefaultGovernancePersonalUsageService {
   private constructor(
     private readonly reader: PersonalUsageReaderPort | undefined,
     private readonly clock: () => number,
   ) {
-    super();
   }
 
   static create(options: {

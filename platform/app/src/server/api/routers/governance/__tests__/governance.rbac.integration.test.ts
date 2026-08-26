@@ -41,7 +41,7 @@ import {
 } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
@@ -60,13 +60,10 @@ describe("governance routers — RBAC enforcement", () => {
   let organizationId: string;
   let adminUserId: string;
   let memberUserId: string;
+  let testApp: App;
 
   beforeAll(async () => {
-    // resolveHome touches UsageStatsService which expects the app
-    // singleton initialised. Other procedures don't need it but
-    // initialising once keeps the test simple.
-    await resetApp();
-    globalForApp.__langwatch_app = createTestApp({
+    testApp = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: async () => enterprisePlan,
       }),
@@ -170,7 +167,8 @@ describe("governance routers — RBAC enforcement", () => {
 
   function callerFor(userId: string) {
     const ctx = createInnerTRPCContext({
-      session: { user: { id: userId }, expires: "1" } as any,
+      app: testApp,
+      session: { user: { id: userId }, expires: "1" },
     });
     return appRouter.createCaller(ctx);
   }

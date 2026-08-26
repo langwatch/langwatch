@@ -1,7 +1,6 @@
 import {
   DEFAULT_GOVERNANCE_SURFACE,
   InvalidSourceTypeError,
-  IngestionTemplatesService,
   PLATFORM_INGESTION_TEMPLATES,
   PlatformTemplateImmutableError,
   RETIRED_PLATFORM_TEMPLATE_SLUGS,
@@ -21,13 +20,12 @@ import {
 import { generate } from "@langwatch/ksuid";
 import type { IngestionTemplateRepository } from "../ports/ingestion-template.port";
 
-export class IngestionTemplateService extends IngestionTemplatesService {
+export class IngestionTemplateService {
   private constructor(
     private readonly repository: IngestionTemplateRepository,
     private readonly newSlugSuffix: () => string,
     private readonly now: () => Date,
   ) {
-    super();
   }
 
   static create(options: {

@@ -37,7 +37,7 @@ export const ingestionKeyRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.ingestionKeys.listForPersonalProject({
+      return await ctx.app.governance.ingestionKeyListForPersonalProject({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
@@ -52,7 +52,7 @@ export const ingestionKeyRouter = createTRPCRouter({
     .input(mintInput)
     .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
-      return await ctx.app.governance.ingestionKeys.ensureForPersonalProject({
+      return await ctx.app.governance.ingestionKeyEnsureForPersonalProject({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         sourceType: input.sourceType,
@@ -69,7 +69,7 @@ export const ingestionKeyRouter = createTRPCRouter({
     .input(mintInput)
     .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
-      return await ctx.app.governance.ingestionKeys.ensureForPersonalProject({
+      return await ctx.app.governance.ingestionKeyEnsureForPersonalProject({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         sourceType: input.sourceType,

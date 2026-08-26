@@ -11,13 +11,15 @@ portable contracts without importing Node, persistence, or server feature code.
 
 ## Decision
 
-`@langwatch/enterprise-web` exports a class with `static create` that accepts
-portable initial licensing status while owning no React implementation itself.
+`@langwatch/enterprise-web` exports a class with `static create` for shell
+state. Licensed rendered feature surfaces live in their Enterprise feature web
+package and are mounted by the application through thin route adapters.
 
 ## Public surfaces and transports
 
-The package exposes web composition state only. Rendered components and client
-transports remain in deliberately named feature web packages or applications.
+The package exposes web composition state and coordinates feature web
+installers. Rendered governance components live in the Enterprise governance
+web package; application code provides only host UI/RPC adapters.
 
 ## Dependencies
 

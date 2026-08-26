@@ -146,29 +146,3 @@ export class InvalidSourceTypeError extends ValidationError {
 }
 
 export const defaultIngestionTemplateSurface = DEFAULT_GOVERNANCE_SURFACE;
-
-export abstract class IngestionTemplatesService {
-  abstract listForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
-  abstract listForOrgAdmin(input: {
-    organizationId: string;
-  }): Promise<IngestionTemplate[]>;
-  abstract tryFindByIdForOrg(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<IngestionTemplate | null>;
-  abstract getByIdForOrg(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<IngestionTemplate>;
-  abstract createOrgTemplate(
-    input: CreateIngestionTemplateInput,
-  ): Promise<IngestionTemplate>;
-  abstract updateOttlRules(
-    input: UpdateIngestionTemplateOttlInput,
-  ): Promise<IngestionTemplate>;
-  abstract archiveOrgTemplate(input: ArchiveIngestionTemplateInput): Promise<void>;
-  abstract cloneFromPlatform(
-    input: CloneIngestionTemplateInput,
-  ): Promise<IngestionTemplate>;
-  abstract syncPlatformCatalog(): Promise<PlatformIngestionTemplateSyncResult>;
-}

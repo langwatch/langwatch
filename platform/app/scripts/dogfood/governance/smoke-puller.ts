@@ -22,12 +22,16 @@
  */
 
 import { createClient } from "@clickhouse/client";
+import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/governance/governance-ocsf-events.adapter";
+import { AppIngestionPullWorkerAdapter } from "@langwatch/enterprise-api/governance/ingestion-pull-worker.adapter";
+import { PostgresIngestionPullSourceAdapter } from "@langwatch/enterprise-governance-server";
 import { randomBytes } from "crypto";
 import http from "http";
 import type { AddressInfo } from "net";
-import { ensureHiddenGovernanceProject } from "../../../ee/governance/services/governanceProject.service";
-import { runIngestionPull } from "../../../ee/governance/services/pullers/pullerWorker";
+import { AppGovernanceIngestionPullHost } from "~/server/app-layer/governance-ingestion-pull.host";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { prisma } from "../../../src/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 
 const CLICKHOUSE_URL =
   process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
@@ -142,10 +146,20 @@ async function main(): Promise<void> {
   });
   console.log(`[smoke-puller] IngestionSource minted: id=${source.id}`);
 
-  const outcome = await runIngestionPull({ sourceId: source.id, cursor: null });
+  const app = initializeDefaultApp({ processRole: "web" });
+  const worker = AppIngestionPullWorkerAdapter.create({
+    sources: PostgresIngestionPullSourceAdapter.create(prisma),
+    host: AppGovernanceIngestionPullHost.create(featureFlagService),
+    projects: app.projects,
+    events: new AppGovernanceOcsfEventsAdapter(app.clickhouse.resolveClient),
+  }).build();
+  const outcome = await worker.run({ sourceId: source.id, cursor: null });
   console.log(`[smoke-puller] runIngestionPull completed`);
 
-  const govProject = await ensureHiddenGovernanceProject(prisma, org.id);
+  const govProject = await app.projects.ensureInternal({
+    organizationId: org.id,
+    kind: "internal_governance",
+  });
   console.log(`[smoke-puller] hidden Governance Project: id=${govProject.id}`);
 
   // Async insert settle.

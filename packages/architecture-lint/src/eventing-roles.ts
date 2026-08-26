@@ -220,7 +220,11 @@ export function lintEventingRoles(
   packages: readonly ClassifiedPackage[],
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  const scanRoots = [join(root, "platform/app/src")];
+  const scanRoots = [
+    join(root, "platform/app/src"),
+    join(root, "packages/enterprise/composition/api/src"),
+    join(root, "packages/enterprise/composition/worker/src"),
+  ];
   for (const pkg of packages) {
     if (pkg.kind === "server") scanRoots.push(join(pkg.root, "src"));
   }

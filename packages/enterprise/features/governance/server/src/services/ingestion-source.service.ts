@@ -1,6 +1,5 @@
 import {
   GOVERNANCE_INGESTION_SOURCE_TYPES,
-  GovernanceIngestionSourceService,
   GovernanceValidationError,
   IngestionSourceCapReachedError,
   IngestionSourceNotFoundError,
@@ -26,7 +25,7 @@ import type { PullDestinationService } from "./pull-destination.service";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
-export class IngestionSourceService extends GovernanceIngestionSourceService {
+export class IngestionSourceService {
   private constructor(
     private readonly repository: IngestionSourceRepository,
     private readonly projects: ProjectService,
@@ -38,7 +37,6 @@ export class IngestionSourceService extends GovernanceIngestionSourceService {
     private readonly diagnostics: GovernanceDiagnosticsPort,
     private readonly now: () => number,
   ) {
-    super();
   }
 
   static create(options: {

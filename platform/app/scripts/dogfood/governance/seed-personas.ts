@@ -237,7 +237,7 @@ export async function runSeedPersonas(
       `[seed-personas] personal workspace ${workspace.created ? "created" : "found"}: team=${workspace.team.id} project=${workspace.project.id}\n`,
     );
 
-    const issued = await app.governance.personalVirtualKeys.issue({
+    const issued = await app.governance.personalVirtualKeyIssue({
       userId: user.id,
       organizationId: org.id,
       personalProjectId: workspace.project.id,

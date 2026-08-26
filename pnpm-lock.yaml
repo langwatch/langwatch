@@ -479,9 +479,27 @@ importers:
 
   packages/enterprise/composition/api:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1080.0
+        version: 3.1108.0
+      '@clickhouse/client':
+        specifier: ^1.12.1
+        version: 1.23.0
+      '@langwatch/api-key-contract':
+        specifier: workspace:*
+        version: link:../../../features/api-key/contract
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../../features/automation/contract
       '@langwatch/enterprise':
         specifier: workspace:*
         version: link:../..
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../features/governance/contract
+      '@langwatch/enterprise-governance-server':
+        specifier: workspace:*
+        version: link:../../features/governance/server
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../features/licensing/contract
@@ -491,6 +509,36 @@ importers:
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../../features/sso/contract
+      '@langwatch/enterprise-webhook-contract':
+        specifier: workspace:*
+        version: link:../../features/webhook/contract
+      '@langwatch/enterprise-webhook-server':
+        specifier: workspace:*
+        version: link:../../features/webhook/server
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
+      '@langwatch/gateway-server':
+        specifier: workspace:*
+        version: link:../../../features/gateway/server
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../features/organization/contract
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../../features/project/contract
+      ioredis:
+        specifier: ^5.8.2
+        version: 5.10.1
+      nanoid:
+        specifier: ^5.1.6
+        version: 5.1.16
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -526,6 +574,12 @@ importers:
       '@langwatch/enterprise':
         specifier: workspace:*
         version: link:../..
+      '@langwatch/enterprise-governance-server':
+        specifier: workspace:*
+        version: link:../../features/governance/server
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -939,9 +993,30 @@ importers:
 
   packages/enterprise/features/scim/server:
     dependencies:
+      '@langwatch/actor':
+        specifier: workspace:*
+        version: link:../../../../actor
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../../../features/authz/contract
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../governance/contract
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../features/entitlement/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../../observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../../prisma-client
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../features/user/contract
       hono-openapi:
         specifier: ^1.3.1
         version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
@@ -3961,9 +4036,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
-      '@langwatch/gateway-server':
+      '@langwatch/enterprise-api':
         specifier: workspace:*
-        version: link:../../packages/features/gateway/server
+        version: link:../../packages/enterprise/composition/api
       '@langwatch/enterprise-audit-log-server':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/audit-log/server
@@ -4024,6 +4099,9 @@ importers:
       '@langwatch/enterprise-webhook-server':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/webhook/server
+      '@langwatch/enterprise-worker':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/composition/worker
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../packages/features/entitlement/contract
@@ -4057,6 +4135,9 @@ importers:
       '@langwatch/experiment-web':
         specifier: workspace:*
         version: link:../../packages/features/experiment/web
+      '@langwatch/gateway-server':
+        specifier: workspace:*
+        version: link:../../packages/features/gateway/server
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../../packages/features/github/contract

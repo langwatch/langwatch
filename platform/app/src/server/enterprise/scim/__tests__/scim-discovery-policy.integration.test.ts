@@ -18,8 +18,12 @@
  * while the registry lies.
  */
 import { describe, expect, it } from "vitest";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { getRoutePolicy } from "~/server/api/security";
+import { createTestApp } from "~/server/app-layer/presets";
 import { app } from "../routes";
+
+const requestApp = createTestApp();
 
 const DISCOVERY_PATHS = [
   "/api/scim/v2/ServiceProviderConfig",
@@ -33,7 +37,11 @@ describe("Feature: SCIM 2.0 is published in the API reference", () => {
     it.each(DISCOVERY_PATHS)(
       "answers %s without credentials, and declares itself public",
       async (path) => {
-        const response = await app.request(path);
+        const response = await app.request(
+          path,
+          undefined,
+          appContextBindingsFor(requestApp),
+        );
 
         expect(response.status).toBe(200);
         const body = (await response.json()) as { schemas: string[] };
@@ -58,7 +66,11 @@ describe("Feature: SCIM 2.0 is published in the API reference", () => {
     });
 
     it("refuses an anonymous call to a provisioning route", async () => {
-      const response = await app.request("/api/scim/v2/Users");
+      const response = await app.request(
+        "/api/scim/v2/Users",
+        undefined,
+        appContextBindingsFor(requestApp),
+      );
 
       expect(response.status).toBe(401);
       expect(response.headers.get("content-type")).toContain("application/scim+json");

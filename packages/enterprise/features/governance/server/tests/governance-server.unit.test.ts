@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  IngestionPullRunStatusProjection,
-  PulledUsagePricingService,
-  PulledUsageRatePort,
-} from "../src";
+import { PulledUsagePricingService, PulledUsageRatePort } from "../src";
+import { IngestionPullRunStatusProjection } from "../src/projections/ingestion-pull-run-status.projection";
 
 class FixedRate extends PulledUsageRatePort {
   rate() {
@@ -13,7 +10,7 @@ class FixedRate extends PulledUsageRatePort {
 
 describe("governance server", () => {
   it("converts provider decimal money without floating-point drift", () => {
-    const service = new PulledUsagePricingService(new FixedRate());
+    const service = PulledUsagePricingService.create(new FixedRate());
     expect(
       service.price({
         basis: "provider_reported",

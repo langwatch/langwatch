@@ -26,7 +26,7 @@ export const personalSessionsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .query(async ({ ctx }) => {
-      const sessions = await ctx.app.governance.cliSessions.listForUser({
+      const sessions = await ctx.app.governance.cliSessionListForUser({
         userId: ctx.session.user.id,
       });
       return sessions.map((s) => ({
@@ -49,7 +49,7 @@ export const personalSessionsRouter = createTRPCRouter({
     )
     .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
-      const result = await ctx.app.governance.cliSessions.revokeSession({
+      const result = await ctx.app.governance.cliSessionRevoke({
         userId: ctx.session.user.id,
         sessionStartedAtMs: input.sessionStartedAtMs,
       });
@@ -62,7 +62,7 @@ export const personalSessionsRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       // Reuse the user-wide revoke from Phase 1B.5 — that path also
       // clears the per-user token index in one shot.
-      const result = await ctx.app.governance.cliTokenRevocation.revokeForUser({
+      const result = await ctx.app.governance.cliTokenRevokeForUser({
         userId: ctx.session.user.id,
       });
       return { ok: true, revokedTokens: result.revokedCount };

@@ -26,8 +26,8 @@
  */
 
 import type {
-  GovernancePersonalUsageService,
-  GovernancePersonalVirtualKeyService,
+  PersonalUsageBreakdown,
+  PersonalUsageQueryInput,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type {
@@ -117,20 +117,34 @@ export type BudgetOverviewForUser = {
   budgets: BudgetOverviewItem[];
 };
 
+type PersonalVirtualKeyReader = {
+  listActiveForPrincipal(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>>;
+};
+
+type PersonalUsageReader = {
+  breakdownByModel(
+    input: PersonalUsageQueryInput,
+    limit?: number,
+  ): Promise<PersonalUsageBreakdown[]>;
+};
+
 export class BudgetOverviewService {
   private constructor(
     private readonly prisma: PrismaClient,
     private readonly organizations: OrganizationService,
-    private readonly personalVirtualKeys: GovernancePersonalVirtualKeyService,
-    private readonly personalUsage: GovernancePersonalUsageService,
+    private readonly personalVirtualKeys: PersonalVirtualKeyReader,
+    private readonly personalUsage: PersonalUsageReader | undefined,
     private readonly chRepo?: GatewayBudgetClickHouseRepository,
   ) {}
 
   static create(options: {
     database: PrismaClient;
     organizations: OrganizationService;
-    personalVirtualKeys: GovernancePersonalVirtualKeyService;
-    personalUsage: GovernancePersonalUsageService;
+    personalVirtualKeys: PersonalVirtualKeyReader;
+    personalUsage?: PersonalUsageReader;
     budgetRepository?: GatewayBudgetClickHouseRepository;
   }): BudgetOverviewService {
     return new BudgetOverviewService(
@@ -182,7 +196,7 @@ export class BudgetOverviewService {
         userId: input.userId,
         organizationId: input.organizationId,
       }),
-      this.personalVirtualKeys.list({
+      this.personalVirtualKeys.listActiveForPrincipal({
         userId: input.userId,
         organizationId: input.organizationId,
       }),
@@ -309,7 +323,7 @@ export class BudgetOverviewService {
     personalProjectId: string | null;
     userId: string;
   }): Promise<Array<{ model: string; spentUsd: number }>> {
-    if (!input.personalProjectId) return [];
+    if (!input.personalProjectId || !this.personalUsage) return [];
     try {
       const breakdown = await this.personalUsage.breakdownByModel(
         { personalProjectId: input.personalProjectId, userId: input.userId },

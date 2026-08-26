@@ -19,7 +19,7 @@ export class IngestionPullService {
   private readonly maxAttempts: number;
   private readonly clock: () => number;
 
-  constructor(
+  private constructor(
     private readonly runPort: IngestionPullRunPort,
     private readonly outcomePort: IngestionPullOutcomePort,
     private readonly metrics: IngestionPullMetricsPort,

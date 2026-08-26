@@ -6,7 +6,7 @@ import {
   type RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
 import { RoutingPolicyRepository } from "../src/ports/routing-policy.port";
-import { DefaultGovernanceRoutingPolicyService } from "../src/services/routing-policy.service";
+import { DefaultGovernanceRoutingPolicyService } from "../src/services/governance-routing.service";
 
 const policy: RoutingPolicy = {
   id: "policy",

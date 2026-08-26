@@ -28,7 +28,6 @@ import {
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { featureFlagService } from "~/server/featureFlag";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
@@ -50,7 +49,7 @@ export const governanceRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.setupState.resolve(input.organizationId);
+      return await ctx.app.governance.resolveSetupState(input.organizationId);
     }),
 
   /**
@@ -86,7 +85,7 @@ export const governanceRouter = createTRPCRouter({
         organizationIntent,
       ] = await Promise.all([
         // hasApplicationTraces is part of setupState as of 9d2688c84.
-        ctx.app.governance.setupState.resolve(input.organizationId),
+        ctx.app.governance.resolveSetupState(input.organizationId),
         // The user's first project via team membership. Personal workspaces
         // are excluded outright: they are the governance data home, never a
         // navigable org project (ADR-038 v6).
@@ -125,9 +124,7 @@ export const governanceRouter = createTRPCRouter({
         // kind before persona detection and the user pin. Fail-safe like the
         // sibling lookups: a transient error means "no intent", which takes
         // the legacy path instead of 500ing the whole resolve.
-        getApp()
-          .organizations.getPrimaryIntent(input.organizationId)
-          .catch(() => null),
+        ctx.app.organizations.getPrimaryIntent(input.organizationId).catch(() => null),
       ]);
 
       // Org managers routinely have NO TeamUser row on the default team
@@ -204,7 +201,7 @@ export const governanceRouter = createTRPCRouter({
     .permission("complianceExport:view")
     .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT))
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.ocsfExport.list({
+      return await ctx.app.governance.ocsfList({
         organizationId: input.organizationId,
         sinceMs: input.sinceMs ?? 0,
         sinceEventId: input.sinceEventId,
@@ -265,7 +262,7 @@ export const governanceRouter = createTRPCRouter({
     )
     .permission("governance:view")
     .mutation(async ({ ctx, input }) => {
-      return await ctx.app.governance.adminWorkspaceViewAudit.recordView({
+      return await ctx.app.governance.adminWorkspaceRecordView({
         actorUserId: ctx.session.user.id,
         organizationId: input.organizationId,
         targetTeamId: input.targetTeamId,
@@ -356,7 +353,7 @@ export const governanceRouter = createTRPCRouter({
     )
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.quarantineFill.evaluate({
+      return await ctx.app.governance.quarantineFillEvaluate({
         organizationId: input.organizationId,
         windowSeconds: input.windowSeconds,
         threshold: input.threshold,

@@ -27,6 +27,18 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       filename: "platform/app/src/runtime/app/example.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
+    {
+      filename: "apps/worker/src/example.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+    {
+      filename: "packages/enterprise/composition/api/src/example.ts",
+      code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server"; export { GovernanceService };',
+    },
+    {
+      filename: "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
   ],
   invalid: [
     {

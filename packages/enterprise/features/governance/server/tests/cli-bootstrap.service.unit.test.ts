@@ -1,15 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  GovernanceAiToolCatalogService,
-  PLATFORM_TOOL_POLICY_DEFAULTS,
-} from "@langwatch/enterprise-governance-contract";
+import { PLATFORM_TOOL_POLICY_DEFAULTS } from "@langwatch/enterprise-governance-contract";
 import {
   CliAdminContactPort,
   CliBudgetOverviewPort,
 } from "../src/ports/cli-bootstrap.port";
 import { DefaultGovernanceCliBootstrapService } from "../src/services/cli-bootstrap.service";
 
-class MemoryCatalog extends GovernanceAiToolCatalogService {
+class MemoryCatalog {
   listForUser = vi.fn();
   listForAdmin = vi.fn();
   tryFindById = vi.fn();

@@ -11,7 +11,7 @@ import {
   BillingPriceCatalogue,
   getStripeEnvironmentFromNodeEnv,
 } from "@langwatch/enterprise-billing-contract";
-import { resolveGatewayBaseUrl } from "@langwatch/enterprise-governance-contract";
+import { resolveGatewayBaseUrl } from "~/runtime/public-config.server";
 import {
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
@@ -27,14 +27,26 @@ import {
   StripeUsageReportingService,
   SubscriptionItemCalculatorService,
 } from "~/runtime/app/features/billing";
-import { AppGovernanceEventingAdapter } from "~/runtime/app/features/governance/governance-eventing.adapter";
-import { AppIngestionPullWorkerAdapter } from "~/runtime/app/features/governance/ingestion-pull-worker.adapter";
-import { AppIngestionSourceAdapter } from "~/runtime/app/features/governance/ingestion-source.adapter";
-import { AppIngestionSourceActivityAdapter } from "~/runtime/app/features/governance/ingestion-source-activity.adapter";
-import { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/governance/governance-kpis.clickhouse.repository";
-import { GovernanceOcsfEventsClickHouseRepository } from "~/runtime/app/features/governance/governance-ocsf-events.clickhouse.repository";
-import { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/features/governance/governance-trace-activity.clickhouse.repository";
-import { PersonalUsageClickHouseRepository } from "~/runtime/app/features/governance/personal-usage.clickhouse.repository";
+import {
+  AppGovernanceEventingAdapter,
+  AppGovernanceEventingRuntime,
+  AppIngestionPullExecutionRuntime,
+  AppIngestionPullLifecycleRuntime,
+} from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
+import { AppIngestionPullWorkerAdapter } from "@langwatch/enterprise-api/governance/ingestion-pull-worker.adapter";
+import {
+  AppGovernanceIngestionPullHost,
+  AppGovernanceIngestionPullMetrics,
+  AppGovernanceIngestionPullSchedule,
+  AppGovernanceModelProviderCatalog,
+  AppGovernanceOrganizationContacts,
+} from "~/server/app-layer/governance-ingestion-pull.host";
+import { AppIngestionSourceAdapter } from "@langwatch/enterprise-api/governance/ingestion-source.adapter";
+import { AppIngestionSourceActivityAdapter } from "@langwatch/enterprise-api/governance/ingestion-source-activity.adapter";
+import { AppGovernanceKpisAdapter } from "@langwatch/enterprise-api/governance/governance-kpis.adapter";
+import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/governance/governance-ocsf-events.adapter";
+import { AppGovernanceTraceActivityAdapter } from "@langwatch/enterprise-api/governance/governance-trace-activity.adapter";
+import { AppPersonalUsageReadAdapter } from "@langwatch/enterprise-api/governance/personal-usage-read.adapter";
 import {
   WebhookEventsClickHouseRepository,
   type WebhookDeliveryProcessDeps,
@@ -54,9 +66,12 @@ import {
   AppAutomationRuntime,
   createAppAutomationEmailCaps,
 } from "~/runtime/app/features/automation";
-import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
+import { AppGovernanceRuntime } from "@langwatch/enterprise-api/governance/runtime";
 import { AppTraceRuntime } from "~/runtime/app/features/trace";
 import { AppTraceQueryFieldValuesAdapter } from "~/runtime/app/features/trace-query-field-values.adapter";
+import { AppGatewayGovernancePort } from "@langwatch/enterprise-api";
+import { PostgresIngestionPullSourceAdapter } from "@langwatch/enterprise-governance-server";
+import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { AppModelProviderRuntime } from "~/runtime/app/features/model-provider";
 import { AppOrganizationRuntime } from "~/runtime/app/features/organization";
@@ -107,6 +122,7 @@ import { AuthzFeature } from "~/runtime/app/features/authz";
 import { AnalyticsAdapter, LoggingAnalyticsTripwire } from "@langwatch/analytics-server";
 import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import { PostgresDashboardAdapter } from "@langwatch/dashboard-server";
+import { PostgresScimAdapter } from "@langwatch/enterprise-scim-server";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validateSavedWorkbenchChartDefinition } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import {
@@ -170,8 +186,9 @@ import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
+import { getEdgeSpoolFailOpenCounter, getLangyTurnsCounter } from "~/server/metrics";
 import {
   getLangyGithubPrUsage,
   LANGY_GITHUB_PRS_PER_DAY,
@@ -1194,19 +1211,18 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // gate: the ledger is the only store spend accrues in.
   const gatewayDebits =
     clickhouseEnabled && gatewayBudgetRepository
-      ? {
+      ? AppGatewayGovernancePort.create(
           prisma,
-          budgetCHRepository: gatewayBudgetRepository,
-          changeEventDedupe: createBudgetChangeEventDedupeService(redis),
-        }
+          gatewayBudgetRepository,
+          createBudgetChangeEventDedupeService(redis),
+        )
       : undefined;
 
   // Governance's KPI rollup. One instance for the whole App: the subscriber
   // sync writes through it, the spend-spike anomaly evaluator reads through
-  // it — the same repository reference the process manager below takes and
-  // `app.governance.kpis` hands out.
+  // it — the same repository reference the process manager below takes.
   const governanceKpisRepository = clickhouseEnabled
-    ? new GovernanceKpisClickHouseRepository(resolveClickHouseClient)
+    ? new AppGovernanceKpisAdapter(resolveClickHouseClient)
     : undefined;
   const governanceKpisSync = governanceKpisRepository
     ? { governanceKpisRepository }
@@ -1215,10 +1231,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
   // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
-  // through it — the same repository reference the process manager below
-  // takes and `app.governance.ocsfEvents` hands out.
+  // through it — the same repository reference the process manager below takes.
   const governanceOcsfEventsRepository = clickhouseEnabled
-    ? new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient)
+    ? new AppGovernanceOcsfEventsAdapter(resolveClickHouseClient)
     : undefined;
   const governanceOcsfEventsSync = governanceOcsfEventsRepository
     ? { governanceOcsfEventsRepository }
@@ -1227,24 +1242,27 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // Governance-domain reads over the shared `trace_summaries` table (the
   // persona-detection activity probe, the quarantine-fill breakdown).
   const governanceTraceActivityRepository = clickhouseEnabled
-    ? new GovernanceTraceActivityClickHouseRepository(resolveClickHouseClient)
+    ? new AppGovernanceTraceActivityAdapter(resolveClickHouseClient)
     : undefined;
 
   // The /me dashboard's spend/token/model rollups, over trace_summaries
   // and the gateway ledger's PRINCIPAL rows.
   const personalUsageRepository = clickhouseEnabled
-    ? new PersonalUsageClickHouseRepository(resolveClickHouseClient)
+    ? new AppPersonalUsageReadAdapter(resolveClickHouseClient)
     : undefined;
   const governanceActivity = AppIngestionSourceActivityAdapter.create({
     database: prisma,
     resolveClient: async (organizationId) =>
       clickhouseEnabled ? getClickHouseClientForOrganization(organizationId) : null,
-  }).build();
+  }).clickhouse();
 
-  // Governance is composed once for the process. Request transports receive
-  // these same capabilities through `ctx.app`; background pipelines receive
-  // the same project and worker instances directly.
-  const governanceRuntime = AppGovernanceRuntime.create(prisma, {
+  // Governance is composed once after its event-sourcing command ports have
+  // registered. Request transports then receive that one capability through
+  // `ctx.app`; the worker uses the same project service directly.
+  const governanceVirtualKeys = VirtualKeyService.create(prisma);
+  const governanceIngestionPullHost =
+    AppGovernanceIngestionPullHost.create(featureFlagService);
+  const governanceOptions = {
     organizations,
     projects,
     apiKeys,
@@ -1252,28 +1270,32 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ocsfEvents: governanceOcsfEventsRepository,
     traceActivity: governanceTraceActivityRepository,
     personalUsage: personalUsageRepository,
-    budgetRepository: gatewayBudgetRepository,
     gatewayBaseUrl: resolveGatewayBaseUrl({
-      publicUrl: env.LW_GATEWAY_PUBLIC_URL,
-      baseUrl: env.LW_GATEWAY_BASE_URL,
-      isSaas: config.isSaas,
+      LW_GATEWAY_PUBLIC_URL: env.LW_GATEWAY_PUBLIC_URL,
+      LW_GATEWAY_BASE_URL: env.LW_GATEWAY_BASE_URL,
+      IS_SAAS: config.isSaas,
     }),
+    virtualKeys: governanceVirtualKeys,
+    budgetOverview: BudgetOverviewService.create({
+      database: prisma,
+      budgetRepository: gatewayBudgetRepository,
+      organizations,
+      personalUsage: personalUsageRepository,
+      personalVirtualKeys: governanceVirtualKeys,
+    }),
+    providers: AppGovernanceModelProviderCatalog.create(),
+    contacts: AppGovernanceOrganizationContacts.create(prisma),
     redis,
     ottl: {
       baseUrl: env.LW_GATEWAY_INTERNAL_URL ?? env.LW_GATEWAY_BASE_URL,
       secret: env.LW_GATEWAY_INTERNAL_SECRET,
     },
-  });
-  const users = AppUserRuntime.create({
-    database: prisma,
-    redis,
-    organizations,
-    cliTokenRevocation: governanceRuntime.cliTokenRevocation,
-  });
+  };
   const secrets = AppSecretRuntime.create({ database: prisma });
   const ingestionPullWorker = AppIngestionPullWorkerAdapter.create({
-    database: prisma,
-    projects: governanceRuntime.projects,
+    sources: PostgresIngestionPullSourceAdapter.create(prisma),
+    host: governanceIngestionPullHost,
+    projects,
     events: governanceOcsfEventsRepository,
   }).build();
 
@@ -1570,22 +1592,19 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
           }),
       },
     },
-    enterprisePipelines: {
-      database: prisma,
-      runsWorkers: roleRunsWorkers(config.processRole),
-      worker: ingestionPullWorker,
-      resolveTenantId: async (organizationId) =>
-        (
-          await governanceRuntime.projects.ensureInternal({
-            organizationId,
-            kind: "internal_governance",
-          })
-        ).id,
-      // Pulled provider cost shares the gateway debits' ClickHouse gate: it
-      // lands in the same ledger table, so without ClickHouse there is nowhere
-      // for it to go. The pipeline still records every observation on the log.
-      pulledUsageLedger: gatewayBudgetRepository,
-    },
+    enterprisePipelines: AppGovernanceEventingRuntime.create(
+      AppIngestionPullExecutionRuntime.create(
+        ingestionPullWorker,
+        gatewayBudgetRepository,
+        AppGovernanceIngestionPullMetrics.create(),
+      ),
+      AppIngestionPullLifecycleRuntime.create(
+        prisma,
+        projects,
+        AppGovernanceIngestionPullSchedule.create(),
+        roleRunsWorkers(config.processRole),
+      ),
+    ),
     projects,
     monitors,
     automation,
@@ -1610,11 +1629,36 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   suiteStartRun.resolve(commands.suiteRuns.startSuiteRun);
   suiteQueueRun.resolve(commands.simulations.queueRun);
   const ingestionSources = AppIngestionSourceAdapter.create({
-    database: prisma,
-    projects: governanceRuntime.projects,
     plans: planProvider,
     lifecycle: registry.getGovernanceLifecycle(),
     secretPepper: env.LW_VIRTUAL_KEY_PEPPER ?? "",
+    encryption: governanceIngestionPullHost.encryption,
+  });
+  const governance = AppGovernanceRuntime.create(prisma, {
+    ...governanceOptions,
+    eventing: AppGovernanceEventingAdapter.governancePort(
+      commands.ingestionPull,
+      commands.pulledUsage,
+    ),
+    activityClickhouse: governanceActivity,
+    ingestionSourceEntitlements: ingestionSources.entitlements(),
+    ingestionSourceLifecycle: ingestionSources.lifecycle(),
+    ingestionEncryption: ingestionSources.encryption(),
+    ingestionSecretPepper: ingestionSources.secretPepper(),
+    ingestionDiagnostics: ingestionSources.diagnostics(),
+  });
+  const users = AppUserRuntime.create({
+    database: prisma,
+    redis,
+    organizations,
+    governance,
+  });
+  const scim = PostgresScimAdapter.create({
+    database: prisma,
+    writer: authzFeature.grants,
+    users,
+    governance,
+    entitlements: planProvider,
   }).build();
   (globalForApp as any).__scenarioExecutionPool = commands.scenarioExecutionPool;
 
@@ -2049,7 +2093,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     simulationExports,
     topics,
     gateway: {
-      budgetOverview: governanceRuntime.budgetOverview,
       budgetDecisions: GatewayBudgetService.create(prisma, gatewayBudgetRepository),
       budgets: gatewayBudgetRepository,
       virtualKeySpend: gatewayVirtualKeySpendRepository,
@@ -2075,29 +2118,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         getClickHouseClientForOrganization,
       ),
     },
-    governance: {
-      activity: governanceActivity,
-      ingestionTemplates: governanceRuntime.ingestionTemplates,
-      ingestionSources,
-      setupState: governanceRuntime.setupState,
-      ocsfExport: governanceRuntime.ocsfExport,
-      ottlGateway: governanceRuntime.ottlGateway,
-      policy: governanceRuntime.policy,
-      canonicalCostExtractor: governanceRuntime.canonicalCostExtractor,
-      ocsfEvents: governanceOcsfEventsRepository,
-      traceActivity: governanceTraceActivityRepository,
-      kpis: governanceKpisRepository,
-      personalUsage: governanceRuntime.personalUsage,
-      routingPolicies: governanceRuntime.routingPolicies,
-      personalVirtualKeys: governanceRuntime.personalVirtualKeys,
-      aiTools: governanceRuntime.aiTools,
-      cliBootstrap: governanceRuntime.cliBootstrap,
-      cliSessions: governanceRuntime.cliSessions,
-      cliTokenRevocation: governanceRuntime.cliTokenRevocation,
-      adminWorkspaceViewAudit: governanceRuntime.adminWorkspaceViewAudit,
-      quarantineFill: governanceRuntime.quarantineFill,
-      ingestionKeys: governanceRuntime.ingestionKeys,
-    },
+    governance,
     billableEvents: billableEventsRepository ?? undefined,
     billingQueries,
     codingAgents: {
@@ -2139,6 +2160,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     notifications,
     apiKeys,
     managedProviders,
+    scim,
     modelProviders,
     prompts,
     nurturing,
@@ -2288,32 +2310,55 @@ export function createTestApp(
     deriveBindingId: AuthzFeature.deriveGrantId,
     diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key:test")),
   }).build();
-  const testGovernanceRuntime = AppGovernanceRuntime.create(testPrisma, {
+  const testGovernanceVirtualKeys = VirtualKeyService.create(testPrisma);
+  const testGovernanceIngestionPullHost =
+    AppGovernanceIngestionPullHost.create(featureFlagService);
+  const testPlanProvider =
+    overrides?.planProvider ??
+    PlanProviderService.create({
+      getActivePlan: async () => FREE_PLAN,
+    });
+  const testGovernanceOptions = {
     organizations: nullOrganizations,
     projects: testProjects,
     apiKeys,
     gatewayBaseUrl: "http://localhost:5563",
+    virtualKeys: testGovernanceVirtualKeys,
+    budgetOverview: BudgetOverviewService.create({
+      database: testPrisma,
+      organizations: nullOrganizations,
+      personalVirtualKeys: testGovernanceVirtualKeys,
+    }),
+    providers: AppGovernanceModelProviderCatalog.create(),
+    contacts: AppGovernanceOrganizationContacts.create(testPrisma),
     redis: null,
+  };
+  const testIngestionSources = AppIngestionSourceAdapter.create({
+    plans: testPlanProvider,
+    lifecycle: AppIngestionSourceAdapter.disabledLifecycle(),
+    secretPepper: "test-ingestion-secret-pepper",
+    encryption: testGovernanceIngestionPullHost.encryption,
+  });
+  const testGovernanceActivity = AppIngestionSourceActivityAdapter.create({
+    database: testPrisma,
+    resolveClient: async () => null,
+  }).clickhouse();
+  const testGovernance = AppGovernanceRuntime.create(testPrisma, {
+    ...testGovernanceOptions,
+    eventing: AppGovernanceEventingAdapter.noopGovernancePort(),
+    activityClickhouse: testGovernanceActivity,
+    ingestionSourceEntitlements: testIngestionSources.entitlements(),
+    ingestionSourceLifecycle: testIngestionSources.lifecycle(),
+    ingestionEncryption: testIngestionSources.encryption(),
+    ingestionSecretPepper: testIngestionSources.secretPepper(),
+    ingestionDiagnostics: testIngestionSources.diagnostics(),
   });
   const testUsers = AppUserRuntime.create({
     database: testPrisma,
     redis: null,
     organizations: nullOrganizations,
-    cliTokenRevocation: testGovernanceRuntime.cliTokenRevocation,
+    governance: testGovernance,
   });
-  const testIngestionSources = AppIngestionSourceAdapter.create({
-    database: testPrisma,
-    projects: testGovernanceRuntime.projects,
-    plans: {
-      getActivePlan: async () => FREE_PLAN,
-    },
-    lifecycle: { sync: async () => undefined },
-    secretPepper: "test-ingestion-secret-pepper",
-  }).build();
-  const testGovernanceActivity = AppIngestionSourceActivityAdapter.create({
-    database: testPrisma,
-    resolveClient: async () => null,
-  }).build();
   const testBroadcast = new BroadcastService(null);
   const testCodingAgentSessions = new CodingAgentSessionService({
     sessions: new NullCodingAgentSessionRepository(),
@@ -2427,6 +2472,13 @@ export function createTestApp(
       metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
   );
+  const testScim = PostgresScimAdapter.create({
+    database: testPrisma,
+    writer: testAuthz.grants,
+    users: testUsers,
+    governance: testGovernance,
+    entitlements: testPlanProvider,
+  }).build();
 
   const testOpsService = AppOpsRuntime.create({
     database: testPrisma,
@@ -2454,6 +2506,7 @@ export function createTestApp(
     monitors: testMonitors,
     apiKeys,
     managedProviders,
+    scim: testScim,
     modelProviders,
     prompts,
     broadcast: testBroadcast,
@@ -2573,7 +2626,6 @@ export function createTestApp(
     simulationExports: ScenarioRunExportService.create(testSimulations),
     topics: testTopics,
     gateway: {
-      budgetOverview: testGovernanceRuntime.budgetOverview,
       budgetDecisions: GatewayBudgetService.create(testPrisma),
       budgets: undefined,
       virtualKeySpend: undefined,
@@ -2597,29 +2649,7 @@ export function createTestApp(
     billing: {
       events: new BillableEventsMeterClickHouseRepository(async () => null),
     },
-    governance: {
-      activity: testGovernanceActivity,
-      ingestionTemplates: testGovernanceRuntime.ingestionTemplates,
-      ingestionSources: testIngestionSources,
-      setupState: testGovernanceRuntime.setupState,
-      ocsfExport: testGovernanceRuntime.ocsfExport,
-      ottlGateway: testGovernanceRuntime.ottlGateway,
-      policy: testGovernanceRuntime.policy,
-      canonicalCostExtractor: testGovernanceRuntime.canonicalCostExtractor,
-      ocsfEvents: undefined,
-      traceActivity: undefined,
-      kpis: undefined,
-      personalUsage: testGovernanceRuntime.personalUsage,
-      routingPolicies: testGovernanceRuntime.routingPolicies,
-      personalVirtualKeys: testGovernanceRuntime.personalVirtualKeys,
-      aiTools: testGovernanceRuntime.aiTools,
-      cliBootstrap: testGovernanceRuntime.cliBootstrap,
-      cliSessions: testGovernanceRuntime.cliSessions,
-      cliTokenRevocation: testGovernanceRuntime.cliTokenRevocation,
-      adminWorkspaceViewAudit: testGovernanceRuntime.adminWorkspaceViewAudit,
-      quarantineFill: testGovernanceRuntime.quarantineFill,
-      ingestionKeys: testGovernanceRuntime.ingestionKeys,
-    },
+    governance: testGovernance,
     billableEvents: undefined,
     billingQueries: BillableEventsQueryService.create(null),
     codingAgents: {
@@ -2716,9 +2746,7 @@ export function createTestApp(
       async () => FREE_PLAN,
       null,
     ),
-    planProvider: PlanProviderService.create({
-      getActivePlan: async () => FREE_PLAN,
-    }),
+    planProvider: testPlanProvider,
     subscription: undefined,
     billingCustomer: undefined,
     notifications: NotificationService.createNull(),
@@ -2795,7 +2823,8 @@ export function createTestApp(
         recordClusteringRunFailed: noop,
         recordTopics: noop,
       } as AppCommands["topicClustering"],
-      ...AppGovernanceEventingAdapter.noopCommands(),
+      ingestionPull: AppGovernanceEventingAdapter.noopIngestionPullPipeline(),
+      pulledUsage: AppGovernanceEventingAdapter.noopPulledUsagePipeline(),
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],

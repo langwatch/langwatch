@@ -148,6 +148,17 @@ function packageSubpath(specifier, packageName) {
   return `.${specifier.slice(packageName.length)}`;
 }
 
+function isFeatureServerCompositionRoot(workspacePath) {
+  return (
+    /^(apps\/(api|worker)|packages\/enterprise\/composition\/(api|worker))\/src\//.test(
+      workspacePath,
+    ) ||
+    /^platform\/app\/src\/runtime\/(app|worker)\//.test(workspacePath) ||
+    workspacePath ===
+      "platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts"
+  );
+}
+
 function importedPackage(specifier, workspace) {
   for (const [name, pkg] of workspace.packages) {
     if (specifier === name || specifier.startsWith(`${name}/`)) {
@@ -290,9 +301,7 @@ const boundaryRule = {
         if (
           classification.role === "other" &&
           target.pkg.role === "server" &&
-          !/^platform\/app\/src\/runtime\/(app|worker)\//.test(
-            classification.workspacePath,
-          )
+          !isFeatureServerCompositionRoot(classification.workspacePath)
         ) {
           context.report({ node, messageId: "compositionRoot" });
         }

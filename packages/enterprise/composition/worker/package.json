@@ -14,6 +14,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./governance/spend-spike-anomaly.worker": {
+      "types": "./src/governance/spend-spike-anomaly.worker.ts",
+      "default": "./src/governance/spend-spike-anomaly.worker.ts"
     }
   },
   "scripts": {
@@ -21,7 +25,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/enterprise": "workspace:*"
+    "@langwatch/enterprise": "workspace:*",
+    "@langwatch/enterprise-governance-server": "workspace:*",
+    "@langwatch/observability": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

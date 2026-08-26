@@ -1,17 +1,18 @@
-import { GovernancePolicyService as GovernancePolicyContract } from "@langwatch/enterprise-governance-contract";
+import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository";
 import {
   NullGovernanceDiagnosticsPort,
   type GovernanceDiagnosticsPort,
 } from "../ports/governance-diagnostics.port";
+import { z } from "zod";
 
 const UNASSIGNED_DEPARTMENT = "unassigned";
+const codingAssistantConfigSchema = z.looseObject({
+  assistantKind: z.string(),
+  bundledPlan: z.boolean(),
+});
 
-type TraceDepartmentInput = Parameters<
-  GovernancePolicyContract["resolveTraceDepartment"]
->[0];
-
-export class PostgresGovernancePolicyService extends GovernancePolicyContract {
+export class PostgresGovernancePolicyService {
   private readonly cache = new Map<string, { nonBillable: boolean; expiresAt: number }>();
 
   static create(
@@ -25,16 +26,14 @@ export class PostgresGovernancePolicyService extends GovernancePolicyContract {
     return new PostgresGovernancePolicyService(repository, options);
   }
 
-  constructor(
+  private constructor(
     private readonly repository: CostAttributionPolicyRepository,
     private readonly options: {
       clock?: () => number;
       cacheTtlMs?: number;
       diagnostics?: GovernanceDiagnosticsPort;
     } = {},
-  ) {
-    super();
-  }
+  ) {}
 
   async resolveSourceNonBillable(input: {
     organizationId: string;
@@ -51,11 +50,12 @@ export class PostgresGovernancePolicyService extends GovernancePolicyContract {
         input.organizationId,
       );
       nonBillable = !configs.some((candidate) => {
-        const config =
-          candidate && typeof candidate === "object"
-            ? (candidate as Record<string, unknown>)
-            : {};
-        return config.assistantKind === input.sourceType && config.bundledPlan === false;
+        const parsed = codingAssistantConfigSchema.safeParse(candidate);
+        return (
+          parsed.success &&
+          parsed.data.assistantKind === input.sourceType &&
+          parsed.data.bundledPlan === false
+        );
       });
     } catch (error) {
       const diagnostics = this.options.diagnostics ?? new NullGovernanceDiagnosticsPort();

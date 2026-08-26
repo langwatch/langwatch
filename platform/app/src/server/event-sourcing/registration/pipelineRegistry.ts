@@ -1,25 +1,36 @@
 import {
   AppGovernanceEventingAdapter,
-  type AppGovernanceEventingAdapterOptions,
-} from "~/runtime/app/features/governance/governance-eventing.adapter";
+  type AppGovernanceEventingRuntime,
+} from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
 import {
   AppGatewayDebitAdapter,
-  type AppGatewayDebitAdapterDependencies,
-} from "~/runtime/app/features/governance/gateway-debit.adapter";
+  GovernanceSignalDeliveryPort,
+  type GatewayGovernancePort,
+} from "@langwatch/enterprise-api";
 import {
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,
   GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+  createGovernanceEventsPipeline,
+  type GovernanceBudgetCrossingData,
+  type GovernanceTraceEvent,
+  type GovernanceTraceSummary,
+  type GovernanceVkLifecycleData,
+  TraceAlertTriggerMatchPort,
+  TraceAlertTriggerPort,
 } from "@langwatch/enterprise-governance-server";
 import {
   AppGovernanceSubscriberAdapter,
   type AppGovernanceKpisSubscriberDependencies,
   type AppGovernanceOcsfSubscriberDependencies,
-} from "~/runtime/app/features/governance/governance-subscriber.adapter";
+  GovernanceSubscriberRuntime,
+  type TraceAlertTriggerMatchInput,
+} from "@langwatch/enterprise-api/governance/governance-subscriber.adapter";
 import type { WebhookDeliveryProcessDeps } from "~/runtime/app/features/webhooks";
-import { AppGovernanceWebhookAdapter } from "~/runtime/app/features/governance/governance-webhook.adapter";
+import { AppGovernanceWebhookAdapter } from "@langwatch/enterprise-api/governance/governance-webhook.adapter";
 import type {
   AppendStore,
   EventSourcing,
+  EventSourcedQueueProcessor,
   FoldProjectionStore,
   Projection,
   ProjectionStore,
@@ -47,13 +58,18 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { DatasetNormalizePayload } from "@langwatch/dataset-server";
 import { featureFlagService } from "~/server/featureFlag";
+import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
+import { incrementAutomationMatchRecordsTotal } from "~/server/metrics";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { UsageReportingService } from "~/runtime/app/features/billing";
 import type { AutomationService } from "@langwatch/automation-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
@@ -149,7 +165,6 @@ import type { OpenAdmission } from "../pipelines/gateway-spend-processing/reposi
 import { getOpenAdmissionFindersByInstance } from "../pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "../pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "../pipelines/github-maintenance/pipeline";
-import { createGovernanceEventsPipeline } from "../pipelines/governance-events/pipeline";
 import { createLangyConversationProcessingPipeline } from "@langwatch/langy-server";
 import { createLangyEffectPorts } from "../pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
 import type { LangyAnalyticsEventProjectionRecord } from "@langwatch/langy-server";
@@ -217,6 +232,57 @@ import { createTraceUpdateBroadcastHandler } from "../pipelines/trace-processing
 import { createTrackedEventSyncHandler } from "../pipelines/trace-processing/subscribers/trackedEventSync.subscriber";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
+
+class AppGovernanceSubscriberRuntime extends GovernanceSubscriberRuntime {
+  capture(error: unknown): void {
+    captureException(toError(error));
+  }
+
+  passesTraceOriginGuard(input: {
+    event: GovernanceTraceEvent;
+    state: GovernanceTraceSummary;
+  }): boolean {
+    return passesTraceOriginGuards(input.event, input.state);
+  }
+
+  countAutomationMatchRecords(count: number): void {
+    incrementAutomationMatchRecordsTotal(count);
+  }
+}
+
+class AppPipelineGovernanceSignalDeliveryPort extends GovernanceSignalDeliveryPort {
+  private constructor(
+    private readonly commands: {
+      recordVkLifecycle: { send(data: GovernanceVkLifecycleData): Promise<unknown> };
+      recordBudgetCrossing: {
+        send(data: GovernanceBudgetCrossingData): Promise<unknown>;
+      };
+    },
+  ) {
+    super();
+  }
+
+  static create(commands: {
+    recordVkLifecycle: { send(data: GovernanceVkLifecycleData): Promise<unknown> };
+    recordBudgetCrossing: {
+      send(data: GovernanceBudgetCrossingData): Promise<unknown>;
+    };
+  }): AppPipelineGovernanceSignalDeliveryPort {
+    return new AppPipelineGovernanceSignalDeliveryPort(commands);
+  }
+
+  available(): boolean {
+    return true;
+  }
+
+  async appendVirtualKeyLifecycle(data: GovernanceVkLifecycleData): Promise<void> {
+    await this.commands.recordVkLifecycle.send(data);
+  }
+
+  async appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void> {
+    await this.commands.recordBudgetCrossing.send(data);
+  }
+}
 
 /**
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
@@ -365,7 +431,7 @@ export interface PipelineRegistryDeps {
     /** Runs one clustering page (the ADR-051 effect's domain function). */
     runPort: TopicClusteringRunPort;
   };
-  enterprisePipelines: Omit<AppGovernanceEventingAdapterOptions, "eventSourcing">;
+  enterprisePipelines: AppGovernanceEventingRuntime;
   projects: ProjectService;
   monitors: MonitorService;
   automation: AutomationService;
@@ -386,7 +452,7 @@ export interface PipelineRegistryDeps {
   usageReportingService?: UsageReportingService;
   gatewaySpend?: { repository: GatewaySpendEventsRepository };
   webhookDelivery?: WebhookDeliveryProcessDeps;
-  gatewayDebits?: AppGatewayDebitAdapterDependencies;
+  gatewayDebits?: GatewayGovernancePort;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -419,6 +485,48 @@ export interface PipelineRegistryDeps {
     /** One retention pass over the branch bookkeeping. */
     pruneStaleBranchLinkage: () => Promise<{ branchChecks: number }>;
   };
+}
+
+/** The one Automation-backed trigger catalogue used by Governance trace alerts. */
+class AppGovernanceTraceAlertTriggerPort extends TraceAlertTriggerPort {
+  private constructor(private readonly automation: AutomationService) {
+    super();
+  }
+
+  static create(automation: AutomationService): AppGovernanceTraceAlertTriggerPort {
+    return new AppGovernanceTraceAlertTriggerPort(automation);
+  }
+
+  async activeForProject(projectId: string) {
+    const triggers = await this.automation.getActiveTraceTriggersForProject(projectId);
+    return triggers.map((trigger) => ({
+      id: trigger.id,
+      action: trigger.action,
+      actionClass: NOTIFY_TRIGGER_ACTIONS.has(trigger.action) ? "notify" : "persist",
+      traceDebounceMs: trigger.traceDebounceMs,
+      notificationCadence: trigger.notificationCadence,
+      hasEvaluationFilters: classifyTriggerFilters(trigger.filters).hasEvaluationFilters,
+    }));
+  }
+}
+
+/** The one durable command boundary for Governance trace-alert matches. */
+class AppGovernanceTraceAlertMatchPort extends TraceAlertTriggerMatchPort {
+  private constructor(
+    private readonly recordTriggerMatch: EventSourcedQueueProcessor<TraceAlertTriggerMatchInput>,
+  ) {
+    super();
+  }
+
+  static create(
+    recordTriggerMatch: EventSourcedQueueProcessor<TraceAlertTriggerMatchInput>,
+  ): AppGovernanceTraceAlertMatchPort {
+    return new AppGovernanceTraceAlertMatchPort(recordTriggerMatch);
+  }
+
+  async send(input: TraceAlertTriggerMatchInput): Promise<void> {
+    await this.recordTriggerMatch.send(input);
+  }
 }
 
 /**
@@ -542,6 +650,12 @@ export class PipelineRegistry {
     }
 
     const automationCommands = mapCommands(automationPipeline.commands);
+    const governanceTraceAlertTriggers = AppGovernanceTraceAlertTriggerPort.create(
+      this.deps.automation,
+    );
+    const governanceTraceAlertMatches = AppGovernanceTraceAlertMatchPort.create(
+      automationPipeline.commands.recordTriggerMatch,
+    );
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
         triggerMatchHandler: createEvaluationAlertTriggerMatchHandler({
@@ -559,8 +673,11 @@ export class PipelineRegistry {
     // contribution commands.
     const codingAgentPipeline = this.registerCodingAgentPipeline();
     if (this.deps.gatewaySpend) {
-      this.registerGatewaySpendPipeline(this.deps.gatewaySpend);
-      this.registerGovernanceEventsPipeline();
+      const governanceEvents = this.registerGovernanceEventsPipeline();
+      const governanceDelivery = AppPipelineGovernanceSignalDeliveryPort.create(
+        governanceEvents.commands,
+      );
+      this.registerGatewaySpendPipeline(this.deps.gatewaySpend, governanceDelivery);
     }
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline({
@@ -586,12 +703,9 @@ export class PipelineRegistry {
       evalPipeline,
       traceSummaryStore,
       automations: {
-        triggerMatchHandler: AppGovernanceSubscriberAdapter.create().traceAlerts({
-          triggers: this.deps.automation,
-          matches: {
-            send: automationCommands.recordTriggerMatch,
-          },
-        }),
+        triggerMatchHandler: AppGovernanceSubscriberAdapter.create(
+          this.governanceSubscriberRuntime,
+        ).traceAlerts(governanceTraceAlertTriggers, governanceTraceAlertMatches),
         graphActivityHandler,
       },
       codingAgentSubscribers: [
@@ -617,10 +731,10 @@ export class PipelineRegistry {
     const { pipeline: langyConversationPipeline } =
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } = this.registerTopicClusteringPipeline();
-    const enterprisePipelines = AppGovernanceEventingAdapter.create({
-      ...this.deps.enterprisePipelines,
-      eventSourcing: this.deps.eventSourcing,
-    }).register();
+    const enterprisePipelines = AppGovernanceEventingAdapter.create(
+      this.deps.eventSourcing,
+      this.deps.enterprisePipelines,
+    ).register();
     this.governanceLifecycle = enterprisePipelines.lifecycle;
     const billingPipeline = this.registerBillingReportingPipeline();
     // The grants ledger (ADR-092 §13). The write paths emit through the
@@ -646,7 +760,8 @@ export class PipelineRegistry {
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
       topicClustering: mapCommands(topicClusteringPipeline.commands),
-      ...enterprisePipelines.commands,
+      ingestionPull: enterprisePipelines.ingestionPull,
+      pulledUsage: enterprisePipelines.pulledUsage,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
       /** Late-bind the execution pool for the simulationRunExecution process manager. */
@@ -660,6 +775,8 @@ export class PipelineRegistry {
     }
     return this.governanceLifecycle;
   }
+
+  private readonly governanceSubscriberRuntime = new AppGovernanceSubscriberRuntime();
 
   /**
    * ADR-051: topic clustering scheduling as a builder-mounted process
@@ -882,9 +999,10 @@ export class PipelineRegistry {
     );
   }
 
-  private registerGatewaySpendPipeline(deps: {
-    repository: GatewaySpendEventsRepository;
-  }) {
+  private registerGatewaySpendPipeline(
+    deps: { repository: GatewaySpendEventsRepository },
+    governanceDelivery: GovernanceSignalDeliveryPort,
+  ) {
     return this.deps.eventSourcing.register(
       createGatewaySpendProcessingPipeline({
         gatewaySpendStore: this.cached<GatewaySpendState>(
@@ -894,9 +1012,7 @@ export class PipelineRegistry {
         // The ADR-073 delivery process manager consumes this pipeline's
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
-        gatewayDebits: this.deps.gatewayDebits
-          ? AppGatewayDebitAdapter.create(this.deps.gatewayDebits).build()
-          : undefined,
+        gatewayDebits: this.createGatewayDebits(governanceDelivery),
         settlement: {
           // Lazy: the pipeline is being built by this very call, so the
           // sweeper resolves the command sender at execution time.
@@ -956,6 +1072,13 @@ export class PipelineRegistry {
         },
       }),
     );
+  }
+
+  private createGatewayDebits(governanceDelivery: GovernanceSignalDeliveryPort) {
+    const gateway = this.deps.gatewayDebits;
+    if (!gateway) return undefined;
+
+    return AppGatewayDebitAdapter.create(gateway, governanceDelivery).build();
   }
 
   private registerCodingAgentPipeline() {
@@ -1199,7 +1322,9 @@ export class PipelineRegistry {
 
     // EE governance rollups, composed here as full subscriber specs so the
     // OSS pipeline definition stays free of `@ee` imports.
-    const governanceSubscribers = AppGovernanceSubscriberAdapter.create();
+    const governanceSubscribers = AppGovernanceSubscriberAdapter.create(
+      this.governanceSubscriberRuntime,
+    );
     const governanceKpis = this.deps.governanceKpisSync
       ? governanceSubscribers.kpis(this.deps.governanceKpisSync.governanceKpisRepository)
       : undefined;

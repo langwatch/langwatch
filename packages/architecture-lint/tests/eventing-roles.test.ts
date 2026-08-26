@@ -82,6 +82,21 @@ describe("Eventing role lint", () => {
     expect(policies()).toContain("eventing-process-purity");
   });
 
+  it("applies executable eventing rules in Enterprise API and worker composition", () => {
+    write(
+      "packages/enterprise/composition/api/src/governance/unsafe.process.ts",
+      'import "node:http"; export async function evolve() { await fetch("https://example.com"); }',
+    );
+    write(
+      "packages/enterprise/composition/worker/src/governance/unsafe.projection.ts",
+      'import "node:http"; export async function project() { await fetch("https://example.com"); }',
+    );
+
+    expect(policies()).toEqual(
+      expect.arrayContaining(["eventing-process-purity", "eventing-projection-purity"]),
+    );
+  });
+
   it("requires a named redelivery test for every strict-package subscriber", () => {
     const pkg = strictServer();
     write(

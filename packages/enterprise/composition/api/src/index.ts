@@ -1,12 +1,24 @@
 import { EnterpriseCatalogue } from "@langwatch/enterprise";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
-import type { ScimTokenCapability } from "@langwatch/enterprise-scim-contract";
+import type { ScimService } from "@langwatch/enterprise-scim-contract";
 import type { SsoGate } from "@langwatch/enterprise-sso-contract";
+
+export {
+  AppGatewayDebitAdapter,
+  AppGatewayGovernancePort,
+  GatewayGovernancePort,
+  type GovernanceBudgetResolutionInput,
+} from "./governance/gateway-debit.adapter";
+export {
+  AppGovernanceSignalsService,
+  GovernanceSignalDeliveryPort,
+  GovernanceSignalStoragePort,
+} from "./governance/governance-signals.adapter";
 
 export type EnterpriseApiCompositionOptions = {
   licensing?: LicensingService;
   sso?: SsoGate;
-  scimTokens?: ScimTokenCapability;
+  scim?: ScimService;
 };
 
 /** Explicit API-only Enterprise dependencies; registration remains app-owned. */
@@ -15,7 +27,7 @@ export class EnterpriseApiComposition {
     readonly catalogue: EnterpriseCatalogue,
     readonly licensing: LicensingService | undefined,
     readonly sso: SsoGate | undefined,
-    readonly scimTokens: ScimTokenCapability | undefined,
+    readonly scim: ScimService | undefined,
   ) {}
 
   static create(options: EnterpriseApiCompositionOptions = {}): EnterpriseApiComposition {
@@ -23,7 +35,7 @@ export class EnterpriseApiComposition {
       EnterpriseCatalogue.create(),
       options.licensing,
       options.sso,
-      options.scimTokens,
+      options.scim,
     );
   }
 }

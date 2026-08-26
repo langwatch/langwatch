@@ -1,4 +1,3 @@
-import { createScimTokenService } from "~/runtime/app/features/scim";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
@@ -17,8 +16,7 @@ const enterpriseScimProcedure = protectedProcedure
 
 export const scimTokenRouter = createTRPCRouter({
   list: enterpriseScimProcedure.query(async ({ ctx, input }) => {
-    const tokenService = createScimTokenService(ctx.prisma);
-    return tokenService.list({ organizationId: input.organizationId });
+    return ctx.app.scim.listTokens({ organizationId: input.organizationId });
   }),
 
   generate: enterpriseScimProcedure
@@ -28,8 +26,7 @@ export const scimTokenRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const tokenService = createScimTokenService(ctx.prisma);
-      return tokenService.generate({
+      return ctx.app.scim.generateToken({
         organizationId: input.organizationId,
         description: input.description,
       });
@@ -42,8 +39,7 @@ export const scimTokenRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const tokenService = createScimTokenService(ctx.prisma);
-      return tokenService.revoke({
+      return ctx.app.scim.revokeToken({
         organizationId: input.organizationId,
         tokenId: input.tokenId,
       });

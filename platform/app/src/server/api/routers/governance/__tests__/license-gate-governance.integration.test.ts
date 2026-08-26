@@ -24,7 +24,6 @@
  */
 
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@langwatch/enterprise-governance-contract";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { nanoid } from "nanoid";
@@ -36,7 +35,7 @@ import {
 } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
@@ -51,6 +50,7 @@ let organizationId: string;
 let teamId: string;
 let adminUserId: string;
 let memberUserId: string;
+let testApp: App;
 
 beforeAll(async () => {
   const organization = await prisma.organization.create({
@@ -124,8 +124,7 @@ afterAll(async () => {
 });
 
 async function configureApp(plan: PlanInfo) {
-  await resetApp();
-  globalForApp.__langwatch_app = createTestApp({
+  testApp = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,
     }),
@@ -134,7 +133,8 @@ async function configureApp(plan: PlanInfo) {
 
 function callerFor(userId: string) {
   const ctx = createInnerTRPCContext({
-    session: { user: { id: userId }, expires: "1" } as any,
+    app: testApp,
+    session: { user: { id: userId }, expires: "1" },
   });
   return appRouter.createCaller(ctx);
 }
@@ -280,13 +280,13 @@ describe("license-gate on governance backend", () => {
     });
 
     describe("service-layer defense-in-depth", () => {
-      it("rejects direct IngestionSourceService.createSource over the non-enterprise cap", async () => {
-        const service = IngestionSourceService.create(prisma);
+      it("rejects direct GovernanceService.ingestionSourceCreate over the non-enterprise cap", async () => {
+        const service = testApp.governance;
         // Seed the cap so the next call trips the defense-in-depth gate
         // regardless of entry point (this catches non-tRPC callers like
         // background workers + webhook adapters).
         for (let i = 0; i < NON_ENTERPRISE_INGESTION_SOURCE_CAP; i++) {
-          await service.createSource({
+          await service.ingestionSourceCreate({
             organizationId,
             sourceType: "otel_generic",
             name: `service-direct-seed-${i}`,
@@ -294,7 +294,7 @@ describe("license-gate on governance backend", () => {
           });
         }
         await expect(
-          service.createSource({
+          service.ingestionSourceCreate({
             organizationId,
             sourceType: "otel_generic",
             name: "service-direct-blocked",
@@ -343,9 +343,9 @@ describe("license-gate on governance backend", () => {
       expect(result).toBeDefined();
     });
 
-    it("service-layer createSource succeeds when plan is Enterprise", async () => {
-      const service = IngestionSourceService.create(prisma);
-      const { source, ingestSecret } = await service.createSource({
+    it("GovernanceService.ingestionSourceCreate succeeds when plan is Enterprise", async () => {
+      const service = testApp.governance;
+      const { source, ingestSecret } = await service.ingestionSourceCreate({
         organizationId,
         sourceType: "otel_generic",
         name: `service-direct-allowed-${ns}`,

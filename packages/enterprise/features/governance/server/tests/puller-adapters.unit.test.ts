@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { HttpPollingPullerAdapter } from "../src/adapters/http-poller.http-poller.adapter";
-import { S3PollingPullerAdapter } from "../src/adapters/s3-puller.s3-puller.adapter";
+import { HttpPollingPullerAdapter } from "../src/adapters/http-poller.adapter";
+import { S3PollingPullerAdapter } from "../src/adapters/s3-puller.adapter";
 import {
   GovernanceHttpPort,
   type GovernanceHttpResponse,

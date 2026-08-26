@@ -49,8 +49,3 @@ export const governanceSetupStateSchema = z
   })
   .strict();
 export type GovernanceSetupState = z.infer<typeof governanceSetupStateSchema>;
-
-/** Process-owned read capability for Governance persona/setup detection. */
-export abstract class GovernanceSetupStateService {
-  abstract resolve(organizationId: string): Promise<GovernanceSetupState>;
-}

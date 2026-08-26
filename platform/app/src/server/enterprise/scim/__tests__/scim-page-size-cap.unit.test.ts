@@ -13,47 +13,8 @@
  * because either one alone can be right while the pair disagrees.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const { listUsers, listGroups, verifyEntitled } = vi.hoisted(() => ({
-  listUsers: vi.fn(),
-  listGroups: vi.fn(),
-  verifyEntitled: vi.fn(),
-}));
-
-// The declared permission seam resolves its service from the App.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
-  return appPermissionsMock();
-});
-
-vi.mock("~/server/db", () => ({ prisma: {} }));
-
-vi.mock("~/runtime/app/features/scim", () => ({
-  CREATE_GROUP: {},
-  CREATE_USER: {},
-  DELETE_GROUP: {},
-  DELETE_USER: {},
-  GET_GROUP: {},
-  GET_SERVICE_PROVIDER_CONFIG: {},
-  GET_USER: {},
-  LIST_GROUPS: {},
-  LIST_RESOURCE_TYPES: {},
-  LIST_SCHEMAS: {},
-  LIST_USERS: {},
-  PATCH_GROUP: {},
-  PATCH_USER: {},
-  REPLACE_GROUP: {},
-  REPLACE_USER: {},
-  createScimTokenService: () => ({ verifyEntitled }),
-}));
-
-vi.mock("../scim.service", () => ({
-  ScimService: { create: () => ({ listUsers }) },
-}));
-
-vi.mock("../scim-group.service", () => ({
-  ScimGroupService: { create: () => ({ listGroups }) },
-}));
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
+import { createTestApp } from "~/server/app-layer/presets";
 
 import { app } from "../routes";
 
@@ -66,33 +27,40 @@ const EMPTY_PAGE = {
   Resources: [],
 };
 
+const requestApp = createTestApp();
+const request = (path: string, init?: RequestInit) =>
+  app.request(path, init, appContextBindingsFor(requestApp));
+
 beforeEach(() => {
-  vi.clearAllMocks();
-  verifyEntitled.mockResolvedValue({ status: "ok", organizationId: "org_1" });
-  listUsers.mockResolvedValue(EMPTY_PAGE);
-  listGroups.mockResolvedValue(EMPTY_PAGE);
+  vi.restoreAllMocks();
+  vi.spyOn(requestApp.scim, "verifyToken").mockResolvedValue({
+    status: "ok",
+    organizationId: "org_1",
+  });
+  vi.spyOn(requestApp.scim, "listUsers").mockResolvedValue(EMPTY_PAGE);
+  vi.spyOn(requestApp.scim, "listGroups").mockResolvedValue(EMPTY_PAGE);
 });
 
 describe("SCIM list pagination", () => {
   describe("given a count above the published maximum", () => {
     it("serves /Users at the cap rather than the number asked for", async () => {
-      const response = await app.request("/api/scim/v2/Users?count=1000000", {
+      const response = await request("/api/scim/v2/Users?count=1000000", {
         headers: AUTH,
       });
 
       expect(response.status).toBe(200);
-      expect(listUsers).toHaveBeenCalledWith(
+      expect(requestApp.scim.listUsers).toHaveBeenCalledWith(
         expect.objectContaining({ count: 100, startIndex: 1 }),
       );
     });
 
     it("serves /Groups at the cap rather than the number asked for", async () => {
-      const response = await app.request("/api/scim/v2/Groups?count=1000000", {
+      const response = await request("/api/scim/v2/Groups?count=1000000", {
         headers: AUTH,
       });
 
       expect(response.status).toBe(200);
-      expect(listGroups).toHaveBeenCalledWith(
+      expect(requestApp.scim.listGroups).toHaveBeenCalledWith(
         expect.objectContaining({ count: 100, startIndex: 1 }),
       );
     });
@@ -100,23 +68,27 @@ describe("SCIM list pagination", () => {
 
   describe("given a count below the published maximum", () => {
     it("serves the page size the caller asked for", async () => {
-      await app.request("/api/scim/v2/Users?count=25", { headers: AUTH });
+      await request("/api/scim/v2/Users?count=25", { headers: AUTH });
 
-      expect(listUsers).toHaveBeenCalledWith(expect.objectContaining({ count: 25 }));
+      expect(requestApp.scim.listUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ count: 25 }),
+      );
     });
   });
 
   describe("given no count at all", () => {
     it("falls back to the published maximum", async () => {
-      await app.request("/api/scim/v2/Users", { headers: AUTH });
+      await request("/api/scim/v2/Users", { headers: AUTH });
 
-      expect(listUsers).toHaveBeenCalledWith(expect.objectContaining({ count: 100 }));
+      expect(requestApp.scim.listUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ count: 100 }),
+      );
     });
   });
 
   describe("given ServiceProviderConfig is read", () => {
     it("publishes the same maximum the list handlers apply", async () => {
-      const response = await app.request("/api/scim/v2/ServiceProviderConfig");
+      const response = await request("/api/scim/v2/ServiceProviderConfig");
 
       const body = (await response.json()) as {
         filter: { maxResults: number };

@@ -11,13 +11,15 @@ cannot silently acquire API routes or browser feature dependencies.
 
 ## Decision
 
-`@langwatch/enterprise-worker` exports a class with `static create` and begins
-as an empty role-specific shell over the portable Enterprise catalogue.
+`@langwatch/enterprise-worker` exports a class with `static create` and
+Enterprise-owned worker installers. Workers receive their process-owned
+database and service dependencies explicitly at boot.
 
 ## Public surfaces and transports
 
-The package exposes composition state only. Queue consumers, jobs, and event
-handlers remain owned by the server feature packages that implement them.
+The package exposes composition state and worker installers. Queue consumers,
+jobs, and event handlers remain feature-owned and are started only by the
+physical worker application.
 
 ## Dependencies
 

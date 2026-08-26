@@ -12,25 +12,9 @@
  * - GET              /api/scim/v2/ServiceProviderConfig
  */
 
+import { scimTransportOperations } from "~/runtime/app/scim/scim-transport.adapter";
 import {
-  CREATE_GROUP,
-  CREATE_USER,
-  DELETE_GROUP,
-  DELETE_USER,
-  GET_GROUP,
-  GET_SERVICE_PROVIDER_CONFIG,
-  GET_USER,
-  LIST_GROUPS,
-  LIST_RESOURCE_TYPES,
-  LIST_SCHEMAS,
-  LIST_USERS,
-  PATCH_GROUP,
-  PATCH_USER,
-  REPLACE_GROUP,
-  REPLACE_USER,
-} from "~/runtime/app/features/scim";
-import {
-  isScimError,
+  ScimProtocolError,
   scimCreateGroupRequestSchema,
   scimCreateUserRequestSchema,
   scimPatchRequestSchema,
@@ -40,10 +24,6 @@ import type { Context, MiddlewareHandler } from "hono";
 import { describeRoute } from "hono-openapi";
 import { ENTERPRISE_FEATURE_ERRORS } from "~/server/api/enterprise";
 import { createServiceApp, internalSecret, publicEndpoint } from "~/server/api/security";
-import { prisma } from "~/server/db";
-import { ScimGroupService } from "./scim-group.service";
-import { ScimService } from "./scim.service";
-import { createScimTokenService } from "~/runtime/app/features/scim";
 
 /** The organization the bearer credential resolved to, set by {@link scimAuth}. */
 type ScimEnv = { Variables: { scimOrganizationId: string } };
@@ -108,8 +88,7 @@ const scimAuth: MiddlewareHandler<ScimEnv> = async (c, next) => {
   }
 
   const token = authHeader.slice(7);
-  const tokenService = createScimTokenService();
-  const result = await tokenService.verifyEntitled({ token });
+  const result = await c.app.scim.verifyToken({ token });
 
   if (result.status === "invalid_token") {
     return scimError(c, 401, "Bearer token is not valid");
@@ -131,6 +110,15 @@ const secured = createServiceApp<ScimEnv>({
   // own `public` classification: the override renames the app's secret, and
   // discovery is reached without it.
   credentialClass: "scim_token",
+});
+
+// The service is value-or-throw; this transport is the sole place that turns
+// a typed protocol failure back into the RFC 7644 Error resource.
+secured.hono.onError((error, c) => {
+  if (error instanceof ScimProtocolError) {
+    return scimJson(c, error.response, Number(error.response.status));
+  }
+  throw error;
 });
 
 const SCIM_POLICY = internalSecret(
@@ -175,68 +163,76 @@ function pageSizeQuery(raw: string | undefined) {
 
 secured
   .access(SCIM_DISCOVERY_POLICY)
-  .get("/ServiceProviderConfig", describeRoute(GET_SERVICE_PROVIDER_CONFIG), (c) => {
-    return c.json({
-      schemas: ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
-      documentationUri: "https://docs.langwatch.ai/scim",
-      patch: { supported: true },
-      bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
-      filter: { supported: true, maxResults: MAX_PAGE_SIZE },
-      changePassword: { supported: false },
-      sort: { supported: false },
-      etag: { supported: false },
-      authenticationSchemes: [
-        {
-          type: "oauthbearertoken",
-          name: "OAuth Bearer Token",
-          description: "Authentication scheme using the OAuth Bearer Token standard",
-        },
-      ],
-    });
-  });
+  .get(
+    "/ServiceProviderConfig",
+    describeRoute(scimTransportOperations.getServiceProviderConfig),
+    (c) => {
+      return c.json({
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
+        documentationUri: "https://docs.langwatch.ai/scim",
+        patch: { supported: true },
+        bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
+        filter: { supported: true, maxResults: MAX_PAGE_SIZE },
+        changePassword: { supported: false },
+        sort: { supported: false },
+        etag: { supported: false },
+        authenticationSchemes: [
+          {
+            type: "oauthbearertoken",
+            name: "OAuth Bearer Token",
+            description: "Authentication scheme using the OAuth Bearer Token standard",
+          },
+        ],
+      });
+    },
+  );
 
 // ── ResourceTypes ────────────────────────────────────────────────────
 
 secured
   .access(SCIM_DISCOVERY_POLICY)
-  .get("/ResourceTypes", describeRoute(LIST_RESOURCE_TYPES), (c) => {
-    return c.json({
-      schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-      totalResults: 2,
-      itemsPerPage: 2,
-      startIndex: 1,
-      Resources: [
-        {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
-          id: "User",
-          name: "User",
-          endpoint: "/api/scim/v2/Users",
-          schema: "urn:ietf:params:scim:schemas:core:2.0:User",
-          meta: {
-            resourceType: "ResourceType",
-            location: "/api/scim/v2/ResourceTypes/User",
+  .get(
+    "/ResourceTypes",
+    describeRoute(scimTransportOperations.listResourceTypes),
+    (c) => {
+      return c.json({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+        totalResults: 2,
+        itemsPerPage: 2,
+        startIndex: 1,
+        Resources: [
+          {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+            id: "User",
+            name: "User",
+            endpoint: "/api/scim/v2/Users",
+            schema: "urn:ietf:params:scim:schemas:core:2.0:User",
+            meta: {
+              resourceType: "ResourceType",
+              location: "/api/scim/v2/ResourceTypes/User",
+            },
           },
-        },
-        {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
-          id: "Group",
-          name: "Group",
-          endpoint: "/api/scim/v2/Groups",
-          schema: "urn:ietf:params:scim:schemas:core:2.0:Group",
-          meta: {
-            resourceType: "ResourceType",
-            location: "/api/scim/v2/ResourceTypes/Group",
+          {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+            id: "Group",
+            name: "Group",
+            endpoint: "/api/scim/v2/Groups",
+            schema: "urn:ietf:params:scim:schemas:core:2.0:Group",
+            meta: {
+              resourceType: "ResourceType",
+              location: "/api/scim/v2/ResourceTypes/Group",
+            },
           },
-        },
-      ],
-    });
-  });
+        ],
+      });
+    },
+  );
 
 // ── Schemas ──────────────────────────────────────────────────────────
 
 secured
   .access(SCIM_DISCOVERY_POLICY)
-  .get("/Schemas", describeRoute(LIST_SCHEMAS), (c) => {
+  .get("/Schemas", describeRoute(scimTransportOperations.listSchemas), (c) => {
     return c.json({
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: 2,
@@ -362,218 +358,206 @@ secured
 
 // ── Users ────────────────────────────────────────────────────────────
 
-secured.access(SCIM_POLICY).get("/Users", describeRoute(LIST_USERS), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
+secured
+  .access(SCIM_POLICY)
+  .get("/Users", describeRoute(scimTransportOperations.listUsers), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
 
-  const scimService = ScimService.create({ prisma });
+    const scimService = c.app.scim;
 
-  const filter = c.req.query("filter") ?? undefined;
-  const startIndex = positiveIntegerQuery(c.req.query("startIndex"), 1);
-  const count = pageSizeQuery(c.req.query("count"));
+    const filter = c.req.query("filter") ?? undefined;
+    const startIndex = positiveIntegerQuery(c.req.query("startIndex"), 1);
+    const count = pageSizeQuery(c.req.query("count"));
 
-  const result = await scimService.listUsers({
-    organizationId,
-    filter,
-    startIndex,
-    count,
+    const result = await scimService.listUsers({
+      organizationId,
+      filter,
+      startIndex,
+      count,
+    });
+
+    return scimJson(c, result);
   });
-
-  return scimJson(c, result);
-});
-
-secured.access(SCIM_POLICY).post("/Users", describeRoute(CREATE_USER), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
-
-  const scimService = ScimService.create({ prisma });
-
-  const body = await parseJsonBody(c);
-  if (body === null) {
-    return scimError(c, 400, "Invalid JSON in request body");
-  }
-
-  const parsed = scimCreateUserRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return scimError(c, 400, parsed.error.message);
-  }
-
-  const result = await scimService.createUser({
-    request: parsed.data,
-    organizationId,
-  });
-
-  if (isScimError(result)) {
-    return scimJson(c, result, parseInt(result.status, 10));
-  }
-
-  return scimJson(c, result, 201);
-});
-
-secured.access(SCIM_POLICY).get("/Users/:id", describeRoute(GET_USER), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
-
-  const { id } = c.req.param();
-  const scimService = ScimService.create({ prisma });
-
-  const result = await scimService.getUser({ id, organizationId });
-
-  if (isScimError(result)) {
-    return scimJson(c, result, parseInt(result.status, 10));
-  }
-
-  return scimJson(c, result);
-});
-
-secured.access(SCIM_POLICY).put("/Users/:id", describeRoute(REPLACE_USER), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
-
-  const { id } = c.req.param();
-  const scimService = ScimService.create({ prisma });
-
-  const body = await parseJsonBody(c);
-  if (body === null) {
-    return scimError(c, 400, "Invalid JSON in request body");
-  }
-
-  const parsed = scimCreateUserRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return scimError(c, 400, parsed.error.message);
-  }
-
-  const result = await scimService.replaceUser({
-    id,
-    organizationId,
-    request: parsed.data,
-  });
-
-  if (isScimError(result)) {
-    return scimJson(c, result, parseInt(result.status, 10));
-  }
-
-  return scimJson(c, result);
-});
-
-secured.access(SCIM_POLICY).patch("/Users/:id", describeRoute(PATCH_USER), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
-
-  const { id } = c.req.param();
-  const scimService = ScimService.create({ prisma });
-
-  const body = await parseJsonBody(c);
-  if (body === null) {
-    return scimError(c, 400, "Invalid JSON in request body");
-  }
-
-  const parsed = scimPatchRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return scimError(c, 400, parsed.error.message);
-  }
-
-  const result = await scimService.updateUser({
-    id,
-    organizationId,
-    patchRequest: parsed.data,
-  });
-
-  if (isScimError(result)) {
-    return scimJson(c, result, parseInt(result.status, 10));
-  }
-
-  return scimJson(c, result);
-});
 
 secured
   .access(SCIM_POLICY)
-  .delete("/Users/:id", describeRoute(DELETE_USER), async (c) => {
+  .post("/Users", describeRoute(scimTransportOperations.createUser), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
+
+    const scimService = c.app.scim;
+
+    const body = await parseJsonBody(c);
+    if (body === null) {
+      return scimError(c, 400, "Invalid JSON in request body");
+    }
+
+    const parsed = scimCreateUserRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return scimError(c, 400, parsed.error.message);
+    }
+
+    const result = await scimService.createUser({
+      request: parsed.data,
+      organizationId,
+    });
+
+    return scimJson(c, result, 201);
+  });
+
+secured
+  .access(SCIM_POLICY)
+  .get("/Users/:id", describeRoute(scimTransportOperations.getUser), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
-    const scimService = ScimService.create({ prisma });
+    const scimService = c.app.scim;
 
-    const result = await scimService.deleteUser({ id, organizationId });
+    const result = await scimService.getUser({ id, organizationId });
 
-    if (result && isScimError(result)) {
-      return scimJson(c, result, parseInt(result.status, 10));
+    return scimJson(c, result);
+  });
+
+secured
+  .access(SCIM_POLICY)
+  .put("/Users/:id", describeRoute(scimTransportOperations.replaceUser), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
+
+    const { id } = c.req.param();
+    const scimService = c.app.scim;
+
+    const body = await parseJsonBody(c);
+    if (body === null) {
+      return scimError(c, 400, "Invalid JSON in request body");
     }
+
+    const parsed = scimCreateUserRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return scimError(c, 400, parsed.error.message);
+    }
+
+    const result = await scimService.replaceUser({
+      id,
+      organizationId,
+      request: parsed.data,
+    });
+
+    return scimJson(c, result);
+  });
+
+secured
+  .access(SCIM_POLICY)
+  .patch("/Users/:id", describeRoute(scimTransportOperations.patchUser), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
+
+    const { id } = c.req.param();
+    const scimService = c.app.scim;
+
+    const body = await parseJsonBody(c);
+    if (body === null) {
+      return scimError(c, 400, "Invalid JSON in request body");
+    }
+
+    const parsed = scimPatchRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return scimError(c, 400, parsed.error.message);
+    }
+
+    const result = await scimService.updateUser({
+      id,
+      organizationId,
+      patchRequest: parsed.data,
+    });
+
+    return scimJson(c, result);
+  });
+
+secured
+  .access(SCIM_POLICY)
+  .delete("/Users/:id", describeRoute(scimTransportOperations.deleteUser), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
+
+    const { id } = c.req.param();
+    const scimService = c.app.scim;
+
+    await scimService.deleteUser({ id, organizationId });
 
     return c.body(null, 204);
   });
 
 // ── Groups ───────────────────────────────────────────────────────────
 
-secured.access(SCIM_POLICY).get("/Groups", describeRoute(LIST_GROUPS), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
+secured
+  .access(SCIM_POLICY)
+  .get("/Groups", describeRoute(scimTransportOperations.listGroups), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
 
-  const service = ScimGroupService.create({ prisma });
+    const service = c.app.scim;
 
-  const excludedAttributes = (c.req.query("excludedAttributes") ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+    const excludedAttributes = (c.req.query("excludedAttributes") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-  const result = await service.listGroups({
-    organizationId,
-    filter: c.req.query("filter") ?? undefined,
-    startIndex: positiveIntegerQuery(c.req.query("startIndex"), 1),
-    count: pageSizeQuery(c.req.query("count")),
-    excludeMembers: excludedAttributes.includes("members"),
+    const result = await service.listGroups({
+      organizationId,
+      filter: c.req.query("filter") ?? undefined,
+      startIndex: positiveIntegerQuery(c.req.query("startIndex"), 1),
+      count: pageSizeQuery(c.req.query("count")),
+      excludeMembers: excludedAttributes.includes("members"),
+    });
+
+    return scimJson(c, result);
   });
-
-  return scimJson(c, result);
-});
-
-secured.access(SCIM_POLICY).post("/Groups", describeRoute(CREATE_GROUP), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
-
-  const service = ScimGroupService.create({ prisma });
-
-  const body = await parseJsonBody(c);
-  if (body === null) {
-    return scimError(c, 400, "Invalid JSON");
-  }
-
-  const parsed = scimCreateGroupRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return scimError(c, 400, parsed.error.message);
-  }
-
-  const result = await service.createGroup({
-    request: parsed.data,
-    organizationId,
-  });
-
-  if (isScimError(result)) {
-    return scimJson(c, result, parseInt(result.status, 10));
-  }
-
-  return scimJson(c, result, 201);
-});
-
-secured.access(SCIM_POLICY).get("/Groups/:id", describeRoute(GET_GROUP), async (c) => {
-  const organizationId = c.get("scimOrganizationId");
-
-  const { id } = c.req.param();
-
-  const excludedAttributes = (c.req.query("excludedAttributes") ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const result = await ScimGroupService.create({ prisma }).getGroup({
-    externalScimId: id,
-    organizationId,
-    excludeMembers: excludedAttributes.includes("members"),
-  });
-
-  if (isScimError(result)) {
-    return scimJson(c, result, parseInt(result.status, 10));
-  }
-
-  return scimJson(c, result);
-});
 
 secured
   .access(SCIM_POLICY)
-  .put("/Groups/:id", describeRoute(REPLACE_GROUP), async (c) => {
+  .post("/Groups", describeRoute(scimTransportOperations.createGroup), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
+
+    const service = c.app.scim;
+
+    const body = await parseJsonBody(c);
+    if (body === null) {
+      return scimError(c, 400, "Invalid JSON");
+    }
+
+    const parsed = scimCreateGroupRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return scimError(c, 400, parsed.error.message);
+    }
+
+    const result = await service.createGroup({
+      request: parsed.data,
+      organizationId,
+    });
+
+    return scimJson(c, result, 201);
+  });
+
+secured
+  .access(SCIM_POLICY)
+  .get("/Groups/:id", describeRoute(scimTransportOperations.getGroup), async (c) => {
+    const organizationId = c.get("scimOrganizationId");
+
+    const { id } = c.req.param();
+
+    const excludedAttributes = (c.req.query("excludedAttributes") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const result = await c.app.scim.getGroup({
+      externalScimId: id,
+      organizationId,
+      excludeMembers: excludedAttributes.includes("members"),
+    });
+
+    return scimJson(c, result);
+  });
+
+secured
+  .access(SCIM_POLICY)
+  .put("/Groups/:id", describeRoute(scimTransportOperations.replaceGroup), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
@@ -588,22 +572,18 @@ secured
       return scimError(c, 400, parsed.error.message);
     }
 
-    const result = await ScimGroupService.create({ prisma }).replaceGroup({
+    const result = await c.app.scim.replaceGroup({
       externalScimId: id,
       organizationId,
       request: parsed.data,
     });
-
-    if (isScimError(result)) {
-      return scimJson(c, result, parseInt(result.status, 10));
-    }
 
     return scimJson(c, result);
   });
 
 secured
   .access(SCIM_POLICY)
-  .patch("/Groups/:id", describeRoute(PATCH_GROUP), async (c) => {
+  .patch("/Groups/:id", describeRoute(scimTransportOperations.patchGroup), async (c) => {
     const organizationId = c.get("scimOrganizationId");
 
     const { id } = c.req.param();
@@ -618,35 +598,31 @@ secured
       return scimError(c, 400, parsed.error.message);
     }
 
-    const result = await ScimGroupService.create({ prisma }).updateGroup({
+    const result = await c.app.scim.updateGroup({
       externalScimId: id,
       organizationId,
       patchRequest: parsed.data,
     });
-
-    if (isScimError(result)) {
-      return scimJson(c, result, parseInt(result.status, 10));
-    }
 
     return scimJson(c, result);
   });
 
 secured
   .access(SCIM_POLICY)
-  .delete("/Groups/:id", describeRoute(DELETE_GROUP), async (c) => {
-    const organizationId = c.get("scimOrganizationId");
+  .delete(
+    "/Groups/:id",
+    describeRoute(scimTransportOperations.deleteGroup),
+    async (c) => {
+      const organizationId = c.get("scimOrganizationId");
 
-    const { id } = c.req.param();
-    const result = await ScimGroupService.create({ prisma }).deleteGroup({
-      externalScimId: id,
-      organizationId,
-    });
+      const { id } = c.req.param();
+      await c.app.scim.deleteGroup({
+        externalScimId: id,
+        organizationId,
+      });
 
-    if (result && isScimError(result)) {
-      return scimJson(c, result, parseInt(result.status, 10));
-    }
-
-    return c.body(null, 204);
-  });
+      return c.body(null, 204);
+    },
+  );
 
 export const app = secured.hono;

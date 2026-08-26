@@ -1,6 +1,5 @@
 import {
   ADMIN_WORKSPACE_VIEW_DEDUP_MS,
-  GovernanceAdminWorkspaceViewAuditService,
   type AdminWorkspaceKind,
   type RecordWorkspaceViewInput,
   type RecordWorkspaceViewResult,
@@ -18,7 +17,7 @@ const skipped = (): RecordWorkspaceViewResult => ({
   auditLogId: null,
 });
 
-export class DefaultGovernanceAdminWorkspaceViewAuditService extends GovernanceAdminWorkspaceViewAuditService {
+export class DefaultGovernanceAdminWorkspaceViewAuditService {
   private constructor(
     private readonly repository: AdminWorkspaceViewAuditRepository,
     private readonly options: {
@@ -28,7 +27,6 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService extends GovernanceA
       clock: () => number;
     },
   ) {
-    super();
   }
 
   static create(options: {

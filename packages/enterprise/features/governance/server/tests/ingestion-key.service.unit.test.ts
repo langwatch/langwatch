@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   IngestionKeyIssuerPort,
   IngestionKeyRepository,
 } from "../src/ports/ingestion-source-key.port";
-import { OrganizationService } from "@langwatch/organization-contract";
 import { IngestionKeyService } from "../src/services/ingestion-source-key.service";
+import { TestOrganizationService } from "./support/test-organization-service";
 
 class FakeIngestionKeyRepository extends IngestionKeyRepository {
   prior: Awaited<ReturnType<IngestionKeyRepository["tryFindIngestKey"]>> = null;
@@ -23,30 +24,13 @@ class FakeIngestionKeyIssuer extends IngestionKeyIssuerPort {
   });
 }
 
-class FakeOrganizations extends OrganizationService {
+class FakeOrganizations extends TestOrganizationService {
   projectId: string | null = "project-personal";
-  getOldestTeamId = unsupported<OrganizationService["getOldestTeamId"]>();
-  getBillingProfile = unsupported<OrganizationService["getBillingProfile"]>();
-  claimBillingCustomerId = unsupported<OrganizationService["claimBillingCustomerId"]>();
-  ensurePersonalWorkspace = unsupported<OrganizationService["ensurePersonalWorkspace"]>();
-  getPersonalWorkspaceFeatures =
-    unsupported<OrganizationService["getPersonalWorkspaceFeatures"]>();
-  enableAllPersonalWorkspaceFeatures =
-    unsupported<OrganizationService["enableAllPersonalWorkspaceFeatures"]>();
-  disableAllPersonalWorkspaceFeatures =
-    unsupported<OrganizationService["disableAllPersonalWorkspaceFeatures"]>();
-  getTeam = unsupported<OrganizationService["getTeam"]>();
-  listTeams = unsupported<OrganizationService["listTeams"]>();
-  createTeam = unsupported<OrganizationService["createTeam"]>();
-  updateTeam = unsupported<OrganizationService["updateTeam"]>();
-  archiveTeam = unsupported<OrganizationService["archiveTeam"]>();
-  addTeamMember = unsupported<OrganizationService["addTeamMember"]>();
-  removeTeamMember = unsupported<OrganizationService["removeTeamMember"]>();
 
-  async tryFindPersonalWorkspace(): Promise<
+  tryFindPersonalWorkspace = async (): Promise<
     Awaited<ReturnType<OrganizationService["tryFindPersonalWorkspace"]>>
-  > {
-    return this.projectId
+  > =>
+    this.projectId
       ? {
           team: { id: "team", name: "Mine", slug: "mine", createdAtMs: 1 },
           project: {
@@ -58,11 +42,6 @@ class FakeOrganizations extends OrganizationService {
           },
         }
       : null;
-  }
-}
-
-function unsupported<Method>(): Method {
-  return (() => Promise.reject(new Error("not used by this test"))) as Method;
 }
 
 describe("IngestionKeyService", () => {

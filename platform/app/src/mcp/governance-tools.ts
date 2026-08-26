@@ -150,9 +150,6 @@ export function registerGovernanceMcpTools(
     return null;
   };
 
-  const templateService = ctx.governance.ingestionTemplates;
-  const ingestionKeyService = ctx.governance.ingestionKeys;
-
   const text = (value: string) => ({
     content: [{ type: "text" as const, text: value }],
   });
@@ -168,7 +165,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requireRead(r, "aiTools:view");
       if (denied) return text(denied);
-      const rows = await templateService.listForUser({
+      const rows = await ctx.governance.templateListForUser({
         organizationId: r.organizationId,
       });
       return json(rows);
@@ -186,7 +183,7 @@ export function registerGovernanceMcpTools(
       // sessions without a user identity are rejected, not silently allowed.
       const denied = await requirePermission(r, "aiTools:manage");
       if (denied) return text(denied);
-      const rows = await templateService.listForOrgAdmin({
+      const rows = await ctx.governance.templateListForOrgAdmin({
         organizationId: r.organizationId,
       });
       return json(rows);
@@ -201,7 +198,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requireRead(r, "aiTools:view");
       if (denied) return text(denied);
-      const row = await templateService.tryFindByIdForOrg({
+      const row = await ctx.governance.tryFindTemplateByIdForOrg({
         id,
         organizationId: r.organizationId,
       });
@@ -228,7 +225,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "aiTools:manage");
       if (denied) return text(denied);
-      const row = await templateService.createOrgTemplate({
+      const row = await ctx.governance.templateCreateOrg({
         organizationId: r.organizationId,
         callerUserId: r.callerUserId!,
         sourceType: input.source_type,
@@ -254,7 +251,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "aiTools:manage");
       if (denied) return text(denied);
-      const row = await templateService.updateOttlRules({
+      const row = await ctx.governance.templateUpdateOttlRules({
         id,
         organizationId: r.organizationId,
         callerUserId: r.callerUserId!,
@@ -273,7 +270,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "aiTools:manage");
       if (denied) return text(denied);
-      const row = await templateService.cloneFromPlatform({
+      const row = await ctx.governance.templateCloneFromPlatform({
         sourceTemplateId: source_template_id,
         organizationId: r.organizationId,
         callerUserId: r.callerUserId!,
@@ -291,7 +288,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "aiTools:manage");
       if (denied) return text(denied);
-      await templateService.archiveOrgTemplate({
+      await ctx.governance.templateArchiveOrg({
         id,
         organizationId: r.organizationId,
         callerUserId: r.callerUserId!,
@@ -316,7 +313,7 @@ export function registerGovernanceMcpTools(
       }
       const denied = await requireRead(r, "organization:view");
       if (denied) return text(denied);
-      const rows = await ingestionKeyService.listForPersonalProject({
+      const rows = await ctx.governance.ingestionKeyListForPersonalProject({
         userId: r.callerUserId,
         organizationId: r.organizationId,
       });
@@ -335,7 +332,7 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requirePermission(r, "organization:view");
       if (denied) return text(denied);
-      const result = await ingestionKeyService.ensureForPersonalProject({
+      const result = await ctx.governance.ingestionKeyEnsureForPersonalProject({
         userId: r.callerUserId!,
         organizationId: r.organizationId,
         sourceType: source_type,

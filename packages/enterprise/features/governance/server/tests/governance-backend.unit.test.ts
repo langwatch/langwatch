@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PostgresGovernanceAdapter } from "../src/adapters/postgres.governance.adapter";
+import { PostgresGovernanceAdapter } from "../src/adapters/postgres-governance.adapter";
 import { GovernanceEncryptionPort } from "../src/ports/governance-encryption.port";
 import { CostAttributionPolicyRepository } from "../src/repositories/cost-attribution-policy.repository";
 import { CanonicalCostExtractorService } from "../src/services/canonical-cost-extractor.service";

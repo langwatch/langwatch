@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { NotFoundError } from "@langwatch/handled-error";
+import type { ScimError } from "./scim.contract";
+
+/** A SCIM protocol failure; transports render its stable SCIM Error resource. */
+export class ScimProtocolError extends Error {
+  constructor(readonly response: ScimError) {
+    super(response.detail);
+    this.name = "ScimProtocolError";
+  }
+}
 
 /**
  * The SCIM token id does not exist in the caller's organization, or was

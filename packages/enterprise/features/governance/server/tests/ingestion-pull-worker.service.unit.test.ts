@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  ProjectService,
-  type InternalProject,
-  type InternalProjectQuery,
+import type {
+  InternalProject,
+  InternalProjectQuery,
 } from "@langwatch/project-contract";
 import type {
   GovernanceIngestionSource,
@@ -29,6 +28,7 @@ import { PulledUsagePricingService } from "../src/services/pulled-usage-pricing.
 import { PulledUsageRecordService } from "../src/services/pulled-usage-record.service";
 import { PullerRegistryService } from "../src/services/puller-registry.service";
 import { PulledUsageRatePort } from "../src/ports/pulled-usage-rate.port";
+import { TestProjectService } from "./support/test-project-service";
 
 function ingestionSource(
   overrides: Partial<GovernanceIngestionSource> = {},
@@ -88,13 +88,10 @@ class FakeSources extends IngestionPullSourcePort {
   }
 }
 
-class FakeProjects extends ProjectService {
-  async tryFindInternal(_input: InternalProjectQuery): Promise<InternalProject | null> {
-    return null;
-  }
+class FakeProjects extends TestProjectService {
+  tryFindInternal = async (_input: InternalProjectQuery): Promise<InternalProject | null> => null;
 
-  async ensureInternal(_input: InternalProjectQuery): Promise<InternalProject> {
-    return {
+  ensureInternal = async (_input: InternalProjectQuery): Promise<InternalProject> => ({
       id: "gov-project",
       name: "Governance (internal)",
       slug: "governance-org",
@@ -102,8 +99,7 @@ class FakeProjects extends ProjectService {
       kind: "internal_governance",
       archivedAtMs: null,
       traceSharingEnabled: false,
-    };
-  }
+  });
 }
 
 class FakeSink extends GovernanceOcsfEventSinkPort {

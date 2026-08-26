@@ -158,34 +158,3 @@ export const sourceHealthMetricsSchema = z
   })
   .strict();
 export type SourceHealthMetrics = z.infer<typeof sourceHealthMetricsSchema>;
-
-export abstract class GovernanceActivityMonitorService {
-  abstract summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
-  abstract spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]>;
-  abstract spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]>;
-  abstract spendByDepartment(
-    input: ActivityMonitorWindowQuery,
-  ): Promise<SpendByDepartmentRow[]>;
-  abstract spendOverTime(input: {
-    organizationId: string;
-    windowDays: number;
-    groupBy: SpendOverTimeGroupBy;
-  }): Promise<SpendOverTimeResult>;
-  abstract recentAnomalies(input: {
-    organizationId: string;
-    limit?: number;
-  }): Promise<RecentAnomalyRow[]>;
-  abstract ingestionSourcesHealth(input: {
-    organizationId: string;
-  }): Promise<IngestionSourceHealthRow[]>;
-  abstract eventsForSource(input: {
-    organizationId: string;
-    sourceId: string;
-    limit?: number;
-    beforeIso?: string;
-  }): Promise<ActivityEventDetailRow[]>;
-  abstract sourceHealthMetrics(input: {
-    organizationId: string;
-    sourceId: string;
-  }): Promise<SourceHealthMetrics>;
-}

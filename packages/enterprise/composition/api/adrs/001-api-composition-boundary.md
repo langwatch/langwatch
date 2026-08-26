@@ -11,8 +11,10 @@ feature packages register themselves or importing worker and web composition.
 
 ## Decision
 
-`@langwatch/enterprise-api` exports a class with `static create` that holds the
-portable catalogue and explicitly supplied API-facing feature capabilities.
+`@langwatch/enterprise-api` exports a class with `static create` and the
+Enterprise-owned API installers. Installers assemble a feature's server graph
+once from explicit application infrastructure adapters; request transports
+receive the resulting feature façade and never construct it.
 
 ## Public surfaces and transports
 
@@ -22,7 +24,8 @@ their HTTP, RPC, validation, and transport-specific public surfaces.
 ## Dependencies
 
 The API composition may depend on portable contracts and Enterprise server
-surfaces, but never worker, web, Prisma, or legacy application aliases.
+surfaces, but never on application aliases. The host supplies physical
+infrastructure through explicit ports at process boot.
 
 ## Persistence
 
@@ -51,5 +54,5 @@ surface checks without introducing a second transport validation layer.
 
 ## Consequences
 
-API assembly becomes discoverable and class-based while existing application
-registration can migrate incrementally without cross-role dependencies.
+API assembly is discoverable, feature-owned and constructed once per process;
+the application retains only the installer call and transports.

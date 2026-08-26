@@ -305,35 +305,3 @@ export class AiToolDepartmentScopeError extends Error {
     this.name = "AiToolDepartmentScopeError";
   }
 }
-
-export abstract class GovernanceAiToolCatalogService {
-  abstract listForUser(input: AiToolMemberInput): Promise<AiToolEntry[]>;
-  abstract listForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]>;
-  abstract tryFindById(input: FindAiToolEntryInput): Promise<AiToolEntry | null>;
-  abstract getById(input: FindAiToolEntryInput): Promise<AiToolEntry>;
-  abstract create(input: CreateAiToolEntryInput): Promise<AiToolEntry>;
-  abstract update(input: UpdateAiToolEntryInput): Promise<AiToolEntry>;
-  abstract remove(input: FindAiToolEntryInput): Promise<AiToolEntry>;
-  abstract ensureDefaultCatalog(
-    input: AiToolOrganizationInput,
-  ): Promise<{ hasSeeded: boolean; created: number }>;
-  abstract seedStarterPack(
-    input: SeedAiToolStarterPackInput,
-  ): Promise<{ created: number; updated: number; skipped: number }>;
-  abstract listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
-  abstract listProviderOptionsForAdmin(
-    input: AiToolOrganizationInput,
-  ): Promise<AiToolProviderOption[]>;
-  abstract listRoutingPolicyOptionsForAdmin(
-    input: AiToolOrganizationInput,
-  ): Promise<Array<{ id: string; name: string }>>;
-  abstract reorder(input: ReorderAiToolEntriesInput): Promise<void>;
-  abstract resolveToolPolicyOverrides(
-    input: AiToolMemberInput,
-  ): Promise<Partial<Record<PlatformToolSlug, PlatformToolPolicy>>>;
-  abstract resolveToolPolicyMap(input: AiToolMemberInput): Promise<PlatformToolPolicyMap>;
-  abstract resolveToolPolicy(
-    input: AiToolMemberInput & { slug: PlatformToolSlug },
-  ): Promise<PlatformToolPolicy>;
-  abstract resolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog>;
-}

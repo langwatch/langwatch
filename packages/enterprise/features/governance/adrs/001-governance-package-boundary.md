@@ -21,9 +21,12 @@ governance policy and enforcement, governance anomalies and audit facts, and
 the operator surfaces that expose those decisions. It also owns the pure
 persona-home policy that chooses between Governance and project homes from
 organisation intent and Governance setup state; the application still owns
-authentication, signal loading and the redirect transport. The ingestion-pull and
-pulled-usage workflows therefore belong to governance rather than to a generic
-Enterprise event-sourcing directory. Governance also owns quarantine-fill rate
+authentication, signal loading and the redirect transport. The ingestion-pull,
+pulled-usage, and governance-signal workflows therefore belong to governance
+rather than to an application event-sourcing directory. Governance-signal
+command identities preserve once-per-lifecycle and once-per-budget-crossing-
+per-period delivery before webhook composition. Governance also owns
+quarantine-fill rate
 and warning policy; project resolution and trace-activity storage remain
 injected capabilities.
 

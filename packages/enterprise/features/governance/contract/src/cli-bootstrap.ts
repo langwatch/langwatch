@@ -45,7 +45,3 @@ export const cliBootstrapResultSchema = z
   })
   .strict();
 export type CliBootstrapResult = z.infer<typeof cliBootstrapResultSchema>;
-
-export abstract class GovernanceCliBootstrapService {
-  abstract resolve(input: CliBootstrapInput): Promise<CliBootstrapResult>;
-}

@@ -24,9 +24,3 @@ export const recordWorkspaceViewResultSchema = z
   })
   .strict();
 export type RecordWorkspaceViewResult = z.infer<typeof recordWorkspaceViewResultSchema>;
-
-export abstract class GovernanceAdminWorkspaceViewAuditService {
-  abstract recordView(
-    input: RecordWorkspaceViewInput,
-  ): Promise<RecordWorkspaceViewResult>;
-}

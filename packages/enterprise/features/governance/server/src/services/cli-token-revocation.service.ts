@@ -1,5 +1,4 @@
 import {
-  GovernanceCliTokenRevocationService,
   type CliUserInput,
   cliAccessTokenKey,
   cliRefreshTokenKey,
@@ -9,12 +8,11 @@ import {
 import type { CliTokenStorePort } from "../ports/cli-token-store.port";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port";
 
-export class DefaultGovernanceCliTokenRevocationService extends GovernanceCliTokenRevocationService {
+export class DefaultGovernanceCliTokenRevocationService {
   private constructor(
     private readonly store: CliTokenStorePort | undefined,
     private readonly diagnostics: GovernanceDiagnosticsPort | undefined,
   ) {
-    super();
   }
 
   static create(options: {

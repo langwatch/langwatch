@@ -13,6 +13,10 @@ This directory is the legal and package ownership root:
   vertical. Licensing currently provides portable contracts and a server
   implementation; it has no separate web implementation.
 
+Billing's Stripe subscription lifecycle, usage-limit notifications, and
+license-purchase workflow live in `features/billing/server`; the application
+keeps only injected provider/mail/notification adapters and route mounting.
+
 Some Enterprise domains remain under `platform/app/ee/` while they are moved
 into this package layout. They remain governed by the Enterprise license in
 this directory through the repository's open-core licensing arrangement.

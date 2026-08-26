@@ -1,15 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  GovernanceRoutingPolicyService,
   NoEligibleProvidersError,
   type PersonalVirtualKey,
 } from "@langwatch/enterprise-governance-contract";
-import { OrganizationService } from "@langwatch/organization-contract";
 import {
   PersonalVirtualKeyIssuerPort,
   PersonalVirtualKeyRepository,
 } from "../src/ports/personal-virtual-key.port";
-import { DefaultGovernancePersonalVirtualKeyService } from "../src/services/personal-virtual-key.service";
+import { DefaultGovernancePersonalVirtualKeyService } from "../src/services/governance-personal-key.service";
+import { TestOrganizationService } from "./support/test-organization-service";
 
 const key: PersonalVirtualKey = {
   id: "key",
@@ -40,23 +39,7 @@ class MemoryIssuer extends PersonalVirtualKeyIssuerPort {
   revoke = vi.fn(async () => key);
 }
 
-class MemoryOrganizations extends OrganizationService {
-  getOldestTeamId = unsupported<OrganizationService["getOldestTeamId"]>();
-  getBillingProfile = unsupported<OrganizationService["getBillingProfile"]>();
-  claimBillingCustomerId = unsupported<OrganizationService["claimBillingCustomerId"]>();
-  getPersonalWorkspaceFeatures =
-    unsupported<OrganizationService["getPersonalWorkspaceFeatures"]>();
-  enableAllPersonalWorkspaceFeatures =
-    unsupported<OrganizationService["enableAllPersonalWorkspaceFeatures"]>();
-  disableAllPersonalWorkspaceFeatures =
-    unsupported<OrganizationService["disableAllPersonalWorkspaceFeatures"]>();
-  getTeam = unsupported<OrganizationService["getTeam"]>();
-  listTeams = unsupported<OrganizationService["listTeams"]>();
-  createTeam = unsupported<OrganizationService["createTeam"]>();
-  updateTeam = unsupported<OrganizationService["updateTeam"]>();
-  archiveTeam = unsupported<OrganizationService["archiveTeam"]>();
-  addTeamMember = unsupported<OrganizationService["addTeamMember"]>();
-  removeTeamMember = unsupported<OrganizationService["removeTeamMember"]>();
+class MemoryOrganizations extends TestOrganizationService {
   ensurePersonalWorkspace = vi.fn(async () => ({
     team: { id: "team", name: "Mine", slug: "mine", createdAtMs: 1 },
     project: {
@@ -71,11 +54,7 @@ class MemoryOrganizations extends OrganizationService {
   tryFindPersonalWorkspace = vi.fn(async () => null);
 }
 
-function unsupported<Method>(): Method {
-  return (() => Promise.reject(new Error("not used by this test"))) as Method;
-}
-
-class MemoryPolicies extends GovernanceRoutingPolicyService {
+class MemoryPolicies {
   list = vi.fn(async () => []);
   tryFindById = vi.fn(async () => null);
   create = vi.fn();

@@ -14,29 +14,31 @@ and product provisioning were coupled in the application Enterprise tree.
 ## Decision
 
 Own SCIM v2 resource contracts and role resolution in a contract package. Own
-credential hashing, entitlement-aware verification, Postgres token persistence,
-and OpenAPI metadata in a server package. Product provisioning remains an app
-composition concern until its core services have portable ports.
+one abstract `ScimService` that owns both provisioning and credential lifecycle.
+The server package provides its Postgres composition and OpenAPI metadata; the
+application composes it once with UserService, GovernanceService,
+AuthzGrantsService, and plans.
 
 ## Public surfaces and transports
 
 The contract exposes Zod 4 resource schemas, DTOs, errors, and role helpers.
-The server exposes class token services/adapters and OpenAPI operation metadata;
-the application owns Hono route registration.
+The server exposes only `PostgresScimAdapter` and OpenAPI operation metadata;
+the application owns thin Hono route registration.
 
 ## Dependencies
 
 The contract depends on handled errors and Zod 4. The server depends on the
-contract, Node crypto, and Hono OpenAPI types only.
+contract, GovernanceService, UserService, AuthzGrantsService, and Node crypto.
+Hono OpenAPI types stay in the transport adapter.
 
 ## Persistence
 
-`PrismaScimTokenRepository` is the only token persistence adapter and consumes
-an injected structural database capability.
+`PrismaScimRepository` is the only persistence adapter and consumes the
+generated Prisma client directly.
 
 ## Runtime and registration
 
-`PostgresScimTokenAdapter.create(...).build()` constructs a service. Packages
+`PostgresScimAdapter.create(...).build()` constructs the singular service. Packages
 perform no route registration, global mutation, or connection at import time.
 
 ## Environment and configuration
@@ -56,5 +58,5 @@ schema URNs.
 
 ## Consequences
 
-REST, RPC, and worker callers may reuse credential semantics without importing
-the app, while Hono provisioning continues to compose app-owned dependencies.
+REST, RPC, webhook, and provisioning callers reuse the process-owned service
+from request App context; no transport creates a service or accesses Prisma.

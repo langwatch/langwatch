@@ -130,13 +130,3 @@ export class RoutingPolicyHasNoProvidersError extends Error {
     this.name = "RoutingPolicyHasNoProvidersError";
   }
 }
-
-export abstract class GovernancePersonalVirtualKeyService {
-  abstract ensureDefault(
-    input: EnsureDefaultPersonalVirtualKeyInput,
-  ): Promise<IssuedPersonalVirtualKey>;
-  abstract issue(input: IssuePersonalVirtualKeyInput): Promise<IssuedPersonalVirtualKey>;
-  abstract list(input: ListPersonalVirtualKeysInput): Promise<PersonalVirtualKey[]>;
-  abstract revoke(input: RevokePersonalVirtualKeyInput): Promise<PersonalVirtualKey>;
-  abstract revokeAllForUser(input: RevokeAllPersonalVirtualKeysInput): Promise<number>;
-}

@@ -21,7 +21,6 @@ import {
   ANOMALY_RULE_SCOPES,
   ANOMALY_RULE_SEVERITIES,
 } from "@langwatch/enterprise-governance-contract";
-import { PostgresAnomalyRuleAdapter } from "@langwatch/enterprise-governance-server";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
@@ -83,10 +82,6 @@ const severitySchema = z.enum(ANOMALY_RULE_SEVERITIES);
 const scopeSchema = z.enum(ANOMALY_RULE_SCOPES);
 const statusSchema = z.enum(["active", "disabled"]);
 
-function createAnomalyRuleService(database: object) {
-  return PostgresAnomalyRuleAdapter.create({ database }).build();
-}
-
 function toDto(row: {
   id: string;
   organizationId: string;
@@ -129,8 +124,7 @@ export const anomalyRulesRouter = createTRPCRouter({
     .permission("anomalyRules:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = createAnomalyRuleService(ctx.prisma);
-      const rows = await service.list(input.organizationId);
+      const rows = await ctx.app.governance.anomalyRuleList(input.organizationId);
       return rows.map(toDto);
     }),
 
@@ -139,8 +133,9 @@ export const anomalyRulesRouter = createTRPCRouter({
     .permission("anomalyRules:view")
     .use(enterpriseGate)
     .query(async ({ ctx, input }) => {
-      const service = createAnomalyRuleService(ctx.prisma);
-      return toDto(await service.getById(input.id, input.organizationId));
+      return toDto(
+        await ctx.app.governance.anomalyRuleGetById(input.id, input.organizationId),
+      );
     }),
 
   create: protectedProcedure
@@ -161,9 +156,8 @@ export const anomalyRulesRouter = createTRPCRouter({
     .permission("anomalyRules:manage")
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
-      const service = createAnomalyRuleService(ctx.prisma);
       try {
-        const created = await service.createRule({
+        const created = await ctx.app.governance.anomalyRuleCreate({
           organizationId: input.organizationId,
           name: input.name,
           description: input.description ?? null,
@@ -201,9 +195,8 @@ export const anomalyRulesRouter = createTRPCRouter({
     .permission("anomalyRules:manage")
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
-      const service = createAnomalyRuleService(ctx.prisma);
       try {
-        const updated = await service.updateRule({
+        const updated = await ctx.app.governance.anomalyRuleUpdate({
           id: input.id,
           organizationId: input.organizationId,
           name: input.name,
@@ -227,8 +220,10 @@ export const anomalyRulesRouter = createTRPCRouter({
     .permission("anomalyRules:manage")
     .use(enterpriseGate)
     .mutation(async ({ ctx, input }) => {
-      const service = createAnomalyRuleService(ctx.prisma);
-      const archived = await service.archive(input.id, input.organizationId);
+      const archived = await ctx.app.governance.anomalyRuleArchive(
+        input.id,
+        input.organizationId,
+      );
       return toDto(archived);
     }),
 });

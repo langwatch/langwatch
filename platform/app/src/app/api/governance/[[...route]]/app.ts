@@ -31,7 +31,6 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { AppContextVariables } from "~/app/api/middleware/app-context";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
-import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -115,15 +114,6 @@ const cloneTemplateSchema = z.object({
 });
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-async function orgIdForProject(projectId: string): Promise<string> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: { team: true },
-  });
-  if (!project) throw new Error(`project ${projectId} missing`);
-  return project.team.organizationId;
-}
 
 function toTemplateDto(row: {
   id: string;
@@ -248,8 +238,8 @@ secured.access(apiKeyPermission("aiTools:view")).get(
   }),
   async (c) => {
     const project = c.get("project");
-    const organizationId = await orgIdForProject(project.id);
-    const rows = await c.var.langwatchApp.governance.ingestionTemplates.listForUser({
+    const organizationId = await c.app.projects.getOrganizationId(project.id);
+    const rows = await c.app.governance.templateListForUser({
       organizationId,
     });
     return c.json({ data: rows.map(toTemplateDto) });
@@ -278,8 +268,8 @@ secured.access(apiKeyPermission("aiTools:manage")).get(
   requireUserBoundCaller,
   async (c) => {
     const project = c.get("project");
-    const organizationId = await orgIdForProject(project.id);
-    const rows = await c.var.langwatchApp.governance.ingestionTemplates.listForOrgAdmin({
+    const organizationId = await c.app.projects.getOrganizationId(project.id);
+    const rows = await c.app.governance.templateListForOrgAdmin({
       organizationId,
     });
     return c.json({ data: rows.map(toTemplateDto) });
@@ -316,8 +306,8 @@ secured.access(apiKeyPermission("aiTools:view")).get(
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const organizationId = await orgIdForProject(project.id);
-    const row = await c.var.langwatchApp.governance.ingestionTemplates.getByIdForOrg({
+    const organizationId = await c.app.projects.getOrganizationId(project.id);
+    const row = await c.app.governance.templateGetByIdForOrg({
       id,
       organizationId,
     });
@@ -366,27 +356,26 @@ secured.access(apiKeyPermission("aiTools:manage")).post(
         400,
       );
     }
-    const organizationId = await orgIdForProject(project.id);
+    const organizationId = await c.app.projects.getOrganizationId(project.id);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      const row =
-        await c.var.langwatchApp.governance.ingestionTemplates.createOrgTemplate({
-          organizationId,
-          callerUserId,
-          sourceType: body.data.source_type,
-          displayName: body.data.display_name,
-          description: body.data.description ?? null,
-          iconAsset: body.data.icon_asset ?? null,
-          credentialSchema:
-            body.data.credential_schema === "otlp_token"
-              ? null
-              : (body.data.credential_schema ?? null),
-          ottlRules: body.data.ottl_rules,
-          surface: resolveSurfaceFromRequest(c),
-        });
+      const row = await c.app.governance.templateCreateOrg({
+        organizationId,
+        callerUserId,
+        sourceType: body.data.source_type,
+        displayName: body.data.display_name,
+        description: body.data.description ?? null,
+        iconAsset: body.data.icon_asset ?? null,
+        credentialSchema:
+          body.data.credential_schema === "otlp_token"
+            ? null
+            : (body.data.credential_schema ?? null),
+        ottlRules: body.data.ottl_rules,
+        surface: resolveSurfaceFromRequest(c),
+      });
       logger.info(
         { templateId: row.id, organizationId, callerUserId },
         "ingestion template created via REST",
@@ -446,13 +435,13 @@ secured.access(apiKeyPermission("aiTools:manage")).patch(
         400,
       );
     }
-    const organizationId = await orgIdForProject(project.id);
+    const organizationId = await c.app.projects.getOrganizationId(project.id);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      const row = await c.var.langwatchApp.governance.ingestionTemplates.updateOttlRules({
+      const row = await c.app.governance.templateUpdateOttlRules({
         organizationId,
         callerUserId,
         id,
@@ -499,13 +488,13 @@ secured.access(apiKeyPermission("aiTools:manage")).delete(
   async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
-    const organizationId = await orgIdForProject(project.id);
+    const organizationId = await c.app.projects.getOrganizationId(project.id);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      await c.var.langwatchApp.governance.ingestionTemplates.archiveOrgTemplate({
+      await c.app.governance.templateArchiveOrg({
         organizationId,
         callerUserId,
         id,
@@ -561,19 +550,18 @@ secured.access(apiKeyPermission("aiTools:manage")).post(
         400,
       );
     }
-    const organizationId = await orgIdForProject(project.id);
+    const organizationId = await c.app.projects.getOrganizationId(project.id);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      const row =
-        await c.var.langwatchApp.governance.ingestionTemplates.cloneFromPlatform({
-          organizationId,
-          callerUserId,
-          sourceTemplateId: body.data.source_template_id,
-          surface: resolveSurfaceFromRequest(c),
-        });
+      const row = await c.app.governance.templateCloneFromPlatform({
+        organizationId,
+        callerUserId,
+        sourceTemplateId: body.data.source_template_id,
+        surface: resolveSurfaceFromRequest(c),
+      });
       return c.json({ ingestion_template: toTemplateDto(row) }, 201);
     } catch (err) {
       const mapped = mapTemplateError(err);

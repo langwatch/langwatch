@@ -5,7 +5,7 @@ import { z } from "zod";
 import {
   DatabricksGeniePuller,
   WAREHOUSE_COST_ROW_LIMIT,
-} from "../src/adapters/databricks-genie-puller.databricks-genie-puller.adapter";
+} from "../src/adapters/databricks-genie-puller.adapter";
 import {
   GovernanceHttpPort,
   type GovernanceHttpResponse,

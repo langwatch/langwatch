@@ -89,8 +89,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("ingestionSources:view")
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionSources;
-      const rows = await service.list(input.organizationId);
+      const service = ctx.app.governance;
+      const rows = await service.ingestionSourceList(input.organizationId);
       return rows.map(toDto);
     }),
 
@@ -99,8 +99,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("ingestionSources:view")
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionSources;
-      return toDto(await service.getById(input.id, input.organizationId));
+      const service = ctx.app.governance;
+      return toDto(await service.ingestionSourceGetById(input.id, input.organizationId));
     }),
 
   /**
@@ -123,8 +123,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
     )
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionSources;
-      const created = await service.createSource({
+      const service = ctx.app.governance;
+      const created = await service.ingestionSourceCreate({
         organizationId: input.organizationId,
         teamId: input.teamId ?? null,
         sourceType: input.sourceType,
@@ -156,8 +156,8 @@ export const ingestionSourcesRouter = createTRPCRouter({
     )
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionSources;
-      const updated = await service.updateSource({
+      const service = ctx.app.governance;
+      const updated = await service.ingestionSourceUpdate({
         id: input.id,
         organizationId: input.organizationId,
         name: input.name,
@@ -178,8 +178,11 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionSources;
-      const rotated = await service.rotateSecret(input.id, input.organizationId);
+      const service = ctx.app.governance;
+      const rotated = await service.ingestionSourceRotateSecret(
+        input.id,
+        input.organizationId,
+      );
       return {
         source: toDto(rotated.source),
         ingestSecret: rotated.ingestSecret,
@@ -190,8 +193,11 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = ctx.app.governance.ingestionSources;
-      const archived = await service.archive(input.id, input.organizationId);
+      const service = ctx.app.governance;
+      const archived = await service.ingestionSourceArchive(
+        input.id,
+        input.organizationId,
+      );
       return toDto(archived);
     }),
 
@@ -241,7 +247,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .permission("ingestionSources:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.app.governance.ottlGateway.validate(input.statements);
+        return await ctx.app.governance.ottlValidate(input.statements);
       } catch (err) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",

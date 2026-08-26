@@ -60,7 +60,7 @@ function usdToNanoUsd(value: string): bigint {
 }
 
 export class PulledUsagePricingService {
-  constructor(private readonly rates: PulledUsageRatePort) {}
+  private constructor(private readonly rates: PulledUsageRatePort) {}
 
   static create(rates: PulledUsageRatePort): PulledUsagePricingService {
     return new PulledUsagePricingService(rates);

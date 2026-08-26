@@ -1,37 +1,14 @@
 import type { Event, IntentContext, ProcessStore } from "@langwatch/eventing";
+import {
+  GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
+  GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
+  type RecordBudgetCrossingCommandData,
+  type RecordVkLifecycleCommandData,
+} from "@langwatch/enterprise-governance-contract";
 
-export const GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE = "lw.governance.vk_lifecycle" as const;
-export const GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE =
-  "lw.governance.budget_crossing" as const;
-
-export type GovernanceVkLifecycleData = {
-  tenantId: string;
-  organization_id: string;
-  virtual_key_id: string;
-  action: "created" | "rotated" | "disabled" | "enabled" | "revoked";
-  name: string;
-  display_prefix: string;
-  reason: string | null;
-  occurred_at: number;
-};
-
-export type GovernanceBudgetCrossingData = {
-  tenantId: string;
-  organization_id: string;
-  budget_id: string;
-  kind: "threshold_crossed" | "breached";
-  scope_type: string;
-  bucket_scope_id: string;
-  end_user_id: string | null;
-  virtual_key_id: string | null;
-  anchor_project_id: string | null;
-  window: string;
-  period_started_at_ms: number;
-  limit_usd: string;
-  spent_usd: string;
-  on_breach: "block" | "warn";
-  occurred_at: number;
-};
+export { GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE, GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE };
+export type GovernanceVkLifecycleData = RecordVkLifecycleCommandData;
+export type GovernanceBudgetCrossingData = RecordBudgetCrossingCommandData;
 
 export type GovernanceEventsProcessingEvent =
   | (Event<GovernanceVkLifecycleData> & {

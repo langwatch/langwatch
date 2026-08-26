@@ -9,7 +9,7 @@ import {
   type SortDir,
   type SpendOverTimeGroupBy,
   type SpendSortField,
-} from "../src/repositories/prisma/prisma.ingestion-source-activity.repository";
+} from "../src/repositories/prisma/prisma-ingestion-source-activity.repository";
 
 type ClickHouseQuery = {
   query: string;

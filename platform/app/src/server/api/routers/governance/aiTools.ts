@@ -27,7 +27,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { ZodError as Zod4Error } from "zod/v4";
+import { ZodError } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -74,9 +74,9 @@ export const aiToolsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
-      const service = ctx.app.governance.aiTools;
+      const service = ctx.app.governance;
       try {
-        await service.ensureDefaultCatalog({
+        await service.aiToolEnsureDefaultCatalog({
           organizationId: input.organizationId,
         });
       } catch (error) {
@@ -89,7 +89,7 @@ export const aiToolsRouter = createTRPCRouter({
           },
         });
       }
-      return await service.listForUser({
+      return await service.aiToolListForUser({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
       });
@@ -108,7 +108,7 @@ export const aiToolsRouter = createTRPCRouter({
     .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
       const configuredProviders =
-        await ctx.app.governance.aiTools.listConfiguredProvidersForUser({
+        await ctx.app.governance.aiToolListConfiguredProvidersForUser({
           organizationId: input.organizationId,
           userId: ctx.session.user.id,
         });
@@ -133,16 +133,12 @@ export const aiToolsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
-      const source = await ctx.prisma.ingestionSource.findFirst({
-        where: {
-          organizationId: input.organizationId,
-          sourceType: "claude_code",
-          archivedAt: null,
-          status: { not: "disabled" },
-        },
-        select: { id: true },
-        orderBy: { createdAt: "asc" },
-      });
+      const source = (await ctx.app.governance.ingestionSourceList(input.organizationId))
+        .filter(
+          (candidate) =>
+            candidate.sourceType === "claude_code" && candidate.status !== "disabled",
+        )
+        .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
       if (!source) return { endpoint: null };
       return { endpoint: `/api/ingest/otel/${source.id}` };
     }),
@@ -155,7 +151,7 @@ export const aiToolsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.aiTools.listForAdmin({
+      return await ctx.app.governance.aiToolListForAdmin({
         organizationId: input.organizationId,
       });
     }),
@@ -164,7 +160,7 @@ export const aiToolsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
-      return ctx.app.governance.aiTools.getById({
+      return ctx.app.governance.aiToolGetById({
         id: input.id,
         organizationId: input.organizationId,
       });
@@ -187,7 +183,7 @@ export const aiToolsRouter = createTRPCRouter({
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.app.governance.aiTools.create({
+        return await ctx.app.governance.aiToolCreate({
           organizationId: input.organizationId,
           departmentIds: input.departmentIds,
           type: input.type as (typeof AI_TOOL_TYPES)[number],
@@ -198,7 +194,7 @@ export const aiToolsRouter = createTRPCRouter({
           actorUserId: ctx.session.user.id,
         });
       } catch (err) {
-        if (err instanceof Zod4Error) {
+        if (err instanceof ZodError) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: `Invalid config for ${input.type}: ${err.issues.map((i) => i.message).join("; ")}`,
@@ -228,7 +224,7 @@ export const aiToolsRouter = createTRPCRouter({
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.app.governance.aiTools.update({
+        return await ctx.app.governance.aiToolUpdate({
           id: input.id,
           organizationId: input.organizationId,
           displayName: input.displayName,
@@ -241,7 +237,7 @@ export const aiToolsRouter = createTRPCRouter({
           actorUserId: ctx.session.user.id,
         });
       } catch (err) {
-        if (err instanceof Zod4Error) {
+        if (err instanceof ZodError) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: `Invalid config: ${err.issues.map((i) => i.message).join("; ")}`,
@@ -261,7 +257,7 @@ export const aiToolsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      return await ctx.app.governance.aiTools.remove({
+      return await ctx.app.governance.aiToolRemove({
         id: input.id,
         organizationId: input.organizationId,
       });
@@ -284,7 +280,7 @@ export const aiToolsRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      return await ctx.app.governance.aiTools.update({
+      return await ctx.app.governance.aiToolUpdate({
         id: input.id,
         organizationId: input.organizationId,
         enabled: input.enabled,
@@ -313,7 +309,7 @@ export const aiToolsRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      return await ctx.app.governance.aiTools.seedStarterPack({
+      return await ctx.app.governance.aiToolSeedStarterPack({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
         slugs: input.slugs,
@@ -348,7 +344,7 @@ export const aiToolsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.aiTools.listProviderOptionsForAdmin({
+      return await ctx.app.governance.aiToolListProviderOptionsForAdmin({
         organizationId: input.organizationId,
       });
     }),
@@ -363,7 +359,7 @@ export const aiToolsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
-      return await ctx.app.governance.aiTools.listRoutingPolicyOptionsForAdmin({
+      return await ctx.app.governance.aiToolListRoutingPolicyOptionsForAdmin({
         organizationId: input.organizationId,
       });
     }),
@@ -379,7 +375,7 @@ export const aiToolsRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      await ctx.app.governance.aiTools.reorder({
+      await ctx.app.governance.aiToolReorder({
         organizationId: input.organizationId,
         updates: input.updates,
       });

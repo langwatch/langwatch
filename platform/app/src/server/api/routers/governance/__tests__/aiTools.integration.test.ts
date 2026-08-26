@@ -30,14 +30,11 @@ import {
 } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import {
-  AiToolEntryService,
-  STARTER_PACK_TILES,
-} from "@ee/governance/services/aiToolEntry.service";
+import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
 
 describe("aiToolsRouter integration", () => {
   const ns = `aitools-${nanoid(8)}`;
@@ -51,10 +48,10 @@ describe("aiToolsRouter integration", () => {
   let memberPlatformUserId: string;
   let memberOrphanUserId: string;
   let liteUserId: string;
+  let testApp: App;
 
   beforeAll(async () => {
-    await resetApp();
-    globalForApp.__langwatch_app = createTestApp();
+    testApp = createTestApp();
 
     const organization = await prisma.organization.create({
       data: { name: `AiTools Org ${ns}`, slug: `--ait-${ns}` },
@@ -216,7 +213,8 @@ describe("aiToolsRouter integration", () => {
 
   function callerFor(userId: string) {
     const ctx = createInnerTRPCContext({
-      session: { user: { id: userId }, expires: "1" } as any,
+      app: testApp,
+      session: { user: { id: userId }, expires: "1" },
     });
     return appRouter.createCaller(ctx);
   }
@@ -482,11 +480,11 @@ describe("aiToolsRouter integration", () => {
         data: { entryId: deptTile.id, departmentId: polDeptId },
       });
 
-      const service = AiToolEntryService.create(prisma);
+      const service = testApp.governance;
 
       // The dept member sees the dept tile, which shadows the org one
       // despite its higher order: direct OTLP is governed OFF.
-      const inDeptPolicy = await service.resolveToolPolicyOverrides({
+      const inDeptPolicy = await service.aiToolResolvePolicyOverrides({
         organizationId: polOrgId,
         userId: polMemberInDeptId,
       });
@@ -497,7 +495,7 @@ describe("aiToolsRouter integration", () => {
 
       // The orphan member can't see the dept tile, so the restrictive
       // policy does NOT leak: they keep the org-wide tile's policy.
-      const orphanPolicy = await service.resolveToolPolicyOverrides({
+      const orphanPolicy = await service.aiToolResolvePolicyOverrides({
         organizationId: polOrgId,
         userId: polMemberOrphanId,
       });
@@ -565,7 +563,7 @@ describe("aiToolsRouter integration", () => {
         const again = await callerFor(member.id).aiTools.list({
           organizationId: org.id,
         });
-        expect(again).toHaveLength(STARTER_PACK_TILES.length);
+        expect(again).toHaveLength(AI_TOOL_STARTER_TILES.length);
       } finally {
         await prisma.aiToolEntry.deleteMany({
           where: { organizationId: org.id },
@@ -812,7 +810,7 @@ describe("aiToolsRouter integration", () => {
         // Only the genuinely missing tile comes back; the archived one and
         // the rest of the untouched tiles are treated as present.
         expect(result.created).toBe(1);
-        expect(result.skipped).toBe(STARTER_PACK_TILES.length - 1);
+        expect(result.skipped).toBe(AI_TOOL_STARTER_TILES.length - 1);
 
         const rows = await prisma.aiToolEntry.findMany({
           where: { organizationId: freshOrgId },
@@ -942,12 +940,12 @@ describe("aiToolsRouter integration", () => {
         expect(result.updated).toBe(1); // Claude Code merged in place
         expect(result.skipped).toBe(1); // Codex admin-curated icon preserved
         // remaining starter set inserted (all tiles minus the merged + skipped)
-        expect(result.created).toBe(STARTER_PACK_TILES.length - 2);
+        expect(result.created).toBe(AI_TOOL_STARTER_TILES.length - 2);
 
         const after = await callerFor(adminUserId).aiTools.adminList({
           organizationId: freshOrgId,
         });
-        expect(after).toHaveLength(STARTER_PACK_TILES.length); // no duplicate row created
+        expect(after).toHaveLength(AI_TOOL_STARTER_TILES.length); // no duplicate row created
 
         const claudeRows = after.filter(
           (e) => e.type === "coding_assistant" && e.displayName === "Claude Code",

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PostgresGovernanceAdapter,
   type GovernanceDatabase,
-} from "../src/adapters/postgres.governance.adapter";
+} from "../src/adapters/postgres-governance.adapter";
 
 class PolicyHarness {
   private constructor(

@@ -1,5 +1,4 @@
 import {
-  GovernanceOcsfExportService as GovernanceOcsfExportServiceContract,
   governanceOcsfExportInputSchema,
   type GovernanceOcsfExportInput,
   type GovernanceOcsfExportPage,
@@ -9,12 +8,11 @@ import type {
   GovernanceOcsfExportRepository,
 } from "../ports/ocsf-export.port";
 
-export class DefaultGovernanceOcsfExportService extends GovernanceOcsfExportServiceContract {
+export class DefaultGovernanceOcsfExportService {
   private constructor(
     private readonly repository: GovernanceOcsfExportRepository,
     private readonly events: GovernanceOcsfEventsReaderPort | undefined,
   ) {
-    super();
   }
 
   static create(options: {

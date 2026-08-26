@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { anthropicAdminPullConfigSchema } from "@ee/governance/services/pullers/anthropicAdmin.puller";
+import { anthropicAdminPullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import {
   buildAnthropicAdminPullConfig,
   buildParserConfig,

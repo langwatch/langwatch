@@ -7,6 +7,10 @@ import {
   type IngestionPullProcessingEvent,
 } from "@langwatch/enterprise-governance-contract";
 import {
+  GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
+  GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
+} from "@langwatch/enterprise-governance-contract";
+import {
   InMemoryProcessStore,
   buildProcessDefinition,
   buildProcessManager,
@@ -18,8 +22,8 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { IngestionPullEventingAdapter } from "../src/adapters/ingestion-pull.ingestion-pull.adapter";
-import { PulledUsageEventingAdapter } from "../src/adapters/pulled-usage.pulled-usage.adapter";
+import { IngestionPullEventingAdapter } from "../src/adapters/ingestion-pull.adapter";
+import { PulledUsageEventingAdapter } from "../src/adapters/pulled-usage.adapter";
 import {
   GatewayDebitPort,
   type GatewayBudgetCrossingCandidate,
@@ -58,8 +62,11 @@ import {
   IngestionPullProcess,
 } from "../src/processes/ingestion-pull.process";
 import { IngestionPullService } from "../src/services/ingestion-pull.service";
-import { PulledUsageLedgerProcess } from "../src/processes/pulled-usage-ledger.process";
 import { PulledUsageLedgerIntent } from "../src/intents/pulled-usage-ledger.intent";
+import {
+  RecordBudgetCrossingCommand,
+  RecordVkLifecycleCommand,
+} from "../src/adapters/governance-events.adapter";
 
 class FixedSchedule extends IngestionPullSchedulePort {
   nextRunAt(input: { cron: string; after: number }): number {
@@ -291,6 +298,65 @@ describe("governance Eventing adapters", () => {
     expect(first?.aggregateId).toBe("restatement-1");
     expect(correction?.aggregateId).toBe("restatement-1");
     expect(correction?.idempotencyKey).not.toBe(first?.idempotencyKey);
+  });
+});
+
+describe("governance signal eventing", () => {
+  it("keeps virtual-key lifecycle appends ordered and idempotent per subject", async () => {
+    const data = {
+      tenantId: "project-1",
+      organization_id: "org-1",
+      virtual_key_id: "key-1",
+      action: "rotated" as const,
+      name: "Production key",
+      display_prefix: "lw_vk_",
+      reason: null,
+      occurred_at: 1_000,
+    };
+    const [event] = await new RecordVkLifecycleCommand().handle({
+      type: "lw.governance.record_vk_lifecycle",
+      tenantId: createTenantId("project-1"),
+      aggregateId: "vk:key-1",
+      data,
+    });
+
+    expect(event).toMatchObject({
+      aggregateId: "vk:key-1",
+      type: GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
+      idempotencyKey: "project-1:vk:key-1:rotated:1000",
+    });
+  });
+
+  it("keys a budget crossing once per bucket, kind, and billing period", async () => {
+    const data = {
+      tenantId: "project-1",
+      organization_id: "org-1",
+      budget_id: "budget-1",
+      kind: "breached" as const,
+      scope_type: "project",
+      bucket_scope_id: "project-1",
+      end_user_id: null,
+      virtual_key_id: null,
+      anchor_project_id: "project-1",
+      window: "month",
+      period_started_at_ms: 0,
+      limit_usd: "20",
+      spent_usd: "20.01",
+      on_breach: "block" as const,
+      occurred_at: 1_000,
+    };
+    const [event] = await new RecordBudgetCrossingCommand().handle({
+      type: "lw.governance.record_budget_crossing",
+      tenantId: createTenantId("project-1"),
+      aggregateId: "budget:budget-1",
+      data,
+    });
+
+    expect(event).toMatchObject({
+      aggregateId: "budget:budget-1",
+      type: GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
+      idempotencyKey: "project-1:budget:budget-1:project-1:breached:0",
+    });
   });
 });
 

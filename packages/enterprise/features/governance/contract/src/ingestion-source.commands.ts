@@ -85,33 +85,3 @@ export const createdGovernanceIngestionSourceSchema = z
 export type CreatedGovernanceIngestionSource = z.infer<
   typeof createdGovernanceIngestionSourceSchema
 >;
-
-export abstract class GovernanceIngestionSourceService {
-  abstract list(organizationId: string): Promise<GovernanceIngestionSource[]>;
-  abstract tryFindById(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource | null>;
-  abstract getById(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource>;
-  abstract tryFindByIngestSecret(
-    rawSecret: string,
-  ): Promise<GovernanceIngestionSource | null>;
-  abstract createSource(
-    input: CreateGovernanceIngestionSourceCommand,
-  ): Promise<CreatedGovernanceIngestionSource>;
-  abstract updateSource(
-    input: UpdateGovernanceIngestionSourceCommand,
-  ): Promise<GovernanceIngestionSource>;
-  abstract rotateSecret(
-    id: string,
-    organizationId: string,
-  ): Promise<CreatedGovernanceIngestionSource>;
-  abstract archive(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource>;
-  abstract recordEventReceived(id: string): Promise<void>;
-}

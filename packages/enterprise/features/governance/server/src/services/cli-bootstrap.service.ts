@@ -1,9 +1,9 @@
 import {
-  GovernanceCliBootstrapService,
   cliBootstrapInputSchema,
+  type AiToolCliCatalog,
   type CliBootstrapInput,
   type CliBootstrapResult,
-  type GovernanceAiToolCatalogService,
+  type PlatformToolPolicyMap,
 } from "@langwatch/enterprise-governance-contract";
 import type {
   CliAdminContactPort,
@@ -11,18 +11,21 @@ import type {
   CliBudgetOverviewPort,
 } from "../ports/cli-bootstrap.port";
 
-export class DefaultGovernanceCliBootstrapService extends GovernanceCliBootstrapService {
+type AiToolCliCatalogReader = {
+  resolveCliCatalogForUser(input: CliBootstrapInput): Promise<AiToolCliCatalog>;
+  resolveToolPolicyMap(input: CliBootstrapInput): Promise<PlatformToolPolicyMap>;
+};
+
+export class DefaultGovernanceCliBootstrapService {
   private constructor(
-    private readonly catalog: GovernanceAiToolCatalogService,
+    private readonly catalog: AiToolCliCatalogReader,
     private readonly budgets: CliBudgetOverviewPort,
     private readonly contacts: CliAdminContactPort,
     private readonly gatewayUrl: string,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
-    catalog: GovernanceAiToolCatalogService;
+    catalog: AiToolCliCatalogReader;
     budgets: CliBudgetOverviewPort;
     contacts: CliAdminContactPort;
     gatewayUrl: string;
