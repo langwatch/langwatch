@@ -3,12 +3,12 @@ import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { CustomGraph } from "~/generated/prisma/client";
 import type { SeriesInputType, TimeseriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import { buildSeriesName } from "@langwatch/analytics-contract";
 import {
   aggregateSeriesValues,
+  buildSeriesName,
   extractGroupTotals,
   extractSeriesPoints,
-} from "~/server/app-layer/analytics/series-points";
+} from "@langwatch/analytics-contract";
 import type { ReportSource } from "@langwatch/automation-contract";
 
 /**
@@ -82,7 +82,9 @@ async function mapWithConcurrency<T, R>(
   concurrency: number,
   fn: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> {
-  const results = new Array<R>(items.length);
+  const results: R[] = [];
+  results.length = items.length;
+
   let cursor = 0;
   const worker = async (): Promise<void> => {
     for (;;) {
