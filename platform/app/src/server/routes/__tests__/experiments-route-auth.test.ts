@@ -143,9 +143,12 @@ describe("GET /api/experiments/:slug (public REST read)", () => {
   describe("when the path is the runs collection rather than a slug", () => {
     /** @scenario The runs routes keep their own handlers */
     it("does not let the slug parameter swallow /runs", async () => {
-      const res = await router.request("http://localhost/api/experiments/runs", {
-        method: "GET",
-      });
+      const res = await router.request(
+        "http://localhost/api/experiments/runs",
+        {
+          method: "GET",
+        },
+      );
 
       // The runs route has its own API-key guard in the v3 app, which answers
       // with a different envelope. Either way the read-one handler must not be
