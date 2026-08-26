@@ -1307,15 +1307,62 @@ p1_8_negative_controls() {
   phase "P1.8 — negative controls (AC24)"
 
   ac "AC24(a)" "dropping one seeded entity makes the harness FAIL"
-  # Run the AC8 check in a subshell after destroying one class. The subshell
-  # must exit 30. A subshell that exits 0 means AC8 asserts nothing.
-  ch_query "$(ch_pods | head -1)" "DROP SETTINGS PROFILE IF EXISTS up_probe_profile"
-  info "dropped settings profile up_probe_profile; re-running the AC8 check, which MUST fail"
-  local rc=0
-  ( ac8_five_classes ) || rc=$?
-  ac_assert_eq "AC24(a): the AC8 check exits 30 (AC failure) with an entity destroyed" "$rc" "30"
-  ch_query "$(ch_pods | head -1)" "CREATE SETTINGS PROFILE IF NOT EXISTS up_probe_profile SETTINGS max_threads = 3"
-  pass "AC24(a) the harness detects a dropped entity"
+  # The question this control has to answer is whether the detector AC8 is built
+  # on actually notices a destroyed entity. The naive form — drop one entity,
+  # assert the AC8 check exits 30 — is unsound here for two independent reasons:
+  #
+  #  (1) KEEP_GOING. ac_fail RETURNS instead of exiting under KEEP_GOING, so a
+  #      subshell running ac8_five_classes exits 0 whatever it finds. Ladder run
+  #      4 failed AC24(a) with "expected '30', got '0'" for exactly this reason:
+  #      a harness artifact, not a detection failure.
+  #  (2) ATTRIBUTION. In this experiment AC8 ALREADY fails for all five classes
+  #      (total loss across the upgrade), so the subshell exits 30 with or
+  #      without the drop. A red that would have happened anyway is not evidence
+  #      that the drop was detected.
+  #
+  # So the control below is two-sided and tests the detector directly: the same
+  # classifier must say present-on-all when the entity is there and
+  # absent-on-all once it is dropped. Both halves are measured against a live
+  # cluster, and this is sound in THIS run precisely because forward propagation
+  # works — AC23 measured new entities reaching every replica in 0s. A detector
+  # that cannot tell those two states apart invalidates every AC8 verdict.
+  local pod0 ctl_dir v_present v_absent
+  pod0="$(ch_pods | head -1)"
+  ctl_dir="${RUN_DIR}/ac24-control"
+
+  ch_query "$pod0" "CREATE SETTINGS PROFILE IF NOT EXISTS up_probe_profile SETTINGS max_threads = 3"
+  sleep "$PROPAGATION_TIMEOUT_S"
+  capture_entities "${ctl_dir}-present" "AC24(a) control, entity PRESENT"
+  v_present="$(classify_capture "${ctl_dir}-present" profile)"
+  ac_assert_eq "AC24(a) control: with the entity present the detector says present-on-all" \
+    "$v_present" "present-on-all"
+
+  ch_query "$pod0" "DROP SETTINGS PROFILE IF EXISTS up_probe_profile"
+  sleep "$PROPAGATION_TIMEOUT_S"
+  capture_entities "${ctl_dir}-absent" "AC24(a) control, entity DROPPED"
+  v_absent="$(classify_capture "${ctl_dir}-absent" profile)"
+  ac_assert_eq "AC24(a) control: with the entity dropped the detector says absent-on-all" \
+    "$v_absent" "absent-on-all"
+
+  # The AC8-mediated form is additionally run, but ONLY when its red would be
+  # attributable to the drop — that is, when every class was green beforehand.
+  local cls all_green="yes" pre_verdict
+  for cls in $CLASSES; do
+    pre_verdict="$(classify_capture "${RUN_DIR}/post-upgrade" "$cls")"
+    [[ "$pre_verdict" == "present-on-all" ]] || all_green="no"
+  done
+  if [[ "$all_green" == "yes" ]]; then
+    ch_query "$pod0" "DROP SETTINGS PROFILE IF EXISTS up_probe_profile"
+    info "dropped settings profile up_probe_profile; re-running the AC8 check, which MUST fail"
+    local rc=0
+    # KEEP_GOING is disabled inside the subshell so ac_fail exits 30 as this
+    # control requires; with it inherited the subshell always exits 0.
+    ( KEEP_GOING=false; ac8_five_classes ) || rc=$?
+    ac_assert_eq "AC24(a): the AC8 check exits 30 (AC failure) with an entity destroyed" "$rc" "30"
+    ch_query "$pod0" "CREATE SETTINGS PROFILE IF NOT EXISTS up_probe_profile SETTINGS max_threads = 3"
+  else
+    ac_unmeasured "the AC8-mediated form of AC24(a) is UNMEASURED: the post-upgrade state is not green for all five classes before anything is dropped, so ac8_five_classes exits 30 with or without the drop and the red cannot be attributed to it. The two-sided detector control above is the measured form, and it does not depend on AC8's colour."
+  fi
 
   ac "AC24(b)" "REPLICAS=1 aborts at the AC7 void rule"
   info "AC24(b) is a separate invocation, by construction: it needs a single-replica"
