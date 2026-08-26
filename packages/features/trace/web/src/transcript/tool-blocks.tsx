@@ -1,10 +1,11 @@
-import { Box, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { type ReactNode, useMemo, useState } from "react";
+import { Box, chakra, Icon, Text, VStack } from "@chakra-ui/react";
+import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuSparkles, LuWrench } from "react-icons/lu";
 import { tryPrettyJson } from "./parsing";
 import { skillInvocationFromToolUse } from "./skill-invocation";
 import type { ChatMessage } from "./types";
 import { toolResultBodyToString } from "./tool-result-body";
+import { ToolArgRow, ToolPairSection } from "./tool-pair-sections";
 import { useTranscriptRenderPorts } from "../transcript-render-ports";
 import { isRecord } from "./record";
 
@@ -264,112 +265,5 @@ export function ToolPairCard({
         </VStack>
       )}
     </Box>
-  );
-}
-
-function ToolPairSection({
-  label,
-  tone = "default",
-  children,
-}: {
-  label: string;
-  tone?: "default" | "error";
-  children: ReactNode;
-}) {
-  return (
-    <Box
-      paddingX={2.5}
-      paddingY={1.5}
-      _notFirst={{ borderTopWidth: "1px", borderTopColor: "border.muted" }}
-    >
-      <Text
-        textStyle="2xs"
-        fontWeight="600"
-        color={tone === "error" ? "red.fg" : "fg.subtle"}
-        textTransform="uppercase"
-        letterSpacing="0.06em"
-        marginBottom={1}
-      >
-        {label}
-      </Text>
-      {children}
-    </Box>
-  );
-}
-
-/**
- * Single argument row inside a tool_use card. Renders the key as a small
- * label and the value with shape-appropriate formatting:
- *   - strings stay as prose / monospace depending on length
- *   - objects/arrays render as a compact inline JSON pre-block
- *   - primitives render as monospace tokens
- */
-function ToolArgRow({ name, value }: { name: string; value: unknown }) {
-  const valueDisplay = useMemo(() => {
-    if (value == null) {
-      return { kind: "primitive" as const, text: "null" };
-    }
-    if (typeof value === "string") {
-      return { kind: "string" as const, text: value };
-    }
-    if (typeof value === "number" || typeof value === "boolean") {
-      return { kind: "primitive" as const, text: String(value) };
-    }
-    try {
-      return { kind: "json" as const, text: JSON.stringify(value, null, 2) };
-    } catch {
-      return { kind: "primitive" as const, text: String(value) };
-    }
-  }, [value]);
-
-  return (
-    <HStack align="flex-start" gap={2} minWidth={0}>
-      <Text
-        textStyle="2xs"
-        fontFamily="mono"
-        color="fg.subtle"
-        fontWeight="500"
-        flexShrink={0}
-        minWidth="60px"
-      >
-        {name}
-      </Text>
-      {valueDisplay.kind === "string" && valueDisplay.text.length < 120 ? (
-        <Text
-          textStyle="xs"
-          fontFamily="mono"
-          color="fg"
-          wordBreak="break-word"
-          flex={1}
-          minWidth={0}
-        >
-          {valueDisplay.text}
-        </Text>
-      ) : valueDisplay.kind === "primitive" ? (
-        <Text textStyle="xs" fontFamily="mono" color="fg" flex={1}>
-          {valueDisplay.text}
-        </Text>
-      ) : (
-        <Box
-          as="pre"
-          textStyle="2xs"
-          fontFamily="mono"
-          color="fg"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-          bg="bg.panel"
-          borderRadius="sm"
-          paddingX={2}
-          paddingY={1}
-          margin={0}
-          maxHeight="400px"
-          overflow="auto"
-          flex={1}
-          minWidth={0}
-        >
-          {valueDisplay.text}
-        </Box>
-      )}
-    </HStack>
   );
 }
