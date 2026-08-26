@@ -1,5 +1,5 @@
 /**
- * The table of test cases: the name and the labels, with a Run button, an
+ * The table of scenarios: the name and the labels, with a Run button, an
  * Edit button and a row menu at the end of every row.
  *
  * The table is a grid inside one card, not a ruled table: the columns line up
@@ -10,7 +10,7 @@
  * the Results tab. A person who wants the last run of a row reaches it from
  * the row menu.
  *
- * The All test cases surface reads like a code host root: the test suites sit
+ * The All scenarios surface reads like a code host root: the test suites sit
  * on top as folder rows, and the cases filed in no test suite sit below as
  * loose rows. A folder row opens its own surface; it does not expand in place.
  *
@@ -24,12 +24,13 @@ import {
   Checkbox,
   chakra,
   HStack,
+  Icon,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { format } from "date-fns";
-import { MoreVertical, Pencil } from "lucide-react";
+import { FileCheckCorner, MoreVertical, Pencil } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
@@ -53,14 +54,14 @@ const CHECKBOX_COLUMN = "24px";
 const EXTERNAL_COLUMNS = "minmax(0,1fr) 110px";
 
 export type CasesTableProps = {
-  /** The real test suites, drawn as folder rows on the All test cases surface. */
+  /** The real test suites, drawn as folder rows on the All scenarios surface. */
   folderGroups: CaseGroup[];
   /**
-   * The cases that sit at the root of the surface: on All test cases the ones
+   * The cases that sit at the root of the surface: on All scenarios the ones
    * filed in no test suite, on a suite surface every case of that suite.
    */
   looseCases: TestCase[];
-  /** True on the All test cases surface, where folder rows are drawn. */
+  /** True on the All scenarios surface, where folder rows are drawn. */
   isAllView: boolean;
   /** The test suites a case can be moved into. */
   suites: TestSuiteEntry[];
@@ -160,7 +161,7 @@ export function CasesTable({
     <TableCard data-testid="agent-testing-cases-table">
       <TableHeaderRow templateColumns={templateColumns}>
         {isSelectionMode && <Text as="span" />}
-        <Text as="span">Test case</Text>
+        <Text as="span">Scenario</Text>
         <Text as="span" />
       </TableHeaderRow>
 
@@ -278,6 +279,12 @@ function CaseRow({
         </Box>
       )}
       <HStack gap={1.5} minWidth={0} flexWrap="wrap">
+        <Icon
+          as={FileCheckCorner}
+          boxSize="12px"
+          color={FG_MUTED}
+          flexShrink={0}
+        />
         <chakra.button
           type="button"
           minWidth={0}
@@ -497,7 +504,7 @@ export function ExternalCasesTable({
   return (
     <TableCard data-testid="agent-testing-external-cases-table">
       <TableHeaderRow templateColumns={EXTERNAL_COLUMNS}>
-        <Text as="span">Test case</Text>
+        <Text as="span">Scenario</Text>
         <Text as="span" textAlign="right">
           Last run
         </Text>
