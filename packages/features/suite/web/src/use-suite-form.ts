@@ -1,136 +1,37 @@
-/**
- * Custom hook encapsulating all form state and logic for suite creation/editing.
- *
- * Uses react-hook-form + Zod validation, following the ScenarioForm pattern.
- * Error dismissal on typing is handled natively by react-hook-form's
- * default reValidateMode ("onChange"), which re-checks fields on change
- * after the first failed submit.
- *
- * Separated from SuiteFormDrawer to keep the drawer a thin UI orchestrator.
- */
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { FieldMapping } from "@langwatch/scenario-contract";
+import { suiteTargetSchema, type SuiteTarget } from "@langwatch/suite-contract";
+
 import {
-  suiteTargetSchema,
-  type SuiteTarget,
-  type SuiteTargetType,
-} from "@langwatch/suite-contract";
+  filterScenarios,
+  filterTargets,
+  getAllLabels,
+  getArchivedScenarioIds,
+  getArchivedTargets,
+  getAvailableTargets,
+  isSameTarget,
+  withTargetMapping,
+} from "./suite-form-derivations";
+import {
+  suiteFormDefaultValues,
+  suiteFormSchema,
+  type SuiteFormData,
+  type UseSuiteFormParams,
+} from "./suite-form.types";
 
-export const MAX_REPEAT_COUNT = 5;
-
-export const suiteFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string(),
-  labels: z.array(z.string()),
-  selectedScenarioIds: z.array(z.string()).min(1, "At least one scenario is required"),
-  selectedTargets: z.array(suiteTargetSchema).min(1, "At least one target is required"),
-  repeatCount: z
-    .number()
-    .int()
-    .min(1, `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`)
-    .max(MAX_REPEAT_COUNT, `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`),
-  // null = follow the project default (scenarios.user_simulator /
-  // scenarios.judge); a string pins the model for the whole run plan.
-  simulatorModel: z.string().nullable(),
-  judgeModel: z.string().nullable(),
-});
-
-export type SuiteFormData = z.infer<typeof suiteFormSchema>;
-
-export interface SuiteFormScenario {
-  id: string;
-  name: string;
-  labels: string[];
-}
-
-export interface SuiteFormAgent {
-  id: string;
-  name: string;
-  type: string;
-}
-
-export interface SuiteFormPrompt {
-  id: string;
-  handle?: string | null;
-}
-
-export interface SuiteFormAvailableTarget {
-  name: string;
-  type: SuiteTargetType;
-  referenceId: string;
-}
-
-export interface SuiteFormSuite {
-  id: string;
-  projectId?: string;
-  slug?: string;
-  archivedAt?: Date | null;
-  createdAt?: Date;
-  updatedAt?: Date;
-  name: string;
-  description: string | null;
-  labels: string[];
-  scenarioIds: string[];
-  targets: unknown;
-  repeatCount: number;
-  simulatorModel: string | null;
-  judgeModel: string | null;
-}
-
-export interface UseSuiteFormParams {
-  /** Suite data for edit mode (null for create mode). */
-  suite: SuiteFormSuite | null | undefined;
-  /** Whether the drawer is currently open. */
-  isOpen: boolean;
-  /** Suite ID from drawer params (present in edit mode). */
-  suiteId: string | undefined;
-  /** Available scenarios from the project. */
-  scenarios: SuiteFormScenario[] | undefined;
-  /** Available agents from the project. */
-  agents: SuiteFormAgent[] | undefined;
-  /** Available prompts from the project. */
-  prompts: SuiteFormPrompt[] | undefined;
-}
-
-const isSameTarget = (a: SuiteTarget, b: SuiteTarget) =>
-  a.type === b.type && a.referenceId === b.referenceId;
-
-/** One target with a single mapping set (or cleared, for an undefined mapping). */
-function withTargetMapping({
-  target,
-  identifier,
-  mapping,
-}: {
-  target: SuiteTarget;
-  identifier: string;
-  mapping: FieldMapping | undefined;
-}): SuiteTarget {
-  const mappings = { ...target.scenarioMappings };
-  if (mapping) {
-    mappings[identifier] = mapping;
-  } else {
-    delete mappings[identifier];
-  }
-  return {
-    ...target,
-    scenarioMappings: Object.keys(mappings).length > 0 ? mappings : undefined,
-  };
-}
-
-const defaultValues: SuiteFormData = {
-  name: "",
-  description: "",
-  labels: [],
-  selectedScenarioIds: [],
-  selectedTargets: [],
-  repeatCount: 1,
-  simulatorModel: null,
-  judgeModel: null,
-};
+export { MAX_REPEAT_COUNT, suiteFormSchema } from "./suite-form.types";
+export type {
+  SuiteFormAgent,
+  SuiteFormAvailableTarget,
+  SuiteFormData,
+  SuiteFormPrompt,
+  SuiteFormScenario,
+  SuiteFormSuite,
+  UseSuiteFormParams,
+} from "./suite-form.types";
 
 export function useSuiteForm({
   suite,
@@ -141,110 +42,49 @@ export function useSuiteForm({
   prompts,
 }: UseSuiteFormParams) {
   const form = useForm<SuiteFormData>({
-    defaultValues,
+    defaultValues: suiteFormDefaultValues,
     resolver: zodResolver(suiteFormSchema),
     mode: "onSubmit",
   });
 
-  // -- UI state (not form data) --
   const [executionOptionsOpen, setExecutionOptionsOpen] = useState(false);
   const [scenarioSearch, setScenarioSearch] = useState("");
   const [targetSearch, setTargetSearch] = useState("");
   const [activeLabelFilter, setActiveLabelFilter] = useState<string | null>(null);
 
-  // -- Watch form values for derived state --
   const selectedScenarioIds = form.watch("selectedScenarioIds");
   const selectedTargets = form.watch("selectedTargets");
   const labels = form.watch("labels");
   const simulatorModel = form.watch("simulatorModel");
   const judgeModel = form.watch("judgeModel");
 
-  // -- Derived: available targets from agents + prompts --
-  const availableTargets = useMemo(() => {
-    const result: SuiteFormAvailableTarget[] = [];
-    if (agents) {
-      for (const agent of agents) {
-        // http, code, and workflow agents are supported as suite targets.
-        // signature agents are excluded — they're used as sub-components of
-        // workflows rather than as stand-alone scenario targets.
-        if (agent.type !== "http" && agent.type !== "code" && agent.type !== "workflow") {
-          continue;
-        }
-        result.push({
-          name: agent.name,
-          type: agent.type,
-          referenceId: agent.id,
-        });
-      }
-    }
-    if (prompts) {
-      for (const prompt of prompts) {
-        result.push({
-          name: prompt.handle ?? prompt.id,
-          type: "prompt",
-          referenceId: prompt.id,
-        });
-      }
-    }
-    return result;
-  }, [agents, prompts]);
+  const availableTargets = useMemo(
+    () => getAvailableTargets(agents, prompts),
+    [agents, prompts],
+  );
 
-  // -- Derived: archived scenarios (selected but not in active scenarios query) --
-  const archivedScenarioIds = useMemo(() => {
-    if (!scenarios) return [];
-    const activeIds = new Set(scenarios.map((s) => s.id));
-    return selectedScenarioIds
-      .filter((id) => !activeIds.has(id))
-      .map((id) => ({ id, name: id }));
-  }, [selectedScenarioIds, scenarios]);
+  const archivedScenarioIds = useMemo(
+    () => getArchivedScenarioIds(selectedScenarioIds, scenarios),
+    [selectedScenarioIds, scenarios],
+  );
 
-  // -- Derived: archived targets (selected but no longer available, with full type info) --
-  const archivedTargets = useMemo(() => {
-    if (!agents || !prompts) return [];
-    return selectedTargets
-      .filter(
-        (t) =>
-          !availableTargets.some(
-            (a) => a.type === t.type && a.referenceId === t.referenceId,
-          ),
-      )
-      .map((t) => ({ ...t, name: t.referenceId }));
-  }, [selectedTargets, availableTargets, agents, prompts]);
+  const archivedTargets = useMemo(
+    () => getArchivedTargets(selectedTargets, availableTargets, agents, prompts),
+    [selectedTargets, availableTargets, agents, prompts],
+  );
 
-  // -- Derived: unique scenario labels --
-  const allLabels = useMemo(() => {
-    if (!scenarios) return [];
-    const labelSet = new Set<string>();
-    for (const s of scenarios) {
-      for (const l of s.labels) {
-        labelSet.add(l);
-      }
-    }
-    return Array.from(labelSet).sort();
-  }, [scenarios]);
+  const allLabels = useMemo(() => getAllLabels(scenarios), [scenarios]);
 
-  // -- Derived: filtered scenarios --
-  const filteredScenarios = useMemo(() => {
-    if (!scenarios) return [];
-    let filtered = scenarios;
-    if (scenarioSearch.trim()) {
-      const q = scenarioSearch.toLowerCase();
-      filtered = filtered.filter((s) => s.name.toLowerCase().includes(q));
-    }
-    if (activeLabelFilter) {
-      filtered = filtered.filter((s) => s.labels.includes(activeLabelFilter));
-    }
-    return filtered;
-  }, [scenarios, scenarioSearch, activeLabelFilter]);
+  const filteredScenarios = useMemo(
+    () => filterScenarios(scenarios, scenarioSearch, activeLabelFilter),
+    [scenarios, scenarioSearch, activeLabelFilter],
+  );
 
-  // -- Derived: filtered targets --
-  const filteredTargets = useMemo(() => {
-    if (!targetSearch.trim()) return availableTargets;
-    const q = targetSearch.toLowerCase();
-    return availableTargets.filter((t) => t.name.toLowerCase().includes(q));
-  }, [availableTargets, targetSearch]);
+  const filteredTargets = useMemo(
+    () => filterTargets(availableTargets, targetSearch),
+    [availableTargets, targetSearch],
+  );
 
-  // -- Initialize form for edit mode / reset for create mode --
   useEffect(() => {
     if (suite && isOpen) {
       form.reset({
@@ -258,45 +98,32 @@ export function useSuiteForm({
         judgeModel: suite.judgeModel,
       });
     } else if (isOpen) {
-      form.reset(defaultValues);
+      form.reset(suiteFormDefaultValues);
       setScenarioSearch("");
       setTargetSearch("");
       setActiveLabelFilter(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on suite.id to avoid infinite loop from unstable suite reference
+    // Keyed on suite.id to avoid an infinite loop from an unstable suite reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suite?.id, suiteId, isOpen]);
-
-  // -- Actions --
 
   const toggleScenario = (id: string) => {
     const current = form.getValues("selectedScenarioIds");
     const next = current.includes(id)
-      ? current.filter((s) => s !== id)
+      ? current.filter((scenarioId) => scenarioId !== id)
       : [...current, id];
     form.setValue("selectedScenarioIds", next);
   };
 
   const toggleTarget = (target: SuiteTarget) => {
     const current = form.getValues("selectedTargets");
-    const exists = current.some(
-      (t) => t.type === target.type && t.referenceId === target.referenceId,
-    );
+    const exists = current.some((candidate) => isSameTarget(candidate, target));
     const next = exists
-      ? current.filter(
-          (t) => !(t.type === target.type && t.referenceId === target.referenceId),
-        )
+      ? current.filter((candidate) => !isSameTarget(candidate, target))
       : [...current, target];
     form.setValue("selectedTargets", next);
   };
 
-  /**
-   * Set (or clear) one binding on a selected target.
-   *
-   * Only prompt targets use this: an agent is configured, so its mappings live
-   * on the agent record; a prompt is authored elsewhere and pointed at, so the
-   * binding between a simulation and its declared inputs belongs to the run
-   * plan that made the pairing.
-   */
   const setTargetMapping = ({
     target,
     identifier,
@@ -317,21 +144,24 @@ export function useSuiteForm({
   };
 
   const isTargetSelected = (type: string, referenceId: string) =>
-    selectedTargets.some((t) => t.type === type && t.referenceId === referenceId);
+    selectedTargets.some(
+      (target) => target.type === type && target.referenceId === referenceId,
+    );
 
   const selectAllTargets = () => {
     const current = form.getValues("selectedTargets");
-    const currentKeys = new Set(current.map((t) => `${t.type}:${t.referenceId}`));
+    const currentKeys = new Set(
+      current.map((target) => `${target.type}:${target.referenceId}`),
+    );
     const newTargets = filteredTargets
-      .filter((t) => !currentKeys.has(`${t.type}:${t.referenceId}`))
-      .map((t) => ({ type: t.type, referenceId: t.referenceId }));
+      .filter((target) => !currentKeys.has(`${target.type}:${target.referenceId}`))
+      .map((target) => ({ type: target.type, referenceId: target.referenceId }));
     form.setValue("selectedTargets", [...current, ...newTargets], {
       shouldDirty: true,
       shouldValidate: true,
     });
   };
 
-  // Clears all targets regardless of filter (matches ScenarioPicker behavior)
   const clearTargets = () => {
     form.setValue("selectedTargets", [], {
       shouldDirty: true,
@@ -342,7 +172,10 @@ export function useSuiteForm({
   const selectAllScenarios = () => {
     if (filteredScenarios) {
       const current = form.getValues("selectedScenarioIds");
-      const merged = new Set([...current, ...filteredScenarios.map((s) => s.id)]);
+      const merged = new Set([
+        ...current,
+        ...filteredScenarios.map((scenario) => scenario.id),
+      ]);
       form.setValue("selectedScenarioIds", Array.from(merged));
     }
   };
@@ -362,7 +195,7 @@ export function useSuiteForm({
     const current = form.getValues("labels");
     form.setValue(
       "labels",
-      current.filter((l) => l !== label),
+      current.filter((currentLabel) => currentLabel !== label),
     );
   };
 
@@ -370,7 +203,7 @@ export function useSuiteForm({
     const current = form.getValues("selectedScenarioIds");
     form.setValue(
       "selectedScenarioIds",
-      current.filter((s) => s !== id),
+      current.filter((scenarioId) => scenarioId !== id),
     );
   };
 
@@ -378,17 +211,12 @@ export function useSuiteForm({
     const current = form.getValues("selectedTargets");
     form.setValue(
       "selectedTargets",
-      current.filter(
-        (t) => !(t.type === target.type && t.referenceId === target.referenceId),
-      ),
+      current.filter((candidate) => !isSameTarget(candidate, target)),
     );
   };
 
   return {
-    // react-hook-form instance
     form,
-
-    // Form field values (watched)
     labels,
     selectedScenarioIds,
     selectedTargets,
@@ -398,12 +226,8 @@ export function useSuiteForm({
       form.setValue("simulatorModel", value, { shouldDirty: true }),
     setJudgeModel: (value: string | null) =>
       form.setValue("judgeModel", value, { shouldDirty: true }),
-
-    // UI state
     executionOptionsOpen,
     setExecutionOptionsOpen,
-
-    // Scenario state
     scenarioSearch,
     setScenarioSearch,
     activeLabelFilter,
@@ -414,8 +238,6 @@ export function useSuiteForm({
     selectAllScenarios,
     clearScenarios,
     totalScenarioCount: scenarios?.length ?? 0,
-
-    // Target state
     targetSearch,
     setTargetSearch,
     availableTargets,
@@ -425,14 +247,10 @@ export function useSuiteForm({
     selectAllTargets,
     clearTargets,
     isTargetSelected,
-
-    // Archived references
     archivedScenarioIds,
     archivedTargets,
     removeArchivedScenario,
     removeArchivedTarget,
-
-    // Actions
     addLabel,
     removeLabel,
   };
