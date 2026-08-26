@@ -10,12 +10,14 @@
  * this deployment's honest answer is `lwql_unavailable`, which proves the
  * refusal was about the bucket arithmetic and not about the door.
  *
- * The family publishes the canonical error envelope, so the refusal is read at
- * `body.error.code` with its structured detail at `body.error.meta` — by code,
- * never by message prose.
+ * The family publishes the canonical error envelope wrapped in a JSON-RPC
+ * `error`, so the refusal is read at `body.error.data.error.code` with its
+ * structured detail at `body.error.data.error.meta` — by code, never by
+ * message prose.
  *
  * @see specs/analytics/lwql-workbench.feature
  * @see ~/server/analytics/lwql/resolveTimeWindow.ts — the budget contract
+ * @see ./queryRpcApi.integration.test.ts — the door's envelope and isolation proofs
  */
 
 import { nanoid } from "nanoid";
@@ -44,29 +46,33 @@ const GRANULARITY_SQL =
 /** Seven days, in seconds — the window every request below reports over. */
 const WEEK_SECONDS = 7 * 24 * 3600;
 
-describe("given the LangWatchQL REST query endpoint and the granularity budget", () => {
+describe("given the /api/v1/query JSON-RPC endpoint and the granularity budget", () => {
   const ns = nanoid(8);
 
   let organization: Organization;
   let team: Team;
   let project: Project;
 
-  const queryPath = (p: Project) =>
-    `/api/v1/projects/${p.id}/analytics/query/clickhouse`;
+  const rpcPath = "/api/v1/query";
 
-  const post = async (
-    body: Record<string, unknown>,
+  const call = async (
+    params: Record<string, unknown>,
   ): Promise<{
     status: number;
     body: Body;
   }> => {
-    const response = await app.request(queryPath(project), {
+    const response = await app.request(rpcPath, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Auth-Token": project.apiKey,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "query.run",
+        params,
+      }),
     });
     return { status: response.status, body: (await response.json()) as Body };
   };
@@ -123,7 +129,7 @@ describe("given the LangWatchQL REST query endpoint and the granularity budget",
   describe("when a statement declaring the parameter is run at one-second steps over a week", () => {
     /** @scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST" */
     it("is refused with the named code and the bucket arithmetic in the envelope's meta", async () => {
-      const { status, body } = await post({
+      const { status, body } = await call({
         sql: GRANULARITY_SQL,
         timeWindow: {
           start: "2026-02-20T00:00:00.000Z",
@@ -133,8 +139,8 @@ describe("given the LangWatchQL REST query endpoint and the granularity budget",
       });
 
       expect(status).toBe(400);
-      expect(body.error.code).toBe("lwql_granularity_too_fine");
-      expect(body.error.meta).toMatchObject({
+      expect(body.error.data.error.code).toBe("lwql_granularity_too_fine");
+      expect(body.error.data.error.meta).toMatchObject({
         requestedGranularitySeconds: 1,
         windowSeconds: WEEK_SECONDS,
         maxBuckets: 10_000,
@@ -144,7 +150,7 @@ describe("given the LangWatchQL REST query endpoint and the granularity budget",
 
   describe("when the same statement is run at an hour, which fits the ceiling", () => {
     it("gets past the budget gate and reaches the next gate instead", async () => {
-      const { status, body } = await post({
+      const { status, body } = await call({
         sql: GRANULARITY_SQL,
         timeWindow: {
           start: "2026-02-20T00:00:00.000Z",
@@ -160,7 +166,9 @@ describe("given the LangWatchQL REST query endpoint and the granularity budget",
       // a provisioned ClickHouse -> the query path itself), so assert only
       // that the budget refusal is gone, not which honest answer follows.
       expect(status).not.toBe(400);
-      expect(body.error?.code).not.toBe("lwql_granularity_too_fine");
+      expect(body.error?.data?.error?.code).not.toBe(
+        "lwql_granularity_too_fine",
+      );
     });
   });
 });

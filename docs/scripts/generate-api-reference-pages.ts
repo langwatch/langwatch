@@ -77,8 +77,8 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
-const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
-  "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
+const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
+  "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
@@ -103,16 +103,12 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
-  "/api/v1/projects/{projectId}/analytics/query/clickhouse":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
-  "/api/v1/projects/{projectId}/analytics/schema":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
