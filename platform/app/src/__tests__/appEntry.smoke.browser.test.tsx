@@ -1,6 +1,5 @@
-import { render } from "@testing-library/react";
-import { Suspense } from "react";
-import { RouterProvider } from "react-router/dom";
+import { UiRuntime } from "@langwatch/ui";
+import { act } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -17,23 +16,29 @@ describe("app entry", () => {
   describe("when mounted at /auth/signin with the real provider stack", () => {
     it("renders the routed page (query wiring is alive)", async () => {
       window.history.replaceState({}, "", "/auth/signin");
-      const { OuterProviders } = await import("../AppProviders");
+      const { LegacyUiShellAdapter } =
+        await import("../runtime/ui/legacy-ui-shell.adapter");
       const { router } = await import("../routes");
+      const container = document.createElement("div");
+      container.id = "root";
+      document.body.append(container);
+      const runtime = UiRuntime.create({
+        document,
+        shell: LegacyUiShellAdapter.create(),
+      });
 
-      const { container } = render(
-        <OuterProviders>
-          <Suspense fallback={null}>
-            <RouterProvider router={router} />
-          </Suspense>
-        </OuterProviders>,
-      );
+      try {
+        await act(async () => {
+          runtime.start();
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+        });
 
-      // The capability query has no live API here — success is the query
-      // firing and the router tree staying mounted (not a client-side
-      // construction crash).
-      await new Promise((resolve) => setTimeout(resolve, 4000));
-      expect(router.state.initialized).toBe(true);
-      expect(container.innerHTML.length).toBeGreaterThan(0);
+        expect(router.state.initialized).toBe(true);
+        expect(container.innerHTML.length).toBeGreaterThan(0);
+      } finally {
+        await act(() => runtime.close());
+        container.remove();
+      }
     }, 30_000);
   });
 });
