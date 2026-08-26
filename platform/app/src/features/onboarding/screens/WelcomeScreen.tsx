@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
-import { JoinYourTeamNotice } from "~/components/JoinYourTeamNotice";
+import { JoinYourTeamTakeover } from "~/components/JoinYourTeamTakeover";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { showErrorToast } from "~/features/errors";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
@@ -191,7 +191,7 @@ export const WelcomeScreen: React.FC = () => {
               nothing when nothing is open to their address, which is most
               people, and nothing at all once it has been waved away — so it
               costs the ordinary sign-up nothing. */}
-          <JoinYourTeamNotice />
+          <JoinYourTeamTakeover />
           <Box
             position="relative"
             overflow="hidden"

@@ -30,7 +30,7 @@ import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
-import { JoinYourTeamNotice } from "./JoinYourTeamNotice";
+import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
 import { SavedViewsBar } from "./SavedViewsBar";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -297,7 +297,7 @@ export const DashboardPageBody = ({
           An ADDITIONAL address still gets asked about — in account settings,
           on the row it belongs to, which is where somebody who added one goes
           looking. */}
-      <JoinYourTeamNotice />
+      <JoinYourTeamTakeover />
 
       {adminViewingAs && (
         <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
