@@ -147,13 +147,16 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   project: Project;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const visibleGroups = useVisibleProjectGroups(
     buildProjectGroups(organizations),
   );
 
   return (
-    <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+    <Menu.Root
+      open={isOpen}
+      onOpenChange={({ open: nextOpen }) => setIsOpen(nextOpen)}
+    >
       <Menu.Trigger asChild>
         <Button
           variant="ghost"
@@ -177,7 +180,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
       </Menu.Trigger>
       <Portal>
         <Box zIndex="popover" padding={0}>
-          {open && (
+          {isOpen && (
             <Menu.Content>
               {visibleGroups.map((projectGroup) => (
                 <ProjectGroupSection
