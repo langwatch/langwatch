@@ -3,12 +3,16 @@
  * Which source types route conversations into a trace destination.
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  *
- * The worker's own gate is `event.action === GENIE_QUERY_ACTION`
- * (`genieTraceMapper.ts:239`), so a source type that emits no such event
- * can carry a destination column that nothing ever reads. The drawer must
- * not offer a control with no effect, and this declaration is what it
- * asks — kept beside the catalog so a new adapter's author sees it while
- * adding their entry.
+ * The worker routes an event only when its source has an entry in
+ * `CONVERSATION_ROUTING_PROFILES` (`pullers/pullerWorker.ts`) and the event's
+ * action is the one that entry's profile names. A source type meeting
+ * neither condition can carry a destination column that nothing ever reads.
+ * The drawer must not offer a control with no effect, and this declaration
+ * is what it asks — kept beside the catalog so a new adapter's author sees
+ * it while adding their entry.
+ *
+ * That gate lives in server code this bundle must not import, so the two are
+ * kept in step by declaration plus this test rather than a shared constant.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -18,8 +22,13 @@ import {
 
 describe("given the ingestion-source catalog", () => {
   describe("when asked which types route conversations", () => {
-    it("says Genie does, because it is the one adapter emitting conversations", () => {
+    it("says the two adapters that emit conversations do", () => {
       expect(routesConversations("databricks_genie")).toBe(true);
+      expect(routesConversations("copilot_studio_dataverse")).toBe(true);
+    });
+
+    it("says the retired Copilot source does not — it never emitted one", () => {
+      expect(routesConversations("copilot_studio")).toBe(false);
     });
 
     it("says an aggregate pull does not — its events are counts", () => {
