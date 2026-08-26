@@ -57,7 +57,9 @@ export const MINUTE_INTERVALS = [5, 10, 15, 30] as const;
  * it is rendered by.
  */
 export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
+  // Retired, but kept: rows configured on it still need a cadence resolved.
   copilot_studio: "copilot_studio",
+  copilot_studio_dataverse: "copilot_studio_dataverse",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
   anthropic_admin: "anthropic_admin",
@@ -73,6 +75,10 @@ export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
  */
 export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
+  // Dataverse writes a transcript roughly half an hour after the conversation
+  // ends, so a shorter cadence than this buys nothing; a longer one only adds
+  // to a delay the customer already feels.
+  copilot_studio_dataverse: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
   anthropic_admin: "0 * * * *",

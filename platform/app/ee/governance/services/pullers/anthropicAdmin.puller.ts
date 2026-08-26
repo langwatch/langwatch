@@ -680,6 +680,10 @@ export class AnthropicAdminPuller
         Accept: "application/json",
       },
       signal,
+      // The header above is the customer's admin API key. The fetch helper
+      // follows up to ten redirects by default and re-sends headers to each
+      // host, so a redirect would hand the key to wherever it points.
+      followRedirects: false,
     });
     if (!response.ok) {
       throw await fetchPageError(response, config.report);

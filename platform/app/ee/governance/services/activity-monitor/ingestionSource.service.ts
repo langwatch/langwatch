@@ -53,7 +53,9 @@ export type SourceType =
   | "claude_code"
   | "claude_cowork"
   | "workato"
+  /** Retired: reads the directory audit, which holds no conversations. */
   | "copilot_studio"
+  | "copilot_studio_dataverse"
   | "openai_compliance"
   | "claude_compliance"
   | "anthropic_admin"
@@ -67,6 +69,7 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "claude_cowork",
   "workato",
   "copilot_studio",
+  "copilot_studio_dataverse",
   "openai_compliance",
   "claude_compliance",
   "anthropic_admin",
@@ -245,6 +248,45 @@ const CURSOR_MUST_NOT_MOVE: ReportImmutabilityVerdict = {
  * because it is the same thing the adapter consults, and it is read through
  * the shared predicate so the two cannot drift apart.
  */
+/**
+ * The adapter a source runs under is fixed at create.
+ *
+ * Without this, the destination check above can be walked around rather than
+ * defeated. It reads the adapter off the stored row, so it validates a
+ * `databricks_genie` source against the Databricks host rule — but the request
+ * that satisfied that rule with a real workspace URL can also carry
+ * `adapter: "http_polling"` and a `url` of its own. The check passes, the new
+ * adapter is written, and the next run resolves the stored credential envelope
+ * and sends it to that URL. The caller never reads the secret; the server
+ * delivers it.
+ *
+ * Pinning the adapter is what makes the destination rule mean anything: a
+ * config can only ever be judged against the rules of the adapter that will
+ * actually run it. Absent still means unchanged — the composer does not render
+ * this field, so a client cannot send it back.
+ */
+export function assertAdapterUnchanged({
+  stored,
+  incoming,
+}: {
+  stored: Record<string, unknown>;
+  incoming: Record<string, unknown>;
+}): void {
+  const storedAdapter = stored.adapter;
+  if (typeof storedAdapter !== "string") return;
+  if (incoming.adapter === undefined) return;
+  if (incoming.adapter === storedAdapter) return;
+
+  const complaint =
+    `This source runs on the ${storedAdapter} adapter, which is fixed when ` +
+    "the source is created. Changing it would point the credentials this " +
+    "source already holds at a different service. Archive this source and " +
+    "create a new one to change how it pulls.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
+}
+
 export function assertReportUnchangedOncePulled({
   existing,
   incoming,
@@ -549,7 +591,7 @@ export class IngestionSourceService {
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
     };
-    assertPullDestinationAllowed(requestedParserConfig);
+    assertPullDestinationAllowed({ parserConfig: requestedParserConfig });
     await assertTraceDestinationIsOwnLiveProject({
       prisma: this.prisma,
       organizationId: input.organizationId,
@@ -618,16 +660,34 @@ export class IngestionSourceService {
       // must mean "unchanged" for all of them, not just the secret.
       const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
       for (const key of Object.keys(stored)) {
-        const hiddenFromClients = key === "credentials" || key.startsWith("_");
+        // `adapter` and `schedule` join the list for the same reason as the
+        // rest: the composer deliberately renders neither, so a client cannot
+        // send them back and absent must mean unchanged. Dropping `adapter`
+        // leaves a pull source the worker can no longer dispatch — a rename
+        // would quietly stop the source pulling.
+        const hiddenFromClients =
+          key === "credentials" ||
+          key === "adapter" ||
+          key === "schedule" ||
+          key.startsWith("_");
         if (hiddenFromClients && incoming[key] === undefined) {
           incoming[key] = stored[key];
         }
       }
+      assertAdapterUnchanged({ stored, incoming });
       ({ cursorMustNotMove } = assertReportUnchangedOncePulled({
         existing,
         incoming,
       }));
-      assertPullDestinationAllowed(incoming);
+      // The adapter comes from the stored row, not from `incoming`. The edit
+      // form sends back only the fields it renders and `adapter` is not one of
+      // them, so dispatching on the incoming value would make this check do
+      // nothing on precisely the request that repoints the host — leaving the
+      // destination pinned at create and free afterwards.
+      assertPullDestinationAllowed({
+        parserConfig: incoming,
+        adapterId: stored.adapter as string,
+      });
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
       ) as Prisma.InputJsonValue;
