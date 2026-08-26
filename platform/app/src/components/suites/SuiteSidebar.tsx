@@ -39,7 +39,7 @@ import { useNow } from "~/hooks/useNow";
 import type {
   ExternalSetSummary,
   SuiteRunSummary,
-} from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { ALL_RUNS_ID, toExternalSetSelection } from "./useSuiteRouting";

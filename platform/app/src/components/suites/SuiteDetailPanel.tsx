@@ -30,7 +30,7 @@ import type { Period } from "~/components/PeriodSelector";
 import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { useNow } from "~/hooks/useNow";
-import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { getSuiteSetId } from "@langwatch/suite-contract";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { RunHistoryPanel, type RunHistoryStats } from "./RunHistoryPanel";

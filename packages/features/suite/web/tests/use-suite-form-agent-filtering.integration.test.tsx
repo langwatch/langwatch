@@ -10,7 +10,7 @@
 
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { useSuiteForm } from "../useSuiteForm";
+import { useSuiteForm } from "../src/use-suite-form";
 
 const baseParams = {
   suite: null,

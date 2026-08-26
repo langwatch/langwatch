@@ -18,8 +18,8 @@ import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { api } from "~/utils/api";
 import {
   GroupRow,

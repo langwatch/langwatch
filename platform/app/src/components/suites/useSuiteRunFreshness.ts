@@ -12,7 +12,7 @@
 
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { api } from "~/utils/api";
 import { getAdaptivePollingInterval } from "@langwatch/suite-web";
 

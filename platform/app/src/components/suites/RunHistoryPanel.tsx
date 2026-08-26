@@ -28,10 +28,10 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { isOnPlatformSet } from "@langwatch/scenario-contract";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
+import { isSuiteSetId } from "@langwatch/suite-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import {

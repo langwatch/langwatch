@@ -11,28 +11,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TargetPicker, type TargetPickerProps } from "../TargetPicker";
-
-vi.mock("../../ui/checkbox", () => ({
-  Checkbox: ({
-    checked,
-    onCheckedChange,
-    children,
-  }: {
-    checked: boolean;
-    onCheckedChange?: (details: { checked: boolean }) => void;
-    children: React.ReactNode;
-  }) => (
-    <label>
-      <input
-        type="checkbox"
-        checked={!!checked}
-        onChange={() => onCheckedChange?.({ checked: !checked })}
-      />
-      {children}
-    </label>
-  ),
-}));
+import { TargetPicker, type TargetPickerProps } from "../src/target-picker";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

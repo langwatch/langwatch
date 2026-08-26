@@ -8,7 +8,7 @@
  */
 
 import { useCallback } from "react";
-import { isCancellableStatus } from "~/server/scenarios/scenario-event.enums";
+import { isCancellableStatus } from "@langwatch/scenario-contract";
 import { api } from "~/utils/api";
 
 export { isCancellableStatus };

@@ -3370,12 +3370,21 @@ importers:
       '@chakra-ui/react':
         specifier: ^3.36.0
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@hookform/resolvers':
+        specifier: ^5.4.0
+        version: 5.4.0(react-hook-form@7.80.0(react@19.2.8))
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/simulation-contract':
         specifier: workspace:*
         version: link:../../simulation/contract
+      '@langwatch/suite-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@tanstack/react-virtual':
         specifier: ^3.14.5
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -3388,6 +3397,9 @@ importers:
       react-feather:
         specifier: ^2.0.10
         version: 2.0.10(react@19.2.8)
+      react-hook-form:
+        specifier: ^7.80.0
+        version: 7.80.0(react@19.2.8)
       zod:
         specifier: ^4.4.3
         version: 4.4.3

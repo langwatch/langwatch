@@ -8,28 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioPicker, type ScenarioPickerProps } from "../ScenarioPicker";
-
-vi.mock("../../ui/checkbox", () => ({
-  Checkbox: ({
-    checked,
-    onCheckedChange,
-    children,
-  }: {
-    checked: boolean;
-    onCheckedChange?: (details: { checked: boolean }) => void;
-    children: React.ReactNode;
-  }) => (
-    <label>
-      <input
-        type="checkbox"
-        checked={!!checked}
-        onChange={() => onCheckedChange?.({ checked: !checked })}
-      />
-      {children}
-    </label>
-  ),
-}));
+import { ScenarioPicker, type ScenarioPickerProps } from "../src/scenario-picker";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

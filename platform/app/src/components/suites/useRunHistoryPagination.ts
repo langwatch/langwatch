@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { api } from "~/utils/api";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
