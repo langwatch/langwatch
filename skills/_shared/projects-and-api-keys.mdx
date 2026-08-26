@@ -10,12 +10,15 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. Check `.env` for `LANGWATCH_ENDPOINT` as well: if it is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is available to the CLI. Locally that is the project's `.env`; in CI the runner injects it into the process environment, and the CLI reads either. Check whether the variable is already set before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. Look for `LANGWATCH_ENDPOINT` in the same places: if it is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
 
 **What you read is not what you say.** These skills are working notes for you, not
-copy for the reader. Read the project's own `.env` freely, that is how you learn
-where to work. What must not reach an answer is anything that describes the
-machine YOU run on: a path in your workspace, a container port, the address this
-worker dials. Those say how the work is done rather than what was done, and a
-host of ours means nothing to the reader. Say what you did and where to find it
-in LangWatch.
+copy for the reader. Read `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` from the
+project's own `.env`, that is how you learn where to work. Read nothing else out
+of that file: it holds database, cloud and provider credentials that are none of
+your business, and every value you read can reach your context and your command
+output. What must not reach an answer is anything that describes the machine YOU
+run on: a path in your workspace, a container port, the address this worker
+dials. Those say how the work is done rather than what was done, and a host of
+ours means nothing to the reader. Say what you did and where to find it in
+LangWatch.

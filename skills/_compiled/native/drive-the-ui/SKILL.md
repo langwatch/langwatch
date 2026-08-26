@@ -31,7 +31,7 @@ The result carries `executedVia`:
 - `"browser"`: the user's open page applied it. They saw it happen.
 - `"backend"`: no page answered, the platform applied it to the saved state. The page has not caught up.
 
-**Say where the change happened.** When you report work you did, name the place, because those are two different places for the reader. `"browser"` means it is on the page in front of them, so point at it: "the new column is on your table now". `"backend"` means it is on the saved workbench and their page is behind, so tell them that: "I made it on the saved workbench, so reload the page to see it". This is not decoration. A reader watching a page they think is current, which is not, will read stale numbers and believe them.
+**Say where the change happened.** When you report work you did, name the place, because those are two different places for the reader. `"browser"` means it is on the page in front of them, so point at it: "the new column is on your table now". `"backend"` means it is on the saved workbench and their page is behind, so tell them that: "I made it on the saved workbench, so your page is a step behind". Do not tell them to reload. A page with no unsaved edits catches up on its own, and a page that has unsaved edits shows a stale banner and lets them choose, because a reload discards what they wrote. This is not decoration. A reader watching a page they think is current, which is not, will read stale numbers and believe them.
 
 Say it once for a run of work, not once per call. A loop that made six changes reports where the six landed, not six sentences.
 

@@ -160,8 +160,22 @@ describe("native skill generation", () => {
     // endpoint the customer will type in, and forbidding it would take the
     // example away for nothing: the reader cannot reach ours because it is
     // loopback, not because it ends in a particular word.
-    const WORKER_SIDE_ADDRESS =
-      /https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal)/i;
+    //
+    // A bare `localhost:3000` counts too: it names the same worker port that
+    // `http://localhost:3000` does, and a disclosure that drops the scheme
+    // would otherwise pass. It needs a port, so the word on its own, in prose
+    // saying a self-hosted instance can run locally, still passes.
+    //
+    // The bare form skips anything already carrying a scheme, because the
+    // scheme is what tells the two apart. The voice examples hand the reader
+    // `ws://localhost:8765/stream` for the Pipecat bot THEY run, which is a
+    // placeholder like `https://lw.acme.internal` and not an address of ours.
+    // Only http and https loopback is ours to forbid outright.
+    const LOOPBACK_HOST = String.raw`localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|host\.docker\.internal`;
+    const WORKER_SIDE_ADDRESS = new RegExp(
+      `(https?://(${LOOPBACK_HOST})|(?<!://)\\b(${LOOPBACK_HOST}):\\d{2,5}\\b)`,
+      "i",
+    );
 
     /** @scenario "A skill never hands the customer a path from the machine it runs on" */
     it("names no path from the machine the agent runs on", () => {

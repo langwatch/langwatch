@@ -194,7 +194,7 @@ For Python, scenario tracing is configured via `scenario.configure(...)` combine
 
 For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill. Do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
-**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment, plus `LANGWATCH_ENDPOINT` for self-hosted. If setup runs but no traces appear in the LangWatch UI, the key is missing.
+**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment, plus `LANGWATCH_ENDPOINT` for self-hosted. If setup runs but no traces appear in the LangWatch UI, check each link in turn: the key is set and belongs to the project you are looking at, the endpoint points at the instance you are looking at, the instrumentation step above actually ran, and the run finished without a send failure in its output. A missing key is the most common cause, not the only one.
 
 **VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
