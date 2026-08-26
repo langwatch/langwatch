@@ -7,7 +7,7 @@
  * which is what keeps the surface off a deployment that has no restricted
  * identity to run a customer's SQL as.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { Badge, Box, Spinner } from "@chakra-ui/react";
@@ -16,10 +16,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { LangWatchQLWorkbench } from "~/features/analytics-query/components/LangWatchQLWorkbench";
-import {
-  lwqlNotEnabledPayload,
-  lwqlUnavailablePayload,
-} from "~/features/analytics-query/logic/lwqlFailure";
+import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "@langwatch/analytics-web";
 import { HandledErrorState } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";

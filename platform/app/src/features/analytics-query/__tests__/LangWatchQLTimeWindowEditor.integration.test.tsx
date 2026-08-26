@@ -15,7 +15,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangWatchQLTimeWindowEditor } from "../components/LangWatchQLTimeWindowEditor";
+import { LangWatchQLTimeWindowEditor } from "@langwatch/analytics-web";
 
 const WINDOW = {
   start: Date.UTC(2026, 1, 20, 0, 0, 0),

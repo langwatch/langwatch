@@ -12,9 +12,9 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangWatchQLSchemaBrowser } from "../components/LangWatchQLSchemaBrowser";
-import { lwqlSchemaModel } from "../logic/lwqlSchemaModel";
+import { lwqlSchemaModel } from "@langwatch/analytics-web";
 
-import { SCHEMA_DATASET_NAMES, SCHEMA_RESPONSE } from "./lwqlFixtures";
+import { SCHEMA_DATASET_NAMES, SCHEMA_RESPONSE } from "@langwatch/analytics-web/testing";
 
 function renderBrowser(onInsert = vi.fn()) {
   const model = lwqlSchemaModel(SCHEMA_RESPONSE);

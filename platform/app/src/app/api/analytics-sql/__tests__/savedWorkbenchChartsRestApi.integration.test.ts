@@ -35,7 +35,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
+import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
 import {
   type Organization,
   type Project,

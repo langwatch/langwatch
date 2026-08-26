@@ -34,7 +34,7 @@ import "@testing-library/jest-dom/vitest";
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
 
-import { SCHEMA_RESPONSE } from "./lwqlFixtures";
+import { SCHEMA_RESPONSE } from "@langwatch/analytics-web/testing";
 
 const harness = vi.hoisted(() => ({ mutation: vi.fn() }));
 

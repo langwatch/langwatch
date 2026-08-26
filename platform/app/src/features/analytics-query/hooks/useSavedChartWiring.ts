@@ -16,7 +16,7 @@ import { useCallback, useState } from "react";
 
 import { showErrorToast } from "~/features/errors";
 
-import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
+import type { LangWatchQLParameterValue } from "@langwatch/analytics-web";
 
 import type { UseLangWatchQLQuery } from "./useLangWatchQLQuery";
 import { useSavedWorkbenchCharts } from "./useSavedWorkbenchCharts";

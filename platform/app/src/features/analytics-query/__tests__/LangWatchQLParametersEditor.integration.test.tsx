@@ -20,7 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type LangWatchQLParametersChange,
   LangWatchQLParametersEditor,
-} from "../components/LangWatchQLParametersEditor";
+} from "@langwatch/analytics-web";
 
 /** Renders the editor open, returning the spy holding every change it emits. */
 function renderEditor() {

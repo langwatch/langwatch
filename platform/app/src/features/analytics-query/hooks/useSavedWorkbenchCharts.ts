@@ -16,7 +16,7 @@ import { type Dispatch, type SetStateAction, useCallback, useRef, useState } fro
 
 import { api } from "~/utils/api";
 
-import type { LangWatchQLParameterValue } from "../logic/lwqlRequestState";
+import type { LangWatchQLParameterValue } from "@langwatch/analytics-web";
 
 /** The definition a save writes, assembled from what is on screen. */
 export interface WorkbenchChartDraft {

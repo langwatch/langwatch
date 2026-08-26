@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
+import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
 import type { CustomGraph } from "~/generated/prisma/client";
 
 import type { Protections } from "../../../traces/protections";

@@ -34,11 +34,11 @@ vi.mock("~/utils/compat/next-dynamic", () => {
 });
 
 import { LangWatchQLVegaLiteChart } from "../components/LangWatchQLVegaLiteChart";
-import { validateVegaLiteSpec } from "../visualization/validateVegaLiteSpec";
+import { validateVegaLiteSpec } from "@langwatch/analytics-web/validation";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
-} from "../visualization/visualization.types";
+} from "@langwatch/analytics-web/visualization";
 
 import {
   ADVERSARIAL_VEGA_FIXTURES,

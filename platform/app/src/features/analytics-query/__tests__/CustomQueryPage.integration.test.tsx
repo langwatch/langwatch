@@ -16,9 +16,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { explainHandledError, readHandledError } from "~/features/errors";
 
 import { CustomQueryMenuLink } from "../components/CustomQueryMenuLink";
-import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "../logic/lwqlFailure";
+import { lwqlNotEnabledPayload, lwqlUnavailablePayload } from "@langwatch/analytics-web";
 
-import { SCHEMA_RESPONSE } from "./lwqlFixtures";
+import { SCHEMA_RESPONSE } from "@langwatch/analytics-web/testing";
 
 const harness = vi.hoisted(() => ({
   available: true,

@@ -17,13 +17,12 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LangWatchQLEditor } from "../components/LangWatchQLEditor";
-import { LWQL_LANGUAGE_ITEMS } from "../logic/lwqlLanguageItems";
-import { lwqlSchemaModel } from "../logic/lwqlSchemaModel";
+import { LWQL_LANGUAGE_ITEMS, lwqlSchemaModel } from "@langwatch/analytics-web";
 import {
   SCHEMA_AVAILABLE_COLUMN_NAMES,
   SCHEMA_DATASET_NAMES,
   SCHEMA_RESPONSE,
-} from "./lwqlFixtures";
+} from "@langwatch/analytics-web/testing";
 
 interface CompletionProvider {
   provideCompletionItems: (

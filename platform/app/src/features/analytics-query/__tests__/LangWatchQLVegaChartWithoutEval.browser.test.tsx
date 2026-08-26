@@ -46,9 +46,11 @@ vi.mock("~/utils/compat/next-dynamic", () => {
 import embed from "vega-embed";
 
 import { LangWatchQLChartMode } from "../components/LangWatchQLChartMode";
-import { lwqlVegaEmbedOptions } from "../hooks/useLangWatchQLVegaView";
-import { buildLangWatchQLVegaSpec } from "../visualization/buildLangWatchQLVegaSpec";
-import type { LangWatchQLDatasetColumn } from "../visualization/visualization.types";
+import {
+  lwqlVegaEmbedOptions,
+  type LangWatchQLDatasetColumn,
+} from "@langwatch/analytics-web/chart";
+import { buildLangWatchQLVegaSpec } from "@langwatch/analytics-web/visualization";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },

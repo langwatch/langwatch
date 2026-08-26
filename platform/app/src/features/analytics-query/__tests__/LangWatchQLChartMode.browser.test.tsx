@@ -43,7 +43,7 @@ vi.mock("~/utils/compat/next-dynamic", () => {
 });
 
 import { LangWatchQLChartMode } from "../components/LangWatchQLChartMode";
-import type { LangWatchQLDatasetColumn } from "../visualization/visualization.types";
+import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-web/chart";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },

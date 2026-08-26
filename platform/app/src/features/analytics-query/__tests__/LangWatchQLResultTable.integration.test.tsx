@@ -22,9 +22,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
 
-import { LangWatchQLResultTable } from "../components/LangWatchQLResultTable";
+import { LangWatchQLResultTable } from "@langwatch/analytics-web";
 
-import { lwqlResult } from "./lwqlFixtures";
+import { lwqlResult } from "@langwatch/analytics-web/testing";
 
 /** The height the stubbed viewport reports, in pixels. */
 const VIEWPORT_HEIGHT = 480;

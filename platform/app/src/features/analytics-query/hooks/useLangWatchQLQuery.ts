@@ -1,9 +1,9 @@
 /**
  * The workbench's request state, bound to React.
  *
- * A thin wrapper: the machine is `../logic/lwqlRequestController`, and
- * everything this adds is lifecycle — one controller per mount, a subscription,
- * and a disposal that aborts whatever is in flight.
+ * A thin application binding around the Analytics package request machine.
+ * This adds one controller per mount, a subscription, and disposal that aborts
+ * whatever is in flight.
  *
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
@@ -15,16 +15,14 @@ import { api } from "~/utils/api";
 import { createLangWatchQLExecute } from "../logic/lwqlExecute";
 import {
   createLangWatchQLRequestController,
-  type LangWatchQLRequestController,
-} from "../logic/lwqlRequestController";
-import {
   isLangWatchQLResultStale,
   type LangWatchQLActionLabel,
   type LangWatchQLParameterValue,
+  type LangWatchQLRequestController,
   type LangWatchQLRequestState,
   type LangWatchQLTimeWindowValues,
   lwqlActionLabel,
-} from "../logic/lwqlRequestState";
+} from "@langwatch/analytics-web";
 
 export interface UseLangWatchQLQuery {
   state: LangWatchQLRequestState;

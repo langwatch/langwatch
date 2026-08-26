@@ -26,9 +26,9 @@ import { LangWatchQLResultPane } from "../components/LangWatchQLResultPane";
 import type {
   LangWatchQLAnswer,
   LangWatchQLRequestState,
-} from "../logic/lwqlRequestState";
+} from "@langwatch/analytics-web";
 
-import { handledErrorEnvelope, lwqlResult } from "./lwqlFixtures";
+import { handledErrorEnvelope, lwqlResult } from "@langwatch/analytics-web/testing";
 
 const SUBMITTED_SQL = "SELECT trace_id FROM analytics.traces_daily";
 

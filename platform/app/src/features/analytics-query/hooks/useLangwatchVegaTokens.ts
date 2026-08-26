@@ -21,7 +21,7 @@ import { rotatingColors } from "~/utils/rotatingColors";
 import type {
   LangWatchQLVegaColorMode,
   LangwatchVegaTokens,
-} from "../visualization/langwatchVegaConfig";
+} from "@langwatch/analytics-web/visualization";
 
 /**
  * The palette names behind the application's chart colours, derived from the

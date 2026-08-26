@@ -31,7 +31,7 @@ import {
   lwqlResult,
   SCHEMA_DATASET_NAMES,
   SCHEMA_RESPONSE,
-} from "./lwqlFixtures";
+} from "@langwatch/analytics-web/testing";
 
 const harness = vi.hoisted(() => ({
   mutation: vi.fn(),

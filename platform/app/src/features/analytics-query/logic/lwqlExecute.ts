@@ -12,8 +12,10 @@
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
-import type { LangWatchQLExecute } from "./lwqlRequestController";
-import type { LangWatchQLParameterValue } from "./lwqlRequestState";
+import type {
+  LangWatchQLExecute,
+  LangWatchQLParameterValue,
+} from "@langwatch/analytics-web";
 
 export interface LangWatchQLQueryInput {
   projectId: string;

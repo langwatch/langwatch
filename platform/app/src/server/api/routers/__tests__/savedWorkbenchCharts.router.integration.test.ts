@@ -51,7 +51,7 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
-import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
+import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";

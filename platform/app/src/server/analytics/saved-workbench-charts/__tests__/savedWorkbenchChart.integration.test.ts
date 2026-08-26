@@ -13,7 +13,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
-import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
+import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import {
   AppAutomationRuntime,
