@@ -4,24 +4,22 @@ import {
   PostgresExperimentAdapter,
   type PostgresExperimentAdapterOptions,
 } from "@langwatch/experiment-server";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 
 export type AppExperimentRuntimeOptions = PostgresExperimentAdapterOptions;
 
 export class AppExperimentDspyRetentionPort extends ExperimentDspyRetentionPort {
-  static create(resolver: RetentionPolicyResolver): AppExperimentDspyRetentionPort {
+  static create(resolver: DataRetentionService): AppExperimentDspyRetentionPort {
     return new AppExperimentDspyRetentionPort(resolver);
   }
 
-  private constructor(private readonly resolver: RetentionPolicyResolver) {
+  private constructor(private readonly resolver: DataRetentionService) {
     super();
   }
 
   async getTraceRetentionDays(tenantId: string): Promise<number> {
-    return (
-      (await this.resolver.resolve(tenantId))?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS
-    );
+    const retention = await this.resolver.getResolvedForProject({ projectId: tenantId });
+    return retention.traces;
   }
 }
 

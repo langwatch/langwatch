@@ -1838,18 +1838,21 @@ importers:
 
   packages/features/data-retention/server:
     dependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.0
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
-      '@langwatch/prisma-client':
-        specifier: workspace:*
-        version: link:../../../prisma-client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^7.0.2

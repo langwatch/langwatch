@@ -63,7 +63,6 @@ import type { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
-import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import type { SuiteService } from "@langwatch/suite-contract";
@@ -115,11 +114,7 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { NlpLambdaRuntime } from "~/runtime/api/nlp-lambda";
 
-export type DataRetentionDependencies = DataRetentionService & {
-  /** Singular feature service: policy and trace-pin methods share one instance. */
-  retroactive: RetroactiveUpdateService;
-  metering: StorageMeterService;
-};
+export type DataRetentionDependencies = DataRetentionService;
 
 export type OpsDependencies = OpsService & {
   eventExplorer: EventExplorerService;
@@ -378,6 +373,7 @@ export interface AppDependencies {
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
   dataRetention: DataRetentionDependencies;
+  storageMeter: StorageMeterService;
   share: ShareService;
   commands: AppCommands;
   ops: OpsDependencies;

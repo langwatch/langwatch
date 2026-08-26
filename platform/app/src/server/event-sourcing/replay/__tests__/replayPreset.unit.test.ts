@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import { getApp } from "../../../app-layer/app";
 import { createReplayRuntime } from "../replayPreset";
 
@@ -65,6 +66,9 @@ vi.mock("../replayService", () => ({
 }));
 
 const mockedGetApp = vi.mocked(getApp);
+const retentionPolicyResolver = {
+  resolve: vi.fn(async () => null),
+} satisfies RetentionPolicyResolver;
 
 /** Minimal pipeline definition double for replay discovery. */
 function pipelineDef(params: {
@@ -107,7 +111,10 @@ describe("createReplayRuntime", () => {
           }),
         ]);
 
-        const runtime = createReplayRuntime({ redisUrl: "redis://unit-test" });
+        const runtime = createReplayRuntime({
+          redisUrl: "redis://unit-test",
+          retentionPolicyResolver,
+        });
 
         expect(runtime.mapProjections).toEqual([
           expect.objectContaining({
@@ -134,7 +141,10 @@ describe("createReplayRuntime", () => {
           }),
         ]);
 
-        const runtime = createReplayRuntime({ redisUrl: "redis://unit-test" });
+        const runtime = createReplayRuntime({
+          redisUrl: "redis://unit-test",
+          retentionPolicyResolver,
+        });
 
         expect(runtime.mapProjections).toEqual([]);
         await runtime.close();

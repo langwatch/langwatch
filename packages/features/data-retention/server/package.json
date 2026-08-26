@@ -13,6 +13,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./retention-tables": {
+      "types": "./src/adapters/clickhouse.retention-table.adapter.ts",
+      "default": "./src/adapters/clickhouse.retention-table.adapter.ts"
     }
   },
   "scripts": {
@@ -21,9 +25,11 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.23.0",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/project-contract": "workspace:*"
+    "@langwatch/project-contract": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

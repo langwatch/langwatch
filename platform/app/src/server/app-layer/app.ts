@@ -165,6 +165,7 @@ export class App {
   readonly usageLimits: AppDependencies["usageLimits"];
   readonly ops?: OpsDependencies;
   readonly dataRetention: DataRetentionDependencies;
+  readonly storageMeter: AppDependencies["storageMeter"];
   readonly share: AppDependencies["share"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
@@ -246,6 +247,7 @@ export class App {
     this.langy = deps.langy;
     this.ops = deps.ops;
     this.dataRetention = deps.dataRetention;
+    this.storageMeter = deps.storageMeter;
     this.share = deps.share;
     this._eventSourcing = deps._eventSourcing;
     this._authzMigration = deps._authzMigration;

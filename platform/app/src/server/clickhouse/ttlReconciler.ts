@@ -1,7 +1,7 @@
 import { createClient } from "@clickhouse/client";
 
 import { createLogger } from "@langwatch/observability";
-import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
+import { RETENTION_MANAGED_TABLES } from "@langwatch/data-retention-server/retention-tables";
 import { parseConnectionUrl } from "./goose";
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");

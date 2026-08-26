@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { TtlCache } from "~/server/utils/ttlCache";
 import {
   PRODUCTION_STORAGE_METER_TABLES,
   RETENTION_TABLE_CATEGORY_MAP,
-  type RetentionCategory,
-} from "../retentionPolicy.schema";
+} from "@langwatch/data-retention-server/retention-tables";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { TtlCache } from "~/server/utils/ttlCache";
+import type { RetentionCategory } from "@langwatch/data-retention-contract";
 
 const logger = createLogger("langwatch:data-retention:metering");
 

@@ -1,6 +1,10 @@
 import type {
+  KillRetroactiveMutationInput,
   PinnedTrace,
   PinTraceInput,
+  RetroactiveMutationProjectInput,
+  RetroactiveMutationProgress,
+  RetroactiveRetentionUpdateInput,
   ResolvedRetention,
   RetentionCategory,
   RetentionPolicy,
@@ -10,6 +14,28 @@ import type {
 
 export class ScopeTargetNotFoundError extends Error {
   readonly name = "ScopeTargetNotFoundError" as const;
+}
+
+export class RetroactiveMutationInProgressError extends Error {
+  readonly name = "RetroactiveMutationInProgressError" as const;
+
+  constructor(readonly blocked: RetroactiveMutationProgress[]) {
+    const summary = blocked
+      .map((mutation) => `${mutation.table} (${mutation.mutationId})`)
+      .join(", ");
+    super(
+      `Retroactive update already in progress for: ${summary}. ` +
+        "Wait for completion or kill the listed mutation(s) before starting another.",
+    );
+  }
+}
+
+export class DataRetentionBackendUnavailableError extends Error {
+  readonly name = "DataRetentionBackendUnavailableError" as const;
+
+  constructor() {
+    super("ClickHouse not available");
+  }
 }
 
 export abstract class DataRetentionService {
@@ -44,4 +70,11 @@ export abstract class DataRetentionService {
   abstract tryGetPin(input: UnpinTraceInput): Promise<PinnedTrace | null>;
   abstract listByProject(input: { projectId: string }): Promise<PinnedTrace[]>;
   abstract getPinnedTraceIds(input: { projectId: string }): Promise<string[]>;
+  abstract triggerRetroactiveUpdate(
+    input: RetroactiveRetentionUpdateInput,
+  ): Promise<{ tables: string[] }>;
+  abstract getRetroactiveMutationProgress(
+    input: RetroactiveMutationProjectInput,
+  ): Promise<RetroactiveMutationProgress[]>;
+  abstract killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void>;
 }

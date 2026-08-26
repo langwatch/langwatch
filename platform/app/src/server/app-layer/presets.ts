@@ -225,9 +225,9 @@ import {
 } from "./billing/enterprise/webhook.service";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { PrismaDataRetentionAdapter } from "@langwatch/data-retention-server";
+import { AppEventingRetentionAdapter } from "~/runtime/app/features/eventing-retention.adapter";
 import { PostgresShareAdapter } from "@langwatch/share-server";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { PostgresAutomationGraphDeliveryAdapter } from "@langwatch/automation-server";
 import { createAutomationGraphPorts } from "~/runtime/app/features/automation-graph-ports";
@@ -610,7 +610,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
     redis,
     cacheTtlMs: 60_000,
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
   });
+  const eventingRetention = AppEventingRetentionAdapter.create(dataRetentionService);
   const share = traced(
     PostgresShareAdapter.create({
       database: prisma,
@@ -1059,16 +1061,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       })
     : undefined;
 
-  const retroactiveUpdateService = new RetroactiveUpdateService(
-    clickhouseEnabled ? resolveClickHouseClient : null,
-  );
   const storageMeterService = new StorageMeterService({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
   });
-  const dataRetention: DataRetentionDependencies = Object.assign(dataRetentionService, {
-    retroactive: retroactiveUpdateService,
-    metering: storageMeterService,
-  });
+  const dataRetention: DataRetentionDependencies = dataRetentionService;
 
   const langyAdapter = PostgresLangyAdapter.create({ database: prisma });
   const langyPersistence = langyAdapter.eventing();
@@ -1312,7 +1308,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const eventStore = clickhouseEnabled
     ? new EventStoreClickHouse(
         new EventRepositoryClickHouse(resolveClickHouseClient),
-        dataRetentionService,
+        eventingRetention,
       )
     : undefined;
   const configuredGlobalConcurrency = Number(process.env.GLOBAL_QUEUE_CONCURRENCY);
@@ -1347,7 +1343,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     consumersEnabled: roleRunsWorkers(config.processRole),
     executionTarget: config.processRole === "all" ? undefined : config.processRole,
     replayMarkerChecker: redis ? new RedisReplayMarkerChecker(redis) : undefined,
-    retentionPolicyResolver: dataRetentionService,
+    retentionPolicyResolver: eventingRetention,
     configureGlobalProjections: config.isSaas
       ? (registry) => {
           registry.registerMapProjection(orgBillableEventsMeterProjection);
@@ -2062,7 +2058,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         audit: new ProcessAuditRepository(prisma),
       });
     })(),
-    replay: new ReplayService(replayRepo),
+    replay: new ReplayService(replayRepo, eventingRetention),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, ops: opsService, snapshots })
       : null,
@@ -2166,6 +2162,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     nurturing,
     usageLimits,
     dataRetention,
+    storageMeter: storageMeterService,
     share,
     commands,
     ops,
@@ -2465,13 +2462,8 @@ export function createTestApp(
     database: testPrisma,
     processStore: new PrismaProcessStore(testPrisma),
   }).build();
-  const testDataRetention: DataRetentionDependencies = Object.assign(
-    testDataRetentionService,
-    {
-      retroactive: new RetroactiveUpdateService(null),
-      metering: new StorageMeterService({ resolveClickHouseClient: null }),
-    },
-  );
+  const testDataRetention: DataRetentionDependencies = testDataRetentionService;
+  const testStorageMeter = new StorageMeterService({ resolveClickHouseClient: null });
   const testScim = PostgresScimAdapter.create({
     database: testPrisma,
     writer: testAuthz.grants,
@@ -2759,7 +2751,10 @@ export function createTestApp(
         fleet: new NullProcessOpsRepository(),
         audit: new NullProcessAuditSink(),
       }),
-      replay: new ReplayService(new NullReplayRepository()),
+      replay: new ReplayService(
+        new NullReplayRepository(),
+        AppEventingRetentionAdapter.create(testDataRetentionService),
+      ),
       metricsCollector: null,
       snapshots: null,
     }),
@@ -2839,6 +2834,7 @@ export function createTestApp(
       },
     },
     dataRetention: testDataRetention,
+    storageMeter: testStorageMeter,
     share: testShare,
     _authzMigration: testAuthz.migration,
     ...overrides,

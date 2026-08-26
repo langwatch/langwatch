@@ -1,8 +1,8 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import { batchScopePermissions } from "~/server/api/rbac";
-import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import type { ScopeTier } from "~/server/scopes/scope.types";
+import type { StorageMeterService } from "./storageMeter.service";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };
 
@@ -28,13 +28,13 @@ export type StorageScopeUsage = {
  */
 export async function resolveScopeStorageUsage(
   ctx: ReadCtx,
+  metering: StorageMeterService,
   params: {
     projectId: string;
     scope: { scopeType: ScopeTier; scopeId: string };
   },
 ): Promise<StorageScopeUsage> {
   const { projectId, scope } = params;
-  const metering = getApp().dataRetention.metering;
 
   const project = await ctx.prisma.project.findFirst({
     where: { id: projectId },

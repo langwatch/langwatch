@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
+import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
 import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
 import {
   assertCanDisableRetention,
@@ -11,7 +12,12 @@ import {
   assertRetentionWriteAllowed,
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
-import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
+import {
+  killRetroactiveMutationInputSchema,
+  retroactiveMutationProjectInputSchema,
+  retentionCategorySchema,
+  ScopeTargetNotFoundError,
+} from "@langwatch/data-retention-contract";
 
 /**
  * Plan-gate the retention mutations via the project's owning organization.
@@ -22,6 +28,7 @@ import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRet
 async function assertRetentionPlanForProject(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
+  planProvider: PlanProvider,
 ): Promise<void> {
   const project = await ctx.prisma.project.findFirst({
     where: { id: projectId },
@@ -34,13 +41,11 @@ async function assertRetentionPlanForProject(
       message: "Project does not belong to any organization.",
     });
   }
-  await assertRetentionPlan(ctx, organizationId);
+  await assertRetentionPlan(ctx, organizationId, planProvider);
 }
 
 import {
   INDEFINITE_RETENTION_DAYS,
-  type RetentionCategory,
-  retentionCategorySchema,
   retentionDaysInputSchema,
 } from "~/server/data-retention/retentionPolicy.schema";
 import { SCOPE_TIERS } from "~/server/scopes/scope.types";
@@ -51,6 +56,10 @@ const scopeInput = z.object({
   scopeType: z.enum(SCOPE_TIERS),
   scopeId: z.string().min(1),
 });
+const triggerRetroactiveMutationInputSchema =
+  retroactiveMutationProjectInputSchema.extend({
+    category: retentionCategorySchema,
+  });
 
 export const dataRetentionRouter = createTRPCRouter({
   /**
@@ -63,7 +72,12 @@ export const dataRetentionRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:view")
     .query(async ({ input, ctx }) => {
-      return getRetentionPolicySnapshot(ctx, { projectId: input.projectId });
+      return getRetentionPolicySnapshot(
+        ctx,
+        { projectId: input.projectId },
+        ctx.app.dataRetention,
+        ctx.app.planProvider,
+      );
     }),
 
   /**
@@ -103,17 +117,21 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
         input.retentionDays,
+        ctx.app.planProvider,
       );
       // Disabling retention (indefinite/keep-forever) is platform-admin only.
       // The schema accepts the 0 sentinel structurally; this is where the
       // capability is actually authorized — independent of org/team RBAC.
       if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
-        assertCanDisableRetention({ prisma: ctx.prisma, session: ctx.session });
+        assertCanDisableRetention(
+          { prisma: ctx.prisma, session: ctx.session },
+          ctx.app.ops,
+        );
       }
       try {
-        return await ctx.app.dataRetention.policy.setForScope({
+        return await ctx.app.dataRetention.setForScope({
           scope: input.scope,
-          category: input.category as RetentionCategory,
+          category: input.category,
           retentionDays: input.retentionDays,
         });
       } catch (error) {
@@ -145,7 +163,7 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
-      return ctx.app.dataRetention.policy.previewScopeRemoval(input.scope);
+      return ctx.app.dataRetention.previewScopeRemoval({ scope: input.scope });
     }),
 
   /** Remove one category's override at one scope; the next tier then applies. */
@@ -171,23 +189,19 @@ export const dataRetentionRouter = createTRPCRouter({
       await assertRetentionPlanForScope(
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
+        ctx.app.planProvider,
       );
-      await ctx.app.dataRetention.policy.removeForScope({
+      await ctx.app.dataRetention.removeForScope({
         scope: input.scope,
-        category: input.category as RetentionCategory,
+        category: input.category,
       });
     }),
 
   triggerRetroactiveUpdate: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        category: retentionCategorySchema,
-      }),
-    )
+    .input(triggerRetroactiveMutationInputSchema)
     .permission("project:update")
     .mutation(async ({ input, ctx }) => {
-      await assertRetentionPlanForProject(ctx, input.projectId);
+      await assertRetentionPlanForProject(ctx, input.projectId, ctx.app.planProvider);
       // Resolve the retention value server-side. Trusting a client-supplied
       // newRetentionDays would let a project:update caller rewrite existing
       // rows to any value, irreversibly contracting data without a matching
@@ -199,10 +213,10 @@ export const dataRetentionRouter = createTRPCRouter({
       // value. We return `appliedRetentionDays` to the UI so it can show
       // the truth (the dialog previously named the form value, which
       // could differ silently from what got applied).
-      const effective = await ctx.app.dataRetention.policy.getResolvedForProject(
-        input.projectId,
-      );
-      const category = input.category as RetentionCategory;
+      const effective = await ctx.app.dataRetention.getResolvedForProject({
+        projectId: input.projectId,
+      });
+      const category = input.category;
       const newRetentionDays = effective[category];
       if (newRetentionDays === undefined) {
         throw new TRPCError({
@@ -210,7 +224,7 @@ export const dataRetentionRouter = createTRPCRouter({
           message: `No effective retention is resolvable for category ${category}.`,
         });
       }
-      const result = await ctx.app.dataRetention.retroactive.triggerUpdate({
+      const result = await ctx.app.dataRetention.triggerRetroactiveUpdate({
         projectId: input.projectId,
         category,
         newRetentionDays,
@@ -219,25 +233,20 @@ export const dataRetentionRouter = createTRPCRouter({
     }),
 
   getMutationProgress: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(retroactiveMutationProjectInputSchema)
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      return ctx.app.dataRetention.retroactive.getMutationProgress({
+      return ctx.app.dataRetention.getRetroactiveMutationProgress({
         projectId: input.projectId,
       });
     }),
 
   killMutation: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        mutationId: z.string(),
-      }),
-    )
+    .input(killRetroactiveMutationInputSchema)
     .permission("project:update")
     .mutation(async ({ input, ctx }) => {
-      await assertRetentionPlanForProject(ctx, input.projectId);
-      await ctx.app.dataRetention.retroactive.killMutation({
+      await assertRetentionPlanForProject(ctx, input.projectId, ctx.app.planProvider);
+      await ctx.app.dataRetention.killRetroactiveMutation({
         projectId: input.projectId,
         mutationId: input.mutationId,
       });
@@ -255,7 +264,7 @@ export const dataRetentionRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), scope: scopeInput }))
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      return resolveScopeStorageUsage(ctx, {
+      return resolveScopeStorageUsage(ctx, ctx.app.storageMeter, {
         projectId: input.projectId,
         scope: input.scope,
       });

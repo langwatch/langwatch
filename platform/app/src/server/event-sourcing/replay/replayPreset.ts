@@ -3,6 +3,7 @@ import type {
   RegisteredFoldProjection,
   RegisteredMapProjection,
   RegisteredStateProjection,
+  RetentionPolicyResolver,
 } from "@langwatch/eventing";
 import { ReplayService, RepositoryFoldStore } from "@langwatch/eventing";
 import { RedisConnectionService } from "@langwatch/redis-client";
@@ -56,7 +57,10 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
  * Iterates the live pipeline definitions from the EventSourcing runtime and
  * re-creates each fold projection with a raw CH store (no Redis cache).
  */
-export function createReplayRuntime(config: { redisUrl: string }): ReplayRuntime {
+export function createReplayRuntime(config: {
+  redisUrl: string;
+  retentionPolicyResolver: RetentionPolicyResolver;
+}): ReplayRuntime {
   // Replay runs its own connection rather than the App's on purpose: a full
   // rebuild should not share a socket with live traffic. It is still built by
   // the client package, so a `rediss://` target gets TLS and the dev database
@@ -178,7 +182,7 @@ export function createReplayRuntime(config: { redisUrl: string }): ReplayRuntime
     redis,
     // Reuse the live pipeline's cached resolver so replay-rebuilt rows honour
     // the same per-tenant retention as live ingestion.
-    retentionPolicyResolver: getApp().retentionPolicyCache,
+    retentionPolicyResolver: config.retentionPolicyResolver,
   });
 
   return {

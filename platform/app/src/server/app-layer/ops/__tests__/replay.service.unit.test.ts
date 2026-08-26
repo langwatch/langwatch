@@ -1,4 +1,4 @@
-import type { ReplayProgress } from "@langwatch/eventing";
+import type { ReplayProgress, RetentionPolicyResolver } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
 import { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "../replay.service";
@@ -18,6 +18,9 @@ vi.mock("~/server/event-sourcing/replay/replayPreset", () => ({
 }));
 
 const mockedCreateReplayRuntime = vi.mocked(createReplayRuntime);
+const retentionPolicyResolver = {
+  resolve: vi.fn(async () => null),
+} satisfies RetentionPolicyResolver;
 
 /** In-memory ReplayRepository double with spy-wrapped lock methods. */
 function createFakeRepo() {
@@ -142,7 +145,7 @@ describe("ops ReplayService", () => {
     describe("when a full rebuild starts", () => {
       it("clears the selected projections' markers before replaying", async () => {
         const repo = createFakeRepo();
-        const service = new ReplayService(repo);
+        const service = new ReplayService(repo, retentionPolicyResolver);
         const callOrder: string[] = [];
         const { cleanup } = stubRuntime(
           vi.fn(async () => {
@@ -178,7 +181,7 @@ describe("ops ReplayService", () => {
     describe("when clearing the markers fails", () => {
       it("fails the run instead of replaying against them", async () => {
         const repo = createFakeRepo();
-        const service = new ReplayService(repo);
+        const service = new ReplayService(repo, retentionPolicyResolver);
         const replay = vi.fn(async () => ({
           aggregatesReplayed: 1,
           totalEvents: 3,
@@ -207,7 +210,7 @@ describe("ops ReplayService", () => {
     describe("when a default run starts", () => {
       it("preserves the markers so the run resumes where it stopped", async () => {
         const repo = createFakeRepo();
-        const service = new ReplayService(repo);
+        const service = new ReplayService(repo, retentionPolicyResolver);
         const { cleanup } = stubRuntime(
           vi.fn(async () => ({
             aggregatesReplayed: 1,
@@ -234,7 +237,7 @@ describe("ops ReplayService", () => {
 
   it("routes operational state projections through the unified replay entry point", async () => {
     const repo = createFakeRepo();
-    const service = new ReplayService(repo);
+    const service = new ReplayService(repo, retentionPolicyResolver);
     const replay = vi.fn(async () => ({
       aggregatesReplayed: 1,
       totalEvents: 3,
@@ -273,7 +276,7 @@ describe("ops ReplayService", () => {
         vi.useFakeTimers();
         try {
           const repo = createFakeRepo();
-          const service = new ReplayService(repo);
+          const service = new ReplayService(repo, retentionPolicyResolver);
 
           let finishRun!: () => void;
           const runGate = new Promise<void>((resolve) => {
@@ -331,7 +334,7 @@ describe("ops ReplayService", () => {
         vi.useFakeTimers();
         try {
           const repo = createFakeRepo();
-          const service = new ReplayService(repo);
+          const service = new ReplayService(repo, retentionPolicyResolver);
 
           let finishRun!: () => void;
           const runGate = new Promise<void>((resolve) => {
@@ -380,7 +383,7 @@ describe("ops ReplayService", () => {
         vi.useFakeTimers();
         try {
           const repo = createFakeRepo();
-          const service = new ReplayService(repo);
+          const service = new ReplayService(repo, retentionPolicyResolver);
 
           // First refresh fails (e.g. a Redis hiccup); later ones succeed
           // via the fake's real implementation.
@@ -437,7 +440,7 @@ describe("ops ReplayService", () => {
         vi.useFakeTimers();
         try {
           const repo = createFakeRepo();
-          const service = new ReplayService(repo);
+          const service = new ReplayService(repo, retentionPolicyResolver);
 
           let proceedToProgress!: () => void;
           const progressGate = new Promise<void>((resolve) => {
@@ -500,7 +503,7 @@ describe("ops ReplayService", () => {
         vi.useFakeTimers();
         try {
           const repo = createFakeRepo();
-          const service = new ReplayService(repo);
+          const service = new ReplayService(repo, retentionPolicyResolver);
           let hasResumedAfterAbort = false;
 
           let proceedToProgress!: () => void;
@@ -565,7 +568,7 @@ describe("ops ReplayService", () => {
         vi.useFakeTimers();
         try {
           const repo = createFakeRepo();
-          const service = new ReplayService(repo);
+          const service = new ReplayService(repo, retentionPolicyResolver);
 
           let finishRun!: () => void;
           const runGate = new Promise<void>((resolve) => {
@@ -616,7 +619,7 @@ describe("ops ReplayService", () => {
     describe("when the stale run finishes", () => {
       it("does not overwrite the new holder's status", async () => {
         const repo = createFakeRepo();
-        const service = new ReplayService(repo);
+        const service = new ReplayService(repo, retentionPolicyResolver);
 
         stubRuntime(async () => {
           // Simulate the lock being lost mid-run: it expires AND a new run
@@ -658,7 +661,7 @@ describe("ops ReplayService", () => {
     describe("when the run finishes successfully", () => {
       it("still finalizes the run as completed", async () => {
         const repo = createFakeRepo();
-        const service = new ReplayService(repo);
+        const service = new ReplayService(repo, retentionPolicyResolver);
 
         stubRuntime(async () => {
           // Lock expired mid-run and nobody took over: holder is null.

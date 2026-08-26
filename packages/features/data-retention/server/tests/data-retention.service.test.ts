@@ -117,6 +117,24 @@ const createService = (repository = new Repository(), cache?: Cache) =>
   });
 
 describe("DataRetentionService", () => {
+  it("preserves unavailable ClickHouse behaviour", async () => {
+    const service = createService();
+
+    await expect(
+      service.triggerRetroactiveUpdate({
+        projectId: "project",
+        category: "traces",
+        newRetentionDays: 49,
+      }),
+    ).rejects.toThrow("ClickHouse not available");
+    await expect(
+      service.getRetroactiveMutationProgress({ projectId: "project" }),
+    ).resolves.toEqual([]);
+    await expect(
+      service.killRetroactiveMutation({ projectId: "project", mutationId: "mutation" }),
+    ).resolves.toBeUndefined();
+  });
+
   it("resolves policy through the project/team/organization cascade", async () => {
     const repository = new Repository();
     repository.rows = [

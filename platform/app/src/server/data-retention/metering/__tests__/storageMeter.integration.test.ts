@@ -16,16 +16,16 @@
  * actually answer the query the service builds for it.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  PRODUCTION_STORAGE_METER_TABLES,
+  RETENTION_MANAGED_TABLES,
+} from "@langwatch/data-retention-server/retention-tables";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import {
-  PRODUCTION_STORAGE_METER_TABLES,
-  RETENTION_MANAGED_TABLES,
-} from "../../retentionPolicy.schema";
 import { StorageMeterService } from "../storageMeter.service";
 
 let ch: ClickHouseClient;

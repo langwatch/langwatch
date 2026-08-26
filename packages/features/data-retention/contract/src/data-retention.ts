@@ -16,6 +16,40 @@ export const retentionCategories = ["traces", "scenarios", "experiments"] as con
 export const retentionCategorySchema = z.enum(retentionCategories);
 export type RetentionCategory = z.infer<typeof retentionCategorySchema>;
 
+export const retroactiveMutationProgressSchema = z
+  .object({
+    mutationId: z.string(),
+    table: z.string(),
+    isDone: z.boolean(),
+    partsToDo: z.number(),
+    createTime: z.string(),
+    category: retentionCategorySchema.nullable(),
+  })
+  .strict();
+export type RetroactiveMutationProgress = z.infer<
+  typeof retroactiveMutationProgressSchema
+>;
+
+export type RetentionChangeKind = "expansion" | "contraction" | "noop";
+
+export function classifyRetentionChange(input: {
+  current: number;
+  next: number;
+}): RetentionChangeKind {
+  const current = input.current <= 0 ? Number.POSITIVE_INFINITY : input.current;
+  const next = input.next <= 0 ? Number.POSITIVE_INFINITY : input.next;
+
+  if (next < current) {
+    return "contraction";
+  }
+
+  if (next > current) {
+    return "expansion";
+  }
+
+  return "noop";
+}
+
 export const pinSources = ["manual", "share"] as const;
 export const pinSourceSchema = z.enum(pinSources);
 export type PinSource = z.infer<typeof pinSourceSchema>;
@@ -94,6 +128,34 @@ export const retentionDaysInputSchema = z.union([
   z.literal(INDEFINITE_RETENTION_DAYS),
   retentionDaysSchema,
 ]);
+
+export const retroactiveRetentionUpdateInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    category: retentionCategorySchema,
+    newRetentionDays: retentionDaysInputSchema,
+  })
+  .strict();
+export type RetroactiveRetentionUpdateInput = z.infer<
+  typeof retroactiveRetentionUpdateInputSchema
+>;
+
+export const retroactiveMutationProjectInputSchema = z
+  .object({ projectId: z.string().min(1) })
+  .strict();
+export type RetroactiveMutationProjectInput = z.infer<
+  typeof retroactiveMutationProjectInputSchema
+>;
+
+export const killRetroactiveMutationInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    mutationId: z.string().min(1),
+  })
+  .strict();
+export type KillRetroactiveMutationInput = z.infer<
+  typeof killRetroactiveMutationInputSchema
+>;
 
 export const retentionPolicySchema = z
   .object({

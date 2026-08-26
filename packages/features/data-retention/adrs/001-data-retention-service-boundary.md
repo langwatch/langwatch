@@ -12,15 +12,17 @@ across application folders. Policy reads also duplicated scope traversal.
 ## Decision
 
 Data Retention is one core feature with contract, server, and web surfaces.
-Its service owns policy cascade, policy persistence, caching, and trace pins.
+Its service owns policy cascade, policy persistence, caching, trace pins, and
+retroactive retention mutations.
 
 ## Public surfaces and transports
 
 The contract exports Zod 4 values, errors, and one `DataRetentionService`.
 The web package exports reusable transport-free settings presentation. App
 tRPC and pages remain compatibility composition until the physical app split.
-Retroactive updates, metering and policy-authorisation adapters remain app
-migration debt until their server and process slices move.
+Metering and policy-authorisation adapters remain app migration debt. The
+feature server owns the ClickHouse table catalogue; legacy TTL and metering
+callers use its narrow compatibility export until those slices move.
 
 ## Dependencies
 
@@ -35,8 +37,9 @@ Pinning never changes retention stamps or ClickHouse TTLs.
 
 ## Runtime and registration
 
-Boot composes one service per process. Retroactive execution belongs behind a
-retry-safe worker boundary; request handlers do not construct the service.
+Boot composes one service per process. A private ClickHouse repository receives
+the tenant-aware client resolver; unavailable ClickHouse preserves the existing
+trigger error, empty progress, and no-op cancellation behaviour.
 
 ## Environment and configuration
 

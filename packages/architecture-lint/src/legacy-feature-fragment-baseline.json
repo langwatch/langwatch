@@ -847,6 +847,51 @@
       "kind": "legacy-implementation"
     },
     {
+      "feature": "data-retention",
+      "file": "platform/app/src/pages/settings/data-retention.tsx",
+      "kind": "page-shell"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/api/routers/dataRetention.ts",
+      "kind": "transport"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/data-retention/index.ts",
+      "kind": "legacy-implementation"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/data-retention/metering/storageMeter.read.ts",
+      "kind": "legacy-implementation"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/data-retention/metering/storageMeter.service.ts",
+      "kind": "legacy-implementation"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/data-retention/policy/dataRetentionPolicy.authz.ts",
+      "kind": "legacy-implementation"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/data-retention/policy/dataRetentionPolicy.read.ts",
+      "kind": "legacy-implementation"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/data-retention/resolveRetentionDays.ts",
+      "kind": "legacy-implementation"
+    },
+    {
+      "feature": "data-retention",
+      "file": "platform/app/src/server/data-retention/retentionPolicy.schema.ts",
+      "kind": "legacy-implementation"
+    },
+    {
       "feature": "dataset",
       "file": "platform/app/src/app/api/dataset/[[...route]]/app.ts",
       "kind": "transport"

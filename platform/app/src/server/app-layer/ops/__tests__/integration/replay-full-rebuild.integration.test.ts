@@ -21,7 +21,10 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { RegisteredMapProjection } from "@langwatch/eventing";
+import type {
+  RegisteredMapProjection,
+  RetentionPolicyResolver,
+} from "@langwatch/eventing";
 import {
   aggregateKey,
   cleanupAll,
@@ -50,6 +53,10 @@ import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/repl
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
 import { ReplayService } from "../../replay.service";
 import { ReplayRedisRepository } from "../../repositories/replay.redis.repository";
+
+const retentionPolicyResolver = {
+  resolve: vi.fn(async () => null),
+} satisfies RetentionPolicyResolver;
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -292,7 +299,10 @@ describe("given identical span history for tenants whose rollup is empty", () =>
       close: async () => {},
     });
 
-    opsReplay = new ReplayService(new ReplayRedisRepository(redis));
+    opsReplay = new ReplayService(
+      new ReplayRedisRepository(redis),
+      retentionPolicyResolver,
+    );
   });
 
   beforeEach(async () => {

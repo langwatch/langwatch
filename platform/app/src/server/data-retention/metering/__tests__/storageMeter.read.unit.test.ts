@@ -3,23 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const rbacMocks = vi.hoisted(() => ({ batchScopePermissions: vi.fn() }));
 vi.mock("~/server/api/rbac", () => rbacMocks);
 
-const appMocks = vi.hoisted(() => ({
-  getTotalStorageBytes: vi.fn(),
-  getTotalStorageBytesForTenants: vi.fn(),
-}));
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    dataRetention: {
-      metering: {
-        getTotalStorageBytes: appMocks.getTotalStorageBytes,
-        getTotalStorageBytesForTenants: appMocks.getTotalStorageBytesForTenants,
-      },
-    },
-  }),
-}));
-
+import { StorageMeterService } from "../storageMeter.service";
 import { resolveScopeStorageUsage } from "../storageMeter.read";
 
 /**
@@ -35,13 +19,19 @@ describe("resolveScopeStorageUsage", () => {
     project: { findFirst: vi.fn(), findMany: vi.fn() },
   } as any;
   const ctx = { prisma, session };
+  const storageMeter = new StorageMeterService({ resolveClickHouseClient: null });
+  const getTotalStorageBytes = vi.spyOn(storageMeter, "getTotalStorageBytes");
+  const getTotalStorageBytesForTenants = vi.spyOn(
+    storageMeter,
+    "getTotalStorageBytesForTenants",
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();
     prisma.project.findFirst.mockResolvedValue({
       team: { organizationId: "org_1" },
     });
-    appMocks.getTotalStorageBytesForTenants.mockImplementation(
+    getTotalStorageBytesForTenants.mockImplementation(
       async (ids: string[]) => ids.length * 100,
     );
   });
@@ -63,15 +53,12 @@ describe("resolveScopeStorageUsage", () => {
         ]),
       });
 
-      const result = await resolveScopeStorageUsage(ctx, {
+      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
         projectId: "proj_a",
         scope: { scopeType: "ORGANIZATION", scopeId: "org_1" },
       });
 
-      expect(appMocks.getTotalStorageBytesForTenants).toHaveBeenCalledWith([
-        "proj_a",
-        "proj_c",
-      ]);
+      expect(getTotalStorageBytesForTenants).toHaveBeenCalledWith(["proj_a", "proj_c"]);
       expect(result).toEqual({ totalBytes: 200, projectCount: 2 });
     });
 
@@ -82,7 +69,7 @@ describe("resolveScopeStorageUsage", () => {
         projects: new Map(),
       });
 
-      await resolveScopeStorageUsage(ctx, {
+      await resolveScopeStorageUsage(ctx, storageMeter, {
         projectId: "proj_a",
         scope: { scopeType: "ORGANIZATION", scopeId: "org_1" },
       });
@@ -112,7 +99,7 @@ describe("resolveScopeStorageUsage", () => {
         ]),
       });
 
-      const result = await resolveScopeStorageUsage(ctx, {
+      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
         projectId: "proj_b",
         scope: { scopeType: "TEAM", scopeId: "team_b" },
       });
@@ -133,28 +120,28 @@ describe("resolveScopeStorageUsage", () => {
       // org-constrained query returns nothing for a scopeId in another org
       prisma.project.findMany.mockResolvedValue([]);
 
-      const result = await resolveScopeStorageUsage(ctx, {
+      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
         projectId: "proj_a",
         scope: { scopeType: "PROJECT", scopeId: "proj_in_other_org" },
       });
 
       expect(result).toEqual({ totalBytes: 0, projectCount: 0 });
       expect(rbacMocks.batchScopePermissions).not.toHaveBeenCalled();
-      expect(appMocks.getTotalStorageBytesForTenants).not.toHaveBeenCalled();
+      expect(getTotalStorageBytesForTenants).not.toHaveBeenCalled();
     });
   });
 
   describe("given a personal-account project with no organization", () => {
     it("returns just that project's storage", async () => {
       prisma.project.findFirst.mockResolvedValue({ team: null });
-      appMocks.getTotalStorageBytes.mockResolvedValue(512);
+      getTotalStorageBytes.mockResolvedValue(512);
 
-      const result = await resolveScopeStorageUsage(ctx, {
+      const result = await resolveScopeStorageUsage(ctx, storageMeter, {
         projectId: "proj_personal",
         scope: { scopeType: "PROJECT", scopeId: "proj_personal" },
       });
 
-      expect(appMocks.getTotalStorageBytes).toHaveBeenCalledWith({
+      expect(getTotalStorageBytes).toHaveBeenCalledWith({
         tenantId: "proj_personal",
       });
       expect(result).toEqual({ totalBytes: 512, projectCount: 1 });

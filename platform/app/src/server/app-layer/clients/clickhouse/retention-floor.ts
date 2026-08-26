@@ -3,12 +3,12 @@ import {
   RetentionFloorService,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import {
-  PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionManagedTable,
-} from "~/server/data-retention/retentionPolicy.schema";
-import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
+} from "@langwatch/data-retention-server/retention-tables";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 
 const logger = createLogger("langwatch:clickhouse:retention-floor");
 
@@ -21,7 +21,7 @@ const logger = createLogger("langwatch:clickhouse:retention-floor");
  * the project cascade.
  */
 class PlatformRetentionDaysProvider implements RetentionDaysProvider {
-  constructor(private readonly resolver: RetentionPolicyResolver) {}
+  constructor(private readonly resolver: DataRetentionService) {}
 
   async getRetentionDays({
     tenantId,
@@ -33,8 +33,8 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
     const category = RETENTION_TABLE_CATEGORY_MAP[table as RetentionManagedTable];
     if (!category) return null;
 
-    const resolved = await this.resolver.resolve(tenantId);
-    return resolved?.[category] ?? null;
+    const resolved = await this.resolver.getResolvedForProject({ projectId: tenantId });
+    return resolved[category];
   }
 }
 
@@ -45,7 +45,7 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
  * — so a caller can adopt this before its construction site is rewired.
  */
 export function createRetentionFloorService(
-  resolver?: RetentionPolicyResolver,
+  resolver?: DataRetentionService,
 ): RetentionFloorService {
   return new RetentionFloorService({
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,

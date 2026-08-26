@@ -40,3 +40,9 @@ Feature: Data Retention service boundary
     Given an auto-share pin was promoted to a manual pin
     When the share is removed
     Then the pin annotation remains
+
+  Scenario: Apply retention to existing project data
+    Given a project has a new resolved retention value
+    When the Data Retention service triggers a retroactive update
+    Then it routes the mutation through that project's ClickHouse tenant
+    And it updates every table belonging to the requested category

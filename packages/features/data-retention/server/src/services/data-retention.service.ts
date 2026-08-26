@@ -1,16 +1,24 @@
 import {
   DataRetentionService as DataRetentionServiceContract,
+  DataRetentionBackendUnavailableError,
+  killRetroactiveMutationInputSchema,
   ScopeTargetNotFoundError,
   platformDefaultRetentionDaysSchema,
   resolveRetention,
   resolveScopeChain,
   retentionDaysInputSchema,
+  retroactiveMutationProjectInputSchema,
+  retroactiveRetentionUpdateInputSchema,
+  type KillRetroactiveMutationInput,
   type ResolvedRetention,
   type RetentionCategory,
   type RetentionPolicy,
   type ScopeAssignment,
   type PinnedTrace,
   type PinTraceInput,
+  type RetroactiveMutationProgress,
+  type RetroactiveMutationProjectInput,
+  type RetroactiveRetentionUpdateInput,
   pinTraceInputSchema,
   type UnpinTraceInput,
   unpinTraceInputSchema,
@@ -23,6 +31,7 @@ import {
 import type { ProjectService } from "@langwatch/project-contract";
 import { DataRetentionRepository } from "../repositories/data-retention.repository";
 import { PinnedTraceRepository } from "../repositories/pinned-trace.repository";
+import { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository";
 import type { DataRetentionCacheStore } from "../stores/data-retention-cache.store";
 
 export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
@@ -34,6 +43,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     organizations: OrganizationService;
     defaultRetentionDays: number;
     pinRepository: PinnedTraceRepository;
+    retroactiveRepository?: RetroactiveRetentionRepository | null;
     cache?: DataRetentionCacheStore;
   }): DataRetentionService {
     return new DataRetentionService(
@@ -42,6 +52,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
       options.organizations,
       platformDefaultRetentionDaysSchema.parse(options.defaultRetentionDays),
       options.pinRepository,
+      options.retroactiveRepository ?? null,
       options.cache,
     );
   }
@@ -52,6 +63,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     private readonly organizations: OrganizationService,
     private readonly defaultRetentionDays: number,
     private readonly pinRepository: PinnedTraceRepository,
+    private readonly retroactiveRepository: RetroactiveRetentionRepository | null,
     private readonly cache?: DataRetentionCacheStore,
   ) {
     super();
@@ -196,6 +208,33 @@ export class DataRetentionService extends DataRetentionServiceContract {
 
   getPinnedTraceIds(input: { projectId: string }): Promise<string[]> {
     return this.pinRepository.findAllTraceIds(input);
+  }
+
+  async triggerRetroactiveUpdate(
+    input: RetroactiveRetentionUpdateInput,
+  ): Promise<{ tables: string[] }> {
+    const parsed = retroactiveRetentionUpdateInputSchema.parse(input);
+    if (!this.retroactiveRepository) {
+      throw new DataRetentionBackendUnavailableError();
+    }
+
+    return this.retroactiveRepository.triggerUpdate(parsed);
+  }
+
+  async getRetroactiveMutationProgress(
+    input: RetroactiveMutationProjectInput,
+  ): Promise<RetroactiveMutationProgress[]> {
+    const parsed = retroactiveMutationProjectInputSchema.parse(input);
+    if (!this.retroactiveRepository) {
+      return [];
+    }
+
+    return this.retroactiveRepository.getMutationProgress(parsed);
+  }
+
+  async killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void> {
+    const parsed = killRetroactiveMutationInputSchema.parse(input);
+    await this.retroactiveRepository?.killMutation(parsed);
   }
 
   private defaultRetention(): ResolvedRetention {

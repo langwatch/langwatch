@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
-import type { ReplayProgress } from "@langwatch/eventing";
+import type { ReplayProgress, RetentionPolicyResolver } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
@@ -31,7 +31,10 @@ class ReplayCancelledError extends Error {
 }
 
 export class ReplayService {
-  constructor(readonly repo: ReplayRepository) {}
+  constructor(
+    readonly repo: ReplayRepository,
+    private readonly retentionPolicyResolver: RetentionPolicyResolver,
+  ) {}
 
   async getStatus(): Promise<ReplayStatus> {
     return this.repo.getStatus();
@@ -147,7 +150,10 @@ export class ReplayService {
 
     let runtime;
     try {
-      runtime = createReplayRuntime({ redisUrl });
+      runtime = createReplayRuntime({
+        redisUrl,
+        retentionPolicyResolver: this.retentionPolicyResolver,
+      });
     } catch (err) {
       await this.finalizeWithError({
         runId: params.runId,

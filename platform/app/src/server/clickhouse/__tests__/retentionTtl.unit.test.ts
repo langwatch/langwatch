@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
+import { RETENTION_MANAGED_TABLES } from "@langwatch/data-retention-server/retention-tables";
 import {
   buildRetentionTTLExpression,
   hasRetentionTTL,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PRODUCTION_STORAGE_METER_TABLES } from "../../retentionPolicy.schema";
+import { PRODUCTION_STORAGE_METER_TABLES } from "@langwatch/data-retention-server/retention-tables";
 import { StorageMeterService } from "../storageMeter.service";
 
 /**
