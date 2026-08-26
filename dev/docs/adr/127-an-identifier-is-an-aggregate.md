@@ -219,6 +219,14 @@ ever need to fan out, the answer is a row-truth claim in the shape of
 `IdentifierReservation`, not a wider lane — but that is a decision to take when
 there is a reason, not now.
 
+Attach and verify moving off the person's lane still lets them interleave with a
+detach on it, and both directions land on the safe side. A verify that completes
+after a detach has read the heads makes the detach's refusal more conservative
+than it needed to be, not less. A detach that completes after a verify has read
+its head leaves that head DETACHED, and `reduceIdentifier` refuses to resurrect a
+tombstone — so the projection is right either way, and the person is never left
+with fewer ways in than the guard believed.
+
 ### The existing log is not rewritten
 
 The log is live: events have been appended under `aggregateId = userId`, and the
