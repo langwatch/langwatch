@@ -89,7 +89,6 @@ import type { OpsService, OpsSnapshotService } from "@langwatch/ops-contract";
 import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { ManagerExplorerService } from "./ops/manager-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
-import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -122,7 +121,6 @@ export type DataRetentionDependencies = DataRetentionService & {
 };
 
 export type OpsDependencies = OpsService & {
-  queues: QueueService;
   eventExplorer: EventExplorerService;
   managerExplorer: ManagerExplorerService;
   replay: ReplayService;

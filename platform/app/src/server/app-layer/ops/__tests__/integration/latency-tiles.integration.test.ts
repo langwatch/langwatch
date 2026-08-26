@@ -13,10 +13,7 @@ import {
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import { OpsMetricsCollector } from "../../metrics-collector";
-import {
-  NullQueueRepository,
-  type QueueRepository,
-} from "../../repositories/queue.repository";
+import { OpsMetricsTestAdapter } from "../ops-metrics.fixture";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -175,12 +172,11 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
         // Drive the real collector — stub queueRepo so it sees exactly this
         // suite's queue. Any future drift in key names, filtering, or
         // percentile math inside OpsMetricsCollector will break this test.
-        const queueRepoStub: QueueRepository = Object.assign(new NullQueueRepository(), {
-          discoverQueueNames: async () => [name],
-        });
+        const ops = OpsMetricsTestAdapter.create();
+        ops.setQueueNames([name]);
         const collector = new OpsMetricsCollector({
           redis,
-          queueRepo: queueRepoStub,
+          ops,
         });
         try {
           await collector.discoverQueues();
@@ -222,13 +218,12 @@ describe.skipIf(!hasTestcontainers)("Ops dashboard latency tiles", () => {
         const minute = await redis.hgetall(latencyMinuteBucketKey(name, Date.now()));
         expect(Object.keys(minute).length).toBeGreaterThan(0);
 
-        const queueRepoStub: QueueRepository = Object.assign(new NullQueueRepository(), {
-          discoverQueueNames: async () => [name],
-        });
+        const ops = OpsMetricsTestAdapter.create();
+        ops.setQueueNames([name]);
         const snapshots = RedisOpsSnapshotAdapter.create({ redis });
         const collector = new OpsMetricsCollector({
           redis,
-          queueRepo: queueRepoStub,
+          ops,
           snapshots,
         });
         try {

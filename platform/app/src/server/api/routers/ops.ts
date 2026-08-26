@@ -163,12 +163,12 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.getParkedGroups(input);
+      return ops.listParkedQueueGroups(input);
     }),
 
   listQueues: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
     const ops = ctx.app.ops;
-    return ops.queues.getQueues();
+    return ops.listQueues();
   }),
 
   listScheduledJobs: protectedProcedure
@@ -255,7 +255,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.getGroups(input);
+      return ops.listQueueGroups(input);
     }),
 
   getGroupDetail: protectedProcedure
@@ -268,7 +268,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      const group = await ops.queues.getGroupDetail(input);
+      const group = await ops.tryGetQueueGroup(input);
       if (!group) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -293,7 +293,7 @@ export const opsRouter = createTRPCRouter({
 
   getBlockedSummary: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
     const ops = ctx.app.ops;
-    return ops.queues.getBlockedSummary();
+    return ops.getBlockedQueueSummary();
   }),
 
   getGroupJobs: protectedProcedure
@@ -308,7 +308,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.getGroupJobs(input);
+      return ops.listQueueGroupJobs(input);
     }),
 
   unblockGroup: protectedProcedure
@@ -321,7 +321,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.unblockGroup(input);
+      return ops.unblockQueueGroup(input);
     }),
 
   unblockAll: protectedProcedure
@@ -333,7 +333,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.unblockAll(input);
+      return ops.unblockAllQueueGroups(input);
     }),
 
   drainGroup: protectedProcedure
@@ -346,7 +346,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.drainGroup(input);
+      return ops.drainQueueGroup(input);
     }),
 
   pausePipeline: protectedProcedure
@@ -359,7 +359,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.pausePipeline(input);
+      return ops.pauseQueuePipeline(input);
     }),
 
   unpausePipeline: protectedProcedure
@@ -372,7 +372,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.unpausePipeline(input);
+      return ops.unpauseQueuePipeline(input);
     }),
 
   pauseTenant: protectedProcedure
@@ -385,7 +385,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.pauseTenant(input);
+      return ops.pauseQueueTenant(input);
     }),
 
   unpauseTenant: protectedProcedure
@@ -398,7 +398,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.unpauseTenant(input);
+      return ops.unpauseQueueTenant(input);
     }),
 
   listPausedTenants: protectedProcedure
@@ -406,7 +406,7 @@ export const opsRouter = createTRPCRouter({
     .input(z.object({ queueName: z.string() }))
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.listPausedTenants(input);
+      return ops.listPausedQueueTenants(input);
     }),
 
   drainTenant: protectedProcedure
@@ -422,7 +422,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.drainTenant(input);
+      return ops.drainQueueTenant(input);
     }),
 
   retryBlocked: protectedProcedure
@@ -436,7 +436,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.retryBlocked(input);
+      return ops.retryBlockedQueueJob(input);
     }),
 
   listProjections: protectedProcedure.use(opsViewPermission).query(() => {
@@ -860,12 +860,12 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.listDlqGroups(input);
+      return ops.listQueueDlqGroups(input);
     }),
 
   listAllDlqGroups: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
     const ops = ctx.app.ops;
-    return ops.queues.getAllDlqGroups();
+    return ops.listAllQueueDlqGroups();
   }),
 
   listPausedKeys: protectedProcedure
@@ -877,7 +877,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.listPausedKeys(input);
+      return ops.listPausedQueueKeys(input);
     }),
 
   drainAllBlockedPreview: protectedProcedure
@@ -891,7 +891,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.getDrainPreview(input);
+      return ops.getQueueDrainPreview(input);
     }),
 
   moveToDlq: protectedProcedure
@@ -904,7 +904,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.moveToDlq(input);
+      return ops.moveQueueGroupToDlq(input);
     }),
 
   moveAllBlockedToDlq: protectedProcedure
@@ -918,7 +918,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.moveAllBlockedToDlq(input);
+      return ops.moveAllBlockedQueueGroupsToDlq(input);
     }),
 
   replayFromDlq: protectedProcedure
@@ -931,7 +931,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.replayFromDlq(input);
+      return ops.replayQueueGroupFromDlq(input);
     }),
 
   replayAllFromDlq: protectedProcedure
@@ -945,7 +945,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.replayAllFromDlq(input);
+      return ops.replayAllQueueGroupsFromDlq(input);
     }),
 
   /**
@@ -962,7 +962,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.app.ops.queues.redriveManyFromDlq({
+      return ctx.app.ops.redriveQueueDlqGroups({
         ...input,
         requestedBy: ctx.session.user.id,
       });
@@ -981,7 +981,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.app.ops.queues.discardManyFromDlq({
+      return ctx.app.ops.discardQueueDlqGroups({
         ...input,
         requestedBy: ctx.session.user.id,
       });
@@ -998,7 +998,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.canaryRedrive(input);
+      return ops.canaryRedriveQueueDlq(input);
     }),
 
   canaryUnblock: protectedProcedure
@@ -1012,7 +1012,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = ctx.app.ops;
-      return ops.queues.canaryUnblock(input);
+      return ops.canaryUnblockQueueGroups(input);
     }),
 
   searchAggregates: protectedProcedure

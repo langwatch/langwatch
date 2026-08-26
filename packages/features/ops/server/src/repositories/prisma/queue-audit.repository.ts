@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 export type QueueControlAction = "queue_redrive_dlq_groups" | "queue_discard_dlq_groups";
 
@@ -19,6 +20,7 @@ export interface QueueAuditSink {
 }
 
 const TARGET_KIND = "queue_dlq";
+const auditMetadataSchema = z.record(z.string(), z.json());
 
 /** For app presets that run without Postgres. */
 export class NullQueueAuditSink implements QueueAuditSink {
@@ -29,7 +31,11 @@ export class NullQueueAuditSink implements QueueAuditSink {
 
 /** Writes queue dead-letter operator actions to the shared audit log. */
 export class QueueAuditRepository implements QueueAuditSink {
-  constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  static create(prisma: PrismaClient): QueueAuditRepository {
+    return new QueueAuditRepository(prisma);
+  }
 
   async append(entry: {
     actorUserId: string;
@@ -47,7 +53,7 @@ export class QueueAuditRepository implements QueueAuditSink {
         action: entry.action,
         targetKind: TARGET_KIND,
         targetId: entry.queueName,
-        metadata: (entry.metadata ?? {}) as Prisma.InputJsonValue,
+        metadata: auditMetadataSchema.parse(entry.metadata ?? {}),
       },
     });
   }

@@ -3,14 +3,22 @@ import type {
   ParkedGroupInfo,
   QueueSummaryInfo,
 } from "@langwatch/ops-contract";
-import { NullQueueAuditSink, type QueueAuditSink } from "./queue-audit.repository";
+import {
+  NullQueueAuditSink,
+  type QueueAuditSink,
+} from "../repositories/prisma/queue-audit.repository";
 import type {
   BlockedSummary,
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
   QueueRepository,
-} from "./repositories/queue.repository";
+} from "../repositories/queue.repository";
+import type {
+  OpsParkedTenantsPage,
+  OpsQueueReconcileResult,
+  QueueInfo,
+} from "@langwatch/ops-contract";
 
 /** What an error with no recognizable class name is recorded as. */
 const UNTYPED_ERROR_SHAPE = "untyped_error";
@@ -35,17 +43,21 @@ function summarizeErrorShapes(messages: string[]): string[] {
 }
 
 export class QueueService {
-  readonly repo: QueueRepository;
+  private readonly repository: QueueRepository;
   private readonly audit: QueueAuditSink;
 
-  constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
-    this.repo = params.repo;
+  private constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
+    this.repository = params.repo;
     this.audit = params.audit ?? new NullQueueAuditSink();
   }
 
+  static create(params: { repo: QueueRepository; audit?: QueueAuditSink }): QueueService {
+    return new QueueService(params);
+  }
+
   async getQueues(): Promise<QueueSummaryInfo[]> {
-    const queueNames = await this.repo.discoverQueueNames();
-    const queues = await this.repo.scanQueues({ queueNames });
+    const queueNames = await this.repository.discoverQueueNames();
+    const queues = await this.repository.scanQueues({ queueNames });
     return queues.map(({ groups: _groups, ...summary }) => summary);
   }
 
@@ -59,7 +71,7 @@ export class QueueService {
     page: number;
     pageSize: number;
   }> {
-    const queues = await this.repo.scanQueues({
+    const queues = await this.repository.scanQueues({
       queueNames: [params.queueName],
     });
     const queue = queues[0];
@@ -86,11 +98,11 @@ export class QueueService {
     };
   }
 
-  async getGroupDetail(params: {
+  async tryGetGroupDetail(params: {
     queueName: string;
     groupId: string;
   }): Promise<GroupInfo | null> {
-    const queues = await this.repo.scanQueues({
+    const queues = await this.repository.scanQueues({
       queueNames: [params.queueName],
     });
     const queue = queues[0];
@@ -110,7 +122,7 @@ export class QueueService {
     page: number;
     pageSize: number;
   }> {
-    const result = await this.repo.getGroupJobs(params);
+    const result = await this.repository.getGroupJobs(params);
     return {
       ...result,
       page: params.page,
@@ -119,8 +131,8 @@ export class QueueService {
   }
 
   async getBlockedSummary(): Promise<BlockedSummary> {
-    const queueNames = await this.repo.discoverQueueNames();
-    return this.repo.getBlockedSummary({ queueNames });
+    const queueNames = await this.repository.discoverQueueNames();
+    return this.repository.getBlockedSummary({ queueNames });
   }
 
   /**
@@ -138,7 +150,7 @@ export class QueueService {
     page: number;
     pageSize: number;
   }> {
-    const result = await this.repo.listParkedGroups(params);
+    const result = await this.repository.listParkedGroups(params);
     return { ...result, page: params.page, pageSize: params.pageSize };
   }
 
@@ -154,7 +166,7 @@ export class QueueService {
       movedAt: number | null;
     }>
   > {
-    const queueNames = await this.repo.discoverQueueNames();
+    const queueNames = await this.repository.discoverQueueNames();
     const allGroups: Array<{
       queueName: string;
       queueDisplayName: string;
@@ -167,7 +179,7 @@ export class QueueService {
     }> = [];
 
     for (const queueName of queueNames) {
-      const groups = await this.repo.listDlqGroups({ queueName });
+      const groups = await this.repository.listDlqGroups({ queueName });
       const displayName = queueName.replace(/:gq$/, "").replace(/^.*:/, "");
       for (const group of groups) {
         allGroups.push({
@@ -186,26 +198,26 @@ export class QueueService {
     queueName: string;
     groupId: string;
   }): Promise<{ wasBlocked: boolean }> {
-    return this.repo.unblockGroup(params);
+    return this.repository.unblockGroup(params);
   }
 
   async unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }> {
-    return this.repo.unblockAll(params);
+    return this.repository.unblockAll(params);
   }
 
   async drainGroup(params: {
     queueName: string;
     groupId: string;
   }): Promise<{ jobsRemoved: number }> {
-    return this.repo.drainGroup(params);
+    return this.repository.drainGroup(params);
   }
 
   async pausePipeline(params: { queueName: string; key: string }): Promise<void> {
-    return this.repo.pausePipeline(params);
+    return this.repository.pausePipeline(params);
   }
 
   async unpausePipeline(params: { queueName: string; key: string }): Promise<void> {
-    return this.repo.unpausePipeline(params);
+    return this.repository.unpausePipeline(params);
   }
 
   async retryBlocked(params: {
@@ -213,23 +225,23 @@ export class QueueService {
     groupId: string;
     jobId: string;
   }): Promise<{ wasBlocked: boolean }> {
-    return this.repo.retryBlocked(params);
+    return this.repository.retryBlocked(params);
   }
 
   async listPausedKeys(params: { queueName: string }): Promise<string[]> {
-    return this.repo.listPausedKeys(params);
+    return this.repository.listPausedKeys(params);
   }
 
   async pauseTenant(params: { queueName: string; tenantId: string }): Promise<void> {
-    return this.repo.pauseTenant(params);
+    return this.repository.pauseTenant(params);
   }
 
   async unpauseTenant(params: { queueName: string; tenantId: string }): Promise<void> {
-    return this.repo.unpauseTenant(params);
+    return this.repository.unpauseTenant(params);
   }
 
   async listPausedTenants(params: { queueName: string }): Promise<string[]> {
-    return this.repo.listPausedTenants(params);
+    return this.repository.listPausedTenants(params);
   }
 
   async drainTenant(params: {
@@ -237,14 +249,14 @@ export class QueueService {
     tenantId: string;
     groupIdContains?: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }> {
-    return this.repo.drainTenant(params);
+    return this.repository.drainTenant(params);
   }
 
   async moveToDlq(params: {
     queueName: string;
     groupId: string;
   }): Promise<{ jobsMoved: number }> {
-    return this.repo.moveToDlq(params);
+    return this.repository.moveToDlq(params);
   }
 
   async moveAllBlockedToDlq(params: {
@@ -252,14 +264,14 @@ export class QueueService {
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<{ movedCount: number; jobsMoved: number }> {
-    return this.repo.moveAllBlockedToDlq(params);
+    return this.repository.moveAllBlockedToDlq(params);
   }
 
   async replayFromDlq(params: {
     queueName: string;
     groupId: string;
   }): Promise<{ jobsReplayed: number }> {
-    return this.repo.replayFromDlq(params);
+    return this.repository.replayFromDlq(params);
   }
 
   async replayAllFromDlq(params: {
@@ -267,7 +279,7 @@ export class QueueService {
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<{ replayedCount: number; jobsReplayed: number }> {
-    return this.repo.replayAllFromDlq(params);
+    return this.repository.replayAllFromDlq(params);
   }
 
   /**
@@ -281,7 +293,7 @@ export class QueueService {
     requestedBy: string;
   }): Promise<{ redrivenCount: number; jobsRedriven: number }> {
     const { requestedBy, ...rest } = params;
-    const result = await this.repo.redriveManyFromDlq(rest);
+    const result = await this.repository.redriveManyFromDlq(rest);
     if (result.redrivenCount > 0) {
       await this.audit.append({
         actorUserId: requestedBy,
@@ -308,7 +320,7 @@ export class QueueService {
     requestedBy: string;
   }): Promise<{ discardedCount: number; jobsDiscarded: number }> {
     const { requestedBy, ...rest } = params;
-    const { lastErrors, ...result } = await this.repo.discardManyFromDlq(rest);
+    const { lastErrors, ...result } = await this.repository.discardManyFromDlq(rest);
     if (result.discardedCount > 0) {
       await this.audit.append({
         actorUserId: requestedBy,
@@ -334,7 +346,7 @@ export class QueueService {
     count?: number;
     pipelineFilter?: string;
   }): Promise<{ redrivenCount: number; groupIds: string[] }> {
-    return this.repo.canaryRedrive(params);
+    return this.repository.canaryRedrive(params);
   }
 
   async canaryUnblock(params: {
@@ -342,11 +354,11 @@ export class QueueService {
     count?: number;
     pipelineFilter?: string;
   }): Promise<{ unblockedCount: number; groupIds: string[] }> {
-    return this.repo.canaryUnblock(params);
+    return this.repository.canaryUnblock(params);
   }
 
   async listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
-    return this.repo.listDlqGroups(params);
+    return this.repository.listDlqGroups(params);
   }
 
   async getDrainPreview(params: {
@@ -354,6 +366,31 @@ export class QueueService {
     pipelineFilter?: string;
     errorFilter?: string;
   }): Promise<DrainPreview> {
-    return this.repo.drainAllBlockedPreview(params);
+    return this.repository.drainAllBlockedPreview(params);
+  }
+
+  discoverQueueNames(): Promise<string[]> {
+    return this.repository.discoverQueueNames();
+  }
+
+  scanQueues(input: { queueNames: string[] }): Promise<QueueInfo[]> {
+    return this.repository.scanQueues(input);
+  }
+
+  tryReconcilePending(input: {
+    queueName: string;
+  }): Promise<OpsQueueReconcileResult | null> {
+    return this.repository.tryReconcileTotalPending(input.queueName);
+  }
+
+  readPublishedPendingDrift(input: { queueNames: string[] }): Promise<number> {
+    return this.repository.readPublishedPendingDrift(input.queueNames);
+  }
+
+  listParkedTenants(input: {
+    queueNames: string[];
+    maxTenants: number;
+  }): Promise<OpsParkedTenantsPage> {
+    return this.repository.enumerateParkedTenants(input);
   }
 }

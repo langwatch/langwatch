@@ -16,6 +16,7 @@ import type {
   JobNameMetrics,
   LatencyWindows,
   OpsSnapshotService,
+  OpsService,
   PipelineNode,
   QueueInfo,
   QueueSummaryInfo,
@@ -29,7 +30,6 @@ import {
 } from "@langwatch/ops-server";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { QueueRepository } from "./repositories/queue.repository";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
 
@@ -377,7 +377,7 @@ export class OpsMetricsCollector {
   private prevCompleted = new Map<string, number>();
   private prevFailed = new Map<string, number>();
 
-  private queueRepo: QueueRepository;
+  private readonly ops: OpsService;
   private snapshots: OpsSnapshotService | null;
   /** Identity of this writer in the lease and in every artifact it stamps. */
   private readonly writerId: string;
@@ -392,12 +392,12 @@ export class OpsMetricsCollector {
 
   constructor(params: {
     redis: IORedis | Cluster;
-    queueRepo: QueueRepository;
+    ops: OpsService;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }) {
     this.redis = params.redis;
-    this.queueRepo = params.queueRepo;
+    this.ops = params.ops;
     this.snapshots = params.snapshots ?? null;
     this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
   }
@@ -465,7 +465,7 @@ export class OpsMetricsCollector {
 
   async discoverQueues(): Promise<void> {
     try {
-      this.groupQueueNames = await this.queueRepo.discoverQueueNames();
+      this.groupQueueNames = await this.ops.discoverQueueNames();
     } catch (err) {
       logger.warn({ error: err }, "Queue discovery failed, keeping existing names");
     }
@@ -476,7 +476,7 @@ export class OpsMetricsCollector {
       let measuredDrift = 0;
       let measuredAny = false;
       for (const queueName of this.groupQueueNames) {
-        const result = await this.queueRepo.reconcileTotalPending(queueName);
+        const result = await this.ops.tryReconcileQueuePending({ queueName });
         if (result) {
           measuredDrift += Math.abs(result.drift);
           measuredAny = true;
@@ -489,9 +489,9 @@ export class OpsMetricsCollector {
       // queue that has plenty, and an instance that won some of the queues would
       // report a partial total. Reading the shared figures is what makes every
       // instance agree, and agree on the whole.
-      this.latestPendingDrift = await this.queueRepo.readPublishedPendingDrift(
-        this.groupQueueNames,
-      );
+      this.latestPendingDrift = await this.ops.readQueuePendingDrift({
+        queueNames: this.groupQueueNames,
+      });
 
       if (measuredAny && measuredDrift !== 0) {
         logger.info(
@@ -699,10 +699,8 @@ export class OpsMetricsCollector {
     void (async () => {
       try {
         const [blocked, parked, latencyWindows] = await Promise.all([
-          this.queueRepo.getBlockedSummary({
-            queueNames: this.groupQueueNames,
-          }),
-          this.queueRepo.enumerateParkedTenants({
+          this.ops.getBlockedQueueSummary(),
+          this.ops.listParkedQueueTenants({
             queueNames: this.groupQueueNames,
             maxTenants: MAX_PARKED_TENANTS,
           }),
@@ -1214,7 +1212,7 @@ export class OpsMetricsCollector {
         this.leaseToken = lease.token;
       }
       const [queues, redisInfo] = await Promise.all([
-        this.queueRepo.scanQueues({ queueNames: this.groupQueueNames }),
+        this.ops.scanQueues({ queueNames: this.groupQueueNames }),
         this.getRedisInfo(),
       ]);
       this.latestQueues = queues;
@@ -1363,7 +1361,7 @@ let singleton: OpsMetricsCollector | null = null;
 
 export function getOpsMetricsCollector(params: {
   redis: IORedis | Cluster;
-  queueRepo: QueueRepository;
+  ops: OpsService;
   snapshots?: OpsSnapshotService | null;
 }): OpsMetricsCollector {
   if (!singleton) {

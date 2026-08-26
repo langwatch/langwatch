@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
   CachedLuaScript,
-  decodeJobEnvelope,
   GROUP_QUEUE_REGISTRY_KEY,
   isEnvelope,
   isNoScriptResult,
@@ -9,14 +8,12 @@ import {
   PENDING_INDEX_HELPER_LUA,
   pendingDriftKey,
   pendingGroupsKey,
-  RedisJobBlobStore,
   readEnvelopeDescriptor,
   readJobRoutingMeta,
   splitEnvelope,
-  TieredBlobStore,
   TTL_HELPER_LUA,
 } from "@langwatch/group-queue/operational";
-import { normalizeErrorMessage } from "@langwatch/ops-server";
+import { normalizeErrorMessage } from "../../ops.error-normalizer";
 import { createLogger } from "@langwatch/observability";
 import type {
   ErrorCluster,
@@ -27,8 +24,7 @@ import type {
 } from "@langwatch/ops-contract";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
-import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
+import { QueuePayloadDecoderPort } from "../../ports/queue-payload-decoder.port";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -37,9 +33,15 @@ import type {
   ParkedTenantsPage,
   QueueRepository,
   ReconcileResult,
-} from "./queue.repository";
+} from "../queue.repository";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
+
+class NullQueuePayloadDecoder extends QueuePayloadDecoderPort {
+  async tryDecode(): Promise<Record<string, unknown> | null> {
+    return null;
+  }
+}
 
 // ── Lua Scripts ──────────────────────────────────────────────────────
 
@@ -492,9 +494,14 @@ function resolveRetryCount(attemptRaw: string | null): number | null {
 
 export class QueueRedisRepository implements QueueRepository {
   private readonly redis: IORedis | Cluster;
+  private readonly payloads: QueuePayloadDecoderPort;
 
-  constructor(redis: IORedis | Cluster) {
+  constructor(
+    redis: IORedis | Cluster,
+    payloads: QueuePayloadDecoderPort = new NullQueuePayloadDecoder(),
+  ) {
     this.redis = redis;
+    this.payloads = payloads;
   }
 
   // ── Queue Discovery & Scanning ──────────────────────────────────
@@ -831,21 +838,6 @@ export class QueueRedisRepository implements QueueRepository {
       }
       const dataResults = await dataPipeline.exec();
 
-      const blobs = new RedisJobBlobStore({
-        redis: this.redis,
-        queueName: params.queueName,
-      });
-      // Wire the tiered store so an offloaded envelope renders its body in the
-      // ops dashboard. Without
-      // it, decode throws "no tiered store provided" and the catch below hides
-      // the payload from an operator trying to diagnose a stuck job.
-      const tieredBlobs = new TieredBlobStore({
-        redisBlobs: blobs,
-        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
-        resolveDestination: resolveProjectStorageDestination,
-        queueName: params.queueName,
-        logger,
-      });
       await Promise.all(
         jobIds.map(async (_, i) => {
           const raw = dataResults?.[i]?.[1] as string | null;
@@ -853,7 +845,7 @@ export class QueueRedisRepository implements QueueRepository {
           await this.decorateJobFromRaw({
             job: jobs[i]!,
             raw,
-            tieredBlobs,
+            queueName: params.queueName,
           });
         }),
       );
@@ -866,11 +858,11 @@ export class QueueRedisRepository implements QueueRepository {
   private async decorateJobFromRaw({
     job,
     raw,
-    tieredBlobs,
+    queueName,
   }: {
     job: JobEntry;
     raw: string;
-    tieredBlobs: TieredBlobStore;
+    queueName: string;
   }): Promise<void> {
     // Storage shape from the header alone — survives a body the decode below
     // cannot read, which is exactly when an operator most wants to know where
@@ -882,11 +874,7 @@ export class QueueRedisRepository implements QueueRepository {
       // (2026-06-24 review). A repeatedly-viewed blocked group would
       // otherwise keep its orphan blobs alive indefinitely. readMode
       // "peek" routes tiered blob reads to their non-refreshing variant.
-      job.data = await decodeJobEnvelope({
-        value: raw,
-        tieredBlobs,
-        readMode: "peek",
-      });
+      job.data = await this.payloads.tryDecode({ value: raw, queueName });
     } catch {
       // ignore undecodable values
     }
@@ -1992,41 +1980,18 @@ export class QueueRedisRepository implements QueueRepository {
     };
   }
 
-  // ── Counter Reconciliation ──────────────────────────────────────
-
   /**
    * Reconcile the total-pending counter against the live ground truth.
    *
-   * WHY: The `total-pending` counter is incremented at dispatch (INCR) and
-   * decremented at complete (DECR), but several paths leak without a DECR:
-   *   - worker death after dispatch but before complete
-   *   - the 6-hour `:jobs` TTL reaping a group without a DECR
-   *   - MOVE_TO_DLQ_LUA which deletes `:jobs` without decrementing the counter
-   * Over time the counter drifts upward. Since it is read-only ops metadata
-   * (drives the dashboard "pending" tile), overwriting it with the ZCARD-derived
-   * ground truth is safe and does not affect dispatch correctness.
+   * Dispatch, worker death, TTL expiry and DLQ moves can leave the metadata
+   * counter above the authoritative sum of live job zsets. This method repairs
+   * that read-only metric without affecting dispatch correctness.
    *
-   * The ground truth is the authoritative Σ ZCARD over the `:jobs` zset of every
-   * group this queue knows about — intentionally the complete count, distinct
-   * from the top-N sampled per-group dashboard tile.
-   *
-   * A small re-drift from concurrent dispatch/complete INCR/DECR during the SET
-   * window is acceptable and self-corrects on the next scheduled cycle.
-   *
-   * The single-flight window default is shorter than the collector's reconcile
-   * interval so each scheduled cycle can acquire the marker while still guarding
-   * against multi-pod overlap.
-   *
-   * The reconcile is single-flighted per `singleFlightWindowMs` so only one
-   * pod recomputes per window. The marker is held for the whole pass and only
-   * then downgraded to the remainder of the window, so a pass that outlives the
-   * window cannot be joined by a second one — the regime where a stacked pass
-   * would hurt most is exactly the regime where passes run long. It is
-   * intentionally off the hot dispatch path.
-   *
-   * See issue #4683.
+   * One holder computes per window. It keeps the marker for the whole scan,
+   * then shortens it to the remainder of the interval. Concurrent dispatch may
+   * cause small drift during the final write; the next cycle repairs it.
    */
-  async reconcileTotalPending(
+  async tryReconcileTotalPending(
     queueName: string,
     singleFlightWindowMs = 55_000,
   ): Promise<ReconcileResult | null> {

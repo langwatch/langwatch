@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { OpsMetricsCollector } from "../metrics-collector";
 import type { OpsSnapshotService } from "@langwatch/ops-contract";
+import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
 
 /**
  * The lease gate is the whole cost saving in ADR-090: a pod that does not hold
@@ -61,13 +62,11 @@ const FLEET_STATE = {
   latestTotalFailed: 12,
 };
 
-const makeQueueRepo = () => ({
-  discoverQueueNames: vi.fn().mockResolvedValue(["trace_processing"]),
-  scanQueues: vi.fn().mockResolvedValue([]),
-  getBlockedSummary: vi.fn().mockResolvedValue({ totalBlocked: 0, clusters: [] }),
-  enumerateParkedTenants: vi.fn().mockResolvedValue({ tenants: [], total: 0 }),
-  reconcileTotalPending: vi.fn().mockResolvedValue(null),
-});
+const makeOps = () => {
+  const ops = OpsMetricsTestAdapter.create();
+  ops.setQueueNames(["trace_processing"]);
+  return ops;
+};
 
 const makeSnapshots = (isHeld: boolean): OpsSnapshotService => ({
   start: vi.fn().mockResolvedValue(void 0),
@@ -88,17 +87,15 @@ const makeSnapshots = (isHeld: boolean): OpsSnapshotService => ({
 });
 
 const makeWriter = (held: boolean) => {
-  const queueRepo = makeQueueRepo();
+  const ops = makeOps();
   const snapshots = makeSnapshots(held);
   const collector = new OpsMetricsCollector({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     redis: redisStub as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    queueRepo: queueRepo as any,
+    ops,
     snapshots,
     writerId: held ? "holder" : "loser",
   });
-  return { collector, queueRepo, snapshots };
+  return { collector, ops, snapshots };
 };
 
 describe("snapshot writer lease gate", () => {
@@ -106,12 +103,12 @@ describe("snapshot writer lease gate", () => {
     describe("when its collection cycle runs", () => {
       /** @scenario "Only the lease holder scans" */
       it("performs no scan at all", async () => {
-        const { collector, queueRepo, snapshots } = makeWriter(false);
+        const { collector, ops, snapshots } = makeWriter(false);
 
         await collector.discoverQueues();
         await collector.collect();
 
-        expect(queueRepo.scanQueues).not.toHaveBeenCalled();
+        expect(ops.getScanCalls()).toBe(0);
         expect(snapshots.writeLive).not.toHaveBeenCalled();
         expect(collector.isWriter()).toBe(false);
       });
@@ -121,12 +118,12 @@ describe("snapshot writer lease gate", () => {
   describe("given the pod holding the lease", () => {
     describe("when its collection cycle runs", () => {
       it("scans and publishes the live artifact", async () => {
-        const { collector, queueRepo, snapshots } = makeWriter(true);
+        const { collector, ops, snapshots } = makeWriter(true);
 
         await collector.discoverQueues();
         await collector.collect();
 
-        expect(queueRepo.scanQueues).toHaveBeenCalled();
+        expect(ops.getScanCalls()).toBeGreaterThan(0);
         expect(snapshots.writeLive).toHaveBeenCalled();
         expect(collector.isWriter()).toBe(true);
       });
@@ -156,10 +153,8 @@ describe("snapshot writer lease gate", () => {
       const redis = makeRedisHoldingState(FLEET_STATE);
       const snapshots = makeSnapshots(true);
       const collector = new OpsMetricsCollector({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         redis: redis as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        queueRepo: makeQueueRepo() as any,
+        ops: makeOps(),
         snapshots,
         writerId: "taking-over",
       });
@@ -186,10 +181,8 @@ describe("snapshot writer lease gate", () => {
       // them destroys the fleet's only copy.
       const redis = makeRedisHoldingState(FLEET_STATE);
       const collector = new OpsMetricsCollector({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         redis: redis as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        queueRepo: makeQueueRepo() as any,
+        ops: makeOps(),
         snapshots: makeSnapshots(true),
         writerId: "taking-over",
       });
@@ -215,10 +208,8 @@ describe("snapshot writer lease gate", () => {
       const snapshots = makeSnapshots(true);
       (snapshots.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(false);
       const collector = new OpsMetricsCollector({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         redis: redisStub as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        queueRepo: makeQueueRepo() as any,
+        ops: makeOps(),
         snapshots,
         writerId: "fenced-out",
       });

@@ -63,12 +63,15 @@ is owned by the private Redis repository.
 `PostgresOpsAdapter.create(...).build()` constructs the process-owned Ops
 service. Snapshot collection and dashboard streaming use one process-owned
 `OpsSnapshotService`; its Redis adapter owns lease/read/write/version handling.
-Scheduler operator controls are part of the canonical `OpsService`. Its private
-scheduler collaborator uses the application's scheduled-job store and package
-audit and Redis wake adapters. Project labels come from the complete Project
-service, not a Project repository owned by Ops. The application registers
-Hono/tRPC routes and owns the calendar scheduler loop; package imports do not
-register transports.
+Scheduler and queue operator controls are methods on the canonical
+`OpsService`. Private collaborators own the scheduled-job store, Redis queue
+state, queue DLQ audit rows, and Redis snapshot reads. Queue payload decoding
+uses one named application storage adapter; the package has no app storage or
+environment import. Project labels come from the complete Project service, not
+a Project repository owned by Ops. The application registers Hono/tRPC routes
+and owns the calendar scheduler loop; package imports do not register
+transports. The app metrics collector is a process adapter only: it receives
+the canonical Ops service and never a queue repository.
 
 Anomaly worker construction remains a thin application composition adapter
 because the central worker bootstrap is shared and currently composes the

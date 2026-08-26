@@ -1,18 +1,9 @@
-import type { Redis } from "ioredis";
+import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  startTestContainers,
-  stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { QueueRedisRepository } from "../../repositories/queue.redis.repository";
+import { QueueRedisRepository } from "../../../src/repositories/redis/queue.repository";
 
-let redis: Redis;
-beforeAll(async () => {
-  ({ redisConnection: redis } = await startTestContainers());
-});
-afterAll(async () => {
-  await stopTestContainers();
-});
+const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
+const hasRedis = !!redisUrl;
 
 // Module-level incrementing counter for unique queue names — no Date.now().
 let queueCounter = 0;
@@ -24,11 +15,24 @@ let queueCounter = 0;
  */
 const counterSuffixes = ["strikes", "attempt", "failstreak"] as const;
 
-describe("operator recovery clears every per-group counter", () => {
+describe.skipIf(!hasRedis)("operator recovery clears every per-group counter", () => {
+  let redis: Redis;
   let repo: QueueRedisRepository;
   let queueName: string;
   let prefix: string;
   const groupId = "project-1/subscriber/pm:langyConversation";
+
+  beforeAll(() => {
+    if (!redisUrl) {
+      return;
+    }
+
+    redis = new IORedis(redisUrl);
+  });
+
+  afterAll(async () => {
+    await redis?.quit();
+  });
 
   const counterKey = (suffix: string) => `${prefix}group:${groupId}:${suffix}`;
 

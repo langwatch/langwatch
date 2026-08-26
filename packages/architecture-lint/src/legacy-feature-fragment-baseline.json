@@ -3888,6 +3888,11 @@
     },
     {
       "feature": "ops",
+      "file": "platform/app/src/runtime/app/features/ops.ts",
+      "kind": "composition"
+    },
+    {
+      "feature": "ops",
       "file": "platform/app/src/server/api/routers/ops.ts",
       "kind": "transport"
     },
@@ -3914,16 +3919,6 @@
     {
       "feature": "ops",
       "file": "platform/app/src/server/app-layer/ops/process-audit.repository.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/server/app-layer/ops/queue-audit.repository.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/server/app-layer/ops/queue.service.ts",
       "kind": "legacy-implementation"
     },
     {
@@ -3959,16 +3954,6 @@
     {
       "feature": "ops",
       "file": "platform/app/src/server/app-layer/ops/repositories/process-ops.repository.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/server/app-layer/ops/repositories/queue.redis.repository.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/server/app-layer/ops/repositories/queue.repository.ts",
       "kind": "legacy-implementation"
     },
     {

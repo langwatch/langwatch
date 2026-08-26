@@ -3,7 +3,7 @@ import {
   GroupStagingScripts,
 } from "@langwatch/group-queue/operational";
 import { describe, expect, it, vi } from "vitest";
-import { QueueRedisRepository } from "../repositories/queue.redis.repository";
+import { QueueRedisRepository } from "../../src/repositories/redis/queue.repository";
 
 type ScanPage = [cursor: string, keys: string[]];
 

@@ -1,7 +1,7 @@
 export {
   PostgresOpsAdapter,
   type PostgresOpsAdapterOptions,
-} from "./adapters/postgres.ops.adapter";
+} from "./adapters/postgres-ops.adapter";
 export {
   RedisOpsSnapshotAdapter,
   type RedisOpsSnapshotAdapterOptions,
@@ -28,6 +28,7 @@ export {
   type OpsWorkerAdapterOptions,
 } from "./adapters/ops-worker.adapter";
 export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port";
+export { QueuePayloadDecoderPort } from "./ports/queue-payload-decoder.port";
 export type {
   AnomalyFeatureFlagConfig,
   AnomalyFeatureFlagsPort,

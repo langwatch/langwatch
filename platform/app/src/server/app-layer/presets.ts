@@ -312,15 +312,11 @@ import {
   NullProcessAuditSink,
   ProcessAuditRepository,
 } from "./ops/process-audit.repository";
-import { QueueService } from "./ops/queue.service";
-import { QueueAuditRepository } from "./ops/queue-audit.repository";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
 import { ProcessOpsPrismaRepository } from "./ops/repositories/process-ops.prisma.repository";
 import { NullProcessOpsRepository } from "./ops/repositories/process-ops.repository";
-import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
-import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
 import { NullReplayRepository } from "./ops/repositories/replay.repository";
 import {
@@ -1983,7 +1979,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     },
   }).build();
 
-  const queueRepo = redis ? new QueueRedisRepository(redis) : new NullQueueRepository();
   const replayRepo = redis
     ? new ReplayRedisRepository(redis)
     : new NullReplayRepository();
@@ -1997,10 +1992,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     : new NullEventExplorerRepository();
 
   const ops = Object.assign(opsService, {
-    queues: new QueueService({
-      repo: queueRepo,
-      audit: new QueueAuditRepository(prisma),
-    }),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     managerExplorer: (() => {
       const fleet = new ProcessOpsPrismaRepository(prisma);
@@ -2021,7 +2012,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     })(),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
-      ? getOpsMetricsCollector({ redis, queueRepo, snapshots })
+      ? getOpsMetricsCollector({ redis, ops: opsService, snapshots })
       : null,
     snapshots,
   });
@@ -2735,7 +2726,6 @@ export function createTestApp(
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     ops: Object.assign(testOpsService, {
-      queues: new QueueService({ repo: new NullQueueRepository() }),
       eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
       managerExplorer: new ManagerExplorerService({
         store: new InMemoryProcessStore(),

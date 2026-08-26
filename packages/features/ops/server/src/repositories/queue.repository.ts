@@ -1,9 +1,13 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
 import type {
-  ErrorCluster,
+  OpsBlockedSummary,
+  OpsParkedTenantsPage,
+  OpsQueueDlqGroup,
+  OpsQueueDrainPreview,
+  OpsQueueJob,
+  OpsQueueReconcileResult,
   ParkedGroupInfo,
-  ParkedTenant,
   QueueInfo,
 } from "@langwatch/ops-contract";
 
@@ -13,69 +17,12 @@ import type {
  * `total` is the honest count even when `tenants` is capped, so a caller can
  * say "showing N of M" rather than presenting a bounded list as complete.
  */
-export interface ParkedTenantsPage {
-  tenants: ParkedTenant[];
-  total: number;
-}
-
-export interface BlockedSummary {
-  totalBlocked: number;
-  clusters: ErrorCluster[];
-}
-
-export interface DlqGroupInfo {
-  groupId: string;
-  error: string | null;
-  errorStack: string | null;
-  pipelineName: string | null;
-  jobCount: number;
-  movedAt: number | null;
-}
-
-export interface DrainPreview {
-  totalAffected: number;
-  byPipeline: Array<{ name: string; count: number }>;
-  byError: Array<{ message: string; count: number }>;
-}
-
-/**
- * How a job's staged value is stored, read from the envelope header alone
- * (shape only, never body bytes — see `readEnvelopeDescriptor`).
- */
-export interface JobEnvelopeInfo {
-  /** Body encoding — "redis" | "s3" | "ref" | "gz" | "j". */
-  format: string | null;
-  /** Canonical envelope version. */
-  version: number | null;
-  /** Tiered blob hash when the body is offloaded. */
-  blobId: string | null;
-}
-
-export interface JobEntry {
-  jobId: string;
-  score: number;
-  data: Record<string, unknown> | null;
-  /**
-   * Serialized payload size in bytes as the encoder recorded it — the size the
-   * payload has back in a worker's hands, not the (compressed/offloaded)
-   * stored value's length. Null when the value predates the size field.
-   */
-  payloadBytes: number | null;
-  envelope: JobEnvelopeInfo | null;
-}
-
-/** Result returned by {@link QueueRepository.reconcileTotalPending}. */
-export interface ReconcileResult {
-  /** The value of the counter before this reconcile cycle. */
-  counter: number;
-  /** The authoritative Σ ZCARD over ALL `group:*:jobs` keys for the queue. */
-  groundTruth: number;
-  /**
-   * How far the counter was above ground truth before healing.
-   * Positive = over-counted; negative = under-counted.
-   */
-  drift: number;
-}
+export type ParkedTenantsPage = OpsParkedTenantsPage;
+export type BlockedSummary = OpsBlockedSummary;
+export type DlqGroupInfo = OpsQueueDlqGroup;
+export type DrainPreview = OpsQueueDrainPreview;
+export type JobEntry = OpsQueueJob;
+export type ReconcileResult = OpsQueueReconcileResult;
 
 export interface QueueRepository {
   discoverQueueNames(): Promise<string[]>;
@@ -212,7 +159,7 @@ export interface QueueRepository {
     errorFilter?: string;
   }): Promise<DrainPreview>;
 
-  reconcileTotalPending(queueName: string): Promise<ReconcileResult | null>;
+  tryReconcileTotalPending(queueName: string): Promise<ReconcileResult | null>;
 
   /**
    * The drift the most recent reconcile pass published for each named queue,
@@ -349,7 +296,7 @@ export class NullQueueRepository implements QueueRepository {
     return { totalAffected: 0, byPipeline: [], byError: [] };
   }
 
-  async reconcileTotalPending(): Promise<ReconcileResult | null> {
+  async tryReconcileTotalPending(): Promise<ReconcileResult | null> {
     return null;
   }
 

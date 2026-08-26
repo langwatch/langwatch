@@ -32,6 +32,11 @@ import type { SchedulerOpsRepository } from "../ports/scheduler-ops.repository";
 import type { SchedulerWakeService } from "../ports/scheduler-wake.service";
 import { SchedulerOpsService } from "../services/scheduler-ops.service";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis-anomaly-state.repository";
+import { QueueRedisRepository } from "../repositories/redis/queue.repository";
+import { QueueAuditRepository } from "../repositories/prisma/queue-audit.repository";
+import { NullQueueRepository } from "../repositories/queue.repository";
+import { QueueService } from "../services/queue.service";
+import type { QueuePayloadDecoderPort } from "../ports/queue-payload-decoder.port";
 import {
   PrismaSchedulerAuditRepository,
   type SchedulerAuditDatabase,
@@ -43,6 +48,7 @@ export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   access?: AdminAccess | undefined;
   now?: (() => Date) | undefined;
   redis?: IORedis | Cluster | undefined;
+  queuePayloads?: QueuePayloadDecoderPort | undefined;
   users: UserService;
   scheduler: {
     repository: SchedulerOpsRepository;
@@ -70,6 +76,13 @@ export class PostgresOpsAdapter {
     const access =
       this.options.access ??
       AdminAccessService.create({ adminEmails: this.options.adminEmails });
+    const queues = this.options.redis
+      ? QueueService.create({
+          repo: new QueueRedisRepository(this.options.redis, this.queuePayloads()),
+          audit: QueueAuditRepository.create(this.options.database),
+        })
+      : QueueService.create({ repo: new NullQueueRepository() });
+
     return OpsService.create({
       access,
       adminBackoffice: AdminBackofficeService.create({
@@ -95,6 +108,17 @@ export class PostgresOpsAdapter {
       anomalyState: this.options.redis
         ? RedisAnomalyStateRepository.create(this.options.redis)
         : null,
+      queues,
     });
+  }
+
+  private queuePayloads(): QueuePayloadDecoderPort {
+    if (!this.options.queuePayloads) {
+      throw new Error(
+        "Ops queue composition requires a payload decoder when Redis is configured",
+      );
+    }
+
+    return this.options.queuePayloads;
   }
 }

@@ -1,10 +1,9 @@
-import type { Redis } from "ioredis";
+import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  startTestContainers,
-  stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { QueueRedisRepository } from "../../repositories/queue.redis.repository";
+import { QueueRedisRepository } from "../../../src/repositories/redis/queue.repository";
+
+const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
+const hasRedis = !!redisUrl;
 
 /**
  * Discard and explicit-id redrive against a real Redis
@@ -13,18 +12,24 @@ import { QueueRedisRepository } from "../../repositories/queue.redis.repository"
  * queue.service unit suite covers; here the substrate contract is that the
  * jobs are gone and cannot come back.
  */
-let redis: Redis;
-beforeAll(async () => {
-  ({ redisConnection: redis } = await startTestContainers());
-});
-afterAll(async () => {
-  await stopTestContainers();
-});
-
 // Module-level incrementing counter for unique queue names — no Date.now().
 let queueCounter = 0;
 
-describe("DLQ discard and explicit-id redrive", () => {
+describe.skipIf(!hasRedis)("DLQ discard and explicit-id redrive", () => {
+  let redis: Redis;
+
+  beforeAll(() => {
+    if (!redisUrl) {
+      return;
+    }
+
+    redis = new IORedis(redisUrl);
+  });
+
+  afterAll(async () => {
+    await redis?.quit();
+  });
+
   function freshQueue(): { queueName: string; prefix: string } {
     queueCounter++;
     const queueName = `dlq-discard-${queueCounter}`;

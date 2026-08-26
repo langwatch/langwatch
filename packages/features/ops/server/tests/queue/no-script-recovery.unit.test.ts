@@ -1,6 +1,6 @@
 import type { ChainableCommander } from "ioredis";
 import { describe, expect, it } from "vitest";
-import { execWithNoScriptRecovery } from "../repositories/queue.redis.repository";
+import { execWithNoScriptRecovery } from "../../src/repositories/redis/queue.repository";
 
 /**
  * A pipeline whose queued commands all come back NOSCRIPT — what Redis returns

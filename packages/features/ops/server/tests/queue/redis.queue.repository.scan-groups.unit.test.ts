@@ -1,6 +1,6 @@
 import type { Redis } from "ioredis";
 import { describe, expect, it } from "vitest";
-import { QueueRedisRepository } from "../queue.redis.repository";
+import { QueueRedisRepository } from "../../src/repositories/redis/queue.repository";
 
 const QUEUE_NAME = "test-queue";
 const PREFIX = `${QUEUE_NAME}:gq:`;
@@ -229,9 +229,9 @@ describe("QueueRedisRepository.scanQueues — group summary", () => {
     });
   });
 
-  describe("given only a pre-ADR-080 job id marker", () => {
+  describe("given only a legacy retry marker in the job id", () => {
     describe("when the queue is scanned", () => {
-      it("falls back to the legacy /r/<n> id parse", async () => {
+      it("does not infer a retry count without the canonical attempt key", async () => {
         const redis = new FakeRedis();
         stageGroup({
           redis,
@@ -244,7 +244,7 @@ describe("QueueRedisRepository.scanQueues — group summary", () => {
         const queue = await scan({ redis, topN: 10 });
 
         const group = queue.groups.find((g) => g.groupId === "group-legacy");
-        expect(group?.retryCount).toBe(2);
+        expect(group?.retryCount).toBeNull();
       });
     });
   });

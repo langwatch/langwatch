@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   NoopSchedulerWakeService,
   PostgresOpsAdapter,
+  QueuePayloadDecoderPort,
   type SchedulerOpsRepository,
 } from "@langwatch/ops-server";
 import type { OpsService } from "@langwatch/ops-contract";
@@ -35,6 +36,12 @@ const schedulerRepository: SchedulerOpsRepository = {
 
 const projects: ProjectService = Object.create(ProjectService.prototype);
 projects.listNamesByIds = async () => [];
+
+class NoopQueuePayloadDecoder extends QueuePayloadDecoderPort {
+  async tryDecode(): Promise<Record<string, unknown> | null> {
+    return null;
+  }
+}
 
 /**
  * The operator delete path against a live Redis. The point under test is the
@@ -75,6 +82,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       audit: { record: async () => undefined },
       users: {} as UserService,
       redis,
+      queuePayloads: new NoopQueuePayloadDecoder(),
       scheduler: {
         repository: schedulerRepository,
         wake: NoopSchedulerWakeService.create(),
