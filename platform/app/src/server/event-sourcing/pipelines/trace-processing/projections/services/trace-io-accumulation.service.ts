@@ -10,7 +10,7 @@ import {
   serializeMediaRefList,
 } from "~/shared/traces/media-refs";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 export const OUTPUT_SOURCE = {
   EXPLICIT: "explicit",

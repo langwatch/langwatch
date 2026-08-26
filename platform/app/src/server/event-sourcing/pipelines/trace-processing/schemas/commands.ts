@@ -1,8 +1,12 @@
 import { z } from "zod";
 import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
-import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./constants";
+import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "@langwatch/trace-contract";
 import { metricCorrelationFields } from "./metricCorrelationFields";
-import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
+import {
+  instrumentationScopeSchema,
+  resourceSchema,
+  spanSchema,
+} from "@langwatch/trace-contract";
 
 export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
 export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;

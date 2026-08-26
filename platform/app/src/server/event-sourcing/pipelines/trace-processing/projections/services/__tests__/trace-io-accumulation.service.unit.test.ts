@@ -19,7 +19,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { LogRecordReceivedEventData } from "../../../schemas/events";
-import type { NormalizedSpan } from "../../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import {
   extractIOFromLogRecord,
   TraceIOAccumulationService,

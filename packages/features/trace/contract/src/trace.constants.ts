@@ -240,38 +240,9 @@ export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
 export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
 
 /**
- * Append-coalescing bound for the trace-side correlation commands —
- * `recordLogContribution` and `recordMetricCorrelation` (ADR-066 pillar 2).
- *
- * Both are keyed on the trace, so every log record and every metric exemplar
- * belonging to one trace funnels into a single queue group. A chatty agent
- * trace mints thousands of them, and without folding that group drains one
- * claim at a time, appending a tiny event_log part per item and holding a fleet
- * slot per claim. Other traces are not queued behind it — the group key is
- * per-trace, so they have their own groups — but they contend for those slots
- * and for the merge headroom the small parts consume.
- *
- * Neither command declares a group key, so both funnel by the DEFAULT aggregate
- * key, exactly as unsharded `recordSpan` does. That is why the grouped-producer
- * warning at registration never named them: it reads a producer's *declared*
- * grouping (`serializeByAggregate` or an explicit `getGroupKey`) and a default
- * key is neither.
- *
- * Safe to fold, on the same terms as their `log_processing` and
- * `metric_processing` counterparts: each handler derives its event from its own
- * command alone, never reads back a same-batch append, and stamps a per-item
- * idempotency key, so a retried batch neither duplicates nor drops. The emitted
- * events still carry aggregateId = traceId, leaving the trace-summary and
- * trace-analytics folds — on their own aggregate-keyed, separately coalesced
- * queues — untouched.
- *
- * Matches the log/metric *record* bound rather than the span one because these
- * carry no more than the records they are derived from: a contribution holds
- * IO_PREVIEW_BYTES-capped previews where the canonical record holds the whole
- * body, and a correlation is a handful of scalars. The fat case is still bound
- * correctly — the drain weighs each job by the `s` payload size the envelope
- * records before compression and offload, so a batch of maximal previews hits
- * the 4 MiB byte budget at roughly 32 items, well before this count. The count
- * only has to stop a burst of small ones from growing unboundedly.
+ * Correlation commands share a trace queue group, so coalescing prevents chatty
+ * traces from producing one tiny event-log part per item. Each handler derives
+ * one independently idempotent event from its command, making retries safe.
+ * The drain's 4 MiB byte budget bounds large previews before this count does.
  */
 export const TRACE_CORRELATION_COALESCE_MAX_BATCH = 256;

@@ -7,7 +7,7 @@ import {
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import type {
   LogRecordReceivedEvent,
   MetricDataPointCorrelatedEvent,

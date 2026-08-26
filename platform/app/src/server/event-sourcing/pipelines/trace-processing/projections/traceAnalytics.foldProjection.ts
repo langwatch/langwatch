@@ -10,7 +10,7 @@ import {
 } from "~/server/app-layer/traces/span-normalization.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
-import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "../schemas/constants";
+import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "@langwatch/trace-contract";
 import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
@@ -35,7 +35,7 @@ import {
   topicAssignedEventSchema,
   traceNameChangedEventSchema,
 } from "../schemas/events";
-import type { NormalizedSpan } from "../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import {
   OUTPUT_SOURCE,
   SpanCostService,

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { NormalizedSpan } from "../../schemas/spans";
-import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
+import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
 import { isValidTimestamp, SpanTimingService } from "./span-timing.service";
 
 function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {

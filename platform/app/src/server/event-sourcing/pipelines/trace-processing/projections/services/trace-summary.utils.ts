@@ -1,4 +1,4 @@
-import type { NormalizedAttributes } from "../../schemas/spans";
+import type { NormalizedAttributes } from "@langwatch/trace-contract";
 
 /**
  * Parses a JSON-encoded string array. Falls back to the raw string as a

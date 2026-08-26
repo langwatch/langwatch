@@ -6,7 +6,7 @@ import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/reposit
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import { anchorStorageTime } from "../services/storage-anchor";
 import {
   projectAnalyticsStateToRow,

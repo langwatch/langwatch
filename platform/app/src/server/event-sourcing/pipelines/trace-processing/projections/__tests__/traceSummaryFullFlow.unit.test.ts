@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NormalizedSpanKind } from "../../schemas/spans";
+import { NormalizedSpanKind } from "@langwatch/trace-contract";
 import {
   applySpanToSummary,
   createInitState,

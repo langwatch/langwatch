@@ -1,7 +1,3 @@
-import {
-  ESpanKind,
-  type EStatusCode,
-} from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { z } from "zod";
 
 export const longBitsSchema = z.object({
@@ -38,19 +34,10 @@ export const bytesSchema = z.instanceof(Uint8Array);
 
 const NUMERIC_KEY = /^\d+$/;
 
-/** Checks whether an object looks like a JSON-serialized Uint8Array ({"0":1,"1":2,...}). */
-function isSerializedUint8Array(
-  obj: Record<string, unknown>,
-): obj is Record<string, number> {
-  return Object.entries(obj).every(
-    ([k, v]) =>
-      NUMERIC_KEY.test(k) &&
-      typeof v === "number" &&
-      Number.isInteger(v) &&
-      v >= 0 &&
-      v <= 255,
-  );
-}
+const serializedUint8ArraySchema = z.record(
+  z.string().regex(NUMERIC_KEY),
+  z.number().int().min(0).max(255),
+);
 
 /** Sorts a validated serialized-Uint8Array object by numeric key and returns the byte values. */
 function sortedByteValues(obj: Record<string, number>): number[] {
@@ -59,28 +46,30 @@ function sortedByteValues(obj: Record<string, number>): number[] {
     .map(([, v]) => v);
 }
 
-// Normalize Uint8Array / JSON-serialized Uint8Array to hex string before validating
-export const idSchema = z.preprocess((val) => {
-  if (val instanceof Uint8Array) {
-    return Buffer.from(val).toString("hex");
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function trySerializedByteValues(value: unknown): number[] | undefined {
+  const parsed = serializedUint8ArraySchema.safeParse(value);
+  if (!parsed.success) {
+    return void 0;
   }
-  if (val != null && typeof val === "object") {
-    const obj = val as Record<string, unknown>;
-    if (isSerializedUint8Array(obj)) {
-      return Buffer.from(new Uint8Array(sortedByteValues(obj))).toString("hex");
-    }
+
+  return sortedByteValues(parsed.data);
+}
+
+export const idSchema = z.preprocess((value) => {
+  if (value instanceof Uint8Array) {
+    return bytesToHex(value);
   }
-  return val;
+
+  const bytes = trySerializedByteValues(value);
+  return bytes ? bytesToHex(new Uint8Array(bytes)) : value;
 }, z.string());
 
-/**
- * AnyValue + friends 🤗
- *
- * OTLP AnyValue is effectively "oneof". This schema accepts any object that matches at
- * least one of the optional fields, but does NOT enforce exclusivity.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type widened to accept JSON-serialized bytesValue
-export const anyValueSchema: z.ZodType<OtlpAnyValue, any> = z.object({
+/** OTLP AnyValue accepts its optional fields without enforcing oneof exclusivity. */
+export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
   stringValue: z.string().nullable().optional(),
   boolValue: z.union([z.boolean(), z.string()]).nullable().optional(),
   intValue: z.union([z.number(), z.string(), longBitsSchema]).nullable().optional(),
@@ -93,34 +82,29 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue, any> = z.object({
     .lazy(() => keyValueListSchema)
     .optional()
     .nullable(),
-  // JSON.stringify converts Uint8Array to {"0":1,"1":2,...} — reconstruct before validating
   bytesValue: z
-    .preprocess((val) => {
-      if (val != null && typeof val === "object" && !(val instanceof Uint8Array)) {
-        const obj = val as Record<string, unknown>;
-        if (isSerializedUint8Array(obj)) {
-          return new Uint8Array(sortedByteValues(obj));
-        }
+    .preprocess((value) => {
+      if (value instanceof Uint8Array) {
+        return value;
       }
-      return val;
+
+      const bytes = trySerializedByteValues(value);
+      return bytes ? new Uint8Array(bytes) : value;
     }, bytesSchema)
     .optional()
     .nullable(),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const keyValueSchema: z.ZodType<OtlpKeyValue, any> = z.object({
+export const keyValueSchema: z.ZodType<OtlpKeyValue> = z.object({
   key: z.string(),
   value: anyValueSchema,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const arrayValueSchema: z.ZodType<OtlpArrayValue, any> = z.object({
+export const arrayValueSchema: z.ZodType<OtlpArrayValue> = z.object({
   values: z.array(anyValueSchema),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const keyValueListSchema: z.ZodType<OtlpKeyValueList, any> = z.object({
+export const keyValueListSchema: z.ZodType<OtlpKeyValueList> = z.object({
   values: z.array(keyValueSchema),
 });
 
@@ -141,11 +125,18 @@ const STATUS_CODE_SET = {
   0: true,
   1: true,
   2: true,
-} as const satisfies Record<EStatusCode, true>;
+} as const;
 
-// OTLP span kind can be either numeric (from binary format) or string (from JSON format)
+/** OTLP uses numeric span kinds in binary and symbolic names in JSON. */
 export const eSpanKindSchema = z.union([
-  z.nativeEnum(ESpanKind),
+  z.union([
+    z.literal(0),
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+  ]),
   z.enum([
     "SPAN_KIND_UNSPECIFIED",
     "SPAN_KIND_INTERNAL",
@@ -159,13 +150,10 @@ export const eSpanKindSchema = z.union([
 export const eStatusCodeSchema = z
   .number()
   .int()
-  .refine((v): v is EStatusCode => v in STATUS_CODE_SET, {
+  .refine((v): v is 0 | 1 | 2 => v in STATUS_CODE_SET, {
     message: "Invalid EStatusCode",
   });
 
-/**
- * Status / Event / Link / Span
- */
 export const statusSchema = z.object({
   message: z.string().optional().nullable(),
   code: eStatusCodeSchema.optional().nullable(),
@@ -210,9 +198,6 @@ export const spanSchema = z.object({
   droppedLinksCount: z.number().optional().nullable().default(0),
 });
 
-/**
- * ScopeSpans / ResourceSpans / ExportTraceServiceRequest
- */
 export const scopeSpansSchema = z.object({
   scope: instrumentationScopeSchema.optional(),
   spans: z.array(spanSchema).optional(),

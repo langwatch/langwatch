@@ -9,7 +9,7 @@ import {
   ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
   BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
   REMOVE_ANNOTATION_COMMAND_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import {
   annotationAddedEventDataSchema,
   annotationRemovedEventDataSchema,

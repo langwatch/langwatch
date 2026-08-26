@@ -3,7 +3,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import { passesTraceOriginGuards } from "../_originGuardedSubscriber";
 

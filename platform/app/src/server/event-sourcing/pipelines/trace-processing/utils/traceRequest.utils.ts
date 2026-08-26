@@ -6,12 +6,12 @@ import {
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { match } from "ts-pattern";
 import { safeUnflatten } from "~/utils/safeUnflatten";
-import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "../schemas/otlp";
+import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import {
   type NormalizedAttributes,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "../schemas/spans";
+} from "@langwatch/trace-contract";
 
 const TRACE_FLAGS_MASK = 0xff as const; // bits 0–7
 const TRACE_FLAGS_IS_REMOTE_MASK = 1 << 8; // bit 8

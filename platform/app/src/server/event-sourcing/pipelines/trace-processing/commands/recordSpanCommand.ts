@@ -32,9 +32,9 @@ import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { SpanReceivedEvent } from "../schemas/events";
-import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
+import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { capOversizedAttributes } from "../utils/capOversizedAttributes";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 

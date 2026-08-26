@@ -48,9 +48,9 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   TRACE_CORRELATION_COALESCE_MAX_BATCH,
   TRACE_PROCESSING_EVENT_TYPES,
-} from "./schemas/constants";
+} from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "./schemas/events";
-import type { NormalizedSpan } from "./schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { TraceSummarySubscriber } from "./subscribers/_originGuardedSubscriber";
 import {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,

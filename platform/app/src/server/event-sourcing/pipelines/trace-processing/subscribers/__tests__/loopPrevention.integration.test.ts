@@ -67,9 +67,9 @@ import { SpanStorageMapProjection } from "../../projections/spanStorage.mapProje
 import { SpanAppendStore } from "../../projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../../projections/traceSummary.store";
-import { TRACE_PROCESSING_EVENT_TYPES } from "../../schemas/constants";
+import { TRACE_PROCESSING_EVENT_TYPES } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../../schemas/events";
-import type { OtlpSpan } from "../../schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import { createEvaluationTriggerSubscriber } from "../evaluationTrigger.subscriber";
 
 const hasTestcontainers = !!(

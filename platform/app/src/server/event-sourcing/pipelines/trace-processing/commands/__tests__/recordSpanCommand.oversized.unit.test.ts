@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { maybeSpool } from "~/server/app-layer/traces/edge-spool";
 import type { RecordSpanCommandData } from "../../schemas/commands";
-import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
+import { RECORD_SPAN_COMMAND_TYPE } from "@langwatch/trace-contract";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../utils/capOversizedAttributes";
 import {
   RecordSpanCommand,

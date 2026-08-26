@@ -19,8 +19,8 @@ import {
 import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
 import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/commands";
-import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
-import type { OtlpKeyValue } from "../../schemas/otlp";
+import { RECORD_SPAN_COMMAND_TYPE } from "@langwatch/trace-contract";
+import type { OtlpKeyValue } from "@langwatch/trace-contract";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,

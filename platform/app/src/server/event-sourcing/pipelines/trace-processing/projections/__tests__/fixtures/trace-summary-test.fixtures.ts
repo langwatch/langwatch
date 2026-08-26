@@ -1,14 +1,14 @@
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../../schemas/constants";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { SpanReceivedEvent } from "../../../schemas/events";
-import type { OtlpSpan } from "../../../schemas/otlp";
-import type { NormalizedSpan } from "../../../schemas/spans";
+import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "../../../schemas/spans";
+} from "@langwatch/trace-contract";
 import { TraceIOAccumulationService } from "../../services/trace-io-accumulation.service";
 import {
   applySpanToSummary as applySpanToSummaryWithServices,

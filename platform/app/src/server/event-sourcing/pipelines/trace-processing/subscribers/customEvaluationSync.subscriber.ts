@@ -4,10 +4,10 @@ import { createLogger } from "@langwatch/observability";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import type { ReportEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
+import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../schemas/events";
 import { isSpanReceivedEvent } from "../schemas/events";
-import type { OtlpSpan } from "../schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:custom-evaluation-sync");
 

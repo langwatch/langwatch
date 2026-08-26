@@ -6,7 +6,7 @@ import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-ext
 import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { TraceNameChangedEvent } from "../../schemas/events";
 import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
 import {

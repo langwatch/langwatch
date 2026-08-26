@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OtlpResource, OtlpSpan } from "../../schemas/otlp";
+import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,

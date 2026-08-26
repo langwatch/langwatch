@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import {
   aggregateScenarioRoleMetrics,
   deriveScenarioRoleMetricsFromSpans,

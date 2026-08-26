@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { NormalizedSpan } from "../../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service";
 import type { TraceOriginService } from "../trace-origin.service";
 

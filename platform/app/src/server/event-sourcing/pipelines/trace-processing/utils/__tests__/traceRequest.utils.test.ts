@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OtlpAnyValue } from "../../schemas/otlp";
+import type { OtlpAnyValue } from "@langwatch/trace-contract";
 import { TraceRequestUtils } from "../traceRequest.utils";
 
 describe("traceRequest.utils", () => {

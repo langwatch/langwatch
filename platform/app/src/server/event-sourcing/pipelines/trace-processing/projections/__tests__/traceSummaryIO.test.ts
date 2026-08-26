@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import {
   applySpanToSummary,
   createInitState,

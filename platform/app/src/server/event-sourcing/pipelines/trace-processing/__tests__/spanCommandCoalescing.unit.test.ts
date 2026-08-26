@@ -28,7 +28,7 @@ import {
   RECORD_SPAN_COALESCE_MAX_BATCH,
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import {
   buildTraceDeps,
   FIXTURE_TENANT_ID,

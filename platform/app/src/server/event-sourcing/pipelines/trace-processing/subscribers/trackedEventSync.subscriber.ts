@@ -11,10 +11,10 @@ import {
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
+import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../schemas/events";
 import { isSpanReceivedEvent } from "../schemas/events";
-import type { OtlpAnyValue, OtlpSpan } from "../schemas/otlp";
+import type { OtlpAnyValue, OtlpSpan } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:tracked-event-sync");
 

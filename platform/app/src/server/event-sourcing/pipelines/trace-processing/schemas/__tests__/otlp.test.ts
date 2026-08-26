@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { anyValueSchema, bytesSchema, idSchema, spanSchema } from "../otlp";
+import {
+  anyValueSchema,
+  bytesSchema,
+  idSchema,
+  spanSchema,
+} from "@langwatch/trace-contract";
 
 describe("otlp schemas", () => {
   describe("idSchema", () => {

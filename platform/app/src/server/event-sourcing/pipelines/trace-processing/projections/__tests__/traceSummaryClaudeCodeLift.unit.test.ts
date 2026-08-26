@@ -28,7 +28,7 @@ import {
   LOG_CONTRIBUTED_EVENT_VERSION_LATEST,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { LogContributedEvent, LogRecordReceivedEvent } from "../../schemas/events";
 import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
 import {

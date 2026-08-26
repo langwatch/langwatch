@@ -4,7 +4,7 @@ import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { TraceOriginService } from "./trace-origin.service";
 import { parseJsonStringArray, stringAttr } from "./trace-summary.utils";
 

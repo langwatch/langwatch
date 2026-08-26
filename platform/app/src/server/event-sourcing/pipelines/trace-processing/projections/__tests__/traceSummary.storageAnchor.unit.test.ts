@@ -1,6 +1,6 @@
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
-import { LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
+import { LOG_RECORD_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import {
   type TraceSummaryData,
   TraceSummaryFoldProjection,

@@ -19,9 +19,13 @@ import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
-} from "./constants";
+} from "@langwatch/trace-contract";
 import { metricCorrelationFields } from "./metricCorrelationFields";
-import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
+import {
+  instrumentationScopeSchema,
+  resourceSchema,
+  spanSchema,
+} from "@langwatch/trace-contract";
 
 /**
  * Zod schema for EventMetadataBase.

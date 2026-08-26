@@ -3,7 +3,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   MAX_PROCESSED_SPANS,

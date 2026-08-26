@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { SpanReceivedEvent, TraceProcessingEvent } from "../../schemas/events";
-import type { OtlpSpan } from "../../schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   createTrackedEventSyncHandler,
   extractTrackedEventsFromSpan,

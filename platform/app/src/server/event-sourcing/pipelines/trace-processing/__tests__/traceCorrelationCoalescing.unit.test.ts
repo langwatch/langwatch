@@ -26,7 +26,7 @@ import {
   RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
   TRACE_CORRELATION_COALESCE_MAX_BATCH,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import {
   buildTraceDeps,
   FIXTURE_TENANT_ID,

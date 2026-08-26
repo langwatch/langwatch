@@ -4,7 +4,7 @@ import type { TraceSummaryData } from "../projections/traceSummary.foldProjectio
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../schemas/events";
 
 const logger = createLogger("langwatch:trace-processing:origin-guarded-subscriber");

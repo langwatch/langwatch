@@ -4,7 +4,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { SpanReceivedEvent } from "../../schemas/events";
 import {
   createSimulationMetricsSyncHandler,

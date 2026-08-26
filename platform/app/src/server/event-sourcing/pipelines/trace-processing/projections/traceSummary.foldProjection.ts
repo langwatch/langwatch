@@ -12,7 +12,7 @@ import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
@@ -37,7 +37,7 @@ import {
   topicAssignedEventSchema,
   traceNameChangedEventSchema,
 } from "../schemas/events";
-import type { NormalizedSpan } from "../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import {
   extractIOFromLogRecord,
   OUTPUT_SOURCE,

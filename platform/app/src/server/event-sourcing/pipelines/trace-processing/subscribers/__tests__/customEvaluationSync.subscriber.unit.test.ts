@@ -2,7 +2,7 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { SpanReceivedEvent, TraceProcessingEvent } from "../../schemas/events";
-import type { OtlpSpan } from "../../schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import {
   type CustomEvaluationSyncSubscriberDeps,
   createCustomEvaluationSyncHandler,

@@ -3,7 +3,7 @@ import {
   CHANGE_TRACE_NAME_COMMAND_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import { traceNameChangedEventDataSchema } from "../schemas/events";
 
 /**

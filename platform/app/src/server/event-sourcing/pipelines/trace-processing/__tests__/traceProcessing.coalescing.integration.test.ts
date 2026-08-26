@@ -15,9 +15,9 @@ import { RecordSpanCommand } from "../commands/recordSpanCommand";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../projections/traceSummary.store";
-import { RECORD_SPAN_COMMAND_TYPE } from "../schemas/constants";
+import { RECORD_SPAN_COMMAND_TYPE } from "@langwatch/trace-contract";
 import type { SpanReceivedEvent } from "../schemas/events";
-import type { OtlpSpan } from "../schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 
 // Subclass that injects no-op span-enrichment deps so the production
 // `require("~/server/db")` default-dependency path never runs (that require

@@ -38,7 +38,7 @@
  *   replaced. The walk is in place and degrades gracefully — a malformed value
  *   is left as-is rather than throwing.
  */
-import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "../schemas/otlp";
+import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 /**
  * Generous threshold (256KB). Real-world text input/output is far smaller; this

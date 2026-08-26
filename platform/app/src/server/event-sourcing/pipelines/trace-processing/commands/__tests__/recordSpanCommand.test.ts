@@ -9,7 +9,7 @@ import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/com
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
+import { NormalizedSpanKind } from "@langwatch/trace-contract";
 
 import { SpanCostService } from "../span-cost.service";
 

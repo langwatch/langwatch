@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { NormalizedSpan } from "../../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { createTestSpan } from "../../__tests__/fixtures/trace-summary-test.fixtures";
 import { deriveSpanCost } from "../span-cost.derivation";
 import { SpanCostService } from "../span-cost.service";

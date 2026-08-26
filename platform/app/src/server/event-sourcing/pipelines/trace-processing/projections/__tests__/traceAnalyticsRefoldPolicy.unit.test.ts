@@ -2,7 +2,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   type TraceAnalyticsData,

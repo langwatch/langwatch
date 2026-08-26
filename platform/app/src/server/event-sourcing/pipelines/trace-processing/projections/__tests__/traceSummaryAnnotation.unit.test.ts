@@ -10,7 +10,7 @@ import {
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-} from "../../schemas/constants";
+} from "@langwatch/trace-contract";
 import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,

@@ -9,7 +9,7 @@ import {
   ASSIGN_TOPIC_COMMAND_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { TopicAssignedEvent } from "../schemas/events";
 
 /**

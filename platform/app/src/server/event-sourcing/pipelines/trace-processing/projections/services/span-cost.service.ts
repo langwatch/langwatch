@@ -2,7 +2,7 @@ import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { coerceToNumber } from "~/utils/coerceToNumber";
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 export const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",

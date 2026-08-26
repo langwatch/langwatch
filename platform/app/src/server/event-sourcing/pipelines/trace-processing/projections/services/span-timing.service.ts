@@ -1,6 +1,6 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 /**
  * Validates whether a timestamp value is usable (positive, finite number).

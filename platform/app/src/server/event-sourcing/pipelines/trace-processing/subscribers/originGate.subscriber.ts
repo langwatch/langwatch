@@ -2,7 +2,7 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { ResolveOriginCommandData } from "../schemas/commands";
-import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
+import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "../schemas/events";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");

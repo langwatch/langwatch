@@ -8,7 +8,7 @@ import {
   LOG_CONTRIBUTED_EVENT_TYPE,
   LOG_CONTRIBUTED_EVENT_VERSION_LATEST,
   RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { LogContributedEvent } from "../schemas/events";
 
 export class RecordLogContributionCommand implements CommandHandler<

@@ -85,9 +85,7 @@ describe("spanStorage shard group key", () => {
         traceCanonicalisation: TraceCanonicalisationService.create(),
       });
 
-      expect(projection.options.coalesceMaxBatch).toBe(
-        TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
-      );
+      expect(projection.options.coalesceMaxBatch).toBe(TRACE_SPAN_MAP_COALESCE_MAX_BATCH);
       // 256 is deliberate (matches the log/metric map ceilings); changing it
       // is a decision, so the exact value is pinned.
       expect(TRACE_SPAN_MAP_COALESCE_MAX_BATCH).toBe(256);

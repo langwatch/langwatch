@@ -14,7 +14,7 @@ import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "../../schemas/spans";
+} from "@langwatch/trace-contract";
 import { SpanAppendStore } from "../spanStorage.store";
 import { TraceSummaryStore } from "../traceSummary.store";
 

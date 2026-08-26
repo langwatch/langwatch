@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+/** OTLP span kinds after the ingest boundary has normalized numeric/string values. */
 export enum NormalizedSpanKind {
   UNSPECIFIED = 0,
   INTERNAL = 1,
@@ -9,6 +10,7 @@ export enum NormalizedSpanKind {
   CONSUMER = 5,
 }
 
+/** OTLP status codes after the ingest boundary has normalized numeric/string values. */
 export enum NormalizedStatusCode {
   UNSET = 0,
   OK = 1,
@@ -21,6 +23,7 @@ const normalizedAttributeScalarSchema = z.union([
   z.number(),
   z.bigint(),
 ]);
+
 const normalizedAttributesValueSchema = z.union([
   normalizedAttributeScalarSchema,
   z.array(normalizedAttributeScalarSchema),
@@ -48,7 +51,8 @@ const normalizedLinkSchema = z.object({
   attributes: normalizedAttributesSchema,
 });
 
-const normalizedSpanSchema = z.object({
+/** The canonical span row shared by trace projections and trace readers. */
+export const normalizedSpanSchema = z.object({
   id: z.string(),
   traceId: z.string(),
   spanId: z.string(),
@@ -72,16 +76,10 @@ const normalizedSpanSchema = z.object({
   droppedAttributesCount: z.literal(0),
   droppedEventsCount: z.literal(0),
   droppedLinksCount: z.literal(0),
-  // Per-span cost, computed at projection time from the span's tokens ×
-  // pricing via the same SpanCostService the trace-summary fold uses, so a
-  // span's stored cost matches its contribution to the trace total. Null when
-  // the span carries no costable usage (no tokens / no explicit cost).
+  // Cost is computed at projection time from usage and model pricing. It is
+  // null when the span has no costable usage or explicit cost.
   cost: z.number().nullable(),
-  // Portion of `cost` covered by a flat plan rather than billed per token
-  // (the span's / resource's `langwatch.cost.non_billable` marker). Equals
-  // `cost` for a fully-bundled span, null/0 for a fully-billed one — mirrors
-  // how `trace_summaries.NonBilledCost` is summed in the fold. Billed portion
-  // is `cost - nonBilledCost`.
+  // The flat-plan portion of cost. The billed portion is cost - nonBilledCost.
   nonBilledCost: z.number().nullable(),
 });
 

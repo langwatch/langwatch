@@ -7,7 +7,7 @@ import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
   RESOLVE_ORIGIN_COMMAND_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { OriginResolvedEvent } from "../schemas/events";
 
 const logger = createLogger("langwatch:trace-processing:resolve-origin");

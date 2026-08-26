@@ -17,8 +17,11 @@ import { SpanAppendStore } from "../projections/spanStorage.store";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "../projections/traceSummary.store";
-import { RECORD_SPAN_COMMAND_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
-import type { OtlpSpan } from "../schemas/otlp";
+import {
+  RECORD_SPAN_COMMAND_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 
 class TestRecordSpanCommand extends RecordSpanCommand {
   static override readonly schema = RecordSpanCommand.schema;

@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { parseJsonStringArray } from "./trace-summary.utils";
 
 /**

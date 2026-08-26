@@ -1,4 +1,4 @@
-import type { NormalizedSpan } from "../../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { SpanCostService } from "./span-cost.service";
 
 /**

@@ -8,7 +8,7 @@ import {
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
-} from "../schemas/constants";
+} from "@langwatch/trace-contract";
 import type { MetricDataPointCorrelatedEvent } from "../schemas/events";
 
 export class RecordMetricCorrelationCommand implements CommandHandler<

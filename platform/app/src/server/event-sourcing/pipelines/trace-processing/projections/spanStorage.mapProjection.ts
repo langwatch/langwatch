@@ -6,7 +6,7 @@ import {
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "../schemas/events";
-import type { NormalizedSpan } from "../schemas/spans";
+import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { deriveSpanCost } from "./services/span-cost.derivation";
 import { SpanCostService } from "./services/span-cost.service";
 import {
