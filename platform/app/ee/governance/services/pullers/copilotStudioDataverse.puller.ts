@@ -418,9 +418,15 @@ function botFactsOf(params: {
 /**
  * What a walk of this run's pages has read so far.
  *
- * Held on one object because a page read can throw part-way through the walk.
- * The run keeps the rows it already read, and reading them back off a shared
- * accumulator is what makes that true rather than aspirational.
+ * Held on one object because a page read can throw part-way through the walk,
+ * and the rows already read have to be reachable from the catch rather than
+ * lost with the stack frame that was collecting them.
+ *
+ * Whether they are then written is the worker's call, not this one's, and for
+ * a throw the answer is no: an error count with an unchanged cursor fails the
+ * run. The accumulator earns its keep on the path that does not throw — a
+ * refused next-page link stops the walk, keeps the pages already read, and
+ * advances the cursor over them.
  */
 interface TranscriptWalk {
   events: NormalizedPullEvent[];
@@ -605,8 +611,16 @@ export class CopilotStudioDataversePuller
       );
       // The cursor is deliberately not advanced: the next run retries the
       // same window, and re-reading is safe because identifiers are derived
-      // from the conversation rather than minted per pull. What the walk read
-      // before it failed is kept.
+      // from the conversation rather than minted per pull.
+      //
+      // The events already read are handed back, but the worker will not
+      // write them — an error count with an unchanged cursor is the "made no
+      // progress" half of the `PullResult` contract, and it fails the run.
+      // That is the intended answer: a walk that threw part-way through a page
+      // cannot say which rows it got, so keeping some of them would persist a
+      // window nobody can describe. They are returned anyway because the caller
+      // is what decides, and a run that reports zero events reads as a source
+      // with nothing in it rather than one that fell over.
       return {
         events: walk.events,
         cursor: options.cursor,
