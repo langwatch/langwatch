@@ -1,5 +1,5 @@
 import { createEnv } from "@t3-oss/env-core";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 /**
  * Zod validators for the three AI Gateway secrets.
@@ -142,7 +142,7 @@ export function alignDevAuthUrlsToPort(processEnv) {
  */
 export function createEnvConfig(source) {
   alignDevAuthUrlsToPort(source);
-  /** @param {import('zod/v4').ZodTypeAny} schema */
+  /** @param {import('zod').ZodTypeAny} schema */
   const optionalIfBuildTime = (schema) =>
     source.BUILD_TIME ? schema.optional() : schema;
 

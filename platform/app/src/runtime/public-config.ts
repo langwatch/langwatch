@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const PUBLIC_APP_CONFIG_META_NAME = "langwatch-public-config";
 
@@ -41,8 +41,12 @@ const encodeBase64Url = (value: string): string => {
     const bits = (first << 16) | ((second ?? 0) << 8) | (third ?? 0);
     encoded += BASE64URL_ALPHABET[(bits >>> 18) & 63];
     encoded += BASE64URL_ALPHABET[(bits >>> 12) & 63];
-    if (second !== undefined) encoded += BASE64URL_ALPHABET[(bits >>> 6) & 63];
-    if (third !== undefined) encoded += BASE64URL_ALPHABET[bits & 63];
+    if (second !== void 0) {
+      encoded += BASE64URL_ALPHABET[(bits >>> 6) & 63];
+    }
+    if (third !== void 0) {
+      encoded += BASE64URL_ALPHABET[bits & 63];
+    }
   }
   return encoded;
 };
@@ -95,7 +99,9 @@ export const createPublicAppConfigMetaTag = (config: PublicAppConfig): string =>
 
 /** Reads and validates the deployment configuration installed by the shell. */
 export const readPublicAppConfig = (
-  documentRoot: Pick<Document, "querySelector"> = document,
+  documentRoot: {
+    querySelector(selector: string): { getAttribute(name: string): string | null } | null;
+  } = document,
 ): PublicAppConfig => {
   const element = documentRoot.querySelector(
     `meta[name="${PUBLIC_APP_CONFIG_META_NAME}"]`,
