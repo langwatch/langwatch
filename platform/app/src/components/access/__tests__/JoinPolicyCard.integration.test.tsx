@@ -6,6 +6,7 @@
  * Spec: specs/identity/domain-auto-join.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DomainJoinSetting } from "@langwatch/identity";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,8 +29,14 @@ vi.mock("~/hooks/usePublicEnv", () => ({
 const { JoinPolicyCard } = await import("../JoinPolicyCard");
 
 function renderCard({
-  domainJoin = "off" as const,
+  // Typed as the setting rather than inferred from the default: `"off" as
+  // const` narrows the parameter to that one literal, so every scenario that
+  // opens the door was passing a value the helper's own signature refused.
+  domainJoin = "off",
   joinDomains = [] as string[],
+}: {
+  domainJoin?: DomainJoinSetting;
+  joinDomains?: string[];
 } = {}) {
   const onSave = vi.fn();
   render(

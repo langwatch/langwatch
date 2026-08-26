@@ -44,14 +44,17 @@ const enrollment = (
 });
 
 const ceremoniesOver = (state: MfaEnrollmentState) => {
+  // Each takes its command, declared rather than inferred: `async () => []`
+  // types the arguments as an EMPTY tuple, so the scenarios below that read
+  // `mock.calls[0]` were indexing a tuple the type said had no element there.
   const mfa = {
-    enrollMfa: vi.fn(async () => []),
-    confirmMfa: vi.fn(async () => []),
-    consumeBackupCode: vi.fn(async () => []),
-    regenerateBackupCodes: vi.fn(async () => []),
-    disableMfa: vi.fn(async () => []),
-    expireMfaEnrollment: vi.fn(async () => []),
-    recordVerificationFailure: vi.fn(async () => []),
+    enrollMfa: vi.fn(async (_command: unknown) => []),
+    confirmMfa: vi.fn(async (_command: unknown) => []),
+    consumeBackupCode: vi.fn(async (_command: unknown) => []),
+    regenerateBackupCodes: vi.fn(async (_command: unknown) => []),
+    disableMfa: vi.fn(async (_command: unknown) => []),
+    expireMfaEnrollment: vi.fn(async (_command: unknown) => []),
+    recordVerificationFailure: vi.fn(async (_command: unknown) => []),
   };
   const ceremonies = new MfaCeremonies({
     mfa: mfa as never,

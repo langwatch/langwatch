@@ -114,7 +114,10 @@ function build(initial: ScimSyncState | null): void {
   service = new ScimOversightService({
     reads: reads.port as never,
     lifecycle: () => lifecycle as never,
-    deprovision: () => deprovision,
+    // `vi.fn()` types its arguments loosely, so the double satisfies the
+    // port's shape without restating the command it takes — the scenario
+    // below asserts on the exact argument anyway.
+    deprovision: () => deprovision as never,
   });
 }
 

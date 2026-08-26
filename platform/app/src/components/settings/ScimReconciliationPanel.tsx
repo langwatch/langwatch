@@ -15,6 +15,7 @@ import { Plug } from "lucide-react";
 import type { ReactNode } from "react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import { isRunningConnection } from "~/features/directory/logic/connectionLifecycle";
+import type { OrganizationReconciliation } from "~/server/app-layer/identity/scim-reconciliation.service";
 import { api } from "../../utils/api";
 import RouterLink from "../../utils/compat/next-link";
 import { SettingsDisclosure } from "./SettingsDisclosure";
@@ -142,9 +143,15 @@ function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
   );
 }
 
-type Reconciliation = NonNullable<
-  ReturnType<typeof api.scimReconciliation.getAll.useQuery>["data"]
->;
+/**
+ * Taken from the SERVICE's own return type rather than inferred back out of
+ * the query hook. The permission-checked procedure builder re-implements
+ * tRPC's typing (see `permission` in `server/api/trpc.ts`) and does not thread
+ * the handler's output through, so the hook's `data` widens to `{}` and every
+ * index into it is a compile error. A type-only import is erased, so this
+ * crosses no server/client boundary.
+ */
+type Reconciliation = OrganizationReconciliation;
 type ConnectionPanel = Reconciliation["connections"][number];
 
 /**

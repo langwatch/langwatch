@@ -74,7 +74,11 @@ describe("better-auth config", () => {
       // their env flag is on, which is why they are permitted rather than
       // required — with both flags off the array is genericOAuth or empty,
       // exactly as before.
-      const deliberate = ["generic-oauth", "two-factor", "passkey"];
+      //
+      // `sso` (D09, wave 3) is registered unconditionally: it is what
+      // terminates an organization's own identity provider, and its
+      // registration is deliberate in the same sense the others are.
+      const deliberate = ["generic-oauth", "two-factor", "passkey", "sso"];
       for (const id of pluginIds) {
         expect(deliberate).toContain(id);
       }

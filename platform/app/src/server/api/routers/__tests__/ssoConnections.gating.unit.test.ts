@@ -144,9 +144,15 @@ describe("the back-office single sign-on surface", () => {
       // message that names nothing — no resource, no id, no surface. A
       // message naming the back office would tell a prober it exists and they
       // merely lack the session.
+      // Two-handed `then` rather than `catch`: a `catch` widens the type to
+      // "the refusal or whatever the call returns", and every assertion below
+      // is about the refusal alone.
       const denial = await caller
         .attestDomain({ ...TARGET, domain: "acme.com" })
-        .catch(
+        .then(
+          (): never => {
+            throw new Error("the call was expected to be refused");
+          },
           (error: unknown) =>
             error as {
               code: string;

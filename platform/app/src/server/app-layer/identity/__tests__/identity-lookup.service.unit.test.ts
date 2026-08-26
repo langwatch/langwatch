@@ -49,6 +49,10 @@ import type {
   LookupSessionRow,
   LookupUserRow,
 } from "../repositories/identity-lookup.prisma.repository";
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "./support/identity-test-doubles";
 
 const NOW = 1_700_000_000_000;
 const DAY = 24 * 60 * 60 * 1000;
@@ -284,7 +288,11 @@ function build({
   const invitations = new RecordingInvitations();
   const routed: (string | null)[] = [];
   const identity = new IdentityService(
-    new IdentityGuards(new InMemoryHeads(heads) as never),
+    new IdentityGuards(
+      new InMemoryHeads(heads) as never,
+      inMemoryIdentityUsers(),
+      inMemoryIdentityReservations(),
+    ),
     ledger,
   );
   const links = {

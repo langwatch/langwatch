@@ -26,8 +26,11 @@ import {
 import { IdentityLedgerWriter } from "./ledger";
 import { EventLogIdentityRepository } from "./repositories/identity-event-log.repository";
 import { PrismaIdentityLookupRepository } from "./repositories/identity-lookup.prisma.repository";
-import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
-import { identityService, signInRouter } from "./runtime";
+import {
+  identityProjectionStore,
+  identityService,
+  signInRouter,
+} from "./runtime";
 
 /**
  * The proposal log, read. One instance: it holds no request state, and its
@@ -43,11 +46,14 @@ const identityEventLog = new EventLogIdentityRepository();
 export function linkProposals(): LinkProposalService {
   return new LinkProposalService({
     guards: new LinkProposalGuards({ proposals: identityEventLog }),
+    // The shared factory, not a second construction: the store also releases
+    // the address locks a user stops holding, and it needs the reservation
+    // repository to do it.
     ledger: new IdentityLedgerWriter({
-      projectionStore: new PrismaIdentityProjectionRepository(prisma),
+      projectionStore: identityProjectionStore(),
     }),
     proposals: identityEventLog,
-    directory: new BetterAuthLinkProposalDirectory(),
+    directory: new BetterAuthLinkProposalDirectory(prisma),
   });
 }
 

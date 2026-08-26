@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   HStack,
   Input,
   SegmentGroup,
@@ -178,9 +179,10 @@ function AreaGroup({
       borderRadius="lg"
       overflow="hidden"
     >
-      <HStack
-        as="button"
+      <chakra.button
         type="button"
+        display="flex"
+        alignItems="center"
         width="full"
         paddingX={4}
         paddingY={3}
@@ -215,7 +217,7 @@ function AreaGroup({
             <ChevronRight size={14} aria-hidden />
           )}
         </Box>
-      </HStack>
+      </chakra.button>
       {open && (
         <VStack
           align="stretch"

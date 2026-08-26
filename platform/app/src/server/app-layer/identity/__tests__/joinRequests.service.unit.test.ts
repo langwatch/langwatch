@@ -87,8 +87,8 @@ function harness({
   setting?: { domainJoin: DomainJoinSetting; joinDomains: string[] };
 } = {}) {
   const requests = {
-    requestJoin: vi.fn(async () => []),
-    approveJoin: vi.fn(async () => []),
+    requestJoin: vi.fn(async (_command: Record<string, unknown>) => []),
+    approveJoin: vi.fn(async (_command: Record<string, unknown>) => []),
     // The command is declared so `mock.calls` carries its type: the
     // assertion below is that a field is ABSENT from it, and an untyped
     // mock makes that a cast rather than a check.
@@ -816,12 +816,8 @@ describe("given an organization that admits its domain automatically", () => {
         verifiedEmail: "sam@acme.com",
       });
 
-      const [requested] = requests.requestJoin.mock.calls[0] as [
-        Record<string, unknown>,
-      ];
-      const [approved] = requests.approveJoin.mock.calls[0] as [
-        Record<string, unknown>,
-      ];
+      const [requested] = requests.requestJoin.mock.calls[0]!;
+      const [approved] = requests.approveJoin.mock.calls[0]!;
       // The SAME request, on the same aggregate and the same tenant, which is
       // what puts it in the same panel and the same history as an approval
       // somebody clicked. Only the resolver differs.
@@ -845,10 +841,8 @@ describe("given an organization that admits its domain automatically", () => {
         verifiedEmail: "sam@acme.com",
       });
 
-      const [approved] = requests.approveJoin.mock.calls[0] as [
-        { resolvedBy: { type: string } },
-      ];
-      expect(approved.resolvedBy.type).not.toBe("user");
+      const [approved] = requests.approveJoin.mock.calls[0]!;
+      expect((approved.resolvedBy as { type: string }).type).not.toBe("user");
       // And nobody is named as the approver on the membership either.
       expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
         expect.objectContaining({ approvedByUserId: null }),

@@ -133,7 +133,13 @@ describe("the back-office directory sync surface", () => {
     it("refuses it the same way an unregistered address is refused", async () => {
       const caller = buildCaller("ana@acme.com");
 
-      const denial = await caller.getAll({ page: 0, pageSize: 25 }).catch(
+      // Two-handed `then` rather than `catch`: a `catch` widens the type to
+      // "the refusal or whatever the call returns", and every assertion below
+      // is about the refusal alone.
+      const denial = await caller.getAll({ page: 0, pageSize: 25 }).then(
+        (): never => {
+          throw new Error("the call was expected to be refused");
+        },
         (error: unknown) =>
           error as {
             code: string;

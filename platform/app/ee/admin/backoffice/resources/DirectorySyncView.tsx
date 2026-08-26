@@ -15,6 +15,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import type { OversightSyncList } from "~/server/app-layer/identity/scim-oversight.service";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";
@@ -102,9 +103,13 @@ const STATE_TONE: Record<string, string> = {
   REVOKED: "gray",
 };
 
-type OversightList = NonNullable<
-  ReturnType<typeof api.scimOversight.getAll.useQuery>["data"]
->;
+/**
+ * Taken from the SERVICE's own return type rather than inferred back out of
+ * the query hook: the permission-checked procedure builder does not thread a
+ * handler's output through, so the hook's `data` widens to `{}`. A type-only
+ * import is erased, so this crosses no server/client boundary.
+ */
+type OversightList = OversightSyncList;
 type SyncRow = OversightList["syncs"][number];
 type Failure = SyncRow["deadLetters"][number];
 

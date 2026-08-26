@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert } from "~/features/errors/components/HandledErrorAlert";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,

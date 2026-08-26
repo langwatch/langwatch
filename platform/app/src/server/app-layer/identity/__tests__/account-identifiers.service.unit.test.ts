@@ -7,6 +7,10 @@ import type {
 import { IdentityGuards, IdentityService } from "@langwatch/identity-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountIdentifiersService } from "../account-identifiers.service";
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "./support/identity-test-doubles";
 
 /**
  * Adding an address to an account, and what the surface is allowed to say
@@ -61,19 +65,26 @@ function build({
     findIdentifierIdForAccount: () => Promise.resolve(null),
   };
 
-  const identity = new IdentityService(new IdentityGuards(repository), {
-    commit: ({ facts }: { facts: { type: string }[] }) => {
-      const stamped = facts.map((fact) => ({ ...fact, occurredAt: 1 }));
-      appended.push(...stamped);
-      for (const fact of stamped) {
-        state.heads = reduceIdentity({
-          heads: state.heads,
-          fact: fact as never,
-        });
-      }
-      return Promise.resolve(stamped);
-    },
-  } as never);
+  const identity = new IdentityService(
+    new IdentityGuards(
+      repository,
+      inMemoryIdentityUsers(),
+      inMemoryIdentityReservations(),
+    ),
+    {
+      commit: ({ facts }: { facts: { type: string }[] }) => {
+        const stamped = facts.map((fact) => ({ ...fact, occurredAt: 1 }));
+        appended.push(...stamped);
+        for (const fact of stamped) {
+          state.heads = reduceIdentity({
+            heads: state.heads,
+            fact: fact as never,
+          });
+        }
+        return Promise.resolve(stamped);
+      },
+    } as never,
+  );
 
   const ceremony = {
     mintEmailVerification: vi.fn().mockResolvedValue({

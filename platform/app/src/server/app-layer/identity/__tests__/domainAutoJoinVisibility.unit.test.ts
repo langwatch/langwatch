@@ -14,8 +14,10 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const sendDomainAutoJoined = vi.fn(async () => undefined);
-const sendArrived = vi.fn(async () => undefined);
+// The argument is declared so `mock.calls` carries it: `async () => undefined`
+// types the arguments as an EMPTY tuple, and the forwarders below pass one.
+const sendDomainAutoJoined = vi.fn(async (_args: unknown) => undefined);
+const sendArrived = vi.fn(async (_args: unknown) => undefined);
 
 vi.mock("~/server/mailer/joinRequestEmails", () => ({
   sendDomainAutoJoinedEmail: (args: unknown) => sendDomainAutoJoined(args),

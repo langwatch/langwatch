@@ -59,11 +59,13 @@ import type { IdentityLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
 import { createTenantId } from "~/server/event-sourcing";
+import type { Event } from "~/server/event-sourcing/domain/types";
 import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import { IDENTITY_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/identity/schemas/constants";
 import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,
@@ -115,7 +117,9 @@ export async function resolveIdentityEventStore(): Promise<
  * here rather than casting the identity resolver, which would have made the
  * types say "identity events" about a stream that holds none.
  */
-export async function resolveEventStore<TEvent>(): Promise<EventStore<TEvent>> {
+export async function resolveEventStore<TEvent extends Event>(): Promise<
+  EventStore<TEvent>
+> {
   const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
   let app = tryGetApp();
   while (!app && Date.now() < deadline) {

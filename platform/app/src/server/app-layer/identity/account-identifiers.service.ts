@@ -194,6 +194,9 @@ export class AccountIdentifiersService {
       accountId: null,
       provider: "email",
       providerId: null,
+      // Null exactly when `providerId` is, which the schema requires and
+      // this ceremony satisfies: nobody asserted this address but its owner.
+      issuer: null,
       providerAccountId: null,
       value: email,
       occurredAtMs,

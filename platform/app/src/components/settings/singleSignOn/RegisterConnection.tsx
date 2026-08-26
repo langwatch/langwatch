@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   Field,
   Heading,
   Input,
@@ -427,8 +428,7 @@ function ProviderTile({
   onPick: () => void;
 }) {
   return (
-    <Box
-      as="button"
+    <chakra.button
       type="button"
       role="radio"
       aria-checked={selected}
@@ -477,6 +477,6 @@ function ProviderTile({
       <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
         {preset.name}
       </Text>
-    </Box>
+    </chakra.button>
   );
 }

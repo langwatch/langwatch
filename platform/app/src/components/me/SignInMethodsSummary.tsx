@@ -106,8 +106,10 @@ export function SignInMethodsSummary() {
             passkeyCount: passkeys.data?.length ?? 0,
             hasPassword: password.data?.hasPassword === true,
             twoStep: twoStep.data ?? null,
-          }).map((row) => (
-            <MethodRow key={row.key} {...row} />
+          }).map(({ key, ...row }) => (
+            // `key` is React's, not a prop: spreading the whole row after it
+            // set it twice, and the spread won.
+            <MethodRow key={key} {...row} />
           ))}
         </VStack>
       )}
@@ -188,7 +190,9 @@ function methodRows({
   identifiers: ReadonlyArray<{
     identifierId: string;
     provider: string;
-    value: string;
+    /** Null when we hold no display value for it — the read's own type
+     *  permits it, and a row that assumed a string rendered `undefined`. */
+    value: string | null;
     isPrimary: boolean;
     confirmed: boolean;
   }>;
@@ -200,7 +204,12 @@ function methodRows({
   hasPassword: boolean;
   twoStep: { offered: boolean; enabled: boolean } | null;
 }): MethodRowProps[] {
-  const addresses = identifiers.filter((row) => row.provider === "email");
+  // Narrowed at the filter rather than asserted downstream: an email
+  // identifier we hold no address for is not an address anybody can be shown.
+  const addresses = identifiers.filter(
+    (row): row is (typeof identifiers)[number] & { value: string } =>
+      row.provider === "email" && row.value !== null,
+  );
   const federated = identifiers.filter(
     (row) =>
       row.provider !== "email" &&
@@ -220,7 +229,7 @@ function methodRows({
     ...federated.map((row) => ({
       key: row.identifierId,
       label: labelFor(row.provider),
-      detail: row.value,
+      detail: row.value ?? "Not recorded",
       chip: null,
       testId: "method-row-federated",
     })),

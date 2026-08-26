@@ -104,8 +104,11 @@ export class InviteServiceOperatorInvitations
 export class BetterAuthLinkProposalDirectory
   implements LinkProposalDirectoryPort
 {
+  constructor(private readonly prisma: PrismaClient) {}
+
   async linkProviderAccount({
     userId,
+    connectionId,
     provider,
     subject,
   }: {
@@ -115,12 +118,46 @@ export class BetterAuthLinkProposalDirectory
     subject: string;
     normalizedEmail: string;
   }): Promise<void> {
+    const issuer = await this.issuerFor({ connectionId, provider });
     await betterAuth.$context.then((context) =>
       context.internalAdapter.createAccount({
         userId,
         providerId: provider,
+        issuer,
         accountId: subject,
       }),
     );
+  }
+
+  /**
+   * WHO asserted this subject — the other half of better-auth 1.7's account
+   * key, which it looks up as `(issuer, accountId)`.
+   *
+   * A proposal that names a connection takes that connection's own issuer,
+   * because the identity provider behind it is literally the party that
+   * asserted the subject. Everything else follows the convention the
+   * `account_issuer` migration established when it backfilled this column,
+   * so a row written here and a row backfilled then are keyed the same way —
+   * which is the whole point of the column.
+   */
+  private async issuerFor({
+    connectionId,
+    provider,
+  }: {
+    connectionId: string | null;
+    provider: string;
+  }): Promise<string> {
+    if (connectionId !== null) {
+      const connection = await this.prisma.ssoConnection.findUnique({
+        where: { id: connectionId },
+        select: { idpMetadata: true },
+      });
+      const issuer = (connection?.idpMetadata as { issuer?: string } | null)
+        ?.issuer;
+      if (issuer) return issuer;
+    }
+    if (provider === "credential") return "local:credential";
+    if (provider === "google") return "https://accounts.google.com";
+    return `local:oauth:${provider}`;
   }
 }
