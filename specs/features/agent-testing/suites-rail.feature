@@ -74,6 +74,31 @@ Feature: The test suites rail
     Then the archive confirmation dialog opens naming the suite
     And confirming removes the suite from the rail
 
+  # --- Suite editor drawer ---
+
+  @integration
+  Scenario: Edit suite opens the suite editor drawer with four tabs
+    Given a test suite in the rail
+    When "Edit suite" is chosen from its row menu
+    Then the suite editor drawer opens
+    And it holds four tabs: "General", "Test cases", "Simulation models", "Execution"
+
+  @integration
+  Scenario: The Test cases tab lists the cases filed under the suite and can add and remove
+    Given the suite editor drawer is open on a test suite
+    When the "Test cases" tab is chosen
+    Then every test case filed under the suite is listed
+    And every row carries a remove control
+    And an "Add test cases" control is offered
+
+  @integration
+  Scenario: Add test cases opens a picker of cases not currently in the suite
+    Given the suite editor drawer is open on a test suite
+    And a test case not filed under the suite exists
+    When "Add test cases" is chosen
+    Then a dialog lists the test cases not currently in the suite
+    And selecting one and confirming files it under the suite
+
   @integration
   Scenario: A person with read-only access sees no changing actions in the row menu
     Given a person with read-only access to the project

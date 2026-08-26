@@ -4,7 +4,9 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
+import { useDrawer } from "~/hooks/useDrawer";
 import { toExternalPlanSlug } from "../results/run-plans";
+import { SUITE_EDITOR_DRAWER } from "./AgentTestingSuiteEditorDrawer";
 import { CasesPanel } from "./CasesPanel";
 import { collectLabels } from "./test-cases";
 import type { TestCasesTabModel } from "./useTestCasesTab";
@@ -19,8 +21,9 @@ function panelTitle({ base, view }: TestCasesTabModel): string {
 }
 
 export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
-  const { base, data, view, caseMutations, suiteMutations, run, open } = model;
+  const { base, data, view, caseMutations, run, open } = model;
   const isExternal = base.selection.kind === "external";
+  const { openDrawer } = useDrawer();
 
   return (
     <CasesPanel
@@ -58,9 +61,10 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       onOpenExternalResults={() =>
         base.selectPlan(toExternalPlanSlug(view.externalSetId))
       }
-      onEditSuite={() =>
-        suiteMutations.setSuiteToRename(view.selectedSuite ?? null)
-      }
+      onEditSuite={() => {
+        const suiteId = view.selectedSuite?.id;
+        if (suiteId) openDrawer(SUITE_EDITOR_DRAWER, { suiteId });
+      }}
     />
   );
 }

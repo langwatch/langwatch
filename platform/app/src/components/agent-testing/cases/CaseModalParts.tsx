@@ -21,7 +21,7 @@ import {
 import { Play } from "lucide-react";
 import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
-import { Dialog } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { TagList } from "~/components/ui/TagList";
 import { CustomizeChips } from "../shared/CustomizeChips";
@@ -53,16 +53,16 @@ export function CaseModalHeader({
   openHistoryOnOpen?: boolean;
 }) {
   return (
-    <Dialog.Header
+    <Drawer.Header
       borderBottomWidth="1px"
       borderColor="border"
       paddingX={5}
       paddingY={3.5}
       display="block"
     >
-      <Dialog.Title fontSize="14px" fontWeight="semibold">
+      <Drawer.Title fontSize="14px" fontWeight="semibold">
         {isEditing ? "Edit test case" : "New test case"}
-      </Dialog.Title>
+      </Drawer.Title>
       <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
         {CASE_MODAL_SUBTITLE}
       </Text>
@@ -73,8 +73,8 @@ export function CaseModalHeader({
           initialOpen={openHistoryOnOpen}
         />
       )}
-      <Dialog.CloseTrigger />
-    </Dialog.Header>
+      <Drawer.CloseTrigger />
+    </Drawer.Header>
   );
 }
 
@@ -239,7 +239,7 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
   const { draft, setDraft } = editor;
 
   return (
-    <Dialog.Footer
+    <Drawer.Footer
       borderTopWidth="1px"
       borderColor="border"
       paddingX={5}
@@ -286,7 +286,7 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
           Save &amp; Run
         </SmallButton>
       </HStack>
-    </Dialog.Footer>
+    </Drawer.Footer>
   );
 }
 

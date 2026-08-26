@@ -16,10 +16,12 @@ import type {
 } from "~/components/PeriodSelector";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useCan } from "~/hooks/useCan";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
 import { useAgentTestingStore } from "../useAgentTestingStore";
+import { CASE_EDITOR_DRAWER } from "./AgentTestingCaseEditorDrawer";
 import { type CaseOpenActions, useCaseOpenActions } from "./useCaseOpenActions";
 import { type CaseRunActions, useCaseRunActions } from "./useCaseRunActions";
 import { type TestCasesData, useTestCasesData } from "./useTestCasesData";
@@ -58,10 +60,11 @@ function useTestCasesTabBase(): TestCasesTabBase {
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
   const isRailCollapsed = useAgentTestingStore((state) => state.railCollapsed);
   const toggleRail = useAgentTestingStore((state) => state.toggleRailCollapsed);
-  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
+  const { openDrawer } = useDrawer();
   const onNewTestCase = useCallback(
-    (folderId: string | null) => openCaseEditor({ folderId }),
-    [openCaseEditor],
+    (folderId: string | null) =>
+      openDrawer(CASE_EDITOR_DRAWER, { folderId: folderId ?? undefined }),
+    [openDrawer],
   );
 
   return {

@@ -23,7 +23,6 @@ import {
   ScenarioPicker,
 } from "~/components/suites/ScenarioPicker";
 import { TestCasesTab } from "../cases/TestCasesTab";
-import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
 const mockFoldersGetAll = vi.hoisted(() => vi.fn());
@@ -109,9 +108,12 @@ vi.mock("~/hooks/useCan", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
+const mockOpenDrawer = vi.hoisted(() => vi.fn());
+
 vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: vi.fn(), setFlowCallbacks: vi.fn() }),
+  useDrawer: () => ({ openDrawer: mockOpenDrawer, setFlowCallbacks: vi.fn() }),
   useDrawerParams: () => ({}),
+  setFlowCallbacks: vi.fn(),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -168,12 +170,27 @@ describe("the Test cases tab", () => {
   afterEach(cleanup);
 
   const renderTab = () => {
-    useAgentTestingStore.getState().closeCaseEditor();
+    mockOpenDrawer.mockClear();
     render(<TestCasesTab />, { wrapper: Wrapper });
   };
 
-  /** What the page-level case editor was last asked to open. */
-  const caseEditor = () => useAgentTestingStore.getState().caseEditor;
+  /**
+   * The URL params the case editor drawer would have been opened with, from
+   * the last call site, so a test can assert on the target of a click.
+   */
+  const caseEditor = () => {
+    const lastCall = mockOpenDrawer.mock.calls
+      .filter(([drawer]) => drawer === "agentTestingCaseEditor")
+      .at(-1);
+    if (!lastCall) return { open: false };
+    const params = (lastCall[1] ?? {}) as Record<string, unknown>;
+    return {
+      open: true,
+      scenarioId: params.scenarioId ?? null,
+      folderId: params.folderId ?? null,
+      showHistory: params.showHistory === "true",
+    };
+  };
 
   /** @scenario "A project with no test cases shows what to do first" */
   it("says what a test case is and offers the first one", () => {
@@ -210,6 +227,10 @@ describe("the Test cases tab", () => {
       folderId: null,
       showHistory: true,
     });
+    expect(mockOpenDrawer).toHaveBeenCalledWith(
+      "agentTestingCaseEditor",
+      expect.objectContaining({ scenarioId: "case_1", showHistory: "true" }),
+    );
   });
 
   /** @scenario "A case created from inside a suite is filed into that suite" */
@@ -231,6 +252,10 @@ describe("the Test cases tab", () => {
       folderId: REFUNDS.id,
       showHistory: false,
     });
+    expect(mockOpenDrawer).toHaveBeenCalledWith(
+      "agentTestingCaseEditor",
+      expect.objectContaining({ folderId: REFUNDS.id }),
+    );
   });
 
   /** @scenario "Choosing a suite in the rail does not reload the page" */

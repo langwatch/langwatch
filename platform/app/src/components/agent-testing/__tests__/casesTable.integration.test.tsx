@@ -345,8 +345,8 @@ describe("the test cases table", () => {
     expect(runButton.querySelector("svg.lucide-play")).toBeInTheDocument();
   });
 
-  /** @scenario "The row menu offers Edit, Duplicate, Open last run and Archive in order" */
-  it("offers Edit, Duplicate, Open last run, Move to suite and Archive in order", async () => {
+  /** @scenario "The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order" */
+  it("offers Edit, Duplicate, Open last run, Move to suite... and Archive in order", async () => {
     renderPanel({
       groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
       lastResults: new Map([["case_1", makeResult()]]),
@@ -360,7 +360,7 @@ describe("the test cases table", () => {
       "Edit",
       "Duplicate",
       "Open last run",
-      "Move to suite",
+      "Move to suite...",
       "History",
       "Archive",
     ]);
@@ -420,11 +420,10 @@ describe("the test cases table", () => {
     ).toBeInTheDocument();
   });
 
-  /** @scenario "Moving a case from its row menu regroups the case list" */
-  /** @scenario "Unfiling a case moves it to the unfiled group" */
-  it("moves a case to another suite, and out of every suite, from its row menu", async () => {
+  /** @scenario "Move to suite... on a row starts checkbox selection with that row pre-checked" */
+  it("starts checkbox selection with the clicked row pre-checked from the row menu", async () => {
     const filed = makeCase();
-    const { props, view } = renderPanel({
+    renderPanel({
       groups: groupCasesByFolder({
         cases: [filed],
         suites: [REFUNDS, CHECKOUT],
@@ -433,44 +432,59 @@ describe("the test cases table", () => {
     const user = await openRowMenu("Double charge");
 
     await user.click(
-      await screen.findByRole("menuitem", { name: "Move to suite" }),
+      await screen.findByRole("menuitem", { name: "Move to suite..." }),
     );
-    await user.click(await screen.findByRole("menuitem", { name: "Checkout" }));
+
+    expect(screen.getByTestId("cases-selection-action-bar")).toHaveTextContent(
+      "1 selected",
+    );
+    expect(
+      screen.getByTestId("case-row-Double charge-checkbox"),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "Move to suite... confirms a bulk move to another suite" */
+  /** @scenario "Move to suite... unfiles when 'No test suite' is picked" */
+  it("moves the selection to another suite and unfiles from the action bar", async () => {
+    const filed = makeCase();
+    const { props } = renderPanel({
+      groups: groupCasesByFolder({
+        cases: [filed],
+        suites: [REFUNDS, CHECKOUT],
+      }),
+    });
+    const user = await openRowMenu("Double charge");
+
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Move to suite..." }),
+    );
+    await user.click(screen.getByTestId("cases-selection-move-to-suite"));
+
+    const select = await screen.findByTestId("cases-move-to-suite-select");
+    await user.selectOptions(select, CHECKOUT.id);
+    await user.click(screen.getByTestId("cases-move-to-suite-confirm"));
+
     expect(props.onMoveToSuite).toHaveBeenCalledWith(filed, CHECKOUT.id);
+  });
 
-    const moved = { ...filed, folderId: CHECKOUT.id };
-    view.rerender(
-      <CasesPanel
-        {...props}
-        groups={groupCasesByFolder({
-          cases: [moved],
-          suites: [REFUNDS, CHECKOUT],
-        })}
-      />,
-    );
-    expect(
-      screen.queryByTestId("folder-header-row-Refunds"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("folder-header-row-Checkout")).getByLabelText(
-        "1 test case",
-      ),
-    ).toBeInTheDocument();
+  /** @scenario "Move to suite... unfiles when 'No test suite' is picked" */
+  it("unfiles the selection when No test suite is picked in the dialog", async () => {
+    const filed = makeCase();
+    const { props } = renderPanel({
+      groups: groupCasesByFolder({
+        cases: [filed],
+        suites: [REFUNDS, CHECKOUT],
+      }),
+    });
+    const user = await openRowMenu("Double charge");
 
-    const unfiled = { ...filed, folderId: null };
-    view.rerender(
-      <CasesPanel
-        {...props}
-        groups={groupCasesByFolder({
-          cases: [unfiled],
-          suites: [REFUNDS, CHECKOUT],
-        })}
-      />,
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Move to suite..." }),
     );
-    expect(
-      screen.getByTestId(`folder-header-row-${UNFILED_GROUP_NAME}`),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Double charge")).toBeInTheDocument();
+    await user.click(screen.getByTestId("cases-selection-move-to-suite"));
+    await user.click(screen.getByTestId("cases-move-to-suite-confirm"));
+
+    expect(props.onMoveToSuite).toHaveBeenCalledWith(filed, null);
   });
 
   // --- Row click ---

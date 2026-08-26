@@ -11,7 +11,7 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
-import type { TestCase, TestSuiteEntry } from "./test-cases";
+import type { TestCase } from "./test-cases";
 
 function toastOnError(fallbackTitle: string) {
   return (error: unknown) => showErrorToast({ error, fallbackTitle });
@@ -27,13 +27,8 @@ function useCasesInvalidate(projectId: string): () => void {
 }
 
 export type SuiteMutations = {
-  /** The suite the edit dialog is open on, if any. */
-  suiteToRename: TestSuiteEntry | null;
-  setSuiteToRename: (suite: TestSuiteEntry | null) => void;
   isArchiving: boolean;
-  isRenaming: boolean;
   createSuite: (name: string) => void;
-  renameSuite: (name: string) => void;
   archiveSuite: (suiteId: string) => void;
 };
 
@@ -48,9 +43,6 @@ export function useSuiteMutations({
   selectSuite: (selection: AgentTestingSelection) => void;
 }): SuiteMutations {
   const invalidate = useCasesInvalidate(projectId);
-  const [suiteToRename, setSuiteToRename] = useState<TestSuiteEntry | null>(
-    null,
-  );
 
   const create = api.suites.folders.create.useMutation({
     onSuccess: (folder) => {
@@ -58,14 +50,6 @@ export function useSuiteMutations({
       selectSuite({ kind: "suite", slug: folder.slug });
     },
     onError: toastOnError("Couldn't create the test suite"),
-  });
-
-  const rename = api.suites.folders.rename.useMutation({
-    onSuccess: () => {
-      invalidate();
-      setSuiteToRename(null);
-    },
-    onError: toastOnError("Couldn't rename the test suite"),
   });
 
   const archive = api.suites.folders.archive.useMutation({
@@ -77,15 +61,8 @@ export function useSuiteMutations({
   });
 
   return {
-    suiteToRename,
-    setSuiteToRename,
     isArchiving: archive.isPending,
-    isRenaming: rename.isPending,
     createSuite: (name) => create.mutate({ projectId, name }),
-    renameSuite: (name) => {
-      if (!suiteToRename) return;
-      rename.mutate({ projectId, folderId: suiteToRename.id, name });
-    },
     archiveSuite: (suiteId) => archive.mutate({ projectId, folderId: suiteId }),
   };
 }

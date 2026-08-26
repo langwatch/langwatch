@@ -1,17 +1,17 @@
 /**
- * The dialogs the Test cases tab keeps mounted: the run dialog, the archive
- * confirmation of a case, and the editor of a test suite.
+ * The dialogs the Test cases tab keeps mounted: the run dialog and the
+ * archive confirmation of a case. The suite editor is a drawer, not a
+ * dialog, so it lives in the drawer registry.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
 
 import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
 import { RunDialog } from "../run/RunDialog";
-import { RenameSuiteDialog } from "./RenameSuiteDialog";
 import type { TestCasesTabModel } from "./useTestCasesTab";
 
 export function TestCasesDialogs({ model }: { model: TestCasesTabModel }) {
-  const { run, caseMutations, suiteMutations } = model;
+  const { run, caseMutations } = model;
   const { caseToArchive } = caseMutations;
 
   return (
@@ -29,13 +29,6 @@ export function TestCasesDialogs({ model }: { model: TestCasesTabModel }) {
         onConfirm={caseMutations.archiveCase}
         scenarios={caseToArchive ? [caseToArchive] : []}
         isLoading={caseMutations.isArchiving}
-      />
-
-      <RenameSuiteDialog
-        suite={suiteMutations.suiteToRename}
-        isLoading={suiteMutations.isRenaming}
-        onClose={() => suiteMutations.setSuiteToRename(null)}
-        onRename={suiteMutations.renameSuite}
       />
     </>
   );

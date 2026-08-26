@@ -4,12 +4,15 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
+import { useDrawer } from "~/hooks/useDrawer";
+import { SUITE_EDITOR_DRAWER } from "./AgentTestingSuiteEditorDrawer";
 import { SuiteRail } from "./SuiteRail";
 import type { TestCasesTabModel } from "./useTestCasesTab";
 
 export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
   const { base, data, suiteMutations, run } = model;
   const { periodPicker } = base;
+  const { openDrawer } = useDrawer();
 
   return (
     <SuiteRail
@@ -25,11 +28,7 @@ export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
       onCreateSuite={suiteMutations.createSuite}
       onNewTestCase={(suiteId) => base.onNewTestCase(suiteId)}
       onRunSuite={run.runSuiteById}
-      onEditSuite={(suiteId) =>
-        suiteMutations.setSuiteToRename(
-          data.suites.find((suite) => suite.id === suiteId) ?? null,
-        )
-      }
+      onEditSuite={(suiteId) => openDrawer(SUITE_EDITOR_DRAWER, { suiteId })}
       onOpenLastRun={(suite) => base.selectPlan(suite.slug)}
       onArchiveSuite={suiteMutations.archiveSuite}
       isArchiving={suiteMutations.isArchiving}

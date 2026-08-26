@@ -119,3 +119,20 @@ Feature: A test suite is a folder of test cases
     Then they see every folder in the project
     But creating a folder is refused with "insufficient_permissions"
     And archiving a folder is refused with "insufficient_permissions"
+
+  # --- Folder editor overrides ---
+
+  @unit
+  Scenario: A folder suite round-trips the run overrides through update
+    Given a folder suite in the project
+    When the update carries a name, labels, model overrides, a repeat count and targets
+    Then every field is persisted on the SimulationSuite row
+    And the slug is not re-generated
+
+  @unit
+  Scenario: A folder suite refuses a scope or scenarioIds write on update
+    Given a folder suite in the project
+    When the update carries a scope
+    Then the request is refused with "suite_scope_not_allowed"
+    When the update carries a scenarioIds list
+    Then the request is refused with "validation_error"

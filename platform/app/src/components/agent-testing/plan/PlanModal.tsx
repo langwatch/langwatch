@@ -1,16 +1,21 @@
 /**
- * Write or edit one run plan, in one dialog.
+ * Write or edit one run plan, in a right-side drawer.
  *
- * The dialog asks three groups of questions behind a tab strip: what the plan
+ * The drawer asks three groups of questions behind a tab strip: what the plan
  * is and what runs, which models play the user and the judge, and how the run
  * is executed. A test suite is a run plan whose scope is fixed, so it reads
- * the same dialog with its case list stated rather than picked.
+ * the same drawer with its case list stated rather than picked.
+ *
+ * The drawer is URL routed, so a shared link opens the same run plan editor,
+ * and a Save & Run leaves the drawer through the standard drawer navigation
+ * rather than a hand-rolled dialog dismiss.
  *
  * @see specs/features/agent-testing/run-plan-editor.feature
+ * @see dev/docs/best_practices/drawers.md
  */
 
 import { useEffect, useState } from "react";
-import { Dialog } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import {
   PlanModalBody,
@@ -29,8 +34,8 @@ export type PlanModalProps = {
   onRunRequested?: (suite: SimulationSuite) => void;
 };
 
-/** What the dialog is called, given the plan it has open. */
-function planModalTitle(editor: ReturnType<typeof usePlanEditor>): string {
+/** What the drawer is called, given the plan it has open. */
+function planDrawerTitle(editor: ReturnType<typeof usePlanEditor>): string {
   if (editor.isFixedScope) return "Edit test suite";
   return editor.isEditing ? "Edit run plan" : "New run plan";
 }
@@ -45,42 +50,37 @@ export function PlanModal(_props: PlanModalProps) {
   }, [editor.isOpen]);
 
   return (
-    <Dialog.Root
+    <Drawer.Root
       open={editor.isOpen}
       onOpenChange={({ open }) => {
         if (!open) editor.close();
       }}
-      placement="center"
+      placement="end"
+      size="md"
     >
-      <Dialog.Content bg="bg.panel" maxWidth="580px" data-testid="plan-modal">
-        <Dialog.Header
+      <Drawer.Content bg="bg.panel" data-testid="plan-modal">
+        <Drawer.Header
           borderBottomWidth="1px"
           borderColor="border"
           paddingX={5}
           paddingY={3.5}
           display="block"
         >
-          <Dialog.Title fontSize="14px" fontWeight="semibold">
-            {planModalTitle(editor)}
-          </Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
+          <Drawer.Title fontSize="14px" fontWeight="semibold">
+            {planDrawerTitle(editor)}
+          </Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
 
         <PlanModalTabs tab={tab} onTabChange={setTab} />
 
-        <Dialog.Body
-          paddingX={5}
-          paddingY={4}
-          minHeight="268px"
-          maxHeight="54vh"
-          overflowY="auto"
-        >
+        <Drawer.Body paddingX={5} paddingY={4} overflowY="auto">
           <PlanModalBody editor={editor} tab={tab} />
-        </Dialog.Body>
+        </Drawer.Body>
 
         <PlanModalFooter editor={editor} />
-      </Dialog.Content>
-    </Dialog.Root>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 

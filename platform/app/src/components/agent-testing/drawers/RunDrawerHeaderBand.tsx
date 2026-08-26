@@ -17,8 +17,8 @@ import { hasNoResults } from "~/components/simulations/scenario-run-status.utils
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { Drawer } from "~/components/ui/drawer";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
+import { CASE_EDITOR_DRAWER } from "../cases/AgentTestingCaseEditorDrawer";
 import { CaseVersionChip } from "../shared/CaseVersionChip";
-import { useAgentTestingStore } from "../useAgentTestingStore";
 import type {
   RunDetail,
   RunDrawerState,
@@ -75,7 +75,6 @@ function HeaderActions({
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
   const { scenarioData } = detail;
-  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
   // Without a trace there is no conversation to reach, and a run that ends
   // before it answers has none worth opening.
   const isTraceReachable =
@@ -94,7 +93,10 @@ function HeaderActions({
         isRunning={detail.isRunning}
         onRunAgain={detail.handleRunAgainClick}
         onEditScenario={() =>
-          scenarioData && openCaseEditor({ scenarioId: scenarioData.id })
+          scenarioData &&
+          detail.openDrawer(CASE_EDITOR_DRAWER, {
+            scenarioId: scenarioData.id,
+          })
         }
         onOpenThread={isTraceReachable ? openThread : null}
         onOpenInTraces={isTraceReachable ? detail.handleOpenInTraces : null}

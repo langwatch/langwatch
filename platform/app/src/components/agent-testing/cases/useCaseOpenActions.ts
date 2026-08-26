@@ -1,12 +1,14 @@
 /**
- * Every way the Test cases tab opens one case: the editor, the version
+ * Every way the Test cases tab opens one case: the editor drawer, the version
  * history, and the run it last had.
  *
  * @see specs/features/agent-testing/cases-table.feature
+ * @see dev/docs/best_practices/drawers.md
  */
 
 import { useCallback } from "react";
-import { useAgentTestingStore } from "../useAgentTestingStore";
+import { useDrawer } from "~/hooks/useDrawer";
+import { CASE_EDITOR_DRAWER } from "./AgentTestingCaseEditorDrawer";
 import type { CaseLastResult } from "./CasesTable";
 import type { TestCase } from "./test-cases";
 import { useOpenLiveRun } from "./useOpenLiveRun";
@@ -23,19 +25,23 @@ export function useCaseOpenActions(
   lastResults: Map<string, CaseLastResult>,
 ): CaseOpenActions {
   const { openLiveRun } = useOpenLiveRun();
-  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
+  const { openDrawer } = useDrawer();
 
   const openEditor = useCallback(
-    (testCase: TestCase) => openCaseEditor({ scenarioId: testCase.id }),
-    [openCaseEditor],
+    (testCase: TestCase) =>
+      openDrawer(CASE_EDITOR_DRAWER, { scenarioId: testCase.id }),
+    [openDrawer],
   );
 
-  // The history reads inside the case dialog, beside the version it is the
+  // The history reads inside the case drawer, beside the version it is the
   // history of, so History opens the case with its versions already open.
   const openHistory = useCallback(
     (testCase: TestCase) =>
-      openCaseEditor({ scenarioId: testCase.id, showHistory: true }),
-    [openCaseEditor],
+      openDrawer(CASE_EDITOR_DRAWER, {
+        scenarioId: testCase.id,
+        showHistory: "true",
+      }),
+    [openDrawer],
   );
 
   const openLastRun = useCallback(

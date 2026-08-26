@@ -17,6 +17,7 @@
 import {
   Box,
   Button,
+  Checkbox,
   chakra,
   HStack,
   Skeleton,
@@ -50,10 +51,12 @@ export type CaseLastResult = ScenarioLastResultSummary;
 
 /**
  * The columns of the table. Under one suite the last result column carries the
- * time and the cost as well, so it is wider there.
+ * time and the cost as well, so it is wider there. When the table is in
+ * selection mode a checkbox column is added at the start of every row.
  */
 const WIDE_COLUMNS = "minmax(0,1fr) 290px 112px";
 const NARROW_COLUMNS = "minmax(0,1fr) 170px 112px";
+const CHECKBOX_COLUMN = "24px";
 /** A set that runs from code has no controls, and a last run column instead. */
 const EXTERNAL_COLUMNS = "minmax(0,1fr) 290px 110px";
 
@@ -68,6 +71,12 @@ export type CasesTableProps = {
   suites: TestSuiteEntry[];
   canManage: boolean;
   runningCaseId?: string | null;
+  /** True when the table shows checkboxes for a bulk move-to-suite. */
+  isSelectionMode: boolean;
+  selectedIds: Set<string>;
+  onToggleSelected: (scenarioId: string) => void;
+  /** Enters selection mode with this row pre-checked. */
+  onStartMoveToSuite: (scenarioId: string) => void;
   onSelectSuite: (suiteId: string) => void;
   onRowClick: (testCase: TestCase) => void;
   /** Opens the run dialog for the case. */
@@ -76,7 +85,6 @@ export type CasesTableProps = {
   /** Opens the version history drawer of the case. */
   onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 };
@@ -132,24 +140,32 @@ export function CasesTable({
   showGroupHeadings,
   lastResults,
   isLastResultsLoading,
-  suites,
+  suites: _suites,
   canManage,
   runningCaseId,
+  isSelectionMode,
+  selectedIds,
+  onToggleSelected,
+  onStartMoveToSuite,
   onSelectSuite,
   onRowClick,
   onRunCase,
   onEdit,
   onHistory,
   onDuplicate,
-  onMoveToSuite,
   onOpenLastRun,
   onArchive,
 }: CasesTableProps) {
-  const templateColumns = showGroupHeadings ? NARROW_COLUMNS : WIDE_COLUMNS;
+  const baseColumns = showGroupHeadings ? NARROW_COLUMNS : WIDE_COLUMNS;
+  const templateColumns = isSelectionMode
+    ? `${CHECKBOX_COLUMN} ${baseColumns}`
+    : baseColumns;
+  const aggregateSpan = isSelectionMode ? 3 : 2;
 
   return (
     <TableCard data-testid="agent-testing-cases-table">
       <TableHeaderRow templateColumns={templateColumns}>
+        {isSelectionMode && <Text as="span" />}
         <Text as="span">Test case</Text>
         <Text as="span">Last result</Text>
         <Text as="span" />
@@ -162,7 +178,7 @@ export function CasesTable({
               name={group.name}
               caseCount={group.cases.length}
               templateColumns={templateColumns}
-              aggregateSpan={2}
+              aggregateSpan={aggregateSpan}
               separated={index > 0}
               onClick={
                 group.id === UNFILED_GROUP_ID
@@ -189,15 +205,17 @@ export function CasesTable({
                 lastResult={lastResults.get(testCase.id)}
                 isLastResultsLoading={isLastResultsLoading}
                 showMetricsInline={!showGroupHeadings}
-                suites={suites}
                 canManage={canManage}
                 isRunning={runningCaseId === testCase.id}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedIds.has(testCase.id)}
+                onToggleSelected={onToggleSelected}
+                onStartMoveToSuite={onStartMoveToSuite}
                 onRowClick={onRowClick}
                 onRunCase={onRunCase}
                 onEdit={onEdit}
                 onHistory={onHistory}
                 onDuplicate={onDuplicate}
-                onMoveToSuite={onMoveToSuite}
                 onOpenLastRun={onOpenLastRun}
                 onArchive={onArchive}
               />
@@ -232,15 +250,17 @@ function CaseRow({
   lastResult,
   isLastResultsLoading,
   showMetricsInline,
-  suites,
   canManage,
   isRunning,
+  isSelectionMode,
+  isSelected,
+  onToggleSelected,
+  onStartMoveToSuite,
   onRowClick,
   onRunCase,
   onEdit,
   onHistory,
   onDuplicate,
-  onMoveToSuite,
   onOpenLastRun,
   onArchive,
 }: {
@@ -249,18 +269,28 @@ function CaseRow({
   lastResult?: CaseLastResult;
   isLastResultsLoading: boolean;
   showMetricsInline: boolean;
-  suites: TestSuiteEntry[];
   canManage: boolean;
   isRunning: boolean;
+  isSelectionMode: boolean;
+  isSelected: boolean;
+  onToggleSelected: (scenarioId: string) => void;
+  onStartMoveToSuite: (scenarioId: string) => void;
   onRowClick: (testCase: TestCase) => void;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
   onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 }) {
+  const handleRowClick = () => {
+    if (isSelectionMode) {
+      onToggleSelected(testCase.id);
+      return;
+    }
+    onRowClick(testCase);
+  };
+
   return (
     <Box
       display="grid"
@@ -271,9 +301,22 @@ function CaseRow({
       paddingY="10px"
       cursor="pointer"
       _hover={{ background: ROW_HOVER_BG }}
-      onClick={() => onRowClick(testCase)}
+      onClick={handleRowClick}
       data-testid={`case-row-${testCase.name}`}
     >
+      {isSelectionMode && (
+        <Box onClick={(event) => event.stopPropagation()}>
+          <Checkbox.Root
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelected(testCase.id)}
+            aria-label={`Select ${testCase.name}`}
+            data-testid={`case-row-${testCase.name}-checkbox`}
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+          </Checkbox.Root>
+        </Box>
+      )}
       <HStack gap={1.5} minWidth={0} flexWrap="wrap">
         <chakra.button
           type="button"
@@ -324,13 +367,12 @@ function CaseRow({
         )}
         <CaseRowActionsMenu
           testCase={testCase}
-          suites={suites}
           canManage={canManage}
           hasLastRun={!!lastResult}
           onEdit={onEdit}
           onHistory={onHistory}
           onDuplicate={onDuplicate}
-          onMoveToSuite={onMoveToSuite}
+          onStartMoveToSuite={onStartMoveToSuite}
           onOpenLastRun={onOpenLastRun}
           onArchive={onArchive}
         />
@@ -394,68 +436,24 @@ function LastResultCell({
   );
 }
 
-/** The submenu that files a case under one of the test suites, or under none. */
-function MoveToSuiteSubmenu({
-  testCase,
-  suites,
-  onMoveToSuite,
-}: {
-  testCase: TestCase;
-  suites: TestSuiteEntry[];
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
-}) {
-  const stop = (event: React.MouseEvent) => event.stopPropagation();
-
-  return (
-    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-      <Menu.TriggerItem value="move-to-suite">Move to suite</Menu.TriggerItem>
-      <Menu.Content>
-        {suites.map((suite) => (
-          <Menu.Item
-            key={suite.id}
-            value={`move-${suite.id}`}
-            onClick={(event) => {
-              stop(event);
-              onMoveToSuite(testCase, suite.id);
-            }}
-          >
-            {suite.name}
-          </Menu.Item>
-        ))}
-        <Menu.Item
-          value="move-unfiled"
-          onClick={(event) => {
-            stop(event);
-            onMoveToSuite(testCase, null);
-          }}
-        >
-          No test suite
-        </Menu.Item>
-      </Menu.Content>
-    </Menu.Root>
-  );
-}
-
 function CaseRowActionsMenu({
   testCase,
-  suites,
   canManage,
   hasLastRun,
   onEdit,
   onHistory,
   onDuplicate,
-  onMoveToSuite,
+  onStartMoveToSuite,
   onOpenLastRun,
   onArchive,
 }: {
   testCase: TestCase;
-  suites: TestSuiteEntry[];
   canManage: boolean;
   hasLastRun: boolean;
   onEdit: (testCase: TestCase) => void;
   onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
-  onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
+  onStartMoveToSuite: (scenarioId: string) => void;
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
 }) {
@@ -511,11 +509,15 @@ function CaseRowActionsMenu({
           </Menu.Item>
         )}
         {canManage && (
-          <MoveToSuiteSubmenu
-            testCase={testCase}
-            suites={suites}
-            onMoveToSuite={onMoveToSuite}
-          />
+          <Menu.Item
+            value="move-to-suite"
+            onClick={(event) => {
+              stop(event);
+              onStartMoveToSuite(testCase.id);
+            }}
+          >
+            Move to suite...
+          </Menu.Item>
         )}
         <Menu.Item
           value="history"

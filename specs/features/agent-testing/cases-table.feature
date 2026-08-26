@@ -81,10 +81,33 @@ Feature: The test cases table
     And it carries the play icon
 
   @integration
-  Scenario: The row menu offers Edit, Duplicate, Open last run and Archive in order
+  Scenario: The row menu offers Edit, Duplicate, Open last run, Move to suite... and Archive in order
     Given a test case row with a finished run
     When its row menu is opened
-    Then the actions read, in order: "Edit", "Duplicate", "Open last run", "Archive"
+    Then the actions read, in order: "Edit", "Duplicate", "Open last run", "Move to suite...", "History", "Archive"
+
+  @integration
+  Scenario: Move to suite... on a row starts checkbox selection with that row pre-checked
+    Given a test case row
+    When "Move to suite..." is chosen from the row menu
+    Then the cases table shows a checkbox on every row
+    And the checkbox on that row is pre-checked
+    And a selection action bar names the count and offers one "Move to suite" action
+
+  @integration
+  Scenario: Move to suite... confirms a bulk move to another suite
+    Given a checkbox selection of one test case
+    When "Move to suite" is clicked in the selection action bar
+    And a target test suite is picked from the dialog
+    Then every selected test case is moved to the target test suite
+    And the selection clears
+
+  @integration
+  Scenario: Move to suite... unfiles when 'No test suite' is picked
+    Given a checkbox selection of one test case
+    When "Move to suite" is clicked in the selection action bar
+    And "No test suite" is picked from the dialog
+    Then every selected test case is unfiled
 
   @integration
   Scenario: Open last run is not offered for a case that never ran

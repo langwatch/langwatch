@@ -7,7 +7,7 @@
 
 import { Box, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";
-import { Dialog } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
 import { describeError, FormServerError } from "~/features/errors";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
@@ -95,10 +95,10 @@ export function PlanModalBody({
   );
 }
 
-/** Leave the dialog, write the plan, or write it and run it at once. */
+/** Leave the drawer, write the plan, or write it and run it at once. */
 export function PlanModalFooter({ editor }: { editor: PlanEditorState }) {
   return (
-    <Dialog.Footer
+    <Drawer.Footer
       borderTopWidth="1px"
       borderColor="border"
       paddingX={5}
@@ -142,7 +142,7 @@ export function PlanModalFooter({ editor }: { editor: PlanEditorState }) {
       >
         {editor.isEditing ? "Save" : "Create run plan"}
       </SmallButton>
-    </Dialog.Footer>
+    </Drawer.Footer>
   );
 }
 
