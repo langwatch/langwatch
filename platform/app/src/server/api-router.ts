@@ -35,6 +35,7 @@ import { app as organizationApp } from "../app/api/organization/[[...route]]/app
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
 import { app as promptsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
@@ -114,7 +115,8 @@ export function createApiRouter() {
 
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
-  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL
+  api.route("/", analyticsSqlApp); // /api/v1/projects/:projectId/analytics/* — governed SQL (superseded by queryApp)
+  api.route("/", queryApp); // /api/v1/query — LWQL query domain, JSON-RPC (replaces the analytics-sql routes above)
   api.route("/", copilotKitApp);
   api.route("/", codingAgentApp);
   api.route("/", dashboardsApp);

@@ -29,6 +29,7 @@ import { app as organizationApp } from "../app/api/organization/[[...route]]/app
 import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
 import { ORGANIZATIONS_SPEC_OPTIONS } from "../app/api/organizations/[[...route]]/openapi";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import { app as queryApp } from "../app/api/query/[[...route]]/app";
 import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
 import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
@@ -78,6 +79,12 @@ const APP_DERIVED_PREFIXES = [
   "/api/analytics",
   "/api/coding-agent",
   "/api/v1/projects",
+  "/api/v1/query",
+  // The query domain's former prefix, kept listed so the two paths it used to
+  // publish are pruned from the committed spec rather than riding the merge
+  // union forever. Nothing serves it any more; remove this entry once a
+  // regenerated spec no longer contains `/api/query/v1`.
+  "/api/query/v1",
   "/api/dashboards",
   "/api/evaluators",
   "/api/events",
@@ -193,6 +200,8 @@ export default async function execute() {
   const analyticsSpec = await generateSpecs(analyticsApp);
   console.log("Building governed analytics SQL spec...");
   const analyticsSqlSpec = await generateSpecs(analyticsSqlApp);
+  console.log("Building query domain spec...");
+  const querySpec = await generateSpecs(queryApp);
   console.log("Building coding agent spec...");
   const codingAgentSpec = await generateSpecs(codingAgentApp);
   console.log("Building dashboards spec...");
@@ -280,6 +289,7 @@ export default async function execute() {
       apiKeysSpec,
       analyticsSpec,
       analyticsSqlSpec,
+      querySpec,
       codingAgentSpec,
       dashboardsSpec,
       datasetSpec,
