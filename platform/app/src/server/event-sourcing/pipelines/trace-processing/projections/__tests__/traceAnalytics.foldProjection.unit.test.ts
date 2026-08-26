@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import { LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
 import {
@@ -12,6 +13,7 @@ import { createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 const TENANT = "tenant-x";
 
 const slimProjection = new TraceAnalyticsFoldProjection({
+  traceCanonicalisation: TraceCanonicalisationService.create(),
   store: { store: async () => {}, get: async () => null },
 });
 
@@ -211,6 +213,7 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
         data: {
           traceId: "trace-log-only",
           spanId: "span-1",
+          scopeName: "test",
           body: "hello",
           attributes: {},
           resourceAttributes: {},

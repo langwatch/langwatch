@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
@@ -26,6 +27,7 @@ const TENANT = "tenant-rb";
 const BASE_MS = 1_760_000_000_000;
 
 const projection = new TraceAnalyticsFoldProjection({
+  traceCanonicalisation: TraceCanonicalisationService.create(),
   store: { store: async () => {}, get: async () => null },
 });
 
@@ -497,6 +499,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
       it("resumes the classification from the committed row instead of losing it", async () => {
         const { repo, rows } = recordingRepo();
         const fold = new TraceAnalyticsFoldProjection({
+          traceCanonicalisation: TraceCanonicalisationService.create(),
           store: new TraceAnalyticsStore(repo),
         });
         // A loader that fails the test if the executor still replays history:

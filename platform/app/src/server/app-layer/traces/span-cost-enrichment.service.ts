@@ -5,9 +5,11 @@ import {
 } from "~/server/modelProviders/llmModelCost";
 import { matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
-import { CLAUDE_CODE_LLM_REQUEST_SPAN_NAME } from "./canonicalisation/extractors/claudeCode";
-import { CODEX_TURN_SPAN_NAME } from "./canonicalisation/extractors/codex";
+import {
+  ATTR_KEYS,
+  CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,
+  CODEX_TURN_SPAN_NAME,
+} from "@langwatch/trace-contract";
 import { extractModelName } from "./utils/spanModel";
 
 /**

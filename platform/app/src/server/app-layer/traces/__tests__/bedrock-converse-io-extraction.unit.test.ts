@@ -23,11 +23,11 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { CanonicalizeSpanAttributesService } from "../canonicalisation/canonicalizeSpanAttributesService";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
-const canonicaliser = new CanonicalizeSpanAttributesService();
-const ioService = new TraceIOExtractionService();
+const canonicaliser = TraceCanonicalisationService.create();
+const ioService = new TraceIOExtractionService(canonicaliser);
 
 /**
  * Only ever used to CONSTRUCT the span. The assertions below hardcode the
@@ -79,11 +79,11 @@ function makeSpan(
  * texts as they would be written to `trace_summaries`.
  */
 function computeTraceIO(span: NormalizedSpan) {
-  const canonicalised = canonicaliser.canonicalize(
-    span.spanAttributes,
-    span.events,
+  const canonicalised = canonicaliser.canonicalizeSpanAttributes({
+    spanAttributes: span.spanAttributes,
+    events: span.events,
     span,
-  );
+  });
   const spans: NormalizedSpan[] = [
     {
       ...span,

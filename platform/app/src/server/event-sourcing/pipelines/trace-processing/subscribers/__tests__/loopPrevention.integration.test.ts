@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Real integration test for online-evaluator loop prevention.
  *
@@ -266,10 +267,16 @@ describe.skipIf(!hasTestcontainers)(
         }),
       })
         .withClickHouseFoldProjection(
-          new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
+          new TraceSummaryFoldProjection({
+            store: traceSummaryStore,
+            traceCanonicalisation: TraceCanonicalisationService.create(),
+          }) as any,
         )
         .withClickHouseMapProjection(
-          new SpanStorageMapProjection({ store: spanAppendStore }) as any,
+          new SpanStorageMapProjection({
+            store: spanAppendStore,
+            traceCanonicalisation: TraceCanonicalisationService.create(),
+          }) as any,
         )
         .withProjectionSubscriber("evaluationTrigger", fastSpec as any)
         .withProjectionSubscriber("customEvaluationSync", noopFoldSubscriber() as any)

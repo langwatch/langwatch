@@ -19,7 +19,6 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { ExportFailedError, ExportUnauthenticatedError } from "~/server/export/errors";
-import { ExportService } from "~/server/export/export.service";
 import { exportRequestSchema } from "~/server/export/types";
 import type { NextRequest } from "~/types/next-stubs";
 
@@ -99,10 +98,9 @@ secured
     const contentType =
       request.format === "csv" ? "text/csv; charset=utf-8" : "application/x-ndjson";
 
-    let exportService: Awaited<ReturnType<typeof ExportService.create>>;
+    const exportService = c.app.traces.export;
     let totalCount: number;
     try {
-      exportService = await ExportService.create();
       totalCount = await exportService.getTotalCount({ request, protections });
     } catch (error) {
       // A failure that already knows what it is — a query timeout, a time range

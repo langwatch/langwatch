@@ -1,7 +1,7 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -40,8 +40,6 @@ import {
 import type { NormalizedSpan } from "../schemas/spans";
 import {
   extractIOFromLogRecord,
-  liftCanonicalAttributesFromLogRecord,
-  NON_BILLABLE_ATTR,
   OUTPUT_SOURCE,
   SpanCostService,
   SpanStatusService,
@@ -64,20 +62,12 @@ const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 
 // ─── Main composition ───────────────────────────────────────────────
 
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
-);
-
 const spanTimingService = new SpanTimingService();
 const spanStatusService = new SpanStatusService();
 const spanCostService = new SpanCostService();
 const traceOriginService = new TraceOriginService();
 const traceAttributeAccumulationService = new TraceAttributeAccumulationService(
   traceOriginService,
-);
-const traceIOExtractionService = new TraceIOExtractionService();
-const traceIOAccumulationService = new TraceIOAccumulationService(
-  traceIOExtractionService,
 );
 const tracePromptAccumulationService = new TracePromptAccumulationService();
 const traceNameResolutionService = new TraceNameResolutionService();
@@ -194,9 +184,11 @@ function recordContextSize({
 export function applySpanToSummary({
   state,
   span,
+  traceIOAccumulationService,
 }: {
   state: TraceSummaryData;
   span: NormalizedSpan;
+  traceIOAccumulationService: TraceIOAccumulationService;
 }): TraceSummaryData {
   if (SYNTHETIC_SPAN_NAMES.has(span.name)) {
     // Synthetic spans (e.g. `langwatch.track_event`) must not contribute to
@@ -493,6 +485,9 @@ export class TraceSummaryFoldProjection
   >
   implements FoldEventHandlers<typeof traceSummaryEvents, TraceSummaryData>
 {
+  private readonly spanNormalizationPipelineService: SpanNormalizationPipelineService;
+  private readonly traceCanonicalisation: TraceCanonicalisationService;
+  private readonly traceIOAccumulationService: TraceIOAccumulationService;
   readonly name = "traceSummary";
   readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceSummaryData>;
@@ -562,13 +557,24 @@ export class TraceSummaryFoldProjection
 
   protected readonly events = traceSummaryEvents;
 
-  constructor(deps: { store: FoldProjectionStore<TraceSummaryData> }) {
+  constructor(deps: {
+    store: FoldProjectionStore<TraceSummaryData>;
+    traceCanonicalisation: TraceCanonicalisationService;
+  }) {
     super({
       createdAtKey: "createdAt",
       updatedAtKey: "updatedAt",
       LastEventOccurredAtKey: "LastEventOccurredAt",
     });
     this.store = deps.store;
+    this.traceCanonicalisation = deps.traceCanonicalisation;
+    this.traceIOAccumulationService = new TraceIOAccumulationService(
+      new TraceIOExtractionService(deps.traceCanonicalisation),
+      deps.traceCanonicalisation,
+    );
+    this.spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+      deps.traceCanonicalisation,
+    );
   }
 
   protected initState() {
@@ -672,7 +678,7 @@ export class TraceSummaryFoldProjection
       return { ...state, spanCount: state.spanCount + 1 };
     }
 
-    const normalizedSpan = spanNormalizationPipelineService.normalizeSpanReceived(
+    const normalizedSpan = this.spanNormalizationPipelineService.normalizeSpanReceived(
       event.tenantId,
       event.data.span,
       event.data.resource,
@@ -681,7 +687,11 @@ export class TraceSummaryFoldProjection
     enrichRagContextIds(normalizedSpan);
 
     return {
-      ...applySpanToSummary({ state, span: normalizedSpan }),
+      ...applySpanToSummary({
+        state,
+        span: normalizedSpan,
+        traceIOAccumulationService: this.traceIOAccumulationService,
+      }),
       createdAt: state.createdAt,
     };
   }
@@ -711,15 +721,13 @@ export class TraceSummaryFoldProjection
       return state;
     }
 
-    const logIO = extractIOFromLogRecord(event.data);
+    const logIO = extractIOFromLogRecord(event.data, this.traceCanonicalisation);
 
-    // Run the canonical extractor registry against this log record.
-    // Each extractor (ClaudeCode, Codex, GenAI, SpringAI) claims its
-    // own scope/event-name surface and lifts model / cost / tokens /
-    // cache / thread.id onto canonical langwatch.* keys. Adding a new
-    // platform tool is a one-line addition to the registry plus a new
-    // extractor class under canonicalisation/extractors/.
-    const liftedAttributes = liftCanonicalAttributesFromLogRecord(event.data);
+    const liftedAttributes = this.traceCanonicalisation.canonicalizeLogRecord({
+      scopeName: event.data.scopeName,
+      body: event.data.body,
+      attributes: event.data.attributes,
+    }).attributes;
 
     return applyLogContribution({
       state,

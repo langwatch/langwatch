@@ -34,13 +34,7 @@
  */
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
 import type { ChatMessage, SpanInputOutput } from "~/server/tracer/types";
-
-import {
-  buildInputMessagesFromRequestBody,
-  extractAssistantOutputFromResponseBody,
-  extractToolResultsFromRequestBody,
-  isConversationalQuerySource,
-} from "./canonicalisation/extractors/claudeCode";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 /** A claude_code content log record, normalized by the caller. */
 export interface ClaudeContentLog {
@@ -125,15 +119,17 @@ const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 export function computeClaudeSpanEnrichment({
   spans,
   logs,
+  traceCanonicalisation,
 }: {
   spans: ClaudeSpanRef[];
   logs: ClaudeContentLog[];
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Map<string, ClaudeSpanEnrichment> {
   const result = new Map<string, ClaudeSpanEnrichment>();
   if (spans.length === 0 || logs.length === 0) return result;
 
-  const outputByRequestId = buildOutputIndex(logs);
-  const inputBySpanId = buildInputIndex({ spans, logs });
+  const outputByRequestId = buildOutputIndex(logs, traceCanonicalisation);
+  const inputBySpanId = buildInputIndex({ spans, logs, traceCanonicalisation });
 
   for (const span of spans) {
     const output =
@@ -152,7 +148,10 @@ export function computeClaudeSpanEnrichment({
  * the first log of each kind wins. Bodies are bounded by `capPayloadString`
  * (the response-body extractor caps internally; the raw text is capped here).
  */
-function buildOutputIndex(logs: ClaudeContentLog[]): Map<string, SpanInputOutput> {
+function buildOutputIndex(
+  logs: ClaudeContentLog[],
+  traceCanonicalisation: TraceCanonicalisationService,
+): Map<string, SpanInputOutput> {
   const byRequestId = new Map<string, SpanInputOutput>();
 
   for (const log of logs) {
@@ -169,7 +168,11 @@ function buildOutputIndex(logs: ClaudeContentLog[]): Map<string, SpanInputOutput
       (log.derivedToolCallCount ?? 0) === 0
         ? log.derivedOutputText
         : null;
-    const text = derived ?? extractAssistantOutputFromResponseBody(log.body);
+    const text =
+      derived ??
+      traceCanonicalisation.deriveClaudeResponseContent({
+        body: log.body,
+      }).assistantOutput;
     if (text !== null) {
       byRequestId.set(log.requestId, { type: "text", value: text });
     }
@@ -213,9 +216,11 @@ function buildOutputIndex(logs: ClaudeContentLog[]): Map<string, SpanInputOutput
 function buildInputIndex({
   spans,
   logs,
+  traceCanonicalisation,
 }: {
   spans: ClaudeSpanRef[];
   logs: ClaudeContentLog[];
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Map<string, SpanInputOutput> {
   const bySpanId = new Map<string, SpanInputOutput>();
 
@@ -251,7 +256,11 @@ function buildInputIndex({
     const requestBodies = requestBodiesByQuerySource.get(key) ?? [];
     const prompts = promptsByQuerySource.get(key) ?? [];
     for (let i = 0; i < spansInGroup.length; i++) {
-      const input = buildSpanInput({ requestBody: requestBodies[i], prompts });
+      const input = buildSpanInput({
+        requestBody: requestBodies[i],
+        prompts,
+        traceCanonicalisation,
+      });
       if (input !== null) bySpanId.set(spansInGroup[i]!.spanId, input);
     }
   }
@@ -339,13 +348,17 @@ function repeatedSystemPlaceholder(content: string, firstCall: number): ChatMess
 function buildSpanInput({
   requestBody,
   prompts,
+  traceCanonicalisation,
 }: {
   requestBody: ClaudeContentLog | undefined;
   prompts: ClaudeContentLog[];
+  traceCanonicalisation: TraceCanonicalisationService;
 }): SpanInputOutput | null {
   const messages =
     requestBody !== undefined
-      ? buildInputMessagesFromRequestBody(requestBody.body)
+      ? traceCanonicalisation.deriveClaudeRequestContent({
+          body: requestBody.body,
+        }).messages
       : null;
   if (messages !== null && messages.length > 0) {
     const value: ChatMessage[] = messages.map((m) => ({
@@ -471,10 +484,12 @@ export function computeClaudeToolSpanEnrichment({
   spans,
   toolLogs,
   contentLogs,
+  traceCanonicalisation,
 }: {
   spans: ClaudeToolSpanRef[];
   toolLogs: ClaudeToolLog[];
   contentLogs: ClaudeContentLog[];
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Map<string, ClaudeToolSpanEnrichment> {
   const result = new Map<string, ClaudeToolSpanEnrichment>();
   if (spans.length === 0 || toolLogs.length === 0) return result;
@@ -495,7 +510,10 @@ export function computeClaudeToolSpanEnrichment({
   }
   if (resultByUseId.size === 0 && decisionByUseId.size === 0) return result;
 
-  const resultContentByUseId = buildToolResultContentIndex(contentLogs);
+  const resultContentByUseId = buildToolResultContentIndex(
+    contentLogs,
+    traceCanonicalisation,
+  );
 
   for (const span of spans) {
     const toolResult = resultByUseId.get(span.toolUseId) ?? null;
@@ -522,11 +540,15 @@ export function computeClaudeToolSpanEnrichment({
  */
 function buildToolResultContentIndex(
   contentLogs: ClaudeContentLog[],
+  traceCanonicalisation: TraceCanonicalisationService,
 ): Map<string, string> {
   const out = new Map<string, string>();
   for (const log of contentLogs) {
     if (log.eventName !== INPUT_BODY_EVENT || log.body === null) continue;
-    for (const [useId, text] of extractToolResultsFromRequestBody(log.body)) {
+    const { toolResults } = traceCanonicalisation.deriveClaudeRequestContent({
+      body: log.body,
+    });
+    for (const { useId, text } of toolResults) {
       if (!out.has(useId)) out.set(useId, text);
     }
   }
@@ -626,15 +648,23 @@ export function computeClaudeInteractionOutput({
   windowStartMs,
   windowEndMs,
   slackMs = 2_000,
+  traceCanonicalisation,
 }: {
   logs: ClaudeContentLog[];
   windowStartMs: number;
   windowEndMs: number;
   slackMs?: number;
+  traceCanonicalisation: TraceCanonicalisationService;
 }): SpanInputOutput | null {
   let best: { timeUnixMs: number; rank: number; text: string } | null = null;
   for (const log of logs) {
-    if (!isConversationalQuerySource(log.querySource)) continue;
+    if (
+      !traceCanonicalisation.classifyClaudeCall({
+        querySource: log.querySource,
+      }).conversational
+    ) {
+      continue;
+    }
     if (log.timeUnixMs < windowStartMs) continue;
     if (log.timeUnixMs > windowEndMs + slackMs) continue;
 
@@ -645,7 +675,11 @@ export function computeClaudeInteractionOutput({
         log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0
           ? log.derivedOutputText
           : null;
-      text = derived ?? extractAssistantOutputFromResponseBody(log.body);
+      text =
+        derived ??
+        traceCanonicalisation.deriveClaudeResponseContent({
+          body: log.body,
+        }).assistantOutput;
       rank = 1;
     } else if (log.eventName === ASSISTANT_RESPONSE_EVENT) {
       text =

@@ -1,6 +1,6 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace-processing/schemas/constants";
 import {
@@ -77,6 +77,7 @@ const logger = createLogger("langwatch:coding-agent-processing:span-facts-dispat
  * source; no cap or backoff tuning does.
  */
 export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
+  traceCanonicalisation: TraceCanonicalisationService;
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
   getNormalizedSpanById: (params: {
     tenantId: string;
@@ -86,9 +87,7 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
     occurredAtMs: number;
   }) => Promise<NormalizedSpan | null>;
 }): EventSubscriberDefinition<TraceProcessingEvent> {
-  const normalization = new SpanNormalizationPipelineService(
-    new CanonicalizeSpanAttributesService(),
-  );
+  const normalization = new SpanNormalizationPipelineService(deps.traceCanonicalisation);
 
   /**
    * The raw-name gate — the enqueue filter, and the handler's inline guard.

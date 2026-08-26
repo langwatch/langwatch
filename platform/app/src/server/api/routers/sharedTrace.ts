@@ -11,7 +11,6 @@ import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { rateLimit } from "~/server/rateLimit";
 import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redaction";
 import type { Protections } from "~/server/traces/protections";
-import { TraceService } from "~/server/traces/trace.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { getUserProtectionsForProject } from "../utils";
 import type { SharedTraceDto } from "./sharedTrace.schemas";
@@ -30,7 +29,7 @@ import {
   gateTreeCost,
 } from "./tracesV2.gates";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
-import type { TraceResourceInfoDto } from "./tracesV2.schemas";
+import type { TraceResourceInfoDto } from "@langwatch/trace-contract";
 
 /**
  * The single public surface for anonymous shared-trace reads.
@@ -246,12 +245,7 @@ export const sharedTraceRouter = createTRPCRouter({
           traceId,
           ...occurredAtHint,
         }),
-        TraceService.create(
-          ctx.prisma,
-          undefined,
-          undefined,
-          ctx.app.evaluations,
-        ).getEvaluationsMultiple(projectId, [traceId], protections),
+        ctx.app.traces.read.getEvaluationsMultiple(projectId, [traceId], protections),
       ]);
 
       // Header (spend stripped; the DROP banner derives exactly as the

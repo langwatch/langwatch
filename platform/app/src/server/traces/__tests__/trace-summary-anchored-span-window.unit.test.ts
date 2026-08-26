@@ -15,11 +15,13 @@
  * SQL: the interpolated fragment is either there or it is not.
  */
 import { describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { Protections } from "~/server/traces/protections";
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
 }));
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 vi.mock("~/server/app-layer/app", () => {
   const app = () => ({
@@ -153,6 +155,7 @@ async function readTraces(traceIds: string[]) {
     prisma: {
       project: { findUnique: vi.fn() },
     } as never,
+    traceCanonicalisation,
   });
   await service.getTracesWithSpans("proj-1", traceIds, protections);
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>

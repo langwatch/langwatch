@@ -1,5 +1,5 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { parsePromptReference } from "~/server/traces/parsePromptReference";
+import { parsePromptTraceReference } from "@langwatch/prompt-contract";
 import type { NormalizedSpan } from "../../schemas/spans";
 
 const ATTR_PROMPT_SELECTED_ID = "langwatch.prompt.selected.id";
@@ -63,7 +63,7 @@ export class TracePromptAccumulationService {
       }
     }
 
-    const ref = parsePromptReference(span.spanAttributes);
+    const ref = parsePromptTraceReference(span.spanAttributes);
     if (ref.promptHandle) {
       if (
         isLater({

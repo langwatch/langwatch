@@ -2,10 +2,22 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 // Mock TraceService to verify routing goes through it
 const mockGetById = vi.fn();
 const mockGetEvaluationsMultiple = vi.fn();
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: vi.fn(() => ({
+    traces: {
+      read: {
+        getById: mockGetById,
+        getEvaluationsMultiple: mockGetEvaluationsMultiple,
+      },
+    },
+  })),
+}));
 
 vi.mock("~/server/traces/trace.service", async () => {
   class AmbiguousTraceIdPrefixError extends Error {
@@ -98,11 +110,7 @@ const { AmbiguousTraceIdPrefixError } = await import("~/server/traces/trace.serv
 // Build a wrapper app that injects the project variable (mimicking auth middleware)
 // and adds an error handler that mirrors the real app's JSON error responses
 const testApp = new Hono();
-testApp.use("*", appContextMiddlewareFor({ evaluations: {} } as never));
-testApp.use("*", async (c, next) => {
-  c.set("project" as never, { id: "project-123", apiKey: "key-123" });
-  await next();
-});
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", v1App);
 testApp.onError((err, c) => {
   const status = "status" in err ? (err.status as number) : 500;

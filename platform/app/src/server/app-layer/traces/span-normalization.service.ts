@@ -1,5 +1,7 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import crypto from "crypto";
 import { getLangWatchTracer } from "langwatch";
@@ -15,8 +17,6 @@ import type {
 } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import type { CanonicalizeSpanAttributesService } from "./canonicalisation";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 
 export class SpanNormalizationPipelineService {
   private readonly logger = createLogger(
@@ -26,9 +26,7 @@ export class SpanNormalizationPipelineService {
     "langwatch.trace-processing.span-normalization-pipeline-service",
   );
 
-  constructor(
-    private readonly canonicalizeSpanAttributesService: CanonicalizeSpanAttributesService,
-  ) {}
+  constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
 
   normalizeSpanReceived(
     tenantId: string,
@@ -192,11 +190,11 @@ export class SpanNormalizationPipelineService {
         },
       },
       (span) => {
-        const result = this.canonicalizeSpanAttributesService.canonicalize(
-          normalizedSpan.spanAttributes,
-          normalizedSpan.events,
-          normalizedSpan,
-        );
+        const result = this.traceCanonicalisation.canonicalizeSpanAttributes({
+          spanAttributes: normalizedSpan.spanAttributes,
+          events: normalizedSpan.events,
+          span: normalizedSpan,
+        });
 
         span.setAttributes({
           applied_rules: result.appliedRules,

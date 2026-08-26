@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Full-loop end-to-end test for traceparent propagation:
  *
@@ -274,10 +275,16 @@ describe.skipIf(!shouldRun)(
         }),
       })
         .withClickHouseFoldProjection(
-          new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
+          new TraceSummaryFoldProjection({
+            store: traceSummaryStore,
+            traceCanonicalisation: TraceCanonicalisationService.create(),
+          }) as any,
         )
         .withClickHouseMapProjection(
-          new SpanStorageMapProjection({ store: spanAppendStore }) as any,
+          new SpanStorageMapProjection({
+            store: spanAppendStore,
+            traceCanonicalisation: TraceCanonicalisationService.create(),
+          }) as any,
         )
         .withProjectionSubscriber("evaluationTrigger", noopFoldSubscriber() as any)
         .withProjectionSubscriber("customEvaluationSync", noopFoldSubscriber() as any)

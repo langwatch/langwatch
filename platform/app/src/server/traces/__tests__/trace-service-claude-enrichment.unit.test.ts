@@ -13,6 +13,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
 import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { Span, Trace } from "~/server/tracer/types";
@@ -67,6 +68,7 @@ const REQUEST_ID = "req_011CcuGBf1aBcDeFgHiJkLmN";
 const REPL = "repl_main_thread";
 /** What ingest computed from the span's own tokens, and what every read shows. */
 const STORED_COST = 0.193022;
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 const protections: Protections = {
   canSeeCosts: true,
@@ -175,9 +177,11 @@ const CLAUDE_LOG_ROWS: StoredLogRecordRow[] = [
 function makeService(
   getLogsByTraceId: LogRecordStorageService["getLogsByTraceId"],
 ): TraceService {
-  return new TraceService({} as never, undefined, {
-    getLogsByTraceId,
-  } as unknown as LogRecordStorageService);
+  return TraceService.create({
+    prisma: {} as never,
+    logRecordStorage: { getLogsByTraceId } as unknown as LogRecordStorageService,
+    traceCanonicalisation,
+  });
 }
 
 describe("TraceService.getById — Claude Code log content enrichment", () => {

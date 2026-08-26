@@ -15,6 +15,7 @@
  */
 
 import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -838,7 +839,9 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         projectId: TENANT_A,
         normalizedSpans: [stagedSpan],
         blobStore,
-        ioExtractionService: new TraceIOExtractionService(),
+        ioExtractionService: new TraceIOExtractionService(
+          TraceCanonicalisationService.create(),
+        ),
         logger,
       });
 

@@ -9,6 +9,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
@@ -197,6 +198,7 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
   let ClickHouseTraceService: typeof import("../clickhouse-trace.service").ClickHouseTraceService;
   let blobStore: BlobStore;
   let resolveTraceSpansFn: import("../clickhouse-trace.service").ResolveTraceSpansFn;
+  let traceCanonicalisation: TraceCanonicalisationService;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -205,7 +207,8 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
     ClickHouseTraceService = mod.ClickHouseTraceService;
 
     blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
-    const ioExtractionService = new TraceIOExtractionService();
+    traceCanonicalisation = TraceCanonicalisationService.create();
+    const ioExtractionService = new TraceIOExtractionService(traceCanonicalisation);
     const logger = createLogger("test");
 
     resolveTraceSpansFn = (projectId, normalizedSpans) =>
@@ -234,6 +237,7 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
           const service = new ClickHouseTraceService({
             prisma: { project: { findUnique: vi.fn() } } as never,
             resolveTraceSpans: resolveTraceSpansFn,
+            traceCanonicalisation,
           });
 
           // Per-call gate (#4888): resolution fires only when resolveBlobs:true.

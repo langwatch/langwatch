@@ -116,7 +116,7 @@ describe("ExportService", () => {
           batches: [traces],
           totalHits: 2,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         const chunks: Array<{
           chunk: string;
@@ -150,7 +150,7 @@ describe("ExportService", () => {
           batches: [batch1, batch2],
           totalHits: 5,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         const chunks: Array<{
           chunk: string;
@@ -187,7 +187,7 @@ describe("ExportService", () => {
           batches: [traces],
           totalHits: 1,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         const chunks: Array<{
           chunk: string;
@@ -218,7 +218,7 @@ describe("ExportService", () => {
           batches: [traces],
           totalHits: 2,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         const chunks: Array<{
           chunk: string;
@@ -267,7 +267,7 @@ describe("ExportService", () => {
           batches: [traces],
           totalHits: 1,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         const chunks: Array<{
           chunk: string;
@@ -292,7 +292,7 @@ describe("ExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         const chunks: Array<{
           chunk: string;
@@ -315,7 +315,7 @@ describe("ExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of service.exportTraces({
@@ -339,7 +339,7 @@ describe("ExportService", () => {
           batches: [[]],
           totalHits: 0,
         });
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of service.exportTraces({

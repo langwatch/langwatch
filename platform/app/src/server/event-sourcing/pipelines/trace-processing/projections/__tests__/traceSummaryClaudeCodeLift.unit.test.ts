@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Fold-projection log-lift regression tests for the events that REMAIN on
  * the log path: claude_code `user_prompt`, codex (`codex.sse_event` /
@@ -29,14 +30,15 @@ import {
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
 } from "../../schemas/constants";
 import type { LogContributedEvent, LogRecordReceivedEvent } from "../../schemas/events";
+import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
 import {
   applySpanToSummary,
-  TraceSummaryFoldProjection,
-} from "../traceSummary.foldProjection";
-import { createInitState } from "./fixtures/trace-summary-test.fixtures";
+  createInitState,
+} from "./fixtures/trace-summary-test.fixtures";
 
 function makeProjection() {
   return new TraceSummaryFoldProjection({
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     store: { store: async () => {}, get: async () => null },
   });
 }

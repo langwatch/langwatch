@@ -9,6 +9,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
@@ -18,6 +19,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 import type { GetAllTracesForProjectInput, TracesForProjectResult } from "../types";
 import { openProtections } from "./open-protections";
 
@@ -159,6 +161,7 @@ beforeAll(async () => {
     prisma: prisma as unknown as ConstructorParameters<
       typeof ClickHouseTraceService
     >[0]["prisma"],
+    traceCanonicalisation,
   });
 
   await ch.insert({

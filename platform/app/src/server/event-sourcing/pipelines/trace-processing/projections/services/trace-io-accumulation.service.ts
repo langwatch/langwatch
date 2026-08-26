@@ -1,8 +1,4 @@
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import {
-  extractAssistantTextFromResponseBody,
-  isConversationalQuerySource,
-} from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
@@ -73,7 +69,10 @@ export function shouldOverrideOutput({
 /**
  * Extracts I/O from log records (Spring AI and Claude Code).
  */
-export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
+export function extractIOFromLogRecord(
+  data: LogRecordReceivedEventData,
+  traceCanonicalisation: TraceCanonicalisationService,
+): {
   input: string | null;
   output: string | null;
 } {
@@ -118,13 +117,16 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
     // isConversationalQuerySource allowlist so the two output paths agree.
     if (
       data.attributes["event.name"] === "api_response_body" &&
-      isConversationalQuerySource(
-        typeof data.attributes.query_source === "string"
-          ? data.attributes.query_source
-          : null,
-      )
+      traceCanonicalisation.classifyClaudeCall({
+        querySource:
+          typeof data.attributes.query_source === "string"
+            ? data.attributes.query_source
+            : null,
+      }).conversational
     ) {
-      const responseText = extractAssistantTextFromResponseBody(data.attributes.body);
+      const responseText = traceCanonicalisation.deriveClaudeResponseContent({
+        body: data.attributes.body,
+      }).assistantText;
       if (responseText !== null) {
         return { input: null, output: responseText };
       }
@@ -138,11 +140,12 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
     // the headline output.
     if (
       data.attributes["event.name"] === "assistant_response" &&
-      isConversationalQuerySource(
-        typeof data.attributes.query_source === "string"
-          ? data.attributes.query_source
-          : null,
-      )
+      traceCanonicalisation.classifyClaudeCall({
+        querySource:
+          typeof data.attributes.query_source === "string"
+            ? data.attributes.query_source
+            : null,
+      }).conversational
     ) {
       const response = data.attributes.response;
       if (typeof response === "string" && response.length > 0) {
@@ -223,7 +226,10 @@ function accumulateMediaRefs({
  * root > explicit (langwatch) > last-finishing inferred (gen_ai).
  */
 export class TraceIOAccumulationService {
-  constructor(private readonly traceIOExtractionService: TraceIOExtractionService) {}
+  constructor(
+    private readonly traceIOExtractionService: TraceIOExtractionService,
+    private readonly traceCanonicalisation: TraceCanonicalisationService,
+  ) {}
 
   accumulateIO({ state, span }: { state: TraceSummaryData; span: NormalizedSpan }): {
     computedInput: string | null;
@@ -289,7 +295,9 @@ export class TraceIOAccumulationService {
     const claudeQuerySource = span.spanAttributes["claude_code.query_source"];
     const isClaudeUtilitySpan =
       typeof claudeQuerySource === "string" &&
-      !isConversationalQuerySource(claudeQuerySource);
+      !this.traceCanonicalisation.classifyClaudeCall({
+        querySource: claudeQuerySource,
+      }).conversational;
 
     // Tool spans never define the trace's headline I/O: they are
     // sub-operations (a Bash run, an Edit), not the conversation. This is

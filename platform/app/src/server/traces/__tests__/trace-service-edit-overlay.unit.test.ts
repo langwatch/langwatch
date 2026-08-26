@@ -7,6 +7,7 @@
  * real.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
 import type { Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
@@ -112,9 +113,14 @@ const traceOutputPatch = (output: string): TraceEditOverlayPatch => ({
   deletedSpanIds: [],
   trace: { output: { value: output } },
 });
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 const buildService = () =>
-  TraceService.create({} as never, undefined, {} as unknown as LogRecordStorageService);
+  TraceService.create({
+    prisma: {} as never,
+    logRecordStorage: {} as unknown as LogRecordStorageService,
+    traceCanonicalisation,
+  });
 
 beforeEach(() => {
   vi.clearAllMocks();

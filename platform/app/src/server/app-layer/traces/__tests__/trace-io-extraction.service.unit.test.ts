@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { NormalizedSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   NormalizedSpanKind,
@@ -7,7 +8,7 @@ import {
 import { IO_PREVIEW_BYTES, structuredIoPreview } from "../lean-for-projection";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
-const service = new TraceIOExtractionService();
+const service = new TraceIOExtractionService(TraceCanonicalisationService.create());
 
 function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {

@@ -71,6 +71,7 @@ import type { SimulationService } from "@langwatch/simulation-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
+import type { ExportService } from "../export/export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import type { AutomationService } from "@langwatch/automation-contract";
@@ -102,7 +103,11 @@ import type { TraceRequestCollectionService } from "./traces/trace-request-colle
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { UsageService } from "./usage/usage.service";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { TraceService } from "@langwatch/trace-contract";
+import type {
+  TraceCanonicalisationService,
+  TraceService as TraceTreeService,
+} from "@langwatch/trace-contract";
+import type { TraceService as TraceReadService } from "../traces/trace.service";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -159,8 +164,13 @@ export interface AppDependencies {
   secrets: SecretService;
 
   traces: {
+    canonicalisation: TraceCanonicalisationService;
+    /** One process-owned legacy trace read service shared by every transport. */
+    read: TraceReadService;
+    /** One process-owned export facade over the legacy trace reader. */
+    export: ExportService;
     /** The feature-owned viewer-safe, cursor-paged span tree. */
-    tree: TraceService;
+    tree: TraceTreeService;
     summary: TraceSummaryService;
     list: TraceListService;
     /** Sessions lens: server-side per-conversation rollups (specs/traces-v2/sessions-lens.feature). */

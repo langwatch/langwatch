@@ -23,6 +23,7 @@
  */
 
 import type { Event } from "@langwatch/eventing";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
@@ -317,7 +318,9 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
       logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
-      const ioExtractionService = new TraceIOExtractionService();
+      const ioExtractionService = new TraceIOExtractionService(
+        TraceCanonicalisationService.create(),
+      );
 
       resolvedResult = await resolveOffloadedTraces({
         projectId: PROJECT_ID,
@@ -406,7 +409,9 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
       const logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
-      const ioExtractionService = new TraceIOExtractionService();
+      const ioExtractionService = new TraceIOExtractionService(
+        TraceCanonicalisationService.create(),
+      );
 
       const result = await resolveOffloadedTraces({
         projectId: PROJECT_ID,
@@ -454,7 +459,9 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
-      const ioExtractionService = new TraceIOExtractionService();
+      const ioExtractionService = new TraceIOExtractionService(
+        TraceCanonicalisationService.create(),
+      );
 
       await expect(
         resolveOffloadedTraces({
@@ -472,7 +479,9 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
-      const ioExtractionService = new TraceIOExtractionService();
+      const ioExtractionService = new TraceIOExtractionService(
+        TraceCanonicalisationService.create(),
+      );
 
       const result = await resolveOffloadedTraces({
         projectId: PROJECT_ID,
@@ -493,7 +502,9 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
-      const ioExtractionService = new TraceIOExtractionService();
+      const ioExtractionService = new TraceIOExtractionService(
+        TraceCanonicalisationService.create(),
+      );
 
       await resolveOffloadedTraces({
         projectId: PROJECT_ID,
@@ -511,7 +522,9 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const logger = { warn: vi.fn(), error: vi.fn() };
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
-      const ioExtractionService = new TraceIOExtractionService();
+      const ioExtractionService = new TraceIOExtractionService(
+        TraceCanonicalisationService.create(),
+      );
 
       const result = await resolveOffloadedTraces({
         projectId: PROJECT_ID,

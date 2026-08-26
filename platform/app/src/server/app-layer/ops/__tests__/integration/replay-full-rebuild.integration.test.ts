@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Integration test for the ops full-rebuild replay path.
  *
@@ -263,6 +264,7 @@ describe("given identical span history for tenants whose rollup is empty", () =>
     await seedEventLog(rebuiltTenantId, rebuiltTraceId);
 
     const projection = new TraceAnalyticsRollupMapProjection({
+      traceCanonicalisation: TraceCanonicalisationService.create(),
       store: new TraceAnalyticsRollupAppendStore(
         new TraceAnalyticsRollupClickHouseRepository(async () => client),
       ),

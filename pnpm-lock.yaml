@@ -3914,6 +3914,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../packages/clickhouse-client
+      '@langwatch/coding-agent-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/coding-agent/contract
       '@langwatch/coding-agent-web':
         specifier: workspace:*
         version: link:../../packages/features/coding-agent/web

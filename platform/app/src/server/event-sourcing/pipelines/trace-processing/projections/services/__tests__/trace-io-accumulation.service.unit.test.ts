@@ -15,6 +15,7 @@
  * computedOutput is the extracted text, not the raw wrapper.
  */
 import { describe, expect, it } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { LogRecordReceivedEventData } from "../../../schemas/events";
@@ -23,6 +24,14 @@ import {
   extractIOFromLogRecord,
   TraceIOAccumulationService,
 } from "../trace-io-accumulation.service";
+
+const traceCanonicalisation = TraceCanonicalisationService.create();
+
+function createAccumulator(
+  extractor: TraceIOExtractionService,
+): TraceIOAccumulationService {
+  return new TraceIOAccumulationService(extractor, traceCanonicalisation);
+}
 
 function emptyState(): TraceSummaryData {
   return {
@@ -123,7 +132,7 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
         source: "langwatch",
       },
     });
-    const accumulator = new TraceIOAccumulationService(extractor);
+    const accumulator = createAccumulator(extractor);
 
     const result = accumulator.accumulateIO({
       state: emptyState(),
@@ -151,7 +160,7 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
         source: "langwatch",
       },
     });
-    const accumulator = new TraceIOAccumulationService(extractor);
+    const accumulator = createAccumulator(extractor);
 
     const result = accumulator.accumulateIO({
       state: emptyState(),
@@ -171,7 +180,7 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
         source: "langwatch",
       },
     });
-    const accumulator = new TraceIOAccumulationService(extractor);
+    const accumulator = createAccumulator(extractor);
 
     const result = accumulator.accumulateIO({
       state: emptyState(),
@@ -193,7 +202,7 @@ describe("TraceIOAccumulationService: media refs", () => {
     it("records which side of the conversation each recording came from", () => {
       // A voice agent's span input is the whole transcript, so the caller's
       // recording and the agent's reply both ride the input attribute.
-      const accumulator = new TraceIOAccumulationService(
+      const accumulator = createAccumulator(
         stubExtractor({
           input: {
             raw: { input: "shipment 4417?" },
@@ -245,7 +254,7 @@ describe("TraceIOAccumulationService — claude utility spans", () => {
 
   describe("given a non-conversational claude_code query source", () => {
     it("does not let a prompt_suggestion reply become the trace headline output", () => {
-      const accumulator = new TraceIOAccumulationService(utilityOutput);
+      const accumulator = createAccumulator(utilityOutput);
 
       const result = accumulator.accumulateIO({
         state: emptyState(),
@@ -260,7 +269,7 @@ describe("TraceIOAccumulationService — claude utility spans", () => {
     });
 
     it("skips generate_session_title too", () => {
-      const accumulator = new TraceIOAccumulationService(utilityOutput);
+      const accumulator = createAccumulator(utilityOutput);
 
       const result = accumulator.accumulateIO({
         state: emptyState(),
@@ -277,7 +286,7 @@ describe("TraceIOAccumulationService — claude utility spans", () => {
 
   describe("given a conversational claude_code query source", () => {
     it("still lifts the reply for repl_main_thread", () => {
-      const accumulator = new TraceIOAccumulationService(utilityOutput);
+      const accumulator = createAccumulator(utilityOutput);
 
       const result = accumulator.accumulateIO({
         state: emptyState(),
@@ -316,6 +325,7 @@ describe("extractIOFromLogRecord — claude assistant_response fallback", () => 
           query_source: "repl_main_thread",
           response: "E aí! Tudo bem?",
         }),
+        traceCanonicalisation,
       );
 
       expect(result).toEqual({ input: null, output: "E aí! Tudo bem?" });
@@ -330,6 +340,7 @@ describe("extractIOFromLogRecord — claude assistant_response fallback", () => 
           query_source: "generate_session_title",
           response: "Telemetry chat",
         }),
+        traceCanonicalisation,
       );
 
       expect(result).toEqual({ input: null, output: null });
@@ -344,6 +355,7 @@ describe("extractIOFromLogRecord — claude assistant_response fallback", () => 
           query_source: "repl_main_thread",
           response: "",
         }),
+        traceCanonicalisation,
       );
 
       expect(result).toEqual({ input: null, output: null });
@@ -405,7 +417,7 @@ describe("TraceIOAccumulationService: media refs", () => {
     let state = emptyState();
     let last!: ReturnType<TraceIOAccumulationService["accumulateIO"]>;
     for (const { span, input } of spans) {
-      const accumulator = new TraceIOAccumulationService(stubExtractor({ input }));
+      const accumulator = createAccumulator(stubExtractor({ input }));
       last = accumulator.accumulateIO({ state, span });
       state = {
         ...state,

@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import { LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
 import {
@@ -32,6 +33,7 @@ const TRACE_ID = "aaaa0000000000000000000000000012";
 const BASE_MS = 1_760_000_000_000;
 
 const projection = new TraceSummaryFoldProjection({
+  traceCanonicalisation: TraceCanonicalisationService.create(),
   store: { store: async () => {}, get: async () => null },
 });
 

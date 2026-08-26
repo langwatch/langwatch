@@ -15,6 +15,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
@@ -27,6 +28,8 @@ import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "../resolve-offloaded-traces-batch";
 import type { GetAllTracesForProjectInput } from "../types";
 import { makeSpanRowWithEventRef, makeSummaryRow } from "./fixtures/ch-row-fixtures";
+
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 // ---------------------------------------------------------------------------
 // Hoisted mock — only the raw CH SQL boundary
@@ -122,7 +125,7 @@ function makeEventRefBlobStore(): {
 
 /** ClickHouseTraceService wired with BOTH resolvers from a fake blobStore. */
 function buildService(blobStore: BlobStore): ClickHouseTraceService {
-  const ioExtractionService = new TraceIOExtractionService();
+  const ioExtractionService = new TraceIOExtractionService(traceCanonicalisation);
   const logger = createLogger("test");
   return new ClickHouseTraceService({
     prisma: { project: { findUnique: vi.fn() } } as never,
@@ -142,6 +145,7 @@ function buildService(blobStore: BlobStore): ClickHouseTraceService {
         ioExtractionService,
         logger,
       }),
+    traceCanonicalisation,
   });
 }
 
@@ -289,6 +293,7 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
     return new ClickHouseTraceService({
       prisma: { project: { findUnique: vi.fn() } } as never,
       resolveTraceSpansBatch: resolve,
+      traceCanonicalisation,
     });
   }
 

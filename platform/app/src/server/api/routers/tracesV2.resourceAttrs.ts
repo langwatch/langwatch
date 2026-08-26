@@ -1,4 +1,4 @@
-import { NON_BILLABLE_ATTR } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-cost.service";
+import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 
 /**
  * Internal cost-classification markers the receiver stamps on a span's

@@ -17,6 +17,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import {
   createAnnotationTestOrganizations,
   createAnnotationTestProjects,
@@ -31,6 +32,7 @@ import {
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import type { Protections } from "../../traces/protections";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 import { enrichTracesWithEvaluations } from "../enrich-evaluations";
 import {
   compileProjection,
@@ -269,6 +271,7 @@ beforeAll(async () => {
       projects: createAnnotationTestProjects(),
       organizations: createAnnotationTestOrganizations(),
     }).build(),
+    traceCanonicalisation,
   });
 
   await insert({
@@ -292,8 +295,8 @@ beforeAll(async () => {
           "event.type": "thumbs_up_down",
           "event.metrics.vote": "1",
           "event.details.reason": "great answer",
-        },
-      }),
+      },
+    }),
     ],
   });
   await insert({ table: "evaluation_runs", values: [makeEvaluationRunRow()] });

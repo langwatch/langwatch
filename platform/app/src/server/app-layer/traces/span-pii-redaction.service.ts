@@ -40,7 +40,7 @@ import type {
   OtlpResource,
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.

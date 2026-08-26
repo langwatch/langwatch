@@ -6,7 +6,7 @@ import {
   spanTreeNodeSchema,
   traceHeaderSchema,
   traceResourceInfoSchema,
-} from "../tracesV2.schemas";
+} from "@langwatch/trace-contract";
 
 /**
  * The share payload's output schema is the structural half of the leak-

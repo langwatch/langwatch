@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Unit tests for `TraceAnalyticsRollupMapProjection.mapTraceSpanReceived`.
  *
@@ -21,6 +22,7 @@ type SpanOptions = TestSpanReceivedEventOptions;
 
 function mapRow(options: SpanOptions = {}): TraceAnalyticsRollupRow {
   const projection = new TraceAnalyticsRollupMapProjection({
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     store: { append: async () => {}, appendBatch: async () => {} } as never,
   });
   return projection.mapTraceSpanReceived(createSpanReceivedEvent(options));

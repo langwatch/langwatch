@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { NormalizedSpanKind } from "../../schemas/spans";
-import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  applySpanToSummary,
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Full-flow integration tests that exercise the entire applySpanToSummary

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { AmbiguousTraceIdPrefixError, TraceService } from "../trace.service";
@@ -22,6 +23,7 @@ const mockClickHouseInstance = {
   getTracesWithSpans: mockGetTracesWithSpansCH,
   resolveTraceIdByPrefix: mockResolveTraceIdByPrefixCH,
 };
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 vi.mock("../clickhouse-trace.service", () => ({
   ClickHouseTraceService: Object.assign(vi.fn(), {
@@ -62,7 +64,10 @@ describe("TraceService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new TraceService(mockPrisma);
+    service = TraceService.create({
+      prisma: mockPrisma,
+      traceCanonicalisation,
+    });
   });
 
   describe("getAllTracesForProject()", () => {

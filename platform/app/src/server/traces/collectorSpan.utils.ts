@@ -1,5 +1,5 @@
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type {
   OtlpKeyValue,
   OtlpResource,

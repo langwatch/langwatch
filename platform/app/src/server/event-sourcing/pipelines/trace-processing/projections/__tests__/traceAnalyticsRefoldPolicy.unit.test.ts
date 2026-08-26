@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
@@ -30,6 +31,7 @@ const CHECKPOINT_MS = 9_000;
 
 function stateWithSpanCount(spanCount: number): TraceAnalyticsData {
   const projection = new TraceAnalyticsFoldProjection({
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     store: { store: async () => {}, get: async () => null },
   });
   return {
@@ -62,7 +64,10 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
       get: vi.fn().mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
       store: vi.fn().mockResolvedValue(undefined),
     };
-    const projection = new TraceAnalyticsFoldProjection({ store });
+    const projection = new TraceAnalyticsFoldProjection({
+      store,
+      traceCanonicalisation: TraceCanonicalisationService.create(),
+    });
     const eventLoader = vi.fn().mockResolvedValue([]);
     projection.eventLoader = eventLoader;
 
@@ -89,7 +94,10 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
           }),
         };
 
-        const projection = new TraceAnalyticsFoldProjection({ store });
+        const projection = new TraceAnalyticsFoldProjection({
+          store,
+          traceCanonicalisation: TraceCanonicalisationService.create(),
+        });
         const eventLoader = vi.fn().mockResolvedValue([]);
         projection.eventLoader = eventLoader;
 

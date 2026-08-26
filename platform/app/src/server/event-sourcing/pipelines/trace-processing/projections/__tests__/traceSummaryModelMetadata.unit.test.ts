@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * @vitest-environment node
  *
@@ -16,8 +17,11 @@ import {
   applySpanToAnalytics,
   TraceAnalyticsFoldProjection,
 } from "../traceAnalytics.foldProjection";
-import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  applySpanToSummary,
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 function llmSpan(id: string, model: string) {
   return createTestSpan({
@@ -150,6 +154,7 @@ describe("when the trace has no model on any span", () => {
 describe("when folding spans into slim analytics", () => {
   it("stamps the same metadata as the trace-summary fold", () => {
     const projection = new TraceAnalyticsFoldProjection({
+      traceCanonicalisation: TraceCanonicalisationService.create(),
       store: { store: async () => {}, get: async () => null },
     });
     let state = projection.init();

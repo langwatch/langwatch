@@ -1,17 +1,19 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { createTenantId } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
 } from "../../schemas/constants";
 import type { TraceNameChangedEvent } from "../../schemas/events";
+import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
 import {
   applySpanToSummary,
-  TraceSummaryFoldProjection,
-} from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 function makeTraceNameChangedEvent({
   newName,
@@ -39,7 +41,10 @@ function makeProjection() {
     store: async () => {},
     get: async () => null,
   };
-  return new TraceSummaryFoldProjection({ store });
+  return new TraceSummaryFoldProjection({
+    store,
+    traceCanonicalisation: TraceCanonicalisationService.create(),
+  });
 }
 
 describe("applySpanToSummary() trace name extraction", () => {

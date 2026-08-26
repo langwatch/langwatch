@@ -6,6 +6,7 @@
  */
 
 import { createTenantId } from "@langwatch/eventing";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
@@ -33,10 +34,12 @@ import {
 const SESSION_ID = "8f2c9a1e-4711-4e0f-9d2e-session";
 const TRACE_A = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 const TRACE_B = "b1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d7";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function makeProjection() {
   return new CodingAgentSessionFoldProjection({
     store: { store: async () => {}, get: async () => null },
+    traceCanonicalisation,
   });
 }
 

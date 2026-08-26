@@ -1,4 +1,6 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../schemas/constants";
 import type { SpanReceivedEvent } from "../../../schemas/events";
 import type { OtlpSpan } from "../../../schemas/otlp";
@@ -7,11 +9,31 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "../../../schemas/spans";
-import { TraceSummaryFoldProjection } from "../../traceSummary.foldProjection";
+import { TraceIOAccumulationService } from "../../services/trace-io-accumulation.service";
+import {
+  applySpanToSummary as applySpanToSummaryWithServices,
+  TraceSummaryFoldProjection,
+} from "../../traceSummary.foldProjection";
 
+const traceCanonicalisation = TraceCanonicalisationService.create();
+const traceIOAccumulationService = new TraceIOAccumulationService(
+  new TraceIOExtractionService(traceCanonicalisation),
+  traceCanonicalisation,
+);
 const traceSummaryProjection = new TraceSummaryFoldProjection({
   store: { store: async () => {}, get: async () => null },
+  traceCanonicalisation,
 });
+
+export function applySpanToSummary(input: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+}): TraceSummaryData {
+  return applySpanToSummaryWithServices({
+    ...input,
+    traceIOAccumulationService,
+  });
+}
 
 export function createInitState(): TraceSummaryData {
   return traceSummaryProjection.init();

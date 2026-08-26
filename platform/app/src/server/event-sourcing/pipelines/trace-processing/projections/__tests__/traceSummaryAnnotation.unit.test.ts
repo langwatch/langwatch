@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -22,7 +23,10 @@ function createFoldProjection() {
     store: async () => {},
     get: async () => null,
   };
-  return new TraceSummaryFoldProjection({ store });
+  return new TraceSummaryFoldProjection({
+    store,
+    traceCanonicalisation: TraceCanonicalisationService.create(),
+  });
 }
 
 function makeInitState(): TraceSummaryData {

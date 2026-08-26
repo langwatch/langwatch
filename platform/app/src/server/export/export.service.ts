@@ -9,12 +9,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
@@ -35,7 +33,7 @@ const logger = createLogger("langwatch:export");
  *
  * @example
  * ```ts
- * const service = ExportService.create(prisma);
+ * const service = ExportService.create({ traceService });
  * for await (const { chunk, progress } of service.exportTraces(request)) {
  *   response.write(chunk);
  *   updateProgress(progress);
@@ -45,26 +43,12 @@ const logger = createLogger("langwatch:export");
 export class ExportService {
   private readonly traceService: TraceService;
 
-  constructor({ traceService }: { traceService: TraceService }) {
+  private constructor({ traceService }: { traceService: TraceService }) {
     this.traceService = traceService;
   }
 
-  /**
-   * Factory method for creating ExportService with default dependencies.
-   *
-   * Lazily imports TraceService and Prisma to avoid module-level side effects
-   * that would break unit tests which only inject mocks.
-   */
-  static async create(prisma?: PrismaClient): Promise<ExportService> {
-    const { TraceService: TraceServiceImpl } =
-      await import("~/server/traces/trace.service");
-    const resolvedPrisma = prisma ?? (await import("~/server/db")).prisma;
-    // Export is a content-consuming read: wire blob-resolution deps so a full
-    // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
-    const traceService = TraceServiceImpl.create(
-      resolvedPrisma,
-      buildTraceBlobResolutionDeps(),
-    );
+  /** Creates the process-owned export facade over the composed trace reader. */
+  static create({ traceService }: { traceService: TraceService }): ExportService {
     return new ExportService({ traceService });
   }
 
@@ -349,6 +333,8 @@ function serializeJsonBatch({
  */
 export function stripCsvHeader(csv: string): string {
   const firstBreak = csv.indexOf(CSV_NEWLINE);
-  if (firstBreak === -1) return "";
+  if (firstBreak === -1) {
+    return "";
+  }
   return csv.slice(firstBreak + CSV_NEWLINE.length);
 }

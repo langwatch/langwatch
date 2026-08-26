@@ -1,5 +1,6 @@
 import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
@@ -31,6 +32,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 const annotationScoreCount = vi.fn();
+const traceCanonicalisation = TraceCanonicalisationService.create();
 const annotationQueueCount = vi.fn();
 const annotationQueueFindFirst = vi.fn();
 const annotationQueueCreate = vi.fn();
@@ -218,6 +220,7 @@ describe("annotation queue references", () => {
         userId: "creator_1",
         prisma,
         annotations: annotationService(),
+        traceCanonicalisation,
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
@@ -240,6 +243,7 @@ describe("annotation queue references", () => {
         userId: "creator_1",
         prisma,
         annotations: annotationService(),
+        traceCanonicalisation,
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
@@ -258,6 +262,7 @@ describe("annotation queue references", () => {
       userId: "creator_1",
       prisma,
       annotations: annotationService(),
+      traceCanonicalisation,
       // Which ids resolve to a trace is ClickHouse's answer; this file is about
       // which annotators the references are allowed to name.
       findExistingTraceIds: async ({ traceIds }) => traceIds,
@@ -288,6 +293,7 @@ describe("annotation queue references", () => {
       userId: "next-creator",
       prisma,
       annotations: annotationService(),
+      traceCanonicalisation,
       findExistingTraceIds: async ({ traceIds }) => traceIds,
     });
 

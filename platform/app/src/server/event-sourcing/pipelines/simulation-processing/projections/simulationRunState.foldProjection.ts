@@ -5,8 +5,8 @@ import {
   ValidationError,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
+import { simulationMessageSchema } from "../schemas/shared";
 import type {
   SimulationMessageSnapshotEvent,
   SimulationRunCancelRequestedEvent,
@@ -351,11 +351,13 @@ export class SimulationRunStateFoldProjection
       StartedAt: state.StartedAt ?? event.occurredAt,
       LastSnapshotOccurredAt: event.occurredAt,
       Messages: event.data.messages.map((m, i) => {
-        if (!isRecord(m)) {
+        const parsedMessage = simulationMessageSchema.safeParse(m);
+        if (!parsedMessage.success) {
           throw new ValidationError(
             `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
           );
         }
+        const message = parsedMessage.data;
 
         // Content can be either:
         //   - a string (legacy SDK output, possibly a Python-repr-stringified array)
@@ -366,14 +368,14 @@ export class SimulationRunStateFoldProjection
         // Array content gets JSON.stringify'd; the renderer's
         // safeJsonParseOrStringFallback in flattenContent parses it back.
         let content = "";
-        if (typeof m.content === "string") {
-          content = m.content;
-        } else if (Array.isArray(m.content)) {
-          content = JSON.stringify(m.content);
+        if (typeof message.content === "string") {
+          content = message.content;
+        } else if (Array.isArray(message.content)) {
+          content = JSON.stringify(message.content);
         }
 
-        const messageId = typeof m.id === "string" ? m.id : "";
-        const messageRole = typeof m.role === "string" ? m.role : "";
+        const messageId = typeof message.id === "string" ? message.id : "";
+        const messageRole = typeof message.role === "string" ? message.role : "";
         // Snapshots can arrive BEFORE the run-started event (see
         // `StartedAt: state.StartedAt ?? event.occurredAt` two lines up); on
         // that path state.ScenarioRunId is still empty while the event already
@@ -391,9 +393,9 @@ export class SimulationRunStateFoldProjection
             field: "Content",
             ctx,
           }),
-          TraceId: typeof m.trace_id === "string" ? m.trace_id : "",
+          TraceId: typeof message.trace_id === "string" ? message.trace_id : "",
           Rest: capOversizedString({
-            value: buildMessageRestJson(m),
+            value: buildMessageRestJson(message),
             maxBytes: MAX_MESSAGE_REST_BYTES,
             field: "Rest",
             ctx,

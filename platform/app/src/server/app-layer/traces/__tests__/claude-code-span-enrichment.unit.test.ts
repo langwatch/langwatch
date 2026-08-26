@@ -1,13 +1,50 @@
 import { describe, expect, it } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 import {
   type ClaudeContentLog,
   type ClaudeSpanRef,
   type ClaudeToolLog,
-  computeClaudeInteractionOutput,
-  computeClaudeSpanEnrichment,
-  computeClaudeToolSpanEnrichment,
+  type ClaudeToolSpanRef,
+  computeClaudeInteractionOutput as computeClaudeInteractionOutputWithService,
+  computeClaudeSpanEnrichment as computeClaudeSpanEnrichmentWithService,
+  computeClaudeToolSpanEnrichment as computeClaudeToolSpanEnrichmentWithService,
 } from "../claude-code-span-enrichment";
+
+const traceCanonicalisation = TraceCanonicalisationService.create();
+
+function computeClaudeSpanEnrichment(input: {
+  spans: ClaudeSpanRef[];
+  logs: ClaudeContentLog[];
+}) {
+  return computeClaudeSpanEnrichmentWithService({
+    ...input,
+    traceCanonicalisation,
+  });
+}
+
+function computeClaudeToolSpanEnrichment(input: {
+  spans: ClaudeToolSpanRef[];
+  toolLogs: ClaudeToolLog[];
+  contentLogs: ClaudeContentLog[];
+}) {
+  return computeClaudeToolSpanEnrichmentWithService({
+    ...input,
+    traceCanonicalisation,
+  });
+}
+
+function computeClaudeInteractionOutput(input: {
+  logs: ClaudeContentLog[];
+  windowStartMs: number;
+  windowEndMs: number;
+  slackMs?: number;
+}) {
+  return computeClaudeInteractionOutputWithService({
+    ...input,
+    traceCanonicalisation,
+  });
+}
 
 /**
  * Real (sanitized) claude_code request id shape — `req_011Ccu...`.

@@ -10,8 +10,10 @@
  * seeding real ClickHouse rows and driving the EXACT construction the endpoints use.
  *
  * Two construction paths under test:
- *   - no-deps:    TraceService.create(prisma)                   => preview only (bug)
- *   - with-deps:  TraceService.create(prisma, buildTraceBlobResolutionDeps())
+ *   - no-deps:    TraceService.create({ prisma, traceCanonicalisation })
+ *                 => preview only (bug)
+ *   - with-deps:  TraceService.create({ prisma, traceCanonicalisation,
+ *                 blobResolutionDeps })
  *                 + getById(..., { full: true })                 => full value (fix)
  *
  * Deterministic payload: 200 KB whose UNIQUE_TAIL only exists past the 64 KB
@@ -22,6 +24,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Event } from "@langwatch/eventing";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { resetApp } from "~/server/app-layer/app";
@@ -81,6 +84,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => ({
 /** The IO fields the matrix covers; each is leaned + offloaded independently. */
 const IO_FIELDS = ["langwatch.input", "langwatch.output"] as const;
 type IoField = (typeof IO_FIELDS)[number];
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 /**
  * Builds a SpanReceived domain Event whose IO field (`langwatch.input` or
@@ -337,8 +341,8 @@ describe.skipIf(!hasTestcontainers)(
         client,
       );
 
-      // buildTraceBlobResolutionDeps()'s no-arg call — the exact shape the
-      // production routers use — now takes its default resolver from
+      // buildTraceBlobResolutionDeps()'s resolver now takes the canonicalisation
+      // service from the composition root and its default client resolver from
       // getApp().clickhouse, so this test needs a real App singleton whose
       // resolver dials the same (mocked) testcontainer client above.
       await resetApp();
@@ -461,7 +465,10 @@ describe.skipIf(!hasTestcontainers)(
             });
 
             // Real TraceService, NO blob-resolution deps (top-level imports, not mocked).
-            const service = TraceService.create(prisma);
+            const service = TraceService.create({
+              prisma,
+              traceCanonicalisation,
+            });
 
             // Even full:true cannot resolve without deps: the resolve gate needs
             // `this.resolveTraceSpans`, which is undefined for a no-deps service.
@@ -499,7 +506,11 @@ describe.skipIf(!hasTestcontainers)(
           it(`returns the FULL ${ioField} value byte-identically from event_log (AC1)`, async () => {
             const { tenantId, traceId } = await seedOffloadedTrace({ ioField });
 
-            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
+            const service = TraceService.create({
+              prisma,
+              blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
+              traceCanonicalisation,
+            });
 
             const trace = await service.getById(tenantId, traceId, openProtections, {
               full: true,
@@ -524,7 +535,11 @@ describe.skipIf(!hasTestcontainers)(
           it(`strips the reserved eventref namespace from the returned ${ioField} span attributes (AC3)`, async () => {
             const { tenantId, traceId } = await seedOffloadedTrace({ ioField });
 
-            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
+            const service = TraceService.create({
+              prisma,
+              blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
+              traceCanonicalisation,
+            });
 
             const trace = await service.getById(tenantId, traceId, openProtections, {
               full: true,
@@ -549,7 +564,11 @@ describe.skipIf(!hasTestcontainers)(
               ioField,
             });
 
-            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
+            const service = TraceService.create({
+              prisma,
+              blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
+              traceCanonicalisation,
+            });
 
             const trace = await service.getById(tenantId, traceId, openProtections, {
               full: true,
@@ -579,7 +598,11 @@ describe.skipIf(!hasTestcontainers)(
               shouldSeedEventLog: false,
             });
 
-            const service = TraceService.create(prisma, buildTraceBlobResolutionDeps());
+            const service = TraceService.create({
+              prisma,
+              blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
+              traceCanonicalisation,
+            });
 
             // AC5: the missing row must NOT break the read.
             const trace = await service.getById(tenantId, traceId, openProtections, {

@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Fold-cache leanness for a trace carrying a 1 MB IO value
  * (specs/trace-processing/large-trace-blob-offload.feature — Track 1, ADR-022).
@@ -183,7 +184,10 @@ describe("given a trace whose span carries a 1 MB output value", () => {
       const store = new RedisCachedFoldStore<TraceSummaryData>(durable, redis, {
         keyPrefix: KEY_PREFIX,
       });
-      const projection = new TraceSummaryFoldProjection({ store: durable });
+      const projection = new TraceSummaryFoldProjection({
+        store: durable,
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      });
 
       let state = projection.init();
       for (const event of [rootEvent, childEvent]) {

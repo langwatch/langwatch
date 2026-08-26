@@ -9,6 +9,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import {
   startTestContainers,
   stopTestContainers,
@@ -21,6 +22,7 @@ const now = Date.now();
 
 const liveTraceId = `live-${nanoid()}`;
 const otherTenantTraceId = `other-tenant-${nanoid()}`;
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function makeTraceSummaryRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -102,6 +104,7 @@ beforeAll(async () => {
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({
     prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
+    traceCanonicalisation,
   });
 
   await ch.insert({

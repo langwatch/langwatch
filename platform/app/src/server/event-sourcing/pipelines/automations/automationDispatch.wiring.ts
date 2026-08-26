@@ -19,6 +19,7 @@ import type {
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
@@ -69,7 +70,10 @@ export function buildAutomationDispatchPorts({
   emailCaps: AutomationEmailCapService;
   projects: ProjectService;
   evaluations: EvaluationService;
-  traces: { spans: SpanStorageService };
+  traces: {
+    canonicalisation: TraceCanonicalisationService;
+    spans: SpanStorageService;
+  };
   traceSummaryRepository: TraceSummaryRepository;
   analytics: AnalyticsService;
   /** The composition root's ClickHouse resolver — the heartbeat's recency
@@ -104,14 +108,11 @@ export function buildAutomationDispatchPorts({
   // path. Concurrent lookups within one dispatch share a single in-flight
   // protections query per project; the entry drops once settled so
   // protections aren't cached stale across dispatches.
-  const traceService = TraceService.create(
+  const traceService = TraceService.create({
     prisma,
-    void 0,
-    void 0,
-    void 0,
-    void 0,
-    annotations,
-  );
+    annotationService: annotations,
+    traceCanonicalisation: traces.canonicalisation,
+  });
   const protectionsInFlight = new Map<
     string,
     ReturnType<typeof getProtectionsForProject>
@@ -172,7 +173,12 @@ export function buildAutomationDispatchPorts({
       return traceService.getById(projectId, traceId, protections);
     },
     addToAnnotationQueue: async (params) => {
-      await createOrUpdateQueueItems({ ...params, prisma, annotations });
+      await createOrUpdateQueueItems({
+        ...params,
+        prisma,
+        annotations,
+        traceCanonicalisation: traces.canonicalisation,
+      });
     },
     addToDataset: async (params) => {
       if (!dataset) {

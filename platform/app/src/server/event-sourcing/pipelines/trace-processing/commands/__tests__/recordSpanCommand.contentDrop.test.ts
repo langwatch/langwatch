@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Integration tests for the scoped data-privacy content DROP wired into
  * RecordSpanCommand. The drop runs at this single command choke point, so the
@@ -184,6 +185,7 @@ describe("RecordSpanCommand content drop", () => {
       /** @scenario The trace-level computed input is cleared when input is dropped */
       it("yields no computed input from the fold but keeps the computed output", async () => {
         const fold = new TraceSummaryFoldProjection({
+          traceCanonicalisation: TraceCanonicalisationService.create(),
           store: { store: async () => undefined, get: async () => null },
         });
 

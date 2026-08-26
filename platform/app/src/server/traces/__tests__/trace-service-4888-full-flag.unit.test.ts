@@ -33,6 +33,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
@@ -115,6 +116,7 @@ const protections: Protections = {
 const PROJECT_ID_A = "tenant-aaa";
 const PROJECT_ID_B = "tenant-bbb";
 const TRACE_ID = "trace-001";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 const FULL_OUTPUT = "x".repeat(LARGE_BYTE_COUNT);
 const PREVIEW_OUTPUT = "x".repeat(IO_PREVIEW_BYTES) + "…";
@@ -180,9 +182,13 @@ function makeTenantScopedBlobStore(): BlobStore & {
 }
 
 function makeService(blobStore: BlobStore): TraceService {
-  return new TraceService({} as never, {
-    blobStore,
-    ioExtractionService: new TraceIOExtractionService(),
+  return TraceService.create({
+    prisma: {} as never,
+    blobResolutionDeps: {
+      blobStore,
+      ioExtractionService: new TraceIOExtractionService(traceCanonicalisation),
+    },
+    traceCanonicalisation,
   });
 }
 
@@ -404,7 +410,10 @@ describe("TraceService — AC2: a service constructed without blobResolutionDeps
     describe("when getTracesWithSpans is called with full=true", () => {
       it("does not throw and returns the preview (no resolver wired)", async () => {
         setupGetTracesWithSpansMocks();
-        const listService = new TraceService({} as never);
+        const listService = TraceService.create({
+          prisma: {} as never,
+          traceCanonicalisation,
+        });
 
         const traces = await listService.getTracesWithSpans(
           PROJECT_ID_A,
@@ -539,12 +548,13 @@ describe("ClickHouseTraceService — #4888 full resolution crosses the mapper", 
           projectId,
           normalizedSpans,
           blobStore,
-          ioExtractionService: new TraceIOExtractionService(),
+          ioExtractionService: new TraceIOExtractionService(traceCanonicalisation),
           logger: createLogger("test"),
         });
     return new ClickHouseTraceService({
       prisma: { project: { findUnique: vi.fn() } } as never,
       resolveTraceSpans: resolveTraceSpansFn,
+      traceCanonicalisation,
     });
   }
 

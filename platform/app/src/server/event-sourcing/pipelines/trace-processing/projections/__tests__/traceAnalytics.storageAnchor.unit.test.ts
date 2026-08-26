@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
@@ -43,6 +44,7 @@ const TRACE_ID = "aaaa0000000000000000000000000009";
 const BASE_MS = 1_760_000_000_000;
 
 const projection = new TraceAnalyticsFoldProjection({
+  traceCanonicalisation: TraceCanonicalisationService.create(),
   store: { store: async () => {}, get: async () => null },
 });
 

@@ -7,6 +7,7 @@ import {
   type TriggerContext,
   throttledWindow,
 } from "@langwatch/eventing";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
 import { ContributeSpanFactsCommand } from "./commands/contributeSpanFactsCommand";
@@ -39,6 +40,7 @@ import {
 } from "./subscribers/pullRequestMapping.subscriber";
 
 export interface CodingAgentProcessingPipelineDeps {
+  traceCanonicalisation: TraceCanonicalisationService;
   /** Redis-cached at registration — see the fold store's no-read-back note. */
   codingAgentSessionStore: FoldProjectionStore<CodingAgentSessionState>;
   codingAgentTraceSessionAppendStore: AppendStore<CodingAgentTraceSessionRecord>;
@@ -101,6 +103,7 @@ export function createCodingAgentProcessingPipeline(
     .withClickHouseFoldProjection(
       new CodingAgentSessionFoldProjection({
         store: deps.codingAgentSessionStore,
+        traceCanonicalisation: deps.traceCanonicalisation,
       }),
     )
     .withClickHouseMapProjection(

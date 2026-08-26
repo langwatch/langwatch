@@ -6,8 +6,6 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import { TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
 import {
   buildPreconditionTraceDataFromTrace,
@@ -38,14 +36,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(
-        ctx.prisma,
-        void 0,
-        void 0,
-        ctx.app.evaluations,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       return traceService.getAllTracesForProject(input, protections, {
         scrollId: input.scrollId,
       });
@@ -65,14 +56,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       const trace = await traceService.getById(
         input.projectId,
         input.traceId,
@@ -95,12 +79,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(
-        ctx.prisma,
-        undefined,
-        undefined,
-        ctx.app.evaluations,
-      );
+      const traceService = ctx.app.traces.read;
       const evaluations = await traceService.getEvaluationsMultiple(
         input.projectId,
         [input.traceId],
@@ -125,12 +104,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(
-        ctx.prisma,
-        undefined,
-        undefined,
-        ctx.app.evaluations,
-      );
+      const traceService = ctx.app.traces.read;
       return traceService.getEvaluationInputs(input.projectId, input.evaluationId);
     }),
 
@@ -147,12 +121,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(
-        ctx.prisma,
-        undefined,
-        undefined,
-        ctx.app.evaluations,
-      );
+      const traceService = ctx.app.traces.read;
       return traceService.getEvaluationsMultiple(
         input.projectId,
         input.traceIds,
@@ -164,14 +133,7 @@ export const tracesRouter = createTRPCRouter({
     .input(tracesFilterInput)
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(
-        ctx.prisma,
-        void 0,
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       const result = await traceService.getTopicCounts(input);
 
       const topicsMap = Object.fromEntries(
@@ -220,7 +182,7 @@ export const tracesRouter = createTRPCRouter({
     .input(tracesFilterInput)
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = ctx.app.traces.read;
       return traceService.getCustomersAndLabels(input);
     }),
 
@@ -242,14 +204,7 @@ export const tracesRouter = createTRPCRouter({
       // Thread-detail read consumes conversation content — resolve full IO
       // (#4991), not the 64 KB preview. Anonymous shared reads go through the
       // dedicated `sharedTrace.get` surface, never this endpoint. See ADR-057.
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
 
       return traceService.getTracesByThreadId(projectId, threadId, protections, {
         full: true,
@@ -271,14 +226,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       return traceService.getTracesWithSpans(
         projectId,
         traceIds,
@@ -311,7 +259,7 @@ export const tracesRouter = createTRPCRouter({
       // It stays on previews all the same: this runs over a whole page of
       // traces at once, and resolving every offloaded value on all of them is
       // what #4991 kept off the grid. Applying a correction needs none of it.
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = ctx.app.traces.read;
       const traces = await traceService.getTracesWithSpans(
         projectId,
         traceIds,
@@ -343,14 +291,7 @@ export const tracesRouter = createTRPCRouter({
       });
 
       // Thread reads consume conversation content — resolve full IO (#4991).
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       return traceService.getTracesWithSpansByThreadIds(
         projectId,
         threadIds,
@@ -376,14 +317,7 @@ export const tracesRouter = createTRPCRouter({
       // Dataset builder persists trace content — resolve full IO (#4991) so
       // truncated rows never corrupt the dataset. The ID-only list read above
       // stays on the preview (it reads no content).
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       const { groups } = await traceService.getAllTracesForProject(
         {
           ...input,
@@ -418,7 +352,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ ctx, input }) => {
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = ctx.app.traces.read;
       return traceService.getDistinctFieldNames(
         input.projectId,
         input.startDate,
@@ -444,14 +378,7 @@ export const tracesRouter = createTRPCRouter({
 
       // Sample builder feeds dataset/evaluator content — resolve full IO
       // (#4991). The ID-only list read stays on the preview.
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       const { groups } = await traceService.getAllTracesForProject(
         {
           ...input,
@@ -532,14 +459,7 @@ export const tracesRouter = createTRPCRouter({
       // way. Gating resolveBlobs on includeSpans (as this did) silently
       // truncated any offloaded trace in a spans-less download, the same
       // data-loss bug fixed in ExportService for summary-mode exports.
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-        void 0,
-        void 0,
-        void 0,
-        ctx.app.annotations,
-      );
+      const traceService = ctx.app.traces.read;
       return traceService.getAllTracesForProject(
         {
           ...input,

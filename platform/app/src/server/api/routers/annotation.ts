@@ -12,6 +12,7 @@ import {
   withReadableAnnotationAnchor,
 } from "@langwatch/annotation-contract";
 import { createLogger } from "@langwatch/observability";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { TRPCError } from "@trpc/server";
 import type { UserFullProfile, UserService } from "@langwatch/user-contract";
 import { nanoid } from "nanoid";
@@ -22,8 +23,6 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import type { Session } from "~/server/auth";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { TraceEditOverlayService } from "~/server/traces/edit-overlay/traceEditOverlay.service";
-import { TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
 import type { Protections } from "../../traces/protections";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -106,7 +105,7 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
 
   // Annotators label trace content — resolve full IO (#4991) so they see the
   // whole value, not the 64 KB preview.
-  const traceService = TraceService.create(ctx.prisma, buildTraceBlobResolutionDeps());
+  const traceService = ctx.app.traces.read;
   const traces = await traceService.getTracesWithSpans(
     projectId,
     traceIds,
@@ -721,10 +720,7 @@ export const annotationRouter = createTRPCRouter({
       });
       const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
       // Annotation queue shows trace content for labeling — resolve full IO (#4991).
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-      );
+      const traceService = ctx.app.traces.read;
       const traces = await traceService.getTracesWithSpans(
         input.projectId,
         traceIds,
@@ -855,6 +851,7 @@ export const annotationRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         prisma: ctx.prisma,
         annotations: ctx.app.annotations,
+        traceCanonicalisation: ctx.app.traces.canonicalisation,
       });
     }),
   /**
@@ -1241,11 +1238,14 @@ export async function createOrUpdateQueueItems({
   userId,
   prisma,
   annotations,
+  traceCanonicalisation,
   findExistingTraceIds = ({ projectId: forProject, traceIds: candidates }) =>
-    ClickHouseTraceService.create({ prisma }).findExistingTraceIds({
-      projectId: forProject,
-      traceIds: candidates,
-    }),
+    ClickHouseTraceService.create({ prisma, traceCanonicalisation }).findExistingTraceIds(
+      {
+        projectId: forProject,
+        traceIds: candidates,
+      },
+    ),
 }: {
   traceIds: string[];
   projectId: string;
@@ -1253,6 +1253,7 @@ export async function createOrUpdateQueueItems({
   userId: string;
   prisma: PrismaClient;
   annotations: AnnotationService;
+  traceCanonicalisation: TraceCanonicalisationService;
   findExistingTraceIds?: FindExistingTraceIds;
 }): Promise<{ created: number; skipped: number }> {
   const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {

@@ -29,6 +29,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -146,7 +147,7 @@ function unconfiguredBlobStore(): BlobStore {
   } as unknown as BlobStore;
 }
 
-const realIOService = new TraceIOExtractionService();
+const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
 
 /** IO_PREVIEW_BYTES = 64 * 1024 = 65536. */
 const IO_PREVIEW_BYTES = 65536;

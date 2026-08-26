@@ -1,16 +1,18 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 const mockRecordSpan = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
-  getApp: () => ({
+  getApp: vi.fn(() => ({
     traces: {
       recordSpan: mockRecordSpan,
     },
-  }),
+  })),
 }));
 
 vi.mock("~/server/api/utils", () => ({
@@ -87,15 +89,7 @@ registerTracesRoutes(securedTest);
 const v1App = securedTest.hono;
 
 const testApp = new Hono();
-testApp.use("*", async (c, next) => {
-  c.set("project" as never, {
-    id: "project-123",
-    slug: "test-project",
-    piiRedactionLevel: "DISABLED",
-  });
-  c.set("apiKeyUserId" as never, "user-456");
-  await next();
-});
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", v1App);
 testApp.onError((err, c) => {
   const status = "status" in err ? (err.status as number) : 500;

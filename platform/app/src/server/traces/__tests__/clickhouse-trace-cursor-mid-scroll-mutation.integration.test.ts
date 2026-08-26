@@ -25,6 +25,7 @@
  * scenario's ordering — which is exactly the class of bug under test.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -35,6 +36,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 import type { GetAllTracesForProjectInput, TracesForProjectResult } from "../types";
 import { openProtections } from "./open-protections";
 
@@ -225,6 +227,7 @@ beforeAll(async () => {
     prisma: prisma as unknown as ConstructorParameters<
       typeof ClickHouseTraceService
     >[0]["prisma"],
+    traceCanonicalisation,
   });
 
   await insert([

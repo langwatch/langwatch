@@ -7,12 +7,18 @@
  * the data becomes queryable as ordinary log attributes.
  */
 import { describe, expect, it } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { DERIVED_ATTRS, deriveLogContentAttributes } from "../log-content-derivation";
 
 const CLAUDE_SCOPE = "com.anthropic.claude_code.events";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function derive(attributes: Record<string, string>, scopeName = CLAUDE_SCOPE) {
-  return deriveLogContentAttributes({ scopeName, attributes });
+  return deriveLogContentAttributes({
+    scopeName,
+    attributes,
+    traceCanonicalisation,
+  });
 }
 
 const RESPONSE_BODY = JSON.stringify({

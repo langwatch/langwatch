@@ -1,6 +1,6 @@
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
 
-import type { SpanTreeNode } from "./tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 /**
  * The legacy whole-tree and shared-trace transports still read their own

@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation/canonicalizeSpanAttributesService";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  applySpanToSummary,
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 // Copilot CLI emits a root `invoke_agent` span whose gen_ai.usage.* is the
 // EXACT rollup of its `chat` children (verified on the 1.0.79 wire: one turn
@@ -27,18 +30,18 @@ describe("applySpanToSummary copilot rollup-usage handling", () => {
     name: string,
     attrs: Record<string, unknown>,
   ): Record<string, unknown> =>
-    new CanonicalizeSpanAttributesService().canonicalize(
-      attrs as Parameters<CanonicalizeSpanAttributesService["canonicalize"]>[0],
-      [],
-      {
+    TraceCanonicalisationService.create().canonicalizeSpanAttributes({
+      spanAttributes: attrs,
+      events: [],
+      span: {
         name,
         kind: 0,
         instrumentationScope: { name: "github.copilot" },
         statusMessage: null,
         statusCode: null,
         parentSpanId: null,
-      } as unknown as Parameters<CanonicalizeSpanAttributesService["canonicalize"]>[2],
-    ).attributes;
+      },
+    }).attributes;
 
   describe("given a copilot turn whose invoke_agent root repeats its chat child's usage", () => {
     describe("when both canonicalized spans are folded into the trace summary", () => {

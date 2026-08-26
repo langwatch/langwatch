@@ -8,11 +8,7 @@
  * The patch is applied as given. What a viewer may read is decided before it
  * reaches here, by `redactPatchForViewer`.
  */
-import type {
-  SpanDetail,
-  SpanTreeNode,
-  TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { stringifySpanIO } from "~/server/tracer/spanIOStringify";
 import {
   countRemovedSpans,

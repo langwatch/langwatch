@@ -1,7 +1,26 @@
 import { describe, expect, it } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Span } from "~/server/tracer/types";
-import { extractEventsFromSpans, mapTraceSummaryToTrace } from "../trace-summary.mapper";
+import {
+  extractEventsFromSpans,
+  mapTraceSummaryToTrace as mapTraceSummaryToTraceWithServices,
+} from "../trace-summary.mapper";
+
+const traceCanonicalisation = TraceCanonicalisationService.create();
+
+function mapTraceSummaryToTrace(
+  summary: TraceSummaryData,
+  spans: Span[],
+  projectId: string,
+) {
+  return mapTraceSummaryToTraceWithServices(
+    summary,
+    spans,
+    projectId,
+    traceCanonicalisation,
+  );
+}
 
 function makeSpan(overrides: Partial<Span> = {}): Span {
   return {

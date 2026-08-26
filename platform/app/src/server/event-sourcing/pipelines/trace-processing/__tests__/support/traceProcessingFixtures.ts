@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceProcessingPipelineDeps } from "../../pipeline";
 import type {
   RecordLogContributionCommandData,
@@ -17,6 +18,7 @@ export function buildTraceDeps(
 ): TraceProcessingPipelineDeps {
   const store = {} as any;
   return {
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     spanAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,

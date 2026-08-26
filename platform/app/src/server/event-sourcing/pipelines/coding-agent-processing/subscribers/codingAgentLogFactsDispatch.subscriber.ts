@@ -1,6 +1,6 @@
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { extractSessionTitleFromResponseBody } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../log-processing/schemas/events";
 import { LOGS_REQUIRE_SESSION_KEY_AGENT_IDS } from "../agents";
@@ -40,6 +40,7 @@ const logger = createLogger("langwatch:coding-agent:log-facts-dispatch");
  */
 export function createCodingAgentLogFactsDispatchSubscriber(deps: {
   contributeLogFacts: (data: ContributeLogFactsCommandData) => Promise<void>;
+  traceCanonicalisation: TraceCanonicalisationService;
 }): EventSubscriberDefinition<LogProcessingEvent> {
   return {
     name: "codingAgentLogFactsDispatch",
@@ -85,7 +86,11 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
         facts["service.version"] = serviceVersion;
       }
 
-      stampSessionTitle({ facts, attributes });
+      stampSessionTitle({
+        facts,
+        attributes,
+        traceCanonicalisation: deps.traceCanonicalisation,
+      });
       stampPromptTitleFallback({ facts, attributes });
 
       const agent = resolveContributionAgent({
@@ -145,9 +150,11 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
 function stampSessionTitle({
   facts,
   attributes,
+  traceCanonicalisation,
 }: {
   facts: Record<string, string | number | boolean>;
   attributes: Record<string, unknown>;
+  traceCanonicalisation: TraceCanonicalisationService;
 }): void {
   if (
     facts["event.name"] !== RESPONSE_BODY_EVENT_NAME ||
@@ -156,7 +163,9 @@ function stampSessionTitle({
   ) {
     return;
   }
-  const title = extractSessionTitleFromResponseBody(attributes.body);
+  const title = traceCanonicalisation.deriveClaudeResponseContent({
+    body: attributes.body,
+  }).sessionTitle;
   if (title !== null) facts[SESSION_TITLE_FACT_KEY] = title;
 }
 

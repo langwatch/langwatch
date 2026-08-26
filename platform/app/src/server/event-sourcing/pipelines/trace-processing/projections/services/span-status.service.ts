@@ -1,4 +1,4 @@
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../../schemas/spans";

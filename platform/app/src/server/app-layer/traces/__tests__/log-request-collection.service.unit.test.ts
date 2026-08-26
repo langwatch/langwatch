@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type {
   CanonicalLogRecord,
   LogTraceContribution,
@@ -31,6 +32,7 @@ function makeService(args?: { storageFails?: boolean; contributionFails?: boolea
     contributions.push(...batch);
   });
   const service = new LogRequestCollectionService({
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     recordLogRecords,
     recordLogContributions,
     piiRedactionService: { redactLog: async () => undefined },

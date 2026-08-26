@@ -10,6 +10,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
@@ -76,6 +77,7 @@ const protections: Protections = {
 
 const fullOutput =
   "This is the full 50 KB output value that was offloaded to event_log during ingestion";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 /**
  * Builds a fake BlobStore whose getFromEventLog resolves from a static contents map.
@@ -144,9 +146,13 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
   beforeEach(() => {
     vi.clearAllMocks();
     blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
-    ioExtractionService = new TraceIOExtractionService();
+    ioExtractionService = new TraceIOExtractionService(traceCanonicalisation);
 
-    service = new TraceService({} as any, { blobStore, ioExtractionService });
+    service = TraceService.create({
+      prisma: {} as never,
+      blobResolutionDeps: { blobStore, ioExtractionService },
+      traceCanonicalisation,
+    });
   });
 
   describe("given ClickHouse returns a trace with offloaded-span preview output", () => {
@@ -189,7 +195,12 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
         // Constructing TraceService with ADR-022 deps (blobStore + ioExtractionService)
         // should not throw. The production wiring (presets.ts) exercises this path.
         expect(
-          () => new TraceService({} as any, { blobStore, ioExtractionService }),
+          () =>
+            TraceService.create({
+              prisma: {} as never,
+              blobResolutionDeps: { blobStore, ioExtractionService },
+              traceCanonicalisation,
+            }),
         ).not.toThrow();
       });
     });

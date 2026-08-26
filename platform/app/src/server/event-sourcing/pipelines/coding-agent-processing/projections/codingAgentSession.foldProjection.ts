@@ -1,5 +1,6 @@
 import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
 import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { codingAgentCostComputedUsd, codingAgentCostReportedUsd } from "../metrics";
 import {
   type LogFactsContributedEvent,
@@ -219,6 +220,7 @@ export class CodingAgentSessionFoldProjection
   >
   implements FoldEventHandlers<typeof codingAgentSessionEvents, CodingAgentSessionState>
 {
+  private readonly traceCanonicalisation: TraceCanonicalisationService;
   readonly name = "codingAgentSession";
   readonly version = CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<CodingAgentSessionState>;
@@ -272,13 +274,17 @@ export class CodingAgentSessionFoldProjection
     coalesceMaxBatch: CODING_AGENT_SESSION_COALESCE_MAX_BATCH,
   };
 
-  constructor(deps: { store: FoldProjectionStore<CodingAgentSessionState> }) {
+  constructor(deps: {
+    store: FoldProjectionStore<CodingAgentSessionState>;
+    traceCanonicalisation: TraceCanonicalisationService;
+  }) {
     super({
       createdAtKey: "createdAt",
       updatedAtKey: "updatedAt",
       LastEventOccurredAtKey: "LastEventOccurredAt",
     });
     this.store = deps.store;
+    this.traceCanonicalisation = deps.traceCanonicalisation;
   }
 
   protected initState(): CodingAgentSessionState {
@@ -329,6 +335,7 @@ export class CodingAgentSessionFoldProjection
     const data = event.data;
     const next = applySpanToCodingAgentSession({
       state,
+      traceCanonicalisation: this.traceCanonicalisation,
       span: {
         name: data.name,
         startTimeUnixMs: data.startTimeUnixMs,

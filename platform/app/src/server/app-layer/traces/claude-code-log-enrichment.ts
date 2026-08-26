@@ -22,6 +22,8 @@
  * read paths call: it gates, reads the logs, and never fails the read.
  */
 import type { Logger } from "pino";
+import { contentAttrKeys } from "@langwatch/coding-agent-contract";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
 import type { Span } from "~/server/tracer/types";
 import {
@@ -33,7 +35,6 @@ import {
   computeClaudeSpanEnrichment,
   computeClaudeToolSpanEnrichment,
 } from "./claude-code-span-enrichment";
-import { contentAttrKeys } from "./coding-agent-log-content";
 import { DERIVED_ATTRS } from "./log-content-derivation";
 import type { LogRecordStorageService } from "./log-record-storage.service";
 import type { StoredLogRecordRow } from "./repositories/log-record-storage.repository";
@@ -246,9 +247,11 @@ export function mapLogRowsToClaudeContentLogs(
 export function enrichSpansWithClaudeLogContent({
   spans,
   logRows,
+  traceCanonicalisation,
 }: {
   spans: Span[];
   logRows: StoredLogRecordRow[];
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Span[] {
   if (spans.length === 0) return spans;
 
@@ -257,11 +260,16 @@ export function enrichSpansWithClaudeLogContent({
 
   const logs = mapLogRowsToClaudeContentLogs(logRows);
   const refs = mapSpansToClaudeRefs(withInteractionInputs);
-  const enrichmentBySpanId = computeClaudeSpanEnrichment({ spans: refs, logs });
+  const enrichmentBySpanId = computeClaudeSpanEnrichment({
+    spans: refs,
+    logs,
+    traceCanonicalisation,
+  });
   const toolEnrichmentBySpanId = computeClaudeToolSpanEnrichment({
     spans: mapSpansToClaudeToolRefs(withInteractionInputs),
     toolLogs: mapLogRowsToClaudeToolLogs(logRows),
     contentLogs: logs,
+    traceCanonicalisation,
   });
 
   return withInteractionInputs.map((span) => {
@@ -273,6 +281,7 @@ export function enrichSpansWithClaudeLogContent({
             logs,
             windowStartMs: span.timestamps.started_at,
             windowEndMs: span.timestamps.finished_at,
+            traceCanonicalisation,
           })
         : null;
     if (!enrichment && !toolEnrichment && interactionOutput === null) {
@@ -348,6 +357,7 @@ export async function enrichCodingAgentSpansFromLogs({
   spans,
   occurredAtMs,
   logger,
+  traceCanonicalisation,
 }: {
   logRecords: LogRecordStorageService;
   tenantId: string;
@@ -356,12 +366,17 @@ export async function enrichCodingAgentSpansFromLogs({
   /** Partition-pruning hint on the log store's `TimeUnixMs` partition key. */
   occurredAtMs?: number;
   logger?: Logger;
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Promise<Span[]> {
   if (!hasCodingAgentJoinableSpans(spans)) return spans;
 
   try {
     const logRows = await logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs);
-    return enrichSpansWithClaudeLogContent({ spans, logRows });
+    return enrichSpansWithClaudeLogContent({
+      spans,
+      logRows,
+      traceCanonicalisation,
+    });
   } catch (error) {
     logger?.warn(
       {
@@ -405,17 +420,20 @@ export function enrichSingleSpanWithClaudeLogContent({
   span,
   modelCallRefs,
   logRows,
+  traceCanonicalisation,
 }: {
   span: Span;
   /** All model-call refs for the trace, [] when the span has no request_id. */
   modelCallRefs: ClaudeSpanRef[];
   logRows: StoredLogRecordRow[];
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Span {
   const isModelCall = readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
 
   const [enriched] = enrichSpansWithClaudeLogContent({
     spans: [span],
     logRows,
+    traceCanonicalisation,
   });
   let next = enriched!;
 
@@ -433,6 +451,7 @@ export function enrichSingleSpanWithClaudeLogContent({
       const enrichment = computeClaudeSpanEnrichment({
         spans: modelCallRefs,
         logs: mapLogRowsToClaudeContentLogs(logRows),
+        traceCanonicalisation,
       }).get(span.span_id);
       if (enrichment) {
         const clone: Span = { ...next };

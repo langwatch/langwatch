@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation/canonicalizeSpanAttributesService";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import { createTestSpan } from "../../__tests__/fixtures/trace-summary-test.fixtures";
 import { deriveSpanCost } from "../span-cost.derivation";
@@ -107,21 +107,22 @@ describe("deriveSpanCost", () => {
       wireAttributes: Record<string, unknown>,
     ): NormalizedSpan => {
       const base = createTestSpan({ name: "gen_ai.responses" });
-      const { attributes } = new CanonicalizeSpanAttributesService().canonicalize(
-        wireAttributes as NormalizedSpan["spanAttributes"],
-        [],
-        {
-          name: base.name,
-          kind: base.kind,
-          instrumentationScope: {
-            name: "langwatch-service-aigateway",
-            version: null,
+      const { attributes } =
+        TraceCanonicalisationService.create().canonicalizeSpanAttributes({
+          spanAttributes: wireAttributes,
+          events: [],
+          span: {
+            name: base.name,
+            kind: base.kind,
+            instrumentationScope: {
+              name: "langwatch-service-aigateway",
+              version: null,
+            },
+            statusMessage: base.statusMessage,
+            statusCode: base.statusCode,
+            parentSpanId: base.parentSpanId,
           },
-          statusMessage: base.statusMessage,
-          statusCode: base.statusCode,
-          parentSpanId: base.parentSpanId,
-        },
-      );
+        });
       return createTestSpan({
         name: base.name,
         spanAttributes: attributes,

@@ -22,8 +22,7 @@ import {
   ProjectionValidationError,
   projectionRequestSchema,
 } from "~/server/traces/projection";
-import { AmbiguousTraceIdPrefixError, TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { AmbiguousTraceIdPrefixError } from "~/server/traces/trace.service";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,
@@ -188,14 +187,7 @@ export function registerTracesRoutes(
         }
       }
 
-      const traceService = TraceService.create(
-        prisma,
-        void 0,
-        void 0,
-        void 0,
-        void 0,
-        c.app.annotations,
-      );
+      const traceService = c.app.traces.read;
       const results = await traceService.getAllTracesForProject(
         {
           ...searchFields,
@@ -387,7 +379,7 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
-      const traceService = TraceService.create(prisma);
+      const traceService = c.app.traces.read;
 
       let trace;
       try {
@@ -500,12 +492,7 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
-      const traceService = TraceService.create(
-        prisma,
-        buildTraceBlobResolutionDeps(),
-        undefined,
-        c.app.evaluations,
-      );
+      const traceService = c.app.traces.read;
 
       let trace;
       try {

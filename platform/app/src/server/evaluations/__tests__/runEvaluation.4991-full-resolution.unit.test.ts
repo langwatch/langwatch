@@ -15,6 +15,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 const {
   mockCreate,
@@ -91,6 +92,8 @@ const protections = {
   canSeeCosts: true,
 } as const;
 
+const traceCanonicalisation = TraceCanonicalisationService.create();
+
 const traceMapping = {
   mapping: { input: { source: "input" } },
 } as never;
@@ -112,12 +115,11 @@ beforeEach(() => {
 });
 
 function expectConstructedWithDeps() {
-  expect(mockCreate).toHaveBeenCalledWith(
-    undefined,
-    BLOB_DEPS,
-    undefined,
-    expect.anything(),
-  );
+  expect(mockCreate).toHaveBeenCalledWith({
+    blobResolutionDeps: BLOB_DEPS,
+    evaluationService: expect.anything(),
+    traceCanonicalisation,
+  });
 }
 
 describe("runEvaluation — #4991 full blob resolution on evaluator reads", () => {
@@ -143,6 +145,7 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           level: "trace",
           protections,
           evaluations: {} as never,
+          traceCanonicalisation,
         });
 
         expectConstructedWithDeps();
@@ -178,6 +181,7 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           level: "thread",
           protections,
           evaluations: {} as never,
+          traceCanonicalisation,
         });
 
         expectConstructedWithDeps();

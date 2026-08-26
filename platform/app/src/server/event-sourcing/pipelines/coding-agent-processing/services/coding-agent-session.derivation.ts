@@ -1,4 +1,4 @@
-import { claudeCacheWritesLongLived } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import {
   CODING_AGENT_REGISTRY,
@@ -641,21 +641,24 @@ function pricedFromTokens(facts: Record<string, unknown>): number {
  * {@link computeSpanCost} reads. The llm_request span carries the CLI's bare
  * spellings, whose `input_tokens` is already the disjoint non-cached bucket,
  * so this is a respelling plus one judgment: the cache-write lifetime the
- * call's request context implies ({@link claudeCacheWritesLongLived}) — the
- * same stamp the trace pipeline's extractor puts on the identical span, so
+ * trace canonicalisation assigns from the call's request context — the same
+ * stamp the trace pipeline puts on the identical span, so
  * the session and the trace price one call to one figure.
  */
-function claudeCallTokenFacts(attrs: Record<string, unknown>): Record<string, unknown> {
+function claudeCallTokenFacts(
+  attrs: Record<string, unknown>,
+  traceCanonicalisation: TraceCanonicalisationService,
+): Record<string, unknown> {
   const cacheWriteTokens = num(attrs.cache_creation_tokens);
   return {
     ...attrs,
     "gen_ai.usage.cache_read.input_tokens": num(attrs.cache_read_tokens),
     "gen_ai.usage.cache_creation.input_tokens": cacheWriteTokens,
     ...(cacheWriteTokens > 0 &&
-    claudeCacheWritesLongLived({
+    traceCanonicalisation.classifyClaudeCall({
       llmRequestContext: str(attrs["llm_request.context"]),
       querySource: str(attrs.query_source),
-    })
+    }).cacheWritesLongLived
       ? { "gen_ai.usage.cache_creation_1h.input_tokens": cacheWriteTokens }
       : {}),
   };
@@ -698,6 +701,7 @@ export function applySpanToCodingAgentSession({
   state,
   span,
   agent,
+  traceCanonicalisation,
 }: {
   state: CodingAgentSessionData;
   span: SpanFactsView;
@@ -712,6 +716,7 @@ export function applySpanToCodingAgentSession({
    * gate has to be enforced on both sides, not just declared.
    */
   agent?: string;
+  traceCanonicalisation: TraceCanonicalisationService;
 }): CodingAgentSessionData {
   const attrs = span.attrs;
   const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
@@ -727,7 +732,9 @@ export function applySpanToCodingAgentSession({
     // reports about itself lands on agentReportedCostUsd instead.
     return {
       ...folded,
-      costUsd: folded.costUsd + pricedFromTokens(claudeCallTokenFacts(attrs)),
+      costUsd:
+        folded.costUsd +
+        pricedFromTokens(claudeCallTokenFacts(attrs, traceCanonicalisation)),
     };
   }
 

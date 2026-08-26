@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { env } from "~/env.mjs";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import type { SpoolStorage } from "~/server/app-layer/traces/blob-store.service";
@@ -49,17 +50,20 @@ const defaultSpoolStorage: SpoolStorage = {
  * `resolveOffloadedTraces` swallows per-field — the read degrades gracefully
  * to the preview rather than 500ing.
  *
+ * @param traceCanonicalisation - The process-owned canonicalisation service.
+ *   Every caller receives it from its composition root or transport App.
  * @param overrides - Optional composition-root values. `presets.ts` passes its
  *   own `clickhouseEnabled` (which also honors `config.clickhouseUrl`) and
  *   `resolveClickHouseClient` so the eval-path deps stay byte-identical to the
- *   pre-#4888 wiring. Routers call with no arguments, in which case the
- *   resolver comes from `getApp().clickhouse` — the same one every other
- *   repository is built from, rather than a second closure re-deriving it.
+ *   pre-#4888 wiring. Transport callers pass the same process App service.
  */
-export function buildTraceBlobResolutionDeps(overrides?: {
-  clickhouseEnabled?: boolean;
-  resolveClickHouseClient?: ClickHouseClientResolver;
-}): BlobResolutionDeps {
+export function buildTraceBlobResolutionDeps(
+  traceCanonicalisation: TraceCanonicalisationService,
+  overrides?: {
+    clickhouseEnabled?: boolean;
+    resolveClickHouseClient?: ClickHouseClientResolver;
+  },
+): BlobResolutionDeps {
   // Deferred to the first actual resolution, not read while the deps are being
   // built. Routers construct these per request, including on paths that never
   // resolve a blob, so reading the App here made merely *assembling* the deps
@@ -79,7 +83,7 @@ export function buildTraceBlobResolutionDeps(overrides?: {
       spoolStorage: defaultSpoolStorage,
       logger: createLogger("langwatch:traces:blob-store"),
     }),
-    ioExtractionService: new TraceIOExtractionService(),
+    ioExtractionService: new TraceIOExtractionService(traceCanonicalisation),
   };
 }
 

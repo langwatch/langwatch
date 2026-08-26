@@ -1,6 +1,9 @@
 import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
 import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import {
+  NON_BILLABLE_ATTR,
+  type TraceCanonicalisationService,
+} from "@langwatch/trace-contract";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -34,8 +37,6 @@ import {
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
-  liftCanonicalAttributesFromLogRecord,
-  NON_BILLABLE_ATTR,
   OUTPUT_SOURCE,
   SpanCostService,
   SpanStatusService,
@@ -770,10 +771,6 @@ function parseLabels(raw: string | undefined): string[] {
 
 // ─── Service composition ────────────────────────────────────────────
 
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
-);
-
 const spanTimingService = new SpanTimingService();
 const spanStatusService = new SpanStatusService();
 const spanCostService = new SpanCostService();
@@ -1103,6 +1100,8 @@ export class TraceAnalyticsFoldProjection
   >
   implements FoldEventHandlers<typeof traceAnalyticsEvents, TraceAnalyticsData>
 {
+  private readonly spanNormalizationPipelineService: SpanNormalizationPipelineService;
+  private readonly traceCanonicalisation: TraceCanonicalisationService;
   readonly name = "traceAnalytics";
   readonly version = TRACE_ANALYTICS_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceAnalyticsData>;
@@ -1186,13 +1185,20 @@ export class TraceAnalyticsFoldProjection
     coalesceMaxBatch: TRACE_ANALYTICS_COALESCE_MAX_BATCH,
   };
 
-  constructor(deps: { store: FoldProjectionStore<TraceAnalyticsData> }) {
+  constructor(deps: {
+    store: FoldProjectionStore<TraceAnalyticsData>;
+    traceCanonicalisation: TraceCanonicalisationService;
+  }) {
     super({
       createdAtKey: "createdAt",
       updatedAtKey: "updatedAt",
       LastEventOccurredAtKey: "LastEventOccurredAt",
     });
     this.store = deps.store;
+    this.traceCanonicalisation = deps.traceCanonicalisation;
+    this.spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+      deps.traceCanonicalisation,
+    );
   }
 
   protected initState() {
@@ -1266,7 +1272,7 @@ export class TraceAnalyticsFoldProjection
       return { ...state, spanCount: state.spanCount + 1 };
     }
 
-    const normalizedSpan = spanNormalizationPipelineService.normalizeSpanReceived(
+    const normalizedSpan = this.spanNormalizationPipelineService.normalizeSpanReceived(
       event.tenantId,
       event.data.span,
       event.data.resource,
@@ -1299,16 +1305,17 @@ export class TraceAnalyticsFoldProjection
       return state;
     }
 
-    // Run the canonical extractor registry against this log record — each
-    // extractor lifts model / cost / tokens / cache / thread.id onto
-    // canonical langwatch.* keys. Slim mirrors the trace-summary fold's
-    // canonical lift so log-only emitters (Claude Code Path B, Codex Path
-    // B) populate the slim columns even though no spans ever arrive.
+    const liftedAttributes = this.traceCanonicalisation.canonicalizeLogRecord({
+      scopeName: event.data.scopeName,
+      body: event.data.body,
+      attributes: event.data.attributes,
+    }).attributes;
+
     return applyLogContribution({
       state,
       contribution: {
         traceId: event.data.traceId,
-        liftedAttributes: liftCanonicalAttributesFromLogRecord(event.data),
+        liftedAttributes,
         nonBillable: event.data.resourceAttributes?.[NON_BILLABLE_ATTR] === "true",
       },
     });

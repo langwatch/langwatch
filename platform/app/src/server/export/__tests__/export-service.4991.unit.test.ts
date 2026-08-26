@@ -2,14 +2,13 @@
  * #4991 ("2 of 2" of #4888) — AC1 call-site wiring for ExportService.
  *
  * A trace export consumes content: a truncated value is data loss in the CSV/
- * JSONL. Proves (a) ExportService.create() constructs TraceService WITH
- * blob-resolution deps, and (b) BOTH export modes opt resolveBlobs into the
- * getAllTracesForProject options — full mode because it emits span IO, summary
- * mode because it still emits trace-level input/output.
+ * JSONL. Proves the process-owned TraceService is used directly and BOTH
+ * export modes opt resolveBlobs into getAllTracesForProject — full mode because
+ * it emits span IO, summary mode because it still emits trace-level input/output.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type {
@@ -18,26 +17,6 @@ import type {
 } from "~/server/traces/types";
 import { ExportService } from "../export.service";
 import type { ExportRequest } from "../types";
-
-const { mockTraceServiceCreate, mockBuildDeps, BLOB_DEPS } = vi.hoisted(() => {
-  const BLOB_DEPS = {
-    blobStore: { tag: "blobStore" },
-    ioExtractionService: { tag: "ioExtractionService" },
-  };
-  return {
-    mockTraceServiceCreate: vi.fn(),
-    mockBuildDeps: vi.fn(() => BLOB_DEPS),
-    BLOB_DEPS,
-  };
-});
-
-vi.mock("~/server/traces/trace.service", () => ({
-  TraceService: { create: mockTraceServiceCreate },
-}));
-
-vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
-  buildTraceBlobResolutionDeps: mockBuildDeps,
-}));
 
 const protections: Protections = {
   canSeeCapturedInput: true,
@@ -106,19 +85,15 @@ async function drainExport(service: ExportService, request: ExportRequest) {
   }
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockBuildDeps.mockReturnValue(BLOB_DEPS);
-});
-
 describe("ExportService — #4991 AC1 full export resolution", () => {
-  describe("when ExportService.create() builds the service", () => {
-    it("constructs TraceService with blob-resolution deps", async () => {
-      mockTraceServiceCreate.mockReturnValue({} as TraceService);
+  describe("when ExportService.create() receives the process-owned reader", () => {
+    it("wraps that reader without constructing another service", async () => {
+      const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
+      const service = ExportService.create({ traceService });
 
-      await ExportService.create({} as never);
+      await drainExport(service, buildExportRequest({ mode: "summary" }));
 
-      expect(mockTraceServiceCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
+      expect(optionsSeen).toHaveLength(1);
     });
   });
 
@@ -126,7 +101,7 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
     describe("when exportTraces streams a batch", () => {
       it("opts resolveBlobs into the getAllTracesForProject options", async () => {
         const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         await drainExport(service, buildExportRequest({ mode: "full" }));
 
@@ -148,7 +123,7 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
     describe("when exportTraces streams a batch", () => {
       it("opts resolveBlobs in so an offloaded trace is not truncated to its preview", async () => {
         const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         await drainExport(service, buildExportRequest({ mode: "summary" }));
 
@@ -158,7 +133,7 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
 
       it("reads no span content (includeSpans stays false)", async () => {
         const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         await drainExport(service, buildExportRequest({ mode: "summary" }));
 
@@ -175,7 +150,7 @@ describe("ExportService — #4991 AC1 full export resolution", () => {
     describe("when the export is drained", () => {
       it("emits the trace input/output value into the payload", async () => {
         const { traceService } = buildOptionsCapturingTraceService();
-        const service = new ExportService({ traceService });
+        const service = ExportService.create({ traceService });
 
         let payload = "";
         for await (const { chunk } of service.exportTraces({

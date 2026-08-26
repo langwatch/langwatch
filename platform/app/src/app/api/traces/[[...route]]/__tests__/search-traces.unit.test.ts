@@ -1,8 +1,18 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Trace } from "~/server/tracer/types";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 const mockGetAllTracesForProject = vi.fn();
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: vi.fn(() => ({
+    traces: {
+      read: { getAllTracesForProject: mockGetAllTracesForProject },
+    },
+  })),
+}));
 
 vi.mock("~/server/traces/trace.service", () => ({
   TraceService: {
@@ -90,10 +100,7 @@ registerTracesRoutes(securedTest);
 const v1App = securedTest.hono;
 
 const testApp = new Hono();
-testApp.use("*", async (c, next) => {
-  c.set("project" as never, { id: "project-123", apiKey: "key-123" });
-  await next();
-});
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", v1App);
 testApp.onError((err, c) => {
   const status = "status" in err ? (err.status as number) : 500;

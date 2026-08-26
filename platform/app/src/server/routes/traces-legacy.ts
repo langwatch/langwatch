@@ -24,8 +24,6 @@ import { prisma } from "~/server/db";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import type { Span, Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
-import { TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,
@@ -120,12 +118,7 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
     const protections = await getProtectionsForProject(prisma, {
       projectId: project.id,
     });
-    const traceService = TraceService.create(
-      prisma,
-      buildTraceBlobResolutionDeps(),
-      undefined,
-      c.app.evaluations,
-    );
+    const traceService = c.app.traces.read;
     const trace = await traceService.getById(project.id, traceId, protections, {
       full: true,
     });
@@ -268,14 +261,7 @@ secured.access(tracesViewAuth).post("/trace/search", async (c) => {
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });
-  const traceService = TraceService.create(
-    prisma,
-    void 0,
-    void 0,
-    void 0,
-    void 0,
-    c.app.annotations,
-  );
+  const traceService = c.app.traces.read;
   const results = await traceService.getAllTracesForProject(
     {
       ...params,
@@ -346,7 +332,7 @@ secured.access(tracesViewAuth).get("/thread/:id", async (c) => {
     projectId: project.id,
   });
   // Thread-detail read consumes conversation content — resolve full IO (#4991).
-  const traceService = TraceService.create(prisma, buildTraceBlobResolutionDeps());
+  const traceService = c.app.traces.read;
   const traces = await traceService.getTracesByThreadId(
     project.id,
     threadId,

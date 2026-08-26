@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { FoldProjectionExecutor } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
@@ -140,6 +141,7 @@ describe.skipIf(!hasTestcontainers)(
         key: traceId,
       };
       const fold = new TraceSummaryFoldProjection({
+        traceCanonicalisation: TraceCanonicalisationService.create(),
         store: traceSummaryStore,
       });
       const folded = (await new FoldProjectionExecutor().executeBatch(
@@ -151,6 +153,7 @@ describe.skipIf(!hasTestcontainers)(
       expect(folded.computedOutput).toBe('{"greeting":"Hallo"}');
 
       const mapProjection = new SpanStorageMapProjection({
+        traceCanonicalisation: TraceCanonicalisationService.create(),
         store: new SpanAppendStore(spanStorageService.repository),
       });
       const normalizedSpan = mapProjection.mapTraceSpanReceived(event!);

@@ -13,6 +13,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -148,7 +149,7 @@ function makeConcurrencyTrackingBlobStore(fullValue: string): {
   };
 }
 
-const realIOService = new TraceIOExtractionService();
+const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
 
 // ---------------------------------------------------------------------------
 // AC6 — streamed / bounded-concurrency resolution

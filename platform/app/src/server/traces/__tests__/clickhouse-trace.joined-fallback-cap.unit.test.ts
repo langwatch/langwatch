@@ -15,6 +15,7 @@
  * Spec: specs/clickhouse/bounded-reads.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 
@@ -48,6 +49,7 @@ vi.mock("langwatch", () => ({
 }));
 
 const { ClickHouseTraceService } = await import("../clickhouse-trace.service");
+const traceCanonicalisation = TraceCanonicalisationService.create();
 const { openProtections } = await import("./open-protections");
 
 const PROJECT = "project_joined_cap";
@@ -192,7 +194,10 @@ describe("the traces-with-spans memory-limit fallback", () => {
     it("stops and reports how far it got, rather than filling the heap", async () => {
       // 400 traces x 200 spans = 80,000 spans, past the 50,000 cap.
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
-      const service = new ClickHouseTraceService({ prisma: {} as never });
+      const service = new ClickHouseTraceService({
+        prisma: {} as never,
+        traceCanonicalisation,
+      });
 
       const chain = await rejectionChain(
         service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
@@ -204,7 +209,10 @@ describe("the traces-with-spans memory-limit fallback", () => {
     /** @scenario "The memory-limit fallback stops before it exhausts the heap" */
     it("names the traces it had already materialised", async () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
-      const service = new ClickHouseTraceService({ prisma: {} as never });
+      const service = new ClickHouseTraceService({
+        prisma: {} as never,
+        traceCanonicalisation,
+      });
 
       const chain = await rejectionChain(
         service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
@@ -228,7 +236,10 @@ describe("the traces-with-spans memory-limit fallback", () => {
       const { served } = clickHouseThatOOMsThenBatches({
         spansPerTrace: 10_000,
       });
-      const service = new ClickHouseTraceService({ prisma: {} as never });
+      const service = new ClickHouseTraceService({
+        prisma: {} as never,
+        traceCanonicalisation,
+      });
 
       const chain = await rejectionChain(
         service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
@@ -243,7 +254,10 @@ describe("the traces-with-spans memory-limit fallback", () => {
       const { spanReadSettings } = clickHouseThatOOMsThenBatches({
         spansPerTrace: 10_000,
       });
-      const service = new ClickHouseTraceService({ prisma: {} as never });
+      const service = new ClickHouseTraceService({
+        prisma: {} as never,
+        traceCanonicalisation,
+      });
 
       await rejectionChain(
         service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
@@ -260,7 +274,10 @@ describe("the traces-with-spans memory-limit fallback", () => {
     /** @scenario "A fallback that fits under the cap still returns every trace" */
     it("returns every requested trace", async () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 1 });
-      const service = new ClickHouseTraceService({ prisma: {} as never });
+      const service = new ClickHouseTraceService({
+        prisma: {} as never,
+        traceCanonicalisation,
+      });
 
       const traces = await service.getTracesWithSpans(
         PROJECT,

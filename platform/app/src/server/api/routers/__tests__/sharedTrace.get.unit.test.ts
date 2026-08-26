@@ -61,6 +61,7 @@ vi.mock("~/server/app-layer/app", () => ({
     },
     projects: { tryGetById: mockProjectsGetById },
     traces: {
+      read: { getEvaluationsMultiple: mockGetEvaluationsMultiple },
       summary: { getByTraceId: mockSummaryGetByTraceId },
       spans: {
         getSpanSummaryByTraceId: mockGetSpanSummaryByTraceId,
@@ -71,12 +72,6 @@ vi.mock("~/server/app-layer/app", () => ({
       },
     },
   }),
-}));
-
-vi.mock("~/server/traces/trace.service", () => ({
-  TraceService: {
-    create: () => ({ getEvaluationsMultiple: mockGetEvaluationsMultiple }),
-  },
 }));
 
 vi.mock("../../utils", () => ({

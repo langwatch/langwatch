@@ -9,6 +9,7 @@ import {
   type TriggerContext,
   throttledWindow,
 } from "@langwatch/eventing";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
@@ -94,6 +95,7 @@ export type TraceSummaryHandler = (
 ) => Promise<void>;
 
 export interface TraceProcessingPipelineDeps {
+  traceCanonicalisation: TraceCanonicalisationService;
   spanAppendStore: AppendStore<NormalizedSpan>;
   /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
   traceAnalyticsRollupAppendStore: AppendStore<TraceAnalyticsRollupRow>;
@@ -171,21 +173,25 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withClickHouseFoldProjection(
       new TraceSummaryFoldProjection({
         store: deps.traceSummaryStore,
+        traceCanonicalisation: deps.traceCanonicalisation,
       }),
     )
     .withClickHouseFoldProjection(
       new TraceAnalyticsFoldProjection({
         store: deps.traceAnalyticsStore,
+        traceCanonicalisation: deps.traceCanonicalisation,
       }),
     )
     .withClickHouseMapProjection(
       new SpanStorageMapProjection({
         store: deps.spanAppendStore,
+        traceCanonicalisation: deps.traceCanonicalisation,
       }),
     )
     .withClickHouseMapProjection(
       new TraceAnalyticsRollupMapProjection({
         store: deps.traceAnalyticsRollupAppendStore,
+        traceCanonicalisation: deps.traceCanonicalisation,
       }),
     )
     // Deferred origin resolution for pure OTEL traces: reject pre-enqueue as

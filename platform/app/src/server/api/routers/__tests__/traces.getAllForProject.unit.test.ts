@@ -10,31 +10,6 @@ const { mockGetAllTracesForProject } = vi.hoisted(() => ({
   mockGetAllTracesForProject: vi.fn(),
 }));
 
-// The declared permission seam resolves its service from the App.
-vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
-  return appPermissionsMock();
-});
-
-vi.mock("~/server/traces/trace.service", () => ({
-  TraceService: {
-    create: () => ({
-      getAllTracesForProject: mockGetAllTracesForProject,
-    }),
-  },
-}));
-
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
-
 vi.mock("../../utils", () => ({
   getUserProtectionsForProject: vi.fn().mockResolvedValue({
     canSeeCosts: true,
@@ -61,6 +36,10 @@ vi.mock("~/server/evaluations/types", () => ({
   checkPreconditionSchema: {},
 }));
 
+vi.mock("~/runtime/app/features/audit-log", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 describe("traces.getAllForProject", () => {
   let caller: ReturnType<typeof tracesRouter.createCaller>;
 
@@ -75,6 +54,16 @@ describe("traces.getAllForProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    const app = {
+      permissions: {
+        getDecision: vi.fn().mockResolvedValue({
+          permitted: true,
+          organizationRole: "MEMBER",
+        }),
+      },
+      traces: { read: { getAllTracesForProject: mockGetAllTracesForProject } },
+    };
+
     const ctx = createInnerTRPCContext({
       session: {
         user: { id: "test-user-id" },
@@ -84,6 +73,7 @@ describe("traces.getAllForProject", () => {
       res: undefined,
       permissionChecked: true,
       publiclyShared: false,
+      app: app as never,
     });
 
     ctx.prisma = {} as unknown as PrismaClient;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 

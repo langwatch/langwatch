@@ -1,6 +1,7 @@
 import type { AnnotationService } from "@langwatch/annotation-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -176,7 +177,7 @@ class OffloadedSpanResolver {
  *
  * @example
  * ```ts
- * const service = TraceService.create(prisma);
+ * const service = TraceService.create({ traceCanonicalisation, prisma });
  * const traces = await service.getTracesWithSpans(projectId, traceIds, protections);
  * ```
  */
@@ -187,9 +188,10 @@ export class TraceService {
   private readonly injectedLogRecordStorage?: LogRecordStorageService;
   private cachedLogRecordStorage?: LogRecordStorageService;
   private cachedEditOverlayService?: TraceEditOverlayService;
-  constructor(
+  private constructor(
     readonly prisma: PrismaClient,
-    blobResolutionDeps?: BlobResolutionDeps,
+    private readonly traceCanonicalisation: TraceCanonicalisationService,
+    private readonly blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: LogRecordStorageService,
     private evaluationService?: EvaluationService,
     private readonly retentionResolver?: DataRetentionService,
@@ -213,6 +215,7 @@ export class TraceService {
       resolveTraceSpansBatch: resolveTraceSpansBatchFn,
       retentionResolver: this.retentionResolver,
       annotations: this.annotationService,
+      traceCanonicalisation: this.traceCanonicalisation,
     });
     // Injected store for the read-time Claude Code content enrichment; the
     // default comes LAZILY from the App on first use (see
@@ -311,22 +314,32 @@ export class TraceService {
   /**
    * Static factory method for creating TraceService with default dependencies.
    *
-   * @param prisma - PrismaClient instance
+   * @param options - Composed service dependencies
    * @param blobResolutionDeps - Optional blob-offload resolution deps (#4888)
    * @param logRecordStorage - Optional log-record store for read-time Claude
    *   Code content enrichment; default-built when omitted.
    * @returns TraceService instance
    */
-  static create(
-    prisma: PrismaClient = defaultPrisma,
-    blobResolutionDeps?: BlobResolutionDeps,
-    logRecordStorage?: LogRecordStorageService,
-    evaluationService?: EvaluationService,
-    retentionResolver?: DataRetentionService,
-    annotationService?: AnnotationService,
-  ): TraceService {
+  static create({
+    traceCanonicalisation,
+    prisma = defaultPrisma,
+    blobResolutionDeps,
+    logRecordStorage,
+    evaluationService,
+    retentionResolver,
+    annotationService,
+  }: {
+    traceCanonicalisation: TraceCanonicalisationService;
+    prisma?: PrismaClient;
+    blobResolutionDeps?: BlobResolutionDeps;
+    logRecordStorage?: LogRecordStorageService;
+    evaluationService?: EvaluationService;
+    retentionResolver?: DataRetentionService;
+    annotationService?: AnnotationService;
+  }): TraceService {
     return new TraceService(
       prisma,
+      traceCanonicalisation,
       blobResolutionDeps,
       logRecordStorage,
       evaluationService,
@@ -491,6 +504,7 @@ export class TraceService {
       spans: trace.spans,
       occurredAtMs: trace.timestamps.started_at,
       logger: this.logger,
+      traceCanonicalisation: this.traceCanonicalisation,
     });
     return spans === trace.spans ? trace : { ...trace, spans };
   }

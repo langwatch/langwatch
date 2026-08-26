@@ -4,6 +4,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -79,7 +80,7 @@ function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
   } as unknown as BlobStore;
 }
 
-const realIOService = new TraceIOExtractionService();
+const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
 
 const makeSummary = () => ({
   traceId: "trace-1",

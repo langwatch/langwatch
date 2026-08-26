@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { AggregateType, ProjectionStoreContext } from "@langwatch/eventing";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "@langwatch/eventing";
 import { createMockFoldProjectionStore } from "@langwatch/eventing/testing";
@@ -47,14 +48,20 @@ const FOLDS: Array<{
   {
     name: "traceSummary",
     aggregateType: "trace",
-    projection: new TraceSummaryFoldProjection({ store: stubStore() }),
+    projection: new TraceSummaryFoldProjection({
+      store: stubStore(),
+      traceCanonicalisation: TraceCanonicalisationService.create(),
+    }),
     // TraceSummaryStore is get()-only — consistent, because this fold
     // declares no refoldOnStoreMiss for a miss discriminator to feed.
   },
   {
     name: "traceAnalytics",
     aggregateType: "trace",
-    projection: new TraceAnalyticsFoldProjection({ store: stubStore() }),
+    projection: new TraceAnalyticsFoldProjection({
+      store: stubStore(),
+      traceCanonicalisation: TraceCanonicalisationService.create(),
+    }),
     storeClass: TraceAnalyticsStore,
   },
   {
@@ -133,6 +140,7 @@ describe("fold projection contracts", () => {
 
     const signalState = (): TraceAnalyticsData => ({
       ...(new TraceAnalyticsFoldProjection({
+        traceCanonicalisation: TraceCanonicalisationService.create(),
         store: stubStore(),
       }).init() as TraceAnalyticsData),
       traceId: "trace-1",
@@ -143,6 +151,7 @@ describe("fold projection contracts", () => {
 
     const dimensionOnlyState = (): TraceAnalyticsData => ({
       ...(new TraceAnalyticsFoldProjection({
+        traceCanonicalisation: TraceCanonicalisationService.create(),
         store: stubStore(),
       }).init() as TraceAnalyticsData),
       traceId: "trace-1",

@@ -1,7 +1,7 @@
 import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -51,10 +51,6 @@ export interface TraceAnalyticsRollupRow {
   reasoningTokensSum: number;
 }
 
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
-);
-
 const spanCostService = new SpanCostService();
 
 const spanEvents = [spanReceivedEventSchema] as const;
@@ -85,6 +81,7 @@ export class TraceAnalyticsRollupMapProjection
 {
   readonly name = "traceAnalyticsRollup";
   readonly store: AppendStore<TraceAnalyticsRollupRow>;
+  private readonly spanNormalizationPipelineService: SpanNormalizationPipelineService;
   protected readonly events = spanEvents;
 
   override options = {
@@ -93,9 +90,15 @@ export class TraceAnalyticsRollupMapProjection
     groupKeyFn: (event: { id: string }) => `rollup:${event.id}`,
   };
 
-  constructor(deps: { store: AppendStore<TraceAnalyticsRollupRow> }) {
+  constructor(deps: {
+    store: AppendStore<TraceAnalyticsRollupRow>;
+    traceCanonicalisation: TraceCanonicalisationService;
+  }) {
     super();
     this.store = deps.store;
+    this.spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+      deps.traceCanonicalisation,
+    );
   }
 
   mapTraceSpanReceived(event: SpanReceivedEvent): TraceAnalyticsRollupRow {
@@ -103,7 +106,7 @@ export class TraceAnalyticsRollupMapProjection
     // so the rollup contribution matches the trace total to the cent. Reusing
     // the pipeline service guarantees we never drift from the canonical
     // SpanAttributes shape the fold reads.
-    const span = spanNormalizationPipelineService.normalizeSpanReceived(
+    const span = this.spanNormalizationPipelineService.normalizeSpanReceived(
       event.tenantId,
       event.data.span,
       event.data.resource,

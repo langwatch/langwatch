@@ -4,7 +4,7 @@
  * Annotators label trace content, so the annotation-queue reads must resolve
  * the FULL IO value, not the 64 KB preview. Proves both queue-read sites
  * (getQueueItems inline + getOptimizedAnnotationQueues via the shared enrich
- * helper) construct TraceService WITH blob-resolution deps and pass full:true.
+ * helper) use the process-owned reader and pass full:true.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
@@ -20,20 +20,9 @@ import {
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter } from "../annotation";
 
-const { mockCreate, mockGetTracesWithSpans, mockBuildDeps, BLOB_DEPS } = vi.hoisted(
-  () => {
-    const BLOB_DEPS = {
-      blobStore: { tag: "blobStore" },
-      ioExtractionService: { tag: "ioExtractionService" },
-    };
-    return {
-      mockCreate: vi.fn(),
-      mockGetTracesWithSpans: vi.fn(),
-      mockBuildDeps: vi.fn(() => BLOB_DEPS),
-      BLOB_DEPS,
-    };
-  },
-);
+const { mockGetTracesWithSpans } = vi.hoisted(() => ({
+  mockGetTracesWithSpans: vi.fn(),
+}));
 
 const annotation = {
   id: "annotation-1",
@@ -76,14 +65,6 @@ vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import("~/test-utils/appPermissionsMock");
   return appPermissionsMock();
 });
-
-vi.mock("~/server/traces/trace.service", () => ({
-  TraceService: { create: mockCreate },
-}));
-
-vi.mock("~/server/traces/trace-blob-resolution.deps", () => ({
-  buildTraceBlobResolutionDeps: mockBuildDeps,
-}));
 
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
@@ -142,8 +123,6 @@ let users = createAnnotationTestUsers();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockCreate.mockReturnValue({ getTracesWithSpans: mockGetTracesWithSpans });
-  mockBuildDeps.mockReturnValue(BLOB_DEPS);
   mockGetTracesWithSpans.mockResolvedValue([]);
   mockAnnotationFindMany.mockResolvedValue([annotation]);
   users = createAnnotationTestUsers();
@@ -164,12 +143,12 @@ beforeEach(() => {
       organizations: createAnnotationTestOrganizations(),
     }).build(),
     users,
+    traces: { read: { getTracesWithSpans: mockGetTracesWithSpans } },
   });
   caller = annotationRouter.createCaller(ctx);
 });
 
 function expectFullResolution() {
-  expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
   expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
     "project_123",
     ["t1"],
@@ -181,7 +160,7 @@ function expectFullResolution() {
 
 describe("annotation router — #4991 AC3 annotation-queue reads", () => {
   describe("when getQueueItems is called", () => {
-    it("constructs with deps and resolves trace IO full", async () => {
+    it("uses the process-owned reader and resolves trace IO full", async () => {
       await caller.getQueueItems({ projectId: "project_123" });
       expectFullResolution();
       expect(mockQueueItemFindMany).toHaveBeenCalledWith(
@@ -215,14 +194,13 @@ describe("annotation router — #4991 AC3 annotation-queue reads", () => {
   });
 
   describe("when getOptimizedAnnotationQueues is called (shared enrich helper)", () => {
-    it("constructs with deps and resolves trace IO full", async () => {
+    it("uses the process-owned reader and resolves trace IO full", async () => {
       await caller.getOptimizedAnnotationQueues({
         projectId: "project_123",
         selectedAnnotations: "pending",
         pageSize: 10,
         pageOffset: 0,
       });
-      expect(mockCreate).toHaveBeenCalledWith(expect.anything(), BLOB_DEPS);
       expectFullResolution();
     });
 

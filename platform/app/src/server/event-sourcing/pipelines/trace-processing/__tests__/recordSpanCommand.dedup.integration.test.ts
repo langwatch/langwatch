@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Regression test: RecordSpanCommand GQ-layer deduplication
  *
@@ -182,10 +183,16 @@ function createDeduplicationTestPipeline(): PipelineWithCommandHandlers<
     }),
   })
     .withClickHouseFoldProjection(
-      new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
+      new TraceSummaryFoldProjection({
+        store: traceSummaryStore,
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      }) as any,
     )
     .withClickHouseMapProjection(
-      new SpanStorageMapProjection({ store: spanAppendStore }) as any,
+      new SpanStorageMapProjection({
+        store: spanAppendStore,
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      }) as any,
     )
     // Production-faithful registration: imports the SAME RECORD_SPAN_DEDUPLICATION
     // constant the production pipeline uses. Reverting the production registration

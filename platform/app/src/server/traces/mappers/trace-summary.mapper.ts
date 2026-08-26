@@ -1,7 +1,4 @@
-import {
-  extractLastUserMessageText,
-  extractMessageContentText,
-} from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type {
   ErrorCapture,
@@ -301,22 +298,14 @@ function isStructuredValue(data: unknown): data is { type: string; value: unknow
 function extractTextFromMessages(
   data: unknown,
   mode: "input" | "output" = "input",
+  traceCanonicalisation: TraceCanonicalisationService,
 ): string | null {
   // Handle LangWatch structured value wrapper: {type: "json"|"chat_messages", value: ...}
   if (isStructuredValue(data)) {
     const { type, value } = data;
 
     if (type === "chat_messages" && Array.isArray(value)) {
-      // For input mode, extract only the last user message
-      if (mode === "input") {
-        const lastUserText = extractLastUserMessageText(value);
-        if (lastUserText) return lastUserText;
-      }
-      // Fallback: concatenate all messages
-      const texts = value
-        .map((msg) => extractMessageContentText(msg))
-        .filter((t): t is string => t !== null);
-      return texts.length > 0 ? texts.join("\n") : null;
+      return traceCanonicalisation.tryExtractMessageText({ value, mode });
     }
 
     if (type === "json" && typeof value === "object" && value !== null) {
@@ -333,21 +322,12 @@ function extractTextFromMessages(
 
   // Handle array of messages directly
   if (Array.isArray(data)) {
-    // For input mode, extract only the last user message
-    if (mode === "input") {
-      const lastUserText = extractLastUserMessageText(data);
-      if (lastUserText) return lastUserText;
-    }
-    // Fallback: concatenate all messages
-    const texts = data
-      .map((msg) => extractMessageContentText(msg))
-      .filter((t): t is string => t !== null);
-    return texts.length > 0 ? texts.join("\n") : null;
+    return traceCanonicalisation.tryExtractMessageText({ value: data, mode });
   }
 
   // Handle single message object
   if (typeof data === "object" && data !== null) {
-    return extractMessageContentText(data);
+    return traceCanonicalisation.tryExtractMessageText({ value: data, mode });
   }
 
   return null;
@@ -384,6 +364,7 @@ function hasAnnotatedType(
 function parseComputedInput(
   computedInput: string | null,
   attributes: Record<string, string>,
+  traceCanonicalisation: TraceCanonicalisationService,
 ): TraceInput | undefined {
   if (!computedInput) {
     return void 0;
@@ -400,11 +381,11 @@ function parseComputedInput(
 
     // If annotated as chat_messages, treat as message array
     if (isChatMessages && Array.isArray(parsed)) {
-      const text = extractTextFromMessages(parsed, "input");
+      const text = extractTextFromMessages(parsed, "input", traceCanonicalisation);
       if (text) return { value: text };
     }
 
-    const text = extractTextFromMessages(parsed, "input");
+    const text = extractTextFromMessages(parsed, "input", traceCanonicalisation);
     if (text) {
       return { value: text };
     }
@@ -429,6 +410,7 @@ function parseComputedInput(
 function parseComputedOutput(
   computedOutput: string | null,
   attributes: Record<string, string>,
+  traceCanonicalisation: TraceCanonicalisationService,
 ): TraceOutput | undefined {
   if (!computedOutput) {
     return void 0;
@@ -445,11 +427,11 @@ function parseComputedOutput(
 
     // If annotated as chat_messages, treat as message array
     if (isChatMessages && Array.isArray(parsed)) {
-      const text = extractTextFromMessages(parsed, "output");
+      const text = extractTextFromMessages(parsed, "output", traceCanonicalisation);
       if (text) return { value: text };
     }
 
-    const text = extractTextFromMessages(parsed, "output");
+    const text = extractTextFromMessages(parsed, "output", traceCanonicalisation);
     if (text) {
       return { value: text };
     }
@@ -551,6 +533,7 @@ export function mapTraceSummaryToTrace(
   summary: TraceSummaryData,
   spans: Span[],
   projectId: string,
+  traceCanonicalisation: TraceCanonicalisationService,
 ): Trace {
   const metadata = mapAttributesToMetadata(
     summary.attributes,
@@ -579,8 +562,16 @@ export function mapTraceSummaryToTrace(
       inserted_at: summary.createdAt,
       updated_at: summary.updatedAt,
     },
-    input: parseComputedInput(summary.computedInput, summary.attributes),
-    output: parseComputedOutput(summary.computedOutput, summary.attributes),
+    input: parseComputedInput(
+      summary.computedInput,
+      summary.attributes,
+      traceCanonicalisation,
+    ),
+    output: parseComputedOutput(
+      summary.computedOutput,
+      summary.attributes,
+      traceCanonicalisation,
+    ),
     metrics: {
       first_token_ms: summary.timeToFirstTokenMs,
       total_time_ms: summary.totalDurationMs,

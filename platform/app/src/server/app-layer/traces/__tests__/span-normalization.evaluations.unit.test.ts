@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { CanonicalizeSpanAttributesService } from "../canonicalisation/canonicalizeSpanAttributesService";
-import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { SpanNormalizationPipelineService } from "../span-normalization.service";
 
 const service = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
+  TraceCanonicalisationService.create(),
 );
 
 function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpSpan {

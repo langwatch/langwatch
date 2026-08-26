@@ -15,7 +15,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
-} from "../tracesV2.schemas";
+} from "@langwatch/trace-contract";
 
 /**
  * The share-safe gates are the single guarantee that an anonymous share viewer

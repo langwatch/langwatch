@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * Integration test for the replay path that rebuilds `trace_analytics_rollup`.
  *
@@ -266,6 +267,7 @@ describe("given span events in event_log for a tenant whose rollup is empty", ()
       await cleanupAll({ redis, projectionName: PROJECTION_NAME });
 
       const projection = new TraceAnalyticsRollupMapProjection({
+      traceCanonicalisation: TraceCanonicalisationService.create(),
         store: new TraceAnalyticsRollupAppendStore(
           new TraceAnalyticsRollupClickHouseRepository(async () => client),
         ),

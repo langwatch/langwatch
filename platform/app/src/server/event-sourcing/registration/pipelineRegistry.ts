@@ -37,6 +37,7 @@ import {
   RepositoryFoldStore,
   throttledWindow,
 } from "@langwatch/eventing";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { BlobSweeper } from "@langwatch/group-queue/operational";
 import type {
   LangyConversationStateData,
@@ -343,6 +344,7 @@ export interface PipelineRepositories {
 
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
+  traceCanonicalisation: TraceCanonicalisationService;
   /** Package-owned AuthZ definition; this registry only installs and binds it. */
   authz: {
     pipeline: StaticPipelineDefinition<any, any, any>;
@@ -572,6 +574,7 @@ export class PipelineRegistry {
       subscribers: [
         createCodingAgentLogFactsDispatchSubscriber({
           contributeLogFacts: codingAgentCommands.contributeLogFacts,
+          traceCanonicalisation: this.deps.traceCanonicalisation,
         }),
       ],
     });
@@ -594,6 +597,7 @@ export class PipelineRegistry {
       codingAgentSubscribers: [
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
+          traceCanonicalisation: this.deps.traceCanonicalisation,
           getNormalizedSpanById: (params) =>
             this.deps.traces.spans.getNormalizedSpanById(params),
         }),
@@ -957,6 +961,7 @@ export class PipelineRegistry {
   private registerCodingAgentPipeline() {
     return this.deps.eventSourcing.register(
       createCodingAgentProcessingPipeline({
+        traceCanonicalisation: this.deps.traceCanonicalisation,
         // Read-through store (ADR-066): Redis is the warm read tier; on a miss
         // the store reads its own last committed state back from
         // coding_agent_sessions (store.get() → findBySessionId → decode row).
@@ -1241,6 +1246,7 @@ export class PipelineRegistry {
 
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
+        traceCanonicalisation: this.deps.traceCanonicalisation,
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,

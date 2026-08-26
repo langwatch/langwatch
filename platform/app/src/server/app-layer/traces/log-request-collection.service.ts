@@ -1,4 +1,8 @@
 import { createLogger } from "@langwatch/observability";
+import {
+  NON_BILLABLE_ATTR,
+  type TraceCanonicalisationService,
+} from "@langwatch/trace-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
@@ -11,17 +15,14 @@ import type {
   CanonicalLogRecord,
   LogTraceContribution,
 } from "../../event-sourcing/pipelines/log-processing/schemas/logRecord";
-import {
-  extractIOFromLogRecord,
-  liftCanonicalAttributesFromLogRecord,
-  NON_BILLABLE_ATTR,
-} from "../../event-sourcing/pipelines/trace-processing/projections/services";
+import { extractIOFromLogRecord } from "../../event-sourcing/pipelines/trace-processing/projections/services";
 import { piiRedactionLevelSchema } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { LogRecordReceivedEventData } from "../../event-sourcing/pipelines/trace-processing/schemas/events";
 import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface LogRequestCollectionDeps {
+  traceCanonicalisation: TraceCanonicalisationService;
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
   recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
   piiRedactionService?: LogRedactionService;
@@ -147,7 +148,9 @@ export class LogRequestCollectionService {
               continue;
             }
             try {
-              contributions.push(makeTraceContribution(prepared));
+              contributions.push(
+                makeTraceContribution(prepared, this.deps.traceCanonicalisation),
+              );
             } catch (error) {
               // Best-effort, for the same reason the enqueue failure below is:
               // the canonical record is already durably enqueued, so failing to
@@ -204,6 +207,7 @@ export class LogRequestCollectionService {
 
 function makeTraceContribution(
   prepared: Awaited<ReturnType<typeof prepareCanonicalLogRecords>>["accepted"][number],
+  traceCanonicalisation: TraceCanonicalisationService,
 ): LogTraceContribution {
   const { record, normalized } = prepared;
   const legacyView: LogRecordReceivedEventData = {
@@ -219,7 +223,11 @@ function makeTraceContribution(
     scopeVersion: normalized.scopeVersion,
     piiRedactionLevel: record.piiRedactionLevel,
   };
-  const lifted = liftCanonicalAttributesFromLogRecord(legacyView);
+  const lifted = traceCanonicalisation.canonicalizeLogRecord({
+    scopeName: legacyView.scopeName,
+    body: legacyView.body,
+    attributes: legacyView.attributes,
+  }).attributes;
   const liftedAttributes: LogTraceContribution["liftedAttributes"] = {};
   for (const [key, value] of Object.entries(lifted)) {
     if (
@@ -230,7 +238,7 @@ function makeTraceContribution(
       liftedAttributes[key] = value;
     }
   }
-  const io = extractIOFromLogRecord(legacyView);
+  const io = extractIOFromLogRecord(legacyView, traceCanonicalisation);
   const input = io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
   const output = io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
   if (input !== io.input || output !== io.output) {

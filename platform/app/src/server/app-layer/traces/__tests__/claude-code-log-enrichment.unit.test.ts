@@ -8,6 +8,7 @@
  * touches the log store), the join, and best-effort degradation.
  */
 import { describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { Span } from "~/server/tracer/types";
 import {
   enrichCodingAgentSpansFromLogs,
@@ -20,6 +21,7 @@ const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const REQUEST_ID = "req_011CcuGBf1aBcDeFgHiJkLmN";
 const REPL = "repl_main_thread";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function span(params: Record<string, unknown> | null): Span {
   return {
@@ -95,6 +97,7 @@ function enrich({
     traceId: TRACE_ID,
     spans,
     occurredAtMs: 1_700_000_000_000,
+    traceCanonicalisation,
   });
 }
 
@@ -315,6 +318,7 @@ describe("enrichSingleSpanWithClaudeLogContent", () => {
         span: toolSpan(),
         modelCallRefs: [],
         logRows: TOOL_LOGS,
+        traceCanonicalisation,
       });
 
       expect(enriched.input).toEqual({
@@ -358,6 +362,7 @@ describe("enrichSingleSpanWithClaudeLogContent", () => {
           { spanId: "span-2", requestId: "req_second", querySource: REPL },
         ],
         logRows: logs,
+        traceCanonicalisation,
       });
 
       // Without sibling refs the single span would positionally claim the
@@ -378,6 +383,7 @@ describe("enrichSingleSpanWithClaudeLogContent", () => {
         span: secondCallSpan,
         modelCallRefs: [],
         logRows: LIGHT_LOGS,
+        traceCanonicalisation,
       });
 
       expect(enriched.input).toBeNull();

@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TopicAssignedEvent } from "../../schemas/events";
@@ -7,11 +8,12 @@ import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "../traceAnalytics.foldProjection";
+import { TraceSummaryFoldProjection } from "../traceSummary.foldProjection";
 import {
   applySpanToSummary,
-  TraceSummaryFoldProjection,
-} from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Drift guard: the slim fold's handlers MUST produce the same values as the
@@ -27,10 +29,12 @@ import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.f
  */
 
 const slimProjection = new TraceAnalyticsFoldProjection({
+  traceCanonicalisation: TraceCanonicalisationService.create(),
   store: { store: async () => {}, get: async () => null },
 });
 
 const summaryProjection = new TraceSummaryFoldProjection({
+  traceCanonicalisation: TraceCanonicalisationService.create(),
   store: { store: async () => {}, get: async () => null },
 } as never);
 

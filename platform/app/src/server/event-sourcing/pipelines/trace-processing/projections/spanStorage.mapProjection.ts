@@ -1,6 +1,6 @@
 import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -13,10 +13,6 @@ import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
 } from "./spanStorageGroupKey";
-
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
-);
 
 const spanCostService = new SpanCostService();
 
@@ -33,6 +29,7 @@ export class SpanStorageMapProjection
 {
   readonly name = "spanStorage";
   readonly store: AppendStore<NormalizedSpan>;
+  private readonly spanNormalizationPipelineService: SpanNormalizationPipelineService;
   protected readonly events = spanEvents;
 
   override options = {
@@ -44,13 +41,19 @@ export class SpanStorageMapProjection
     coalesceMaxBatch: TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
   };
 
-  constructor(deps: { store: AppendStore<NormalizedSpan> }) {
+  constructor(deps: {
+    store: AppendStore<NormalizedSpan>;
+    traceCanonicalisation: TraceCanonicalisationService;
+  }) {
     super();
     this.store = deps.store;
+    this.spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+      deps.traceCanonicalisation,
+    );
   }
 
   mapTraceSpanReceived(event: SpanReceivedEvent): NormalizedSpan {
-    const span = spanNormalizationPipelineService.normalizeSpanReceived(
+    const span = this.spanNormalizationPipelineService.normalizeSpanReceived(
       event.tenantId,
       event.data.span,
       event.data.resource,

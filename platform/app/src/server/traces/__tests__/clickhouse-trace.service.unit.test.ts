@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { Protections } from "~/server/traces/protections";
 import type { GetAllTracesForProjectInput } from "../types";
 
@@ -48,6 +49,7 @@ vi.mock("~/server/filters/clickhouse", () => ({
 }));
 
 describe("ClickHouseTraceService", () => {
+  const traceCanonicalisation = TraceCanonicalisationService.create();
   const protections: Protections = {
     canSeeCosts: true,
     canSeePiiData: true,
@@ -155,6 +157,7 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -174,6 +177,7 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-A"]);
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -206,6 +210,7 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-A"]);
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -233,6 +238,7 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -281,6 +287,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId();
 
           const service = new ClickHouseTraceService({
+            traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
             } as never,
@@ -308,6 +315,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId();
 
           const service = new ClickHouseTraceService({
+            traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
             } as never,
@@ -341,6 +349,7 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
 
           const service = new ClickHouseTraceService({
+            traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
             } as never,
@@ -366,6 +375,7 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
 
           const service = new ClickHouseTraceService({
+            traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
             } as never,
@@ -396,6 +406,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId({ sortDirection: "asc" });
 
           const service = new ClickHouseTraceService({
+            traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
             } as never,
@@ -424,6 +435,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId({ pageSize: 10 });
 
           const service = new ClickHouseTraceService({
+            traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
             } as never,
@@ -455,6 +467,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -478,6 +491,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -501,6 +515,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -519,6 +534,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -546,6 +562,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -569,6 +586,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -594,6 +612,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -631,6 +650,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -654,6 +674,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -675,6 +696,7 @@ describe("ClickHouseTraceService", () => {
     describe("when user cannot see input or output", () => {
       it("returns empty results when searching without I/O access", async () => {
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -697,6 +719,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -719,6 +742,7 @@ describe("ClickHouseTraceService", () => {
         setupMocksForQueryTest();
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -743,6 +767,7 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -764,6 +789,7 @@ describe("ClickHouseTraceService", () => {
         setupStandardMocks(["trace-1"]);
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -819,6 +845,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -867,6 +894,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -901,6 +929,7 @@ describe("ClickHouseTraceService", () => {
           .mockRejectedValueOnce(new Error("SYNTAX_ERROR: bad query"));
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -940,6 +969,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -984,6 +1014,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -1040,6 +1071,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -1090,6 +1122,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -1114,6 +1147,7 @@ describe("ClickHouseTraceService", () => {
         mockClickHouseQuery.mockRejectedValue(new Error("SYNTAX_ERROR: bad query"));
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -1141,6 +1175,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -1181,6 +1216,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -1215,6 +1251,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,
@@ -1242,6 +1279,7 @@ describe("ClickHouseTraceService", () => {
           });
 
         const service = new ClickHouseTraceService({
+          traceCanonicalisation,
           prisma: {
             project: { findUnique: mockPrismaFindUnique },
           } as never,

@@ -14,6 +14,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { RAGSpan, Span } from "~/server/tracer/types";
@@ -23,6 +24,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 
 const tenantId = `test-rag-contexts-${nanoid()}`;
@@ -177,6 +179,7 @@ beforeAll(async () => {
   const { prisma } = await import("~/server/db");
   service = new ClickHouseTraceService({
     prisma: prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]["prisma"],
+    traceCanonicalisation,
   });
 }, 60_000);
 

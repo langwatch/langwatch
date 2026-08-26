@@ -2,7 +2,11 @@ import type { Evaluation } from "~/server/tracer/types";
 import { redactHiddenAttributes } from "~/server/traces/mappers/redactAttributes";
 import { canReadCapturedContent, type Protections } from "~/server/traces/protections";
 
-import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "./tracesV2.schemas";
+import type {
+  SpanTreeNode,
+  TraceHeader,
+  TraceResourceInfoDto,
+} from "@langwatch/trace-contract";
 
 /**
  * Viewer-scoped gates for the v2 trace read DTOs (header, span tree, resource

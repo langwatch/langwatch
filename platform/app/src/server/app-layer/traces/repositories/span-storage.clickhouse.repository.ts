@@ -6,7 +6,7 @@ import {
   RESOLVER_RECENT_WINDOW_MS,
   type WindowFragment,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";

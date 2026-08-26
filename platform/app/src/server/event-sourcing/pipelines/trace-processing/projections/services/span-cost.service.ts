@@ -1,4 +1,4 @@
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { coerceToNumber } from "~/utils/coerceToNumber";
@@ -29,8 +29,6 @@ export const LAST_TOKEN_EVENTS = new Set([
  * span-level value overrides the resource-level default, so a trace can mix
  * billed and bundled spans.
  */
-export const NON_BILLABLE_ATTR = ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE;
-
 function markerIsTrue(value: unknown): boolean {
   return value === true || value === "true";
 }

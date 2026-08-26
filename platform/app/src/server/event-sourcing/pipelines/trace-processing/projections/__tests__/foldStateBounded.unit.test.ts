@@ -1,11 +1,15 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
-  applySpanToSummary,
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  applySpanToSummary,
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Regression guard for the O(n^2) fold incident: a single long-lived trace
@@ -77,7 +81,10 @@ describe("trace summary fold state size", () => {
   describe("given a trace that exceeds the processing cap", () => {
     describe("when another span is received past MAX_PROCESSED_SPANS", () => {
       it("keeps counting but stops deriving", () => {
-        const projection = new TraceSummaryFoldProjection({ store: {} as any });
+        const projection = new TraceSummaryFoldProjection({
+          store: {} as any,
+          traceCanonicalisation: TraceCanonicalisationService.create(),
+        });
         const atCap: TraceSummaryData = {
           ...createInitState(),
           spanCount: MAX_PROCESSED_SPANS,

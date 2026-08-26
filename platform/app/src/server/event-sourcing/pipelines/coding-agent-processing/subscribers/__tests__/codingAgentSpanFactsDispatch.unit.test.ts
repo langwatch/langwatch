@@ -11,7 +11,7 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import {
   mapChRowToNormalized,
   serializeAttributes,
@@ -105,7 +105,7 @@ function rawSpanEvent({
 
 /** The same normalization the platform runs — builds expected store rows. */
 const normalization = new SpanNormalizationPipelineService(
-  new CanonicalizeSpanAttributesService(),
+  TraceCanonicalisationService.create(),
 );
 
 function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
@@ -237,6 +237,7 @@ function makeSubscriber(
     occurredAtMs: number;
   }> = [];
   const subscriber = createCodingAgentSpanFactsDispatchSubscriber({
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     contributeSpanFacts: async (data) => {
       dispatched.push(data);
     },

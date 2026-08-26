@@ -4,7 +4,7 @@ import type {
   EvaluationService,
   EvaluationSummary,
 } from "@langwatch/evaluation-contract";
-import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
+import { resolveNonBilledCost } from "@langwatch/trace-contract";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import {

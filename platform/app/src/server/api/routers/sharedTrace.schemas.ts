@@ -16,7 +16,7 @@ import {
   spanTreeNodeSchema,
   traceHeaderSchema,
   traceResourceInfoSchema,
-} from "./tracesV2.schemas";
+} from "@langwatch/trace-contract";
 
 /**
  * The share-safe output contract for `sharedTrace.get` — the ONLY payload an

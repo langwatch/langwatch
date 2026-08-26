@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * REAL integration test for per-role cost/latency metrics derivation.
  *
@@ -164,10 +165,16 @@ describe.skipIf(!hasTestcontainers)(
         }),
       })
         .withClickHouseFoldProjection(
-          new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
+          new TraceSummaryFoldProjection({
+            store: traceSummaryStore,
+            traceCanonicalisation: TraceCanonicalisationService.create(),
+          }) as any,
         )
         .withClickHouseMapProjection(
-          new SpanStorageMapProjection({ store: spanAppendStore }) as any,
+          new SpanStorageMapProjection({
+            store: spanAppendStore,
+            traceCanonicalisation: TraceCanonicalisationService.create(),
+          }) as any,
         )
         .withProjectionSubscriber("evaluationTrigger", noopFoldSubscriber() as any)
         .withProjectionSubscriber("customEvaluationSync", noopFoldSubscriber() as any)

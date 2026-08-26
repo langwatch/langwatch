@@ -6,6 +6,7 @@ import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
@@ -77,6 +78,7 @@ const buildThreadData = async (
   trace: Trace,
   mappingState: MappingState | null,
   protections: Protections,
+  traceCanonicalisation: TraceCanonicalisationService,
 ): Promise<Record<string, any>> => {
   if (!mappingState) {
     throw new Error("Mapping state is required for thread-based evaluation");
@@ -90,7 +92,10 @@ const buildThreadData = async (
 
   // #4991: evaluators score against content, so the thread read must resolve
   // the FULL offloaded IO (ADR-022), not the ≤64KB preview.
-  const traceService = TraceService.create(undefined, buildTraceBlobResolutionDeps());
+  const traceService = TraceService.create({
+    blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
+    traceCanonicalisation,
+  });
   const threadTraces = await traceService.getTracesByThreadId(
     projectId,
     threadId,
@@ -191,11 +196,18 @@ const buildDataForEvaluation = async (
   isThreadLevel: boolean,
   projectId: string,
   protections: Protections,
+  traceCanonicalisation: TraceCanonicalisationService,
 ): Promise<DataForEvaluation> => {
   let data: Record<string, any>;
 
   if (isThreadLevel) {
-    data = await buildThreadData(projectId, trace, mappings, protections);
+    data = await buildThreadData(
+      projectId,
+      trace,
+      mappings,
+      protections,
+      traceCanonicalisation,
+    );
   } else {
     const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
     if (!mappedData) {
@@ -218,7 +230,10 @@ const buildDataForEvaluation = async (
     data = mappedData;
 
     if (mappings && hasThreadMappings(mappings)) {
-      const traceService = TraceService.create(undefined, buildTraceBlobResolutionDeps());
+      const traceService = TraceService.create({
+        blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
+        traceCanonicalisation,
+      });
       await resolveThreadMappingsIntoData({
         data: data as Record<string, unknown>,
         trace,
@@ -259,6 +274,7 @@ export const runEvaluationForTrace = async ({
   modelProviders,
   managedProviders,
   workflows,
+  traceCanonicalisation,
 }: {
   projectId: string;
   traceId: string;
@@ -272,15 +288,15 @@ export const runEvaluationForTrace = async ({
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
   workflows: WorkflowService;
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Promise<EvaluationResultWithThreadId> => {
   // #4991: the trace being evaluated is read content-first — resolve the
   // FULL offloaded IO (ADR-022) so the evaluator never scores a preview.
-  const traceService = TraceService.create(
-    undefined,
-    buildTraceBlobResolutionDeps(),
-    undefined,
-    evaluations,
-  );
+  const traceService = TraceService.create({
+    blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation),
+    evaluationService: evaluations,
+    traceCanonicalisation,
+  });
   const trace = await traceService.getById(projectId, traceId, protections, {
     full: true,
   });
@@ -322,6 +338,7 @@ export const runEvaluationForTrace = async ({
     isThreadLevel,
     projectId,
     protections,
+    traceCanonicalisation,
   );
 
   const result = await runEvaluation({

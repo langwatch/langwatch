@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 /**
  * One cached gateway call, priced by the two surfaces that hold money.
  *
@@ -88,6 +89,7 @@ function traceCostUsd(usage: ProviderUsage, inputTokens: number): number {
     },
   });
   const summary = new TraceSummaryFoldProjection({
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     store: { store: async () => {}, get: async () => null },
   }).handleTraceSpanReceived(event, createInitState());
   return summary.totalCost ?? 0;

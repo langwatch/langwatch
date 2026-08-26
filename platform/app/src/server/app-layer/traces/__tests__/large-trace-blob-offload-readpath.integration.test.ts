@@ -46,6 +46,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { Event } from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -338,7 +339,9 @@ describe.skipIf(!hasTestcontainers)(
         // 3) Drive the REAL v2 read entry point with the REAL BlobStore.
         const service = new SpanStorageService(new StagedSpanRepository([leanedSpan]), {
           blobStore: makeRealBlobStore(client),
-          ioExtractionService: new TraceIOExtractionService(),
+          ioExtractionService: new TraceIOExtractionService(
+            TraceCanonicalisationService.create(),
+          ),
         });
 
         const spans = await service.getSpansByTraceId({ tenantId, traceId });
@@ -393,7 +396,9 @@ describe.skipIf(!hasTestcontainers)(
           projectId: tenantId,
           normalizedSpans: [leanedSpan],
           blobStore: makeRealBlobStore(client),
-          ioExtractionService: new TraceIOExtractionService(),
+          ioExtractionService: new TraceIOExtractionService(
+            TraceCanonicalisationService.create(),
+          ),
           logger,
         });
 
@@ -481,7 +486,9 @@ describe.skipIf(!hasTestcontainers)(
           projectId: tenantId,
           normalizedSpans: [spanWithBodyRef],
           blobStore: makeRealBlobStore(client),
-          ioExtractionService: new TraceIOExtractionService(),
+          ioExtractionService: new TraceIOExtractionService(
+            TraceCanonicalisationService.create(),
+          ),
           logger,
         });
 

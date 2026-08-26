@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { FoldProjectionExecutor } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
@@ -126,6 +127,7 @@ describe.skipIf(!hasTestcontainers)("Trace summary fold coalescing -> ClickHouse
 
       const executor = new FoldProjectionExecutor();
       const fold = new TraceSummaryFoldProjection({
+        traceCanonicalisation: TraceCanonicalisationService.create(),
         store: traceSummaryStore,
       });
       const context = { aggregateId: traceId, tenantId, key: traceId };

@@ -15,6 +15,7 @@
  * Spec: specs/clickhouse/bounded-reads.feature
  */
 import { describe, expect, it, vi } from "vitest";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
@@ -32,6 +33,7 @@ vi.mock("langwatch", () => ({
 }));
 
 const { ClickHouseTraceService } = await import("../clickhouse-trace.service");
+const traceCanonicalisation = TraceCanonicalisationService.create();
 const retentionResolver = { resolve: async () => null };
 
 /** The service keeps its floor service private; this is the wiring under test. */
@@ -49,14 +51,20 @@ describe("the production trace-service factory", () => {
     describe("when the service is created", () => {
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("still wires a live retention cascade, so the floor is tenant-aware", () => {
-        const service = ClickHouseTraceService.create({ retentionResolver });
+        const service = ClickHouseTraceService.create({
+          retentionResolver,
+          traceCanonicalisation,
+        });
 
         expect(retentionProviderOf(service)).toBeDefined();
       });
 
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("wires the policy cascade itself, not some other provider", () => {
-        const service = ClickHouseTraceService.create({ retentionResolver });
+        const service = ClickHouseTraceService.create({
+          retentionResolver,
+          traceCanonicalisation,
+        });
 
         // `provider` is the PlatformRetentionDaysProvider adapter the floor
         // service wraps around the resolver; the resolver is the thing that
@@ -68,7 +76,10 @@ describe("the production trace-service factory", () => {
 
       it("keeps the annotation service supplied to the factory", () => {
         const annotations = {} as never;
-        const service = ClickHouseTraceService.create({ annotations });
+        const service = ClickHouseTraceService.create({
+          annotations,
+          traceCanonicalisation,
+        });
 
         expect(annotationServiceOf(service)).toBe(annotations);
       });
@@ -79,7 +90,10 @@ describe("the production trace-service factory", () => {
     describe("when no resolver is supplied", () => {
       /** @scenario "A caller with no resolver wired still gets a bounded read" */
       it("leaves the floor on the platform default, so unit tests stay database-free", () => {
-        const service = new ClickHouseTraceService({ prisma: {} as never });
+        const service = new ClickHouseTraceService({
+          prisma: {} as never,
+          traceCanonicalisation,
+        });
 
         expect(retentionProviderOf(service)).toBeUndefined();
       });

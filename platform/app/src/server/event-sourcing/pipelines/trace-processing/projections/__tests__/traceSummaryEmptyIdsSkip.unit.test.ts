@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import {
@@ -16,6 +17,7 @@ import { createInitState } from "./fixtures/trace-summary-test.fixtures";
 
 function makeProjection() {
   return new TraceSummaryFoldProjection({
+    traceCanonicalisation: TraceCanonicalisationService.create(),
     store: { store: async () => {}, get: async () => null },
   });
 }

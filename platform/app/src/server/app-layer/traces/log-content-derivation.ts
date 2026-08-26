@@ -28,10 +28,7 @@
  * 60 KB, which breaks the JSON) or simply unparseable yields no derived
  * attributes, and every consumer still has its existing fallback path.
  */
-import {
-  buildInputMessagesFromRequestBody,
-  extractAssistantTextFromResponseBody,
-} from "./canonicalisation/extractors/claudeCode";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 /** The scope Claude Code's log events arrive under. */
 const CLAUDE_CODE_EVENTS_SCOPE = "com.anthropic.claude_code.events";
@@ -80,9 +77,11 @@ interface DerivedToolCall {
 export function deriveLogContentAttributes({
   scopeName,
   attributes,
+  traceCanonicalisation,
 }: {
   scopeName: string;
   attributes: Record<string, string>;
+  traceCanonicalisation: TraceCanonicalisationService;
 }): Record<string, string> {
   if (scopeName !== CLAUDE_CODE_EVENTS_SCOPE) return {};
 
@@ -91,20 +90,25 @@ export function deriveLogContentAttributes({
   if (typeof body !== "string" || body.length === 0) return {};
 
   if (eventName === RESPONSE_BODY_EVENT) {
-    return deriveFromResponseBody(body);
+    return deriveFromResponseBody(body, traceCanonicalisation);
   }
   if (eventName === REQUEST_BODY_EVENT) {
-    return deriveFromRequestBody(body);
+    return deriveFromRequestBody(body, traceCanonicalisation);
   }
   return {};
 }
 
-function deriveFromResponseBody(body: string): Record<string, string> {
+function deriveFromResponseBody(
+  body: string,
+  traceCanonicalisation: TraceCanonicalisationService,
+): Record<string, string> {
   const derived: Record<string, string> = {};
 
   // Reuse the canonical extractor rather than re-walking `content[]` here — it
   // already handles the truncation-tolerant cases.
-  const text = extractAssistantTextFromResponseBody(body);
+  const text = traceCanonicalisation.deriveClaudeResponseContent({
+    body,
+  }).assistantText;
   if (text !== null && text.length > 0) {
     derived[DERIVED_ATTRS.OUTPUT_TEXT] = text;
   }
@@ -126,8 +130,13 @@ function deriveFromResponseBody(body: string): Record<string, string> {
   return derived;
 }
 
-function deriveFromRequestBody(body: string): Record<string, string> {
-  const messages = buildInputMessagesFromRequestBody(body);
+function deriveFromRequestBody(
+  body: string,
+  traceCanonicalisation: TraceCanonicalisationService,
+): Record<string, string> {
+  const messages = traceCanonicalisation.deriveClaudeRequestContent({
+    body,
+  }).messages;
   if (messages === null || messages.length === 0) return {};
   return {
     [DERIVED_ATTRS.INPUT_MESSAGE_COUNT]: String(messages.length),

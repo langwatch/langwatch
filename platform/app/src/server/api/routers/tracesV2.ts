@@ -2,11 +2,17 @@ import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
+  buildCodingAgentTranscript,
+  type CodingAgentTranscript,
+  type LogContentCategory,
+  logContentKeys,
+} from "@langwatch/coding-agent-contract";
+import {
+  resolveNonBilledCost,
   spanTreeDeltaTransportInputSchema,
   spanTreeTransportInputSchema,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
-import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
@@ -20,17 +26,9 @@ import {
   isCodingAgentShapedSpan,
   mapSummaryRowsToClaudeRefs,
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
-import {
-  type LogContentCategory,
-  logContentKeys,
-} from "~/server/app-layer/traces/coding-agent-log-content";
 
 const logger = createLogger("langwatch:api:traces-v2");
 
-import {
-  buildCodingAgentTranscript,
-  type CodingAgentTranscript,
-} from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { deriveTraceTimestamp } from "~/server/app-layer/traces/derive-trace-timestamp";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
@@ -881,6 +879,7 @@ async function enrichSpanDetailFromCodingAgentLogs({
       span,
       modelCallRefs: mapSummaryRowsToClaudeRefs(summaryRows),
       logRows,
+      traceCanonicalisation: app.traces.canonicalisation,
     });
   } catch (error) {
     logger.warn(
@@ -946,6 +945,7 @@ async function loadSpansFullWithProtections({
     traceId: input.traceId,
     spans: storedSpans,
     occurredAtMs: input.occurredAtMs,
+    traceCanonicalisation: app.traces.canonicalisation,
   });
 
   const redactions = buildSpanContentRedactions(spans, protections);

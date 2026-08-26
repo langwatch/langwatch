@@ -36,7 +36,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   assertOverThreshold,
@@ -57,7 +57,6 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
-import { ExportService } from "../export.service";
 import type { ExportRequest } from "../types";
 
 // Gate identically to the other blob-offload integration tests: skip when no
@@ -212,9 +211,9 @@ async function seedOffloadedTrace() {
 
 /** Drains the real ExportService and returns the concatenated payload. */
 async function runExport(request: ExportRequest): Promise<string> {
-  // create() resolves prisma + the blob-resolution deps itself; the CH client it
-  // ends up using is the testcontainer, via the mocked resolver above.
-  const service = await ExportService.create();
+  // The test App composes one blob-capable TraceService and one export facade;
+  // the CH client it uses is the testcontainer, via the mocked resolver above.
+  const service = getApp().traces.export;
   let payload = "";
   for await (const { chunk } of service.exportTraces({
     request,
@@ -246,11 +245,8 @@ beforeAll(async () => {
   const chModule = await import("~/server/clickhouse/clickhouseClient");
   vi.mocked(chModule.getClickHouseClientForTenant).mockResolvedValue(ch);
 
-  // ExportService reaches buildTraceBlobResolutionDeps() with no override,
-  // which now takes its default resolver from getApp().clickhouse rather
-  // than isClickHouseEnabled()/getClickHouseClientForTenant directly — so
-  // the production wiring this test wants to exercise needs a real App
-  // singleton whose resolver dials the same (mocked) testcontainer client.
+  // The test App's process-owned trace reader receives blob-resolution deps
+  // with its resolver supplied by this composed ClickHouse service.
   await resetApp();
   globalForApp.__langwatch_app = createTestApp({
     clickhouse: {
@@ -330,6 +326,7 @@ describe.skipIf(!hasTestcontainers)(
             prisma: prisma as ConstructorParameters<
               typeof ClickHouseTraceService
             >[0]["prisma"],
+            traceCanonicalisation: getApp().traces.canonicalisation,
           });
 
           const result = await listService.getAllTracesForProject(

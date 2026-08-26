@@ -7,6 +7,7 @@
  */
 
 import { createTenantId } from "@langwatch/eventing";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../../log-processing/schemas/events";
@@ -18,6 +19,7 @@ import {
 import { createCodingAgentLogFactsDispatchSubscriber } from "../codingAgentLogFactsDispatch.subscriber";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function canonicalLogEvent({
   attributes,
@@ -64,6 +66,7 @@ function canonicalLogEvent({
 function makeSubscriber() {
   const dispatched: ContributeLogFactsCommandData[] = [];
   const subscriber = createCodingAgentLogFactsDispatchSubscriber({
+    traceCanonicalisation,
     contributeLogFacts: async (data) => {
       dispatched.push(data);
     },

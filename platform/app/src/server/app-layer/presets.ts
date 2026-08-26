@@ -234,6 +234,7 @@ import {
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
+import { ExportService } from "../export/export.service";
 import { InviteService } from "../invites/invite.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
@@ -306,6 +307,7 @@ import { MetricDataPointClickHouseRepository } from "./metrics/repositories/metr
 import { NullMetricDataPointRepository } from "./metrics/repositories/metric-data-point.repository";
 
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { EventExplorerService } from "./ops/event-explorer.service";
 import {
   ManagerExplorerService,
@@ -427,6 +429,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   AppAuditLogRuntime.install({ prisma });
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
   const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
+  const traceCanonicalisation = TraceCanonicalisationService.create();
 
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (
@@ -564,10 +567,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // #4888: the same factory backs the customer-facing full=true read path; the
   // composition root passes its own ClickHouse decision/resolver so the
   // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
-  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
-    clickhouseEnabled,
-    resolveClickHouseClient,
-  });
+  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps(
+    traceCanonicalisation,
+    {
+      clickhouseEnabled,
+      resolveClickHouseClient,
+    },
+  );
   // Shared between SpanStorageService and TraceSummaryService's full read.
   const spanStorageRepository = clickhouseEnabled
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
@@ -755,17 +761,17 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     EvaluatorFeature.create({ prisma, workflows }),
     "EvaluatorService",
   );
-  const traceService = TraceService.create(
+  const traceService = TraceService.create({
     prisma,
-    {
+    blobResolutionDeps: {
       blobStore,
       ioExtractionService,
     },
-    void 0,
-    void 0,
-    dataRetentionService,
-    annotations,
-  );
+    retentionResolver: dataRetentionService,
+    annotationService: annotations,
+    traceCanonicalisation,
+  });
+  const exportService = ExportService.create({ traceService });
 
   const evaluationExecution = traced(
     new EvaluationExecutionService({
@@ -1348,7 +1354,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     emailCaps: automationEmailCaps,
     projects,
     evaluations: evaluationService,
-    traces: { spans: spanStorage },
+    traces: { canonicalisation: traceCanonicalisation, spans: spanStorage },
     traceSummaryRepository: repositories.traceSummaryFold,
     analytics: analyticsService,
     resolveClickHouseClient,
@@ -1523,6 +1529,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
+    traceCanonicalisation,
     authz: {
       pipeline: authzFeature.pipeline,
       connect: (authzCommands) => authzFeature.connect(authzCommands as never),
@@ -1799,6 +1806,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const logCollection = traced(
     new LogRequestCollectionService({
+      traceCanonicalisation,
       recordLogRecords: commands.logs.recordLogRecord.sendBatch!,
       recordLogContributions: commands.traces.recordLogContribution.sendBatch!,
     }),
@@ -1889,6 +1897,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     : AppTraceRuntime.createNull(modelProviders);
 
   const traces = {
+    canonicalisation: traceCanonicalisation,
+    read: traceService,
+    export: exportService,
     tree: traceTree,
     summary: traceSummary,
     list: traceList,
@@ -2154,6 +2165,7 @@ export function createTestApp(
   },
 ): App {
   const testPrisma = globalPrisma;
+  const traceCanonicalisation = TraceCanonicalisationService.create();
   AppAuditLogRuntime.install({ prisma: testPrisma });
   const noop = async () => {
     /* noop */
@@ -2452,7 +2464,17 @@ export function createTestApp(
     }),
     secrets: AppSecretRuntime.create({ database: testPrisma }),
     traces: (() => {
+      const traceRead = TraceService.create({
+        prisma: testPrisma,
+        traceCanonicalisation,
+        blobResolutionDeps: buildTraceBlobResolutionDeps(traceCanonicalisation, {
+          clickhouseEnabled: true,
+        }),
+      });
       return {
+        canonicalisation: traceCanonicalisation,
+        read: traceRead,
+        export: ExportService.create({ traceService: traceRead }),
         tree: AppTraceRuntime.createNull(modelProviders),
         summary: traced(
           new TraceSummaryService(new NullTraceSummaryRepository()),
@@ -2493,6 +2515,7 @@ export function createTestApp(
         ),
         logCollection: traced(
           new LogRequestCollectionService({
+            traceCanonicalisation,
             recordLogRecords: noop,
             recordLogContributions: noop,
           }),

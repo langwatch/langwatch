@@ -1,3 +1,4 @@
+import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import { SpanStorageMapProjection } from "../spanStorage.mapProjection";
 import {
@@ -79,8 +80,14 @@ describe("spanStorage shard group key", () => {
 
   describe("when the projection is constructed", () => {
     it("declares the shard key and the coalesce ceiling", () => {
-      const projection = new SpanStorageMapProjection({ store: {} as never });
-      expect(projection.options.coalesceMaxBatch).toBe(TRACE_SPAN_MAP_COALESCE_MAX_BATCH);
+      const projection = new SpanStorageMapProjection({
+        store: {} as never,
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+      });
+
+      expect(projection.options.coalesceMaxBatch).toBe(
+        TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
+      );
       // 256 is deliberate (matches the log/metric map ceilings); changing it
       // is a decision, so the exact value is pinned.
       expect(TRACE_SPAN_MAP_COALESCE_MAX_BATCH).toBe(256);

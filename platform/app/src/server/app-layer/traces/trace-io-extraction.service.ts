@@ -1,11 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
-import {
-  extractLastUserMessageText,
-  extractMessageContentText,
-} from "./canonicalisation/extractors/_messages";
+import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 /**
  * Service for extracting input/output text from spans using tree traversal
@@ -23,6 +19,7 @@ import {
  * ```
  */
 export class TraceIOExtractionService {
+  constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.io-extraction",
   );
@@ -229,7 +226,7 @@ export class TraceIOExtractionService {
     const genAiValue = attrs[keys.genAi];
     if (genAiValue !== undefined && genAiValue !== null) {
       const normalized = normalizeChatPayload(genAiValue);
-      const text = messagesToText(normalized, type);
+      const text = messagesToText(normalized, type, this.traceCanonicalisation);
       if (text) {
         return { raw: normalized, text, source: "gen_ai" };
       }
@@ -244,7 +241,7 @@ export class TraceIOExtractionService {
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
       const normalized = normalizeChatPayload(langwatchValue);
-      const text = messagesToText(normalized, type);
+      const text = messagesToText(normalized, type, this.traceCanonicalisation);
       if (text) {
         return { raw: normalized, text, source: "langwatch" };
       }
@@ -606,6 +603,7 @@ function normalizeChatPayload(
 function messagesToText(
   messages: unknown,
   mode: "input" | "output" = "output",
+  traceCanonicalisation: TraceCanonicalisationService,
 ): string | null {
   if (!messages) return null;
 
@@ -614,7 +612,7 @@ function messagesToText(
     try {
       const parsed: unknown = JSON.parse(messages);
       if (typeof parsed === "object" && parsed !== null) {
-        return messagesToText(parsed, mode);
+        return messagesToText(parsed, mode, traceCanonicalisation);
       }
     } catch {
       // Not JSON — return the string as-is
@@ -623,21 +621,17 @@ function messagesToText(
   }
 
   if (Array.isArray(messages)) {
-    if (mode === "input") {
-      const lastUserText = extractLastUserMessageText(messages);
-      if (lastUserText) return lastUserText;
-    }
-
-    const texts: string[] = [];
-    for (const msg of messages) {
-      const text = extractMessageContentText(msg);
-      if (text) texts.push(text);
-    }
-    return texts.length > 0 ? texts.join("\n") : null;
+    return traceCanonicalisation.tryExtractMessageText({
+      value: messages,
+      mode,
+    });
   }
 
   // Try message-shaped extraction first (content, parts, text, value)
-  const messageText = extractMessageContentText(messages);
+  const messageText = traceCanonicalisation.tryExtractMessageText({
+    value: messages,
+    mode,
+  });
   if (messageText) return messageText;
 
   // Fall back to common JSON wrapper keys (input, question, query, etc.)

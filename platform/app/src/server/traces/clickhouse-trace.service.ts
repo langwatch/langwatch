@@ -8,6 +8,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { parsePromptTraceReference } from "@langwatch/prompt-contract";
 import { LLM_PARAMETER_MAP } from "@langwatch/prompt-web";
+import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
@@ -403,6 +404,7 @@ export class ClickHouseTraceService {
 
   private readonly prisma: PrismaClient;
   private readonly annotations: AnnotationService | undefined;
+  private readonly traceCanonicalisation: TraceCanonicalisationService;
 
   constructor({
     prisma,
@@ -410,6 +412,7 @@ export class ClickHouseTraceService {
     resolveTraceSpansBatch,
     retentionResolver,
     annotations,
+    traceCanonicalisation,
   }: {
     prisma: PrismaClient;
     resolveTraceSpans?: ResolveTraceSpansFn;
@@ -420,9 +423,11 @@ export class ClickHouseTraceService {
      */
     retentionResolver?: DataRetentionService;
     annotations?: AnnotationService;
+    traceCanonicalisation: TraceCanonicalisationService;
   }) {
     this.prisma = prisma;
     this.annotations = annotations;
+    this.traceCanonicalisation = traceCanonicalisation;
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
     this.retentionFloor = createRetentionFloorService(retentionResolver);
@@ -451,9 +456,7 @@ export class ClickHouseTraceService {
 
   /**
    * Static factory method for creating ClickHouseTraceService with explicit
-   * retention dependencies. The process preset injects the singular
-   * DataRetentionService; direct construction remains resolver-free so unit
-   * tests keep the platform default without a database in the graph.
+   * canonicalisation and retention dependencies.
    */
   static create({
     prisma = defaultPrisma,
@@ -461,19 +464,22 @@ export class ClickHouseTraceService {
     resolveTraceSpansBatch,
     retentionResolver,
     annotations,
+    traceCanonicalisation,
   }: {
     prisma?: PrismaClient;
     resolveTraceSpans?: ResolveTraceSpansFn;
     resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
     retentionResolver?: DataRetentionService;
     annotations?: AnnotationService;
-  } = {}): ClickHouseTraceService {
+    traceCanonicalisation: TraceCanonicalisationService;
+  }): ClickHouseTraceService {
     return new ClickHouseTraceService({
       prisma,
       resolveTraceSpans,
       resolveTraceSpansBatch,
       retentionResolver,
       annotations,
+      traceCanonicalisation,
     });
   }
 
@@ -2137,7 +2143,12 @@ export class ClickHouseTraceService {
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);
-          const trace = mapTraceSummaryToTrace(summary, [], projectId);
+          const trace = mapTraceSummaryToTrace(
+            summary,
+            [],
+            projectId,
+            this.traceCanonicalisation,
+          );
           return applyTraceProtections(trace, protections);
         });
 
@@ -2802,7 +2813,12 @@ export class ClickHouseTraceService {
       : null;
 
     const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
-    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId);
+    let trace = mapTraceSummaryToTrace(
+      summary,
+      mappedSpans,
+      projectId,
+      this.traceCanonicalisation,
+    );
 
     // When blobs were resolved, patch trace.input / trace.output with
     // the recomputed full values (overwriting the preview from trace_summaries).

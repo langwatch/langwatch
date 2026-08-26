@@ -1,8 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getUserProtectionsForProject } from "../utils";
 
 export const spansRouter = createTRPCRouter({
@@ -14,10 +12,7 @@ export const spansRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-      );
+      const traceService = ctx.app.traces.read;
       const traces = await traceService.getTracesWithSpans(
         input.projectId,
         [input.traceId],
@@ -69,7 +64,7 @@ export const spansRouter = createTRPCRouter({
         projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = ctx.app.traces.read;
       const result = await traceService.getSpanForPromptStudio(
         projectId,
         spanId,
