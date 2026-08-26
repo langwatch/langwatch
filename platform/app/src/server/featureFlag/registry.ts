@@ -389,17 +389,6 @@ export const FEATURE_FLAGS = [
       "Lets an organization set enterprise single sign-on up itself on the hosted service: register the identity provider, claim a domain, and prove it with a record it publishes once a LangWatch operator has approved the claim (spec: specs/identity/sso-onboarding-tiers.feature). Off = the settings entry is not offered and every self-serve command is refused by name, pointing the reader at talking to us. Self-hosted installations do not consult it — their licence is the authorization there. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=self_serve_sso, or target an organization from /ops/feature-flags.",
   },
   {
-    // D09 (ADR-117). Named `sso_connection_routing` rather than the usual
-    // `release_...` prefix so its auto-derived env override is exactly
-    // `SSO_CONNECTION_ROUTING`, and so it reads as what it is next to the
-    // `SSOCONN_ROUTING` environment variable it takes the routing half of.
-    key: "sso_connection_routing",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Lets one organization's sign-in be decided by the single sign-on connection it registered, instead of the legacy domain and provider columns (spec: specs/identity/sso-idp-termination.feature). Off — the default, and every organization that has not been named — the legacy columns answer exactly as they did before, so an existing customer's sign-in is untouched. On, and that organization's own identity provider terminates its sign-ins. Per organization on purpose: this is the lever a cutover is done and rolled back with, one customer at a time. Target an organization from /ops/feature-flags, or force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=sso_connection_routing.",
-  },
-  {
     key: "release_webhook_automations",
     scope: "PRODUCT",
     defaultValue: false,

@@ -65,7 +65,7 @@ export function SingleSignOnCard({
   setup: LiveSetup;
   canManage: boolean;
 }) {
-  const { connection, claims, goLive, serviceProvider } = setup;
+  const { connection, claims, serviceProvider } = setup;
   const { start, sending, failure } = useTestSignIn({
     connectionId: connection.connectionId,
   });
@@ -82,10 +82,7 @@ export function SingleSignOnCard({
       // is a sentence rather than a name, and a sentence is slower to
       // recognise than a mark.
       leading={<ProtocolMark type={connection.type} />}
-      chip={connectionStatusChipFor({
-        state: connection.state,
-        routingSwitchedOn: goLive?.routingSwitchedOn ?? false,
-      })}
+      chip={connectionStatusChipFor({ state: connection.state })}
       data-testid="single-sign-on-card"
       actions={
         <>
@@ -147,17 +144,21 @@ export function SingleSignOnCard({
         <Text>{connection.providerId}</Text>
       </OverviewDetail>
 
+      {/* WHO IS ACTUALLY SENT HERE, which the status chip states about the
+          CONNECTION and this row states about the PEOPLE. They move together
+          now — turning the connection on is the whole decision — so this row
+          reads off the same state rather than a switch of its own. */}
       <OverviewDetail
         label="Sign-in"
         hint={
-          goLive?.routingSwitchedOn
+          connection.state === "ACTIVE"
             ? undefined
-            : "The connection works. Everyone still signs in the way they do today."
+            : "The connection is not on yet. Everyone signs in the way they do today."
         }
       >
         <IdentityChip
-          label={goLive?.routingSwitchedOn ? "Everybody" : "Not switched over"}
-          tone={goLive?.routingSwitchedOn ? "good" : "warning"}
+          label={connection.state === "ACTIVE" ? "Everybody" : "Nobody yet"}
+          tone={connection.state === "ACTIVE" ? "good" : "warning"}
           data-testid="sso-routing-chip"
         />
       </OverviewDetail>

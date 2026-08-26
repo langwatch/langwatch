@@ -520,12 +520,6 @@ Feature: The people and access settings, as one cluster
       And where the connection stands is said in words, never as a state name
 
     @integration
-    Scenario: A connection that is on but carrying nobody says both
-      Given "acme" has a live connection its sign-ins have not moved to yet
-      When "ana" opens the authentication page
-      Then the card says the connection is on and not routing yet
-
-    @integration
     Scenario: A domain whose record has gone says so on the overview
       Given "acme" proved "acme.com" and its published record has been missing
       for two days

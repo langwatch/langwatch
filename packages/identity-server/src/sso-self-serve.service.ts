@@ -197,19 +197,6 @@ export interface SsoTestSignInLookup {
   }): Promise<SsoTestSignIn | null>;
 }
 
-/**
- * Whether this organization's sign-ins are DECIDED by its connection yet.
- *
- * Separate from activation on purpose, and the setup screen says both: a
- * connection can be on while the rollout that points sign-ins at it has not
- * been switched on for the organization. Telling a customer they are live
- * when the auth screens has not moved would be a screen that lies at exactly
- * the moment somebody is testing.
- */
-export interface SsoConnectionRoutingLookup {
-  routesOffConnection(args: { organizationId: string }): Promise<boolean>;
-}
-
 /** Somebody in the organization, as the break-glass surface names them. */
 export interface SsoOrganizationMember {
   userId: string;
@@ -348,12 +335,6 @@ export interface SelfServeGoLiveView {
   /** Every precondition met. Not the same as `activated`. */
   ready: boolean;
   activated: boolean;
-  /**
-   * Whether sign-ins for this organization are decided by the connection.
-   * False on an ACTIVE connection is an ordinary state and the screen says
-   * so plainly rather than implying the rollout finished.
-   */
-  routingSwitchedOn: boolean;
 }
 
 /**
@@ -448,8 +429,6 @@ export interface SsoSelfServeServiceDeps {
   breakGlass: SsoBreakGlassReadPort;
   /** Who they can be granted to, and who holds the ones that exist. */
   members: SsoOrganizationMemberLookup;
-  /** Whether the organization's sign-ins are decided by the connection. */
-  routing: SsoConnectionRoutingLookup;
   /** The deployment's own address, which is what LangWatch is called to an
    *  identity provider. */
   baseUrl: string;
@@ -556,13 +535,12 @@ export class SsoSelfServeService {
     organizationId: string;
     connection: SsoConnectionState;
   }): Promise<SelfServeGoLiveView> {
-    const [testSignIn, liveBindings, routingSwitchedOn] = await Promise.all([
+    const [testSignIn, liveBindings] = await Promise.all([
       this.deps.testSignIns.findLatestForConnection({
         organizationId,
         connectionId: connection.connectionId,
       }),
       this.liveBindings({ organizationId }),
-      this.deps.routing.routesOffConnection({ organizationId }),
     ]);
     const domainProved = connection.verifiedDomains.length > 0;
     // Somebody has SAID, which is not the same as the connection having an
@@ -587,7 +565,6 @@ export class SsoSelfServeService {
         liveBindings.length > 0 &&
         arrivalsDecided,
       activated: connection.state === "ACTIVE",
-      routingSwitchedOn,
     };
   }
 
@@ -1274,14 +1251,17 @@ export class SsoSelfServeService {
     reason: string | null;
     graceMs: number;
   }): Promise<void> {
-    await this.requireOrganizationConnection({ organizationId, connectionId });
-    const routing = await this.deps.routing.routesOffConnection({
+    const connection = await this.requireOrganizationConnection({
       organizationId,
+      connectionId,
     });
+    // The grace exists to protect people who are being SENT to this
+    // connection. One that was never turned on carried nobody, so waiting out
+    // a week would protect nobody and only delay the tidying.
     await this.deps.connections().requestTeardown({
       ...this.command({ organizationId, connectionId, actor }),
       reason,
-      graceMs: routing ? graceMs : 0,
+      graceMs: connection.state === "ACTIVE" ? graceMs : 0,
     });
   }
 

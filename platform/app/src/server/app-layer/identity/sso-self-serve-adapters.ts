@@ -7,7 +7,6 @@ import type {
 } from "@langwatch/identity";
 import type {
   SsoBreakGlassWarningNotifier,
-  SsoConnectionRoutingLookup,
   SsoDomainFileFetch,
   SsoDomainFileLookup,
   SsoDomainProofLookup,
@@ -661,31 +660,6 @@ export class PrismaSsoTestSignInLookup implements SsoTestSignInLookup {
       userId: account.userId,
       atMs: account.createdAt.getTime(),
     };
-  }
-}
-
-/**
- * Whether this organization's sign-ins are decided by its connection.
- *
- * The same flag the router reads (`sso_connection_routing`), asked the same
- * way, so the setup screen and the auth screens cannot disagree about whether
- * the rollout has happened. Read at request time rather than memoized: this
- * one is a per-organization lever an operator flips during a cutover, and a
- * screen showing a cached answer during a cutover is the screen nobody can
- * debug from.
- */
-export class FeatureFlagSsoRoutingLookup implements SsoConnectionRoutingLookup {
-  constructor(private readonly featureFlags: FeatureFlagService) {}
-
-  async routesOffConnection({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<boolean> {
-    return this.featureFlags.isEnabled("sso_connection_routing", {
-      organizationId,
-      distinctId: organizationId,
-    });
   }
 }
 

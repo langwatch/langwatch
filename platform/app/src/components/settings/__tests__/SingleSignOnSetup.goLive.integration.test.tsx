@@ -129,7 +129,6 @@ function setupWith({
     arrivalsDecided: boolean;
     ready: boolean;
     activated: boolean;
-    routingSwitchedOn: boolean;
   };
   state?: string;
   verifiedDomains?: string[];
@@ -165,7 +164,6 @@ const NOTHING_DONE = {
   arrivalsDecided: false,
   ready: false,
   activated: false,
-  routingSwitchedOn: false,
 };
 
 const EVERYTHING_DONE = {
@@ -175,7 +173,6 @@ const EVERYTHING_DONE = {
   arrivalsDecided: true,
   ready: true,
   activated: false,
-  routingSwitchedOn: false,
 };
 
 const draw = () =>
@@ -407,39 +404,24 @@ describe("given the ways back in an organization holds", () => {
 });
 
 describe("given a connection that is already on", () => {
-  /** @scenario "A connection that is live but not routing says so plainly" */
-  it("says the connection is on and that sign-in has not moved to it", () => {
+  /** @scenario "A connection that is live says sign-in is decided by it" */
+  it("says the connection is on and that sign-in is decided by it", () => {
     setupRef.current = setupWith({
       state: "ACTIVE",
-      goLive: { ...EVERYTHING_DONE, activated: true, routingSwitchedOn: false },
+      goLive: { ...EVERYTHING_DONE, activated: true },
     });
 
     const { container } = draw();
 
-    // The summary's own status chip is what says the connection is on and
-    // not routing; a full-width coloured banner under it was the same fact
-    // twice, in the loudest treatment on the page, about an ordinary state.
-    // What the banner alone carried is the part the chip cannot fit.
-    expect(container.textContent).toContain("On, not routing yet");
-    expect(container.textContent).toContain(
-      "Everyone still signs in the way they do today.",
-    );
-  });
-
-  /** @scenario "A connection that is live and routing says that instead" */
-  it("says people in the proved domains sign in through the identity provider", () => {
-    setupRef.current = setupWith({
-      state: "ACTIVE",
-      goLive: { ...EVERYTHING_DONE, activated: true, routingSwitchedOn: true },
-    });
-
-    const { container } = draw();
-
-    // The status chip carries it. A success banner repeating a settled state
-    // is the loudest treatment on the page spent on the case where nothing
-    // needs doing.
+    // The status chip carries the state; the line under it carries the one
+    // thing the chip cannot fit — that this is the moment sign-in moved, and
+    // that the administrator can move it back themselves.
     expect(container.textContent).toContain("Active");
-    expect(container.textContent).not.toContain("On, not routing yet");
+    expect(container.textContent).toContain(
+      "now sign in through your identity provider",
+    );
+    // The state that only existed because a second switch did.
+    expect(container.textContent).not.toContain("not routing yet");
   });
 });
 

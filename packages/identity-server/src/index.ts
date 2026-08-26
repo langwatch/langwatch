@@ -211,7 +211,6 @@ export {
   type SelfServeIssuedDnsRecord,
   type SelfServeSetupView,
   type SsoBreakGlassReadPort,
-  type SsoConnectionRoutingLookup,
   type SsoDomainFileFetch,
   type SsoDomainFileLookup,
   type SsoDomainProofLookup,

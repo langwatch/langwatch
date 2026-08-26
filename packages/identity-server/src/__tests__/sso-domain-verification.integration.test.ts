@@ -31,7 +31,6 @@ import {
 import {
   StubBreakGlassReads,
   StubMembers,
-  StubRouting,
   StubTestSignIns,
 } from "./support/in-memory-self-serve";
 
@@ -200,7 +199,6 @@ beforeEach(() => {
     testSignIns: new StubTestSignIns(),
     breakGlass: new StubBreakGlassReads(),
     members: new StubMembers(),
-    routing: new StubRouting(false),
     now: () => clock,
   });
 });

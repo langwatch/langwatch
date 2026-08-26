@@ -29,9 +29,9 @@ Feature: Going live with your own identity provider, without asking us
   # fact the ledger keeps. A customer cannot tick this box by clicking a
   # button; they tick it by signing in.
   #
-  # THE TEST WORKS BEFORE ROUTING DOES. Whether an organization's sign-ins
-  # are DECIDED by its connection is the `sso_connection_routing` flag,
-  # default off. The test sign-in does not go through that decision - it
+  # THE TEST WORKS BEFORE ROUTING DOES. An organization's sign-ins are
+  # decided by its connection once that connection is turned on, and this
+  # step comes first. The test sign-in does not go through that decision - it
   # names the connection outright - which is what makes it possible to prove
   # the connection before anything about anybody's sign-in changes.
   #
@@ -340,19 +340,11 @@ Feature: Going live with your own identity provider, without asking us
     Then they are offered a go-live control
 
   @integration
-  Scenario: A connection that is live but not routing says so plainly
+  Scenario: A connection that is live says sign-in is decided by it
     Given the connection is ACTIVE
-    And sign-in routing is not switched on for the organization
     When the administrator opens single sign-on setup
     Then it says the connection is on
-    And it says sign-in is not being decided by it yet
-
-  @integration
-  Scenario: A connection that is live and routing says that instead
-    Given the connection is ACTIVE
-    And sign-in routing is switched on for the organization
-    When the administrator opens single sign-on setup
-    Then it says people in the proved domains now sign in through the
+    And it says people in the proved domains now sign in through the
     identity provider
 
   @integration

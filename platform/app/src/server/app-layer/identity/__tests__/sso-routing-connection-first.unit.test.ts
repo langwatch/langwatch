@@ -1,18 +1,18 @@
 import type { RoutableConnection } from "@langwatch/identity";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PerOrganizationDomainRoutingRepository } from "../repositories/sso-routing-rollout.repository";
+import { describe, expect, it, vi } from "vitest";
+import { ConnectionFirstDomainRoutingRepository } from "../repositories/sso-routing-connection-first.repository";
 import { ssoMethodIsConfiguredWith } from "../sso-method-configured";
 
 /**
  * Who decides a sign-in while the two engines coexist (D09 — see
  * specs/identity/sso-idp-termination.feature).
  *
- * The property under test is the one the rollout depends on: with the flag
- * off, an organization is answered by exactly what answered it before this
- * class existed. Not "something equivalent" — the same object, from the same
- * port, so a customer signing in through the provider this deployment mounts
- * cannot tell the difference.
+ * The property under test is the one every organization without a connection
+ * depends on: it is answered by exactly what answered it before this class
+ * existed. Not "something equivalent" — the same object, from the same port,
+ * so a customer signing in through the provider this deployment mounts cannot
+ * tell the difference.
  */
 
 const legacyConnection: RoutableConnection = {
@@ -41,94 +41,60 @@ function port(
   };
 }
 
-describe("given an organization with a registered connection", () => {
-  let legacy: SignInDomainRoutingPort;
-  let connections: SignInDomainRoutingPort;
-  let enrolled: Set<string>;
-  let repository: PerOrganizationDomainRoutingRepository;
-
-  beforeEach(() => {
-    legacy = port(legacyConnection, [legacyConnection]);
-    connections = port(projectedConnection, [projectedConnection]);
-    enrolled = new Set<string>();
-    repository = new PerOrganizationDomainRoutingRepository({
-      legacy,
-      connections,
-      routesOffConnections: async ({ organizationId }) =>
-        enrolled.has(organizationId),
-      organizationOf: async () => "org_acme",
+describe("given an organization whose connection is live", () => {
+  /** @scenario "A live connection decides the domains it proved" */
+  it("lets the connection projection decide", async () => {
+    const repository = new ConnectionFirstDomainRoutingRepository({
+      legacy: port(legacyConnection, [legacyConnection]),
+      connections: port(projectedConnection, [projectedConnection]),
     });
+
+    expect(
+      await repository.findConnectionForDomain({ domain: "acme.com" }),
+    ).toBe(projectedConnection);
   });
 
-  describe("when the routing flag is off", () => {
-    /** @scenario "With the routing flag off the strings still decide sign-in" */
-    it("answers exactly what the legacy columns answered", async () => {
-      const decided = await repository.findConnectionForDomain({
-        domain: "acme.com",
-      });
-
-      expect(decided).toBe(legacyConnection);
-      expect(legacy.findConnectionForDomain).toHaveBeenCalledWith({
-        domain: "acme.com",
-      });
+  /** @scenario "A live connection decides the domains it proved" */
+  it("counts the connection once, not once per side", async () => {
+    const repository = new ConnectionFirstDomainRoutingRepository({
+      legacy: port(legacyConnection, [legacyConnection]),
+      connections: port(projectedConnection, [projectedConnection]),
     });
 
-    /** @scenario "With the routing flag off the strings still decide sign-in" */
-    it("leaves the sole-connection list to the legacy side", async () => {
-      expect(await repository.listActiveConnections()).toEqual([
-        legacyConnection,
-      ]);
-    });
-  });
-
-  describe("when the routing flag is on for this organization", () => {
-    beforeEach(() => {
-      enrolled.add("org_acme");
-    });
-
-    /** @scenario "With the routing flag on for one organization only that organization moves" */
-    it("lets the connection projection decide", async () => {
-      expect(
-        await repository.findConnectionForDomain({ domain: "acme.com" }),
-      ).toBe(projectedConnection);
-    });
-
-    it("counts the connection once, not once per side", async () => {
-      expect(await repository.listActiveConnections()).toEqual([
-        projectedConnection,
-        legacyConnection,
-      ]);
-    });
-  });
-
-  describe("when the routing flag is on for a different organization", () => {
-    beforeEach(() => {
-      enrolled.add("org_someone_else");
-    });
-
-    /** @scenario "With the routing flag on for one organization only that organization moves" */
-    it("still answers this organization from the legacy columns", async () => {
-      expect(
-        await repository.findConnectionForDomain({ domain: "acme.com" }),
-      ).toBe(legacyConnection);
-    });
+    expect(await repository.listActiveConnections()).toEqual([
+      projectedConnection,
+      legacyConnection,
+    ]);
   });
 });
 
 describe("given a domain no connection was ever projected for", () => {
-  /** @scenario "With the routing flag off the strings still decide sign-in" */
-  it("falls through to the legacy columns whatever the flag says", async () => {
+  /** @scenario "A domain no connection answers for is still decided by the legacy columns" */
+  it("answers exactly what the legacy columns answered", async () => {
     const legacy = port(legacyConnection);
-    const repository = new PerOrganizationDomainRoutingRepository({
+    const repository = new ConnectionFirstDomainRoutingRepository({
       legacy,
       connections: port(null),
-      routesOffConnections: async () => true,
-      organizationOf: async () => "org_acme",
     });
 
     expect(
       await repository.findConnectionForDomain({ domain: "acme.com" }),
     ).toBe(legacyConnection);
+    expect(legacy.findConnectionForDomain).toHaveBeenCalledWith({
+      domain: "acme.com",
+    });
+  });
+
+  /** @scenario "A domain no connection answers for is still decided by the legacy columns" */
+  it("leaves the sole-connection list to the legacy side", async () => {
+    const repository = new ConnectionFirstDomainRoutingRepository({
+      legacy: port(legacyConnection, [legacyConnection]),
+      connections: port(null, []),
+    });
+
+    expect(await repository.listActiveConnections()).toEqual([
+      legacyConnection,
+    ]);
   });
 });
 
@@ -216,24 +182,5 @@ describe("given a deployment in plain email mode", () => {
         organizationId: "org_acme",
       }),
     ).toBe(false);
-  });
-});
-
-describe("given a projected connection whose organization cannot be resolved", () => {
-  it("does not let it decide", async () => {
-    // A connection with no organization is a connection no flag can be
-    // checked for, and the safe answer to "may this decide a sign-in" when
-    // the question cannot be asked is no.
-    const legacy = port(legacyConnection);
-    const repository = new PerOrganizationDomainRoutingRepository({
-      legacy,
-      connections: port(projectedConnection),
-      routesOffConnections: async () => true,
-      organizationOf: async () => null,
-    });
-
-    expect(
-      await repository.findConnectionForDomain({ domain: "acme.com" }),
-    ).toBe(legacyConnection);
   });
 });

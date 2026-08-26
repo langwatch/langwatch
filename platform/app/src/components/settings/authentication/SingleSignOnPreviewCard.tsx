@@ -39,7 +39,7 @@ export function SingleSignOnPreviewCard({
           tone: "neutral" as const,
           title: "No identity provider is connected to this organization.",
         }
-      : connectionStatusChipFor({ state, routingSwitchedOn: false });
+      : connectionStatusChipFor({ state });
 
   return (
     <OverviewCard

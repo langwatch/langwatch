@@ -127,7 +127,7 @@ import {
 } from "./repositories/sso-connection-reads.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
-import { PerOrganizationDomainRoutingRepository } from "./repositories/sso-routing-rollout.repository";
+import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
   IdTokenProviderAssertions,
@@ -152,7 +152,6 @@ import { ssoMethodIsConfiguredWith } from "./sso-method-configured";
 import {
   DnsDomainProofLookup,
   EmailSsoDomainReproofNotifier,
-  FeatureFlagSsoRoutingLookup,
   HttpsDomainProofFileLookup,
   InstanceLicenseProof,
   LicenseDomainClaimAuthority,
@@ -407,11 +406,17 @@ const ssoConnectionDomainRouting = new SsoConnectionDomainRoutingRepository(
  * Which lookup the router gets (ADR-117 §5, revised by D09).
  *
  * D04 staged this on `SSOCONN_ROUTING`, an environment variable, which is a
- * fleet-wide answer to a per-customer question. It is now a per-organization
- * feature flag, `sso_connection_routing`, default off: an organization that
- * has it routes off its own connection, every other organization is answered
- * by the legacy `Organization.ssoDomain` / `ssoProvider` columns exactly as
- * before, and rolling one customer back is turning one flag off.
+ * fleet-wide answer to a per-customer question. D09 answered it per
+ * organization with a feature flag instead, and that was one switch too many:
+ * TURNING THE CONNECTION ON IS THE DECISION. An administrator who proves a
+ * domain, tests a sign-in, holds a way back in and presses go-live has said
+ * what they want as plainly as it can be said, and a second lever they cannot
+ * reach only meant their connection read "on" while it carried nobody.
+ *
+ * So a connection that is live decides the domains it proved, and every
+ * organization without one is answered by the legacy `Organization.ssoDomain`
+ * / `ssoProvider` columns exactly as before. Rolling a customer back is
+ * turning their connection off, which is the control they already have.
  *
  * `SSOCONN_ROUTING` is NOT retired, because it never only meant routing:
  * `legacy-sso-string-writes.ts` reads it to decide when string WRITES stop,
@@ -430,21 +435,9 @@ export function signInDomainRoutingPort(): SignInDomainRoutingPort {
         shadow: ssoConnectionDomainRouting,
       });
     default:
-      return new PerOrganizationDomainRoutingRepository({
+      return new ConnectionFirstDomainRoutingRepository({
         legacy: legacySsoDomainRouting,
         connections: ssoConnectionDomainRouting,
-        routesOffConnections: ({ organizationId }) =>
-          featureFlagService.isEnabled("sso_connection_routing", {
-            organizationId,
-            distinctId: organizationId,
-          }),
-        organizationOf: async ({ connectionId }) =>
-          (
-            await prisma.ssoConnection.findUnique({
-              where: { id: connectionId },
-              select: { organizationId: true },
-            })
-          )?.organizationId ?? null,
       });
   }
 }
@@ -604,7 +597,6 @@ export function ssoSelfServe(): SsoSelfServeService {
     // lists the ways back in and never writes one.
     breakGlass: ssoBreakGlass(),
     members: new PrismaSsoOrganizationMemberLookup(prisma),
-    routing: new FeatureFlagSsoRoutingLookup(featureFlagService),
   });
 }
 

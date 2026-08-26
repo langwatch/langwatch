@@ -326,7 +326,6 @@ describe("how many identity providers an organization may register", () => {
         findAdministrators: async () => [],
         findByIds: async () => [],
       },
-      routing: { routesOffConnection: async () => false },
     });
 
   let registeredConnections: { registerConnection: (data: unknown) => unknown };

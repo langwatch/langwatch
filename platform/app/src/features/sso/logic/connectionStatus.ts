@@ -53,35 +53,28 @@ export function connectionProtocolName(type: SsoConnectionType): string {
 }
 
 /**
- * Where the connection stands, and — separately — whether anybody is being
- * sent to it.
+ * Where the connection stands.
  *
- * The two are different facts, and a live connection whose organization has
- * not been switched over is the case where saying only one of them misleads:
- * "Active" would tell somebody their rollout finished at the exact moment
- * nobody is being routed through it yet.
+ * ONE FACT, NOT TWO. This used to answer "is it on" and "is anybody being
+ * sent to it" separately, because a second switch decided the latter — so a
+ * live connection could truthfully read "On, not routing yet", which is a
+ * chip nobody could act on: the control that would have changed it was not
+ * the administrator's. Turning the connection on is now the whole decision,
+ * so being on and carrying sign-in are the same fact and the chip says it
+ * once.
  */
 export function connectionStatusChipFor({
   state,
-  routingSwitchedOn,
 }: {
   state: SsoConnectionLifecycleState;
-  routingSwitchedOn: boolean;
 }): ConnectionStatusChip {
   if (state === "ACTIVE") {
-    return routingSwitchedOn
-      ? {
-          label: "Active",
-          tone: "good",
-          title:
-            "People with an address at your proved domains sign in through your identity provider.",
-        }
-      : {
-          label: "On, not routing yet",
-          tone: "warning",
-          title:
-            "The connection works. Everyone still signs in the way they do today, until your organization is switched over.",
-        };
+    return {
+      label: "Active",
+      tone: "good",
+      title:
+        "People with an address at your proved domains sign in through your identity provider.",
+    };
   }
   return STEADY_STATES[state];
 }

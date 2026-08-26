@@ -128,7 +128,6 @@ const SETUP = {
     arrivalsDecided: false,
     ready: false,
     activated: false,
-    routingSwitchedOn: false,
   },
   attestationOffered: false,
 };

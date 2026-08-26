@@ -10,60 +10,42 @@ import {
  *
  * The words themselves are copy and will change; asserting them back would
  * pin nothing. What matters is that every state the aggregate can rest in has
- * an answer, that none of the answers is the aggregate's own vocabulary, and
- * that "on" and "actually carrying sign-ins" stay two different chips.
+ * an answer, and that none of the answers is the aggregate's own vocabulary.
  */
 describe("the connection status chip", () => {
   describe("given every state a connection can rest in", () => {
     /** @scenario "Every state a connection can be in has customer words" */
     it("answers each one in words that are not the state's own name", () => {
       for (const state of SSO_CONNECTION_STATES) {
-        for (const routingSwitchedOn of [true, false]) {
-          const chip = connectionStatusChipFor({ state, routingSwitchedOn });
+        const chip = connectionStatusChipFor({ state });
 
-          expect(chip.label.length).toBeGreaterThan(0);
-          expect(chip.title.length).toBeGreaterThan(0);
-          expect(chip.label).not.toBe(state);
-          // The aggregate's vocabulary is SHOUTED_WITH_UNDERSCORES. Nothing
-          // shaped like that may reach a reader.
-          expect(chip.label).not.toMatch(/^[A-Z_]+$/);
-          expect(chip.label).not.toContain("_");
-        }
+        expect(chip.label.length).toBeGreaterThan(0);
+        expect(chip.title.length).toBeGreaterThan(0);
+        expect(chip.label).not.toBe(state);
+        // The aggregate's vocabulary is SHOUTED_WITH_UNDERSCORES. Nothing
+        // shaped like that may reach a reader.
+        expect(chip.label).not.toMatch(/^[A-Z_]+$/);
+        expect(chip.label).not.toContain("_");
       }
     });
   });
 
-  describe("when the connection is on but sign-ins have not moved to it", () => {
-    it("says something different from a connection that is carrying them", () => {
-      const carrying = connectionStatusChipFor({
-        state: "ACTIVE",
-        routingSwitchedOn: true,
-      });
-      const notYet = connectionStatusChipFor({
-        state: "ACTIVE",
-        routingSwitchedOn: false,
-      });
+  describe("when the connection is on", () => {
+    it("says so as a settled state rather than a warning", () => {
+      const carrying = connectionStatusChipFor({ state: "ACTIVE" });
 
-      expect(notYet.label).not.toBe(carrying.label);
       expect(carrying.tone).toBe("good");
-      // Not good: nothing is being routed yet, and a green chip would tell
-      // somebody their rollout finished.
-      expect(notYet.tone).not.toBe("good");
+      // The reader has nothing left to do, so the chip must not imply they
+      // do: an ACTIVE connection IS the routing decision.
+      expect(carrying.shimmer).toBeUndefined();
     });
   });
 
-  describe("when a state is nothing to do with routing", () => {
-    it("answers the same either way", () => {
-      expect(
-        connectionStatusChipFor({
-          state: "SUSPENDED",
-          routingSwitchedOn: true,
-        }),
-      ).toEqual(
-        connectionStatusChipFor({
-          state: "SUSPENDED",
-          routingSwitchedOn: false,
-        }),
+  describe("when the connection is waiting on the reader", () => {
+    it("marks the one state they can act on and no other", () => {
+      expect(connectionStatusChipFor({ state: "VERIFIED" }).shimmer).toBe(true);
+      expect(connectionStatusChipFor({ state: "SUSPENDED" }).shimmer).toBe(
+        undefined,
       );
     });
   });

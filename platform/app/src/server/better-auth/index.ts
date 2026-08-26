@@ -176,9 +176,8 @@ const plugins = [
    * What the plugin being registered does is mount routes that answer for
    * providers in a table; with no rows, `/sso/*` answers "no such provider"
    * and nothing about anybody's sign-in changes. What decides whether a
-   * sign-in ROUTES to a connection is the per-organization
-   * `sso_connection_routing` flag, off by default, and that decision is the
-   * router's rather than the engine's.
+   * sign-in ROUTES to a connection is whether that connection is live, and
+   * that decision is the router's rather than the engine's.
    *
    * The provider rows themselves are never written through this plugin's own
    * registration endpoint. They are folded from the connection log

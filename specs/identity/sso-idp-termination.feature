@@ -46,12 +46,15 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   # address to redirect to. So the setup surface presents LangWatch's service
   # provider details BEFORE it asks for a single field, on both protocols.
   #
-  # ROLLOUT is a per-organization feature flag, `sso_connection_routing`,
-  # default off, and NOT the `SSOCONN_ROUTING` environment variable D04 shipped.
-  # An environment variable is a fleet-wide decision and this is a
-  # per-customer one: the first organization to route through its own
-  # connection has to be able to do so without every other organization on
-  # the deployment moving with it.
+  # ROLLOUT IS THE CONNECTION ITSELF, and NOT the `SSOCONN_ROUTING`
+  # environment variable D04 shipped, nor the per-organization feature flag
+  # D09 replaced it with. An environment variable is a fleet-wide decision
+  # and this is a per-customer one; a feature flag had the grain right and
+  # the control wrong. An administrator who proves a domain, tests a
+  # sign-in, holds a way back in and turns the connection on has said what
+  # they want, and a second switch they cannot reach only meant their
+  # connection read "on" while it carried nobody. Turning it on IS the
+  # decision, and turning it off is how a customer rolls back.
 
   Background:
     Given an organization on an Enterprise plan whose administrator holds
@@ -197,20 +200,18 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   # ---------------------------------------------------------------------
 
   @unit
-  Scenario: With the routing flag off the strings still decide sign-in
-    Given the organization does not have "sso_connection_routing" switched on
-    When the sign-in router resolves a domain
-    Then the legacy organization columns are what answered
-    And the connection projection decided nothing
+  Scenario: A live connection decides the domains it proved
+    Given the organization has turned its connection on
+    When the sign-in router resolves a domain the connection proved
+    Then the connection projection is what answered
+    And the connection is counted once, not once per side
 
   @unit
-  Scenario: With the routing flag on for one organization only that organization moves
-    Given "sso_connection_routing" is switched on for this organization and
-    off for every other
-    When the sign-in router resolves a domain belonging to this organization
-    Then the connection projection is what answered
-    And a domain belonging to another organization is still answered by the
-    legacy columns
+  Scenario: A domain no connection answers for is still decided by the legacy columns
+    Given an organization that never registered a connection
+    When the sign-in router resolves one of its domains
+    Then the legacy organization columns are what answered
+    And the connection projection decided nothing
 
   # ---------------------------------------------------------------------
   # Coexistence with the provider this deployment already mounts

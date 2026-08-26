@@ -156,7 +156,6 @@ const GO_LIVE = {
   arrivalsDecided: true,
   ready: true,
   activated: true,
-  routingSwitchedOn: true,
 };
 
 /** A connection that is on and carrying sign-ins, unless told otherwise. */
@@ -335,19 +334,6 @@ describe("the organization's authentication page", () => {
       // The aggregate's own vocabulary never reaches the reader.
       expect(screen.queryByText("ACTIVE")).toBeNull();
       expect(screen.queryByText(/VERIFICATION_PENDING/)).toBeNull();
-    });
-
-    /** @scenario "A connection that is on but carrying nobody says both" */
-    it("separates a connection that is on from one that is routing", async () => {
-      mockGetSetup.mockReturnValue({
-        data: liveSetup({ goLive: { ...GO_LIVE, routingSwitchedOn: false } }),
-        isLoading: false,
-      });
-      await open();
-
-      const card = screen.getByTestId("single-sign-on-card");
-      expect(within(card).getByText(/not routing yet/i)).toBeTruthy();
-      expect(within(card).queryByText("Active")).toBeNull();
     });
 
     /** @scenario "A domain whose record has gone says so on the overview" */
@@ -615,7 +601,7 @@ describe("the organization's authentication page", () => {
       mockGetSetup.mockReturnValue({
         data: liveSetup({
           connection: { ...liveSetup().connection, state: "VERIFIED" },
-          goLive: { ...GO_LIVE, activated: false, routingSwitchedOn: false },
+          goLive: { ...GO_LIVE, activated: false },
         }),
         isLoading: false,
       });

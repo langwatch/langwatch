@@ -1,7 +1,6 @@
 import type { BreakGlassBinding } from "@langwatch/identity";
 import type {
   SsoBreakGlassReadPort,
-  SsoConnectionRoutingLookup,
   SsoOrganizationMember,
   SsoOrganizationMemberLookup,
   SsoTestSignIn,
@@ -84,18 +83,6 @@ export class StubMembers implements SsoOrganizationMemberLookup {
   }): Promise<SsoOrganizationMember[]> {
     const known = [...this.administrators, ...this.everybody];
     return known.filter((person) => userIds.includes(person.userId));
-  }
-}
-
-export class StubRouting implements SsoConnectionRoutingLookup {
-  constructor(private on = false) {}
-
-  set(on: boolean): void {
-    this.on = on;
-  }
-
-  async routesOffConnection(): Promise<boolean> {
-    return this.on;
   }
 }
 

@@ -131,7 +131,6 @@ function setupIn({
       // below on purpose: it is false for SUSPENDED and TEARDOWN_PENDING in
       // production too, and that is precisely what broke.
       activated: state === "ACTIVE",
-      routingSwitchedOn: true,
     },
     attestationOffered: false,
   };

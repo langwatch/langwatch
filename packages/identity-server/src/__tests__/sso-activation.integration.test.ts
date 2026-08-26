@@ -28,7 +28,6 @@ import {
   bindingFor,
   StubBreakGlassReads,
   StubMembers,
-  StubRouting,
   StubTestSignIns,
 } from "./support/in-memory-self-serve";
 
@@ -143,7 +142,6 @@ let context: StubContext;
 let testSignIns: StubTestSignIns;
 let breakGlassReads: StubBreakGlassReads;
 let activationBindings: StubBreakGlassBindings;
-let routing: StubRouting;
 let proofs: StubProofs;
 let members: StubMembers;
 let committed: {
@@ -164,7 +162,6 @@ beforeEach(async () => {
   // can prove the surface refuses first and the guard would have refused
   // anyway.
   activationBindings = new StubBreakGlassBindings(true);
-  routing = new StubRouting(false);
   proofs = new StubProofs();
   members = new StubMembers(
     [{ userId: ANA.userId, name: "Ana", email: "ana@acme.com" }],
@@ -210,7 +207,6 @@ beforeEach(async () => {
     testSignIns,
     breakGlass: breakGlassReads,
     members,
-    routing,
     now: () => clock,
   });
 
@@ -370,8 +366,8 @@ describe("going live with your own identity provider", () => {
       expect(committed.length).toBe(after);
     });
 
-    /** @scenario "A connection that is live but not routing says so plainly" */
-    it("says the connection is on and that sign-in has not moved to it", async () => {
+    /** @scenario "A connection that is live says sign-in is decided by it" */
+    it("says the connection is on, which is what decides sign-in", async () => {
       await selfServe.activate({
         organizationId: ORG,
         connectionId,
@@ -381,22 +377,6 @@ describe("going live with your own identity provider", () => {
       const setup = await selfServe.getSetup({ organizationId: ORG });
 
       expect(setup.goLive?.activated).toBe(true);
-      expect(setup.goLive?.routingSwitchedOn).toBe(false);
-    });
-
-    /** @scenario "A connection that is live and routing says that instead" */
-    it("says sign-in is decided by the connection once the rollout reaches the organization", async () => {
-      await selfServe.activate({
-        organizationId: ORG,
-        connectionId,
-        actor: ANA,
-      });
-      routing.set(true);
-
-      const setup = await selfServe.getSetup({ organizationId: ORG });
-
-      expect(setup.goLive?.activated).toBe(true);
-      expect(setup.goLive?.routingSwitchedOn).toBe(true);
     });
   });
 
