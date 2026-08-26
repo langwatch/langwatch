@@ -8,12 +8,11 @@
  */
 
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { MessagePreview, SimulationCard } from "@langwatch/suite-web";
 import { Square } from "lucide-react";
-import { SimulationCard } from "~/components/simulations/SimulationCard";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { MessagePreview } from "./MessagePreview";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import { usePrefetchRunState } from "./usePrefetchRunState";

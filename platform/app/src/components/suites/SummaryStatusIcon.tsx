@@ -4,7 +4,7 @@
  * Used by both RunRow and GroupRow headers.
  */
 
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web";
 import type { RunGroupSummary } from "./run-history-transforms";
 import { worstStatus } from "./run-history-transforms";
 import { STATUS_ICON_CONFIG } from "./status-icons";

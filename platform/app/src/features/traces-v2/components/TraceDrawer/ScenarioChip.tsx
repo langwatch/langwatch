@@ -1,6 +1,6 @@
 import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { LuCheck, LuX } from "react-icons/lu";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

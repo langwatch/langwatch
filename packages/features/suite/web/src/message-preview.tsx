@@ -9,12 +9,34 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { Settings } from "react-feather";
-import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { z } from "zod";
+
+const textPartSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+});
+
+/** The subset of a streamed message required by the preview. */
+export type SuiteStreamingMessage = {
+  messageId: string;
+  role: string;
+  content: string;
+  messageIndex?: number;
+  status: "streaming" | "complete";
+};
+
+/** Provider-neutral message shape used by the suite run transport. */
+export type SuiteRunMessage = {
+  id?: string;
+  role?: string;
+  content?: unknown;
+  tool_calls?: Array<{ function?: { name?: string } }>;
+  toolCalls?: Array<{ function?: { name?: string } }>;
+};
 
 type MessagePreviewProps = {
-  messages: ScenarioRunData["messages"];
-  streamingMessages?: StreamingMessage[];
+  messages: readonly SuiteRunMessage[];
+  streamingMessages?: readonly SuiteStreamingMessage[];
 };
 
 /**
@@ -46,14 +68,9 @@ function textContent(content: unknown): string {
 
 function extractTextParts(parts: unknown[]): string {
   return parts
-    .filter(
-      (item): item is { type: string; text: string } =>
-        typeof item === "object" &&
-        item !== null &&
-        (item as Record<string, unknown>).type === "text" &&
-        typeof (item as Record<string, unknown>).text === "string",
-    )
-    .map((item) => item.text)
+    .map((item) => textPartSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data.text)
     .join(" ");
 }
 

@@ -1,8 +1,10 @@
 # Suite
 
-Suite owns run-plan definitions, reference validation, and their portable
-vocabulary. Its canonical server slice provides CRUD, duplication, archiving,
-scoped lookup, slug uniqueness, and run preparation through `SuiteService`.
+Suite owns run-plan definitions, reference validation, run history, and their
+portable vocabulary. Its canonical server slice provides CRUD, duplication,
+archiving, scoped lookup, slug uniqueness, and run preparation through
+`SuiteService`. Its web slice owns the reusable scenario-run card, message
+preview, status configuration, and completion treatment.
 
 ## Boundary
 
@@ -25,8 +27,9 @@ durable read model exists.
   execution port: it resolves run-only parameters and dispatches the existing
   simulation and Suite-run commands. The Suite service and its run repository
   remain package-owned.
-- `platform/app/src/components/suites/`, `components/simulations/`, pages and
-  hooks remain application composition because they depend on tRPC stores,
-  routing and page layout. Portable UI can move later to `suite/web`.
+- `platform/app/src/components/suites/`, pages and hooks remain application
+  composition because they depend on tRPC stores, routing and page layout.
+  Simulation cards, their status treatment, and message previews import the
+  canonical `suite/web` primitives directly.
 - The REST `/api/suites` and tRPC suite router consume the process-owned
   `app.suites`; neither transport constructs a service per request.

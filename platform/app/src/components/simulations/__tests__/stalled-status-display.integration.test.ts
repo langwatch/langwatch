@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { getOverlayConfig } from "../SimulationStatusOverlay";
+import { getOverlayConfig } from "@langwatch/suite-web";
 import { STATUS_DISPLAY_TEXT_MAP } from "../simulation-console/constants";
 
 // ============================================================================

@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, Clock, type LucideIcon, XCircle } from "lucide-react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/simulation-contract";
 
 export interface ScenarioRunStatusConfig {
   /** Chakra colorPalette token */

@@ -11,7 +11,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { MessagePreview } from "../MessagePreview";
+import { MessagePreview } from "@langwatch/suite-web";
 
 type Messages = ScenarioRunData["messages"];
 

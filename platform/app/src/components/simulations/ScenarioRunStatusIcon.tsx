@@ -4,7 +4,7 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
-} from "./scenario-run-status-config";
+} from "@langwatch/suite-web";
 
 interface ScenarioRunStatusIconProps extends Omit<IconProps, "as" | "color"> {
   status?: ScenarioRunStatus;

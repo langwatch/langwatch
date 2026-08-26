@@ -200,6 +200,7 @@
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
+    "@langwatch/suite-web": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-server": "workspace:*",

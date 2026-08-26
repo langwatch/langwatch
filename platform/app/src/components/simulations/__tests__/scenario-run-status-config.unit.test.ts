@@ -5,7 +5,7 @@ import {
   SCENARIO_RUN_STATUS_CONFIG,
   SCENARIO_RUN_STATUS_ICONS,
   type ScenarioRunStatusConfig,
-} from "../scenario-run-status-config";
+} from "@langwatch/suite-web";
 
 const allStatuses = Object.values(ScenarioRunStatus);
 

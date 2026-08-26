@@ -34,6 +34,11 @@ Boot constructs the service once at `app.suites`. REST and tRPC compatibility
 transports call that instance for CRUD, reference checks, archived names and
 run requests. Existing URLs and procedure names remain unchanged.
 
+The `suite/web` surface owns browser-safe run presentation primitives that are
+independent of routing and transport: scenario message previews, status
+configuration/overlay, and the simulation card shell. The application retains
+run-history page composition, tRPC hooks, Langy targeting, and prefetch wiring.
+
 ## Consequences
 
 - Definition and run-plan behavior have one service boundary.
