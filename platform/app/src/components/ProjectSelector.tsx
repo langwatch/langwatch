@@ -22,13 +22,22 @@ interface ProjectGroup {
   projects: Project[];
 }
 
-const sortByName = (a: { name: string }, b: { name: string }) => {
+const sortByName = ({
+  a,
+  b,
+}: {
+  a: { name: string };
+  b: { name: string };
+}) => {
   const first = a.name.toLowerCase();
   const second = b.name.toLowerCase();
   if (first < second) return -1;
   if (first > second) return 1;
   return 0;
 };
+
+const compareByName = (a: { name: string }, b: { name: string }) =>
+  sortByName({ a, b });
 
 /**
  * Build the sorted `{organization, team, projects}` groups from the query
@@ -38,11 +47,11 @@ const sortByName = (a: { name: string }, b: { name: string }) => {
 function buildProjectGroups(
   organizations: FullyLoadedOrganization[],
 ): ProjectGroup[] {
-  return [...organizations].sort(sortByName).flatMap((organization) =>
+  return [...organizations].sort(compareByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
       organization,
       team,
-      projects: [...team.projects].sort(sortByName),
+      projects: [...team.projects].sort(compareByName),
     })),
   );
 }

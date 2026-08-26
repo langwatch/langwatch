@@ -46,13 +46,12 @@ Feature: Organization primary intent decides the "/" landing
       When the home resolver runs
       Then the destination is a project home
 
-  # The client-side landing shim was removed. The "/" resolution now uses
-  # the device's per-organization product memory ahead of the server
-  # resolver (specs/navigation/navigation-v2-landing.feature). For an
-  # organization that carries an intent, the intent still wins over both
-  # the memory and any user pin (see the rule above). Explicit user pins
-  # only come into play for intent-less organizations, on the legacy
-  # resolver path.
+  # Precedence, from strongest to weakest:
+  #   1. An organization intent, when the current organization carries one.
+  #   2. The reader's last-visited product for that organization.
+  #   3. An explicit user pin, only when the organization carries no intent.
+  # See specs/navigation/navigation-v2-landing.feature for the observable
+  # landing rules that apply once the organization is intent-less.
 
   Rule: a kill-switched governance organization never lands on a gated 404
 
