@@ -78,6 +78,23 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
   ];
   return {
     ...Object.fromEntries(factories.map((name) => [name, inert])),
+    // Not inert, unlike its neighbours: `better-auth/index.ts` is on this
+    // router's import graph and calls this at module load to build its
+    // adapter. An empty object there fails the initialization, and because
+    // the failure is an unhandled rejection every test still passed while
+    // the run exited non-zero. Enough shape for `betterAuth()` to finish;
+    // nothing in this suite reaches storage.
+    identityStorageAdapter: () => () => ({
+      id: "stub",
+      create: async () => ({}),
+      update: async () => ({}),
+      updateMany: async () => 0,
+      findOne: async () => null,
+      findMany: async () => [],
+      delete: async () => undefined,
+      deleteMany: async () => 0,
+      count: async () => 0,
+    }),
     isAnyoneLatched: async () => false,
     isLatched: async () => false,
     routesToIdentityBranch: () => false,

@@ -10,7 +10,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { ssoConnectionsRouter } from "../ssoConnections";
 
-const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
+const {
+  mockService,
+  mockAuditLog,
+  mockSsoConnections,
+  stubBetterAuthAdapter,
+} = vi.hoisted(() => ({
+  /** Enough of better-auth's adapter shape for `betterAuth()` to finish
+   *  constructing. Nothing in this suite reaches storage; what it needs is for
+   *  the auth module on its import graph to finish evaluating.
+   *
+   *  HOISTED, because `vi.mock` factories are: declared as a plain `const`
+   *  below the mocks that read it, the factory ran first and hit the temporal
+   *  dead zone. The rejection was unhandled, so every test still passed and
+   *  the run still exited non-zero. */
+  stubBetterAuthAdapter: {
+    id: "stub",
+    create: async () => ({}),
+    update: async () => ({}),
+    updateMany: async () => 0,
+    findOne: async () => null,
+    findMany: async () => [],
+    delete: async () => undefined,
+    deleteMany: async () => 0,
+    count: async () => 0,
+  },
   mockService: {
     list: vi.fn(),
     getById: vi.fn(),
@@ -58,21 +82,6 @@ vi.mock(
     };
   },
 );
-
-/** Enough of better-auth's adapter shape for `betterAuth()` to finish
- *  constructing. Nothing in this suite reaches storage; what it needs is for
- *  the auth module on its import graph to finish evaluating. */
-const stubBetterAuthAdapter = {
-  id: "stub",
-  create: async () => ({}),
-  update: async () => ({}),
-  updateMany: async () => 0,
-  findOne: async () => null,
-  findMany: async () => [],
-  delete: async () => undefined,
-  deleteMany: async () => 0,
-  count: async () => 0,
-};
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoConnections: mockSsoConnections,
