@@ -42,6 +42,14 @@
       "types": "./src/components/column-type-icon.tsx",
       "default": "./src/components/column-type-icon.tsx"
     },
+    "./metric-value-formatters": {
+      "types": "./src/metric-value-formatters.ts",
+      "default": "./src/metric-value-formatters.ts"
+    },
+    "./pass-rate-indicator": {
+      "types": "./src/components/pass-rate-indicator.tsx",
+      "default": "./src/components/pass-rate-indicator.tsx"
+    },
     "./dialog": {
       "types": "./src/components/dialog.tsx",
       "default": "./src/components/dialog.tsx"

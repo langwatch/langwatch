@@ -15,7 +15,10 @@ import { CopyButton } from "~/components/CopyButton";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { formatCost, formatLatency } from "~/components/shared/formatters";
+import {
+  formatCost,
+  formatLatency,
+} from "@langwatch/design-system/metric-value-formatters";
 import { buildDisplayTitle } from "@langwatch/suite-web";
 import { HandledErrorAlert } from "~/features/errors";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";

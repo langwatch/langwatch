@@ -181,3 +181,8 @@ export {
 } from "./batch-results/table-utils";
 export { TradeoffSummaryLine } from "./batch-results/tradeoff-summary-line";
 export { WinRateChart } from "./batch-results/win-rate-chart";
+export {
+  CostStatsTooltip,
+  LatencyStatsTooltip,
+  MetricStatsTooltip,
+} from "./batch-results/metric-stats-tooltip";

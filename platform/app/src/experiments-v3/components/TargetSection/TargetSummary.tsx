@@ -1,19 +1,11 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { memo } from "react";
-import {
-  LuChevronRight,
-  LuClock,
-  LuTriangleRight,
-  LuZap,
-} from "react-icons/lu";
-import {
-  CostStatsTooltip,
-  LatencyStatsTooltip,
-} from "~/components/shared/MetricStatsTooltip";
+import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu";
+import { CostStatsTooltip, LatencyStatsTooltip } from "@langwatch/experiment-web";
 import {
   getPassRateGradientColor,
   PassRateCircle,
-} from "~/components/shared/PassRateIndicator";
+} from "@langwatch/design-system/pass-rate-indicator";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import { useEvaluatorNames } from "../../hooks/useEvaluatorName";
@@ -57,8 +49,7 @@ export const TargetSummary = memo(function TargetSummary({
   evaluators,
   isRunning = false,
 }: TargetSummaryProps) {
-  const { isOpen, handleMouseEnter, handleMouseLeave } =
-    useInteractiveTooltip(150);
+  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
   const evaluatorNames = useEvaluatorNames(evaluators);
 
   // Show summary if we have any completed rows, OR any errors, OR any metrics
@@ -78,8 +69,7 @@ export const TargetSummary = memo(function TargetSummary({
             {aggregates.completedRows}/{aggregates.totalRows}
             {aggregates.errorRows > 0 && (
               <Text as="span" color="red.300" marginLeft={1}>
-                ({aggregates.errorRows}{" "}
-                {aggregates.errorRows === 1 ? "error" : "errors"})
+                ({aggregates.errorRows} {aggregates.errorRows === 1 ? "error" : "errors"})
               </Text>
             )}
           </Text>
@@ -105,9 +95,7 @@ export const TargetSummary = memo(function TargetSummary({
         {aggregates.overallAverageScore !== null && (
           <HStack justify="space-between">
             <Text color="fg.muted">Avg Score</Text>
-            <Text fontWeight="medium">
-              {formatScore(aggregates.overallAverageScore)}
-            </Text>
+            <Text fontWeight="medium">{formatScore(aggregates.overallAverageScore)}</Text>
           </HStack>
         )}
 
@@ -159,9 +147,7 @@ export const TargetSummary = memo(function TargetSummary({
             >
               <Text color="fg.muted">Total Cost</Text>
               <HStack gap={1}>
-                <Text fontWeight="medium">
-                  {formatCost(aggregates.totalCost)}
-                </Text>
+                <Text fontWeight="medium">{formatCost(aggregates.totalCost)}</Text>
                 <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
               </HStack>
             </HStack>
@@ -172,9 +158,7 @@ export const TargetSummary = memo(function TargetSummary({
         {aggregates.totalDuration !== null && (
           <HStack justify="space-between">
             <Text color="fg.muted">Execution Time</Text>
-            <Text fontWeight="medium">
-              {formatLatency(aggregates.totalDuration)}
-            </Text>
+            <Text fontWeight="medium">{formatLatency(aggregates.totalDuration)}</Text>
           </HStack>
         )}
       </VStack>
@@ -198,10 +182,7 @@ export const TargetSummary = memo(function TargetSummary({
                 <HStack gap={2}>
                   {evaluator.passRate !== null && (
                     <HStack gap={1}>
-                      <PassRateCircle
-                        passRate={evaluator.passRate}
-                        size="8px"
-                      />
+                      <PassRateCircle passRate={evaluator.passRate} size="8px" />
                       <Text
                         fontSize="11px"
                         color={getPassRateGradientColor(evaluator.passRate)}
@@ -217,8 +198,7 @@ export const TargetSummary = memo(function TargetSummary({
                   )}
                   {evaluator.errors > 0 && (
                     <Text fontSize="11px" color="red.300">
-                      {evaluator.errors}{" "}
-                      {evaluator.errors === 1 ? "error" : "errors"}
+                      {evaluator.errors} {evaluator.errors === 1 ? "error" : "errors"}
                     </Text>
                   )}
                 </HStack>
@@ -275,9 +255,7 @@ export const TargetSummary = memo(function TargetSummary({
         )}
 
         {(aggregates.overallPassRate !== null ||
-          aggregates.overallAverageScore !== null) && (
-          <Text fontWeight="600">Score</Text>
-        )}
+          aggregates.overallAverageScore !== null) && <Text fontWeight="600">Score</Text>}
 
         {/* Pass rate */}
         {aggregates.overallPassRate !== null && (
@@ -296,9 +274,7 @@ export const TargetSummary = memo(function TargetSummary({
         {aggregates.overallAverageScore !== null && (
           <HStack gap={1}>
             <LuTriangleRight />
-            <Text color="fg.muted">
-              {formatScore(aggregates.overallAverageScore)}
-            </Text>
+            <Text color="fg.muted">{formatScore(aggregates.overallAverageScore)}</Text>
           </HStack>
         )}
 
@@ -306,9 +282,7 @@ export const TargetSummary = memo(function TargetSummary({
         {aggregates.averageLatency !== null && (
           <HStack gap={1}>
             <LuClock style={{ minWidth: "12px" }} />
-            <Text fontWeight="medium">
-              {formatLatency(aggregates.averageLatency)}
-            </Text>
+            <Text fontWeight="medium">{formatLatency(aggregates.averageLatency)}</Text>
           </HStack>
         )}
 
@@ -325,8 +299,7 @@ export const TargetSummary = memo(function TargetSummary({
         {/* Errors indicator */}
         {aggregates.errorRows > 0 && (
           <Text color="red.fg" fontWeight="medium" whiteSpace="nowrap">
-            {aggregates.errorRows}{" "}
-            {aggregates.errorRows === 1 ? "error" : "errors"}
+            {aggregates.errorRows} {aggregates.errorRows === 1 ? "error" : "errors"}
           </Text>
         )}
       </HStack>

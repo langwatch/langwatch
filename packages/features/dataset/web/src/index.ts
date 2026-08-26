@@ -9,6 +9,7 @@ export {
   retryDatasetNormalize,
   type DirectUploadHandle,
 } from "./upload/direct-upload";
+export { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "./upload/column-type-select";
 export {
   parseHeaderColumns,
   HEADER_PARSE_MAX_BYTES,

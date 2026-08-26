@@ -717,9 +717,6 @@
         "~/server/modelProviders/codexRestrictions",
         "~/server/scopes/scope.types"
       ],
-      "platform/app/src/components/shared/ColumnTypeSelect.tsx": [
-        "~/server/datasets/types"
-      ],
       "platform/app/src/components/sidebar/UsageIndicator.tsx": [
         "../../server/app-layer/usage/usage-meter-policy"
       ],

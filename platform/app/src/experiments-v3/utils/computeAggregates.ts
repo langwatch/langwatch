@@ -1,13 +1,6 @@
-import {
-  computeMetricStats,
-  type MetricStats,
-} from "~/components/shared/MetricStatsTooltip";
+import { computeMetricStats, type MetricStats } from "@langwatch/experiment-web";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
-import type {
-  EvaluationResults,
-  EvaluatorConfig,
-  TargetConfig,
-} from "../types";
+import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "../types";
 import { resolveVerdictLabel, toComparisonConfig } from "./normalizeComparison";
 
 export { computeMetricStats, type MetricStats };
@@ -84,20 +77,20 @@ export const computeTargetAggregates = (
   const latencyValues: number[] = [];
 
   for (let i = 0; i < rowCount; i++) {
-    const hasOutput =
-      targetOutputs[i] !== undefined && targetOutputs[i] !== null;
+    const hasOutput = targetOutputs[i] !== undefined && targetOutputs[i] !== null;
     const hasError = !!targetErrors[i];
 
     // Check if all evaluators have completed for this row
-    const allEvaluatorsComplete =
-      evaluators.length === 0 ||
-      evaluators.every((evaluator) => {
-        const evalResult = evaluatorResults[evaluator.id]?.[i];
-        if (evalResult === undefined || evalResult === null) return false;
-        const parsed = parseEvaluationResult(evalResult);
-        // Complete means not pending and not running
-        return parsed.status !== "pending" && parsed.status !== "running";
-      });
+    const allEvaluatorsComplete = evaluators.every((evaluator) => {
+      const evalResult = evaluatorResults[evaluator.id]?.[i];
+      if (evalResult === undefined || evalResult === null) {
+        return false;
+      }
+
+      const parsed = parseEvaluationResult(evalResult);
+
+      return parsed.status !== "pending" && parsed.status !== "running";
+    });
 
     // Row is complete only when target is done AND all evaluators are done
     if ((hasOutput || hasError) && allEvaluatorsComplete) {
@@ -124,58 +117,55 @@ export const computeTargetAggregates = (
   const costStats = computeMetricStats(costValues);
 
   // Compute per-evaluator aggregates
-  const evaluatorAggregates: EvaluatorAggregate[] = evaluators.map(
-    (evaluator) => {
-      const evalResults = evaluatorResults[evaluator.id] ?? [];
+  const evaluatorAggregates: EvaluatorAggregate[] = evaluators.map((evaluator) => {
+    const evalResults = evaluatorResults[evaluator.id] ?? [];
 
-      let total = 0;
-      let passed = 0;
-      let failed = 0;
-      let errors = 0;
-      let scoreSum = 0;
-      let scoreCount = 0;
-      // Count results that have explicit pass/fail for pass rate calculation
-      let passFailCount = 0;
+    let total = 0;
+    let passed = 0;
+    let failed = 0;
+    let errors = 0;
+    let scoreSum = 0;
+    let scoreCount = 0;
+    // Count results that have explicit pass/fail for pass rate calculation
+    let passFailCount = 0;
 
-      for (let i = 0; i < rowCount; i++) {
-        const result = evalResults[i];
-        if (result === undefined || result === null) continue;
+    for (let i = 0; i < rowCount; i++) {
+      const result = evalResults[i];
+      if (result === undefined || result === null) continue;
 
-        const parsed = parseEvaluationResult(result);
-        if (parsed.status === "pending" || parsed.status === "running")
-          continue;
+      const parsed = parseEvaluationResult(result);
+      if (parsed.status === "pending" || parsed.status === "running") continue;
 
-        total++;
+      total++;
 
-        if (parsed.status === "passed") {
-          passed++;
-          passFailCount++;
-        } else if (parsed.status === "failed") {
-          failed++;
-          passFailCount++;
-        } else if (parsed.status === "error") {
-          errors++;
-        }
-        // "processed" and "skipped" don't count towards pass rate
-
-        if (parsed.score !== undefined && parsed.score !== null) {
-          scoreSum += parsed.score;
-          scoreCount++;
-        }
+      if (parsed.status === "passed") {
+        passed++;
+        passFailCount++;
+      } else if (parsed.status === "failed") {
+        failed++;
+        passFailCount++;
+      } else if (parsed.status === "error") {
+        errors++;
       }
+      // "processed" and "skipped" don't count towards pass rate
 
-      return {
-        evaluatorId: evaluator.id,
-        total,
-        passed,
-        failed,
-        errors,
-        // Pass rate only counts results with explicit pass/fail, not score-only ("processed")
-        passRate: passFailCount > 0 ? (passed / passFailCount) * 100 : null,
-        averageScore: scoreCount > 0 ? scoreSum / scoreCount : null,
-      };
-    },
-  );
+      if (parsed.score !== undefined && parsed.score !== null) {
+        scoreSum += parsed.score;
+        scoreCount++;
+      }
+    }
+
+    return {
+      evaluatorId: evaluator.id,
+      total,
+      passed,
+      failed,
+      errors,
+      // Pass rate only counts results with explicit pass/fail, not score-only ("processed")
+      passRate: passFailCount > 0 ? (passed / passFailCount) * 100 : null,
+      averageScore: scoreCount > 0 ? scoreSum / scoreCount : null,
+    };
+  });
 
   // Compute overall pass rate (sum of passed / sum of passed+failed)
   // Only count evaluators that have explicit pass/fail results, not score-only
@@ -184,8 +174,7 @@ export const computeTargetAggregates = (
     0,
   );
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
-  const overallPassRate =
-    totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
+  const overallPassRate = totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
 
   // Compute overall average score (across all evaluators with scores)
   const _allScoreSums = evaluatorAggregates.reduce(
@@ -202,9 +191,7 @@ export const computeTargetAggregates = (
   );
   // Actually we want the average of the individual scores, not weighted by total
   // Let's just average the non-null averageScores
-  const scoresWithValues = evaluatorAggregates.filter(
-    (e) => e.averageScore !== null,
-  );
+  const scoresWithValues = evaluatorAggregates.filter((e) => e.averageScore !== null);
   const overallAverageScore =
     scoresWithValues.length > 0
       ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
@@ -254,9 +241,7 @@ export const computeComparisonColumnTargetAggregate = (
   rowCount: number,
 ): TargetAggregate => {
   const variantIds = target.comparison?.variants ?? [];
-  const metadataByVariant = variantIds.map(
-    (id) => results.targetMetadata[id] ?? [],
-  );
+  const metadataByVariant = variantIds.map((id) => results.targetMetadata[id] ?? []);
   const verdicts = results.evaluatorResults[target.id]?.[target.id] ?? [];
 
   let completedRows = 0;
@@ -447,4 +432,4 @@ export {
   formatCost,
   formatLatency,
   formatScore,
-} from "~/components/shared/formatters";
+} from "@langwatch/design-system/metric-value-formatters";

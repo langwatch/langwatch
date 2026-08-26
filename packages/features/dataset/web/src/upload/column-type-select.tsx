@@ -1,21 +1,14 @@
-/**
- * ColumnTypeSelect — a pretty, icon-led picker for a dataset column's type.
- *
- * Replaces the bare `<NativeSelect>` (OS-native, unstyleable) with the
- * codebase-standard Chakra `Select`, rendering each option as its
- * {@link ColumnTypeIcon} + a friendly label. Drop-in for any column-type field;
- * the trigger forwards `aria-label` so it stays labelled for tests + AT.
- */
 import { createListCollection, HStack, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
-import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import {
+  datasetColumnTypeSchema,
+  type DatasetColumnType,
+} from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { Select } from "@langwatch/design-system/select";
 
 type ColumnTypeOption = { value: DatasetColumnType; label: string };
 
-/** The column types offered at upload/confirm time, with friendly labels. The
- *  `value` is the stored type string; the label is display-only. */
 export const COLUMN_TYPE_OPTIONS: ColumnTypeOption[] = [
   { value: "string", label: "String" },
   { value: "number", label: "Number" },
@@ -57,7 +50,9 @@ export function ColumnTypeSelect({
       value={[value]}
       onValueChange={(details) => {
         const next = details.value[0];
-        if (next) onChange(next as DatasetColumnType);
+        if (next) {
+          onChange(datasetColumnTypeSchema.parse(next));
+        }
       }}
       size={size}
       width={width}
@@ -65,7 +60,7 @@ export function ColumnTypeSelect({
       <Select.Trigger aria-label={ariaLabel}>
         <Select.ValueText placeholder="Type">
           {(items) => {
-            const item = items[0] as ColumnTypeOption | undefined;
+            const item = items[0];
             return item ? <OptionContent {...item} /> : null;
           }}
         </Select.ValueText>

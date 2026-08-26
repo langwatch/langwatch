@@ -1,23 +1,20 @@
-/**
- * MetricStatsTooltip - Statistical breakdown tooltips for latency and cost.
- *
- * Shared between Evaluations V3 TargetSummary and Batch Results.
- */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { computeMetricStats, type MetricStats } from "@langwatch/experiment-web";
-import { formatCost, formatLatency } from "./formatters";
+import {
+  formatCost,
+  formatLatency,
+} from "@langwatch/design-system/metric-value-formatters";
+import {
+  computeMetricStats,
+  type MetricStats,
+} from "../batch-evaluation-results.metric-stats";
 
 export { computeMetricStats, type MetricStats };
 
 type MetricStatsTooltipProps = {
   stats: MetricStats;
-  /** Formatter function for the values */
   formatValue: (value: number | null) => string;
 };
 
-/**
- * Generic statistical breakdown tooltip content.
- */
 export const MetricStatsTooltip = ({ stats, formatValue }: MetricStatsTooltipProps) => (
   <VStack align="stretch" gap={1} fontSize="11px" minWidth="140px">
     <HStack justify="space-between">
@@ -64,16 +61,10 @@ export const MetricStatsTooltip = ({ stats, formatValue }: MetricStatsTooltipPro
   </VStack>
 );
 
-/**
- * Latency-specific stats tooltip.
- */
 export const LatencyStatsTooltip = ({ stats }: { stats: MetricStats }) => (
   <MetricStatsTooltip stats={stats} formatValue={formatLatency} />
 );
 
-/**
- * Cost-specific stats tooltip.
- */
 export const CostStatsTooltip = ({ stats }: { stats: MetricStats }) => (
   <MetricStatsTooltip stats={stats} formatValue={formatCost} />
 );

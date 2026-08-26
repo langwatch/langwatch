@@ -5,7 +5,20 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ColumnTypeSelect } from "../ColumnTypeSelect";
+import "@testing-library/jest-dom/vitest";
+import { ColumnTypeSelect } from "../../src/upload/column-type-select";
+
+vi.stubGlobal(
+  "ResizeObserver",
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+
+Element.prototype.scrollTo ??= function () {};
+Element.prototype.scrollIntoView ??= function () {};
 
 const renderSelect = (
   props: Partial<React.ComponentProps<typeof ColumnTypeSelect>> = {},

@@ -53,7 +53,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { api } from "~/utils/api";
-import { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "../../shared/ColumnTypeSelect";
+import { COLUMN_TYPE_OPTIONS, ColumnTypeSelect } from "@langwatch/dataset-web";
 import { Drawer } from "../../ui/drawer";
 import {
   DROPZONE_DOTTED_STYLE,

@@ -313,7 +313,6 @@
   "src/components/settings/__tests__/seatTypeExplanation.integration.test.tsx": 3231,
   "src/components/settings/governance/__tests__/ToolCatalogEditorStarterPack.integration.test.tsx": 626,
   "src/components/settings/governance/routingPolicies/__tests__/routingPolicyForm.unit.test.ts": 42,
-  "src/components/shared/__tests__/ColumnTypeSelect.integration.test.tsx": 1272,
   "src/components/sidebar/__tests__/SidebarSection.integration.test.tsx": 692,
   "src/components/sidebar/__tests__/codingAgentActivity.unit.test.ts": 52,
   "src/components/sidebar/__tests__/getUsageDisplay.unit.test.ts": 20,

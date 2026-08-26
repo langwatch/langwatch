@@ -32,14 +32,11 @@ import { useMemo, useState } from "react";
 import {
   getPassRateGradientColor,
   PassRateCircle,
-} from "~/components/shared/PassRateIndicator";
+} from "@langwatch/design-system/pass-rate-indicator";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { useNow } from "~/hooks/useNow";
-import type {
-  ExternalSetSummary,
-  SuiteRunSummary,
-} from "@langwatch/scenario-contract";
+import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { ALL_RUNS_ID, toExternalSetSelection } from "./useSuiteRouting";
