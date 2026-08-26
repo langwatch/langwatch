@@ -224,6 +224,13 @@ function resolvePullConfig(
       "Missing required Copilot Studio fields",
       "The environment URL is required, plus all three parts of the app registration: tenant ID, client ID and client secret.",
     ],
+    openai_admin: [
+      () => buildOpenAiAdminPullConfig(composer, { shouldRequireCredentials }),
+      "Missing or invalid OpenAI fields",
+      shouldRequireCredentials
+        ? "An organization Admin API key is required, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
+        : "The backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
+    ],
     anthropic_admin: [
       () =>
         buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
@@ -1900,6 +1907,25 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "60",
     },
   ],
+  openai_admin: [
+    {
+      // `credentials*` prefix routes this into the encrypted `credentials`
+      // subtree — the only part of the config the server encrypts at rest.
+      key: "credentialsToken",
+      label: "Admin API key",
+      placeholder: "sk-admin-...",
+      hint: "Generate under OpenAI Platform → Settings → Organization → Admin keys. A regular project key returns 401 on the organization reports. We encrypt this server-side.",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "startingAt",
+      label: "Backfill start (optional)",
+      placeholder: "",
+      hint: "The day the first run reads from. Later runs follow on from where the last one stopped. Empty = 3 calendar days back at midnight UTC. Spend broken down by API key is only available from December 2025 onward; earlier days are still read and still name the person, just not the key.",
+      control: "date",
+    },
+  ],
   claude_compliance: [
     {
       key: "workspaceApiKey",
@@ -2245,6 +2271,43 @@ export function buildAnthropicAdminPullConfig(
     schedule:
       c.pullSchedule.trim() ||
       PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
+      "0 * * * *",
+    ...(token ? { credentials: { token } } : {}),
+  };
+}
+
+/**
+ * The OpenAI Admin adapter config, or null when a required field is empty or
+ * the backfill start is not a date the adapter will accept. Nothing validates
+ * pullConfig against the adapter schema at save time, so the builder is the
+ * last checkpoint before the database.
+ *
+ * There is no report to choose: the adapter pulls the cost report and only the
+ * cost report, because the provider's usage surface returns nothing for spend
+ * the cost surface bills. `shouldRequireCredentials` carries the same meaning
+ * as it does for Anthropic above — on edit a blank key means "leave it alone",
+ * so the key must be OMITTED rather than written empty.
+ */
+export function buildOpenAiAdminPullConfig(
+  c: ComposerState,
+  {
+    shouldRequireCredentials = true,
+  }: { shouldRequireCredentials?: boolean } = {},
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const token = trimmedField(p, "credentialsToken");
+  if (!token && shouldRequireCredentials) return null;
+
+  const startingAt = normalizeStartingAt(trimmedField(p, "startingAt"));
+  if (startingAt === null) return null;
+
+  return {
+    adapter: "openai_admin",
+    report: "cost",
+    ...(startingAt ? { startingAt } : {}),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.openai_admin ||
       "0 * * * *",
     ...(token ? { credentials: { token } } : {}),
   };
@@ -2711,6 +2774,10 @@ const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
     // winning the merge would fail the adapter's `.datetime()` check at
     // pull time.
     anthropic_admin: ["report", "bucketWidth", "startingAt"],
+    // Same reason as `startingAt` above: the builder normalizes it to an ISO
+    // instant, and the raw form value winning the merge would fail the
+    // adapter's `.datetime()` check at pull time.
+    openai_admin: ["startingAt"],
     // `warehouseId` is here because the builder DROPS it when empty. Left to
     // the merge, the raw form value would persist `warehouseId: ""`, which the
     // adapter reads as a warehouse to go ask the workspace about.
@@ -2851,6 +2918,9 @@ export function seedPullSchedule({
  */
 const EDITABLE_PULL_CONFIG_SOURCE_TYPES: readonly SourceType[] = [
   "anthropic_admin",
+  // Answers the blank-secret question the same way: one credential, so a
+  // blank field can only mean "keep the stored key".
+  "openai_admin",
 ];
 
 /**

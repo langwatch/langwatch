@@ -148,6 +148,14 @@ export const SOURCE_TYPE_OPTIONS = [
     icon: <OpenAI />,
   },
   {
+    value: "openai_admin",
+    label: "OpenAI Admin API (spend)",
+    mode: "pull",
+    blurb:
+      "Reads your OpenAI organization's daily spend with an Admin API key (sk-admin-...), broken down by project, line item, the person who spent it and the API key it was billed to. A regular project key is refused. Only ever create one per organization — a second source would count the same spend twice.",
+    icon: <OpenAI />,
+  },
+  {
     value: "claude_compliance",
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
@@ -283,6 +291,7 @@ const MONOCHROME_SOURCE_ICONS = new Set<SourceType>([
   "claude_compliance",
   "anthropic_admin",
   "openai_compliance",
+  "openai_admin",
   "http_custom",
 ]);
 
