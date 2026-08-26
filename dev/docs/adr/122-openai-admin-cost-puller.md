@@ -140,10 +140,12 @@ the window.** `group_by=api_key_id` is refused before an epoch the provider
 names in a 400. The adapter detects that specific rejection — `param` of
 `"start_time"` **and** `code` of `"invalid_request_error"` together, a pair
 no other 400 from this endpoint produces — and retries the identical window
-with `api_key_id` removed from `group_by[]`. The other three dimensions
-survive, so **per-person attribution survives for the whole history**; only
-key-level detail is absent below the floor, where those rows carry a
-three-key dimension map.
+with only `user_id` in `group_by[]`. The API refuses any multi-dimension
+request that includes `api_key_id` below the floor — not just the key
+dimension, but any request carrying it alongside others. Falling back to
+`user_id` alone means **per-person attribution survives for the whole
+history**; project and line-item detail is lost alongside the key below the
+floor, where those rows carry a single-dimension map.
 
 Clamping the window forward to an epoch parsed out of the error prose was
 rejected. It discards every day below the floor rather than partially
@@ -155,8 +157,8 @@ wedge.
 
 A bucket below the floor is read once, during the forward backfill, and is
 never revisited — Decision 9's re-read window is measured from the present
-and does not reach it. So no bucket carries a three-key map on one run and a
-four-key map on another.
+and does not reach it. So no bucket carries a one-dimension map on one run
+and a four-dimension map on another.
 
 **9. Restatement re-reads a trailing window.** Each run fetches from
 `watermark - RESTATEMENT_LOOKBACK_DAYS`, not from the watermark, so a bucket
@@ -232,7 +234,7 @@ can exist, so there is nothing to repair.
 | Identity reaches the audit row | Attribution is visible where a surface already reads it | OCSF row asserts `ActorEmail` = the row's email, and `metadata.extension.actorUserId` / `.apiKeyId` = the row's raw ids |
 | The watermark never moves backwards | A re-read window, or a page returned out of order, must not rewind progress | Unit test: a response whose last bucket precedes the stored watermark leaves the watermark unchanged |
 | A corrected bucket replaces, never adds | Restatement is the whole point of the re-read window | Same window pulled twice with a changed `amount.value`; the ledger shows the new figure once, and the row count is unchanged |
-| Below the floor the day survives, only the key is lost | A 400 on key grouping must not cost history | Unit test: a floor 400 triggers one retry without `api_key_id`, and the resulting rows still carry `user_id` |
+| Below the floor the day survives, only the key is lost | A 400 on key grouping must not cost history | Unit test: a floor 400 triggers one retry with `user_id` only, and the resulting rows still carry `user_id` |
 | The cursor never replays a token under a changed query | `next_page` is bound to its query and 400s otherwise | Query identity stored in the cursor; a config edit drops the token rather than replaying it |
 | A partial window never reports as complete | A fetch failure must not advance the watermark | Transport failure returns the prior cursor unchanged and `errorCount: 1` |
 | The dimension set is stable | A restatement finds the figure it corrects | Dimension keys asserted against a frozen list; adding one fails the test |

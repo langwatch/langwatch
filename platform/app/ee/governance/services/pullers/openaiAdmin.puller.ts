@@ -93,12 +93,14 @@ const COST_GROUP_BY = [
 ] as const;
 
 /**
- * The same set with the key dropped, for windows below the provider's
- * key-grouping floor. The person survives; only key-level detail is lost.
+ * Below the provider's key-grouping floor (2025-12-06), the API refuses ANY
+ * request that includes api_key_id — regardless of how many other dimensions
+ * ride alongside it. Only user_id alone works for those older windows; adding
+ * project_id or line_item back triggers the same 400.
+ *
+ * The person survives; project and line-item detail is lost alongside the key.
  */
-const COST_GROUP_BY_WITHOUT_KEY = COST_GROUP_BY.filter(
-  (dim) => dim !== "api_key_id",
-);
+const COST_GROUP_BY_WITHOUT_KEY = ["user_id"] as const;
 
 /**
  * How far behind its watermark each run re-reads, so a bucket the provider
@@ -144,8 +146,8 @@ export type OpenAiAdminPullConfig = z.infer<typeof openaiAdminPullConfigSchema>;
  * `keyGrouping` records whether the in-flight window is being read WITH
  * `api_key_id` in the group-by. It has to be durable for the same reason
  * `page` does: the token is bound to the group-by that produced it, so a run
- * resuming into a window that fell back to three dimensions must keep asking
- * for three.
+ * resuming into a window that fell back to user_id-only must keep asking
+ * with the same single dimension.
  */
 const cursorSchema = z.object({
   startingAt: z.string(),
@@ -666,7 +668,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
 
     logger.warn(
       { adapter: this.id, startingAt },
-      "openai refuses to group this window by api key; re-reading it without that dimension so the window and the person on each row survive",
+      "openai refuses api_key_id before its floor date; falling back to user_id only so the person on each row survives",
     );
     const retried = await this.fetchPage({
       startingAt,

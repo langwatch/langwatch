@@ -386,19 +386,28 @@ describe("given an OpenAI Admin cost source", () => {
       fetchMock
         .mockResolvedValueOnce(KEY_GROUPING_REFUSAL)
         .mockResolvedValueOnce(
-          jsonResponse(page({ results: [costRow({ api_key_id: null })] })),
+          jsonResponse(
+            page({
+              results: [
+                costRow({
+                  api_key_id: null,
+                  project_id: null,
+                  line_item: null,
+                }),
+              ],
+            }),
+          ),
         );
 
       const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      // Same window, one dimension fewer.
+      // Same window, user_id only — the API refuses any multi-dimension
+      // request that includes api_key_id below the floor.
       expect(requestedUrl(1).searchParams.get("start_time")).toBe(
         requestedUrl(0).searchParams.get("start_time"),
       );
       expect(requestedUrl(1).searchParams.getAll("group_by[]")).toEqual([
-        "project_id",
-        "line_item",
         "user_id",
       ]);
       expect(result.events).toHaveLength(1);
@@ -410,7 +419,17 @@ describe("given an OpenAI Admin cost source", () => {
       fetchMock
         .mockResolvedValueOnce(KEY_GROUPING_REFUSAL)
         .mockResolvedValueOnce(
-          jsonResponse(page({ results: [costRow({ api_key_id: null })] })),
+          jsonResponse(
+            page({
+              results: [
+                costRow({
+                  api_key_id: null,
+                  project_id: null,
+                  line_item: null,
+                }),
+              ],
+            }),
+          ),
         );
 
       const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
@@ -460,28 +479,31 @@ describe("given an OpenAI Admin cost source", () => {
 
     it("keeps asking without the key for the rest of the window it fell back on", async () => {
       const puller = new OpenAiAdminPuller();
+      const belowFloorRow = {
+        api_key_id: null,
+        project_id: null,
+        line_item: null,
+      };
       fetchMock
         .mockResolvedValueOnce(KEY_GROUPING_REFUSAL)
         .mockResolvedValueOnce(
           jsonResponse(
             page({
-              results: [costRow({ api_key_id: null })],
+              results: [costRow(belowFloorRow)],
               nextPage: "page_2",
               hasMore: true,
             }),
           ),
         )
         .mockResolvedValue(
-          jsonResponse(page({ results: [costRow({ api_key_id: null })] })),
+          jsonResponse(page({ results: [costRow(belowFloorRow)] })),
         );
 
       await puller.runOnce(RUN_OPTIONS, CONFIG);
 
       // The page token is bound to the query that minted it, so the third
-      // request must carry the same three dimensions as the second.
+      // request must carry the same single dimension as the second.
       expect(requestedUrl(2).searchParams.getAll("group_by[]")).toEqual([
-        "project_id",
-        "line_item",
         "user_id",
       ]);
       expect(requestedUrl(2).searchParams.get("page")).toBe("page_2");
