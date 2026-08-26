@@ -116,6 +116,9 @@ source "$(cd "$(dirname "$0")/../../lib" && pwd)/test-helpers.sh"
 # bug (exit 10). While it names an AC, a failure is that AC failing (exit 30).
 
 CURRENT_AC="HARNESS"
+# Accumulates every AC that failed, so a KEEP_GOING run still exits 30 and still
+# names all of them.
+FAILED_ACS=""
 
 harness_error() {
   echo -e "\n${RED}[HARNESS-ERROR]${NC} $*" >&2
@@ -129,9 +132,22 @@ void_abort() {
   exit 20
 }
 
+# KEEP_GOING records the failure and lets the ladder continue, so a single run
+# yields a verdict for EVERY AC instead of stopping at the first red. It does
+# not soften anything: the assertion still fails, the failure is still printed
+# verbatim, FAILED_ACS still forces exit 30 at the end. It exists because a
+# characterisation run whose first failure hides the other twelve verdicts is
+# worth less than one that reports all thirteen. Downstream ACs that fail only
+# as a CONSEQUENCE of an earlier failure must be read as consequential, not as
+# independent evidence — the report is responsible for saying which is which.
 ac_fail() {
   echo -e "\n${RED}[FAIL ${CURRENT_AC}]${NC} $*" >&2
   echo -e "${RED}[FAIL ${CURRENT_AC}]${NC} Evidence for this failure is printed verbatim above." >&2
+  FAILED_ACS+="${CURRENT_AC}"$'\n'
+  if [[ "${KEEP_GOING:-false}" == "true" ]]; then
+    echo -e "${YELLOW}[KEEP_GOING]${NC} recorded FAIL for ${CURRENT_AC}; continuing to the next assertion" >&2
+    return 0
+  fi
   exit 30
 }
 
@@ -1263,7 +1279,13 @@ main() {
 
   CURRENT_AC="HARNESS"
   sep
-  pass "upgrade-access harness completed phases: ${PHASES}"
+  if [[ -n "${FAILED_ACS//[[:space:]]/}" ]]; then
+    echo -e "${RED}[SUMMARY]${NC} the following assertions FAILED:" >&2
+    printf '%s' "$FAILED_ACS" | sort -u | sed 's/^/    | /' >&2
+    echo -e "${RED}[SUMMARY]${NC} phases run: ${PHASES}. Exiting 30." >&2
+    exit 30
+  fi
+  pass "upgrade-access harness completed phases: ${PHASES} with no failed assertions"
 }
 
 main "$@"
