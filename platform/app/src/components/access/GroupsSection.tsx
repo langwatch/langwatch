@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Heading,
   HStack,
   Spinner,
   Text,
@@ -18,6 +17,7 @@ import {
 import { RoleAssignmentList } from "~/components/access/roleAssignments";
 import { CreateGroupDialog } from "~/components/settings/CreateGroupDialog";
 import { GroupDetailDialog } from "~/components/settings/GroupDetailDialog";
+import { SectionTitle } from "~/components/settings/kit/SettingRow";
 import { SectionErrorNotice } from "~/components/settings/SectionErrorNotice";
 import { ContactSalesBlock } from "~/components/subscription/ContactSalesBlock";
 import { Dialog } from "~/components/ui/dialog";
@@ -87,16 +87,12 @@ function GroupRow({
               </Menu.Trigger>
               <Menu.Content>
                 <Menu.Item value="edit" onClick={onOpen}>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Edit2 size={14} />
-                    Edit
-                  </Box>
+                  <Edit2 size={14} />
+                  Edit
                 </Menu.Item>
-                <Menu.Item value="delete" color="red.500" onClick={onDelete}>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Trash2 size={14} />
-                    Delete
-                  </Box>
+                <Menu.Item value="delete" color="red.fg" onClick={onDelete}>
+                  <Trash2 size={14} />
+                  Delete
                 </Menu.Item>
               </Menu.Content>
             </Menu.Root>
@@ -181,15 +177,13 @@ export function GroupsSection({
       <VStack align="stretch" gap={6} width="full">
         {/* A HEADING, not bold text. It is the title of a section, so it
             belongs in the document's heading order — a reader moving by
-            headings skipped this one entirely — and it wears the same `sm`
-            every other section title on these pages wears. */}
-        <VStack align="stretch" gap={2}>
-          <Heading size="sm">Groups</Heading>
-          <Text color="fg.muted" fontSize="sm">
-            Assign access to many people at once. Who is in a group your
-            identity provider sends is theirs; what it grants is yours.
-          </Text>
-        </VStack>
+            headings skipped this one entirely — and it wears the kit's
+            SectionTitle, the same one every other tab of this page leads
+            with. */}
+        <SectionTitle
+          title="Groups"
+          hint="Assign access to many people at once. Who is in a group your identity provider sends is theirs; what it grants is yours."
+        />
 
         {groups.isLoading && <Spinner size="sm" />}
 

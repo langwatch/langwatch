@@ -30,8 +30,13 @@ export function SettingsPageHeader({
   return (
     <HStack align="start" width="full" gap={4}>
       <VStack align="start" gap={1}>
-        <Heading>{title}</Heading>
-        <Text color="fg.muted" fontSize="sm">
+        <Heading size="lg" letterSpacing="-0.01em">
+          {title}
+        </Heading>
+        {/* Capped at a line length the eye can track back from. Unbounded,
+            a long description runs to the actions at the far end and reads
+            as if it belonged to them. */}
+        <Text color="fg.muted" fontSize="sm" maxW="70ch">
           {description}
         </Text>
       </VStack>

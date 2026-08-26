@@ -10,6 +10,7 @@ import {
 import type { SelfServeBreakGlassBindingView } from "@langwatch/identity-server";
 import { useState } from "react";
 import { api } from "../../../utils/api";
+import { SettingsRowsSkeleton } from "../kit/SettingsSkeleton";
 import { LoadFailure, reportRefusal } from "./refusals";
 
 /**
@@ -64,13 +65,17 @@ export function BreakGlassSection({
       {bindings.error ? (
         <LoadFailure error={bindings.error} what="the ways back in" />
       ) : bindings.isLoading ? (
-        <Text color="fg.muted">Loading…</Text>
+        // The table's own shape while its data lands — one grant is what the
+        // section usually holds, so one placeholder row is what it draws.
+        <SettingsRowsSkeleton rows={1} showLead={false} />
       ) : live.length === 0 ? (
         <Text color="fg.muted" fontSize="sm">
           Nobody can get in without your identity provider yet.
         </Text>
       ) : (
-        <Table.Root size="sm">
+        // Hairlines, not a filled band — the same table the domains two
+        // steps up wear, so the two read as one screen rather than two.
+        <Table.Root size="sm" variant="line">
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Who</Table.ColumnHeader>

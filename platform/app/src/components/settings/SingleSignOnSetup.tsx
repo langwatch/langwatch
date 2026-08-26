@@ -1,11 +1,8 @@
 import {
-  Alert,
-  Box,
   Button,
   Card,
-  Heading,
   HStack,
-  Spacer,
+  IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -13,6 +10,7 @@ import type {
   SelfServeGoLiveView,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
+import { Copy } from "lucide-react";
 import { useState } from "react";
 import {
   connectionProtocolName,
@@ -22,6 +20,11 @@ import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { IdentityChip } from "../access/IdentityRow";
+import { toaster } from "../ui/toaster";
+import { ProtocolMark } from "./authentication/SingleSignOnCard";
+import { SettingList, SettingRow } from "./kit/SettingRow";
+import { SettingsCard } from "./kit/SettingsCard";
+import { SettingsRowsSkeleton } from "./kit/SettingsSkeleton";
 import { ArrivalsSection } from "./singleSignOn/ArrivalsSection";
 import { BreakGlassSection } from "./singleSignOn/BreakGlassSection";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
@@ -44,8 +47,8 @@ import { TestSignInSection } from "./singleSignOn/TestSignInSection";
  * step exists to establish.
  */
 const ARRIVALS_SUMMARY = {
-  admit: "They join, on a domain you proved",
-  request: "They wait for you to approve them",
+  admit: "They join, on a domain you verified",
+  request: "They ask, and you approve them",
   refuse: "Only people already here",
 } as const;
 
@@ -93,7 +96,15 @@ export function SingleSignOnSetup({
   const canManage = hasPermission("sso:manage");
   const setup = api.ssoSetup.getSetup.useQuery({ organizationId });
 
-  if (setup.isLoading) return <Text>Loading…</Text>;
+  // The journey's own shape while its data lands — one placeholder row per
+  // step, so the wizard arrives at the height it is going to keep rather
+  // than jumping out of a bare "Loading…".
+  if (setup.isLoading)
+    return (
+      <VStack align="stretch" gap={6} width="full">
+        <SettingsRowsSkeleton rows={6} />
+      </VStack>
+    );
   // A read that failed says so, in the words registered for its code. It must
   // never fall through to the empty state below: "nothing is registered yet"
   // and "we could not find out" are different facts, and only one of them
@@ -297,6 +308,10 @@ function ConnectedJourney({
  *     seven-day grace in which sign-in keeps working and the removal can
  *     be called off, and refused outright while anybody would be left with
  *     no other way in.
+ *
+ * DRAWN AS A DANGER ZONE, not as another hairline: the red-tinted border and
+ * the red title say "destructive lives here" before a word is read, which is
+ * the one thing a reader skimming to the bottom of a long page must not miss.
  */
 function RemoveConnectionSection({
   organizationId,
@@ -324,57 +339,64 @@ function RemoveConnectionSection({
   };
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      borderTopWidth="1px"
-      borderColor="border.muted"
-      paddingTop={4}
-    >
-      <Text fontSize="sm" color="fg.muted">
-        {activated
-          ? `Removing ${providerName} schedules it: sign-in keeps working for seven days, the removal can be called off in that time, and it is refused while anybody would have no other way in.`
-          : `Removing ${providerName} takes you back to the start. Nothing about anybody's sign-in changes, and you can register a connection again at any time.`}
-      </Text>
-      {confirming ? (
-        <HStack gap={2}>
-          <Button
-            size="sm"
-            colorPalette="red"
-            variant="solid"
-            loading={pending}
-            onClick={() =>
-              activated
-                ? remove.mutate(
-                    { organizationId, connectionId, reason: null },
-                    settle,
-                  )
-                : discard.mutate({ organizationId, connectionId }, settle)
-            }
-          >
-            {activated ? "Yes, schedule the removal" : "Yes, remove it"}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => setConfirming(false)}
-          >
-            Keep it
-          </Button>
-        </HStack>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          colorPalette="red"
-          alignSelf="start"
-          onClick={() => setConfirming(true)}
+    <Card.Root borderColor="red.muted">
+      <Card.Body paddingX={4} paddingY={3.5} gap={3}>
+        <Text fontSize="13.5px" fontWeight="semibold" color="red.fg">
+          Danger zone
+        </Text>
+        <HStack
+          justify="space-between"
+          align={{ base: "stretch", sm: "center" }}
+          gap={3}
+          flexDirection={{ base: "column", sm: "row" }}
         >
-          Remove this connection
-        </Button>
-      )}
-    </VStack>
+          <Text fontSize="13px" color="fg.muted" maxWidth="64ch">
+            {activated
+              ? `Removing ${providerName} schedules it: sign-in keeps working for seven days, the removal can be called off in that time, and it is refused while anybody would have no other way in.`
+              : `Removing ${providerName} takes you back to the start. Nothing about anybody's sign-in changes, and you can register a connection again at any time.`}
+          </Text>
+          {confirming ? (
+            <HStack gap={2} flexShrink={0}>
+              <Button
+                size="sm"
+                colorPalette="red"
+                variant="solid"
+                loading={pending}
+                onClick={() =>
+                  activated
+                    ? remove.mutate(
+                        { organizationId, connectionId, reason: null },
+                        settle,
+                      )
+                    : discard.mutate({ organizationId, connectionId }, settle)
+                }
+              >
+                {activated ? "Yes, schedule the removal" : "Yes, remove it"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => setConfirming(false)}
+              >
+                Keep it
+              </Button>
+            </HStack>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              colorPalette="red"
+              flexShrink={0}
+              alignSelf={{ base: "start", sm: "center" }}
+              onClick={() => setConfirming(true)}
+            >
+              Remove this connection
+            </Button>
+          )}
+        </HStack>
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -382,7 +404,7 @@ function RemoveConnectionSection({
  * Where the connection stands, and — separately — whether anybody is actually
  * being sent to it.
  *
- * The two are different facts and the banner says both. An ACTIVE connection
+ * The two are different facts and the card says both. An ACTIVE connection
  * whose organization has not been switched over routes nothing yet, and a
  * screen that said "live" would be telling somebody their rollout finished at
  * the exact moment they were about to test it.
@@ -398,50 +420,52 @@ function ConnectionSummary({
     state: connection.state,
     routingSwitchedOn: goLive?.routingSwitchedOn ?? false,
   });
+
+  /** The issuer, whole, to the clipboard — the same toast the copy rows give. */
+  const copyIssuer = () => {
+    if (!connection.issuer) return;
+    if (!navigator.clipboard) {
+      toaster.create({
+        title:
+          "Your browser does not support clipboard access, please copy the issuer address manually",
+        type: "error",
+        duration: 2000,
+      });
+      return;
+    }
+    void navigator.clipboard.writeText(connection.issuer).then(() => {
+      toaster.create({
+        title: "Issuer address copied to your clipboard",
+        type: "success",
+        duration: 2000,
+      });
+    });
+  };
+
   return (
-    <Card.Root borderRadius="xl">
-      <Card.Body>
-        <VStack align="stretch" gap={3}>
-          <HStack width="full" gap={2}>
-            <Box
-              width="8px"
-              height="8px"
-              borderRadius="full"
-              flexShrink={0}
-              backgroundColor={
-                chip.tone === "good"
-                  ? "green.solid"
-                  : chip.tone === "warning"
-                    ? "orange.solid"
-                    : chip.tone === "bad"
-                      ? "red.solid"
-                      : "border.emphasized"
-              }
-            />
-            <Heading size="sm">
-              {connectionProtocolName(connection.type)}
-            </Heading>
-            <Spacer />
-            <IdentityChip
-              label={chip.label}
-              tone={chip.tone}
-              title={chip.title}
-              shimmer={chip.shimmer}
-            />
-          </HStack>
-          <HStack
-            gap={6}
-            paddingTop={2}
-            borderTopWidth="1px"
-            borderColor="border.muted"
-            justify="space-between"
-          >
-            <Text fontSize="sm" fontWeight="medium">
-              Identity provider
-            </Text>
-            <VStack align="end" gap={0} minWidth={0}>
-              <Text fontSize="sm">{connection.providerId}</Text>
-              {connection.issuer && (
+    <SettingsCard
+      title={connectionProtocolName(connection.type)}
+      leading={<ProtocolMark type={connection.type} />}
+      // The chip's "good" is the dot's "ok" — one state, two vocabularies.
+      tone={chip.tone === "good" ? "ok" : chip.tone}
+      badge={
+        <IdentityChip
+          label={chip.label}
+          tone={chip.tone}
+          title={chip.title}
+          shimmer={chip.shimmer}
+        />
+      }
+    >
+      <SettingList>
+        <SettingRow label="Identity provider">
+          <VStack align="start" gap={0} minWidth={0}>
+            <Text fontSize="sm">{connection.providerId}</Text>
+            {connection.issuer && (
+              <HStack gap={1} minWidth={0} maxWidth="full">
+                {/* The scheme is chrome, not information — every issuer here
+                    is https, so the display drops it. The whole address is on
+                    the hover, and the button puts it on the clipboard. */}
                 <Text
                   fontFamily="mono"
                   fontSize="xs"
@@ -450,29 +474,40 @@ function ConnectionSummary({
                   maxWidth="full"
                   title={connection.issuer}
                 >
-                  {connection.issuer}
+                  {connection.issuer.replace(/^https?:\/\//, "")}
                 </Text>
-              )}
-            </VStack>
-          </HStack>
-          {/* THE CHIP ALREADY SAID THIS. A full-width coloured banner under a
-              summary whose own status chip reads "On, not routing yet" is the
-              same fact twice, in the loudest treatment on the page, about a
-              state that is ordinary rather than wrong — and it pushed the
-              checklist somebody came to work through below the fold.
+                <IconButton
+                  aria-label="Copy issuer address"
+                  size="xs"
+                  variant="ghost"
+                  flexShrink={0}
+                  color="fg.subtle"
+                  _hover={{ color: "fg.muted" }}
+                  onClick={copyIssuer}
+                >
+                  <Copy size={12} />
+                </IconButton>
+              </HStack>
+            )}
+          </VStack>
+        </SettingRow>
+      </SettingList>
+      {/* THE CHIP ALREADY SAID THIS. A full-width coloured banner under a
+          summary whose own status chip reads "On, not routing yet" is the
+          same fact twice, in the loudest treatment on the page, about a
+          state that is ordinary rather than wrong — and it pushed the
+          checklist somebody came to work through below the fold.
 
-              What the banner alone carried is the one thing the chip cannot
-              fit: that the move is ours to make and reversible. That is a
-              line, and it sits where the state it qualifies is. */}
-          {goLive?.activated && !goLive.routingSwitchedOn && (
-            <Text fontSize="xs" color="fg.muted" lineHeight="1.6">
-              Everyone still signs in the way they do today. Talk to us when you
-              are ready for us to switch your organization over — one
-              organization at a time, and it can be undone immediately.
-            </Text>
-          )}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+          What the banner alone carried is the one thing the chip cannot
+          fit: that the move is ours to make and reversible. That is a
+          line, and it sits where the state it qualifies is. */}
+      {goLive?.activated && !goLive.routingSwitchedOn && (
+        <Text fontSize="xs" color="fg.muted" lineHeight="1.6">
+          Everyone still signs in the way they do today. Talk to us when you are
+          ready for us to switch your organization over — one organization at a
+          time, and it can be undone immediately.
+        </Text>
+      )}
+    </SettingsCard>
   );
 }

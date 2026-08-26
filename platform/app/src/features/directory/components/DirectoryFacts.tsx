@@ -26,11 +26,11 @@ export function DirectorySourceChips({
     status: { headline: string; tone: string };
   }>;
   /**
-   * Where another source is connected. The hint above this fact already says
-   * sources are configured on the Authentication page, and this is that
-   * sentence made pressable — a reader who has just counted their sources is
-   * the reader most likely to want one more. Omitted on the Authentication
-   * page itself, where it would point at the page it is already on.
+   * Where another source is connected. A reader who has just counted their
+   * sources is the reader most likely to want one more, so the way to
+   * Authentication sits beside the sources themselves. Omitted on the
+   * Authentication page itself, where it would point at the page it is
+   * already on.
    */
   addHref?: string;
 }) {

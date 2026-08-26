@@ -102,7 +102,6 @@ export function GoLiveSection({
             alignSelf="start"
             size="lg"
             colorPalette="green"
-            marginTop={2}
             loading={activate.isPending}
             onClick={() =>
               activate.mutate(

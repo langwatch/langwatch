@@ -91,6 +91,7 @@ export function AuthenticationSettings({
       <OrganizationPolicyCard
         organizationId={organizationId}
         canManage={canReadMembership}
+        ssoLive={connection?.state === "ACTIVE"}
       />
 
       <PersonalMethodsFooter />

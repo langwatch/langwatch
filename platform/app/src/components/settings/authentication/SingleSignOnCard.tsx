@@ -18,8 +18,11 @@ import { OverviewCard, OverviewDetail } from "./OverviewCard";
  * so the card wears the tile somebody chose rather than a second icon set
  * invented here. Nothing is drawn where the catalogue has no mark: initials
  * standing in for a logo read as a logo nobody recognises.
+ *
+ * Exported for the connection summary on the provider page, which is the same
+ * connection named in a smaller card.
  */
-function ProtocolMark({ type }: { type: string }) {
+export function ProtocolMark({ type }: { type: string }) {
   const Icon = identityProviderPreset(type).icon;
   return Icon ? <Icon size={14} aria-hidden /> : null;
 }
@@ -136,7 +139,7 @@ export function SingleSignOnCard({
           last test and the ways back in, which are preconditions of going live
           and are already listed as such in the journey one control away. */}
       <OverviewDetail label="Identity provider">
-        <Text fontSize="13px">{connection.providerId}</Text>
+        <Text>{connection.providerId}</Text>
       </OverviewDetail>
 
       <OverviewDetail
@@ -156,9 +159,7 @@ export function SingleSignOnCard({
 
       <OverviewDetail label="Verified domains">
         {connection.verifiedDomains.length === 0 ? (
-          <Text fontSize="sm" color="fg.muted">
-            No domain is proved yet.
-          </Text>
+          <Text color="fg.muted">No domain is proved yet.</Text>
         ) : (
           <HStack gap={1} flexWrap="wrap">
             {connection.verifiedDomains.map((domain) => {

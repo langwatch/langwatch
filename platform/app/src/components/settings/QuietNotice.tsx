@@ -5,23 +5,26 @@ import type { ReactNode } from "react";
 /** What a notice is about. The tone sets the stripe and the glyph, nothing else. */
 export type QuietNoticeTone = "warning" | "danger" | "success";
 
+/**
+ * The palette per tone, named rather than valued. Semantic tokens
+ * (`colorPalette.solid`, `colorPalette.fg`) carry their own dark-mode reading,
+ * which the hardcoded `orange.500` plus a `_dark` variant never did — two
+ * spellings of one colour that had to be kept in step by hand.
+ */
 const TONES: Record<
   QuietNoticeTone,
-  { accent: string; darkAccent: string; icon: ReactNode }
+  { colorPalette: string; icon: ReactNode }
 > = {
   warning: {
-    accent: "orange.500",
-    darkAccent: "orange.400",
+    colorPalette: "orange",
     icon: <TriangleAlert size={15} />,
   },
   danger: {
-    accent: "red.500",
-    darkAccent: "red.400",
+    colorPalette: "red",
     icon: <CircleAlert size={15} />,
   },
   success: {
-    accent: "green.600",
-    darkAccent: "green.400",
+    colorPalette: "green",
     icon: <MailCheck size={15} />,
   },
 };
@@ -65,15 +68,16 @@ export function QuietNotice({
   testId?: string;
   children: ReactNode;
 }) {
-  const { accent, darkAccent, icon } = TONES[tone];
+  const { colorPalette, icon } = TONES[tone];
 
   return (
     <Box
       width="full"
+      colorPalette={colorPalette}
       borderWidth="1px"
       borderColor="border.muted"
       borderLeftWidth="3px"
-      borderLeftColor={accent}
+      borderLeftColor="colorPalette.solid"
       // ONE element, ONE radius, and the accent is the card's own left border
       // rather than a bar behind it. Both of the ways to get this wrong were
       // tried: a separate stripe reads as a sticker, and squaring the left
@@ -81,22 +85,20 @@ export function QuietNotice({
       // the rest of the card curved away from. Because the colour lives on the
       // border, the corner rounds the accent with it — flush at all four
       // corners by construction, with nothing to overhang and no gap to leave.
-      borderRadius="6px"
-      paddingY="14px"
-      paddingX="16px"
-      _dark={{ borderLeftColor: darkAccent }}
+      borderRadius="lg"
+      paddingY={3.5}
+      paddingX={4}
       data-testid={testId}
     >
       {/* The action is the third child and wraps as a whole when the row runs
           out of room, which is how it drops under the body at narrow widths
           without being rendered twice — two copies of one button is two things
           a test, and a screen reader, have to tell apart. */}
-      <HStack align="start" gap="10px" width="full" flexWrap="wrap">
+      <HStack align="start" gap={2.5} width="full" flexWrap="wrap">
         {/* One pixel down: optical alignment with the cap height of the line
             beside it, which mathematical alignment always misses. */}
         <Box
-          color={accent}
-          _dark={{ color: darkAccent }}
+          color="colorPalette.fg"
           display="flex"
           flexShrink={0}
           marginTop="1px"
@@ -104,7 +106,7 @@ export function QuietNotice({
           {icon}
         </Box>
 
-        <VStack align="stretch" gap="2px" flex="1 1 260px" minWidth={0}>
+        <VStack align="stretch" gap={0.5} flex="1 1 260px" minWidth={0}>
           {title ? (
             <Text fontSize="sm" fontWeight={600} lineHeight="1.45">
               {title}

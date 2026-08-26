@@ -1,8 +1,8 @@
 import { VStack } from "@chakra-ui/react";
+import SettingsLayout from "../../components/SettingsLayout";
 import { AuthenticationSettings } from "../../components/settings/AuthenticationSettings";
 import { AuthenticationLayout } from "../../components/settings/authentication/AuthenticationLayout";
 import { SettingsPageHeader } from "../../components/settings/SettingsPageHeader";
-import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
@@ -30,7 +30,7 @@ function AuthenticationPage() {
     <AuthenticationLayout>
       <VStack align="stretch" gap={6} width="full">
         <SettingsPageHeader
-          title="Authentication"
+          title="Overview"
           description={`How everyone in ${organization.name} signs in, and how their accounts arrive.`}
         />
         <AuthenticationSettings organizationId={organization.id} />

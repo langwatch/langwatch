@@ -1,4 +1,5 @@
 import {
+  Alert,
   Card,
   HStack,
   SimpleGrid,
@@ -13,6 +14,7 @@ import {
   DirectorySourceChips,
 } from "~/features/directory/components/DirectoryFacts";
 import { useDirectoryFacts } from "~/features/directory/hooks/useDirectoryFacts";
+import { isEnterpriseGateError } from "~/features/directory/logic/enterpriseGate";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 
@@ -59,6 +61,24 @@ export function DirectorySummary({
   const { reconciliation, groups, provenance } = facts;
 
   if (reconciliation.isError) {
+    // A plan gate is not a failure: on a non-Enterprise organization this is
+    // the band's DEFAULT state, so it reads as an upsell, not as an error
+    // with a trace id.
+    if (isEnterpriseGateError(reconciliation.error)) {
+      return (
+        <Alert.Root status="info">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Directory sync is an Enterprise feature</Alert.Title>
+            <Alert.Description>
+              Connect your identity provider and the people, groups and sync
+              status this band reports fill themselves in. Contact sales to
+              upgrade.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      );
+    }
     return (
       <SectionErrorNotice
         error={reconciliation.error}
@@ -98,15 +118,15 @@ export function DirectorySummary({
         gap={3}
         data-testid="directory-summary"
       >
-        <Fact
-          label="Authentication source"
-          hint="Configured on the Authentication page."
-          icon={<Plug size={14} />}
-        >
-          {/* The names ARE the value here: an administrator with two sources
-              is not asking how many they have, they are asking which one is
-              the one that stopped. The hint says where sources are
-              configured, and `addHref` makes that sentence pressable. */}
+        <Fact label="Sources" icon={<Plug size={14} />}>
+          {/* SOURCES, in this page's own vocabulary — "authentication source"
+              named the page ACROSS the rail on the one page whose subject is
+              the directory itself. The names ARE the value here: an
+              administrator with two sources is not asking how many they have,
+              they are asking which one is the one that stopped. Where another
+              one comes from is the plus beside them, so the tile needs no
+              "configured on the Authentication page" sentence pointing at a
+              door the link already opens. */}
           <DirectorySourceChips
             connections={facts.connections}
             addHref="/settings/authentication"

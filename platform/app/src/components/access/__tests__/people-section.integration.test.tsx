@@ -25,6 +25,12 @@ const state = vi.hoisted(() => ({
   provenance: {} as Record<string, unknown>,
   provenanceError: null as unknown,
   openDrawer: vi.fn(),
+  /** What the department column reports, so a member can belong somewhere. */
+  departments: {
+    show: false,
+    departments: [] as { id: string; name: string }[],
+    byUser: new Map<string, string>(),
+  },
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -69,11 +75,18 @@ vi.mock("~/components/settings/MemberSeatUsage", () => ({
 }));
 vi.mock("~/components/settings/useDepartmentColumn", () => ({
   useDepartmentColumn: () => ({
-    show: false,
-    byUser: new Map(),
-    departments: [],
+    show: state.departments.show,
+    byUser: state.departments.byUser,
+    byTeam: new Map(),
+    byProject: new Map(),
+    departments: state.departments.departments,
     refetch: vi.fn(),
   }),
+}));
+// The picker owns the assign mutations, which the api double does not carry;
+// the editing control is covered where it lives. Here only the read matters.
+vi.mock("~/components/settings/DepartmentPicker", () => ({
+  DepartmentPicker: () => <div data-testid="department-picker" />,
 }));
 
 vi.mock("~/components/members/useTwoStepRequirement", () => ({
@@ -222,6 +235,11 @@ describe("given the directory's people tab", () => {
     state.provenance = {};
     state.provenanceError = null;
     state.openDrawer.mockClear();
+    state.departments = {
+      show: false,
+      departments: [],
+      byUser: new Map(),
+    };
   });
   afterEach(() => cleanup());
 
@@ -417,6 +435,28 @@ describe("given the directory's people tab", () => {
       expect(screen.queryByTestId("provenance-invited")).toBeNull();
       expect(screen.queryByTestId("provenance-domain")).toBeNull();
       expect(screen.queryByTestId("provenance-directory")).toBeNull();
+    });
+  });
+
+  describe("when a member belongs to a department", () => {
+    beforeEach(() => {
+      state.departments = {
+        show: true,
+        departments: [{ id: "dep_eng", name: "Engineering" }],
+        byUser: new Map([["user_sam", "dep_eng"]]),
+      };
+    });
+
+    /** @scenario A member's department is readable at a glance */
+    it("names it beside their name, and says nothing for anybody else", () => {
+      renderPeople();
+
+      const rows = screen.getAllByTestId("member-row");
+      const samRow = rows.find((row) => within(row).queryByText("Sam Rivera"))!;
+      const chip = within(samRow).getByTestId("member-department-chip");
+      expect(chip).toHaveTextContent("Engineering");
+      // Ana belongs nowhere, so she carries no chip rather than an empty one.
+      expect(screen.getAllByTestId("member-department-chip")).toHaveLength(1);
     });
   });
 

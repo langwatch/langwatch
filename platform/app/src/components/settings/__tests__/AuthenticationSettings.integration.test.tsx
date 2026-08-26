@@ -28,6 +28,7 @@ const {
   mockGroups,
   mockProvenance,
   mockSignInSso,
+  mockDepartmentColumn,
 } = vi.hoisted(() => ({
   mockUseOrganizationTeamProject: vi.fn(),
   mockGetSetup: vi.fn(),
@@ -35,6 +36,7 @@ const {
   mockGroups: vi.fn(),
   mockProvenance: vi.fn(),
   mockSignInSso: vi.fn(),
+  mockDepartmentColumn: vi.fn(),
 }));
 
 const mutationDouble = () => ({
@@ -128,6 +130,13 @@ vi.mock("~/components/members/useTwoStepRequirement", () => ({
     saving: false,
     setRequirement: vi.fn(),
   }),
+}));
+
+// The Directory card names the org's departments where there are any. The
+// column's flag and degrade-to-empty behaviour is covered where it lives;
+// here the card only needs the answer.
+vi.mock("~/components/settings/useDepartmentColumn", () => ({
+  useDepartmentColumn: mockDepartmentColumn,
 }));
 
 const SERVICE_PROVIDER = {
@@ -254,6 +263,16 @@ beforeEach(() => {
     },
     isLoading: false,
     isError: false,
+  });
+  // No departments by default: the card's layout must not shift for a reader
+  // or an organization without them.
+  mockDepartmentColumn.mockReturnValue({
+    show: false,
+    departments: [],
+    byUser: new Map(),
+    byTeam: new Map(),
+    byProject: new Map(),
+    refetch: vi.fn(),
   });
 });
 
@@ -409,6 +428,49 @@ describe("the organization's authentication page", () => {
           .getByText(/see who it manages/i)
           .closest("a"),
       ).toHaveAttribute("href", "/settings/directory");
+    });
+
+    /** @scenario "The directory card carries the organization's real numbers" */
+    it("names the departments beside the groups, where the org has any", async () => {
+      mockDepartmentColumn.mockReturnValue({
+        show: true,
+        departments: [
+          { id: "dep_1", name: "Engineering" },
+          { id: "dep_2", name: "Sales" },
+          { id: "dep_3", name: "Support" },
+          { id: "dep_4", name: "Finance" },
+          { id: "dep_5", name: "Legal" },
+        ],
+        byUser: new Map(),
+        byTeam: new Map(),
+        byProject: new Map(),
+        refetch: vi.fn(),
+      });
+      await open();
+
+      const card = screen.getByTestId("directory-card");
+      const chips = within(card).getAllByTestId(
+        "directory-card-department-chip",
+      );
+      // Named like the groups, up to four, and the rest collapse into a count.
+      expect(chips.map((chip) => chip.textContent)).toEqual([
+        "Engineering",
+        "Sales",
+        "Support",
+        "Finance",
+      ]);
+      expect(within(card).getByText("+1 more")).toBeInTheDocument();
+    });
+
+    /** @scenario "The directory card carries the organization's real numbers" */
+    it("draws nothing about departments where there are none", async () => {
+      await open();
+
+      const card = screen.getByTestId("directory-card");
+      expect(
+        within(card).queryByTestId("directory-card-department-chip"),
+      ).toBeNull();
+      expect(within(card).queryByText("Departments")).toBeNull();
     });
 
     /** @scenario "The page points at where the reader's own sign-in lives" */

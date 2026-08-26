@@ -58,20 +58,18 @@ export function SingleSignOnPreviewCard({
       }
     >
       <OverviewDetail label="What it does">
-        <Text fontSize="13px">
+        <Text>
           Your people sign in with your company&apos;s identity provider, and
           you decide there who still has access.
         </Text>
       </OverviewDetail>
 
       <OverviewDetail label="Who it applies to">
-        <Text fontSize="13px">
-          Anyone with an address at a domain you prove is yours.
-        </Text>
+        <Text>Anyone with an address at a domain you prove is yours.</Text>
       </OverviewDetail>
 
       <OverviewDetail label={state === null ? "First step" : "Next step"}>
-        <Text fontSize="13px" color="fg.muted">
+        <Text color="fg.muted">
           {state === null
             ? "Telling us about your identity provider."
             : "Carry on where you left off."}

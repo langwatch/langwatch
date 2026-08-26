@@ -11,7 +11,11 @@ import {
 import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { IdentityRow, IdentityRowList } from "~/components/access/IdentityRow";
+import {
+  IdentityChip,
+  IdentityRow,
+  IdentityRowList,
+} from "~/components/access/IdentityRow";
 import { ProvenanceChip } from "~/components/access/ProvenanceChip";
 import { CopyInput } from "~/components/CopyInput";
 import { AutomaticJoinsNotice } from "~/components/members/AutomaticJoinsNotice";
@@ -131,6 +135,14 @@ function PeopleList({
 
   const department = useDepartmentColumn(organization.id);
   const showDepartment = department.show && canManage;
+  // The name behind each id, so the read-at-a-glance chip can say it. The
+  // picker beside it edits; the chip is what somebody scanning the list
+  // actually reads.
+  const departmentNameById = useMemo(
+    () =>
+      new Map(department.departments.map((option) => [option.id, option.name])),
+    [department.departments],
+  );
 
   const queryClient = api.useUtils();
   const { openDrawer } = useDrawer();
@@ -338,6 +350,13 @@ function PeopleList({
             chips={
               <>
                 <ProvenanceChip provenance={provenance.data?.[member.userId]} />
+                {department.show && (
+                  <DepartmentChip
+                    name={departmentNameById.get(
+                      department.byUser.get(member.userId) ?? "",
+                    )}
+                  />
+                )}
                 {twoStep.show && (
                   <SecondFactorCell
                     member={twoStep.byUser.get(member.userId)}
@@ -568,6 +587,24 @@ function orgRoleLabel(role: OrganizationUserRole): string {
 }
 
 /**
+ * The department a member belongs to, as a fact beside their name rather
+ * than only inside the picker's menu. Drawn like the provenance chip and
+ * silent where there is nothing to say: a member with no department gets no
+ * chip, and invited or waiting people never reach this row at all.
+ */
+function DepartmentChip({ name }: { name: string | undefined }) {
+  if (!name) return null;
+
+  return (
+    <IdentityChip
+      label={name}
+      title={`In the ${name} department. Departments are org structure for accounting and reporting — never an access gate.`}
+      data-testid="member-department-chip"
+    />
+  );
+}
+
+/**
  * Row actions for a member. Disable is the reversible one, and is how an
  * organization gets back within its licensed seats; delete removes the
  * membership outright. See seat-reconciliation.feature.
@@ -628,7 +665,7 @@ function MemberRowActions({
         {canDelete && (
           <Menu.Item
             value="delete"
-            color="red.500"
+            color="red.fg"
             onClick={() => onDelete(member.userId)}
           >
             <Trash2 size={16} />

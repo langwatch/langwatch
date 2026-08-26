@@ -4,7 +4,6 @@ import {
   Collapsible,
   Heading,
   HStack,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";

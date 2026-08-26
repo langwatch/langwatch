@@ -1,6 +1,7 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "../ui/dialog";
 import { PermissionToken } from "./PermissionToken";
+import { SectionEyebrow } from "./RoleCards";
 import {
   PERMISSION_AREAS,
   type PermissionArea,
@@ -66,15 +67,10 @@ export function RoleDetailDialog({
             ) : (
               byArea.map(({ area, permissions: areaPermissions }) => (
                 <VStack key={area} align="stretch" gap={2}>
-                  <Text
-                    fontSize="xs"
-                    fontWeight="semibold"
-                    letterSpacing="wide"
-                    textTransform="uppercase"
-                    color="fg.muted"
-                  >
-                    {area}
-                  </Text>
+                  {/* The same eyebrow the role cards lead their sections
+                      with — one spelling for one element, whatever container
+                      it sits in. */}
+                  <SectionEyebrow>{area}</SectionEyebrow>
                   <VStack align="stretch" gap={1.5}>
                     {areaPermissions.map((permission) => (
                       <HStack key={permission} gap={3} align="center">

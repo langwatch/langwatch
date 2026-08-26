@@ -14,12 +14,14 @@ import {
 import {
   ChevronDown,
   ChevronRight,
+  Folder,
   Pencil,
   Plus,
   RotateCcw,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { roleTone } from "~/components/access/roleAssignments";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { SectionTitle } from "~/components/settings/kit/SettingRow";
 import { Dialog } from "~/components/ui/dialog";
@@ -53,10 +55,34 @@ const BASE_ROLE_ITEMS = [
   { label: "Viewer", value: "VIEWER" },
 ];
 
-function roleBadgeColor(role: string) {
-  if (role === "ADMIN") return "red";
-  if (role === "MEMBER") return "blue";
-  return "gray";
+// A role's colour is decided once, in `roleAssignments`, by how much the
+// role can do — a local copy here disagreed with it for custom roles.
+
+/**
+ * The tracked, quiet label every sub-section leads with — the same register
+ * as the eyebrow on the role cards and the stat-tile labels on the directory
+ * overview, so the three surfaces read as one system.
+ */
+function SectionEyebrow({
+  children,
+  mb,
+}: {
+  children: ReactNode;
+  /** Room under the label where it leads a list rather than a header row. */
+  mb?: number;
+}) {
+  return (
+    <Text
+      fontSize="10px"
+      fontWeight="medium"
+      color="fg.subtle"
+      textTransform="uppercase"
+      letterSpacing="0.08em"
+      mb={mb}
+    >
+      {children}
+    </Text>
+  );
 }
 
 // ── Role select inline ────────────────────────────────────────────────────────
@@ -274,7 +300,7 @@ function AddToTeamDialog({
               </Select.Root>
             </Field.Root>
 
-            <Text fontSize="sm" color="gray.500">
+            <Text fontSize="sm" color="fg.muted">
               This gives them access to all projects in the team at this role
               level.
             </Text>
@@ -423,7 +449,7 @@ function AddToProjectDialog({
               </Select.Root>
             </Field.Root>
 
-            <Text fontSize="sm" color="gray.500">
+            <Text fontSize="sm" color="fg.muted">
               If they&apos;re already on the team, this overrides their team
               role for this project only.
             </Text>
@@ -508,26 +534,30 @@ function ProjectSection({
           py={2}
           cursor="pointer"
           onClick={() => setExpanded((v) => !v)}
-          _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
+          transition="background 0.15s ease"
+          _hover={{ bg: "bg.muted" }}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <Text fontSize="sm" fontWeight="medium">
-            📁 {project.name}
-          </Text>
+          <HStack gap={1.5} color="fg.subtle">
+            <Folder size={14} />
+            <Text fontSize="sm" fontWeight="medium" color="fg">
+              {project.name}
+            </Text>
+          </HStack>
           {hasOverrides && (
             <Badge colorPalette="orange" size="sm">
               has overrides
             </Badge>
           )}
           <Spacer />
-          <Text fontSize="xs" color="gray.500">
+          <Text fontSize="xs" color="fg.muted">
             {access.length} with access
           </Text>
           {canManage && (
             <Button
               size="xs"
               variant="ghost"
-              color="gray.400"
+              color="fg.subtle"
               onClick={(e) => {
                 e.stopPropagation();
                 openDrawer("editProject", {
@@ -558,16 +588,7 @@ function ProjectSection({
             {/* Inherited from team */}
             {inherited.length > 0 && (
               <Box mt={3}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="gray.500"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                  mb={2}
-                >
-                  Inherited from team
-                </Text>
+                <SectionEyebrow mb={2}>Inherited from team</SectionEyebrow>
                 {inherited.map((m, i) => (
                   <HStack key={i} py={1} opacity={0.5} fontSize="sm">
                     <RandomColorAvatar
@@ -576,19 +597,25 @@ function ProjectSection({
                       size="xs"
                     />
                     <Text flex={1}>{m.name}</Text>
-                    <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                    {/* Neutral, not the tier's tone: a red ADMIN pill is the
+                        danger dialect answering a question nobody asked — this
+                        row only says what the team role IS, and the dimming
+                        already carries "inherited". Explicit project-level
+                        grants below keep `roleTone`. */}
+                    <Badge colorPalette="gray" size="sm">
                       {m.customRoleName ?? m.role}
                     </Badge>
                     {m.viaGroupName ? (
                       <Link
                         href="/settings/directory?tab=groups"
                         fontSize="xs"
-                        color="purple.400"
+                        colorPalette="purple"
+                        color="colorPalette.fg"
                       >
                         via {m.viaGroupName}
                       </Link>
                     ) : (
-                      <Text fontSize="xs" color="gray.400">
+                      <Text fontSize="xs" color="fg.subtle">
                         from team
                       </Text>
                     )}
@@ -600,16 +627,7 @@ function ProjectSection({
             {/* Project-level access */}
             {projectLevel.length > 0 && (
               <Box mt={3}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="gray.500"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                  mb={2}
-                >
-                  Project-level access
-                </Text>
+                <SectionEyebrow mb={2}>Project-level access</SectionEyebrow>
                 {projectLevel.map((m, i) => (
                   <HStack key={i} py={1} fontSize="sm">
                     <RandomColorAvatar
@@ -620,7 +638,7 @@ function ProjectSection({
                     <Box flex={1}>
                       <Text display="inline">{m.name}</Text>
                       {m.source === "override" && m.teamRole && (
-                        <Text as="span" fontSize="xs" color="gray.400" ml={2}>
+                        <Text as="span" fontSize="xs" color="fg.subtle" ml={2}>
                           team role: {m.teamRole}
                         </Text>
                       )}
@@ -630,7 +648,7 @@ function ProjectSection({
                         override
                       </Badge>
                     )}
-                    <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                    <Badge colorPalette={roleTone(m.role)} size="sm">
                       {m.role}
                     </Badge>
                     {canManage && m.bindingId && (
@@ -638,7 +656,7 @@ function ProjectSection({
                         size="xs"
                         variant="ghost"
                         color={
-                          m.source === "override" ? "orange.400" : "gray.400"
+                          m.source === "override" ? "orange.fg" : "fg.subtle"
                         }
                         title={
                           m.source === "override"
@@ -670,7 +688,7 @@ function ProjectSection({
 
             {/* Empty state */}
             {projectLevel.length === 0 && inherited.length > 0 && (
-              <Text fontSize="xs" color="gray.400" fontStyle="italic" mt={2}>
+              <Text fontSize="xs" color="fg.subtle" fontStyle="italic" mt={2}>
                 No project-level overrides. Everyone uses their team role.
               </Text>
             )}
@@ -729,7 +747,7 @@ function InlineDepartment({
     <HStack
       gap={2}
       pl={2}
-      color="gray.500"
+      color="fg.muted"
       fontSize="sm"
       onClick={(e) => e.stopPropagation()}
     >
@@ -799,12 +817,13 @@ function TeamCard({
           py={3}
           cursor="pointer"
           onClick={() => setExpanded((v) => !v)}
-          _hover={{ bg: "gray.50", _dark: { bg: "gray.800" } }}
+          transition="background 0.15s ease"
+          _hover={{ bg: "bg.muted" }}
         >
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           <Text fontWeight="semibold">{team.name}</Text>
           <Spacer />
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="fg.muted">
             {team.projects.length}{" "}
             {team.projects.length === 1 ? "project" : "projects"}
             {" · "}
@@ -828,7 +847,7 @@ function TeamCard({
               href={`/settings/teams/${team.slug}`}
               onClick={(e) => e.stopPropagation()}
             >
-              <Button size="xs" variant="ghost" color="gray.400">
+              <Button size="xs" variant="ghost" color="fg.subtle">
                 <Pencil size={13} />
                 Edit
               </Button>
@@ -841,15 +860,7 @@ function TeamCard({
             {/* ── Team members (team-scoped bindings, editable) ── */}
             <Box mt={4}>
               <HStack mb={3}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="gray.500"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                >
-                  Team members
-                </Text>
+                <SectionEyebrow>Team members</SectionEyebrow>
                 <Spacer />
                 {canManage && (
                   <Button
@@ -867,7 +878,7 @@ function TeamCard({
               </HStack>
 
               {team.directMembers.length === 0 ? (
-                <Text fontSize="sm" color="gray.400" fontStyle="italic">
+                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
                   No members yet.
                 </Text>
               ) : (
@@ -876,8 +887,7 @@ function TeamCard({
                     key={i}
                     py={2}
                     borderBottomWidth={i < arr.length - 1 ? "1px" : "0"}
-                    borderColor="gray.100"
-                    _dark={{ borderColor: "gray.700" }}
+                    borderColor="border.muted"
                     opacity={m.viaGroupId ? 0.7 : 1}
                   >
                     <RandomColorAvatar
@@ -890,13 +900,14 @@ function TeamCard({
                     </Text>
                     {m.viaGroupId ? (
                       <>
-                        <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                        <Badge colorPalette={roleTone(m.role)} size="sm">
                           {m.customRoleName ?? m.role}
                         </Badge>
                         <Link
                           href="/settings/directory?tab=groups"
                           fontSize="xs"
-                          color="purple.400"
+                          colorPalette="purple"
+                          color="colorPalette.fg"
                         >
                           via {m.viaGroupName}
                         </Link>
@@ -919,7 +930,7 @@ function TeamCard({
                         <Button
                           size="xs"
                           variant="ghost"
-                          color="gray.400"
+                          color="fg.subtle"
                           loading={deleteBinding.isPending}
                           onClick={() =>
                             deleteBinding.mutate({
@@ -932,14 +943,14 @@ function TeamCard({
                         </Button>
                       </>
                     ) : (
-                      <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                      <Badge colorPalette={roleTone(m.role)} size="sm">
                         {m.customRoleName ?? m.role}
                       </Badge>
                     )}
                   </HStack>
                 ))
               )}
-              <Text fontSize="xs" color="gray.400" mt={2}>
+              <Text fontSize="xs" color="fg.subtle" mt={2}>
                 Editing a role here changes their team-level access, inherited
                 by all projects below.
               </Text>
@@ -948,16 +959,9 @@ function TeamCard({
             {/* ── Project-only access (read-only at team level) ── */}
             {team.projectOnlyAccess.length > 0 && (
               <Box mt={5}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="gray.500"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                  mb={3}
-                >
+                <SectionEyebrow mb={3}>
                   Also has access via projects
-                </Text>
+                </SectionEyebrow>
                 {team.projectOnlyAccess.map((m, i) => (
                   <HStack
                     key={i}
@@ -966,8 +970,7 @@ function TeamCard({
                     borderBottomWidth={
                       i < team.projectOnlyAccess.length - 1 ? "1px" : "0"
                     }
-                    borderColor="gray.100"
-                    _dark={{ borderColor: "gray.700" }}
+                    borderColor="border.muted"
                   >
                     <RandomColorAvatar
                       name={m.name}
@@ -975,18 +978,20 @@ function TeamCard({
                       size="xs"
                     />
                     <Text flex={1}>{m.name}</Text>
-                    <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                    <Badge colorPalette={roleTone(m.role)} size="sm">
                       {m.role}
                     </Badge>
-                    <Text fontSize="xs" color="gray.400">
+                    <Text fontSize="xs" color="fg.subtle">
                       on
                     </Text>
-                    <Badge colorPalette="green" size="sm">
-                      📁 {m.projectName}
+                    <Badge colorPalette="green" size="sm" gap={1}>
+                      <Folder size={14} />
+                      {m.projectName}
                     </Badge>
                     <Link
                       fontSize="xs"
-                      color="purple.400"
+                      colorPalette="purple"
+                      color="colorPalette.fg"
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
@@ -1003,15 +1008,7 @@ function TeamCard({
             {/* ── Projects ── */}
             <Box mt={5}>
               <HStack mb={3}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="gray.500"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                >
-                  Projects
-                </Text>
+                <SectionEyebrow>Projects</SectionEyebrow>
                 <Spacer />
                 {hasPermission("project:create") && (
                   <Button
@@ -1030,7 +1027,7 @@ function TeamCard({
                 )}
               </HStack>
               {team.projects.length === 0 ? (
-                <Text fontSize="sm" color="gray.400" fontStyle="italic">
+                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
                   No projects yet.
                 </Text>
               ) : (
@@ -1132,7 +1129,7 @@ export function TeamsAndProjectsSection({
 
       {teams.isLoading && <Spinner />}
 
-      {teams.data?.length === 0 && <Text color="gray.500">No teams yet.</Text>}
+      {teams.data?.length === 0 && <Text color="fg.muted">No teams yet.</Text>}
 
       <VStack gap={3} width="full" align="stretch">
         {teams.data?.map((team) => (

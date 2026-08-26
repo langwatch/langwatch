@@ -24,10 +24,14 @@ import { useTwoStepRequirement } from "~/components/members/useTwoStepRequiremen
 export function OrganizationPolicyCard({
   organizationId,
   canManage,
+  ssoLive = false,
 }: {
   organizationId: string;
   /** `organization:manage`: both rules are membership reads and writes. */
   canManage: boolean;
+  /** A live connection answers the arrivals question for its own people;
+   *  the join policy card points at that door when it exists. */
+  ssoLive?: boolean;
 }) {
   const joinRequests = useJoinRequests({ organizationId, canManage });
   const twoStep = useTwoStepRequirement({ organizationId, canManage });
@@ -49,6 +53,7 @@ export function OrganizationPolicyCard({
         joinDomains={joinRequests.joining.joinDomains}
         saving={joinRequests.savingJoining}
         onSave={joinRequests.setJoining}
+        ssoLive={ssoLive}
       />
       {/* The card decides for itself whether a second step applies to this
           deployment at all, and draws nothing where it does not. */}

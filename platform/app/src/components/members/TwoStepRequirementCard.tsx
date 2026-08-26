@@ -1,14 +1,8 @@
-import {
-  Box,
-  Card,
-  Heading,
-  HStack,
-  Link,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { AlertTriangle, Lock } from "lucide-react";
+import { Box, HStack, Link, Text } from "@chakra-ui/react";
+import { Lock } from "lucide-react";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
+import { SettingsCard } from "~/components/settings/kit/SettingsCard";
+import { QuietNotice } from "~/components/settings/QuietNotice";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useActivePlan } from "~/hooks/useActivePlan";
@@ -91,6 +85,11 @@ function useEnterpriseLock({ mfaRequired }: { mfaRequired: boolean }): {
  *
  * The greying is a courtesy, not the boundary: `setRequirement` in
  * `organization-mfa.service.ts` refuses the flip on its own.
+ *
+ * The chrome is the settings kit's — `SettingsCard`, the same shape every
+ * card in the cluster wears — and the warning is the one notice these screens
+ * speak, in its warning tone. What is this card's own is the content: the
+ * switch, the count, and what the provider is asserting.
  */
 export function TwoStepRequirementCard({
   mfaRequired,
@@ -111,98 +110,96 @@ export function TwoStepRequirementCard({
   const locked = lock.locked;
 
   return (
-    <Card.Root width="full" data-testid="two-step-requirement-card">
-      <Card.Body>
-        <VStack align="stretch" gap={4}>
-          <HStack align="start" gap={4}>
-            <VStack align="start" gap={1} flex={1}>
-              <HStack gap={2}>
-                <Heading as="h3" size="sm">
-                  Require two-step verification
-                </Heading>
-                {locked && (
-                  <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" />
-                )}
-              </HStack>
-              {/* ONE LINE, AND IT SPENDS ITS SECOND HALF ON THE FEAR. What a
-                  second factor IS needs no explaining to the person who
-                  administers an organization; the belief that turning this on
-                  signs everybody out is the single commonest reason they do
-                  not, and that is what the sentence is for. */}
-              <Text color="fg.muted" fontSize="sm">
-                A code, a passkey, or one their identity provider confirms.
-                Turning it on signs nobody out.
-              </Text>
-              {locked && (
-                <HStack
-                  gap={2}
-                  paddingTop={1}
-                  data-testid="two-step-requirement-plan-notice"
-                >
-                  <Box color="fg.muted">
-                    <Lock size={14} />
-                  </Box>
-                  <Text color="fg.muted" fontSize="sm">
-                    {lock.explanation}{" "}
-                    <Link href={lock.linkHref} fontSize="sm" color="blue.600">
-                      {lock.linkLabel}
-                    </Link>
-                  </Text>
-                </HStack>
-              )}
-            </VStack>
-            {/* The tooltip hangs off a wrapper rather than the switch: a
-                disabled control takes no pointer events, so an explanation
-                pinned to it is one nobody can ever read. */}
-            <Tooltip content={lock.explanation} disabled={!lock.explained}>
-              <Box>
-                <Switch
-                  checked={mfaRequired}
-                  // Turning it OFF is never gated, so an organization that
-                  // moved off the plan with the requirement on can still
-                  // release its members.
-                  disabled={saving || (!lock.canTurnOn && !mfaRequired)}
-                  onCheckedChange={(details) => onChange(details.checked)}
-                  aria-label="Require two-step verification"
-                  inputProps={{ "data-testid": "two-step-requirement-switch" }}
-                />
-              </Box>
-            </Tooltip>
-          </HStack>
-
-          <Text fontSize="sm" data-testid="two-step-held-count">
-            {heldCount === 0
-              ? `All ${memberCount} members can prove a second factor.`
-              : `${heldCount} of ${memberCount} members cannot prove a second factor yet${
-                  mfaRequired
-                    ? " and are being asked to set one up."
-                    : " and would be asked to set one up."
-                }`}
-          </Text>
-
-          {connection.connected && !connection.assertsSecondFactor ? (
-            <HStack
-              align="start"
-              gap={2}
-              data-testid="two-step-connection-warning"
+    <SettingsCard
+      title="Require two-step verification"
+      // ONE LINE, AND IT SPENDS ITS SECOND HALF ON THE FEAR. What a second
+      // factor IS needs no explaining to the person who administers an
+      // organization; the belief that turning this on signs everybody out is
+      // the single commonest reason they do not, and that is what the
+      // sentence is for.
+      hint="A code, a passkey, or one their identity provider confirms. Turning it on signs nobody out."
+      badge={
+        <HStack gap={2}>
+          {locked && (
+            <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" />
+          )}
+          {/* THE SWITCH STANDS WHERE THE BADGE STANDS. This card answers one
+              question — is the requirement on — and the control that answers
+              it belongs beside the title, in the place every card in the
+              cluster reserves for the state. The tooltip hangs off a wrapper
+              rather than the switch: a disabled control takes no pointer
+              events, so an explanation pinned to it is one nobody can ever
+              read. */}
+          <Tooltip content={lock.explanation} disabled={!lock.explained}>
+            <Box>
+              <Switch
+                checked={mfaRequired}
+                // Turning it OFF is never gated, so an organization that
+                // moved off the plan with the requirement on can still
+                // release its members.
+                disabled={saving || (!lock.canTurnOn && !mfaRequired)}
+                onCheckedChange={(details) => onChange(details.checked)}
+                aria-label="Require two-step verification"
+                inputProps={{ "data-testid": "two-step-requirement-switch" }}
+              />
+            </Box>
+          </Tooltip>
+        </HStack>
+      }
+      data-testid="two-step-requirement-card"
+    >
+      {locked && (
+        <HStack
+          gap={2}
+          align="start"
+          data-testid="two-step-requirement-plan-notice"
+        >
+          {/* One pixel down: the glyph optically aligned to the line beside
+              it, which mathematical alignment always misses. */}
+          <Box color="fg.muted" marginTop="1px" flexShrink={0}>
+            <Lock size={14} />
+          </Box>
+          <Text color="fg.muted" fontSize="11.5px" lineHeight="1.55">
+            {lock.explanation}{" "}
+            {/* THE WAY OUT IS THE BRAND COLOUR, NOT A SECOND BLUE. This link
+                used to wear `blue.600`, a colour nothing else on these pages
+                speaks; the way to a plan is an action, and actions here are
+                orange. */}
+            <Link
+              href={lock.linkHref}
+              colorPalette="orange"
+              color="colorPalette.fg"
             >
-              <AlertTriangle size={16} />
-              <VStack align="start" gap={1}>
-                <Text fontSize="sm">
-                  Your identity provider is not telling us that a second factor
-                  was used when your members sign in.
-                </Text>
-                <Text fontSize="sm" color="fg.muted">
-                  Until it does, members who sign in through it are asked to set
-                  two-step verification up here as well. You can turn a second
-                  factor on at your identity provider instead, and it will count
-                  for them the moment it starts confirming one.
-                </Text>
-              </VStack>
-            </HStack>
-          ) : null}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+              {lock.linkLabel}
+            </Link>
+          </Text>
+        </HStack>
+      )}
+
+      <Text fontSize="13px" data-testid="two-step-held-count">
+        {heldCount === 0
+          ? `All ${memberCount} members can prove a second factor.`
+          : `${heldCount} of ${memberCount} members cannot prove a second factor yet${
+              mfaRequired
+                ? " and are being asked to set one up."
+                : " and would be asked to set one up."
+            }`}
+      </Text>
+
+      {/* The provider's shortcoming is a WARNING, in the one notice these
+          screens speak — never a coloured box of this card's own invention. */}
+      {connection.connected && !connection.assertsSecondFactor ? (
+        <QuietNotice
+          tone="warning"
+          title="Your identity provider is not telling us that a second factor was used when your members sign in."
+          testId="two-step-connection-warning"
+        >
+          Until it does, members who sign in through it are asked to set
+          two-step verification up here as well. You can turn a second factor on
+          at your identity provider instead, and it will count for them the
+          moment it starts confirming one.
+        </QuietNotice>
+      ) : null}
+    </SettingsCard>
   );
 }

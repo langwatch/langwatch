@@ -1,3 +1,4 @@
+import { Box } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import { SettingList, SettingRow } from "~/components/settings/kit/SettingRow";
@@ -71,6 +72,14 @@ export function OverviewCard({
   );
 }
 
+/**
+ * THE ONE TRANSLATION BETWEEN THE TWO TONE VOCABULARIES. The chips these
+ * cards wear speak `IdentityChip`'s words (`good` and its neighbours); the
+ * kit's dot and tone speak `ok` and its. Every card in this directory passes
+ * its chip through `OverviewCard`, so the mapping lives exactly once, here —
+ * a card that translated its own tone would be a second answer to a question
+ * that only wants one.
+ */
 function statusToneFor(
   tone: "neutral" | "good" | "warning" | "bad",
 ): "ok" | "warning" | "bad" | "neutral" {
@@ -102,7 +111,11 @@ export function OverviewDetail({
 }) {
   return (
     <SettingRow label={label} hint={hint}>
-      {children}
+      {/* The value wears the row's own size — 13px, the label's — by default,
+          stated once here rather than re-typed as a literal on every row of
+          every card. Chips and controls carry their own size and ignore
+          this. */}
+      <Box fontSize="13px">{children}</Box>
     </SettingRow>
   );
 }

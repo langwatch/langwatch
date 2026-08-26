@@ -1,5 +1,6 @@
 import { Tabs, VStack } from "@chakra-ui/react";
 import { useSearchParams } from "react-router";
+import { DepartmentsSection } from "../../components/access/DepartmentsSection";
 import { DirectorySummary } from "../../components/access/DirectorySummary";
 import { GroupsSection } from "../../components/access/GroupsSection";
 import { PeopleSection } from "../../components/access/PeopleSection";
@@ -8,6 +9,7 @@ import { PermissionAlert } from "../../components/PermissionAlert";
 import SettingsLayout from "../../components/SettingsLayout";
 import { SettingsPageHeader } from "../../components/settings/SettingsPageHeader";
 import { TabCount } from "../../components/settings/TabCount";
+import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 
@@ -34,13 +36,20 @@ import { api } from "../../utils/api";
  * tab under them is what to do about the answer. Putting the band inside a tab
  * would hide the question from three quarters of the page.
  *
- * THREE TABS, THREE SUBJECTS, DRAWN ONE WAY.
+ * THREE TABS EVERY READER HAS, THREE SUBJECTS, DRAWN ONE WAY.
  *
  *   People ─── everybody here and everybody on their way in, as three cuts
  *              of one list
  *   Teams ──── the teams, and the projects each one holds
  *   Groups ─── every group in the organization, the sent ones and the
  *              hand-made ones alike
+ *
+ * A FOURTH TAB JOINS ONLY WHERE THERE IS ANYTHING TO PUT ON IT. Departments
+ * are the AI-governance org structure, managed on Governance's People page;
+ * the Directory references them for the organizations that have them, beside
+ * the people and teams they count. An organization without departments, and
+ * a reader without `governance:view`, never sees the tab — an address naming
+ * it falls back to the people.
  *
  * Each tab puts its own action at the end of its own first heading row, and
  * each carries its count on the tab itself. Three tabs that each placed those
@@ -68,7 +77,8 @@ export default function DirectorySettings() {
 }
 
 const TABS = ["people", "teams", "groups"] as const;
-type DirectoryTab = (typeof TABS)[number];
+/** The three every reader has; "departments" joins where the org has any. */
+type DirectoryTab = (typeof TABS)[number] | "departments";
 
 /** What the reader may open here. */
 interface DirectoryReach {
@@ -97,10 +107,18 @@ interface DirectoryReach {
  */
 export function resolveDirectoryTab({
   requested,
+  available = TABS,
 }: {
   requested: string | null;
+  /**
+   * The tabs this reader may actually open. Defaults to the base three, so
+   * the departments tab is only ever resolved for a reader whose page offered
+   * it — a `?tab=departments` address that arrives without one falls back to
+   * the people like any other tab that is not there.
+   */
+  available?: readonly DirectoryTab[];
 }): DirectoryTab {
-  return TABS.includes(requested as DirectoryTab)
+  return available.includes(requested as DirectoryTab)
     ? (requested as DirectoryTab)
     : "people";
 }
@@ -144,6 +162,13 @@ function DirectorySettingsContent({
     { enabled: reach.mayManageMembership && !!organizationId },
   );
 
+  // Whether the departments tab has anything to say. The hook degrades to
+  // "nothing to show" for a reader the departments queries refuse, and the
+  // permission check keeps the tab from ever being offered to one — for them
+  // there is no error and no empty frame, the tab simply never appears.
+  const department = useDepartmentColumn(organizationId);
+  const maySeeDepartments = department.show && hasPermission("governance:view");
+
   /**
    * Everybody the People tab would list: the members, the invitations still
    * waiting on somebody, and the people asking to join. Undefined until all
@@ -164,7 +189,13 @@ function DirectorySettingsContent({
   // Which tab is open lives in the address, so "the group you mapped is
   // here" is a link that opens on the groups rather than on the status.
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = resolveDirectoryTab({ requested: searchParams.get("tab") });
+  const availableTabs: readonly DirectoryTab[] = maySeeDepartments
+    ? [...TABS, "departments"]
+    : TABS;
+  const tab = resolveDirectoryTab({
+    requested: searchParams.get("tab"),
+    available: availableTabs,
+  });
 
   const selectTab = (next: string) =>
     setSearchParams(
@@ -191,9 +222,9 @@ function DirectorySettingsContent({
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
-        {/* THE WAY BACK to Authentication is on the Authentication source
-            fact in the band below, as a plus beside the sources themselves. A
-            whole sentence of a button under the page title said the same thing
+        {/* THE WAY BACK to Authentication is on the sources fact in the
+            band below, as a plus beside the sources themselves. A whole
+            sentence of a button under the page title said the same thing
             louder, in the one place a reader is looking for the page's own
             subject rather than for somewhere else to go. */}
         <SettingsPageHeader
@@ -208,70 +239,107 @@ function DirectorySettingsContent({
           />
         )}
 
-        <Tabs.Root
-          value={tab}
-          onValueChange={(event) => selectTab(event.value)}
-          colorPalette="blue"
-          width="full"
-        >
-          {/* The same gap Roles leaves under its own tabs. Two tabbed
-              settings pages sitting one menu item apart must not breathe
-              differently.
-
-              The explicit space before each count is not decoration: a flex
-              container drops whitespace-only children from layout but keeps
-              them in the text the accessible name is computed from, so
-              without it a tab announces as "Groups4", one run-together
-              token. */}
-          <Tabs.List marginBottom={6}>
-            {reach.mayManageMembership && (
-              <Tabs.Trigger value="people" gap={2}>
-                People <TabCount value={peopleCount} />
-              </Tabs.Trigger>
-            )}
-            {reach.mayManageMembership && (
-              <Tabs.Trigger value="teams" gap={2}>
-                Teams &amp; projects <TabCount value={teams.data?.length} />
-              </Tabs.Trigger>
-            )}
-            {reach.mayManageMembership && (
-              <Tabs.Trigger value="groups" gap={2}>
-                Groups <TabCount value={groups.data?.length} />
-              </Tabs.Trigger>
-            )}
-          </Tabs.List>
-
-          {reach.mayManageMembership && (
-            <Tabs.Content value="people">
-              {/* Only the tab being read is mounted: a closed tab must not
-                  hold a read of every member in the organization open behind
-                  it, nor offer its actions to somebody looking elsewhere. */}
-              {tab === "people" && (
-                <PeopleSection organizationId={organizationId} />
-              )}
-            </Tabs.Content>
-          )}
-
-          {reach.mayManageMembership && (
-            <Tabs.Content value="teams">
-              {tab === "teams" && (
-                <TeamsAndProjectsSection organizationId={organizationId} />
-              )}
-            </Tabs.Content>
-          )}
-
-          {reach.mayManageMembership && (
-            <Tabs.Content value="groups">
-              {tab === "groups" && (
-                <GroupsSection
-                  organizationId={organizationId}
-                  canManage={true}
-                />
-              )}
-            </Tabs.Content>
-          )}
-        </Tabs.Root>
+        <DirectoryTabs
+          organizationId={organizationId}
+          tab={tab}
+          onSelectTab={selectTab}
+          maySeeDepartments={maySeeDepartments}
+          peopleCount={peopleCount}
+          teamsCount={teams.data?.length}
+          groupsCount={groups.data?.length}
+          departmentsCount={department.departments.length}
+        />
       </VStack>
     </SettingsLayout>
+  );
+}
+
+/**
+ * The tabs themselves. Only ever rendered for a reader holding
+ * `organization:manage` — the page refuses everybody else above — so the
+ * membership tabs carry no permission check of their own; the departments
+ * tab is the one that comes and goes, with what the organization has and
+ * what the reader may view.
+ */
+function DirectoryTabs({
+  organizationId,
+  tab,
+  onSelectTab,
+  maySeeDepartments,
+  peopleCount,
+  teamsCount,
+  groupsCount,
+  departmentsCount,
+}: {
+  organizationId: string;
+  tab: DirectoryTab;
+  onSelectTab: (next: string) => void;
+  /** `governance:view` plus an org that actually has departments. */
+  maySeeDepartments: boolean;
+  peopleCount: number | undefined;
+  teamsCount: number | undefined;
+  groupsCount: number | undefined;
+  departmentsCount: number;
+}) {
+  return (
+    <Tabs.Root
+      value={tab}
+      onValueChange={(event) => onSelectTab(event.value)}
+      colorPalette="orange"
+      width="full"
+    >
+      {/* The same gap Roles leaves under its own tabs. Two tabbed
+          settings pages sitting one menu item apart must not breathe
+          differently.
+
+          The explicit space before each count is not decoration: a flex
+          container drops whitespace-only children from layout but keeps
+          them in the text the accessible name is computed from, so
+          without it a tab announces as "Groups4", one run-together
+          token. */}
+      <Tabs.List marginBottom={6}>
+        <Tabs.Trigger value="people" gap={2}>
+          People <TabCount value={peopleCount} />
+        </Tabs.Trigger>
+        <Tabs.Trigger value="teams" gap={2}>
+          Teams &amp; projects <TabCount value={teamsCount} />
+        </Tabs.Trigger>
+        <Tabs.Trigger value="groups" gap={2}>
+          Groups <TabCount value={groupsCount} />
+        </Tabs.Trigger>
+        {maySeeDepartments && (
+          <Tabs.Trigger value="departments" gap={2}>
+            Departments <TabCount value={departmentsCount} />
+          </Tabs.Trigger>
+        )}
+      </Tabs.List>
+
+      <Tabs.Content value="people">
+        {/* Only the tab being read is mounted: a closed tab must not
+            hold a read of every member in the organization open behind
+            it, nor offer its actions to somebody looking elsewhere. */}
+        {tab === "people" && <PeopleSection organizationId={organizationId} />}
+      </Tabs.Content>
+
+      <Tabs.Content value="teams">
+        {tab === "teams" && (
+          <TeamsAndProjectsSection organizationId={organizationId} />
+        )}
+      </Tabs.Content>
+
+      <Tabs.Content value="groups">
+        {tab === "groups" && (
+          <GroupsSection organizationId={organizationId} canManage={true} />
+        )}
+      </Tabs.Content>
+
+      {maySeeDepartments && (
+        <Tabs.Content value="departments">
+          {tab === "departments" && (
+            <DepartmentsSection organizationId={organizationId} />
+          )}
+        </Tabs.Content>
+      )}
+    </Tabs.Root>
   );
 }

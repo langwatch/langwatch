@@ -196,7 +196,7 @@ const InviteRowActions = ({
         {canResend && (
           <Menu.Item
             value="revoke"
-            color="red.500"
+            color="red.fg"
             onClick={() => onRevokeInvite(invite.id)}
           >
             <Trash2 size={16} />

@@ -1,8 +1,6 @@
 import {
   Box,
   Button,
-  Card,
-  Heading,
   HStack,
   Input,
   Link,
@@ -14,6 +12,7 @@ import type { DomainJoinSetting } from "@langwatch/identity";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
+import { SettingsCard } from "~/components/settings/kit/SettingsCard";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEnterpriseLock } from "./useEnterpriseLock";
 
@@ -34,6 +33,19 @@ import { useEnterpriseLock } from "./useEnterpriseLock";
  * plan that lapses is never a door somebody cannot shut. `setJoining` refuses
  * the same way on its own (`join_policy_not_licensed`): the greying is a
  * courtesy to whoever is reading, and the service is the boundary.
+ *
+ * The chrome is the settings kit's — `SettingsCard`, the same shape every
+ * card in the cluster wears — so this page cannot drift into a dialect of its
+ * own. What is this card's own is the content: the three radios, and the
+ * domain box the automatic option earns.
+ *
+ * ONE QUESTION, TWO DOORS, ONE VOCABULARY. The single sign-on journey asks
+ * the same three answers of the people who arrive THROUGH a connection
+ * (ADR-117 §3), so the options wear the same words in both places — a reader
+ * who has answered one recognises the other. The automatic option still
+ * names its own cost, now in the help line beside the shared label: somebody
+ * walking in with nobody in the loop is a thing an administrator should
+ * agree to on purpose.
  */
 const OPTIONS: Array<{
   value: DomainJoinSetting;
@@ -42,7 +54,7 @@ const OPTIONS: Array<{
 }> = [
   {
     value: "off",
-    label: "Nobody",
+    label: "Only people already here",
     help: "Invitations still work.",
   },
   {
@@ -52,10 +64,8 @@ const OPTIONS: Array<{
   },
   {
     value: "auto",
-    // The one option somebody should agree to on purpose, so it names its own
-    // cost in its own label rather than three lines below it.
-    label: "Straight in, nobody approves",
-    help: "On a domain you verified. You are emailed each time.",
+    label: "They join, on a domain you verified",
+    help: "Nobody approves each person — you are emailed each time.",
   },
 ];
 
@@ -64,11 +74,16 @@ export function JoinPolicyCard({
   joinDomains,
   saving,
   onSave,
+  ssoLive = false,
 }: {
   domainJoin: DomainJoinSetting;
   joinDomains: string[];
   saving: boolean;
   onSave: (next: { domainJoin: DomainJoinSetting; domains: string[] }) => void;
+  /** A connection is routing sign-ins, so the SSO door has its own answer to
+   *  this question — the card points at it rather than letting a reader set
+   *  it here twice. */
+  ssoLive?: boolean;
 }) {
   const [selected, setSelected] = useState<DomainJoinSetting>(domainJoin);
   const [domains, setDomains] = useState(joinDomains.join(", "));
@@ -98,117 +113,140 @@ export function JoinPolicyCard({
     parsedDomains.join(",") === joinDomains.join(",");
 
   return (
-    <Card.Root width="full" data-testid="join-policy-card">
-      <Card.Body>
-        <VStack align="stretch" gap={4}>
-          <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Heading as="h3" size="sm">
-                Who can join your organization
-              </Heading>
-              {lock.locked && (
-                <EnterprisePlanBadge data-testid="join-policy-plan-badge" />
-              )}
-            </HStack>
-            {/* WHICH PEOPLE THIS IS ABOUT, and it is the half a reader
-                guesses at: where a connection is live for a domain, its own
-                provisioning is the way in and this is deliberately not offered
-                beside it. So this governs exactly the arrivals single sign-on
-                does not catch — one clause, because the reader came to move a
-                radio and not to read a page. */}
-            <Text color="fg.muted" fontSize="sm">
-              For colleagues who arrive without single sign-on.
-            </Text>
-            {lock.locked && (
-              <HStack gap={2} paddingTop={1} data-testid="join-policy-notice">
-                <Box color="fg.muted">
-                  <Lock size={14} />
-                </Box>
-                <Text color="fg.muted" fontSize="sm">
-                  {lock.explanation}{" "}
-                  <Link href={lock.linkHref} fontSize="sm" color="blue.600">
-                    {lock.linkLabel}
-                  </Link>
-                </Text>
-              </HStack>
-            )}
-          </VStack>
-
-          <RadioGroup.Root
-            value={selected}
-            onValueChange={(event) =>
-              setSelected((event.value ?? "request") as DomainJoinSetting)
-            }
-          >
-            <VStack align="stretch" gap={3}>
-              {OPTIONS.map((option) => (
-                // The tooltip hangs off a wrapper rather than the radio: a
-                // disabled control takes no pointer events, so an explanation
-                // pinned to it is one nobody can ever read.
-                <Tooltip
-                  key={option.value}
-                  content={lock.explanation}
-                  disabled={!isLocked(option.value)}
-                >
-                  <Box>
-                    <RadioGroup.Item
-                      value={option.value}
-                      disabled={saving || isLocked(option.value)}
-                    >
-                      <RadioGroup.ItemHiddenInput
-                        data-testid={`join-policy-${option.value}`}
-                      />
-                      <RadioGroup.ItemIndicator />
-                      <RadioGroup.ItemText>
-                        <VStack align="start" gap={0}>
-                          <Text fontSize="sm" fontWeight="medium">
-                            {option.label}
-                          </Text>
-                          <Text color="fg.muted" fontSize="xs">
-                            {option.help}
-                          </Text>
-                        </VStack>
-                      </RadioGroup.ItemText>
-                    </RadioGroup.Item>
-                  </Box>
-                </Tooltip>
-              ))}
-            </VStack>
-          </RadioGroup.Root>
-
-          {selected === "auto" && (
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="sm">Which domains, separated by commas</Text>
-              <Input
-                value={domains}
-                placeholder="acme.com"
-                disabled={isLocked("auto")}
-                onChange={(event) => setDomains(event.target.value)}
-                data-testid="join-policy-domains"
-              />
-              {/* What opens this door is the same verification ceremony
-                  sign-in routing uses — never a count of who happens to
-                  receive mail on the domain. */}
-              <Text color="fg.muted" fontSize="sm">
-                Each must be verified as yours first.
-              </Text>
-            </VStack>
-          )}
-
-          <HStack justifyContent="flex-end">
-            <Button
+    <SettingsCard
+      title="Who can join your organization"
+      // WHICH PEOPLE THIS IS ABOUT, and it is the half a reader guesses at:
+      // where a connection is live for a domain, its own provisioning is the
+      // way in and this is deliberately not offered beside it. So this governs
+      // exactly the arrivals single sign-on does not catch — one clause,
+      // because the reader came to move a radio and not to read a page.
+      hint="For colleagues who arrive without single sign-on."
+      badge={
+        lock.locked ? (
+          <EnterprisePlanBadge data-testid="join-policy-plan-badge" />
+        ) : undefined
+      }
+      actions={
+        <Button
+          size="sm"
+          colorPalette="orange"
+          loading={saving}
+          disabled={unchanged || isLocked(selected)}
+          onClick={() =>
+            onSave({ domainJoin: selected, domains: parsedDomains })
+          }
+        >
+          Save
+        </Button>
+      }
+      data-testid="join-policy-card"
+    >
+      {lock.locked && (
+        <HStack gap={2} align="start" data-testid="join-policy-notice">
+          {/* One pixel down: the glyph optically aligned to the line beside
+              it, which mathematical alignment always misses. */}
+          <Box color="fg.muted" marginTop="1px" flexShrink={0}>
+            <Lock size={14} />
+          </Box>
+          <Text color="fg.muted" fontSize="11.5px" lineHeight="1.55">
+            {lock.explanation}{" "}
+            {/* THE WAY OUT IS THE BRAND COLOUR, NOT A SECOND BLUE. This link
+                used to wear `blue.600`, a colour nothing else on these pages
+                speaks; the way to a plan is an action, and actions here are
+                orange. */}
+            <Link
+              href={lock.linkHref}
               colorPalette="orange"
-              loading={saving}
-              disabled={unchanged || isLocked(selected)}
-              onClick={() =>
-                onSave({ domainJoin: selected, domains: parsedDomains })
-              }
+              color="colorPalette.fg"
             >
-              Save
-            </Button>
-          </HStack>
+              {lock.linkLabel}
+            </Link>
+          </Text>
+        </HStack>
+      )}
+
+      <RadioGroup.Root
+        value={selected}
+        onValueChange={(event) =>
+          setSelected((event.value ?? "request") as DomainJoinSetting)
+        }
+      >
+        <VStack align="stretch" gap={3}>
+          {OPTIONS.map((option) => (
+            // The tooltip hangs off a wrapper rather than the radio: a
+            // disabled control takes no pointer events, so an explanation
+            // pinned to it is one nobody can ever read.
+            <Tooltip
+              key={option.value}
+              content={lock.explanation}
+              disabled={!isLocked(option.value)}
+            >
+              <Box>
+                <RadioGroup.Item
+                  value={option.value}
+                  disabled={saving || isLocked(option.value)}
+                >
+                  <RadioGroup.ItemHiddenInput
+                    data-testid={`join-policy-${option.value}`}
+                  />
+                  <RadioGroup.ItemIndicator />
+                  <RadioGroup.ItemText>
+                    <VStack align="start" gap={0}>
+                      <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
+                        {option.label}
+                      </Text>
+                      <Text color="fg.muted" fontSize="11.5px" lineHeight="1.5">
+                        {option.help}
+                      </Text>
+                    </VStack>
+                  </RadioGroup.ItemText>
+                </RadioGroup.Item>
+              </Box>
+            </Tooltip>
+          ))}
         </VStack>
-      </Card.Body>
-    </Card.Root>
+      </RadioGroup.Root>
+
+      {selected === "auto" && (
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="13px" fontWeight="500">
+            Which domains, separated by commas
+          </Text>
+          <Input
+            value={domains}
+            placeholder="acme.com"
+            disabled={isLocked("auto")}
+            onChange={(event) => setDomains(event.target.value)}
+            data-testid="join-policy-domains"
+          />
+          {/* What opens this door is the same verification ceremony
+              sign-in routing uses — never a count of who happens to
+              receive mail on the domain. */}
+          <Text color="fg.muted" fontSize="11.5px">
+            Each must be verified as yours first.
+          </Text>
+        </VStack>
+      )}
+
+      {/* THE OTHER DOOR, NAMED. This card answers for people who arrive
+          WITHOUT single sign-on; the people a live connection signs in are
+          answered by its own setting, and a reader holding both questions
+          should be handed that door rather than left to answer it here
+          twice. */}
+      {ssoLive && (
+        <Text color="fg.subtle" fontSize="11.5px">
+          People signing in through your identity provider are answered by the
+          connection's own setting, on{" "}
+          <Link
+            href="/settings/authentication/provider"
+            colorPalette="orange"
+            color="colorPalette.fg"
+          >
+            Identity provider
+          </Link>
+          .
+        </Text>
+      )}
+    </SettingsCard>
   );
 }

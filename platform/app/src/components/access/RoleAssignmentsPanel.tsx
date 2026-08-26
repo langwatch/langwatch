@@ -1,16 +1,10 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, HStack, Spacer, Text } from "@chakra-ui/react";
 import { KeyRound, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { FilterChips } from "~/components/ui/FilterChips";
 import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
+import { SettingsRowsSkeleton } from "../settings/kit/SettingsSkeleton";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 import { CollapsedGrantList } from "./CollapsedGrants";
 import { IdentityChip, IdentityRow, IdentityRowList } from "./IdentityRow";
@@ -94,10 +88,24 @@ export function RoleAssignmentsPanel({
   return (
     <Box width="full">
       <HStack width="full" marginBottom={4}>
-        <ScopeFilterChips
-          selected={scopeFilter}
-          counts={counts}
-          onSelect={setScopeFilter}
+        {/* A ZERO IS AN ANSWER. Every cut carries its number whether or not
+            there is anything behind it — somebody checking on a quiet week
+            came here to read exactly that. The shared chips say it the same
+            way the People page's cuts do, in the brand accent rather than a
+            blue this cluster speaks nowhere else. */}
+        <FilterChips
+          value={scopeFilter}
+          onChange={(next) => setScopeFilter(next as ScopeFilter)}
+          groupLabel="Filter role assignments by scope"
+          countNoun={{
+            singular: "role assignment",
+            plural: "role assignments",
+          }}
+          items={FILTERS.map((filter) => ({
+            value: filter.value,
+            label: filter.label,
+            count: counts[filter.value],
+          }))}
         />
         <Spacer />
         {assignments.data && (
@@ -109,9 +117,9 @@ export function RoleAssignmentsPanel({
       </HStack>
 
       {assignments.isLoading ? (
-        <Box padding={8} display="flex" justifyContent="center">
-          <Spinner />
-        </Box>
+        /* A spinner says "wait"; a skeleton says what for. Five rows is what
+           the list usually holds, so nothing jumps when the answer lands. */
+        <SettingsRowsSkeleton rows={5} />
       ) : (
         <IdentityRowList
           data-testid="role-assignments-list"
@@ -155,49 +163,6 @@ export function RoleAssignmentsPanel({
  * them used to arrive with no user and no group and land in a single shared
  * row with no name on it. Naming the kind is what keeps that row countable.
  */
-/**
- * The scope filter, each chip carrying how much is behind it.
- *
- * The numbers come from every assignment rather than from the ones currently
- * shown: a filter that only knows about the rows it is already displaying
- * cannot tell the reader whether pressing it is worth anything.
- */
-function ScopeFilterChips({
-  selected,
-  counts,
-  onSelect,
-}: {
-  selected: ScopeFilter;
-  counts: Record<ScopeFilter, number>;
-  onSelect: (next: ScopeFilter) => void;
-}) {
-  return (
-    <HStack gap={1} flexWrap="wrap">
-      {FILTERS.map((filter) => {
-        const active = selected === filter.value;
-        return (
-          <Button
-            key={filter.value}
-            size="sm"
-            variant={active ? "subtle" : "ghost"}
-            colorPalette={active ? "blue" : "gray"}
-            borderRadius="full"
-            onClick={() => onSelect(filter.value)}
-            aria-pressed={active}
-          >
-            <HStack gap={1.5}>
-              <Text>{filter.label}</Text>
-              <Text color="fg.muted" fontVariantNumeric="tabular-nums">
-                {counts[filter.value]}
-              </Text>
-            </HStack>
-          </Button>
-        );
-      })}
-    </HStack>
-  );
-}
-
 function HolderKindBadge({ holder }: { holder: Holder }) {
   if (holder.kind === "person") return null;
 

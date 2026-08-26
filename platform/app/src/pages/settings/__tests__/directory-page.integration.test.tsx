@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  *
  * The Directory page: named for what it holds, leading with its status, with
- * people, teams, groups and provisioning as four tabs under it.
+ * people, teams and groups as tabs under it — and departments as a fourth,
+ * only where the organization has them and the reader may view governance.
  *
  * Spec: specs/identity/org-access-cluster.feature
  */
@@ -15,6 +16,8 @@ const state = vi.hoisted(() => ({
   /** What `hasPermission` answers, so a reader can hold one half and not the
    *  other — the split the page is built around. */
   permissions: new Set<string>(),
+  /** What the department column reports; empty means no departments tab. */
+  departments: [] as { id: string; name: string }[],
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -58,6 +61,25 @@ vi.mock("~/components/access/PeopleSection", () => ({
 
 vi.mock("~/components/access/TeamsAndProjectsSection", () => ({
   TeamsAndProjectsSection: () => <div data-testid="teams-section">teams</div>,
+}));
+
+vi.mock("~/components/access/DepartmentsSection", () => ({
+  DepartmentsSection: () => (
+    <div data-testid="departments-section">departments</div>
+  ),
+}));
+
+// The department column's flag and query behaviour is covered where it
+// lives; here the page only needs to know whether there is anything to show.
+vi.mock("~/components/settings/useDepartmentColumn", () => ({
+  useDepartmentColumn: () => ({
+    show: state.departments.length > 0,
+    departments: state.departments,
+    byUser: new Map(),
+    byTeam: new Map(),
+    byProject: new Map(),
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock("~/components/access/JoinPolicyCard", () => ({
@@ -144,6 +166,7 @@ describe("given the directory page", () => {
       "sso:manage",
       "organization:manage",
     ]);
+    state.departments = [];
   });
   afterEach(() => cleanup());
 
@@ -228,6 +251,47 @@ describe("given the directory page", () => {
 
       expect(tab("Teams")).toHaveAttribute("aria-selected", "true");
       expect(screen.getByTestId("teams-section")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the organization has departments and the reader may view governance", () => {
+    beforeEach(() => {
+      state.permissions.add("governance:view");
+      state.departments = [
+        { id: "dep_eng", name: "Engineering" },
+        { id: "dep_sales", name: "Sales" },
+      ];
+    });
+
+    /** @scenario The departments tab joins only where there is anything to put on it */
+    it("offers the departments tab with its count", () => {
+      renderPage();
+
+      expect(tab("Departments")).toHaveAccessibleName(/2/);
+    });
+
+    /** @scenario The departments tab references what Governance manages */
+    it("opens on the departments when the address names them", () => {
+      renderPage("/settings/directory?tab=departments");
+
+      expect(tab("Departments")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("departments-section")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the organization has departments the reader may not view", () => {
+    beforeEach(() => {
+      // organization:manage without governance:view: the departments queries
+      // would be refused, so the tab simply never appears.
+      state.departments = [{ id: "dep_eng", name: "Engineering" }];
+    });
+
+    /** @scenario A reader who may not view governance is offered no departments tab */
+    it("never offers the tab, and an address naming it lands on the people", () => {
+      renderPage("/settings/directory?tab=departments");
+
+      expect(noTab("Departments")).toBeNull();
+      expect(tab("People")).toHaveAttribute("aria-selected", "true");
     });
   });
 

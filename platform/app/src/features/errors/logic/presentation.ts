@@ -2064,7 +2064,7 @@ const presentations = {
   sso_activation_arrivals_undecided: {
     title: "Say who this connection lets in",
     describe: () =>
-      "Somebody signs in through your identity provider and you have never seen them before — they can join, they can wait for you to approve them, or they can be turned away. Choose one, then turn the connection on.",
+      "Somebody signs in through your identity provider and you have never seen them before — they can join on a domain you verified, they can ask and wait for your approval, or they can be turned away. Choose one, then turn the connection on.",
   },
   sso_connection_string_edit_retired: {
     title: "Single sign-on is configured on the connection now",

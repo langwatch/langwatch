@@ -68,6 +68,7 @@ export function IdentityRow({
       align="center"
       opacity={muted ? 0.6 : 1}
       cursor={interactive ? "pointer" : undefined}
+      transition="background 0.15s ease"
       _hover={interactive ? { background: "bg.muted" } : undefined}
       // The row is the target, not the name inside it: a name-sized hit area
       // in a list of forty people is a list nobody opens twice.

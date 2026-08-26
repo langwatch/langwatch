@@ -30,7 +30,7 @@ export function FilterChips({
   items,
   groupLabel,
   countNoun,
-  colorPalette = "blue",
+  colorPalette = "orange",
   testId,
 }: {
   value: string;

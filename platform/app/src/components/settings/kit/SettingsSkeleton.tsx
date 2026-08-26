@@ -13,7 +13,12 @@ import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
  * The geometry matches the real row on purpose: a mark, a name over a quieter
  * second line, and a control at the end. Nothing moves when the answer
  * arrives, which is the whole point — the placeholder is the row, drawn
- * before we can fill it in.
+ * before we can fill it in. The row's own rhythm is SettingRow's: the same
+ * vertical padding (2.5), and the name's second line the same half-step (0.5)
+ * below the first, so a skeleton standing in for a SettingList holds the
+ * rows' positions exactly. The lead mark's spacing has no SettingRow
+ * counterpart — a bare row has no mark — and stays at the avatar spacing the
+ * icon rows elsewhere already use.
  *
  * `rows` should be what the section usually holds rather than the most it
  * could. Too many placeholders for two real rows is the same jump in the
@@ -47,7 +52,7 @@ export function SettingsRowsSkeleton({
       aria-label="Loading"
     >
       {Array.from({ length: rows }, (_, index) => (
-        <HStack key={index} gap={3} width="full" paddingY={1.5}>
+        <HStack key={index} gap={3} width="full" paddingY={2.5}>
           {showLead && (
             <Skeleton
               height="20px"
@@ -56,7 +61,7 @@ export function SettingsRowsSkeleton({
               flexShrink={0}
             />
           )}
-          <VStack align="start" gap={1.5} flex={1} minWidth={0}>
+          <VStack align="start" gap={0.5} flex={1} minWidth={0}>
             {/* Uneven widths, because a column of identical bars reads as a
                 loading bar rather than as rows of different names. */}
             <Skeleton height="12px" width={index % 2 === 0 ? "38%" : "30%"} />

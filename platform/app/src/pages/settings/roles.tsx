@@ -1,4 +1,4 @@
-import { Alert, Box, Spinner, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Spinner, Tabs, VStack } from "@chakra-ui/react";
 import { useSearchParams } from "react-router";
 import { RoleAssignmentsPanel } from "~/components/access/RoleAssignmentsPanel";
 import { RolesPanel } from "~/components/access/RolesPanel";
@@ -39,6 +39,14 @@ function RolesSettings() {
     return (
       <SettingsLayout>
         <VStack gap={6} width="full" align="start">
+          {/* The lock keeps the page's name and subject, the way the equally
+              gated Groups tab on the Directory does — an upsell that drops
+              the header reads as a different product, not as this page
+              locked. */}
+          <SettingsPageHeader
+            title="Roles"
+            description="What a role can do, and who holds one."
+          />
           <Alert.Root status="info">
             <Alert.Indicator />
             <Alert.Content>
@@ -116,7 +124,7 @@ function RolesTabs({
       <Tabs.Root
         value={tab}
         onValueChange={(event) => selectTab(event.value)}
-        colorPalette="blue"
+        colorPalette="orange"
         width="full"
       >
         <Tabs.List marginBottom={6}>
