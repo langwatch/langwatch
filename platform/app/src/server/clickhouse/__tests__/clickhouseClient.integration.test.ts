@@ -85,13 +85,27 @@ async function createTestOrgWithProject({
   const teamSlug = `--test-ch-team-${namespace}-${nanoid(6)}`;
   const projectSlug = `--test-ch-proj-${namespace}-${nanoid(6)}`;
 
-  const organization = await prisma.organization.create({
-    data: {
-      ...(organizationId ? { id: organizationId } : {}),
-      name: `Test CH Routing Org ${namespace}`,
-      slug: orgSlug,
-    },
-  });
+  // Upserted rather than created when the caller names the id, because two
+  // scenarios want a routed organization at the SAME id — the routing env var
+  // is keyed by it — and the rows live until `afterAll`. Creating twice made
+  // whichever ran second fail on the primary key, which is an ordering
+  // dependency rather than anything either scenario is about.
+  const organization = organizationId
+    ? await prisma.organization.upsert({
+        where: { id: organizationId },
+        update: {},
+        create: {
+          id: organizationId,
+          name: `Test CH Routing Org ${namespace}`,
+          slug: orgSlug,
+        },
+      })
+    : await prisma.organization.create({
+        data: {
+          name: `Test CH Routing Org ${namespace}`,
+          slug: orgSlug,
+        },
+      });
 
   const team = await prisma.team.create({
     data: {

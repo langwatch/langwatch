@@ -45,8 +45,11 @@ const statementsIn = (sql: string): string[] =>
     .map((statement) => statement.trim().replace(/\s+/g, " "))
     .filter((statement) => statement.length > 0);
 
-const REVOKE = "20260825050001_revoke_legacy_impersonating_sessions";
-const DROP = "20260825050002_drop_session_impersonating";
+// Restaged by `cmd/migrationorder` when this branch rebased — the ordering
+// tool renames the directory, and a name written out by hand here does not
+// follow it.
+const REVOKE = "20260825120003_revoke_legacy_impersonating_sessions";
+const DROP = "20260825120004_drop_session_impersonating";
 
 describe("given sessions carrying the legacy impersonation payload", () => {
   describe("when the deliverable is deployed", () => {
