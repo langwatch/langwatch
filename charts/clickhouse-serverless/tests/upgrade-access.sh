@@ -119,6 +119,10 @@ CURRENT_AC="HARNESS"
 # Accumulates every AC that failed, so a KEEP_GOING run still exits 30 and still
 # names all of them.
 FAILED_ACS=""
+# Accumulates assertions that could NOT be evaluated because their precondition
+# was destroyed by an earlier failure. These are neither green nor red: reporting
+# them as either would be a lie. They are UNMEASURED and say why.
+UNMEASURED_ACS=""
 
 harness_error() {
   echo -e "\n${RED}[HARNESS-ERROR]${NC} $*" >&2
@@ -209,6 +213,15 @@ _measure_run() {
   else
     printf '%s\n' "$MEASURED" | sed 's/^/    | /'
   fi
+}
+
+# An assertion whose PRECONDITION no longer holds cannot be evaluated. Calling it
+# a pass would be vacuous (the expected string appears for the wrong reason) and
+# calling it a fail would blame this AC for a defect that belongs to another one.
+ac_unmeasured() {
+  local why="$1"
+  echo -e "${YELLOW}[UNMEASURED ${CURRENT_AC}]${NC} ${why}"
+  UNMEASURED_ACS+="${CURRENT_AC}: ${why}"$'\n'
 }
 
 ac_assert_eq() {
@@ -1087,6 +1100,26 @@ p1_6_keeper_quorum() {
   wait_topology_ready
 
   ac "AC19" "below quorum: default still authenticates, the SQL user fails loudly"
+
+  # VACUITY GUARD. AC19 asks two things about a SQL-defined user: does it fail
+  # LOUDLY below quorum, and does it recover when quorum returns. Both questions
+  # presuppose the user EXISTS at full quorum. When AC8 has already lost every
+  # SQL-defined entity across the upgrade, the probe returns
+  #   Code: 516 ... there is no user with such name (AUTHENTICATION_FAILED)
+  # at full quorum and below it alike. That string satisfies "carries a
+  # ClickHouse error code" for entirely the wrong reason, and the recovery poll
+  # can never go green no matter how healthy Keeper is. Passing or failing on it
+  # would be measuring nothing, so establish the precondition first and say
+  # UNMEASURED when it does not hold.
+  local probe_precondition="present"
+  measure_allow_empty "AC19 precondition: can ${PROBE_USER} authenticate at FULL quorum?" \
+    timeout "$KEEPER_ERROR_TIMEOUT_S" env -u KUBECONFIG kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
+      exec "$(ch_pods | head -1)" -- clickhouse-client --user "$PROBE_USER" --password "$PROBE_PW" -q "SELECT 1"
+  if [[ "$MEASURED" != *"1"* ]] || [[ "$MEASURED_RC" -ne 0 ]]; then
+    probe_precondition="absent"
+    ac_unmeasured "the ${PROBE_USER} half of AC19 is UNMEASURABLE in this run: the user does not authenticate at FULL quorum (rc=${MEASURED_RC}), so a below-quorum error and a failed recovery poll would both be consequences of the earlier AC8 loss, not evidence about Keeper quorum. The 'default' half below IS still measured."
+  fi
+
   kc scale sts "$KEEPER_STS" --replicas=1
   kc rollout status sts "$KEEPER_STS" --timeout=180s || true
   sleep 10
@@ -1099,24 +1132,32 @@ p1_6_keeper_quorum() {
       exec "$target" -- sh -c 'clickhouse-client --password "$(cat /mnt/secrets/password)" -q "SELECT 1"'
   ac_assert_eq "default authenticates below quorum" "$MEASURED" "1"
 
-  measure_allow_empty "SQL user ${PROBE_USER} auth attempt below quorum (${KEEPER_ERROR_TIMEOUT_S}s budget)" \
-    timeout "$KEEPER_ERROR_TIMEOUT_S" env -u KUBECONFIG kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
-      exec "$target" -- clickhouse-client --user "$PROBE_USER" --password "$PROBE_PW" -q "SELECT 1"
-  local probe_rc="$MEASURED_RC" probe_out="$MEASURED"
-  if [[ "$probe_rc" -eq 124 ]]; then
-    ac_fail "the ${PROBE_USER} auth attempt HUNG past ${KEEPER_ERROR_TIMEOUT_S}s below quorum. Without a clock a hang and a slow recovery are indistinguishable — AC19 requires a non-empty error carrying a code within a stated timeout."
-  fi
-  if [[ "$probe_rc" -ne 0 ]]; then
-    [[ -n "${probe_out//[[:space:]]/}" ]] \
-      || ac_fail "the ${PROBE_USER} auth attempt failed SILENTLY below quorum (empty result, rc=${probe_rc}). AC19 requires a non-empty ClickHouse error carrying an error code."
-    ac_assert_contains "the below-quorum error carries a ClickHouse error code" "$probe_out" "Code:"
+  if [[ "$probe_precondition" == "absent" ]]; then
+    ac_unmeasured "skipping the below-quorum ${PROBE_USER} probe — precondition absent (see above)."
   else
-    warn "AC19: ${PROBE_USER} still authenticated below quorum (rc=0). Recorded verbatim above — the expected behaviour is inferred and untested, which is why this is an AC."
+    measure_allow_empty "SQL user ${PROBE_USER} auth attempt below quorum (${KEEPER_ERROR_TIMEOUT_S}s budget)" \
+      timeout "$KEEPER_ERROR_TIMEOUT_S" env -u KUBECONFIG kubectl --context "$KUBE_CTX" -n "$NAMESPACE" \
+        exec "$target" -- clickhouse-client --user "$PROBE_USER" --password "$PROBE_PW" -q "SELECT 1"
+    local probe_rc="$MEASURED_RC" probe_out="$MEASURED"
+    if [[ "$probe_rc" -eq 124 ]]; then
+      ac_fail "the ${PROBE_USER} auth attempt HUNG past ${KEEPER_ERROR_TIMEOUT_S}s below quorum. Without a clock a hang and a slow recovery are indistinguishable — AC19 requires a non-empty error carrying a code within a stated timeout."
+    fi
+    if [[ "$probe_rc" -ne 0 ]]; then
+      [[ -n "${probe_out//[[:space:]]/}" ]] \
+        || ac_fail "the ${PROBE_USER} auth attempt failed SILENTLY below quorum (empty result, rc=${probe_rc}). AC19 requires a non-empty ClickHouse error carrying an error code."
+      ac_assert_contains "the below-quorum error carries a ClickHouse error code" "$probe_out" "Code:"
+    else
+      warn "AC19: ${PROBE_USER} still authenticated below quorum (rc=0). Recorded verbatim above — the expected behaviour is inferred and untested, which is why this is an AC."
+    fi
   fi
 
   ac "AC19" "quorum restoration returns full function within ${KEEPER_RECOVERY_TIMEOUT_S}s, no manual step"
   kc scale sts "$KEEPER_STS" --replicas="$REPLICAS"
   wait_pod_ready "app.kubernetes.io/name=${KEEPER_STS}" "$TIMEOUT"
+  if [[ "$probe_precondition" == "absent" ]]; then
+    ac_unmeasured "skipping the ${PROBE_USER} recovery poll — precondition absent (see above). Keeper quorum WAS restored to ${REPLICAS} replicas and the pods went Ready; what is unmeasured is whether a surviving SQL user would regain function, because no SQL user survived to ask."
+    return 0
+  fi
   local start elapsed out
   start="$(date -u +%s)"
   while :; do
@@ -1240,6 +1281,14 @@ on_exit() {
   exit "$rc"
 }
 
+# UNMEASURED assertions are reported separately from pass and fail. Folding them
+# into either column is what turns a gap in the evidence into a false claim.
+_summarise_unmeasured() {
+  [[ -n "${UNMEASURED_ACS//[[:space:]]/}" ]] || return 0
+  echo -e "${YELLOW}[SUMMARY]${NC} the following were UNMEASURED (precondition destroyed by an earlier failure — neither pass nor fail):" >&2
+  printf '%s' "$UNMEASURED_ACS" | sed 's/^/    | /' >&2
+}
+
 main() {
   [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && usage
   case "$REPLICAS" in
@@ -1282,9 +1331,11 @@ main() {
   if [[ -n "${FAILED_ACS//[[:space:]]/}" ]]; then
     echo -e "${RED}[SUMMARY]${NC} the following assertions FAILED:" >&2
     printf '%s' "$FAILED_ACS" | sort -u | sed 's/^/    | /' >&2
+    _summarise_unmeasured
     echo -e "${RED}[SUMMARY]${NC} phases run: ${PHASES}. Exiting 30." >&2
     exit 30
   fi
+  _summarise_unmeasured
   pass "upgrade-access harness completed phases: ${PHASES} with no failed assertions"
 }
 
