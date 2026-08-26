@@ -491,6 +491,38 @@ describe("given an OpenAI Admin cost source", () => {
       expect(JSON.parse(result.cursor!).page).toBe("page_2");
     });
 
+    /** @scenario "Looking back never rewinds the source's progress" */
+    it("does not walk the window backwards when run after run runs out of time", async () => {
+      const puller = new OpenAiAdminPuller();
+      fetchMock.mockResolvedValue(jsonResponse(page()));
+      let cursor: string | null = JSON.stringify({
+        startingAt: BUCKET_START_ISO,
+        page: null,
+        query: `cost:1d:project_id,line_item,user_id,api_key_id:${CONFIG.startingAt}`,
+        watermark: null,
+        keyGrouping: true,
+      });
+
+      const starts: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const result = await puller.runOnce(
+          { ...RUN_OPTIONS, cursor, deadlineMs: Date.now() - 1 },
+          CONFIG,
+        );
+        cursor = result.cursor;
+        starts.push(JSON.parse(cursor!).startingAt);
+      }
+
+      // The look-back is applied to the stored start on every run; storing the
+      // looked-back value would compound it and walk a chronically slow source
+      // back to its backfill start.
+      expect(starts).toEqual([
+        BUCKET_START_ISO,
+        BUCKET_START_ISO,
+        BUCKET_START_ISO,
+      ]);
+    });
+
     /** @scenario "Every page of a window is read" */
     it("follows the page token to the end of the window", async () => {
       fetchMock

@@ -159,10 +159,25 @@ const cursorSchema = z.object({
   keyGrouping: z.boolean().default(true),
 });
 
-type ParsedCursor = Pick<
-  z.infer<typeof cursorSchema>,
-  "startingAt" | "page" | "watermark" | "keyGrouping"
->;
+interface ParsedCursor {
+  /** What this run asks the provider for — the stored start moved back by the
+   *  restatement look-back, unless a page token pins it. */
+  windowStart: string;
+  /**
+   * What to persist when the run ends WITHOUT a page token in hand.
+   *
+   * Deliberately not `windowStart`. Writing the looked-back value back would
+   * make the look-back compound: a run that ends early with nothing to resume
+   * from would save a start three days older than the one it was given, and
+   * the next run would take three more off that. A source that keeps hitting
+   * its deadline would walk steadily backwards until it was re-reading the
+   * whole backfill window every run.
+   */
+  storedStart: string;
+  page: string | null;
+  watermark: string | null;
+  keyGrouping: boolean;
+}
 
 /**
  * The configuration a cursor is bound to: everything that rides beside `page`
@@ -199,12 +214,13 @@ function parseCursor({
       if (parsed.query === queryIdentity(config)) {
         return {
           // Mid-window (a page token in hand) the start must stay exactly what
-          // the token was minted against. Only a drained cursor gets the
-          // trailing re-read applied to it.
-          startingAt:
+          // the token was minted against. Only a cursor with no token in hand
+          // gets the trailing re-read applied to it.
+          windowStart:
             parsed.page === null
               ? windowStartFor({ stored: parsed.startingAt, config })
               : parsed.startingAt,
+          storedStart: parsed.startingAt,
           page: parsed.page,
           watermark: parsed.watermark,
           keyGrouping: parsed.keyGrouping,
@@ -218,8 +234,10 @@ function parseCursor({
       );
     }
   }
+  const fresh = config.startingAt ?? defaultStartingAt();
   return {
-    startingAt: config.startingAt ?? defaultStartingAt(),
+    windowStart: fresh,
+    storedStart: fresh,
     page: null,
     watermark: null,
     keyGrouping: true,
@@ -257,7 +275,8 @@ function staleCursorRestart({
       ? configuredStart
       : parsed.startingAt;
   return {
-    startingAt: rewound,
+    windowStart: rewound,
+    storedStart: rewound,
     page: null,
     watermark: null,
     keyGrouping: true,
@@ -451,11 +470,19 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     const cursor = parseCursor({ cursor: options.cursor, config });
     // The window start does not move within a run; only the page token, the
     // watermark and the key-grouping fallback do.
-    const startingAt = cursor.startingAt;
+    const startingAt = cursor.windowStart;
     const query = queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
     let keyGrouping = cursor.keyGrouping;
+
+    /**
+     * What an unfinished run persists as its resume point. With a page token
+     * in hand it must be the window the token was minted against; without one
+     * it is the start this run was GIVEN, never the looked-back one — see
+     * `ParsedCursor.storedStart`.
+     */
+    const resumeStart = () => (page === null ? cursor.storedStart : startingAt);
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
@@ -464,7 +491,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         return {
           events,
           cursor: encodeCursor({
-            startingAt,
+            startingAt: resumeStart(),
             page,
             query,
             watermark,
@@ -495,7 +522,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         return {
           events,
           cursor: encodeCursor({
-            startingAt: watermark ?? startingAt,
+            // A window that returned no bucket at all keeps the start it was
+            // given rather than the looked-back one, for the same reason the
+            // deadline path does.
+            startingAt: watermark ?? cursor.storedStart,
             page: null,
             query,
             watermark: null,
@@ -513,7 +543,13 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     );
     return {
       events,
-      cursor: encodeCursor({ startingAt, page, query, watermark, keyGrouping }),
+      cursor: encodeCursor({
+        startingAt: resumeStart(),
+        page,
+        query,
+        watermark,
+        keyGrouping,
+      }),
       errorCount: 0,
     };
   }
