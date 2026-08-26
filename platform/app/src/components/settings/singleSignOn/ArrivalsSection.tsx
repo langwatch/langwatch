@@ -20,12 +20,13 @@ import { InlineRefusal } from "./refusals";
 /**
  * Who this connection admits (ADR-117 §3).
  *
- * THE QUESTION NOBODY WAS ASKED. `allowsJit` defaulted to false and the
- * journey never mentioned it, so every connection in the database forbade
- * provisioning — which meant a person signing in through their own
- * organization's identity provider was authenticated and then handed a brand
- * new workspace of their own. That is the opposite of what registering a
- * connection means, and nobody chose it: it was a default nobody surfaced.
+ * THE QUESTION NOBODY WAS ASKED. Registration states `refuse` and the
+ * journey never mentioned it, so every connection forbade provisioning —
+ * which meant a person signing in through their own organization's identity
+ * provider was authenticated and then handed a brand new workspace of their
+ * own. That is the opposite of what registering a connection means, and
+ * nobody chose it: it was a default nobody surfaced. This step surfaces it,
+ * which is why going live waits for it.
  *
  * IT IS ASKED HERE AND NOT AT REGISTRATION, because the first answer is
  * "anybody on a domain you proved" and that means nothing until a domain is

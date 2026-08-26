@@ -33,7 +33,7 @@ function connection(
     method: okta,
     state: "ACTIVE",
     configured: true,
-    allowsJit: true,
+    arrivalPolicy: "admit",
     ...overrides,
   };
 }

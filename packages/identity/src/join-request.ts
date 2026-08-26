@@ -159,7 +159,7 @@ export type JoinRequestFactInput =
   | { type: typeof JOIN_EXPIRED_EVENT_TYPE; data: JoinExpiredPayload }
   | { type: typeof JOIN_WITHDRAWN_EVENT_TYPE; data: JoinWithdrawnPayload };
 
-export const joinRequestFactInputSchema = z.discriminatedUnion("type", [
+const joinRequestFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(JOIN_REQUESTED_EVENT_TYPE),
     data: joinRequestedPayloadSchema,
@@ -230,7 +230,7 @@ export function emptyJoinRequest({
 }
 
 /** PENDING is the only state anything can be done from. */
-export function isPendingJoinRequest(state: JoinRequestState): boolean {
+function isPendingJoinRequest(state: JoinRequestState): boolean {
   return state === "PENDING";
 }
 

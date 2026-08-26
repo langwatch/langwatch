@@ -220,7 +220,7 @@ export class SsoConnectionGuards {
           organizationId: data.organizationId,
           type: data.type,
           idp: data.idp,
-          allowsJit: data.allowsJit,
+          arrivalPolicy: data.arrivalPolicy,
           actor: data.actor,
           source: data.source,
         },
@@ -259,7 +259,7 @@ export class SsoConnectionGuards {
           organizationId: data.organizationId,
           type: data.type,
           idp: data.idp,
-          allowsJit: data.allowsJit,
+          arrivalPolicy: data.arrivalPolicy,
           actor,
           source,
         },
@@ -899,7 +899,18 @@ export class SsoConnectionGuards {
     data: SetArrivalPolicyCommandData,
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, SET_ARRIVAL_POLICY_COMMAND_TYPE);
-    if (state.arrivalPolicy === data.policy) return [];
+    // Re-stating the same answer costs no fact — but only once somebody has
+    // ANSWERED. Registration states a policy without anybody choosing it, so
+    // a check that compared only the answer would swallow the first choice
+    // whenever it happened to match the default, and going live waits on the
+    // choosing. "Turn everybody away" is a decision, and it looks exactly
+    // like the default it replaces.
+    if (
+      state.arrivalPolicyDecidedAtMs !== null &&
+      state.arrivalPolicy === data.policy
+    ) {
+      return [];
+    }
     return [
       {
         type: CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,

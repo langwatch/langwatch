@@ -81,7 +81,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       await service.claimDomain({
         ...identity,
@@ -146,7 +146,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       committed = [];
 
@@ -166,7 +166,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       committed = [];
 
@@ -176,7 +176,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
 
       expect(facts).toEqual([]);

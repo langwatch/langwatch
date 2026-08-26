@@ -2,7 +2,6 @@ import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
-  arrivalPolicyFromLegacyJit,
   normalizeDomain,
   type SsoArrivalPolicy,
 } from "@langwatch/identity";
@@ -257,7 +256,7 @@ const joinSsoOrganization = async ({
  * setup journey, folded onto the connection and rendered back on two screens,
  * and no code on any sign-in path read it. better-auth's `sso()` plugin
  * creates the user and the account — its own comment says whether they then
- * land in the organization is "the connection's `allowsJit` and the join
+ * land in the organization is "the connection's arrival policy and the join
  * policy's business, not this plugin's" — and nobody did that business.
  * `afterUserCreate` below is the only live auto-join and it matches the
  * LEGACY `Organization.ssoDomain` column, which a self-serve connection never
@@ -424,7 +423,6 @@ const arrivalDecisionFor = async ({
       organizationId: true,
       state: true,
       arrivalPolicy: true,
-      allowsJit: true,
       verifiedDomains: true,
       lapsedDomains: true,
     },
@@ -434,16 +432,11 @@ const arrivalDecisionFor = async ({
   if (!connection.verifiedDomains.includes(domain)) return null;
   if (connection.lapsedDomains.includes(domain)) return null;
 
-  // ASKED of the domain rather than re-derived here. A connection registered
-  // before the question existed has no answer, and the answer is then
-  // whatever the legacy boolean already said — a rule that exists once, in
-  // `arrivalPolicyFromLegacyJit`, precisely so the sign-in path and every
-  // screen that renders the answer cannot drift apart. This is the only
-  // reader for which the answer is an authorization decision, so it is the
-  // last one that should be keeping its own copy.
-  const policy =
-    (connection.arrivalPolicy as SsoArrivalPolicy | null) ??
-    arrivalPolicyFromLegacyJit(connection.allowsJit);
+  // Read off the connection rather than re-derived here. There is one field
+  // and one answer, which is the point of there being one field: this is the
+  // only reader for which the answer is an authorization decision, and it is
+  // the last one that should be keeping a copy.
+  const policy = connection.arrivalPolicy as SsoArrivalPolicy;
   if (policy !== "admit" && policy !== "request") return null;
   return { policy, organizationId: connection.organizationId };
 };

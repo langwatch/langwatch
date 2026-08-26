@@ -32,6 +32,10 @@
     "ee/scim/**/*.ts",
     "ee/sso/**/*.ts",
     "src/features/errors/logic/codes.ts",
-    "src/features/errors/logic/presentation.ts"
+    "src/features/errors/logic/presentation.ts",
+    "src/server/better-auth/**/*.ts",
+    "src/server/event-sourcing/pipelines/sso-connections/**/*.ts",
+    "src/features/sso/**/*.tsx",
+    "ee/admin/backoffice/resources/SsoConnectionsView.tsx"
   ]
 }

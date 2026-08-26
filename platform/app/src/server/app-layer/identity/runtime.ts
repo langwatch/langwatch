@@ -32,7 +32,6 @@ import {
   MfaService,
   newIdentityCommandId,
   newSsoBreakGlassBindingId,
-  ShadowComparingDomainRoutingRepository,
   SignInRouterService,
   SsoBreakGlassService,
   SsoConnectionGrandfatherService,
@@ -129,6 +128,7 @@ import {
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
 import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
+import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
   IdTokenProviderAssertions,
@@ -153,7 +153,6 @@ import { ssoMethodIsConfiguredWith } from "./sso-method-configured";
 import {
   DnsDomainProofLookup,
   EmailSsoDomainReproofNotifier,
-  HttpsDomainProofFileLookup,
   InstanceLicenseProof,
   LicenseDomainClaimAuthority,
   LoggingBreakGlassWarningNotifier,
@@ -406,46 +405,29 @@ const ssoConnectionDomainRouting = new SsoConnectionDomainRoutingRepository(
 /**
  * Which lookup the router gets (ADR-117 §5, revised by D09).
  *
- * D04 staged this on `SSOCONN_ROUTING`, an environment variable, which is a
- * fleet-wide answer to a per-customer question. D09 answered it per
- * organization with a feature flag instead, and that was one switch too many:
  * TURNING THE CONNECTION ON IS THE DECISION. An administrator who proves a
  * domain, tests a sign-in, holds a way back in and presses go-live has said
- * what they want as plainly as it can be said, and a second lever they cannot
- * reach only meant their connection read "on" while it carried nobody.
+ * what they want as plainly as it can be said. D04 staged this on an
+ * environment variable and D09 on a per-organization feature flag; both were
+ * a second lever the person who made the decision could not reach, and a
+ * connection reading "on" while it carried nobody is a screen disagreeing
+ * with itself.
  *
  * So a connection that is live decides the domains it proved, and every
  * organization without one is answered by the legacy `Organization.ssoDomain`
  * / `ssoProvider` columns exactly as before. Rolling a customer back is
  * turning their connection off, which is the control they already have.
- *
- * `SSOCONN_ROUTING` is NOT retired, because it never only meant routing:
- * `legacy-sso-string-writes.ts` reads it to decide when string WRITES stop,
- * which is a separate retirement on a separate clock. What it no longer does
- * is decide who reads what — `enforce` still forces the projection for a
- * whole installation, which is the self-hosted lever, and `shadow` still logs
- * both answers without either deciding.
  */
 export function signInDomainRoutingPort(): SignInDomainRoutingPort {
-  switch (env.SSOCONN_ROUTING) {
-    case "enforce":
-      return ssoConnectionDomainRouting;
-    case "shadow":
-      return new ShadowComparingDomainRoutingRepository({
-        deciding: legacySsoDomainRouting,
-        shadow: ssoConnectionDomainRouting,
-      });
-    default:
-      return new ConnectionFirstDomainRoutingRepository({
-        legacy: legacySsoDomainRouting,
-        connections: ssoConnectionDomainRouting,
-      });
-  }
+  return new ConnectionFirstDomainRoutingRepository({
+    legacy: legacySsoDomainRouting,
+    connections: ssoConnectionDomainRouting,
+  });
 }
 
 /**
  * The identifier-first sign-in router (D03, ADR-117), composed here from its
- * ports: the domain lookup `SSOCONN_ROUTING` selects, the instance method
+ * ports: the connection-first domain lookup, the instance method
  * policy that owns ADR-027's frozen license gate, and — since the revision of
  * 2026-08-25 — what the submitted address's account holds.
  *

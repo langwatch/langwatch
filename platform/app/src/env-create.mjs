@@ -341,18 +341,6 @@ export function createEnvConfig() {
       // ceremony routes and hides the option; passkeys already registered
       // are left alone, so turning it on again finds them still there.
       PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
-      // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
-      // and shipped `off` for the same reason the router's own flag is: the
-      // auth screens is the highest-risk flip in the identity program.
-      // `off` composes today's `Organization.ssoDomain` strings and nothing
-      // else. `shadow` still lets the strings decide, and runs the
-      // `SsoConnection` projection lookup alongside so disagreements are
-      // logged with both answers. `enforce` is the flip, and only at `enforce`
-      // do the string writes stop. Rollback is this value.
-      SSOCONN_ROUTING: z
-        .enum(["off", "shadow", "enforce"])
-        .optional()
-        .default("off"),
       // D08: whether a SCIM push writes membership through the grants
       // service. Two-valued, because there is no useful middle: `off` keeps
       // the previous write path — the hand-written OrganizationUser row with
@@ -693,7 +681,6 @@ export function createEnvConfig() {
       IDENTITY_ROUTER_V2: process.env.IDENTITY_ROUTER_V2,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
       PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
-      SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
       SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:

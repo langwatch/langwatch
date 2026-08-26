@@ -98,9 +98,7 @@ export {
 export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
 export { MfaGuards } from "./mfa-guards";
 export {
-  expireMfaEnrollmentCommandId,
   mfaCeremonyCommandId,
-  newMfaCommandId,
   newMfaEnrollmentId,
 } from "./mfa-id";
 export type { MfaLedger } from "./mfa-ledger";
@@ -142,7 +140,6 @@ export {
 } from "./join-request-guards";
 export {
   approveJoinCommandId,
-  expireJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
 } from "./join-request-id";
@@ -179,12 +176,6 @@ export {
   newSsoConnectionId,
 } from "./sso-connection-id";
 export type { SsoConnectionLedger } from "./sso-connection-ledger";
-export {
-  ShadowComparingDomainRoutingRepository,
-  type SsoConnectionRoutingShadowDeps,
-  type SsoConnectionRoutingShadowRecord,
-  type SsoConnectionRoutingShadowRecorder,
-} from "./sso-connection-routing-shadow";
 export type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,

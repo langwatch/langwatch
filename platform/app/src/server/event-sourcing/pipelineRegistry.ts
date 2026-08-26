@@ -757,12 +757,11 @@ export class PipelineRegistry {
         }),
       }),
     );
-    // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
-    // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
-    // projection and no `Organization.ssoDomain` write stops. Its only
-    // production writer until D05 is the grandfather migration, which is
-    // paced by per-organization enrollment like every other in-place
-    // migration — a deploy changes nothing on its own.
+    // The SSO connection pipeline (ADR-117 §5, D04). Its rollout is the
+    // connection itself: nothing routes off this projection for an
+    // organization that has not registered and turned one on, and the
+    // grandfather migration is paced by per-organization enrollment like
+    // every other in-place migration — a deploy changes nothing on its own.
     this.deps.eventSourcing.register(
       createSsoConnectionPipeline({
         connectionProjectionStore:

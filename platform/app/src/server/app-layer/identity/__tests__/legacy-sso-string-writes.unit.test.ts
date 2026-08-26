@@ -2,55 +2,68 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { env } from "~/env.mjs";
+import { describe, expect, it, vi } from "vitest";
 import { explainHandledError } from "~/features/errors/logic/presentation";
 import {
   assertLegacySsoStringWriteAllowed,
   legacySsoStringColumnsIn,
-  legacySsoStringWritesRetired,
 } from "../legacy-sso-string-writes";
 
-vi.mock("~/env.mjs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/env.mjs")>();
-  return { ...actual, env: { ...actual.env, SSOCONN_ROUTING: "off" } };
-});
-
-const envMock = env as unknown as { SSOCONN_ROUTING: string };
+/**
+ * When a staff member may still set `Organization.ssoDomain` / `ssoProvider`.
+ *
+ * The rule used to be an environment variable with three modes, staged so a
+ * fleet-wide flip could be rolled back in a hurry. There is no flip: routing
+ * asks the connection projection first and falls back to the columns per
+ * organization, so the answer differs per organization and a fleet-wide
+ * switch could only ever be wrong for somebody.
+ *
+ * So the rule asks the data. An edit is refused exactly when it would change
+ * nothing a person would experience — which is the case that matters, because
+ * that is a staff member believing they fixed something.
+ */
 
 const REPO_ROOT = join(import.meta.dirname, "../../../../../../..");
 
-afterEach(() => {
-  envMock.SSOCONN_ROUTING = "off";
-});
+const holdsConnection = vi.fn().mockResolvedValue(true);
+const holdsNone = vi.fn().mockResolvedValue(false);
 
 describe("the legacy sso string columns", () => {
-  describe("given the connection routing flag is off or in shadow", () => {
+  describe("given an organization that never registered a connection", () => {
     /** @scenario "After the flip, the strings stop being written" */
-    it("keeps accepting edits, because the strings still decide sign-in", () => {
-      for (const mode of ["off", "shadow"]) {
-        envMock.SSOCONN_ROUTING = mode;
-        expect(legacySsoStringWritesRetired()).toBe(false);
-        expect(() =>
-          assertLegacySsoStringWriteAllowed({
-            data: { ssoDomain: "acme.com", ssoProvider: "okta" },
-          }),
-        ).not.toThrow();
-      }
+    it("keeps accepting edits, because the strings still decide its sign-in", async () => {
+      await expect(
+        assertLegacySsoStringWriteAllowed({
+          organizationId: "org_acme",
+          data: { ssoDomain: "acme.com", ssoProvider: "okta" },
+          hasConnection: holdsNone,
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("does not ask about a create, which names no organization yet", async () => {
+      const asked = vi.fn().mockResolvedValue(true);
+      await expect(
+        assertLegacySsoStringWriteAllowed({
+          organizationId: null,
+          data: { ssoDomain: "acme.com" },
+          hasConnection: asked,
+        }),
+      ).resolves.toBeUndefined();
+      expect(asked).not.toHaveBeenCalled();
     });
   });
 
-  describe("given the connection routing flag is enforced", () => {
+  describe("given an organization whose connection decides its sign-in", () => {
     /** @scenario "After the flip, the strings stop being written" */
-    it("refuses a string edit and names the columns that are now derived", () => {
-      envMock.SSOCONN_ROUTING = "enforce";
-
-      expect(legacySsoStringWritesRetired()).toBe(true);
-      expect(() =>
+    it("refuses a string edit and names the columns that are now derived", async () => {
+      await expect(
         assertLegacySsoStringWriteAllowed({
+          organizationId: "org_acme",
           data: { name: "Acme", ssoDomain: "acme.com" },
+          hasConnection: holdsConnection,
         }),
-      ).toThrowError(
+      ).rejects.toThrowError(
         expect.objectContaining({
           code: "sso_connection_string_edit_retired",
         }),
@@ -64,19 +77,15 @@ describe("the legacy sso string columns", () => {
     });
 
     /** @scenario "The old single sign-on fields stop being where single sign-on is set up" */
-    it("points the reader at the organization's connection instead", () => {
-      envMock.SSOCONN_ROUTING = "enforce";
-
-      const refusal = (() => {
-        try {
-          assertLegacySsoStringWriteAllowed({
-            data: { ssoProvider: "okta" },
-          });
-          return null;
-        } catch (error) {
-          return error as { code: string };
-        }
-      })();
+    it("points the reader at the organization's connection instead", async () => {
+      const refusal = await assertLegacySsoStringWriteAllowed({
+        organizationId: "org_acme",
+        data: { ssoProvider: "okta" },
+        hasConnection: holdsConnection,
+      }).then(
+        () => null,
+        (error: { code: string }) => error,
+      );
       expect(refusal?.code).toBe("sso_connection_string_edit_retired");
 
       // The words a reader actually sees come from the registry keyed by the
@@ -98,21 +107,29 @@ describe("the legacy sso string columns", () => {
     });
 
     /** @scenario "After the flip, the strings stop being written" */
-    it("leaves every other organization edit alone", () => {
-      envMock.SSOCONN_ROUTING = "enforce";
-
-      expect(() =>
+    it("leaves every other organization edit alone, without asking", async () => {
+      const asked = vi.fn().mockResolvedValue(true);
+      await expect(
         assertLegacySsoStringWriteAllowed({
+          organizationId: "org_acme",
           data: { name: "Acme", presenceEnabled: false },
+          hasConnection: asked,
         }),
-      ).not.toThrow();
-      expect(() =>
-        assertLegacySsoStringWriteAllowed({ data: undefined }),
-      ).not.toThrow();
+      ).resolves.toBeUndefined();
+      await expect(
+        assertLegacySsoStringWriteAllowed({
+          organizationId: "org_acme",
+          data: undefined,
+          hasConnection: asked,
+        }),
+      ).resolves.toBeUndefined();
+      // A payload naming none of the columns is not a question about
+      // connections, so it costs no query.
+      expect(asked).not.toHaveBeenCalled();
     });
   });
 
-  describe("given a connection changes after the flip", () => {
+  describe("given a connection changes", () => {
     /**
      * The other half of "only connection commands change it": a projection
      * row is written by the FOLD and by nothing else. A hand-written row is

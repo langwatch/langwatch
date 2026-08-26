@@ -102,7 +102,7 @@ function connection(
       secretRef: null,
       certRefs: [],
     },
-    allowsJit: false,
+    arrivalPolicy: "refuse",
     source: "self-serve",
     testLoginAccountId: null,
     rejection: null,
@@ -341,7 +341,7 @@ describe("how many identity providers an organization may register", () => {
         .registerConnection({
           organizationId: ORG,
           providerId: "okta",
-          allowsJit: false,
+          arrivalPolicy: "refuse",
           idp: {
             protocol: "oidc",
             issuer: "https://login.acme.okta.com",
@@ -366,7 +366,7 @@ describe("how many identity providers an organization may register", () => {
       const registered = await serviceHolding(null).registerConnection({
         organizationId: ORG,
         providerId: "okta",
-        allowsJit: false,
+        arrivalPolicy: "refuse",
         idp: {
           protocol: "oidc",
           issuer: "https://login.acme.okta.com",

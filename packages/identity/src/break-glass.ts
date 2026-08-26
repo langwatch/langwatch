@@ -104,7 +104,7 @@ export function breakGlassWarningsDue({
  * When the sweep next has something to say about this binding, or null when
  * it has nothing left: every warning sent, or the binding already over.
  */
-export function breakGlassNextWarningAtMs({
+function breakGlassNextWarningAtMs({
   binding,
   nowMs,
 }: {

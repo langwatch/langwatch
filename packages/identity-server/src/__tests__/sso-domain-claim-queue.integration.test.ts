@@ -1,5 +1,5 @@
 import {
-  domainClaimQueue,
+  disputedDomainClaimQueue,
   type SsoConnectionCommand,
   type SsoConnectionFactInput,
 } from "@langwatch/identity";
@@ -102,15 +102,28 @@ async function claim({
     ...identity(`${connectionId}_register`),
     type: "oidc",
     idp: IDP,
-    allowsJit: false,
+    arrivalPolicy: "refuse",
   });
   await service.claimDomain({ ...identity(`${connectionId}_claim`), domain });
 }
 
+/**
+ * The queue an operator actually works. Every domain here is held by some
+ * other organization, which is what makes each claim a dispute — the one
+ * question a published record cannot answer, and so the only thing left on
+ * a person's desk.
+ */
+const CONTESTED = new Map([
+  ["acme.com", "org_someone_else"],
+  ["beta.example", "org_someone_else"],
+  ["gamma.example", "org_someone_else"],
+]);
+
 const queueNow = () =>
-  domainClaimQueue({
+  disputedDomainClaimQueue({
     connections: [...connections.all()],
     nowMs: clock,
+    verifiedElsewhere: CONTESTED,
   });
 
 describe("the domain claims waiting for LangWatch", () => {

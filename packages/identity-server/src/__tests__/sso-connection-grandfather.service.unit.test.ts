@@ -36,7 +36,7 @@ function routable(
     },
     state: "ACTIVE",
     configured: true,
-    allowsJit: true,
+    arrivalPolicy: "admit",
     ...overrides,
   };
 }

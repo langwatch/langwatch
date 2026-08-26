@@ -95,7 +95,7 @@ async function onboard(): Promise<void> {
     ...commandFor("ssocmd_1"),
     type: "oidc",
     idp: IDP,
-    allowsJit: true,
+    arrivalPolicy: "admit",
   });
   await service.claimDomain({ ...commandFor("ssocmd_2"), domain: "acme.com" });
   await service.approveDomainClaim({

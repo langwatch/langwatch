@@ -94,10 +94,10 @@ export interface SsoConnectionPipelineDeps {
  * the operational projection folds into the Postgres `SsoConnection` head in
  * per-connection FIFO.
  *
- * Ships DARK: `SSOCONN_ROUTING` defaults to `off`, so nothing routes off this
- * projection and no string write stops. The grandfather migration is the only
- * production writer until D05's self-service, and it is paced by the same
- * per-organization enrollment every other in-place migration is.
+ * The rollout is the connection itself: nothing routes off this projection
+ * for an organization that has not turned one on, and the grandfather
+ * migration is paced by the same per-organization enrollment every other
+ * in-place migration is.
  *
  * Lanes: the commands keep the default per-aggregate group key — one
  * connection is one lane, which is already the narrowest useful shard, and a

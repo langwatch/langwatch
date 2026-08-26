@@ -8,7 +8,7 @@ import type { PrismaClient, SsoConnection } from "~/generated/prisma/client";
 
 /**
  * The router's domain-lookup port over the `SsoConnection` PROJECTION — what
- * `SSOCONN_ROUTING=enforce` composes, and what `shadow` compares the strings
+ * the connection-first lookup asks first, before it falls back to the strings
  * against (ADR-117 §5).
  *
  * The same port the legacy strings implement, so neither the router nor the
@@ -104,7 +104,7 @@ export class SsoConnectionDomainRoutingRepository
         organizationId: row.organizationId,
       }),
       allowsJit:
-        row.allowsJit &&
+        row.arrivalPolicy !== "refuse" &&
         (domain === undefined || !row.lapsedDomains.includes(domain)),
     };
   }

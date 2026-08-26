@@ -126,39 +126,6 @@ export const ssoConnectionsRouter = createTRPCRouter({
       return service().getById(input);
     }),
 
-  register: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string().min(1),
-        // Both protocols, and neither is refused any more (D09): the engine
-        // that terminates them exists. What an operator registers here is
-        // still the SHAPE of a connection — credentials come from the
-        // organization's own administrator through Settings, so a connection
-        // registered here is not dialable until they do.
-        type: z.enum(["oidc", "saml"]),
-        providerId: z.string().min(1).max(100),
-        issuer: z.string().max(2048).nullable().default(null),
-        allowsJit: z.boolean().default(false),
-      }),
-    )
-    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
-    .mutation(async ({ ctx, input }) => {
-      const operator = await audited({ ctx, action: "register", args: input });
-      return service().registerConnection({ ...input, operator });
-    }),
-
-  claimDomain: protectedProcedure
-    .input(domainTarget)
-    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
-    .mutation(async ({ ctx, input }) => {
-      const operator = await audited({
-        ctx,
-        action: "claimDomain",
-        args: input,
-      });
-      await service().claimDomain({ ...input, operator });
-    }),
-
   approveDomainClaim: protectedProcedure
     .input(domainTarget)
     .noPermission(NO_PERMISSION_FOR_ORGANIZATION)

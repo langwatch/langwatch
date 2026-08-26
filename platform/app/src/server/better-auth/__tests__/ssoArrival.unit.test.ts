@@ -47,7 +47,6 @@ const connectionRow = (over: Record<string, unknown> = {}) => ({
   organizationId: "org_acme",
   state: "ACTIVE",
   arrivalPolicy: "request",
-  allowsJit: true,
   verifiedDomains: ["acme.com"],
   lapsedDomains: [],
   ...over,
@@ -144,7 +143,7 @@ describe("given somebody arriving through a live connection on a domain it prove
   describe("when the answer is that nobody new gets in", () => {
     it("leaves them with the account and nothing else", async () => {
       const { prisma, create } = prismaWith({
-        connection: connectionRow({ arrivalPolicy: "refuse", allowsJit: false }),
+        connection: connectionRow({ arrivalPolicy: "refuse" }),
       });
 
       await admit(prisma);

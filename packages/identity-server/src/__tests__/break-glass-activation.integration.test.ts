@@ -115,7 +115,7 @@ beforeEach(async () => {
     ...command("ssocmd_1"),
     type: "oidc",
     idp: IDP,
-    allowsJit: false,
+    arrivalPolicy: "refuse",
   });
   await service.claimDomain({ ...command("ssocmd_2"), domain: "acme.com" });
   await service.approveDomainClaim({

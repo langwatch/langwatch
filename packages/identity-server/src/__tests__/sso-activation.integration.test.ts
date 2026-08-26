@@ -213,7 +213,7 @@ beforeEach(async () => {
   const registered = await selfServe.registerConnection({
     organizationId: ORG,
     providerId: "okta",
-    allowsJit: false,
+    arrivalPolicy: "refuse",
     idp: OIDC_REGISTRATION,
     actor: ANA,
   });
@@ -430,7 +430,7 @@ describe("going live with your own identity provider", () => {
         .activate({ organizationId: ORG, connectionId, actor: ANA })
         .then(refused, (caught: unknown) => caught);
 
-      // `allowsJit` defaulted to false and the journey never mentioned it, so
+      // Registration states `refuse` and the journey never mentioned it, so
       // every connection forbade provisioning and a person signing in through
       // their own organization's provider was handed a workspace of their own.
       // Nobody chose that. Turning it on without deciding is choosing by not
@@ -454,15 +454,14 @@ describe("going live with your own identity provider", () => {
     });
 
     /** @scenario A connection registered before the question keeps what it did */
-    it("answers with what allowsJit already said where nobody has spoken", async () => {
+    it("is already on an answer before anybody has spoken, and still says nobody chose it", async () => {
       await proveDomain();
 
       const setup = await selfServe.getSetup({ organizationId: ORG });
 
-      // Registered with `allowsJit: false`, and no policy fact: the answer is
-      // the behaviour it already had, and the journey still says nobody chose
-      // it. Nothing about a history written before the question replays
-      // differently.
+      // Registration stated `refuse`, and no policy fact has changed it: the
+      // connection has a behaviour, and the journey still says nobody CHOSE
+      // it. Those are two different facts and the screen shows both.
       expect(setup.connection?.arrivalPolicy).toBe("refuse");
       expect(setup.goLive?.arrivalsDecided).toBe(false);
     });

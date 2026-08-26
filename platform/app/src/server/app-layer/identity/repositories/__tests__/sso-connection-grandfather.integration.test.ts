@@ -190,7 +190,7 @@ describe("the sso connection grandfather migration against Postgres", () => {
         source: "legacy-grandfathered",
         type: "oidc",
         verifiedDomains: [DOMAIN],
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       // The domain went through the whole ceremony as history: claimed,
       // approved, verified — not injected straight into ACTIVE.
@@ -225,7 +225,6 @@ describe("the sso connection grandfather migration against Postgres", () => {
       expect(connection).toMatchObject({
         state: "ACTIVE",
         configured: true,
-        allowsJit: strings?.allowsJit,
       });
       expect(connection?.method.id).toBe(strings?.method.id);
     });

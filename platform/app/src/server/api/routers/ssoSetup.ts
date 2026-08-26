@@ -122,7 +122,6 @@ export const ssoSetupRouter = createTRPCRouter({
     .input(
       orgInput.extend({
         providerId: z.string().min(1).max(100),
-        allowsJit: z.boolean().default(false),
         idp: ssoIdpRegistrationSchema,
       }),
     )
@@ -133,14 +132,12 @@ export const ssoSetupRouter = createTRPCRouter({
         args: {
           organizationId: input.organizationId,
           providerId: input.providerId,
-          allowsJit: input.allowsJit,
           protocol: input.idp.protocol,
         },
       });
       return ssoSelfServe().registerConnection({
         organizationId: input.organizationId,
         providerId: input.providerId,
-        allowsJit: input.allowsJit,
         idp: input.idp,
         actor,
       });

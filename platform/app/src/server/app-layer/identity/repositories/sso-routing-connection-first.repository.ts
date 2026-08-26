@@ -5,7 +5,7 @@ import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
  * Which of the two domain lookups decides a sign-in (D09 — see
  * specs/identity/sso-idp-termination.feature).
  *
- * D04 shipped the flip as `SSOCONN_ROUTING`, an environment variable, and an
+ * D04 shipped the flip as an environment variable, and an
  * environment variable is a fleet-wide decision. D09 replaced it with a
  * per-organization feature flag, which was the right grain and the wrong
  * control: it asked an administrator to turn their connection on and then

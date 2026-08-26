@@ -1,5 +1,6 @@
 import {
   type BreakGlassBinding,
+  DEFAULT_SSO_ARRIVAL_POLICY,
   breakGlassDaysRemaining,
   breakGlassIsLive,
   domainClaimFor,
@@ -325,7 +326,7 @@ export interface SelfServeGoLiveView {
    * signs in through it and is not a member yet (ADR-117 §3).
    *
    * A PRECONDITION OF GOING LIVE, because the alternative is what shipped:
-   * `allowsJit` defaulted to false, the journey never mentioned it, and a
+   * registration states `refuse`, the journey never mentioned it, and a
    * person signing in through their own organization's identity provider was
    * authenticated and then handed a brand new workspace of their own. Nobody
    * chose that. Turning a connection on without deciding what it admits is
@@ -378,10 +379,8 @@ export interface SelfServeSetupView {
     issuer: string | null;
     /**
      * What happens to somebody who signs in through it and is not a member
-     * yet. Always an answer, never null: a connection that predates the
-     * setting is on whatever `allowsJit` already said, and a screen that had
-     * to know the difference would be a screen showing "not set" for a
-     * behaviour that is very much set.
+     * yet. Always an answer, never null: registration states one, so a screen
+     * never has to show "not set" for a behaviour that is very much set.
      */
     arrivalPolicy: SsoArrivalPolicy;
     /**
@@ -547,7 +546,7 @@ export class SsoSelfServeService {
     // answer — it always has one. A connection that predates the question is
     // on `refuse` and nobody chose it, and that is precisely the state this
     // precondition exists to interrupt.
-    const arrivalsDecided = connection.arrivalPolicy !== null;
+    const arrivalsDecided = connection.arrivalPolicyDecidedAtMs !== null;
     return {
       domainProved,
       testSignIn: {
@@ -620,7 +619,7 @@ export class SsoSelfServeService {
     // saying what it does with somebody it has never seen is choosing by not
     // choosing, and the choice that got made by default — turn them away, and
     // hand them a workspace of their own — is the one nobody would pick.
-    if (state.arrivalPolicy === null) {
+    if (state.arrivalPolicyDecidedAtMs === null) {
       throw new SsoActivationArrivalsUndecidedError(
         `connection ${connectionId}: nobody has said who it admits`,
       );
@@ -768,7 +767,6 @@ export class SsoSelfServeService {
   async registerConnection({
     organizationId,
     providerId,
-    allowsJit,
     idp,
     actor,
   }: {
@@ -777,7 +775,6 @@ export class SsoSelfServeService {
      *  what the engine is keyed by — that is the connection id, so two
      *  organizations may both say `okta`. */
     providerId: string;
-    allowsJit: boolean;
     idp: SsoIdpRegistration;
     actor: SelfServeActor;
   }): Promise<{ connectionId: string }> {
@@ -828,7 +825,7 @@ export class SsoSelfServeService {
           secretRef,
           certRefs: [],
         },
-        allowsJit,
+        arrivalPolicy: DEFAULT_SSO_ARRIVAL_POLICY,
       });
       return { connectionId };
     }
@@ -853,7 +850,7 @@ export class SsoSelfServeService {
         secretRef: null,
         certRefs: [certRef],
       },
-      allowsJit,
+      arrivalPolicy: DEFAULT_SSO_ARRIVAL_POLICY,
     });
     return { connectionId };
   }

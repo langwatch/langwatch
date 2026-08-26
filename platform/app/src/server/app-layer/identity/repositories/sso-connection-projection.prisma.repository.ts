@@ -112,8 +112,11 @@ export class PrismaSsoConnectionProjectionRepository
         state.domainVerifications as unknown as Prisma.InputJsonValue,
       pendingVerification: state.pendingVerification ?? undefined,
       idpMetadata: state.idpMetadata,
-      allowsJit: state.allowsJit,
       arrivalPolicy: state.arrivalPolicy,
+      arrivalPolicyDecidedAt:
+        state.arrivalPolicyDecidedAtMs === null
+          ? null
+          : new Date(state.arrivalPolicyDecidedAtMs),
       source: state.source,
       testLoginAccountId: state.testLoginAccountId,
       rejection: state.rejection ?? undefined,
@@ -221,10 +224,9 @@ export function rowToConnection(row: SsoConnection): SsoConnectionState {
         })
       : null,
     idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
-    allowsJit: row.allowsJit,
-    // NULL is an answer here — "nobody has said" — and `ssoArrivalPolicy`
-    // turns it into the one `allowsJit` already gave.
-    arrivalPolicy: (row.arrivalPolicy as SsoArrivalPolicy | null) ?? null,
+    arrivalPolicy: row.arrivalPolicy as SsoArrivalPolicy,
+    arrivalPolicyDecidedAtMs:
+      row.arrivalPolicyDecidedAt?.getTime() ?? null,
     source: row.source as SsoConnectionSource,
     testLoginAccountId: row.testLoginAccountId,
     rejection: row.rejection

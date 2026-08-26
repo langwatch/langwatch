@@ -38,8 +38,6 @@ const {
   mockService: {
     list: vi.fn(),
     getById: vi.fn(),
-    registerConnection: vi.fn(),
-    claimDomain: vi.fn(),
     approveDomainClaim: vi.fn(),
     rejectDomainClaim: vi.fn(),
     attestDomain: vi.fn(),
@@ -69,8 +67,6 @@ vi.mock(
       SsoConnectionBackofficeService: class {
         list = mockService.list;
         getById = mockService.getById;
-        registerConnection = mockService.registerConnection;
-        claimDomain = mockService.claimDomain;
         approveDomainClaim = mockService.approveDomainClaim;
         rejectDomainClaim = mockService.rejectDomainClaim;
         attestDomain = mockService.attestDomain;
@@ -181,7 +177,6 @@ describe("the back-office single sign-on surface", () => {
     it("refuses every mutation on the surface, not only the read", async () => {
       const caller = buildCaller("ana@acme.com");
       const attempts = [
-        () => caller.claimDomain({ ...TARGET, domain: "acme.com" }),
         () => caller.approveDomainClaim({ ...TARGET, domain: "acme.com" }),
         () => caller.attestDomain({ ...TARGET, domain: "acme.com" }),
         () => caller.suspend({ ...TARGET, reason: null }),
@@ -191,7 +186,6 @@ describe("the back-office single sign-on surface", () => {
       for (const attempt of attempts) {
         await expect(attempt()).rejects.toMatchObject({ code: "NOT_FOUND" });
       }
-      expect(mockService.claimDomain).not.toHaveBeenCalled();
       expect(mockService.requestTeardown).not.toHaveBeenCalled();
     });
   });
@@ -201,7 +195,6 @@ describe("the back-office single sign-on surface", () => {
     it("turns every change into a guarded command carrying the operator", async () => {
       const caller = buildCaller("olive@langwatch.ai");
 
-      await caller.claimDomain({ ...TARGET, domain: "acme.com" });
       await caller.approveDomainClaim({ ...TARGET, domain: "acme.com" });
       await caller.attestDomain({ ...TARGET, domain: "acme.com" });
       await caller.activate({ ...TARGET, testLoginAccountId: "acc_test" });
@@ -211,7 +204,6 @@ describe("the back-office single sign-on surface", () => {
       // Every one reached a lifecycle verb, and every one carried the
       // operator as the actor. The surface mints that; no input supplies it.
       const commanded = [
-        mockService.claimDomain,
         mockService.approveDomainClaim,
         mockService.attestDomain,
         mockService.activateConnection,
@@ -231,35 +223,13 @@ describe("the back-office single sign-on surface", () => {
         "activate",
         "approveDomainClaim",
         "attestDomain",
-        "claimDomain",
         "getAll",
         "getById",
-        "register",
         "rejectDomainClaim",
         "requestTeardown",
         "resume",
         "suspend",
       ]);
-    });
-
-    /** @scenario "SAML is no longer refused for being SAML" */
-    it("passes a SAML registration through to the service", async () => {
-      const caller = buildCaller("olive@langwatch.ai");
-      mockService.registerConnection.mockResolvedValueOnce({
-        connectionId: "ssoconn_1",
-      });
-
-      await caller.register({
-        organizationId: "org_acme",
-        type: "saml",
-        providerId: "okta",
-        issuer: null,
-        allowsJit: false,
-      });
-
-      expect(mockService.registerConnection).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "saml" }),
-      );
     });
 
     it("records every attempt in the audit log before the command runs", async () => {

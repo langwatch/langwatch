@@ -144,7 +144,7 @@ function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
 export const registerConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  allowsJit: z.boolean(),
+  arrivalPolicy: ssoArrivalPolicySchema,
 });
 export type RegisterConnectionCommandData = z.infer<
   typeof registerConnectionCommandDataSchema
@@ -327,7 +327,7 @@ export type SetArrivalPolicyCommandData = z.infer<
 export const grandfatherConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  allowsJit: z.boolean(),
+  arrivalPolicy: ssoArrivalPolicySchema,
   /** The domains `Organization.ssoDomain` carries, already normalized. */
   domains: z.array(z.string().min(1)).min(1),
   source: z.literal("legacy-grandfathered"),

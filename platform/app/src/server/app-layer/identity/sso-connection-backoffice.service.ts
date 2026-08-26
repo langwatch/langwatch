@@ -1,14 +1,11 @@
 import type {
+  SsoArrivalPolicy,
   SsoConnectionLifecycleState,
   SsoConnectionState,
-  SsoConnectionType,
   SsoDomainVerification,
 } from "@langwatch/identity";
 import type { SsoConnectionService } from "@langwatch/identity-server";
-import {
-  newSsoConnectionCommandId,
-  newSsoConnectionId,
-} from "@langwatch/identity-server";
+import { newSsoConnectionCommandId } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { rowToConnection } from "./repositories/sso-connection-projection.prisma.repository";
 
@@ -45,7 +42,7 @@ export interface BackofficeSsoConnection {
   domainVerifications: SsoDomainVerification[];
   providerId: string;
   issuer: string | null;
-  allowsJit: boolean;
+  arrivalPolicy: SsoArrivalPolicy;
   source: string;
   testLoginAccountId: string | null;
   rejection: { domain: string; note: string } | null;
@@ -118,58 +115,6 @@ export class SsoConnectionBackofficeService {
     return toBackofficeConnection({
       state: rowToConnection(row),
       organizationName: names.get(row.organizationId) ?? null,
-    });
-  }
-
-  /**
-   * Register a connection for an organization.
-   *
-   * Both protocols, since D09: SAML was refused here because nothing in the
-   * product could terminate it, and something can now.
-   *
-   * What this surface still does not do is take credentials. A connection
-   * registered here carries no references, so the fold writes the engine no
-   * provider and the router reads "not configured" — which is exactly true
-   * until an administrator supplies the client secret or the identity
-   * provider's metadata through Settings. An operator registering the SHAPE
-   * of a connection ahead of that conversation is the tier-1 journey, and it
-   * has never been the thing that makes a sign-in arrive.
-   */
-  async registerConnection({
-    organizationId,
-    type,
-    providerId,
-    issuer,
-    allowsJit,
-    operator,
-  }: {
-    organizationId: string;
-    type: SsoConnectionType;
-    providerId: string;
-    issuer: string | null;
-    allowsJit: boolean;
-    operator: OperatorActor;
-  }): Promise<{ connectionId: string }> {
-    const connectionId = newSsoConnectionId();
-    await this.deps.connections().registerConnection({
-      ...this.command({ organizationId, connectionId, operator }),
-      type,
-      idp: {
-        issuer,
-        providerId,
-        clientIdRef: null,
-        secretRef: null,
-        certRefs: [],
-      },
-      allowsJit,
-    });
-    return { connectionId };
-  }
-
-  async claimDomain(args: DomainCommandArgs): Promise<void> {
-    await this.deps.connections().claimDomain({
-      ...this.command(args),
-      domain: args.domain,
     });
   }
 
@@ -308,7 +253,7 @@ export function toBackofficeConnection({
     domainVerifications: state.domainVerifications,
     providerId: state.idpMetadata.providerId,
     issuer: state.idpMetadata.issuer,
-    allowsJit: state.allowsJit,
+    arrivalPolicy: state.arrivalPolicy,
     source: state.source,
     testLoginAccountId: state.testLoginAccountId,
     rejection: state.rejection,

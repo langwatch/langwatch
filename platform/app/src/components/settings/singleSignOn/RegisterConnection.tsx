@@ -111,7 +111,7 @@ export function RegisterConnection({
             certificate: form.certificate || null,
           } as const);
     register.mutate(
-      { organizationId, providerId: form.providerId, allowsJit: false, idp },
+      { organizationId, providerId: form.providerId, idp },
       { onSuccess: () => void utils.ssoSetup.getSetup.invalidate() },
     );
   };

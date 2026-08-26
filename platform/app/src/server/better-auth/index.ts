@@ -206,7 +206,7 @@ const plugins = [
     // Somebody with no LangWatch account who signs in through their
     // employer's provider gets one, which is what an enterprise rollout
     // means. Whether they then land in the organization is the connection's
-    // `allowsJit` and the join policy's business, not this plugin's.
+    // the arrival policy and the join policy's business, not this plugin's.
     disableImplicitSignUp: false,
     /**
      * What makes trusting the flag above defensible.

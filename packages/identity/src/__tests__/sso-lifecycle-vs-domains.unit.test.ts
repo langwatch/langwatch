@@ -56,7 +56,7 @@ const liveConnection = (): SsoConnectionState => {
       organizationId: "org_acme",
       type: "oidc",
       idp: { issuer: "https://acme.okta.com", clientIdRef: null, secretRef: null, certRefs: [] },
-      allowsJit: true,
+      arrivalPolicy: "admit",
       source: "self-serve",
     }),
   );
@@ -143,7 +143,7 @@ describe("given a connection that has not gone live yet", () => {
           organizationId: "org_acme",
           type: "oidc",
           idp: { issuer: "https://acme.okta.com", clientIdRef: null, secretRef: null, certRefs: [] },
-          allowsJit: true,
+          arrivalPolicy: "admit",
           source: "self-serve",
         }),
       );

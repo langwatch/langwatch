@@ -246,7 +246,7 @@ async function register(): Promise<string> {
   const { connectionId } = await selfServe.registerConnection({
     organizationId: ORG,
     providerId: "okta",
-    allowsJit: false,
+    arrivalPolicy: "refuse",
     idp: OIDC_REGISTRATION,
     actor: ANA,
   });
@@ -445,7 +445,7 @@ describe("self-serve single sign-on setup", () => {
         .registerConnection({
           organizationId: ORG,
           providerId: "okta",
-          allowsJit: false,
+          arrivalPolicy: "refuse",
           idp: OIDC_REGISTRATION,
           actor: ANA,
         })
@@ -1025,7 +1025,7 @@ describe("self-serve single sign-on setup", () => {
         .registerConnection({
           organizationId: ORG,
           providerId: "okta",
-          allowsJit: false,
+          arrivalPolicy: "refuse",
           idp: OIDC_REGISTRATION,
           actor: ANA,
         })
@@ -1062,7 +1062,7 @@ describe("self-serve single sign-on setup", () => {
           secretRef: null,
           certRefs: [],
         },
-        allowsJit: true,
+        arrivalPolicy: "admit",
         domains: ["carried.example"],
       });
 
@@ -1089,7 +1089,7 @@ describe("self-serve single sign-on setup", () => {
         selfServe.registerConnection({
           organizationId: ORG,
           providerId: "okta",
-          allowsJit: false,
+          arrivalPolicy: "refuse",
           idp: {
             protocol: "saml",
             entryPoint: "https://login.acme.example/sso",
@@ -1390,7 +1390,7 @@ function seedOwnActiveConnection({
       secretRef: null,
       certRefs: [],
     },
-    allowsJit: false,
+    arrivalPolicy: "refuse",
     arrivalPolicy: null,
     source: "self-serve",
     testLoginAccountId: "acc_acme",
@@ -1423,7 +1423,7 @@ function seedOtherOrganizationOn(domain: string): void {
       secretRef: null,
       certRefs: [],
     },
-    allowsJit: false,
+    arrivalPolicy: "refuse",
     arrivalPolicy: null,
     source: "self-serve",
     testLoginAccountId: "acc_first",

@@ -17,7 +17,7 @@ export function newMfaEnrollmentId(): string {
 }
 
 /** A live ceremony's command id: a setup, a confirmation, a disable. */
-export function newMfaCommandId(): string {
+function newMfaCommandId(): string {
   return generate("mfacmd").toString();
 }
 
@@ -29,7 +29,7 @@ export function newMfaCommandId(): string {
  * and the event store dedupes it. A wake that fires twice must cost one
  * event.
  */
-export function expireMfaEnrollmentCommandId({
+function expireMfaEnrollmentCommandId({
   enrollmentId,
   scheduledFor,
 }: {

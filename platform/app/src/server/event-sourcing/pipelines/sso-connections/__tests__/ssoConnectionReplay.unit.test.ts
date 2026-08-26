@@ -67,7 +67,7 @@ function lifecycle(): SsoConnectionEvent[] {
         organizationId: ORG,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       },
       0,
     ),

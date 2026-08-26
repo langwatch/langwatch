@@ -158,7 +158,6 @@ describe("the organization's single sign-on setup surface", () => {
         .register({
           organizationId: "org_acme",
           providerId: "okta",
-          allowsJit: false,
           idp: OIDC,
         })
         .catch((error: unknown) => error);
@@ -218,7 +217,6 @@ describe("the organization's single sign-on setup surface", () => {
       await caller().register({
         organizationId: "org_acme",
         providerId: "okta",
-        allowsJit: false,
         idp: OIDC,
       });
 
@@ -251,7 +249,6 @@ describe("the organization's single sign-on setup surface", () => {
       await caller().register({
         organizationId: "org_acme",
         providerId: "okta",
-        allowsJit: false,
         idp: OIDC,
       });
 

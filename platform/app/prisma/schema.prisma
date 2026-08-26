@@ -518,17 +518,19 @@ model SsoConnection {
   /// { domain, method, tokenHash } while a ceremony is in flight.
   pendingVerification Json?
   idpMetadata         Json
-  allowsJit           Boolean   @default(false)
   /// admit | request | refuse - what this connection does with somebody who
-  /// signs in through it and is not a member yet (ADR-117 3). NULL means
-  /// nobody has said, and the answer is then whatever `allowsJit` already
-  /// said: every connection registered before the policy existed keeps
-  /// exactly the behaviour it had, and nothing replays differently.
-  ///
-  /// `allowsJit` is kept in step by the fold so the routing read - which is
-  /// on a sign-in path and wants one indexed predicate - does not have to
-  /// learn a second column.
-  arrivalPolicy       String?
+  /// signs in through it and is not a member yet (ADR-117 3). Stated at
+  /// registration and changed by the setup journey, so it is never absent
+  /// and no reader has to decide what absence means. This was two fields
+  /// for a while - a boolean `allowsJit` beside it, kept in step by the
+  /// fold - and they disagreed about the middle answer.
+  arrivalPolicy       String    @default("refuse")
+  /// When somebody CHOSE the policy above, and null while the registration
+  /// default stands. A different fact from the policy rather than a second
+  /// copy of it: a connection always has a behaviour, and separately
+  /// somebody has or has not decided on it. Going live waits for the
+  /// deciding - "turn everybody away" is a decision too.
+  arrivalPolicyDecidedAt DateTime?
   /// self-serve | legacy-grandfathered
   source              String
   testLoginAccountId  String?

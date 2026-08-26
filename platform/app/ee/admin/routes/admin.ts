@@ -503,18 +503,23 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
   }
 
   // The legacy SSO strings: normalized while they still decide sign-in, and
-  // refused once the connection projection does (ADR-117 §5). Inert until
-  // `SSOCONN_ROUTING` reaches `enforce` — every connection change already has
-  // a guarded command with the actor on it, and after the flip these two
-  // columns are derived rather than settings.
+  // refused for an organization whose connection decides it instead
+  // (ADR-117 §5). Every connection change already has a guarded command with
+  // the actor on it, so for those organizations these two columns are
+  // derived rather than settings.
   if (
     body.resource === "organization" &&
     (body.method === "create" || body.method === "update")
   ) {
     const params = body.params as
-      | { data?: Record<string, unknown> }
+      | { id?: unknown; data?: Record<string, unknown> }
       | undefined;
-    assertLegacySsoStringWriteAllowed({ data: params?.data });
+    await assertLegacySsoStringWriteAllowed({
+      organizationId: params?.id === undefined ? null : String(params.id),
+      data: params?.data,
+      hasConnection: async ({ organizationId }) =>
+        (await prisma.ssoConnection.count({ where: { organizationId } })) > 0,
+    });
     const ssoDomain = params?.data?.ssoDomain;
     if (typeof ssoDomain === "string" && ssoDomain.trim() !== "") {
       params!.data!.ssoDomain = ssoDomain.trim().toLowerCase();

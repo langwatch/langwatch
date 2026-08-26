@@ -92,7 +92,7 @@ describe("given a domain that was proved by a published record", () => {
             secretRef: null,
             certRefs: [],
           },
-          allowsJit: false,
+          arrivalPolicy: "refuse",
           actor: ACTOR,
           source: "self-serve",
         },

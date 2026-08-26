@@ -112,26 +112,27 @@ export type SsoVerificationMethod = z.infer<typeof ssoVerificationMethodSchema>;
  * IT IS ASKED, NEVER ASSUMED. Registering a connection is a strong statement
  * of intent and it is still not this one: an organization that federates
  * sign-in has not thereby said that everybody their provider knows about
- * belongs here. Defaulting it either way picks somebody's security posture
- * for them, and the default that was picked — `allowsJit: false`, never
- * surfaced — meant a person signing in through their own organization's
- * connection was authenticated and then handed a workspace of their own.
+ * belongs here. So registration states an answer and the setup journey asks
+ * for a better one before the connection may go live.
+ *
+ * `refuse` is what registration states, because it is the only answer that
+ * cannot surprise anybody: a connection nobody has decided about admits
+ * nobody new. The screen that asks recommends `admit`, which is the answer
+ * most organizations want — but the recommendation is a person's to take.
+ *
+ * THERE IS ONE FIELD. This was two for a while — a boolean `allowsJit` and
+ * this policy, kept in step by hand — and the two disagreed: the fold wrote
+ * `allowsJit: policy === "admit"`, so an organization that chose "they ask,
+ * you approve" got a connection that routed sign-ins and then provisioned
+ * nothing. No account, no request, and nobody to approve. One field cannot
+ * disagree with itself.
  */
 export const SSO_ARRIVAL_POLICIES = ["admit", "request", "refuse"] as const;
 export const ssoArrivalPolicySchema = z.enum(SSO_ARRIVAL_POLICIES);
 export type SsoArrivalPolicy = z.infer<typeof ssoArrivalPolicySchema>;
 
-/**
- * The policy a connection with no policy fact is on.
- *
- * Derived rather than stored, so every history written before this existed
- * folds to exactly the behaviour it already had: `allowsJit` was the whole
- * answer then, and it is the whole answer for those rows now. Nothing
- * replays differently.
- */
-export function arrivalPolicyFromLegacyJit(allowsJit: boolean): SsoArrivalPolicy {
-  return allowsJit ? "admit" : "refuse";
-}
+/** What a connection admits before anybody has chosen. */
+export const DEFAULT_SSO_ARRIVAL_POLICY: SsoArrivalPolicy = "refuse";
 
 export const SSO_VERIFICATION_CEREMONY_METHODS = [
   "dns-txt",
@@ -156,7 +157,7 @@ export type SsoVerificationCeremonyMethod = z.infer<
  * fact's `method` records, so the re-proof sweep re-reads the evidence where
  * it actually lives.
  */
-export const SSO_PUBLISHED_PROOF_CHANNELS = ["dns-txt", "https-file"] as const;
+const SSO_PUBLISHED_PROOF_CHANNELS = ["dns-txt", "https-file"] as const;
 export const ssoPublishedProofChannelSchema = z.enum(
   SSO_PUBLISHED_PROOF_CHANNELS,
 );
@@ -305,8 +306,7 @@ export const TEARDOWN_REQUESTED_EVENT_TYPE =
   "lw.identity.teardown_requested" as const;
 export const CONNECTION_TORN_DOWN_EVENT_TYPE =
   "lw.identity.connection_torn_down" as const;
-/** Who this connection admits, stated. Additive on purpose: a history
- *  without one folds to what `allowsJit` already said. */
+/** Who this connection admits, changed after registration stated it. */
 export const CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE =
   "lw.identity.connection_arrival_policy_set" as const;
 
@@ -344,8 +344,8 @@ export const connectionRegisteredPayloadSchema = z.object({
   organizationId: z.string().min(1),
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  /** Whether an unmatched callback subject may provision a user. */
-  allowsJit: z.boolean(),
+  /** What this connection does with somebody it has never seen. */
+  arrivalPolicy: ssoArrivalPolicySchema,
   actor: identityActorSchema,
   ...sourced,
 });
@@ -747,15 +747,19 @@ export interface SsoConnectionState {
     expiresAtMs: number | null;
   } | null;
   idpMetadata: SsoIdpMetadata;
-  allowsJit: boolean;
+  /** Who this connection admits (ADR-117 §3). Stated at registration and
+   *  changed by the setup journey; never absent, so no reader has to decide
+   *  what absence means. */
+  arrivalPolicy: SsoArrivalPolicy;
   /**
-   * Who this connection admits, once somebody has said.
+   * When somebody CHOSE it, or null while the registration default stands.
    *
-   * Null means nobody has, and the answer is then whatever `allowsJit`
-   * already said — which is how every history written before this existed
-   * folds to exactly the behaviour it already had.
+   * A different fact from the policy, not a second copy of it: a connection
+   * always has a behaviour, and separately somebody has or has not decided
+   * on it. Going live waits for the deciding — "turn everybody away" is a
+   * decision too — and the screen can say when it was made and stop asking.
    */
-  arrivalPolicy: SsoArrivalPolicy | null;
+  arrivalPolicyDecidedAtMs: number | null;
   source: SsoConnectionSource;
   testLoginAccountId: string | null;
   /** Why ops last rejected a claim, with the domain it was about. Kept so a
@@ -793,8 +797,8 @@ export function emptySsoConnection({
     domainVerifications: [],
     pendingVerification: null,
     idpMetadata: EMPTY_IDP,
-    allowsJit: false,
-    arrivalPolicy: null,
+    arrivalPolicy: DEFAULT_SSO_ARRIVAL_POLICY,
+    arrivalPolicyDecidedAtMs: null,
     source: "self-serve",
     testLoginAccountId: null,
     rejection: null,
@@ -977,7 +981,7 @@ export function reduceSsoConnection({
         type: fact.data.type,
         state: "DRAFT",
         idpMetadata: fact.data.idp,
-        allowsJit: fact.data.allowsJit,
+        arrivalPolicy: fact.data.arrivalPolicy,
         source: fact.data.source,
         createdBy: fact.data.actor.id,
         createdAtMs: fact.occurredAt,
@@ -1175,36 +1179,17 @@ export function reduceSsoConnection({
     case CONNECTION_TORN_DOWN_EVENT_TYPE:
       return { ...touched, state: "TORN_DOWN", tearDownAfterMs: null };
     case CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE:
-      // `allowsJit` is kept in step so nothing reading the old field has to
-      // learn the new one. It is a derived copy, never a second source of
-      // truth: `arrivalPolicy` is what a reader asks, through
-      // `ssoArrivalPolicy` below.
-      //
-      // NOT `=== "admit"`, which is what it said and what silently broke the
-      // middle answer. `allowsJit` asks "may an unmatched subject be
-      // provisioned", and `request` provisions: the account is created and a
-      // request to join stands beside it, because an administrator answering
-      // a request needs somebody to answer ABOUT. Only `refuse` provisions
-      // nobody, so only `refuse` is false here. With `=== "admit"`, an
-      // organization that chose "they ask, you approve" got a connection that
-      // routed sign-ins and then provisioned nothing — no account, no
-      // request, and nobody to approve.
       return {
         ...touched,
         arrivalPolicy: fact.data.policy,
-        allowsJit: fact.data.policy !== "refuse",
+        arrivalPolicyDecidedAtMs: fact.occurredAt,
       };
   }
 }
 
-/**
- * Who this connection admits, whether or not anybody has said.
- *
- * The one place that decides it, so a history from before the policy existed
- * and one written this morning answer the same question the same way.
- */
+/** Who this connection admits. */
 export function ssoArrivalPolicy(state: SsoConnectionState): SsoArrivalPolicy {
-  return state.arrivalPolicy ?? arrivalPolicyFromLegacyJit(state.allowsJit);
+  return state.arrivalPolicy;
 }
 
 // ---- claims and ceremonies, read ------------------------------------------
@@ -1275,7 +1260,7 @@ export interface SsoDomainClaimQueueEntry {
  * operator surface and a test all share — and so the number the epic's Open
  * Q2 wants measured is computed in exactly one place.
  */
-export function domainClaimQueue({
+function domainClaimQueue({
   connections,
   nowMs,
 }: {
@@ -1383,7 +1368,7 @@ export function lapsedDomains(state: SsoConnectionState): string[] {
 /** The domains whose evidence is missing and whose grace has not run out —
  *  the ones an administrator has been emailed about and can still fix at no
  *  cost at all. */
-export function waveringDomains(state: SsoConnectionState): string[] {
+function waveringDomains(state: SsoConnectionState): string[] {
   return state.domainVerifications
     .filter((entry) => entry.proofState === "WAVERING")
     .map((entry) => entry.domain);
@@ -1468,7 +1453,7 @@ export interface ConnectionRoutingComparison {
 }
 
 /**
- * The one comparison `SSOCONN_ROUTING` shadow mode runs on every live login
+ * The one comparison the grandfather pass runs before it finalizes a tenant
  * and the grandfather migration runs per domain to earn `finalized`. Pure, so
  * the thing the bake gate counts is the same function the migration's proof
  * calls and a test can enumerate — and so computing it can never be what

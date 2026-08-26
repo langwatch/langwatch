@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HttpsDomainProofFileLookup } from "../sso-self-serve-adapters";
+import { HttpsDomainProofFileLookup } from "../sso-domain-file-lookup";
 
 /**
  * Telling "nothing is served there" apart from "we could not read it"

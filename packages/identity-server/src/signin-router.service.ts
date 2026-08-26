@@ -19,7 +19,7 @@ const logger = createLogger("langwatch:identity:signin-router");
  *
  * The ports are what make D04 a composition change rather than a router
  * change: today the domain lookup reads `Organization.ssoDomain` strings, and
- * behind `SSOCONN_ROUTING` it reads the `SsoConnection` projection instead.
+ * it reads the `SsoConnection` projection first, and the strings only after.
  * Neither this file nor the engine learns which.
  */
 
