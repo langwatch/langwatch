@@ -21,9 +21,9 @@ export interface RateLimiter {
  * Response cache port, supplied via `createService({ cache })`.
  *
  * The framework owns the key — endpoint name + version namespace + a hash of
- * the validated input body — and stores only validated response bytes. The tag
- * is the family's own name for its data, so two families cannot collide by
- * accident: `invalidateTag` drops every entry the family wrote.
+ * the complete validated handler input — and stores only validated response
+ * bytes. The tag is the family's own name for its data, so two families cannot
+ * collide by accident: `invalidateTag` drops every entry the family wrote.
  */
 export interface ResponseCache {
   get(key: string): Promise<Uint8Array | null>;

@@ -63,12 +63,29 @@ Feature: Fluent endpoint registration
     And it travels on the mount report for the host's policy registry
 
   @unit
-  Scenario: REST families register with an explicit method and path
+  Scenario: REST endpoints register with an explicit method and path
     When the author calls registerRoute with method "get", path "/:id", a
       version, a handler and a chain
     Then the endpoint serves GET on that path under the service's versioned
       namespace
     And new RPC families cannot be expressed through registerRoute's grammar
+
+  @unit @validation
+  Scenario: REST uses the same validated handler boundary as RPC
+    Given a REST route declaring path, query and body schemas
+    When a request reaches its handler
+    Then the handler receives the transformed fields as one input argument
+    And no field may be declared by more than one HTTP source
+    And the route declares an output schema
+    And a route with no response body declares z.void()
+    And returning a hand-built Response cannot bypass output validation
+
+  @unit @validation @typecheck
+  Scenario: GET input comes from its URL
+    Given a GET route with path and query input
+    Then it cannot declare a JSON body schema
+    And every path parameter has a withParams schema
+    And registration repeats both checks at runtime
 
   @unit
   Scenario: Withdrawal is explicit and dated

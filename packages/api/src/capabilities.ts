@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
 
 import type { RateLimiter, ResponseCache } from "./ports.js";
+import { ENDPOINT_INPUT } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Port-backed capabilities (ADR 003)
@@ -85,8 +86,8 @@ function rateLimitPrincipal(c: Context): string {
 
 /**
  * The cache key is the complete call: endpoint name, version namespace and a
- * hash of the validated input body. RPC endpoints put every argument in the
- * body, which is what makes caching POST responses sound.
+ * hash of the complete validated handler input. For REST this includes path,
+ * query and body fields after source validation and normalization.
  */
 export function cacheKeyFor({
   service,
@@ -111,12 +112,10 @@ export function cacheKeyFor({
 export function cacheReadMiddleware({
   cache,
   keyParts,
-  hasInput,
   declaredStatus,
 }: {
   cache: ResponseCache;
   keyParts: { service: string; path: string; version: string };
-  hasInput: boolean;
   /**
    * The endpoint's declared success status, replayed verbatim on a hit. The
    * defaults mirror `serializeEndpointResult`: 204 for a no-body endpoint,
@@ -125,7 +124,7 @@ export function cacheReadMiddleware({
   declaredStatus?: number;
 }): MiddlewareHandler {
   return async (c, next) => {
-    const input = hasInput ? c.req.valid("json" as never) : undefined;
+    const input = c.get(ENDPOINT_INPUT);
     const key = cacheKeyFor({ ...keyParts, input });
     c.set(RESPONSE_CACHE_KEY, key);
 

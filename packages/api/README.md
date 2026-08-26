@@ -1,10 +1,10 @@
 # @langwatch/api
 
-The contract-sealed service framework for LangWatch API services: RPC-first endpoint registration, explicit version namespaces, input/output validation, OpenAPI documentation, capability ports, SSE streaming, and error formatting.
+The contract-sealed service framework for LangWatch HTTP, RPC and streaming APIs: explicit version namespaces, input/output validation, OpenAPI documentation, capability ports, SSE streaming, and error formatting.
 
 Built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Its schema boundary is [Standard Schema](https://standardschema.dev/), and LangWatch-authored schemas use Zod 4.
 
-The lasting decisions live in [adrs/](./adrs) — [001 RPC-first fluent registration](./adrs/001-rpc-first-fluent-registration.md), [002 explicit version namespaces](./adrs/002-explicit-version-namespaces.md), [003 endpoint capabilities are ports](./adrs/003-endpoint-capabilities-are-ports.md) — and the behavioural contracts in [specs/](./specs). This README is usage; rationale stays there.
+The lasting decisions live in [adrs/](./adrs) — [001 fluent handler contract](./adrs/001-rpc-first-fluent-registration.md), [002 explicit version namespaces](./adrs/002-explicit-version-namespaces.md), [003 endpoint capabilities are ports](./adrs/003-endpoint-capabilities-are-ports.md) — and the behavioural contracts in [specs/](./specs). This README is usage; rationale stays there.
 
 ## Quick start
 
@@ -12,7 +12,7 @@ A service is one file exporting a built Hono app. An endpoint is one `register` 
 
 ```ts
 // src/app/api/things/[[...route]]/app.ts
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createProjectApiService } from "~/server/api/project-service";
 
 const thingSchema = z.object({ id: z.string(), name: z.string() });
@@ -70,7 +70,7 @@ api.route("/", thingsApp);
 ## The three registration methods
 
 - **`register(name, version, handler, define?)`** — an RPC endpoint. The name is an identifier, not a URL: slash-less, dotted lower-camelCase, at least one dot — `^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$`, so `things.create` ✓ and `/things.create`, `things/:id`, `things.RollSecret` ✗. The grammar is checked twice: by the types in the editor and by an assert at registration, with one test table (`rpc-types.unit.test.ts`) driving both. Every RPC is a POST, reads included, and every argument travels in the JSON body via `withInput` — `withParams`/`withQuery` are not offered on the RPC chain, and declaring them behind an `any` fails registration. An RPC with no required arguments declares no `withInput`: the pipeline installs the JSON validator only when input is declared, so a bodyless POST and a `{}` POST both succeed.
-- **`registerRoute(method, path, version, handler, define?)`** — the existing resource-REST management families. Paths are used as-is; new families do not use it.
+- **`registerRoute(method, path, version, handler, define)`** — HTTP endpoints with REST methods and resource URLs. Validated path, query and body fields reach the handler as one input.
 - **`registerSse(name, version, handler, define?)`** — a dotted name mounted as a GET, with `.withEvents({...})` / `.withQuery(...)`. See SSE streaming below.
 - **`withdraw(name, version)`** — answers 410 Gone from that version onward, on every mount, with the withdrawn endpoint's config still on the mount report.
 
@@ -87,11 +87,15 @@ and authenticated principal are direct context capabilities:
   const things = context.app.things;       // one process-composed service
   const actorId = context.actor().id;      // authenticated request principal
   await context.authorize("traces:view"); // when validated input selects a permission
-  const params = context.get("params") as { id: string }; // withParams
-  const query = context.get("query");      // withQuery
-  // ...
+  return things.update({ ...input, actorId });
 }, (b) => b.withParams(idParams).withInput(updateThingSchema).withOutput(thingSchema));
 ```
+
+For REST, `withParams`, `withQuery` and `withInput` describe path, query and
+JSON body sources. Their transformed object fields are merged into `input`;
+overlapping field names are refused rather than resolved by precedence. GET
+accepts path and query input only. Every `:param` in a path requires
+`withParams`.
 
 A feature handler never creates a repository, constructs a service or awaits a
 service resolver. Project-scoped RPCs include `projectId` in their validated
@@ -107,12 +111,15 @@ One honesty note on types: `input` is declared on the definition chain, which
 is the argument _after_ the handler — TypeScript checks arguments in order, so
 the chain cannot flow back into the handler's parameter type. Annotate `input`
 (or delegate to a typed domain function) as above; the declared schema is
-always the runtime guarantee. The registration type still requires
-`withInput` whenever the handler declares the input parameter, and requires
-`withOutput` whenever it returns data. An endpoint registered without a chain
-gets `input: undefined`.
+always the runtime guarantee. The registration type requires a declared input
+source whenever the handler declares the input parameter. RPC value handlers
+require `withOutput`; every REST route requires it. A handler with no request
+values takes only `context`.
 
-When `withOutput` is declared, return raw data: the framework validates and serializes (a handler response that violates its own output contract is a 500 — our bug, not the caller's). Without it, return a Hono `Response` directly and own the status outright. An endpoint answers ONE success status: `withStatus(201)` or 200 by default, 204 for a `z.void()` / `z.undefined()` output. An output schema that accepts both `undefined` and a value is refused at registration, because that is what used to let the status move per request.
+Return raw data: the framework validates and serializes it. A REST handler
+cannot return a hand-built `Response`; use `z.void()` for an endpoint with no
+body. Success is `withStatus(201)` or 200 by default, and 204 for a no-body
+schema. A schema accepting both `undefined` and a value is refused.
 
 ## The definition chain
 
@@ -120,10 +127,10 @@ The chain is the only extension point — a new capability is a new chain call a
 
 ```ts
 (b) => b
-  .withInput(z.object({ ... }))        // JSON body schema (not on SSE)
+  .withInput(z.object({ ... }))        // JSON body source (not on SSE)
   .withOutput(thingSchema)             // response schema: validates + OpenAPI (not on SSE)
-  .withParams(z.object({ id: z.string() }))   // path params (registerRoute only)
-  .withQuery(z.object({ limit: z.coerce.number() }))  // query string (registerRoute, registerSse)
+  .withParams(z.object({ id: z.string() }))   // REST path fields merged into input
+  .withQuery(z.object({ limit: z.coerce.number() }))  // REST query fields merged into input
   .withStatus(201)                     // success status (default 200; 204 with no body)
   .withDocs({ summary, description, operationId, tags, security, responses, hide })
   .withAuth("none")                    // or a MiddlewareHandler; default is the service auth
@@ -171,7 +178,7 @@ The platform's root `POST /api/rpc.discover` is the second level: it lists every
 
 Rate limiting and response caching need a substrate the framework may not own, so the package declares the contracts and the application supplies implementations on `createService({ rateLimiter, cache })` (see `ports.ts`). Declaring `.withRateLimit()` without a rate limiter, or `.withCache(...)` without a cache, **fails the build**, naming the endpoint and the missing port — a capability that silently does nothing is worse than no capability. `withCache` without `withOutput` also fails the build: unvalidated bytes may not be cached.
 
-The pipeline positions are fixed: rate limit after auth, before validation (429 + `Retry-After` when the limiter supplies one); cache read after validation, before the handler. The framework owns the keys: service + endpoint + version namespace + principal for the limiter; endpoint + version namespace + a hash of the validated input body for the cache. A cache failure degrades to a handler call and is logged; a limiter failure is logged and propagated.
+The pipeline positions are fixed: rate limit after auth, before validation (429 + `Retry-After` when the limiter supplies one); cache read after validation, before the handler. The framework owns the keys: service + endpoint + version namespace + principal for the limiter; endpoint + version namespace + a hash of the complete validated input for the cache. A cache failure degrades to a handler call and is logged; a limiter failure is logged and propagated.
 
 `withDeprecated(notice)` needs no port: the operation is marked `deprecated: true` with the notice in its description on every dated mount, and live responses carry `Deprecation` + `X-API-Deprecation-Notice` headers — errors included (same `finally` as the version headers).
 
@@ -312,8 +319,8 @@ When creating a new API service using this framework:
 2. Mount it in `src/server/api-router.ts` with `api.route("/", app)` next to the other services (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
 3. Use `createService({ name })` with the service name matching the URL path segment
 4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`; pass capability ports through `createService({ rateLimiter, cache })` when any endpoint declares them — declaring without the port fails the build
-5. Default to `register(name, version, handler, define?)` with a dotted lower-camelCase name; `registerRoute` is for the existing REST management families, `registerSse` for streams. Every registration names its version explicitly
-6. Compose one application instance at process boot and expose it as `context.app`; expose the authenticated request principal as `context.actor()`. Feature handlers must not construct or resolve services per request. Read validated `params`/`query` via `context.get(...)`. Handler signature is `(context, input)` — annotate `input` with the schema's inferred type
+5. Use `register(name, version, handler, define?)` for dotted RPC operations, `registerRoute(method, path, ...)` for HTTP/REST endpoints and `registerSse` for streams. Every registration names its version explicitly
+6. Compose one application instance at process boot and expose it as `context.app`; expose the authenticated request principal as `context.actor()`. Feature handlers must not construct or resolve services per request. Handler signature is `(context, input)`; REST path, query and body fields are already merged into `input`
 7. Declare capabilities on the definition chain: `withInput`/`withOutput`/`withParams`/`withQuery`, `withStatus(201)` on creation endpoints, `withDocs({ operationId, tags })` on every documented endpoint, `withMeta({ policy })` when the host keeps a route policy registry
 8. Handlers return raw data when `withOutput` is declared; the framework validates and serializes
 9. Throw `NotFoundError` / `HandledError` for error responses, never a manual `c.json({ error }, 404)`

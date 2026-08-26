@@ -92,7 +92,7 @@ export function createManagementService({
 
   const guard =
     (permission: AuthzPermission) =>
-    (b: RouteChain): RouteChain =>
+    <TChain extends RouteChain>(b: TChain): TChain =>
       b
         .withPermission(permission)
         .withMeta({

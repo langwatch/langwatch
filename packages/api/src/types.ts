@@ -77,6 +77,9 @@ export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
  */
 export const ENDPOINT_ROUTE = "endpointRoute" as const;
 
+/** Context key holding the complete validated input passed to a regular handler. */
+export const ENDPOINT_INPUT = "endpointInput" as const;
+
 // ---------------------------------------------------------------------------
 // Base app context (provider factories)
 // ---------------------------------------------------------------------------
@@ -219,16 +222,12 @@ export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache">
  * The context variables every handler can read. `.provide()` services widen
  * this map through the service builder's type, so `c.get("things")` is typed.
  *
- * `params` and `query` carry the validated path params / query string of
- * `registerRoute` (and `registerSse`) endpoints. They are typed loosely on
- * purpose: they are declared on the definition chain, which TypeScript checks
- * after the handler argument, so per-endpoint inference is not expressible.
- * The declared schema is the runtime guarantee.
+ * `query` remains a context value for SSE because the handler's second
+ * argument is the stream. Regular RPC and REST handlers receive their input
+ * as the second argument instead.
  */
 export type EndpointVariables = {
-  // biome-ignore lint/suspicious/noExplicitAny: validated at runtime by the declared schema; per-endpoint inference from the trailing define callback is not expressible in TypeScript.
-  params?: any;
-  // biome-ignore lint/suspicious/noExplicitAny: same as params.
+  // biome-ignore lint/suspicious/noExplicitAny: validated at runtime by the declared SSE query schema; inference from the trailing define callback is not expressible in TypeScript.
   query?: any;
 };
 
@@ -377,6 +376,7 @@ export interface ServiceConfig<TApp = unknown> {
 
 /** @internal Stored by the service builder when registering an endpoint. */
 export interface EndpointRegistration {
+  kind: "rpc" | "rest" | "sse";
   method: HttpMethod | "sse";
   /** URL path fragment: `/${name}` for RPC and SSE, the path as-is for REST. */
   path: string;

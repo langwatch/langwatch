@@ -189,7 +189,7 @@ describe("onRouteMounted", () => {
           "get",
           "/items/:id",
           "2025-03-15",
-          async (c) => ({ id: c.get("params").id }),
+          async (_c, input: { id: string }) => ({ id: input.id }),
           (b) =>
             b
               .withParams(z.object({ id: z.string() }))

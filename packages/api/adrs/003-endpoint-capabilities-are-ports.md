@@ -8,7 +8,7 @@
 [../specs/endpoint-capabilities.feature](../specs/endpoint-capabilities.feature)
 
 **Related:**
-[RPC-first fluent registration](./001-rpc-first-fluent-registration.md),
+[the fluent handler contract](./001-rpc-first-fluent-registration.md),
 [the API framework boundary](./20260820-api-framework-boundary.md),
 [Redis is an owned client](../../../dev/docs/adr/093-redis-is-an-owned-client.md).
 
@@ -53,9 +53,9 @@ Substrate-neutral policy stays in the package:
 
 - **Rate-limit key**: service name + endpoint name + version namespace +
   principal. The limiter never decides who is being limited.
-- **Cache key**: endpoint name + version namespace + a hash of the validated
-  input body. RPC endpoints put every argument in the body, which is what
-  makes caching POST responses sound: the body is the complete call.
+- **Cache key**: endpoint name + version namespace + a hash of the complete
+  validated handler input. For REST that input is the flattened result of its
+  path, query, and body schemas; for RPC it is the validated body.
 - **Tag invalidation**: `.withCache(tag, ttl)` stores under `tag`;
   `invalidateTag` drops every entry the family wrote. The tag is the family's
   own name for its data, so two families cannot collide by accident.

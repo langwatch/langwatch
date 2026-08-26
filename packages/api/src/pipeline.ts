@@ -22,7 +22,7 @@ import {
 } from "./schema.js";
 import { serializeEndpointResult } from "./response.js";
 import { createSSEResponse } from "./sse.js";
-import { ENDPOINT_ROUTE } from "./types.js";
+import { ENDPOINT_INPUT, ENDPOINT_ROUTE } from "./types.js";
 import type {
   BaseApp,
   EndpointDef,
@@ -119,7 +119,13 @@ export function buildEndpointMiddlewareStack<TProject>(
     documented,
     paramSource: options.paramSource ?? "route",
   });
-  stack.push(contextVariablesMiddleware(config, options.paramSource ?? "route"));
+  stack.push(
+    validatedInputMiddleware({
+      config,
+      kind: ep.kind,
+      paramSource: options.paramSource ?? "route",
+    }),
+  );
 
   if (config.cache && config.output && ep.method !== "sse") {
     stack.push(
@@ -130,7 +136,6 @@ export function buildEndpointMiddlewareStack<TProject>(
           path: ep.path,
           version,
         },
-        hasInput: Boolean(config.input),
         declaredStatus: config.status,
       }),
     );
@@ -439,23 +444,82 @@ function appendValidationMiddleware({
 }
 
 /**
- * Publishes the validated path params and query string as context variables —
- * `c.get("params")` / `c.get("query")` — which is where Hono already puts
- * request state. Runs after the validators, so only parsed values are
- * published. Params validated by the date-namespace fallback are already
- * published by its own validator.
+ * Builds the one validated handler input after the source validators run.
+ * REST flattens path, query and JSON object fields; RPC uses its JSON value.
+ * SSE keeps query on context because its second argument is the stream.
  */
-function contextVariablesMiddleware(
-  config: EndpointDef,
-  paramSource: "route" | "context",
-): MiddlewareHandler {
+function validatedInputMiddleware({
+  config,
+  kind,
+  paramSource,
+}: {
+  config: EndpointDef;
+  kind: EndpointRegistration["kind"];
+  paramSource: "route" | "context";
+}): MiddlewareHandler {
   return async (c, next) => {
-    if (config.params && paramSource === "route") {
-      c.set("params", c.req.valid("param" as never));
+    const params = config.params
+      ? paramSource === "route"
+        ? c.req.valid("param" as never)
+        : c.get("params")
+      : void 0;
+    const query = config.query ? c.req.valid("query" as never) : void 0;
+
+    if (kind === "sse") {
+      if (query !== void 0) {
+        c.set("query", query);
+      }
+      await next();
+      return;
     }
-    if (config.query) c.set("query", c.req.valid("query" as never));
+
+    const body = config.input ? c.req.valid("json" as never) : void 0;
+    const input = kind === "rest" ? mergeRestInput({ params, query, body }) : body;
+    c.set(ENDPOINT_INPUT, input);
     await next();
   };
+}
+
+function mergeRestInput({
+  params,
+  query,
+  body,
+}: {
+  params: unknown;
+  query: unknown;
+  body: unknown;
+}): Record<string, unknown> | undefined {
+  if (params === void 0 && query === void 0 && body === void 0) {
+    return void 0;
+  }
+
+  const input: Record<string, unknown> = {};
+
+  addRestInputPart(input, "path", params);
+  addRestInputPart(input, "query", query);
+  addRestInputPart(input, "body", body);
+
+  return input;
+}
+
+function addRestInputPart(
+  input: Record<string, unknown>,
+  source: "path" | "query" | "body",
+  part: unknown,
+): void {
+  if (part === void 0) {
+    return;
+  }
+  if (part === null || typeof part !== "object" || Array.isArray(part)) {
+    throw new TypeError(`REST ${source} schemas must produce an object`);
+  }
+
+  for (const [key, value] of Object.entries(part)) {
+    if (Object.hasOwn(input, key)) {
+      throw new TypeError(`REST input field "${key}" is declared by multiple sources`);
+    }
+    input[key] = value;
+  }
 }
 
 function providerMiddleware<TProject>(
@@ -512,14 +576,14 @@ function handlerMiddleware<TProject>({
   }
 
   return async (c: Context) => {
-    const input = config.input ? c.req.valid("json" as never) : undefined;
+    const input = c.get(ENDPOINT_INPUT);
     assertAuthorizedProjectInput({
       context: c,
       input,
       required: serviceConfig.projectIdInput === true,
     });
     const result = await ep.handler(c, input);
-    const response = serializeEndpointResult({ c, config, result });
+    const response = serializeEndpointResult({ c, config, kind: ep.kind, result });
     if (config.cache && config.output && !(result instanceof Response)) {
       await writeCachedResponse({
         c,

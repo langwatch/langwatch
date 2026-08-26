@@ -316,6 +316,31 @@ describe("withCache", () => {
     expect(cache.store.size).toBe(4);
   });
 
+  it("keys REST cache entries by normalized URL input", async () => {
+    const handler = vi.fn(async (_context: unknown, input: { id: string }) => input);
+    const app = createService({
+      name: "things",
+      basePath: "/api/things",
+      logger: false,
+      tracer: false,
+      cache,
+    })
+      .registerRoute("get", "/", "2026-08-07", handler, (builder) =>
+        builder
+          .withQuery(z.object({ id: z.string() }))
+          .withOutput(z.object({ id: z.string() }))
+          .withCache("things", 60),
+      )
+      .build();
+
+    await app.request("/api/things/2026-08-07/?id=th_1");
+    await app.request("/api/things/2026-08-07/?id=th_1");
+    await app.request("/api/things/2026-08-07/?id=th_2");
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(cache.store.size).toBe(2);
+  });
+
   it("drops a family's entries when its tag is invalidated", async () => {
     const handler = vi.fn(async (_c: unknown, input: { id: string }) => ({
       id: input.id,

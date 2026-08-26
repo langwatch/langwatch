@@ -55,8 +55,12 @@ function buildDiscoverService(onRouteMounted?: (route: MountedRoute) => void) {
         "get",
         "/:id",
         "2026-01-15",
-        async (c) => c.json({}),
-        (b) => b.withDocs({ operationId: "getThing" }),
+        async (_c, input: { id: string }) => input,
+        (b) =>
+          b
+            .withParams(z.object({ id: z.string() }))
+            .withOutput(z.object({ id: z.string() }))
+            .withDocs({ operationId: "getThing" }),
       )
       .registerSse(
         "things.watch",

@@ -8,7 +8,7 @@
 [../specs/api-framework.feature](../specs/api-framework.feature)
 
 **Related:**
-[RPC-first fluent registration](./001-rpc-first-fluent-registration.md),
+[the fluent handler contract](./001-rpc-first-fluent-registration.md),
 [explicit version namespaces](./002-explicit-version-namespaces.md),
 [endpoint capabilities are ports](./003-endpoint-capabilities-are-ports.md),
 [the domain errors handled boundary](../../../dev/docs/adr/045-domain-errors-handled-boundary.md),
@@ -63,6 +63,10 @@ ground: the framework serializes `HandledError` on the routes it mounts, while
 legacy routes keep the application-wired boundary of
 [045](../../../dev/docs/adr/045-domain-errors-handled-boundary.md) — a route
 gets exactly one error format, decided by who mounted it.
+
+Endpoints do not maintain an error catalogue. Framework middleware maps
+validation, handled and unknown errors consistently, including status and
+retryability, without another declaration that can drift from thrown errors.
 
 ### 2. The app is the composition root
 

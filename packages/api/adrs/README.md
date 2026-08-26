@@ -3,7 +3,7 @@
 These decisions define the reusable API service framework:
 
 - [API framework boundary](./20260820-api-framework-boundary.md)
-- [RPC-first fluent registration](./001-rpc-first-fluent-registration.md)
+- [RPC and REST share one fluent handler contract](./001-rpc-first-fluent-registration.md)
 - [Explicit version namespaces](./002-explicit-version-namespaces.md)
 - [Endpoint capabilities are ports](./003-endpoint-capabilities-are-ports.md)
 

@@ -6,9 +6,11 @@ import {
   type DefaultsChain,
   type InputDeclared,
   type OutputDeclared,
+  type ParamsDeclared,
   type RouteChain,
   type RpcChain,
   type SseChain,
+  assertRouteDef,
   assertRoutePath,
   assertRpcDef,
   assertSseDef,
@@ -38,9 +40,9 @@ import { type RegistrationEvent, resolveVersions } from "./versioning.js";
 // Handler shapes
 //
 // The handler signature is positional: `(c, input)` — the Hono context and the
-// validated input. Everything else arrives through typed context variables:
-// `.provide()` services via `c.get("things")`, validated params and query via
-// `c.get("params")` / `c.get("query")`.
+// validated input. REST path, query and body fields are normalized into that
+// argument. Provided services remain typed context variables; SSE query stays
+// on context because the stream is its second argument.
 //
 // A note on typing honesty: `input` is declared on the definition chain, which
 // is the argument AFTER the handler — and TypeScript checks arguments in
@@ -75,6 +77,21 @@ type HasInput<THandler extends (...args: never[]) => unknown> =
 type RequiredDefinition<TChain, TNeedsInput extends boolean, TResult> = TChain &
   (TNeedsInput extends true ? InputDeclared : unknown) &
   (NeedsOutput<TResult> extends true ? OutputDeclared : unknown);
+
+type RouteChainFor<TMethod extends HttpMethod> = TMethod extends "get"
+  ? RouteChain & { readonly withInput: never }
+  : RouteChain;
+type PathNeedsParams<TPath extends string> = TPath extends `${string}:${string}`
+  ? true
+  : false;
+type CompleteRouteDefinition<
+  TChain,
+  TNeedsInput extends boolean,
+  TNeedsParams extends boolean,
+> = TChain &
+  (TNeedsInput extends true ? InputDeclared : unknown) &
+  (TNeedsParams extends true ? ParamsDeclared : unknown) &
+  OutputDeclared;
 
 /** SSE handler: `(c, stream)` — a stream has no body. */
 type SseHandler<TVariables extends Record<string, unknown>, TApp> = (
@@ -264,23 +281,24 @@ class ServiceBuilder<
   }
 
   /**
-   * Register a resource-REST endpoint with an explicit method and path, for
-   * the existing REST management families. New families use `register`.
+   * Register an HTTP endpoint with an explicit REST method and path.
    */
-  registerRoute(
-    method: HttpMethod,
-    path: string,
-    version: VersionLabel,
-    handler: BareHandler<TVariables, TApp>,
-  ): this;
-  registerRoute<THandler extends RouteHandler<TVariables, TApp>>(
-    method: HttpMethod,
-    path: string,
+  registerRoute<
+    TMethod extends HttpMethod,
+    TPath extends string,
+    THandler extends RouteHandler<TVariables, TApp>,
+  >(
+    method: TMethod,
+    path: TPath,
     version: VersionLabel,
     handler: THandler,
     define: (
-      b: RouteChain,
-    ) => RequiredDefinition<RouteChain, HasInput<THandler>, ReturnType<THandler>>,
+      b: RouteChainFor<TMethod>,
+    ) => CompleteRouteDefinition<
+      RouteChainFor<TMethod>,
+      HasInput<THandler>,
+      PathNeedsParams<TPath>
+    >,
   ): this;
   registerRoute(
     method: HttpMethod,
@@ -368,6 +386,7 @@ class ServiceBuilder<
     this._events.push({
       version,
       endpoint: {
+        kind: "rpc",
         method: "post",
         path: `/${name}`,
         config,
@@ -392,6 +411,7 @@ class ServiceBuilder<
     this._events.push({
       version,
       endpoint: {
+        kind: "sse",
         method: "sse",
         path: `/${name}`,
         config,
@@ -413,10 +433,12 @@ class ServiceBuilder<
     assertRoutePath(path);
     const def = collectDef(define);
     const config = mergeDefs(this._defaults._def, groupDefaults ?? {}, def);
+    assertRouteDef({ method, path, def: config });
     assertStatusInvariant({ method, path, def: config });
     this._events.push({
       version,
       endpoint: {
+        kind: "rest",
         method,
         path,
         config,
@@ -432,6 +454,7 @@ class ServiceBuilder<
     this._events.push({
       version,
       endpoint: {
+        kind: "rest",
         method: "get",
         path,
         config: {},
@@ -551,20 +574,22 @@ class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown>
     );
   }
 
-  registerRoute(
-    method: HttpMethod,
-    path: string,
-    version: VersionLabel,
-    handler: BareHandler<TVariables, TApp>,
-  ): void;
-  registerRoute<THandler extends RouteHandler<TVariables, TApp>>(
-    method: HttpMethod,
-    path: string,
+  registerRoute<
+    TMethod extends HttpMethod,
+    TPath extends string,
+    THandler extends RouteHandler<TVariables, TApp>,
+  >(
+    method: TMethod,
+    path: TPath,
     version: VersionLabel,
     handler: THandler,
     define: (
-      b: RouteChain,
-    ) => RequiredDefinition<RouteChain, HasInput<THandler>, ReturnType<THandler>>,
+      b: RouteChainFor<TMethod>,
+    ) => CompleteRouteDefinition<
+      RouteChainFor<TMethod>,
+      HasInput<THandler>,
+      PathNeedsParams<TPath>
+    >,
   ): void;
   registerRoute(
     method: HttpMethod,

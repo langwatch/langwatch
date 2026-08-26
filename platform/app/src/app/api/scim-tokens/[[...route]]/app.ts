@@ -73,18 +73,20 @@ const createTokenHandler = async (
   };
 };
 
-const revokeTokenHandler = async (c: ScimTokensContext) => {
-  const params = c.get("params") as z.infer<typeof idParamsSchema>;
+const revokeTokenHandler = async (
+  c: ScimTokensContext,
+  input: z.infer<typeof idParamsSchema>,
+) => {
   const organization = organizationOf(c);
   await c.app.scim.revokeToken({
     organizationId: organization.id,
-    tokenId: params.id,
+    tokenId: input.id,
   });
   emitManagementAudit({
     c,
     organizationId: organization.id,
     action: "management.scimToken.delete",
-    args: { tokenId: params.id },
+    args: { tokenId: input.id },
   });
   return { success: true as const };
 };

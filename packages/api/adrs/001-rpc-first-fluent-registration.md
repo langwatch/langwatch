@@ -1,4 +1,4 @@
-# RPC is the default endpoint style, registered through a fluent definition chain
+# RPC and REST share one fluent handler contract
 
 **Date:** 2026-08-20
 
@@ -17,18 +17,11 @@
 
 ## Context
 
-REST authoring leaks decisions into places that cannot be checked. The verb
-lives in the HTTP method, so a wrong method is a 404 rather than an error at
-registration. Identifiers travel as `:id` path params, outside zod validation.
-URL shapes drive SDK function names unless every endpoint remembers an
-`operationId`. The framework piloted `v.rpc` for the webhooks family to prove
-the alternative, and the pilot's rules — dotted name, POST only, arguments in
-the JSON body — turned out to be machine-checkable in both the editor and at
-startup. The pilot never shipped: webhooks still runs on the older SecuredApp
-stack, and `v.rpc` exists only in the package and its tests. The pilot's ADR
-was never written either; its number (094) was claimed by sibling work, and
-the README carried the decision alone. This is that record, widened from pilot
-to default.
+REST keeps method and argument location as transport concerns. Those concerns
+must not leak into handlers as raw Hono reads or create a weaker validation
+boundary. RPC and REST are both first-class: RPC uses a dotted name and
+body-only input, while REST keeps explicit HTTP methods and resource URLs. Both
+use the same handler and schema discipline.
 
 The version-block API had a second, quieter problem: an endpoint's identity
 was scattered across `.version()` callbacks. Overriding an endpoint in a later
@@ -39,7 +32,7 @@ shape, which is why several of them were never added.
 
 ## Decision
 
-### 1. RPC is the default
+### 1. RPC uses operation names
 
 `service.register(name, version, handler, define?)` registers an RPC endpoint.
 The name is an identifier, not a URL path: no leading slash, dotted
@@ -84,20 +77,22 @@ feature handlers do not resolve or construct services per request. The host
 also exposes the authenticated principal as `context.actor()` and an
 input-dependent permission check as `context.authorize(permission)`. Static
 permissions still belong on `withPermission`; `authorize` is only for a second
-permission selected from already-validated input. Validated route
-params and query remain context variables. An endpoint without `withInput`
-receives `input` as `undefined`. `registerSse` handlers take `(context, stream)`,
-a stream having no body.
+permission selected from already-validated input. REST path, query and body
+schemas are validated separately for OpenAPI, then their transformed object
+fields are merged into that same `input` argument. Fields may not be declared
+by more than one source. An endpoint with no request values receives `input`
+as `undefined`. `registerSse` handlers take `(context, stream)`, a stream having
+no body.
 
 Project-scoped RPCs carry `projectId` in their input so credentials that can
 reach more than one project can choose a target. The host must compare that
 value with the project selected and authorized by authentication before the
 handler runs. A caller cannot gain tenancy by choosing an arbitrary body value.
 
-The registration types require `withInput` when the handler declares an input
-parameter and require `withOutput` when the handler returns data. This is an
-editor guarantee; runtime validation then enforces each schema that was
-declared.
+The registration types require an input source when the handler declares an
+input parameter and require `withOutput` when the handler returns data. Every
+REST route requires `withOutput`, including `z.void()` for no body. Registration
+and response serialization repeat those checks at runtime.
 
 ### 3. The definition chain is the only extension point
 
@@ -168,8 +163,12 @@ version: the version stays explicit on every registration.
 Two shapes cannot be dotted-name POSTs and get their own registration methods
 with the same chain:
 
-- `service.registerRoute(method, path, version, handler, define?)` for the
-  existing resource-REST management families. New families do not use it.
+- `service.registerRoute(method, path, version, handler, define)` for the
+  HTTP surface. `withParams`, `withQuery` and `withInput` declare path, query
+  and body sources; handlers receive their parsed object fields as one input.
+  GET has no JSON body source, and every `:param` in the path requires
+  `withParams`. REST handlers return values, never a hand-built `Response` that
+  bypasses output validation.
 - `service.registerSse(name, version, handler, define?)` with
   `.withEvents(...)` / `.withQuery(...)`: a dotted name mounted as a GET, per
   [../specs/sse-streaming.feature](../specs/sse-streaming.feature).
@@ -198,8 +197,8 @@ than writing a second regex that agrees until one of them changes.
 
 ## Alternatives considered
 
-Keeping REST as the default with RPC as opt-in was rejected: two authoring
-styles with the less checkable one leading is how the pilot stayed a pilot.
+Keeping separate REST and RPC handler contracts was rejected: transport shape
+does not justify separate validation, service access or error behaviour.
 
 Allowing GET for RPC reads was rejected: it splits the surface, invites HTTP
 caching of calls that were never designed for it, and buys nothing an
@@ -242,10 +241,7 @@ endpoint identity to be re-keyed on every version bump.
 - Hosts generating specs must pass `excludeStaticFile: false`; dotted paths
   are otherwise dropped as static files, silently. This trap is pinned by
   test, not by documentation.
-- The four resource-REST management families migrate to `registerRoute` when
-  the rework lands. Webhooks is separate work: it is not on the framework
-  today, its `v1` namespace has no form in the date grammar, and when it
-  migrates it takes date namespaces like every other family (see
-  [002 §5](./002-explicit-version-namespaces.md)).
+- HTTP/Hono routes use `registerRoute`; the framework preserves their verbs
+  and URLs without giving them a second handler contract.
 - `withRateLimit`, `withCache` and `withDeprecated` arrive with the chain they
   hang off; the port contracts are [003](./003-endpoint-capabilities-are-ports.md).

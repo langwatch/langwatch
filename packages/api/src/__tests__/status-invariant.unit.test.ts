@@ -208,23 +208,57 @@ describe("endpoint success status", () => {
   });
 
   describe("given no output schema at all", () => {
-    /**
-     * The no-chain overload already requires a `Response` when no `output` is
-     * declared, so typed code cannot reach this. The cast is what an untyped
-     * caller — or a handler whose return type drifted behind an `any` — does
-     * by accident, and the rule is that it still cannot put an undeclared,
-     * unvalidated payload on the wire: no declared body means no body.
-     */
-    it("sends no body, whatever the handler returned", async () => {
+    it("refuses the REST route at registration", () => {
+      const service = buildTestService();
+
+      expect(() =>
+        Reflect.apply(service.registerRoute, service, [
+          "get",
+          "/bare",
+          "2025-03-15",
+          async () => ({ leaked: "secret" }),
+        ]),
+      ).toThrow(/must declare an output schema/);
+    });
+
+    it("refuses a hand-built response from a schema-backed route", async () => {
       const app = buildTestService()
-        .registerRoute("get", "/bare", "2025-03-15", (async () => ({
-          leaked: "secret",
-        })) as never)
+        .registerRoute(
+          "get",
+          "/response",
+          "2025-03-15",
+          async () => new Response("not validated"),
+          (b) => b.withOutput(z.string()),
+        )
         .build();
 
-      const res = await app.request("/api/test/2025-03-15/bare");
-      expect(res.status).toBe(204);
-      expect(await res.text()).toBe("");
+      const res = await app.request("/api/test/2025-03-15/response");
+
+      expect(res.status).toBe(500);
+      expect(await res.text()).not.toContain("not validated");
+    });
+
+    it("preserves the RPC Response opt-out", async () => {
+      const app = buildTestService()
+        .register(
+          "things.download",
+          "2025-03-15",
+          async () =>
+            new Response("raw bytes", {
+              headers: { "content-type": "application/octet-stream" },
+              status: 206,
+            }),
+          (b) => b.withOutput(z.string()),
+        )
+        .build();
+
+      const res = await app.request("/api/test/2025-03-15/things.download", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(206);
+      expect(res.headers.get("content-type")).toBe("application/octet-stream");
+      expect(await res.text()).toBe("raw bytes");
     });
   });
 });

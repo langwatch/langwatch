@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { createService as createRawService } from "../builder.js";
 import { createTestService as createService } from "./test-service.js";
+import { ChainBuilder } from "../definition.js";
 import type { MountedRoute } from "../types.js";
 
 // ---------------------------------------------------------------------------
@@ -190,10 +191,7 @@ describe("registerRoute", () => {
         "get",
         "/:id",
         "2026-08-07",
-        async (c) => ({
-          id: c.get("params").id,
-          verbose: c.get("query").verbose,
-        }),
+        async (_c, input: { id: string; verbose: string }) => input,
         (b) =>
           b
             .withParams(z.object({ id: z.string() }))
@@ -221,10 +219,108 @@ describe("registerRoute", () => {
     expect(wrongMethod.status).toBe(404);
   });
 
+  it("merges validated path, query and body fields into one handler input", async () => {
+    const app = buildTestService()
+      .registerRoute(
+        "patch",
+        "/:id",
+        "2026-08-07",
+        async (_context, input: { id: string; dryRun: boolean; name: string }) => input,
+        (builder) =>
+          builder
+            .withParams(z.object({ id: z.string().min(1) }))
+            .withQuery(
+              z.object({
+                dryRun: z.enum(["true", "false"]).transform((value) => value === "true"),
+              }),
+            )
+            .withInput(z.object({ name: z.string().trim().min(1) }))
+            .withOutput(
+              z.object({ id: z.string(), dryRun: z.boolean(), name: z.string() }),
+            ),
+      )
+      .build();
+
+    const response = await app.request("/api/test/2026-08-07/th_1?dryRun=true", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "  widget  " }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      id: "th_1",
+      dryRun: true,
+      name: "widget",
+    });
+  });
+
+  it("refuses an input field declared by more than one HTTP source", async () => {
+    const app = buildTestService()
+      .registerRoute(
+        "patch",
+        "/:id",
+        "2026-08-07",
+        async (_context, input: { id: string }) => input,
+        (builder) =>
+          builder
+            .withParams(z.object({ id: z.string() }))
+            .withInput(z.object({ id: z.string() }))
+            .withOutput(z.object({ id: z.string() })),
+      )
+      .build();
+
+    const response = await app.request("/api/test/2026-08-07/path-id", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "body-id" }),
+    });
+
+    expect(response.status).toBe(500);
+    const body = await response.text();
+    expect(body).not.toContain("path-id");
+    expect(body).not.toContain("body-id");
+  });
+
+  it("refuses a JSON body schema on GET", () => {
+    const service = buildTestService();
+
+    expect(() =>
+      Reflect.apply(service.registerRoute, service, [
+        "get",
+        "/things",
+        "2026-08-07",
+        async () => ({ ok: true }),
+        (builder: ChainBuilder) =>
+          builder
+            .withInput(z.object({ id: z.string() }))
+            .withOutput(z.object({ ok: z.boolean() })),
+      ]),
+    ).toThrow(/GET .* cannot declare a JSON body/);
+  });
+
+  it("refuses a path parameter without a matching schema", () => {
+    const service = buildTestService();
+
+    expect(() =>
+      Reflect.apply(service.registerRoute, service, [
+        "get",
+        "/things/:id",
+        "2026-08-07",
+        async () => ({ ok: true }),
+        (builder: ChainBuilder) => builder.withOutput(z.object({ ok: z.boolean() })),
+      ]),
+    ).toThrow(/contains path parameters but does not declare withParams/);
+  });
+
   it("cannot express a new RPC family: paths must start with a slash", () => {
     expect(() =>
-      buildTestService().registerRoute("post", "things.create", "2026-08-07", async (c) =>
-        c.body(null, 204),
+      buildTestService().registerRoute(
+        "post",
+        "things.create",
+        "2026-08-07",
+        async () => void 0,
+        (b) => b.withOutput(z.void()),
       ),
     ).toThrow(/must start with "\/"/);
   });
@@ -237,8 +333,12 @@ describe("registerRoute", () => {
       "/2025-02-30/items",
     ]) {
       expect(() =>
-        buildTestService().registerRoute("get", path, "2025-03-15", async (c) =>
-          c.body(null, 204),
+        buildTestService().registerRoute(
+          "get",
+          path,
+          "2025-03-15",
+          async () => void 0,
+          (b) => b.withOutput(z.void()),
         ),
       ).toThrow(/reserved API version namespace/);
     }
@@ -953,8 +1053,15 @@ describe("group", () => {
       onRouteMounted: (route) => mounted.push(route),
     });
     const things = service.group("things");
-    things.registerRoute("get", "/:id", "2025-03-15", async (c) =>
-      c.json({ id: c.req.param("id") }),
+    things.registerRoute(
+      "get",
+      "/:id",
+      "2025-03-15",
+      async (_c, input: { id: string }) => ({ id: input.id }),
+      (b) =>
+        b
+          .withParams(z.object({ id: z.string() }))
+          .withOutput(z.object({ id: z.string() })),
     );
     service.build();
 

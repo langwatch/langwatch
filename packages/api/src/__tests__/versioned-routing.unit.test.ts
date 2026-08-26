@@ -16,6 +16,7 @@ function makeEndpoint(
   overrides: Partial<EndpointRegistration> = {},
 ): EndpointRegistration {
   return {
+    kind: "rpc",
     method: "post",
     path: "/things.list",
     config: {},

@@ -8,11 +8,14 @@ import { VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
 
 declare const inputDeclared: unique symbol;
 declare const outputDeclared: unique symbol;
+declare const paramsDeclared: unique symbol;
 
 /** @internal Type-state marker produced only by `.withInput(...)`. */
 export type InputDeclared = { readonly [inputDeclared]: true };
 /** @internal Type-state marker produced only by `.withOutput(...)`. */
 export type OutputDeclared = { readonly [outputDeclared]: true };
+/** @internal Type-state marker produced only by `.withParams(...)`. */
+export type ParamsDeclared = { readonly [paramsDeclared]: true };
 
 // ---------------------------------------------------------------------------
 // The definition chain (ADR 001 §3)
@@ -63,7 +66,7 @@ export interface RpcChain extends DefaultsChain {
   withStatus(status: ContentfulStatusCode): this;
 }
 
-/** The definition chain of a REST route registered with `registerRoute`. */
+/** The definition chain of an HTTP route registered with `registerRoute`. */
 export interface RouteChain extends DefaultsChain {
   /** JSON body schema. */
   withInput(schema: ApiSchema): this & InputDeclared;
@@ -71,10 +74,10 @@ export interface RouteChain extends DefaultsChain {
   withOutput(schema: ApiSchema): this & OutputDeclared;
   /** HTTP status code for successful responses (default: 200, or 204 with no body). */
   withStatus(status: ContentfulStatusCode): this;
-  /** Path parameter schema; validated values are read via `c.get("params")`. */
-  withParams(schema: ApiSchema): this;
-  /** Query string schema; validated values are read via `c.get("query")`. */
-  withQuery(schema: ApiSchema): this;
+  /** Path parameter schema; parsed fields are merged into the handler input. */
+  withParams(schema: ApiSchema): this & InputDeclared & ParamsDeclared;
+  /** Query string schema; parsed fields are merged into the handler input. */
+  withQuery(schema: ApiSchema): this & InputDeclared;
 }
 
 /**
@@ -177,14 +180,14 @@ export class ChainBuilder {
     return this;
   }
 
-  withParams(schema: ApiSchema): this {
+  withParams(schema: ApiSchema): this & InputDeclared & ParamsDeclared {
     this._def.params = schema;
-    return this;
+    return this as this & InputDeclared & ParamsDeclared;
   }
 
-  withQuery(schema: ApiSchema): this {
+  withQuery(schema: ApiSchema): this & InputDeclared {
     this._def.query = schema;
-    return this;
+    return this as this & InputDeclared;
   }
 
   withEvents(events: Record<string, ApiSchema>): this {
@@ -297,6 +300,40 @@ export function assertSseDef({ name, def }: { name: string; def: RawEndpointDef 
   }
 }
 
+/** REST routes return framework-validated values, including explicit no-body values. */
+export function assertRouteDef({
+  method,
+  path,
+  def,
+}: {
+  method: HttpMethod;
+  path: string;
+  def: RawEndpointDef;
+}): void {
+  if (method === "get" && def.input) {
+    throw new Error(
+      `REST endpoint GET ${path || "/"} cannot declare a JSON body; use path ` +
+        `or query input`,
+    );
+  }
+  if (routeHasParams(path) && !def.params) {
+    throw new Error(
+      `REST endpoint ${method.toUpperCase()} ${path} contains path parameters but ` +
+        `does not declare withParams`,
+    );
+  }
+  if (!def.output) {
+    throw new Error(
+      `REST endpoint ${method.toUpperCase()} ${path || "/"} must declare an output ` +
+        `schema; use z.void() for an endpoint with no response body`,
+    );
+  }
+}
+
+function routeHasParams(path: string): boolean {
+  return path.split("/").some((segment) => segment.startsWith(":"));
+}
+
 // ---------------------------------------------------------------------------
 // The success-status invariant
 // ---------------------------------------------------------------------------
@@ -312,11 +349,9 @@ export function assertSseDef({ name, def }: { name: string; def: RawEndpointDef 
  * reachable, so it is refused at registration.
  *
  * The honest shapes remain: declare a required `output` and always answer
- * `status ?? 200`; declare `z.void()` and always answer `status ?? 204`; or
- * declare no `output` at all, where the handler builds its own `Response` and
- * that response owns its status outright. This rule governs value-returning
- * handlers — a hand-built `Response` is the framework's deliberate opt-out and
- * always has been.
+ * `status ?? 200`, or declare `z.void()` and always answer `status ?? 204`.
+ * RPC compatibility routes may still omit output and return a Response; REST
+ * routes are checked separately by `assertRouteDef` and cannot opt out.
  */
 export function assertStatusInvariant({
   method,

@@ -143,9 +143,6 @@ const rowMatchesFilters = (
 const organizationOf = (c: Context): Organization =>
   c.get("organization") as Organization;
 
-/** Validated path params, typed at the read site (see the chain note in @langwatch/api). */
-const paramsOf = <T>(c: RoleBindingsContext): T => c.get("params") as T;
-
 /**
  * The just-written binding as the list reports it, so a write's response is
  * byte-compatible with a later read — or null while the grants projection is
@@ -172,14 +169,16 @@ const readBackBinding = async ({
 
 // ── handlers ─────────────────────────────────────────────────────────────────
 
-const listBindingsHandler = async (c: RoleBindingsContext) => {
-  const query = c.get("query") as z.infer<typeof listQuerySchema>;
+const listBindingsHandler = async (
+  c: RoleBindingsContext,
+  input: z.infer<typeof listQuerySchema>,
+) => {
   const rows = await c.get("roleBindings").listForOrg({
     organizationId: organizationOf(c).id,
   });
-  const filtered = rows.filter((row) => rowMatchesFilters(row, query));
-  const offset = query.offset ?? 0;
-  const limit = query.limit ?? 50;
+  const filtered = rows.filter((row) => rowMatchesFilters(row, input));
+  const offset = input.offset ?? 0;
+  const limit = input.limit ?? 50;
   return {
     bindings: filtered.slice(offset, offset + limit).map(bindingWire),
     totalCount: filtered.length,
@@ -236,14 +235,13 @@ const createBindingHandler = async (
 
 const updateBindingHandler = async (
   c: RoleBindingsContext,
-  input: z.infer<typeof updateBindingSchema>,
+  input: z.infer<typeof idParamsSchema> & z.infer<typeof updateBindingSchema>,
 ) => {
-  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
   const roleBindings = c.get("roleBindings");
   const updated = await roleBindings.update({
     organizationId: organization.id,
-    bindingId: params.id,
+    bindingId: input.id,
     role: input.role,
     ...(input.customRoleId !== undefined ? { customRoleId: input.customRoleId } : {}),
     actor: orgRequestLedgerActor(c),
@@ -265,12 +263,14 @@ const updateBindingHandler = async (
   return binding;
 };
 
-const deleteBindingHandler = async (c: RoleBindingsContext) => {
-  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
+const deleteBindingHandler = async (
+  c: RoleBindingsContext,
+  input: z.infer<typeof idParamsSchema>,
+) => {
   const organization = organizationOf(c);
   await c.get("roleBindings").delete({
     organizationId: organization.id,
-    bindingId: params.id,
+    bindingId: input.id,
     actor: orgRequestLedgerActor(c),
   });
   return { success: true as const };

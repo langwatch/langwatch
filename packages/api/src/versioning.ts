@@ -29,6 +29,7 @@ export interface RegistrationEvent {
 export type ResolvedEndpoint =
   | (EndpointRegistration & { withdrawn?: false })
   | {
+      kind: EndpointRegistration["kind"];
       method: HttpMethod | "sse";
       path: string;
       config: EndpointRegistration["config"];
@@ -58,6 +59,7 @@ function applyEvents({
       for (const [key, inherited] of target) {
         if ((inherited.path || "/") !== (ep.path || "/")) continue;
         target.set(key, {
+          kind: inherited.kind,
           method: inherited.method,
           path: inherited.path,
           config: inherited.config,

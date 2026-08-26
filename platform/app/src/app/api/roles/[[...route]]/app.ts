@@ -96,9 +96,6 @@ const roleWire = (
 const organizationOf = (c: Context): Organization =>
   c.get("organization") as Organization;
 
-/** Validated path params, typed at the read site (see the chain note in @langwatch/api). */
-const paramsOf = <T>(c: RolesContext): T => c.get("params") as T;
-
 // ── handlers ─────────────────────────────────────────────────────────────────
 
 const listRolesHandler = async (c: RolesContext) => {
@@ -138,10 +135,9 @@ const permissionCatalogHandler = async () => {
   };
 };
 
-const getRoleHandler = async (c: RolesContext) => {
-  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
+const getRoleHandler = async (c: RolesContext, input: z.infer<typeof idParamsSchema>) => {
   const role = await c.var.langwatchApp.roles.getForOrganization({
-    roleId: params.id,
+    roleId: input.id,
     organizationId: organizationOf(c).id,
   });
   return roleWire(role);
@@ -149,12 +145,11 @@ const getRoleHandler = async (c: RolesContext) => {
 
 const updateRoleHandler = async (
   c: RolesContext,
-  input: z.infer<typeof updateRoleSchema>,
+  input: z.infer<typeof idParamsSchema> & z.infer<typeof updateRoleSchema>,
 ) => {
-  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
   const organization = organizationOf(c);
   const role = await c.var.langwatchApp.roles.updateForOrganization({
-    roleId: params.id,
+    roleId: input.id,
     organizationId: organization.id,
     changes: {
       ...(input.name !== undefined ? { name: input.name } : {}),
@@ -166,11 +161,13 @@ const updateRoleHandler = async (
   return roleWire(role);
 };
 
-const deleteRoleHandler = async (c: RolesContext) => {
-  const params = paramsOf<z.infer<typeof idParamsSchema>>(c);
+const deleteRoleHandler = async (
+  c: RolesContext,
+  input: z.infer<typeof idParamsSchema>,
+) => {
   const organization = organizationOf(c);
   await c.var.langwatchApp.roles.removeForOrganization({
-    roleId: params.id,
+    roleId: input.id,
     organizationId: organization.id,
     actor: orgRequestLedgerActor(c),
   });

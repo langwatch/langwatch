@@ -8,7 +8,7 @@
 [../specs/versioned-routing.feature](../specs/versioned-routing.feature)
 
 **Related:**
-[RPC-first fluent registration](./001-rpc-first-fluent-registration.md),
+[the fluent handler contract](./001-rpc-first-fluent-registration.md),
 [the API framework boundary](./20260820-api-framework-boundary.md).
 
 ## Context

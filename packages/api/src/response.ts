@@ -1,27 +1,28 @@
 import type { Context } from "hono";
 
 import { parseApiSchemaSync } from "./schema.js";
-import { ENDPOINT_ROUTE, type EndpointDef } from "./types.js";
+import { ENDPOINT_ROUTE, type EndpointDef, type EndpointRegistration } from "./types.js";
 
 /** Validates and serializes the value returned by a regular endpoint handler. */
 export function serializeEndpointResult({
   c,
   config,
+  kind,
   result,
 }: {
   c: Context;
   config: EndpointDef;
+  kind: EndpointRegistration["kind"];
   result: unknown;
 }): Response {
-  // A handler that builds its own `Response` owns it completely — status,
-  // body and all. This is the framework's deliberate opt-out, and it already
-  // bypassed output validation long before the status rule below existed; a
-  // redirect, a file stream and a hand-built error all need it. So the
-  // invariant that follows governs VALUE-returning handlers. It is not a
-  // guarantee about every byte an endpoint can emit, and the no-chain
-  // registration overload in fact requires a `Response` when no `output` is
-  // declared, which makes the next branch unreachable from typed code.
   if (result instanceof Response) {
+    // RPC keeps its existing raw-response escape hatch for streams, redirects,
+    // and compatibility handlers. REST always declares and validates output.
+    if (kind === "rest" && config.output) {
+      throw new TypeError(
+        "A handler with an output schema must return a value, not a Response",
+      );
+    }
     return result;
   }
 

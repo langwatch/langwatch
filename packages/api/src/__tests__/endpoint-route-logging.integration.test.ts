@@ -63,8 +63,11 @@ describe("the endpoint a request matched", () => {
           "get",
           "/things/:id",
           "2026-08-07",
-          async (c) => ({ id: c.req.param("id") as string }),
-          (b) => b.withOutput(z.object({ id: z.string() })),
+          async (_c, input: { id: string }) => ({ id: input.id }),
+          (b) =>
+            b
+              .withParams(z.object({ id: z.string() }))
+              .withOutput(z.object({ id: z.string() })),
         )
         .build();
     }

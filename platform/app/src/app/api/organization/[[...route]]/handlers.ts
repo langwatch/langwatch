@@ -2,8 +2,8 @@
  * The organization family's handlers: the profile, its members and its
  * invites. Each takes the request context and the validated input the
  * registration in `app.ts` bound to it, and answers the wire shape declared
- * beside it in `wire.ts`. Services and validated params/query arrive as
- * context variables: `c.get("organizations")`, `c.get("params")`, ...
+ * beside it in `wire.ts`. Services arrive on context; validated path, query
+ * and body fields arrive together as the second argument.
  */
 
 import type { z } from "zod";
@@ -24,9 +24,6 @@ import {
   type updateOrganizationSchema,
   type userIdParamsSchema,
 } from "./wire";
-
-/** Validated path params, typed at the read site (see the chain note in @langwatch/api). */
-const paramsOf = <T>(c: OrganizationContext): T => c.get("params") as T;
 
 // ── handlers ─────────────────────────────────────────────────────────────────
 
@@ -51,14 +48,16 @@ export const updateOrganizationHandler = async (
   return c.get("organizations").getSettings(organization.id);
 };
 
-export const listMembersHandler = async (c: OrganizationContext) => {
-  const query = c.get("query") as z.infer<typeof listMembersQuerySchema>;
+export const listMembersHandler = async (
+  c: OrganizationContext,
+  input: z.infer<typeof listMembersQuerySchema>,
+) => {
   const organizationId = organizationOf(c).id;
   const { members, totalCount } = await c.get("organizations").listMembers({
     organizationId,
-    includeDisabled: query.includeDisabled ?? false,
-    offset: query.offset ?? 0,
-    limit: query.limit ?? 50,
+    includeDisabled: input.includeDisabled ?? false,
+    offset: input.offset ?? 0,
+    limit: input.limit ?? 50,
   });
   // The member wire carries names and addresses, so a credential enumerating
   // the directory leaves the same trace a write does.
@@ -71,18 +70,20 @@ export const listMembersHandler = async (c: OrganizationContext) => {
   return { members: members.map(memberWire), totalCount };
 };
 
-export const getMemberHandler = async (c: OrganizationContext) => {
-  const params = paramsOf<z.infer<typeof userIdParamsSchema>>(c);
+export const getMemberHandler = async (
+  c: OrganizationContext,
+  input: z.infer<typeof userIdParamsSchema>,
+) => {
   const organizationId = organizationOf(c).id;
   const member = await c.get("organizations").getMember({
     organizationId,
-    userId: params.userId,
+    userId: input.userId,
   });
   emitManagementAudit({
     c,
     organizationId,
     action: "management.organizationMember.read",
-    args: { userId: params.userId },
+    args: { userId: input.userId },
   });
   return { ...memberWire(member), teams: member.teams };
 };
@@ -145,9 +146,8 @@ export const applyMemberDisabledChange = async ({
 
 export const updateMemberHandler = async (
   c: OrganizationContext,
-  input: z.infer<typeof updateMemberSchema>,
+  input: z.infer<typeof userIdParamsSchema> & z.infer<typeof updateMemberSchema>,
 ) => {
-  const params = paramsOf<z.infer<typeof userIdParamsSchema>>(c);
   const organization = organizationOf(c);
   const actorUserId = actorUserIdOf(c);
   const organizations = c.get("organizations");
@@ -157,14 +157,14 @@ export const updateMemberHandler = async (
       ? await applyMemberRoleChange({
           organizations,
           organizationId: organization.id,
-          userId: params.userId,
+          userId: input.userId,
           role: input.role,
           actorUserId,
         })
       : await applyMemberDisabledChange({
           organizations,
           organizationId: organization.id,
-          userId: params.userId,
+          userId: input.userId,
           disabled: input.disabled === true,
           actorUserId,
         }).then(() => undefined);
@@ -173,12 +173,12 @@ export const updateMemberHandler = async (
     c,
     organizationId: organization.id,
     action: "management.member.update",
-    args: { userId: params.userId, ...input },
+    args: { ...input },
   });
 
   const member = await organizations.getMember({
     organizationId: organization.id,
-    userId: params.userId,
+    userId: input.userId,
   });
   return {
     ...memberWire(member),
@@ -186,38 +186,42 @@ export const updateMemberHandler = async (
   };
 };
 
-export const removeMemberHandler = async (c: OrganizationContext) => {
-  const params = paramsOf<z.infer<typeof userIdParamsSchema>>(c);
+export const removeMemberHandler = async (
+  c: OrganizationContext,
+  input: z.infer<typeof userIdParamsSchema>,
+) => {
   const organization = organizationOf(c);
   await c.get("organizations").deleteMember({
     organizationId: organization.id,
-    userId: params.userId,
+    userId: input.userId,
     actingUserId: actorUserIdOf(c),
   });
   emitManagementAudit({
     c,
     organizationId: organization.id,
     action: "management.member.delete",
-    args: { userId: params.userId },
+    args: { userId: input.userId },
   });
   return { success: true as const };
 };
 
-export const memberAccessHandler = async (c: OrganizationContext) => {
-  const params = paramsOf<z.infer<typeof userIdParamsSchema>>(c);
+export const memberAccessHandler = async (
+  c: OrganizationContext,
+  input: z.infer<typeof userIdParamsSchema>,
+) => {
   const organization = organizationOf(c);
   // 404 before disclosure: the breakdown call itself never fails on an
   // unknown user, it just answers emptily, which would read as a member with
   // no access rather than no member.
   const member = await c.get("organizations").getMember({
     organizationId: organization.id,
-    userId: params.userId,
+    userId: input.userId,
   });
   emitManagementAudit({
     c,
     organizationId: organization.id,
     action: "management.organizationMember.readAccess",
-    args: { userId: params.userId },
+    args: { userId: input.userId },
   });
   return c.get("roleBindings").getMyAccessBreakdown({
     organizationId: organization.id,
@@ -286,18 +290,20 @@ export const createInvitesHandler = async (
   }
 };
 
-export const revokeInviteHandler = async (c: OrganizationContext) => {
-  const params = paramsOf<{ id: string }>(c);
+export const revokeInviteHandler = async (
+  c: OrganizationContext,
+  input: { id: string },
+) => {
   const organization = organizationOf(c);
   await c.get("invites").revokeInvite({
     organizationId: organization.id,
-    inviteId: params.id,
+    inviteId: input.id,
   });
   emitManagementAudit({
     c,
     organizationId: organization.id,
     action: "management.invite.delete",
-    args: { inviteId: params.id },
+    args: { inviteId: input.id },
   });
   return { success: true as const };
 };
