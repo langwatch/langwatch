@@ -1,14 +1,12 @@
 import { Button, Field, HStack } from "@chakra-ui/react";
 import {
-  Controller,
-  type FieldErrors,
-  type UseFormReturn,
-  useFormState,
-} from "react-hook-form";
+  ScenarioParameterDefinitionsInput,
+  type ScenarioFormController,
+  type ScenarioFormData,
+} from "@langwatch/scenario-web";
+import { Controller, type FieldErrors, useFormState } from "react-hook-form";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Dialog } from "../ui/dialog";
-import type { ScenarioFormData } from "./ScenarioForm";
-import { ParameterDefinitionsInput } from "./ui/ParameterDefinitionsInput";
 
 /**
  * Editor for the parameters a scenario declares, opened from the Parameters
@@ -27,7 +25,7 @@ export function ScenarioParametersDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  form: UseFormReturn<ScenarioFormData>;
+  form: ScenarioFormController;
 }) {
   const { errors } = useFormState({ control: form.control });
   const { parametersError, parameterRowErrors } = readParameterErrors(errors);
@@ -54,7 +52,7 @@ export function ScenarioParametersDialog({
               name="parameters"
               control={form.control}
               render={({ field }) => (
-                <ParameterDefinitionsInput
+                <ScenarioParameterDefinitionsInput
                   value={field.value}
                   onChange={field.onChange}
                   rowErrors={parameterRowErrors}

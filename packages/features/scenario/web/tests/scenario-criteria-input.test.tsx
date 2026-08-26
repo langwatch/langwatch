@@ -3,9 +3,26 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { CriteriaInput } from "../CriteriaInput";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { ScenarioCriteriaInput as CriteriaInput } from "../src/scenario-criteria-input";
+
+class TestResizeObserver {
+  observe(): void {}
+
+  unobserve(): void {}
+
+  disconnect(): void {}
+}
+
+beforeAll(() => {
+  vi.stubGlobal("ResizeObserver", TestResizeObserver);
+});
+
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 afterEach(() => {
   cleanup();

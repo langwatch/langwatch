@@ -1,14 +1,13 @@
 import { Text, type TextProps } from "@chakra-ui/react";
 
-type SectionHeaderProps = {
+type ScenarioSectionHeaderProps = {
   children: React.ReactNode;
 } & TextProps;
 
-/**
- * Section header for scenario forms.
- * Uppercase, gray, small text.
- */
-export function SectionHeader({ children, ...props }: SectionHeaderProps) {
+export function ScenarioSectionHeader({
+  children,
+  ...props
+}: ScenarioSectionHeaderProps) {
   return (
     <Text
       fontSize="11px"

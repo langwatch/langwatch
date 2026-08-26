@@ -3,9 +3,10 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { InlineTagsInput } from "../InlineTagsInput";
+import { ScenarioInlineTagsInput as InlineTagsInput } from "../src/scenario-inline-tags-input";
 
 afterEach(() => {
   cleanup();

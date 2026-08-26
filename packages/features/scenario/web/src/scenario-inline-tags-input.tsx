@@ -2,22 +2,18 @@ import { HStack, Input, Text } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useRef, useState } from "react";
 
-type InlineTagsInputProps = {
+type ScenarioInlineTagsInputProps = {
   value: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
 };
 
-/**
- * Inline tags input with auto-add on blur/Enter.
- * Shows tags with x buttons and an input that automatically adds labels.
- * Labels are added when: pressing Enter, pressing comma, or clicking outside.
- */
-export function InlineTagsInput({
+/** Inline labels committed on comma, Enter or blur. */
+export function ScenarioInlineTagsInput({
   value,
   onChange,
   placeholder = "Add label...",
-}: InlineTagsInputProps) {
+}: ScenarioInlineTagsInputProps) {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -85,7 +81,6 @@ export function InlineTagsInput({
         boxShadow: "0 0 0 1px var(--chakra-colors-blue-subtle)",
       }}
     >
-      {/* Existing tags */}
       {value.map((tag, index) => (
         <HStack
           key={index}
@@ -100,6 +95,7 @@ export function InlineTagsInput({
           <Text>{tag}</Text>
           <button
             type="button"
+            aria-label={`Remove ${tag} label`}
             onClick={(e) => {
               e.stopPropagation();
               handleRemove(index);
@@ -124,7 +120,6 @@ export function InlineTagsInput({
         </HStack>
       ))}
 
-      {/* Input field - always visible */}
       <Input
         ref={inputRef}
         size="sm"

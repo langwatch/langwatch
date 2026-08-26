@@ -22,10 +22,14 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@hookform/resolvers": "^5.4.0",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@tanstack/react-table": "^8.21.3",
     "lucide-react": "^1.22.0",
-    "react": "^19.2.7"
+    "react": "^19.2.7",
+    "react-hook-form": "^7.80.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

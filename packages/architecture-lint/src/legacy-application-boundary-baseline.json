@@ -658,18 +658,12 @@
       "platform/app/src/components/prompts/PromptEditorDrawer.tsx": [
         "~/server/prompt-config/prompt.service"
       ],
-      "platform/app/src/components/scenarios/ScenarioForm.tsx": [
-        "~/server/scenarios/parameters"
-      ],
       "platform/app/src/components/scenarios/ScenarioFormDrawer.tsx": [
         "../../server/scenarios/parameters"
       ],
       "platform/app/src/components/scenarios/SimulationModelSelect.tsx": [
         "../../server/modelProviders/customModelDisplayNames",
         "../../server/modelProviders/latestAliases"
-      ],
-      "platform/app/src/components/scenarios/ui/ParameterDefinitionsInput.tsx": [
-        "~/server/scenarios/parameters"
       ],
       "platform/app/src/components/SeriesFilterDrawer.tsx": ["~/server/filters/types"],
       "platform/app/src/components/settings/AddCustomEmbeddingsModelDialog.tsx": [

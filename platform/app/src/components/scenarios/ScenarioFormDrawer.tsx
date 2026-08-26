@@ -13,12 +13,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  type FieldErrors,
-  type UseFormReturn,
-  useFormState,
-  useWatch,
-} from "react-hook-form";
+import { type FieldErrors, useFormState, useWatch } from "react-hook-form";
 import {
   applyHandledErrorToForm,
   FormServerError,
@@ -40,6 +35,12 @@ import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import { parseScenarioParameterDefinitions } from "@langwatch/scenario-contract";
+import {
+  ScenarioForm,
+  type ScenarioFormController,
+  type ScenarioFormData,
+  type ScenarioInitialData,
+} from "@langwatch/scenario-web";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -50,11 +51,6 @@ import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
-import {
-  ScenarioForm,
-  type ScenarioFormData,
-  type ScenarioInitialData,
-} from "./ScenarioForm";
 import { ScenarioParametersDialog } from "./ScenarioParametersDialog";
 import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import type { TargetValue } from "./TargetSelector";
@@ -112,8 +108,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       ? (rawComplexProps as Partial<ScenarioInitialData>)
       : {};
   const utils = api.useUtils();
-  const [formInstance, setFormInstance] =
-    useState<UseFormReturn<ScenarioFormData> | null>(null);
+  const [formInstance, setFormInstance] = useState<ScenarioFormController | null>(null);
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
@@ -425,9 +420,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       // pops over an invalid form. Then pre-fill the run-model dialog from the
       // scenario's stored choices (null = follow the project default) and open
       // it — the actual save + run happens on confirm.
-      const valid = await form.trigger();
+      const valid = await form.validate();
       if (!valid) {
-        openParametersOnInvalid(form.formState.errors);
+        openParametersOnInvalid(form.errors());
         return;
       }
 
@@ -454,7 +449,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     setRunModelDialogOpen(false);
 
     try {
-      await form.handleSubmit(async (data) => {
+      await form.submit(async (data) => {
         // skipTransition: don't open the edit-mode drawer mid-save — we're
         // navigating away to /simulations next, so the create→edit URL push
         // would race with our redirect (lw#3586 F11). The whole `await` is
@@ -486,7 +481,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // own router.push to strip drawer.* params, which would race with
         // this redirect and silently win (lw#3586 F11).
         void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
-      })();
+      });
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
     }
@@ -505,7 +500,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
     if (!form) return;
-    await form.handleSubmit(async (data) => {
+    await form.submit(async (data) => {
       try {
         const saved = await handleSave({ data, skipTransition: true });
         if (saved) {
@@ -518,10 +513,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       } catch {
         // Error already handled by mutation onError callback
       }
-    }, openParametersOnInvalid)();
+    }, openParametersOnInvalid);
   }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
-  const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData> | null) => {
-    setFormInstance(form);
+  const setFormController = useCallback((controller: ScenarioFormController | null) => {
+    setFormInstance(controller);
   }, []);
   const isSubmitting = createMutation.isPending || updateMutation.isPending || isRunning;
 
@@ -574,7 +569,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                   <ScenarioForm
                     key={scenarioId ?? "new"}
                     defaultValues={defaultValues}
-                    formRef={setFormRef}
+                    onControllerChange={setFormController}
                   />
                 </>
               )}
@@ -721,7 +716,7 @@ function ScenarioFormSkeleton() {
   );
 }
 
-function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
+function FooterLabels({ form }: { form: ScenarioFormController }) {
   const labels = useWatch({ control: form.control, name: "labels" });
 
   return (
@@ -732,12 +727,12 @@ function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
       <TagList
         labels={labels}
         onRemove={(_label, index) =>
-          form.setValue(
+          form.update(
             "labels",
             labels.filter((_, i) => i !== index),
           )
         }
-        onAdd={(label) => form.setValue("labels", [...labels, label])}
+        onAdd={(label) => form.update("labels", [...labels, label])}
       />
     </HStack>
   );
@@ -753,7 +748,7 @@ function FooterParameters({
   form,
   onOpen,
 }: {
-  form: UseFormReturn<ScenarioFormData>;
+  form: ScenarioFormController;
   onOpen: () => void;
 }) {
   const parameters = useWatch({ control: form.control, name: "parameters" });

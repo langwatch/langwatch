@@ -1,11 +1,10 @@
 import { Card, HStack, Icon, List, Text, VStack } from "@chakra-ui/react";
+import type { ScenarioFormController } from "@langwatch/scenario-web";
 import { Check, CircleDot, MessageSquare, TriangleAlert, Users } from "lucide-react";
-import type { UseFormReturn } from "react-hook-form";
 import { ScenarioAIGeneration } from "./ScenarioAIGeneration";
-import type { ScenarioFormData } from "./ScenarioForm";
 
 type ScenarioEditorSidebarProps = {
-  form?: UseFormReturn<ScenarioFormData> | null;
+  form?: ScenarioFormController | null;
 };
 
 /**

@@ -12,15 +12,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability";
+import type { ScenarioFormController } from "@langwatch/scenario-web";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import type { UseFormReturn } from "react-hook-form";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { toaster } from "../ui/toaster";
 import { ResolvedModelCaption } from "./ResolvedModelCaption";
-import type { ScenarioFormData } from "./ScenarioForm";
 import {
   type GeneratedScenario,
   generateScenarioWithAI,
@@ -31,12 +30,8 @@ import { getDefaultModelState } from "./utils/defaultModelState";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 type ScenarioAIGenerationProps = {
-  form: UseFormReturn<ScenarioFormData> | null;
+  form: ScenarioFormController | null;
 };
 
 export type GenerationStatus = "idle" | "generating" | "done" | "error";
@@ -44,10 +39,6 @@ type ViewMode = "prompt" | "input";
 
 // Re-export for backwards compatibility
 export type { GeneratedScenario } from "./services/scenarioGeneration";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Custom Hooks
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function usePromptHistory() {
   const [history, setHistory] = useState<string[]>([]);
@@ -98,28 +89,20 @@ export function useScenarioGeneration(projectId: string | undefined) {
   return { generate, status };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper Functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-export function formHasContent(form: UseFormReturn<ScenarioFormData>): boolean {
-  const name = form.getValues("name").trim();
-  const situation = form.getValues("situation").trim();
-  const criteria = form.getValues("criteria");
+export function formHasContent(input: {
+  name: string;
+  situation: string;
+  criteria: string[];
+}): boolean {
+  const name = input.name.trim();
+  const situation = input.situation.trim();
+  const criteria = input.criteria;
 
   return name.length > 0 || situation.length > 0 || criteria.length > 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
 const PROMPT_INPUT_ROWS = 5;
 const TOAST_DURATION_MS = 5000;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { project } = useOrganizationTeamProject();
@@ -149,7 +132,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
   const isDefaultModelDisabled = !defaultModelState.ok;
 
-  const hasExistingContent = form !== null && formHasContent(form);
+  const hasExistingContent = form !== null && formHasContent(form.read());
 
   const canGenerate = Boolean(
     input.trim() && status !== "generating" && !isDefaultModelDisabled && form,
@@ -169,18 +152,18 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     try {
       const currentScenario = hasHistory
         ? {
-            name: form.getValues("name"),
-            situation: form.getValues("situation"),
-            criteria: form.getValues("criteria"),
+            name: form.read("name"),
+            situation: form.read("situation"),
+            criteria: form.read("criteria"),
           }
         : null;
 
       const scenario = await generate(input, currentScenario);
 
       // Update form with generated data (defensive defaults for unexpected API responses)
-      form.setValue("name", scenario.name ?? "");
-      form.setValue("situation", scenario.situation ?? "");
-      form.setValue("criteria", scenario.criteria ?? []);
+      form.update("name", scenario.name ?? "");
+      form.update("situation", scenario.situation ?? "");
+      form.update("criteria", scenario.criteria ?? []);
 
       addPrompt(input);
       setInput("");

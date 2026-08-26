@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { displayValue, serializeValue } from "~/utils/jsonValueText";
+import { displayValue, serializeValue } from "@langwatch/design-system/json-value-text";
 
 type ParameterEntry = { id: string; key: string; value: string };
 

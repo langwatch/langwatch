@@ -1,14 +1,15 @@
 import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { Plus, X } from "lucide-react";
-import { Switch } from "~/components/ui/switch";
-import { Tooltip } from "~/components/ui/tooltip";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import {
   displayOptionalValue,
   serializeOptionalScalarValue,
-} from "~/utils/jsonValueText";
+} from "@langwatch/design-system/json-value-text";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import { Plus, X } from "lucide-react";
+import type { ReactNode } from "react";
 
-type ParameterDefinitionsInputProps = {
+type ScenarioParameterDefinitionsInputProps = {
   value: ScenarioParameterDefinition[];
   onChange: (value: ScenarioParameterDefinition[]) => void;
   /** Validation message for the row at the same index. */
@@ -16,24 +17,13 @@ type ParameterDefinitionsInputProps = {
   disabled?: boolean;
 };
 
-/**
- * Editor for the parameters a scenario declares: a name, an optional
- * description, an optional default value, and whether the value is secret.
- *
- * The editor always shows a row to type in, so an empty list renders one blank
- * row. That row becomes a declaration on the first keystroke, which keeps a
- * scenario that declares nothing free of an empty declaration it would have to
- * name before it could save.
- *
- * @see specs/scenarios/scenario-run-parameters.feature
- * @see specs/scenarios/secret-run-parameters.feature
- */
-export function ParameterDefinitionsInput({
+/** Scenario parameter rows. An empty definition list renders one draft row. */
+export function ScenarioParameterDefinitionsInput({
   value,
   onChange,
   rowErrors,
   disabled = false,
-}: ParameterDefinitionsInputProps) {
+}: ScenarioParameterDefinitionsInputProps) {
   const rows = value.length > 0 ? value : [BLANK_DEFINITION];
 
   const handleAdd = () => {
@@ -46,7 +36,9 @@ export function ParameterDefinitionsInput({
 
   const handleUpdate: UpdateRow = ({ index, patch }) => {
     const definition = rows[index];
-    if (!definition) return;
+    if (!definition) {
+      return;
+    }
     const updated = [...rows];
     updated[index] = withoutEmptyFields({ ...definition, ...patch });
     onChange(updated);
@@ -95,14 +87,7 @@ export function ParameterDefinitionsInput({
 /** The row the editor shows when a scenario declares nothing yet. */
 const BLANK_DEFINITION: ScenarioParameterDefinition = { name: "" };
 
-/**
- * How the fields share the row.
- *
- * The name column carries a monospace example placeholder, so it needs more
- * room than the quarter of the row an even split with the description would
- * leave it. The secret switch takes a fixed width instead of a share, because
- * it holds one control of a known size.
- */
+/** Name and description flex; the switch keeps its fixed control width. */
 const NAME_FLEX = 1.35;
 const DESCRIPTION_FLEX = 1.65;
 const DEFAULT_VALUE_FLEX = 1;
@@ -116,19 +101,23 @@ const SECRET_DEFAULT_TOOLTIP =
 const SECRET_SWITCH_TOOLTIP =
   "The value is a credential. The run delivers it to the target as secrets.NAME, and records the name without the value.";
 
-/**
- * The declaration with every field the row left empty taken out of it.
- *
- * A key holding undefined survives as an own key, so a default value cleared
- * by the secret switch would still be read as a declared field by anything
- * that counts keys rather than values.
- */
+/** Remove absent own keys so clearing a value clears the declaration field. */
 function withoutEmptyFields(
   definition: ScenarioParameterDefinition,
 ): ScenarioParameterDefinition {
-  return Object.fromEntries(
-    Object.entries(definition).filter(([, value]) => value !== undefined),
-  ) as ScenarioParameterDefinition;
+  const result: ScenarioParameterDefinition = { name: definition.name };
+
+  if (definition.description !== void 0) {
+    result.description = definition.description;
+  }
+  if (definition.defaultValue !== void 0) {
+    result.defaultValue = definition.defaultValue;
+  }
+  if (definition.secret !== void 0) {
+    result.secret = definition.secret;
+  }
+
+  return result;
 }
 
 function ParameterRow({
@@ -169,7 +158,7 @@ function ParameterRow({
             onUpdate({
               index,
               patch: {
-                description: e.target.value === "" ? undefined : e.target.value,
+                description: e.target.value === "" ? void 0 : e.target.value,
               },
             })
           }
@@ -297,8 +286,8 @@ function SecretSwitchCell({
               // run starts, so whatever was typed is dropped here rather than
               // kept out of sight until the save is refused.
               patch: checked
-                ? { secret: true, defaultValue: undefined }
-                : { secret: undefined },
+                ? { secret: true, defaultValue: void 0 }
+                : { secret: void 0 },
             })
           }
           inputProps={{
@@ -316,7 +305,7 @@ function ColumnLabel({
   flex,
   width,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   flex?: number;
   width?: string;
 }) {
@@ -326,7 +315,7 @@ function ColumnLabel({
       color="fg.subtle"
       flex={flex}
       width={width}
-      flexShrink={width ? 0 : undefined}
+      flexShrink={width ? 0 : void 0}
     >
       {children}
     </Text>

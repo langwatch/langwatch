@@ -22,7 +22,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   displayOptionalValue,
   serializeOptionalScalarValue,
-} from "~/utils/jsonValueText";
+} from "@langwatch/design-system/json-value-text";
 import { toaster } from "../ui/toaster";
 import { showSuiteRunError } from "./showSuiteRunError";
 

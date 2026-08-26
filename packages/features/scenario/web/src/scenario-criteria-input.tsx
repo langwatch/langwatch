@@ -10,25 +10,20 @@ import {
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-type CriteriaInputProps = {
+type ScenarioCriteriaInputProps = {
   value: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
   disabled?: boolean;
 };
 
-/**
- * Criteria input with inline editing.
- * - Saved criteria render as numbered plain text with edit button.
- * - Clicking edit turns a criterion into an auto-resizing textarea.
- * - "+ Add criteria" button always visible at the bottom.
- */
-export function CriteriaInput({
+/** Inline add, edit and removal for ordered scenario criteria. */
+export function ScenarioCriteriaInput({
   value,
   onChange,
   placeholder = "Add a criterion...",
   disabled = false,
-}: CriteriaInputProps) {
+}: ScenarioCriteriaInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -60,7 +55,9 @@ export function CriteriaInput({
   };
 
   const handleSaveEdit = () => {
-    if (editingIndex === null) return;
+    if (editingIndex === null) {
+      return;
+    }
     if (editingValue.trim()) {
       const updated = [...value];
       updated[editingIndex] = editingValue.trim();
@@ -95,7 +92,6 @@ export function CriteriaInput({
 
   return (
     <VStack align="stretch" gap={2} data-testid="criteria-list">
-      {/* Existing criteria */}
       {value.map((criterion, index) =>
         editingIndex === index ? (
           <HStack key={index} gap={2} align="start">
@@ -125,13 +121,7 @@ export function CriteriaInput({
                   <Trash2 size={12} />
                 </IconButton>
                 <Spacer />
-                {/* preventDefault on mousedown keeps the textarea focused so this
-                    Cancel's onClick discards BEFORE the textarea's onBlur can commit
-                    the edit. Removing it silently reintroduces commit-on-cancel — the
-                    data-loss path this component guards against. Save needs no such
-                    guard: its onClick runs the same commit onBlur would, so the
-                    double-fire is an idempotent no-op (handleSaveEdit early-returns
-                    once editingIndex is cleared). */}
+                {/* Keep focus until Cancel discards, before blur can save the edit. */}
                 <Button
                   type="button"
                   size="xs"
@@ -180,7 +170,6 @@ export function CriteriaInput({
         ),
       )}
 
-      {/* Add new criterion form */}
       {isAddingNew && (
         <VStack align="stretch" gap={1}>
           <HStack gap={2} align="start">
@@ -202,8 +191,7 @@ export function CriteriaInput({
             />
           </HStack>
           <HStack gap={1} justify="end">
-            {/* preventDefault keeps focus so Cancel discards before onBlur commits
-                the new criterion (see the edit-mode Cancel above for the full why). */}
+            {/* Keep focus until Cancel discards, before blur can save the draft. */}
             <Button
               type="button"
               size="xs"
@@ -223,7 +211,6 @@ export function CriteriaInput({
         </VStack>
       )}
 
-      {/* Add criteria button */}
       {!isAddingNew && (
         <Button
           type="button"

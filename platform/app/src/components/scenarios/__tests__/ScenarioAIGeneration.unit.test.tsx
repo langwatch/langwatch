@@ -229,73 +229,33 @@ describe("useScenarioGeneration", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("formHasContent", () => {
-  it("returns false for empty form", () => {
-    const mockForm = {
-      getValues: (field: string) => {
-        if (field === "criteria") return [];
-        return "";
-      },
-    };
-
-    expect(formHasContent(mockForm as never)).toBe(false);
-  });
-
-  it("returns true when name has content", () => {
-    const mockForm = {
-      getValues: (field: string) => {
-        if (field === "name") return "Test Name";
-        if (field === "criteria") return [];
-        return "";
-      },
-    };
-
-    expect(formHasContent(mockForm as never)).toBe(true);
-  });
-
-  it("returns true when situation has content", () => {
-    const mockForm = {
-      getValues: (field: string) => {
-        if (field === "situation") return "Test situation";
-        if (field === "criteria") return [];
-        return "";
-      },
-    };
-
-    expect(formHasContent(mockForm as never)).toBe(true);
-  });
-
-  it("returns true when criteria has items", () => {
-    const mockForm = {
-      getValues: (field: string) => {
-        if (field === "criteria") return ["criterion 1"];
-        return "";
-      },
-    };
-
-    expect(formHasContent(mockForm as never)).toBe(true);
-  });
-
-  it("returns false for whitespace-only name", () => {
-    const mockForm = {
-      getValues: (field: string) => {
-        if (field === "name") return "   ";
-        if (field === "criteria") return [];
-        return "";
-      },
-    };
-
-    expect(formHasContent(mockForm as never)).toBe(false);
-  });
-
-  it("returns false for whitespace-only situation", () => {
-    const mockForm = {
-      getValues: (field: string) => {
-        if (field === "situation") return "  \n\t  ";
-        if (field === "criteria") return [];
-        return "";
-      },
-    };
-
-    expect(formHasContent(mockForm as never)).toBe(false);
+  it.each([
+    {
+      description: "an empty form",
+      input: { name: "", situation: "", criteria: [] },
+      expected: false,
+    },
+    {
+      description: "a name",
+      input: { name: "Test Name", situation: "", criteria: [] },
+      expected: true,
+    },
+    {
+      description: "a situation",
+      input: { name: "", situation: "Test situation", criteria: [] },
+      expected: true,
+    },
+    {
+      description: "criteria",
+      input: { name: "", situation: "", criteria: ["criterion 1"] },
+      expected: true,
+    },
+    {
+      description: "whitespace only",
+      input: { name: "   ", situation: "  \n\t  ", criteria: [] },
+      expected: false,
+    },
+  ])("returns $expected for $description", ({ input, expected }) => {
+    expect(formHasContent(input)).toBe(expected);
   });
 });

@@ -2872,9 +2872,15 @@ importers:
       '@chakra-ui/react':
         specifier: ^3.36.0
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@hookform/resolvers':
+        specifier: ^5.4.0
+        version: 5.4.0(react-hook-form@7.80.0(react@19.2.8))
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -2884,6 +2890,12 @@ importers:
       react:
         specifier: ^19.2.7
         version: 19.2.8
+      react-hook-form:
+        specifier: ^7.80.0
+        version: 7.80.0(react@19.2.8)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^7.0.1

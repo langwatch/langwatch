@@ -16,7 +16,7 @@ also importing application infrastructure.
 
 `scenario` owns the definition model, Zod 4 parameter schemas, one abstract
 `ScenarioService`, portable input-mapping and template-rendering values, and
-portable Scenario Library UI. The service provides
+portable Scenario Library and authoring UI. The service provides
 required reads that throw `ScenarioNotFoundError` and explicit `try*` reads for
 genuine optional discovery. Every operation accepts a project ID and the
 private Prisma repository applies it to each query.
@@ -31,9 +31,10 @@ repository or import the adapter.
 This slice owns authored scenario definitions, archive state, names, reference
 classification, input mapping, templating, and the compact configuration read
 required before execution.
-Its web package owns portable library controls, table state, onboarding, archive
-confirmation and target selection. Application composition retains routes,
-tRPC, project context and Langy row integration through explicit render ports.
+Its web package owns portable library controls, table state, onboarding,
+archive confirmation, target selection, the controlled form and parameter
+controls. Application composition retains routes, tRPC, project context,
+drawer submission and Langy row integration through explicit render ports.
 It does not own child-process execution, simulator runs, Eventing process
 managers, suite orchestration, exports, trace metrics or page composition.
 Those remain their current feature/application owners until each can consume

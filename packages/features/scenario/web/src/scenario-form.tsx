@@ -9,20 +9,25 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Controller, type UseFormReturn, useForm } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Control,
+  Controller,
+  type FieldErrors,
+  type SubmitErrorHandler,
+  type SubmitHandler,
+  type UseFormRegister,
+  type UseFormReset,
+  type UseFormReturn,
+  type UseFormSetError,
+  useForm,
+} from "react-hook-form";
 import { scenarioParameterDefinitionsSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
-import { CriteriaInput } from "./ui/CriteriaInput";
-import { SectionHeader } from "./ui/SectionHeader";
+import { ScenarioCriteriaInput } from "./scenario-criteria-input";
+import { ScenarioSectionHeader } from "./scenario-section-header";
 
-/**
- * Zod schema for scenario form validation.
- * Colocated with the form component it validates.
- *
- * Parameters reuse the server's schema rather than restating its caps, so the
- * form rejects exactly what the save would.
- */
+/** Parameters reuse the saved definition schema, so form and service agree. */
 export const scenarioFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   situation: z.string(),
@@ -35,25 +40,36 @@ export const scenarioFormSchema = z.object({
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
 
-/**
- * Initial data passed to ScenarioFormDrawer via complexProps when creating
- * a new scenario. The scenario is NOT persisted until the user clicks Save.
- */
+/** Unsaved initial values passed into the application drawer composition. */
 export interface ScenarioInitialData {
   initialFormData: Partial<ScenarioFormData>;
 }
 
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
-  formRef?: (form: UseFormReturn<ScenarioFormData> | null) => void;
+  onControllerChange?: (controller: ScenarioFormController | null) => void;
 };
 
-/**
- * Pure UI form for creating/editing scenarios.
- * Matches the design mockup layout.
- * Submit is handled externally via formRef.
- */
-export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
+/** Narrow composition port for the app-owned drawer, transport and AI actions. */
+export interface ScenarioFormController {
+  control: Control<ScenarioFormData>;
+  read(): ScenarioFormData;
+  read<Name extends keyof ScenarioFormData>(name: Name): ScenarioFormData[Name];
+  update<Name extends keyof ScenarioFormData>(
+    name: Name,
+    value: ScenarioFormData[Name],
+  ): void;
+  setError: UseFormSetError<ScenarioFormData>;
+  validate(): Promise<boolean>;
+  errors(): FieldErrors<ScenarioFormData>;
+  submit(
+    onValid: SubmitHandler<ScenarioFormData>,
+    onInvalid?: SubmitErrorHandler<ScenarioFormData>,
+  ): Promise<void>;
+}
+
+/** Controlled scenario form. The application owns submission through its port. */
+export function ScenarioForm({ defaultValues, onControllerChange }: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
       name: "",
@@ -72,33 +88,28 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     reset,
     formState: { errors },
   } = form;
+  const controller = useMemo(() => createController(form), [form]);
 
-  // Expose form to parent, and take it back on unmount. Whoever holds the
-  // reference renders against it, so a reference that outlives this form
-  // points them at a form nobody is typing in.
   useEffect(() => {
-    formRef?.(form);
-    return () => formRef?.(null);
-  }, [form, formRef]);
+    onControllerChange?.(controller);
+    return () => onControllerChange?.(null);
+  }, [controller, onControllerChange]);
 
   useResetOnDefaultsChange({ reset, defaultValues });
 
   return (
     <VStack align="stretch" gap={6}>
-      {/* SCENARIO Section */}
       <VStack align="stretch" gap={3}>
-        {/* Name */}
         <Field.Root invalid={!!errors.name}>
-          <SectionHeader>Name</SectionHeader>
+          <ScenarioSectionHeader>Name</ScenarioSectionHeader>
           <Input {...register("name")} placeholder="e.g., Angry refund request" />
           <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
         </Field.Root>
       </VStack>
 
-      {/* SITUATION Section */}
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
-          <SectionHeader>Situation</SectionHeader>
+          <ScenarioSectionHeader>Situation</ScenarioSectionHeader>
           <Text fontSize="13px" color="fg.muted">
             Describe the user, their context, and what they're trying to accomplish. Think
             about a critical path or a complex edge case.
@@ -115,10 +126,9 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
         </Field.Root>
       </VStack>
 
-      {/* CRITERIA Section */}
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
-          <SectionHeader>Criteria</SectionHeader>
+          <ScenarioSectionHeader>Criteria</ScenarioSectionHeader>
           <Text fontSize="13px" color="fg.muted">
             What must the agent DO or NOT DO? e.g. "Must remain empathetic", "Must NOT
             offer refund without manager approval"
@@ -128,7 +138,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           name="criteria"
           control={control}
           render={({ field }) => (
-            <CriteriaInput
+            <ScenarioCriteriaInput
               value={field.value}
               onChange={field.onChange}
               placeholder="e.g., Must apologize for the inconvenience"
@@ -142,18 +152,12 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
   );
 }
 
-/**
- * Re-seeds the form when the scenario being edited changes.
- *
- * The previous defaults are tracked by value rather than by object identity: a
- * parent that rebuilds the object on every render would otherwise reset the
- * form under the user mid-edit.
- */
+/** Re-seed only when values change, not when a parent rebuilds the object. */
 function useResetOnDefaultsChange({
   reset,
   defaultValues,
 }: {
-  reset: UseFormReturn<ScenarioFormData>["reset"];
+  reset: UseFormReset<ScenarioFormData>;
   defaultValues?: Partial<ScenarioFormData>;
 }) {
   const prevDefaultsRef = useRef<string | null>(null);
@@ -189,8 +193,8 @@ function AdvancedSection({
   register,
   errors,
 }: {
-  register: ReturnType<typeof useForm<ScenarioFormData>>["register"];
-  errors: ReturnType<typeof useForm<ScenarioFormData>>["formState"]["errors"];
+  register: UseFormRegister<ScenarioFormData>;
+  errors: FieldErrors<ScenarioFormData>;
 }) {
   const [open, setOpen] = useState(false);
   const ChevronIcon = open ? ChevronDown : ChevronRight;
@@ -200,7 +204,7 @@ function AdvancedSection({
       <Collapsible.Trigger asChild>
         <HStack cursor="pointer" userSelect="none" _hover={{ color: "fg.emphasized" }}>
           <ChevronIcon size={14} />
-          <SectionHeader>Advanced</SectionHeader>
+          <ScenarioSectionHeader>Advanced</ScenarioSectionHeader>
         </HStack>
       </Collapsible.Trigger>
       <Collapsible.Content>
@@ -212,12 +216,7 @@ function AdvancedSection({
               </Text>
               <Input
                 {...register("maxTurns", {
-                  setValueAs: (v) =>
-                    v == null || v === ""
-                      ? null
-                      : Number.isNaN(Number(v))
-                        ? null
-                        : Number(v),
+                  setValueAs: optionalNumber,
                 })}
                 type="number"
                 placeholder="Default: 10"
@@ -230,12 +229,7 @@ function AdvancedSection({
               </Text>
               <Input
                 {...register("minTurns", {
-                  setValueAs: (v) =>
-                    v == null || v === ""
-                      ? null
-                      : Number.isNaN(Number(v))
-                        ? null
-                        : Number(v),
+                  setValueAs: optionalNumber,
                 })}
                 type="number"
                 placeholder="Default: none"
@@ -251,4 +245,27 @@ function AdvancedSection({
       </Collapsible.Content>
     </Collapsible.Root>
   );
+}
+
+function createController(form: UseFormReturn<ScenarioFormData>): ScenarioFormController {
+  return {
+    control: form.control,
+    read: form.getValues,
+    update: form.setValue,
+    setError: form.setError,
+    validate: form.trigger,
+    errors: () => form.formState.errors,
+    submit: async (onValid, onInvalid) => {
+      await form.handleSubmit(onValid, onInvalid)();
+    },
+  };
+}
+
+function optionalNumber(value: unknown): number | null {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
 }

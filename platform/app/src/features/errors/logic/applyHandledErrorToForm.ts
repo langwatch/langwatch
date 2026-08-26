@@ -1,4 +1,9 @@
-import type { FieldValues, Path, UseFormReturn } from "react-hook-form";
+import type { Control, FieldValues, Path, UseFormSetError } from "react-hook-form";
+
+type FormErrorTarget<TFieldValues extends FieldValues> = {
+  control: Control<TFieldValues>;
+  setError: UseFormSetError<TFieldValues>;
+};
 
 import { readHandledError, safeProse } from "./readHandledError";
 
@@ -49,7 +54,7 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   hasFormErrorSlot = false,
 }: {
   error: unknown;
-  form: UseFormReturn<TFieldValues>;
+  form: FormErrorTarget<TFieldValues>;
   /**
    * Whether this form renders `<FormServerError form={form} />`.
    *
@@ -154,7 +159,7 @@ function isPaintedField<TFieldValues extends FieldValues>({
   form,
   field,
 }: {
-  form: UseFormReturn<TFieldValues>;
+  form: FormErrorTarget<TFieldValues>;
   field: string;
 }): boolean {
   let node: unknown = (form.control as { _fields?: unknown })._fields;

@@ -7,7 +7,7 @@
  * @see docs/adr/015-scenario-turn-config-ui.md
  */
 import { describe, expect, it } from "vitest";
-import { scenarioFormSchema } from "../ScenarioForm";
+import { scenarioFormSchema } from "../src/scenario-form";
 
 describe("scenarioFormSchema turn config", () => {
   const base = {

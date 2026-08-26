@@ -54,6 +54,10 @@
       "types": "./src/components/input-group.tsx",
       "default": "./src/components/input-group.tsx"
     },
+    "./json-value-text": {
+      "types": "./src/json-value-text.ts",
+      "default": "./src/json-value-text.ts"
+    },
     "./menu": {
       "types": "./src/components/menu.tsx",
       "default": "./src/components/menu.tsx"
