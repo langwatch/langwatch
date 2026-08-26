@@ -77,10 +77,11 @@ const PINNED_DESTINATIONS = new Map<
  * silently do nothing on exactly the request that changes the host. The
  * caller passes the adapter it already has from the stored row instead.
  */
-export function assertPullDestinationAllowed(
-  parserConfig: Record<string, unknown> | null | undefined,
-  adapterId?: string,
-): void {
+export function assertPullDestinationAllowed(params: {
+  parserConfig: Record<string, unknown> | null | undefined;
+  adapterId?: string;
+}): void {
+  const { parserConfig, adapterId } = params;
   if (!parserConfig || typeof parserConfig !== "object") return;
   // The stored adapter wins: it is server-held, where the incoming one is
   // whatever the request carried.

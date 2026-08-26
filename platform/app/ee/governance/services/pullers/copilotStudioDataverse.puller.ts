@@ -541,7 +541,8 @@ function refusesNextLink(params: {
   walk: TranscriptWalk;
 }): boolean {
   const { link, environmentUrl, walk } = params;
-  if (!link || isSameDataverseEnvironment(link, environmentUrl)) return false;
+  if (!link || isSameDataverseEnvironment({ value: link, environmentUrl }))
+    return false;
   walk.errorCount += 1;
   // The host, not the URL: the refused link carries a skip token and query
   // shape that add nothing here, and the host is the whole of what an

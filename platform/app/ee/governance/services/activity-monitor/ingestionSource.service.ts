@@ -591,7 +591,7 @@ export class IngestionSourceService {
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
     };
-    assertPullDestinationAllowed(requestedParserConfig);
+    assertPullDestinationAllowed({ parserConfig: requestedParserConfig });
     await assertTraceDestinationIsOwnLiveProject({
       prisma: this.prisma,
       organizationId: input.organizationId,
@@ -684,7 +684,10 @@ export class IngestionSourceService {
       // them, so dispatching on the incoming value would make this check do
       // nothing on precisely the request that repoints the host — leaving the
       // destination pinned at create and free afterwards.
-      assertPullDestinationAllowed(incoming, stored.adapter as string);
+      assertPullDestinationAllowed({
+        parserConfig: incoming,
+        adapterId: stored.adapter as string,
+      });
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
       ) as Prisma.InputJsonValue;

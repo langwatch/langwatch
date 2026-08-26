@@ -11,8 +11,7 @@
  * failed for reasons nobody can see.
  */
 
-export const COPILOT_STUDIO_DATAVERSE_ADAPTER_ID =
-  "copilot_studio_dataverse" as const;
+export const COPILOT_STUDIO_DATAVERSE_ADAPTER_ID = "copilot_studio_dataverse";
 
 /**
  * The registrable domains Microsoft serves Dataverse environments from, one
@@ -50,10 +49,11 @@ const DATAVERSE_ENVIRONMENT_HOST_SUFFIXES = [
  * environment is a Microsoft address, and forwarding the credential there is
  * still forwarding it to a stranger.
  */
-export function isSameDataverseEnvironment(
-  value: string,
-  environmentUrl: string,
-): boolean {
+export function isSameDataverseEnvironment(params: {
+  value: string;
+  environmentUrl: string;
+}): boolean {
+  const { value, environmentUrl } = params;
   if (!isDataverseEnvironmentOrigin(value)) return false;
   try {
     // `origin` normalises scheme, host case and default ports, so a link that
