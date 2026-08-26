@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import {
   gatedSourceTypeOptions,
   groupForMode,
-  isSourceTypeSelectable,
   SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
   SOURCE_TYPE_OPTIONS,
