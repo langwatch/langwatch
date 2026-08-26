@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
-import { SHAPE } from "~/features/auth/authTheme";
 import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { isSameOrigin, useSession } from "~/utils/auth-client";

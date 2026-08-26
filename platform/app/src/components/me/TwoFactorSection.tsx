@@ -6,7 +6,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";

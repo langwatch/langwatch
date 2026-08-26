@@ -32,12 +32,12 @@ import {
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
-  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type SsoConnectionCommand,
   type SsoConnectionCommandType,
   type SsoConnectionFact,
@@ -76,29 +76,30 @@ export type SsoConnectionStagedSender = {
 
 /** Exported for the wiring pin only: the pipeline must carry every one of
  *  these names, and the test that says so cannot read a private const. */
-export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
-  [REGISTER_CONNECTION_COMMAND_TYPE]: "registerConnection",
-  [CLAIM_DOMAIN_COMMAND_TYPE]: "claimDomain",
-  [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: "approveDomainClaim",
-  [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: "rejectDomainClaim",
-  [DISCARD_CONNECTION_COMMAND_TYPE]: "discardConnection",
-  [REQUEST_VERIFICATION_COMMAND_TYPE]: "requestVerification",
-  [ATTEST_DOMAIN_COMMAND_TYPE]: "attestDomain",
-  [WITHDRAW_DOMAIN_COMMAND_TYPE]: "withdrawDomain",
-  [VERIFY_DOMAIN_COMMAND_TYPE]: "verifyDomain",
-  [ACTIVATE_CONNECTION_COMMAND_TYPE]: "activateConnection",
-  [SUSPEND_CONNECTION_COMMAND_TYPE]: "suspendConnection",
-  [RESUME_CONNECTION_COMMAND_TYPE]: "resumeConnection",
-  [REQUEST_TEARDOWN_COMMAND_TYPE]: "requestTeardown",
-  [COMPLETE_TEARDOWN_COMMAND_TYPE]: "completeTeardown",
-  [SET_ARRIVAL_POLICY_COMMAND_TYPE]: "setArrivalPolicy",
-  // The two re-check verbs the scheduler commands (ADR-123). They were
-  // missing from this map, which the `Record` had been quietly tolerating
-  // until another verb made the type complain about all three at once.
-  [RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE]: "recordDomainProofAbsent",
-  [RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE]: "recordDomainProofPresent",
-  [GRANDFATHER_CONNECTION_COMMAND_TYPE]: "grandfatherConnection",
-};
+export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> =
+  {
+    [REGISTER_CONNECTION_COMMAND_TYPE]: "registerConnection",
+    [CLAIM_DOMAIN_COMMAND_TYPE]: "claimDomain",
+    [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: "approveDomainClaim",
+    [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: "rejectDomainClaim",
+    [DISCARD_CONNECTION_COMMAND_TYPE]: "discardConnection",
+    [REQUEST_VERIFICATION_COMMAND_TYPE]: "requestVerification",
+    [ATTEST_DOMAIN_COMMAND_TYPE]: "attestDomain",
+    [WITHDRAW_DOMAIN_COMMAND_TYPE]: "withdrawDomain",
+    [VERIFY_DOMAIN_COMMAND_TYPE]: "verifyDomain",
+    [ACTIVATE_CONNECTION_COMMAND_TYPE]: "activateConnection",
+    [SUSPEND_CONNECTION_COMMAND_TYPE]: "suspendConnection",
+    [RESUME_CONNECTION_COMMAND_TYPE]: "resumeConnection",
+    [REQUEST_TEARDOWN_COMMAND_TYPE]: "requestTeardown",
+    [COMPLETE_TEARDOWN_COMMAND_TYPE]: "completeTeardown",
+    [SET_ARRIVAL_POLICY_COMMAND_TYPE]: "setArrivalPolicy",
+    // The two re-check verbs the scheduler commands (ADR-123). They were
+    // missing from this map, which the `Record` had been quietly tolerating
+    // until another verb made the type complain about all three at once.
+    [RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE]: "recordDomainProofAbsent",
+    [RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE]: "recordDomainProofPresent",
+    [GRANDFATHER_CONNECTION_COMMAND_TYPE]: "grandfatherConnection",
+  };
 
 async function resolveEventStore(): Promise<EventStore<SsoConnectionEvent>> {
   const deadline = Date.now() + CONNECTION_APP_HANDLE_WAIT_MS;

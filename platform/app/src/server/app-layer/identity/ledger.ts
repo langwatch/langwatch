@@ -115,9 +115,7 @@ export async function resolveIdentityEventStore(): Promise<
  * here rather than casting the identity resolver, which would have made the
  * types say "identity events" about a stream that holds none.
  */
-export async function resolveEventStore<TEvent>(): Promise<
-  EventStore<TEvent>
-> {
+export async function resolveEventStore<TEvent>(): Promise<EventStore<TEvent>> {
   const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
   let app = tryGetApp();
   while (!app && Date.now() < deadline) {

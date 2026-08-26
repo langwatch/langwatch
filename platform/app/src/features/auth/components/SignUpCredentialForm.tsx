@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   PASSWORD_REQUIREMENTS_HINT,
@@ -20,7 +20,6 @@ import { signIn } from "~/utils/auth-client";
 import { credentialSignInFailure } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import "../auth.css";
-import { SHAPE } from "../authTheme";
 import { AuthField } from "./AuthField";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
 import { EmailPill } from "./EmailPill";

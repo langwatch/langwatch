@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
 

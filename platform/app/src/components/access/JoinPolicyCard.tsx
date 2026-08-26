@@ -13,12 +13,12 @@ import { Lock } from "lucide-react";
 import { useState } from "react";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   ARRIVAL_ANSWERS,
   type ArrivalAnswer,
   arrivalAnswerLabel,
 } from "~/features/sso/logic/arrivals";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useEnterpriseLock } from "./useEnterpriseLock";
 
 /**

@@ -6,7 +6,6 @@ import { api } from "~/utils/api";
 import { signIn, signOut, useSession } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { hardRedirect } from "~/utils/hardRedirect";
-import { SHAPE } from "../authTheme";
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import { usePublishAuthStage } from "../logic/groundStage";
 import { usePasskeyCeremony } from "../logic/passkeyCeremony";

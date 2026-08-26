@@ -1,7 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import "../auth.css";
-import { SHAPE } from "../authTheme";
 
 /**
  * The one button that carries a auth-screen card forward, and the one place its
