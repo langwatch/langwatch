@@ -269,14 +269,24 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
         another kind of source
       Then only the Genie questions reach "Analytics"
 
+    The shape a source routes by — which of its events are conversations,
+    the agent that answered, where they came from, and under what name the
+    conversation is recorded — is supplied per source rather than being
+    Genie's constants. Genie is the only source that supplies one today,
+    so no other source routes anything in production; what the scenario
+    below fixes is that the shape is the source's own and is never
+    inherited, which is what a second source will rely on when it arrives.
+
     @unit
-    Scenario: A second kind of source routes its own conversations
-      Given a source that recognises its own conversations, which are not
-        Genie questions, lands in "Support"
-      When a run pulls those conversations
-      Then they reach "Support"
-      And each one names that source as where it came from, and that
-        source's agent as what answered — neither of them Genie's
+    Scenario: The conversation shape travels with the source, not with Genie
+      Given a second source that supplies its own conversation shape: which
+        of its events are conversations, the agent that answered, and where
+        they came from
+      When a batch is routed by that shape
+      Then each conversation names that source as where it came from, and
+        that source's agent as what answered — neither of them Genie's
+      And a Genie question handed to that shape is not one of its
+        conversations, so nothing is routed for it
 
     @unit
     Scenario: A source cannot name a real model as its agent

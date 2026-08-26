@@ -85,57 +85,63 @@ describe("given a source with a live trace destination", () => {
     projectFindFirst.mockResolvedValue({ id: "proj-dest" });
   });
 
-  it("routes through the trace door with the destination as tenant and the ROUTE DEFAULT redaction level", async () => {
-    await routeConversationsToTraceDestination({
-      events: [genieEvent()],
-      source: SOURCE,
+  describe("when a run hands over the source's own conversations", () => {
+    it("routes through the trace door with the destination as tenant and the ROUTE DEFAULT redaction level", async () => {
+      await routeConversationsToTraceDestination({
+        events: [genieEvent()],
+        source: SOURCE,
+      });
+
+      expect(handleOtlpTraceRequest).toHaveBeenCalledTimes(1);
+      const [tenantId, request, level] = handleOtlpTraceRequest.mock.calls[0]!;
+      expect(tenantId).toBe("proj-dest");
+      expect(level).toBe(DEFAULT_PII_REDACTION_LEVEL);
+      expect(
+        request.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.length,
+      ).toBeGreaterThan(0);
     });
 
-    expect(handleOtlpTraceRequest).toHaveBeenCalledTimes(1);
-    const [tenantId, request, level] = handleOtlpTraceRequest.mock.calls[0]!;
-    expect(tenantId).toBe("proj-dest");
-    expect(level).toBe(DEFAULT_PII_REDACTION_LEVEL);
-    expect(
-      request.resourceSpans?.[0]?.scopeSpans?.[0]?.spans?.length,
-    ).toBeGreaterThan(0);
+    it("re-checks the destination against the source's own org, ignoring archived projects", async () => {
+      await routeConversationsToTraceDestination({
+        events: [genieEvent()],
+        source: SOURCE,
+      });
+      expect(projectFindFirst).toHaveBeenCalledWith({
+        where: {
+          id: "proj-dest",
+          archivedAt: null,
+          team: { organizationId: "org-1" },
+        },
+        select: { id: true },
+      });
+    });
   });
 
-  it("re-checks the destination against the source's own org, ignoring archived projects", async () => {
-    await routeConversationsToTraceDestination({
-      events: [genieEvent()],
-      source: SOURCE,
-    });
-    expect(projectFindFirst).toHaveBeenCalledWith({
-      where: {
-        id: "proj-dest",
-        archivedAt: null,
-        team: { organizationId: "org-1" },
-      },
-      select: { id: true },
+  describe("when the batch carries no conversation-bearing events", () => {
+    it("routes nothing when the batch carries no conversation-bearing events", async () => {
+      await routeConversationsToTraceDestination({
+        events: [{ ...genieEvent(), action: "usage_bucket" }],
+        source: SOURCE,
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
+      expect(projectFindFirst).not.toHaveBeenCalled();
     });
   });
 
-  it("routes nothing when the batch carries no conversation-bearing events", async () => {
-    await routeConversationsToTraceDestination({
-      events: [{ ...genieEvent(), action: "usage_bucket" }],
-      source: SOURCE,
-    });
-    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
-    expect(projectFindFirst).not.toHaveBeenCalled();
-  });
+  describe("when the batch also carries another kind of source's events", () => {
+    /** @scenario "A run routes only the events belonging to its own source" */
+    it("routes only its own source's events when the batch also carries another kind", async () => {
+      await routeConversationsToTraceDestination({
+        events: [
+          genieEvent(),
+          { ...genieEvent(), source_event_id: "rep-1", action: "cost_report" },
+        ],
+        source: SOURCE,
+      });
 
-  /** @scenario "A run routes only the events belonging to its own source" */
-  it("routes only its own source's events when the batch also carries another kind", async () => {
-    await routeConversationsToTraceDestination({
-      events: [
-        genieEvent(),
-        { ...genieEvent(), source_event_id: "rep-1", action: "cost_report" },
-      ],
-      source: SOURCE,
+      const [, request] = handleOtlpTraceRequest.mock.calls[0]!;
+      expect(request.resourceSpans[0].scopeSpans[0].spans).toHaveLength(1);
     });
-
-    const [, request] = handleOtlpTraceRequest.mock.calls[0]!;
-    expect(request.resourceSpans[0].scopeSpans[0].spans).toHaveLength(1);
   });
 });
 
@@ -157,16 +163,18 @@ describe("given a counts-pulling source that has a destination anyway", () => {
     projectFindFirst.mockResolvedValue({ id: "proj-dest" });
   });
 
-  /** @scenario "A counts-pulling source with a destination still routes nothing" */
-  it.each([
-    "cost_report",
-    "usage_report",
-  ])("routes no %s row, because a total is not a conversation", async (action) => {
-    await routeConversationsToTraceDestination({
-      events: [{ ...genieEvent(), action }],
-      source: { ...SOURCE, sourceType: "anthropic_admin" },
+  describe("when a run pulls its usage and cost totals", () => {
+    /** @scenario "A counts-pulling source with a destination still routes nothing" */
+    it.each([
+      "cost_report",
+      "usage_report",
+    ])("routes no %s row, because a total is not a conversation", async (action) => {
+      await routeConversationsToTraceDestination({
+        events: [{ ...genieEvent(), action }],
+        source: { ...SOURCE, sourceType: "anthropic_admin" },
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     });
-    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
 });
 
@@ -180,12 +188,14 @@ describe("given a source type the worker has no conversation shape for", () => {
     projectFindFirst.mockResolvedValue({ id: "proj-dest" });
   });
 
-  it("routes nothing, even for an event that would suit another source", async () => {
-    await routeConversationsToTraceDestination({
-      events: [genieEvent()],
-      source: { ...SOURCE, sourceType: "s3_custom" },
+  describe("when the batch carries an event another source would recognise", () => {
+    it("routes nothing, even for an event that would suit another source", async () => {
+      await routeConversationsToTraceDestination({
+        events: [genieEvent()],
+        source: { ...SOURCE, sourceType: "s3_custom" },
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     });
-    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
 
   /**
@@ -195,47 +205,55 @@ describe("given a source type the worker has no conversation shape for", () => {
    * `conversationAction` is undefined, which an event carrying no action of
    * its own then matched — routing a span nobody's source ever emitted.
    */
-  it.each([
-    "constructor",
-    "toString",
-    "__proto__",
-    "valueOf",
-    "hasOwnProperty",
-  ])("routes nothing for the inherited name %s", async (sourceType) => {
-    await routeConversationsToTraceDestination({
-      events: [{ ...genieEvent(), action: undefined as unknown as string }],
-      source: { ...SOURCE, sourceType },
+  describe("when the stored source type is a name every object inherits", () => {
+    it.each([
+      "constructor",
+      "toString",
+      "__proto__",
+      "valueOf",
+      "hasOwnProperty",
+    ])("routes nothing for the inherited name %s", async (sourceType) => {
+      await routeConversationsToTraceDestination({
+        events: [{ ...genieEvent(), action: undefined as unknown as string }],
+        source: { ...SOURCE, sourceType },
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     });
-    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
 
-  it("routes nothing for an event that carries no action at all", async () => {
-    await routeConversationsToTraceDestination({
-      events: [{ ...genieEvent(), action: undefined as unknown as string }],
-      source: SOURCE,
+  describe("when the event carries no action at all", () => {
+    it("routes nothing for an event that carries no action at all", async () => {
+      await routeConversationsToTraceDestination({
+        events: [{ ...genieEvent(), action: undefined as unknown as string }],
+        source: SOURCE,
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     });
-    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
 });
 
 describe("given a source without a destination", () => {
-  it("never touches the trace door — routing is off by default", async () => {
-    await routeConversationsToTraceDestination({
-      events: [genieEvent()],
-      source: { ...SOURCE, traceProjectId: null },
+  describe("when a run hands over its conversations", () => {
+    it("never touches the trace door — routing is off by default", async () => {
+      await routeConversationsToTraceDestination({
+        events: [genieEvent()],
+        source: { ...SOURCE, traceProjectId: null },
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     });
-    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
 });
 
 describe("given a destination that is archived, deleted, or another org's", () => {
-  it("skips routing instead of failing the run or landing elsewhere", async () => {
-    projectFindFirst.mockResolvedValue(null);
-    await routeConversationsToTraceDestination({
-      events: [genieEvent()],
-      source: SOURCE,
+  describe("when a run hands over its conversations", () => {
+    it("skips routing instead of failing the run or landing elsewhere", async () => {
+      projectFindFirst.mockResolvedValue(null);
+      await routeConversationsToTraceDestination({
+        events: [genieEvent()],
+        source: SOURCE,
+      });
+      expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
     });
-    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
 });
 

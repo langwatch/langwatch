@@ -73,96 +73,114 @@ function attributesOf(request: unknown) {
 }
 
 describe("given a source mapping its own conversations", () => {
-  it("routes the events its own profile recognises", () => {
-    const request = mapGenieEventsToTraceRequest(
-      [conversationEvent("copilot_conversation")],
-      { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
-    );
+  describe("when the batch carries the events its own profile recognises", () => {
+    it("routes the events its own profile recognises", () => {
+      const request = mapGenieEventsToTraceRequest(
+        [conversationEvent("copilot_conversation")],
+        { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
+      );
 
-    expect(request).not.toBeNull();
-    expect((request as any).resourceSpans[0].scopeSpans[0].scope.name).toBe(
-      "langwatch.ingestion.copilot_studio",
-    );
+      expect(request).not.toBeNull();
+      expect((request as any).resourceSpans[0].scopeSpans[0].scope.name).toBe(
+        "langwatch.ingestion.copilot_studio",
+      );
+    });
+
+    it("emits spans a second source's batch can actually be ingested from", () => {
+      const request = mapGenieEventsToTraceRequest(
+        [conversationEvent("copilot_conversation")],
+        { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
+      );
+
+      // The same gate Genie's own mapping is held to. Without it the assertions
+      // below could pass on a span the trace pipeline would reject on arrival.
+      const spans = (request as any).resourceSpans[0].scopeSpans[0].spans;
+      expect(spans.length).toBeGreaterThan(0);
+      for (const span of spans) {
+        expect(spanSchema.safeParse(span).success).toBe(true);
+      }
+    });
+
+    /** @scenario "The conversation shape travels with the source, not with Genie" */
+    it("names its own agent and provenance rather than inheriting Genie's", () => {
+      const request = mapGenieEventsToTraceRequest(
+        [conversationEvent("copilot_conversation")],
+        { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
+      );
+
+      const attrs = attributesOf(request);
+      expect(attrs["gen_ai.request.model"]).toBe("microsoft/copilot-studio");
+      expect(attrs["langwatch.source"]).toBe("copilot_studio");
+    });
   });
 
-  it("emits spans a second source's batch can actually be ingested from", () => {
-    const request = mapGenieEventsToTraceRequest(
-      [conversationEvent("copilot_conversation")],
-      { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
-    );
+  describe("when the batch carries a Genie question instead", () => {
+    /** @scenario "The conversation shape travels with the source, not with Genie" */
+    it("leaves another source's events alone", () => {
+      const request = mapGenieEventsToTraceRequest(
+        [conversationEvent("genie_query")],
+        {
+          ...ORIGIN,
+          sourceType: "copilot_studio",
+          profile: OTHER_PROFILE,
+        },
+      );
 
-    // The same gate Genie's own mapping is held to. Without it the assertions
-    // below could pass on a span the trace pipeline would reject on arrival.
-    const spans = (request as any).resourceSpans[0].scopeSpans[0].spans;
-    expect(spans.length).toBeGreaterThan(0);
-    for (const span of spans) {
-      expect(spanSchema.safeParse(span).success).toBe(true);
-    }
-  });
-
-  /** @scenario "A second kind of source routes its own conversations" */
-  it("names its own agent and provenance rather than inheriting Genie's", () => {
-    const request = mapGenieEventsToTraceRequest(
-      [conversationEvent("copilot_conversation")],
-      { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
-    );
-
-    const attrs = attributesOf(request);
-    expect(attrs["gen_ai.request.model"]).toBe("microsoft/copilot-studio");
-    expect(attrs["langwatch.source"]).toBe("copilot_studio");
-  });
-
-  it("leaves another source's events alone", () => {
-    const request = mapGenieEventsToTraceRequest(
-      [conversationEvent("genie_query")],
-      {
-        ...ORIGIN,
-        sourceType: "copilot_studio",
-        profile: OTHER_PROFILE,
-      },
-    );
-
-    expect(request).toBeNull();
+      expect(request).toBeNull();
+    });
   });
 });
 
 describe("given Genie's own profile", () => {
-  it("produces exactly what it produced before profiles existed", () => {
-    const request = mapGenieEventsToTraceRequest(
-      [conversationEvent("genie_query")],
-      ORIGIN,
-    );
+  describe("when a question is mapped", () => {
+    it("produces exactly what it produced before profiles existed", () => {
+      const request = mapGenieEventsToTraceRequest(
+        [conversationEvent("genie_query")],
+        ORIGIN,
+      );
 
-    const scopeSpan = (request as any).resourceSpans[0].scopeSpans[0];
-    expect(scopeSpan.scope.name).toBe("langwatch.ingestion.databricks_genie");
+      const scopeSpan = (request as any).resourceSpans[0].scopeSpans[0];
+      expect(scopeSpan.scope.name).toBe("langwatch.ingestion.databricks_genie");
 
-    const attrs = attributesOf(request);
-    expect(attrs["gen_ai.request.model"]).toBe("databricks/genie");
-    expect(attrs["langwatch.source"]).toBe("databricks_genie");
+      const attrs = attributesOf(request);
+      expect(attrs["gen_ai.request.model"]).toBe("databricks/genie");
+      expect(attrs["langwatch.source"]).toBe("databricks_genie");
+    });
   });
 
-  it("still carries the author through for the identity stack to resolve", () => {
-    const event = conversationEvent("genie_query");
-    const request = mapGenieEventsToTraceRequest(
-      [{ ...event, extra: { ...event.extra, actorUserId: "entra-object-id" } }],
-      ORIGIN,
-    );
+  describe("when the event names the author's directory id", () => {
+    it("still carries the author through for the identity stack to resolve", () => {
+      const event = conversationEvent("genie_query");
+      const request = mapGenieEventsToTraceRequest(
+        [
+          {
+            ...event,
+            extra: { ...event.extra, actorUserId: "entra-object-id" },
+          },
+        ],
+        ORIGIN,
+      );
 
-    expect(attributesOf(request)["langwatch.user.id"]).toBe("entra-object-id");
+      expect(attributesOf(request)["langwatch.user.id"]).toBe(
+        "entra-object-id",
+      );
+    });
   });
 });
 
 describe("given the set of agents a profile may name", () => {
-  /**
-   * That none of these resolves to a price is pinned against the real
-   * pricing table in genieTraceMapper.unit.test.ts, which is the assertion
-   * that matters. This one only fixes the membership, so that adding an
-   * agent is a deliberate edit here rather than a quiet one elsewhere.
-   */
-  it("is exactly the agents we have decided on", () => {
-    expect([...KNOWN_AGENT_IDENTITIES]).toEqual([
-      "databricks/genie",
-      "microsoft/copilot-studio",
-    ]);
+  describe("when the set is read back", () => {
+    /**
+     * That none of these resolves to a price is pinned against the real
+     * pricing table in genieTraceMapper.unit.test.ts, which is the assertion
+     * that matters. This one only fixes the membership, so that adding an
+     * agent is a deliberate edit here rather than a quiet one elsewhere.
+     */
+    it("is exactly the agents we have decided on", () => {
+      expect([...KNOWN_AGENT_IDENTITIES]).toEqual([
+        "databricks/genie",
+        "microsoft/copilot-studio",
+      ]);
+    });
   });
 });
