@@ -34947,6 +34947,13 @@ row picks up whatever the newest session is at that moment. Five results follow:
   them logs in once. Both sessions are valid and the last write wins. No lock
   prevents this. Keep the login idempotent on the target system, or lower the
   run's parallelism when the target rate-limits the login.
+- Cache entries belong to the project, not to one run. A second run reads what
+  an earlier run wrote, which is what makes session reuse across runs work. It
+  also means two concurrent runs that use the same entry name see last-write-wins
+  on both writes and deletes. When a project runs several distinct agents at the
+  same time, pick an entry name that includes the agent's own identity (for
+  example `BILLING_SESSION` and `SUPPORT_SESSION` instead of `SESSION` for both)
+  so they do not collide.
 - A failed read is a miss, and the row logs in. That covers an entry that was
   never written, one whose lifetime has passed, and one the platform can no
   longer read after a key rotation.

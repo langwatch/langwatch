@@ -27,11 +27,17 @@ Feature: The agent cache
   #
   # ACCEPTED: an entry belongs to the project, not to one run. A later run
   # reads what an earlier run wrote under the same name, which is what lets a
-  # second run reuse a session instead of logging in again. It is not a
-  # boundary a run could otherwise cross: every code sandbox in a project
-  # already receives every project secret in its payload, and a cache entry
-  # holds what those same secrets produced. Scoping entries per run would end
-  # reuse between runs and fence off nothing.
+  # second run reuse a session instead of logging in again. The same applies
+  # to writes and deletes: two concurrent runs that write the same entry name
+  # see last-write-wins, and either can delete an entry the other run reads.
+  # That is the documented first-wave race applied across runs, and neither
+  # outcome is wrong: both sessions are valid (both runs logged in), and the
+  # surviving one wins. Scoping entries per run would end reuse between runs
+  # and fence off nothing: every code sandbox in a project already receives
+  # every project secret in its payload, and the code that writes the entry
+  # is authored by someone who holds project access. Docs caution agent
+  # authors to pick collision-resistant entry names when a project runs
+  # several distinct agents concurrently.
   #
   # ACCEPTED: a legacy sk-lw- project key reaches these routes, as it reaches
   # the rest of the project surface. Such a key already holds full project

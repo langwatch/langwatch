@@ -8,6 +8,13 @@ import { TtlCache } from "~/server/utils/ttlCache";
  * and a wildcard out of the name half, so one project can never address
  * another project's entry.
  *
+ * Two concurrent runs in the same project that write the same entry name see
+ * last-write-wins on both writes and deletes. That is accepted: entries are
+ * project-scoped so a second run can reuse a session the first run wrote,
+ * and every code sandbox in a project already receives every project secret.
+ * Docs caution agent authors to pick collision-resistant names when a project
+ * runs several distinct agents at the same time.
+ *
  * Every worktree on a developer machine shares one Redis database, so two
  * stacks that use the same project id and the same entry name read each
  * other's entries. That is local only: a deployment has its own Redis.
