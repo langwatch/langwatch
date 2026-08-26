@@ -23,7 +23,7 @@ import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedControl } from "~/components/ui/segmented-control";
-import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
+import { VariableInfoIcon } from "@langwatch/automation-web";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import {
   FieldHeader,
@@ -35,7 +35,7 @@ import type {
   ConfigFormProps,
   NotifyClientDef,
   SummaryIdentity,
-} from "../types";
+} from "@langwatch/automation-web";
 
 /** A template field, mirroring the Slack provider's `FieldDraft`: empty +
  *  `usingDefault` means the framework default envelope applies. */

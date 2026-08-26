@@ -14,7 +14,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConfigFormCtx } from "~/features/automations/providers/types";
+import type { ConfigFormCtx } from "@langwatch/automation-web";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 vi.mock("~/components/ui/color-mode", () => ({

@@ -8,6 +8,11 @@ import { Markdown } from "~/components/Markdown";
 import { Tooltip } from "~/components/ui/tooltip";
 import dynamic from "~/utils/compat/next-dynamic";
 import {
+  monacoBackgroundFor,
+  trapEscapeInsideEditor,
+  useMonacoTheme,
+} from "@langwatch/automation-web";
+import {
   clearLiquidMarkers,
   clearModelVariables,
   LIQUID_JSON_LANGUAGE_ID,
@@ -19,8 +24,6 @@ import {
   type VariableInfo,
   validateLiquidModel,
 } from "./liquidMonaco";
-import { monacoBackgroundFor, trapEscapeInsideEditor } from "./monacoEditorChrome";
-import { useMonacoTheme } from "./useMonacoTheme";
 
 export type { VariableInfo };
 

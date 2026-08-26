@@ -32,9 +32,8 @@ import { FaSlack } from "react-icons/fa";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Select } from "~/components/ui/select";
-import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
+import { SLACK_BLOCK_KIT_JSON_SCHEMA, VariableInfoIcon } from "@langwatch/automation-web";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
-import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
 import {
   CompactSlackPreview,
   FieldHeader,
@@ -44,7 +43,11 @@ import {
 import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
-import type { ConfigFormProps, NotifyClientDef, SummaryIdentity } from "../types";
+import type {
+  ConfigFormProps,
+  NotifyClientDef,
+  SummaryIdentity,
+} from "@langwatch/automation-web";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,

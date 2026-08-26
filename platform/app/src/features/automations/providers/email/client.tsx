@@ -9,7 +9,7 @@ import { defaultsForSourceKind } from "@langwatch/automation-contract";
 import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
+import { VariableInfoIcon } from "@langwatch/automation-web";
 import {
   CompactEmailPreview,
   FieldHeader,
@@ -18,7 +18,11 @@ import {
 } from "~/features/automations/editors/templateAuthoring";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
-import type { ConfigFormProps, NotifyClientDef, SummaryIdentity } from "../types";
+import type {
+  ConfigFormProps,
+  NotifyClientDef,
+  SummaryIdentity,
+} from "@langwatch/automation-web";
 
 /** A "field that defaults to the framework template until the user
  *  edits it" — `usingDefault=true` means the editor renders the default

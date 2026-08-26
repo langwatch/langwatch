@@ -14,8 +14,9 @@ private to the server package and is supplied through repository ports and
 composition adapters.
 
 Provider schemas, sentinels, action vocabulary, graph-alert/report policy, and
-reusable templating live in the automation contract. Browser-safe authoring
-helpers and controlled overview presentation live in `automation-web`;
+reusable templating live in the automation contract. Browser-safe authoring,
+provider forms, Monaco behaviour, and controlled overview presentation live in
+`automation-web`;
 threshold/series policy lives in the contract and delivery persistence policy
 lives in `automation-server`. The server package also owns persist-cap runaway
 containment as a claim-gated policy over injected pause, counting, notification,

@@ -1,7 +1,7 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, languages, Position, Uri } from "monaco-editor";
 import { substituteLiquidForJsonValidation } from "@langwatch/automation-web";
-import { registerJsonSchema } from "./monacoSchemas";
+import { registerJsonSchema } from "@langwatch/automation-web";
 
 /**
  * Rich variable info the autocomplete uses: path + TypeScript-ish type +
@@ -606,7 +606,7 @@ export function setupLiquidJsonSchema(params: {
 }): { dispose: () => void } {
   const { monaco, realModel, schema, shadowUri } = params;
 
-  // Route through the shared registry (monacoSchemas.ts) so this call
+  // Route through the shared registry in automation-web so this call
   // doesn't wipe schemas registered by sibling editors. Match the shadow
   // model by basename — per Monaco's docs the `**` wildcard spans path
   // separators while a plain `*` does not, so `**/<basename>` is the right

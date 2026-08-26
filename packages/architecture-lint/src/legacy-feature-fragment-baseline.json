@@ -443,32 +443,12 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/components/VariableInfoIcon.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/editors/liquidMonaco.ts",
       "kind": "legacy-implementation"
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/editors/monacoEditorChrome.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/editors/monacoSchemas.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/editors/templateAuthoring.tsx",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/editors/useMonacoTheme.ts",
       "kind": "legacy-implementation"
     },
     {
@@ -529,11 +509,6 @@
     {
       "feature": "automation",
       "file": "platform/app/src/features/automations/providers/TestFireButton.tsx",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/providers/types.ts",
       "kind": "legacy-implementation"
     },
     {

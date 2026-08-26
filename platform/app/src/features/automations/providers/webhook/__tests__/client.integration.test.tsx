@@ -24,7 +24,7 @@ import {
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ConfigFormCtx } from "~/features/automations/providers/types";
+import type { ConfigFormCtx } from "@langwatch/automation-web";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 /** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that

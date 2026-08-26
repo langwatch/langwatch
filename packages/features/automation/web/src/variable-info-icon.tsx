@@ -1,18 +1,8 @@
 import { Box, chakra, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
-import type { VariableInfo } from "~/features/automations/editors/liquidMonaco";
+import type { VariableInfo } from "@langwatch/automation-contract";
 
-/**
- * Small info icon rendered next to a template-field label. On hover it opens
- * a HoverCard listing the variables the author can reference for that field,
- * scoped to the current cadence so the surface stays tight (no
- * `digest.windowStart` when only immediate fires are possible).
- *
- * HoverCard (rather than Tooltip) so the author can move the cursor *into*
- * the panel to scroll long variable lists without dismissing it. Tooltips
- * dismiss the moment the pointer leaves the trigger, which made the list
- * effectively un-readable past the first few rows.
- */
+/** Uses an interactive hover card so long variable lists remain scrollable. */
 export function VariableInfoIcon({ variables }: { variables: VariableInfo[] }) {
   return (
     <HoverCard.Root openDelay={150} closeDelay={120}>

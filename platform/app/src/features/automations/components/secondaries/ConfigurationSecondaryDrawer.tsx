@@ -1,5 +1,5 @@
 import type { NotifyPreview } from "~/features/automations/providers/registry";
-import type { ConfigFormCtx } from "~/features/automations/providers/types";
+import type { ConfigFormCtx } from "@langwatch/automation-web";
 import { useAutomationStore } from "../../state/automationStore";
 import { useActiveProvider } from "../../state/selectors";
 import { SecondaryDrawerShell } from "./SecondaryDrawerShell";

@@ -45,10 +45,7 @@ import {
   CLIENT_PROVIDERS,
   type NotifyPreview,
 } from "~/features/automations/providers/registry";
-import {
-  type ConfigFormCtx,
-  isNotifyEntry,
-} from "~/features/automations/providers/types";
+import { type ConfigFormCtx, isNotifyEntry } from "@langwatch/automation-web";
 import { explainAnyError, readHandledError, showErrorToast } from "~/features/errors";
 import { AlertType, TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";

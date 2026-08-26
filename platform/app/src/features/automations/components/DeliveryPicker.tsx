@@ -1,7 +1,7 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Settings2 } from "lucide-react";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
-import type { ClientEntry } from "~/features/automations/providers/types";
+import type { ClientEntry } from "@langwatch/automation-web";
 import { TriggerAction } from "~/generated/prisma/client";
 import type { ConditionSource } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";

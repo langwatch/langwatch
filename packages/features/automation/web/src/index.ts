@@ -21,3 +21,8 @@ export * from "./logic/report-schedule";
 export * from "./editors/alert-variables";
 export * from "./editors/report-variables";
 export * from "./editors/liquid-json-substitution";
+export * from "./monaco-schemas";
+export { useMonacoTheme } from "./use-monaco-theme";
+export * from "./providers/types";
+export { VariableInfoIcon } from "./variable-info-icon";
+export { monacoBackgroundFor, trapEscapeInsideEditor } from "./monaco-editor-chrome";

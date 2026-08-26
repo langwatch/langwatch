@@ -59,3 +59,9 @@ Feature: Automation ownership
     When the heartbeat checks recent slim-table activity
     Then it batches recency by project and source
     And a failed project does not suppress candidates for other projects
+
+  Scenario: Provider authoring uses one browser surface
+    Given an automation provider contributes a configuration form
+    When the drawer renders its variables and Monaco editors
+    Then it uses the Automation web contracts and editor behaviour
+    And application code retains only drawer and transport composition

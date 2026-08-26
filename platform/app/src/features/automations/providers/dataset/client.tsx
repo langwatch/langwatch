@@ -9,7 +9,11 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
-import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
+import type {
+  ClientDef,
+  ConfigFormProps,
+  SummaryIdentity,
+} from "@langwatch/automation-web";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
  *  shape the dispatcher casts to `TraceMapping` — `source` names a

@@ -2,7 +2,11 @@ import type { AnnotationQueueActionParams } from "@langwatch/automation-contract
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { Users } from "lucide-react";
 import { AddParticipants } from "~/components/traces/AddParticipants";
-import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
+import type {
+  ClientDef,
+  ConfigFormProps,
+  SummaryIdentity,
+} from "@langwatch/automation-web";
 
 export interface AnnotationQueueSlice {
   annotators: { id: string; name: string }[];

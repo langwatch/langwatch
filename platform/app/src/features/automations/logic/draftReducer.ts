@@ -9,7 +9,7 @@ import {
   initialSlices,
   type SliceFor,
 } from "~/features/automations/providers/registry";
-import { isNotifyEntry } from "~/features/automations/providers/types";
+import { isNotifyEntry } from "@langwatch/automation-web";
 import type { AlertType, TriggerAction } from "~/generated/prisma/client";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {

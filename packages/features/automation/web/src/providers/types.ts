@@ -3,15 +3,11 @@ import type {
   SavedTriggerRow,
   SharedDef,
   TemplateDraft,
+  VariableInfo,
 } from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
 
-/**
- * Client-side halves of the automation provider system: the UI definition
- * each provider contributes and the registry entry shapes the drawer
- * consumes. Server-only concerns (secret persistence, dispatch) never
- * appear here — see ~/server/app-layer/automations/providers.
- */
+/** Browser definitions for automation providers. Delivery and secrets remain server-owned. */
 
 /** Identity passed to summary functions so they can include the user's
  *  configured automation name in the section row preview. */
@@ -19,16 +15,12 @@ export interface SummaryIdentity {
   name: string;
 }
 
-/** Context every `ConfigForm` receives from the orchestrator. Generic
- *  over the preview shape so each provider can declare its own. */
+/** Controlled authoring state and actions supplied to a provider form. */
 export interface ConfigFormCtx<TPreview = unknown> {
   projectId: string;
   organizationId: string | undefined;
   teamSlug: string | undefined;
-  /** The saved automation's id when editing an existing row, undefined for a
-   *  new draft. Lets a provider act against the stored (server-side) secret —
-   *  e.g. the Slack channel picker loads channels from the saved bot token
-   *  without the author having to retype it. */
+  /** Present while editing, allowing the transport to reuse a stored secret. */
   automationId?: string;
   /** Variables advertised to the editor (path / type / description). */
   variables: VariableInfo[];
@@ -38,37 +30,24 @@ export interface ConfigFormCtx<TPreview = unknown> {
    *  or undefined for action providers. Shape is owned by the provider. */
   preview?: TPreview;
   previewLoading?: boolean;
-  /** "immediate" vs "digest" — derived from the draft's notificationCadence.
-   *  Providers use it to pick template defaults or default-render shapes. */
+  /** Derived cadence class used to select template defaults. */
   cadenceMode: "immediate" | "digest";
-  /** The full notification cadence value off the draft (e.g. "immediate",
-   *  "5min_digest", "hourly_digest"). Providers that want to expose an
-   *  inline cadence selector — because the choice affects which template
-   *  variables are available — read this and call `setNotificationCadence`. */
+  /** Full draft cadence for providers that expose cadence controls. */
   notificationCadence: NotificationCadence;
-  /** Updates the draft's notification cadence. Wired through the store so
-   *  the change is reflected everywhere (variable filter, preview, the
-   *  cadence secondary drawer). */
+  /** Updates cadence through the owning draft store. */
   setNotificationCadence: (value: NotificationCadence) => void;
   /** True when the draft has any evaluations.* filter set — used by the
    *  Slack picker to surface the eval-failure template. */
   hasEvaluationFilter: boolean;
-  /** What the draft is about — trace data, a custom-graph alert, or a scheduled
-   *  report. Notify providers seed their template defaults from this AND filter
-   *  the template gallery by it, so a report never offers the per-trace
-   *  (immediate) layouts. */
+  /** Subject used to choose compatible templates. */
   sourceKind: "trace" | "graphAlert" | "report";
   /** For a report, the content it sends — a table of matching traces, one
    *  custom graph, or a whole dashboard. Narrows which report layouts apply. */
   reportSourceKind?: "traceQuery" | "customGraph" | "dashboard";
-  /** Send a test notification with the current draft, so the author can try it
-   *  from inside the config section. No-op / absent when the draft isn't
-   *  test-fireable yet. `testFireLoading` reflects the in-flight send. */
+  /** Sends the current draft when it is test-fireable. */
   onTestFire?: () => void;
   testFireLoading?: boolean;
-  /** Most recent test-fire attempt this session, so a provider can render the
-   *  outcome (HTTP status, failure detail) inline next to its test button.
-   *  Providers filter by their own channel before rendering. */
+  /** Most recent test-fire result for inline provider feedback. */
   lastTestAttempt?: {
     at: number;
     channel: "email" | "slack" | "webhook";
@@ -77,14 +56,6 @@ export interface ConfigFormCtx<TPreview = unknown> {
     errorTitle?: string;
     errorDetail?: string;
   } | null;
-}
-
-/** Mirrors `editors/liquidMonaco#VariableInfo`. Defined here too so the
- *  context shape stays self-contained for provider authors. */
-export interface VariableInfo {
-  path: string;
-  type: string;
-  description?: string;
 }
 
 /** The client definition (`client.tsx`) — UI + slice helpers. */
@@ -102,15 +73,13 @@ export interface ClientDef<S = unknown, TPreview = unknown> {
   /** One-line summary rendered on the Configuration section row. */
   summary(slice: S, identity: SummaryIdentity): string;
 
-  /** Read this provider's slice out of a saved trigger row. */
+  /** Reads this provider's state from a saved trigger. */
   fromTriggerRow(row: SavedTriggerRow): S;
 
-  /** Serialise this provider's slice into the JSON `actionParams` we
-   *  store on the row. */
+  /** Serialises this provider's state into action parameters. */
   toActionParams(slice: S): unknown;
 
-  /** Renders the provider-specific config inside the Configuration
-   *  secondary drawer. */
+  /** Renders provider configuration in the controlled host surface. */
   readonly ConfigForm: ComponentType<ConfigFormProps<S, TPreview>>;
 }
 
@@ -125,8 +94,7 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown> extends Client
   S,
   TPreview
 > {
-  /** The channel string the preview/testFire endpoints accept. Each
-   *  provider names its own — the shared layer doesn't enumerate. */
+  /** Channel accepted by preview and test-fire transports. */
   readonly channel: "email" | "slack" | "webhook";
   /** Webhook for the test-fire mutation. ADR-031: email test fires resolve
    *  their recipient server-side (the requester's own inbox), so no provider
@@ -148,15 +116,9 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown> extends Client
   };
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
-  /** Render options the PREVIEW must mirror so it shows what will really be
-   *  delivered. Slack only renders the modern blocks (charts, tables, alert
-   *  banners) over a bot connection — without this the preview would show a
-   *  chart that the webhook is going to strip, or hide one the bot will send.
-   *  Omit when the provider's preview needs no delivery-specific options. */
+  /** Delivery-specific preview options needed for payload parity. */
   previewOptions?(slice: S): { allowGatedBlocks?: boolean };
 }
-
-// ---- Registry entries ---------------------------------------------------
 
 export interface ClientEntry<S = unknown, TPreview = unknown> {
   shared: SharedDef;

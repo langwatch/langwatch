@@ -1,27 +1,9 @@
-import type { Monaco } from "@monaco-editor/react";
+/** Monaco replaces its global schema list on every diagnostics update. */
 
-/**
- * Monaco JSON Schemas used by the automation drawer. Each editor mounts with a
- * stable model URI (the `path` prop) and registers a `fileMatch` entry that
- * targets that URI; Monaco's built-in JSON language then surfaces structural
- * mistakes (unknown fields, wrong types, missing required keys) as inline
- * diagnostics, alongside the regular syntax check.
- *
- * `setDiagnosticsOptions` is a global call that *replaces* the registered
- * schemas — every registration site has to re-emit the full list or the
- * other modules' schemas get wiped. This module keeps the single source of
- * truth in `registered`; sibling editors (Liquid + Block Kit) call
- * `registerJsonSchema` here instead of holding their own map.
- */
-
-// `file:///` URIs make Monaco's JSON language service pick the schemas up
-// reliably; `inmemory://` URIs hit edge cases in the parser depending on the
-// Monaco version. The model path on the editor mounts to these exact URIs.
+// Editor models and schema file matches must use the same stable URI.
 export const CONDITIONS_MODEL_URI = "file:///automation/conditions.json";
 
-/** Permissive shape mirroring `triggerFiltersPermissiveSchema` server-side:
- *  filter values are either an array of strings, or a nested object whose
- *  leaves are arrays of strings. */
+/** Mirrors the permissive nested filter shape accepted by the transport. */
 export const CONDITIONS_JSON_SCHEMA = {
   $schema: "http://json-schema.org/draft-07/schema#",
   title: "Automation conditions",
@@ -50,13 +32,7 @@ export const CONDITIONS_JSON_SCHEMA = {
   },
 } as const;
 
-/** Slack Block Kit subset matching the server-side allowlist (ADR-036):
- *  section, divider, context, header, markdown. `image` blocks and section
- *  `image` accessories are deliberately excluded — the server strips them
- *  (blockKitAllowlist.ts: tracking-pixel vector) so Monaco must reject them
- *  at author time or authors ship blocks that silently disappear on dispatch.
- *  Liquid expressions inside string values are not validated by JSON Schema —
- *  that is intentional. */
+/** Matches the server allowlist; image blocks stay excluded to prevent tracking pixels. */
 export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
   $schema: "http://json-schema.org/draft-07/schema#",
   title: "Slack Block Kit (allowlisted subset)",
@@ -91,9 +67,7 @@ export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
               },
             },
           },
-          // Server allowlist strips ALL section accessories (image included)
-          // to close the tracking-pixel vector. Deliberately omit here so
-          // Monaco rejects any accessory the user writes.
+          // Server delivery rejects section accessories.
         },
       },
       {
@@ -146,14 +120,8 @@ export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
           },
         },
       },
-      // `image` top-level blocks were removed to match server-side allowlist
-      // (blockKitAllowlist.ts: tracking-pixel vector). Do NOT add back without
-      // also loosening the server-side filter.
       {
-        // ui-001: bundled Slack templates emit `{ "type": "markdown", "text": "…" }`
-        // blocks; the schema must allow them or Monaco fires false-positive
-        // red squiggles on the default presets. Slack's newer markdown block
-        // is non-interactive so it fits the same allow-list criteria.
+        // Bundled templates use Slack's non-interactive markdown block.
         title: "markdown",
         type: "object",
         required: ["type", "text"],
@@ -168,6 +136,26 @@ export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
   },
 } as const;
 
+type JsonSchemaRegistration = {
+  uri: string;
+  fileMatch: string[];
+  schema: object;
+};
+
+export type AutomationMonaco = {
+  languages: {
+    json: {
+      jsonDefaults: {
+        setDiagnosticsOptions(options: {
+          validate: boolean;
+          allowComments: boolean;
+          schemas: JsonSchemaRegistration[];
+        }): void;
+      };
+    };
+  };
+};
+
 interface RegisteredEntry {
   schema: object;
   fileMatch: string[];
@@ -175,17 +163,9 @@ interface RegisteredEntry {
 
 const registered = new Map<string, RegisteredEntry>();
 
-/**
- * Registers (or replaces) a JSON Schema keyed to a model URI. Idempotent —
- * calling with the same URI updates the entry, calling with different URIs
- * stacks them. Safe to invoke from `beforeMount` of every editor.
- *
- * `fileMatch` defaults to `[modelUri]` (the exact-URI strategy used by the
- * stable editors). Callers with dynamic shadow URIs (e.g. the Liquid
- * substitution shadow) pass a basename pattern like `["**\/<basename>"]`.
- */
+/** Registers one model schema while retaining every previously registered schema. */
 export function registerJsonSchema(
-  monaco: Monaco,
+  monaco: AutomationMonaco,
   modelUri: string,
   schema: object,
   fileMatch: string[] = [modelUri],

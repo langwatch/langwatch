@@ -19,7 +19,11 @@ import annotationQueueClient, {
 import datasetClient, { type DatasetSlice } from "./dataset/client";
 import emailClient, { type EmailSlice } from "./email/client";
 import slackClient, { type SlackSlice } from "./slack/client";
-import { type ClientEntry, isNotifyEntry, type NotifyClientEntry } from "./types";
+import {
+  type ClientEntry,
+  isNotifyEntry,
+  type NotifyClientEntry,
+} from "@langwatch/automation-web";
 import webhookClient, { type WebhookSlice } from "./webhook/client";
 
 /** Per-action slice type — adding a new action means adding one entry. */
