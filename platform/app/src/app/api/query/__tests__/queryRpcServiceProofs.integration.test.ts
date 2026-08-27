@@ -461,10 +461,12 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
   ) => {
     const response = await call(method, params, { token: project.apiKey });
     const body = (await response.json()) as Record<string, any>;
-    expect(response.status, `${method} failed: ${JSON.stringify(body)}`).toBe(
-      200,
-    );
-    expect(body.error, `${method} answered an error`).toBeUndefined();
+    if (response.status !== 200) {
+      throw new Error(`${method} failed: ${JSON.stringify(body)}`);
+    }
+    if (body.error !== undefined) {
+      throw new Error(`${method} answered an error`);
+    }
     return body.result as Record<string, any>;
   };
 
@@ -498,18 +500,20 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       { token: project.apiKey },
     );
     const body = (await response.json()) as Record<string, any>;
-    expect(
-      response.status,
-      `expected a refusal, got ${response.status}: ${JSON.stringify(body)}`,
-    ).toBeGreaterThanOrEqual(400);
+    if (response.status < 400) {
+      throw new Error(
+        `expected a refusal, got ${response.status}: ${JSON.stringify(body)}`,
+      );
+    }
     const canonical =
       response.status === 401 || response.status === 403
         ? body.error
         : body.error?.data?.error;
-    expect(
-      canonical,
-      `no canonical error body found in: ${JSON.stringify(body)}`,
-    ).toBeDefined();
+    if (canonical === undefined) {
+      throw new Error(
+        `no canonical error body found in: ${JSON.stringify(body)}`,
+      );
+    }
     return canonical as Record<string, any>;
   };
 
@@ -669,7 +673,9 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
         tenantId: project.id,
       })) {
         const result = await postgres.asAdmin(statement);
-        expect(result.exitCode, result.stderr).toBe(0);
+        if (result.exitCode !== 0) {
+          throw new Error(result.stderr);
+        }
       }
     }
 
@@ -847,7 +853,11 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
         sql: PERIOD_SQL(),
         timeWindow,
       });
-      expect(result.followsTimeWindow).toBe(true);
+      if (result.followsTimeWindow !== true) {
+        throw new Error(
+          `expected the reply to report followsTimeWindow: true, got ${JSON.stringify(result.followsTimeWindow)}`,
+        );
+      }
       return Number(result.rows[0].value);
     };
 
@@ -866,10 +876,9 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
           `AND OccurredAt < toDateTime64('2026-02-20 12:01:00', 3)`,
       );
       const count = Number(body.rows[0].value);
-      expect(
-        count,
-        "nothing is seeded in the window under test",
-      ).toBeGreaterThan(0);
+      if (count <= 0) {
+        throw new Error("nothing is seeded in the window under test");
+      }
       return count;
     };
 

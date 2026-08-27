@@ -208,12 +208,18 @@ describe("given the /api/v1/query JSON-RPC family", () => {
       id: 42,
     });
     const body = (await response.json()) as Record<string, any>;
-    expect(response.status, `${method} failed: ${JSON.stringify(body)}`).toBe(
-      200,
-    );
-    expect(body.jsonrpc).toBe("2.0");
-    expect(body.id, "the reply dropped the id it was called with").toBe(42);
-    expect(body.error, `${method} answered an error`).toBeUndefined();
+    if (response.status !== 200) {
+      throw new Error(`${method} failed: ${JSON.stringify(body)}`);
+    }
+    if (body.jsonrpc !== "2.0") {
+      throw new Error(`${method} answered with jsonrpc ${body.jsonrpc}`);
+    }
+    if (body.id !== 42) {
+      throw new Error("the reply dropped the id it was called with");
+    }
+    if (body.error !== undefined) {
+      throw new Error(`${method} answered an error`);
+    }
     return body.result as Record<string, any>;
   };
 
@@ -317,7 +323,9 @@ describe("given the /api/v1/query JSON-RPC family", () => {
         tenantId: project.id,
       })) {
         const result = await postgres.asAdmin(statement);
-        expect(result.exitCode, result.stderr).toBe(0);
+        if (result.exitCode !== 0) {
+          throw new Error(result.stderr);
+        }
       }
     }
 
