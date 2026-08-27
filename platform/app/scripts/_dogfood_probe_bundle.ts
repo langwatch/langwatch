@@ -8,12 +8,10 @@
  * Run after `pnpm tsx scripts/seed-governance-refactor-dogfood.ts`.
  */
 import { prisma } from "~/server/db";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
-import {
-  eligibleModelProvidersForVk,
-  traceProjectFor,
-} from "~/server/gateway/scopeResolver";
-import { hashVirtualKeySecret } from "~/server/gateway/virtualKey.crypto";
+import { eligibleModelProvidersForVk } from "~/server/gateway/scopeResolver";
+import { hashVirtualKeySecret } from "@langwatch/gateway-server";
 
 const VK_SECRETS = process.env.VK_SECRETS?.split(",") ?? [];
 
@@ -29,9 +27,12 @@ async function probe(secret: string) {
   }
 
   const eligibleMPs = await eligibleModelProvidersForVk(prisma, vk);
-  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
+  const app = initializeDefaultApp({ processRole: "web" });
+  const traceProject = vk.traceProjectId
+    ? await app.projects.tryGetTraceDestination(vk.traceProjectId)
+    : null;
 
-  const materialiser = new GatewayConfigMaterialiser(prisma, null);
+  const materialiser = new GatewayConfigMaterialiser(prisma, app.projects, null);
   const bundle = await materialiser.materialise(vk);
 
   console.log(`\n=== ${vk.name} (${vk.id}) ===`);

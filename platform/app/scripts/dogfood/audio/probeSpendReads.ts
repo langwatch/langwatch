@@ -10,7 +10,7 @@
 
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetClickHouseRepository } from "@langwatch/gateway-server";
 
 /** The quantity columns migration 00078 adds. */
 export const REQUIRED_COLUMNS = [

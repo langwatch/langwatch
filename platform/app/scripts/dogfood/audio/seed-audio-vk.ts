@@ -322,7 +322,7 @@ async function main() {
     displayEmail: user.email ?? args.email,
   });
 
-  const issued = await app.governance.personalVirtualKeys.issue({
+  const issued = await app.governance.personalVirtualKeyIssue({
     userId: user.id,
     organizationId: org.id,
     personalProjectId: workspace.project.id,

@@ -185,7 +185,7 @@ interface Probe extends ProbeScope {
 async function provision(args: Args, tenant: Tenant): Promise<Probe> {
   const issued = await initializeDefaultApp({
     processRole: "web",
-  }).governance.personalVirtualKeys.issue({
+  }).governance.personalVirtualKeyIssue({
     userId: tenant.userId,
     organizationId: tenant.organizationId,
     personalProjectId: tenant.projectId,

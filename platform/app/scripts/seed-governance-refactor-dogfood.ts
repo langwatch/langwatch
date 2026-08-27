@@ -54,11 +54,11 @@
  */
 import { randomBytes } from "node:crypto";
 import { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { nextResetAt } from "../src/server/gateway/budgetWindow";
+import { nextResetAt } from "@langwatch/gateway-server";
 import {
   hashVirtualKeySecret,
   mintVirtualKeySecret,
-} from "../src/server/gateway/virtualKey.crypto";
+} from "@langwatch/gateway-server";
 import {
   credentialWriteLog,
   decideCredentialWrite,

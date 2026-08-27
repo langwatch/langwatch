@@ -31,7 +31,6 @@ import type { AddressInfo } from "net";
 import { AppGovernanceIngestionPullHost } from "~/server/app-layer/governance-ingestion-pull.host";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { prisma } from "../../../src/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 
 const CLICKHOUSE_URL =
   process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
@@ -149,7 +148,7 @@ async function main(): Promise<void> {
   const app = initializeDefaultApp({ processRole: "web" });
   const worker = AppIngestionPullWorkerAdapter.create({
     sources: PostgresIngestionPullSourceAdapter.create(prisma),
-    host: AppGovernanceIngestionPullHost.create(featureFlagService),
+    host: AppGovernanceIngestionPullHost.create(app.featureFlags),
     projects: app.projects,
     events: new AppGovernanceOcsfEventsAdapter(app.clickhouse.resolveClient),
   }).build();

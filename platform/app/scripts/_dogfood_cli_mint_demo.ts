@@ -107,12 +107,11 @@ async function main() {
   // Mint a personal VK + approve the device-code, mirroring the
   // /api/auth/cli/approve handler. This invokes the SAME service code
   // path the magic-link browser approval would.
-  const service = initializeDefaultApp({ processRole: "web" }).governance
-    .personalVirtualKeys;
+  const service = initializeDefaultApp({ processRole: "web" }).governance;
   const user = await prisma.user.findUnique({ where: { id: userId } });
   let issued;
   try {
-    issued = await service.ensureDefault({
+    issued = await service.personalVirtualKeyEnsureDefault({
       userId,
       organizationId,
       displayName: user?.name ?? "Rogerio",
@@ -133,7 +132,7 @@ async function main() {
       });
       if (!workspace?.projects[0])
         throw new Error("no personal workspace for additional-device path");
-      issued = await service.issue({
+      issued = await service.personalVirtualKeyIssue({
         userId,
         organizationId,
         personalProjectId: workspace.projects[0].id,

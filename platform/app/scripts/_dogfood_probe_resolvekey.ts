@@ -4,10 +4,9 @@
  * the Hono CP swallows behind 500-Internal-Server-Error.
  */
 import { prisma } from "~/server/db";
+import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
-import { traceProjectFor } from "~/server/gateway/scopeResolver";
-import { hashVirtualKeySecret } from "~/server/gateway/virtualKey.crypto";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { hashVirtualKeySecret } from "@langwatch/gateway-server";
 
 async function main() {
   const presented = process.env.VK_SECRET;
@@ -21,12 +20,15 @@ async function main() {
   const hashed = hashVirtualKeySecret(presented);
   console.log("hashed length:", hashed.length);
 
-  const service = VirtualKeyService.create(prisma);
+  const app = initializeDefaultApp({ processRole: "web" });
+  const service = app.gateway.virtualKeys;
   const vk = await service.getByHashedSecretInternal(hashed);
   console.log("vk:", vk ? `${vk.id} (${vk.name})` : "null");
   if (!vk) return;
 
-  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
+  const traceProject = vk.traceProjectId
+    ? await app.projects.tryGetTraceDestination(vk.traceProjectId)
+    : null;
   console.log("traceProject:", traceProject);
 
   const { jwt } = signGatewayJwt({
