@@ -148,7 +148,27 @@ describe("FACET_REGISTRY shape", () => {
       }
       const { sql } = def.queryBuilder(baseCtx);
       expect(sql).toContain("Events.Attributes");
-      expect(sql).toMatch(/arrayJoin\s*\(\s*mapKeys\s*\(\s*arrayJoin/);
+      expect(sql).toMatch(/arrayJoin\s*\(\s*arrayJoin\s*\(/);
+    });
+
+    it("flattens through the keys subcolumn, never the Map itself", () => {
+      // `Events.Attributes` is Array(Map(LowCardinality(String), String)).
+      // Reading the Map to list keys materialises the String values beside
+      // them, which is MEMORY_LIMIT_EXCEEDED on a tenant with busy events.
+      // `.keys` is Array(Array(LowCardinality(String))) and never opens the
+      // values column. Same invariant span-attribute-keys and metadata-keys
+      // already hold for their flat Maps. Behavioural coverage lives in
+      // event-attribute-keys.integration.test.ts.
+      const def = FACET_REGISTRY.find((d) => d.key === "eventAttributeKeys");
+      if (def?.kind !== "dynamic_keys") {
+        throw new Error("expected eventAttributeKeys to be dynamic_keys");
+      }
+      const { sql } = def.queryBuilder(baseCtx);
+      expect(sql).toContain("`Events.Attributes`.keys");
+      expect(sql).not.toContain("mapKeys");
+      expect(sql).not.toContain("mapValues");
+      expect(sql).toMatch(/length\(`Events\.Attributes`\.keys\)\s*>\s*0/);
+      expect(sql).not.toMatch(/length\(`Events\.Attributes`\)\s*>\s*0/);
     });
   });
 });
