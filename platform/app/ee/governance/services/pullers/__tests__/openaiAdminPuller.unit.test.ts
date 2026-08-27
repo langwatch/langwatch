@@ -524,7 +524,11 @@ describe("given an OpenAI Admin cost source", () => {
           jsonResponse(
             page({
               results: [
-                costRow({ api_key_id: null, project_id: null, line_item: null }),
+                costRow({
+                  api_key_id: null,
+                  project_id: null,
+                  line_item: null,
+                }),
               ],
             }),
           ),
@@ -549,17 +553,13 @@ describe("given an OpenAI Admin cost source", () => {
       // The request must start one day AFTER the watermark, not at it or three
       // days before. Starting at the watermark would re-read that bucket with
       // keyed dimensions, producing a different source_event_id and doubling it.
-      const run2Start = Number(
-        requestedUrl(2).searchParams.get("start_time"),
-      );
-      expect(run2Start).toBe(
-        Math.floor(Date.parse(cursor1.startingAt) / 1000),
-      );
+      const run2Start = Number(requestedUrl(2).searchParams.get("start_time"));
+      expect(run2Start).toBe(Math.floor(Date.parse(cursor1.startingAt) / 1000));
 
       // Key grouping was used.
-      expect(
-        requestedUrl(2).searchParams.getAll("group_by[]"),
-      ).toContain("api_key_id");
+      expect(requestedUrl(2).searchParams.getAll("group_by[]")).toContain(
+        "api_key_id",
+      );
 
       // The upgrade flag clears once key grouping succeeds.
       const cursor2 = JSON.parse(run2.cursor!);
@@ -585,16 +585,17 @@ describe("given an OpenAI Admin cost source", () => {
           jsonResponse(
             page({
               results: [
-                costRow({ api_key_id: null, project_id: null, line_item: null }),
+                costRow({
+                  api_key_id: null,
+                  project_id: null,
+                  line_item: null,
+                }),
               ],
             }),
           ),
         );
 
-      const result = await puller.runOnce(
-        { ...RUN_OPTIONS, cursor },
-        CONFIG,
-      );
+      const result = await puller.runOnce({ ...RUN_OPTIONS, cursor }, CONFIG);
 
       const nextCursor = JSON.parse(result.cursor!);
       expect(nextCursor.hasKeyGrouping).toBe(true);
