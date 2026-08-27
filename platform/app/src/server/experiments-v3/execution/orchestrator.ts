@@ -78,6 +78,7 @@ import {
 } from "./resultMapper";
 import { createSemaphore } from "./semaphore";
 import {
+  type CarriedOverCell,
   type EvaluationV3Event,
   type ExecutionCell,
   type ExecutionScope,
@@ -127,6 +128,11 @@ export type OrchestratorInput = {
     string,
     { output: unknown; cost?: number; duration?: number }
   >;
+  /**
+   * Board cells the run carries rather than produces, so the run holds the
+   * whole board and not only the column that was clicked.
+   */
+  carriedOverCells?: CarriedOverCell[];
 };
 
 /**
@@ -2533,6 +2539,199 @@ export const buildEvaluatorResultDispatch = ({
 };
 
 /**
+ * The stored rows for the board cells a run carries rather than produces.
+ *
+ * A run holds a snapshot of the whole board, so opening it shows what the
+ * person was looking at instead of the one column they clicked. The cells
+ * outside the execution scope are copied in at run start; the cells inside it
+ * fill in as they execute.
+ *
+ * Built through the same two dispatch builders a live cell goes through, so a
+ * carried cell and a produced cell are the same row in every respect but one:
+ * `carriedOver`. That flag is what keeps the run's cost, duration and progress
+ * about the run's own work. Money and time belong to this run; verdicts and
+ * scores belong to the board.
+ *
+ * A cell with neither an output nor a failure gets no target row. Writing one
+ * would say the column produced nothing, which reads as a result rather than
+ * as an empty cell. A verdict whose status is not one the store knows is
+ * dropped for the same reason.
+ *
+ * Exported for unit testing.
+ */
+export const buildCarriedOverDispatches = ({
+  tenantId,
+  runId,
+  experimentId,
+  cells,
+  datasetRows,
+  evaluatorNameFor,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  cells: CarriedOverCell[];
+  datasetRows: Array<Record<string, unknown>>;
+  evaluatorNameFor: (evaluatorId: string) => string | null;
+  occurredAt: number;
+}): {
+  targetResults: RecordTargetResultCommandData[];
+  evaluatorResults: RecordEvaluatorResultCommandData[];
+} => {
+  const targetResults: RecordTargetResultCommandData[] = [];
+  const evaluatorResults: RecordEvaluatorResultCommandData[] = [];
+
+  for (const cell of cells) {
+    const datasetEntry = datasetRows[cell.rowIndex];
+    if (!datasetEntry) continue;
+
+    const hasOutput = cell.output !== undefined && cell.output !== null;
+    if (hasOutput || cell.error) {
+      const dispatch = buildTargetResultDispatch({
+        tenantId,
+        runId,
+        experimentId,
+        event: {
+          type: "target_result",
+          rowIndex: cell.rowIndex,
+          targetId: cell.targetId,
+          output: cell.output,
+          ...(cell.cost !== undefined ? { cost: cell.cost } : {}),
+          ...(cell.duration !== undefined ? { duration: cell.duration } : {}),
+          ...(cell.traceId !== undefined ? { traceId: cell.traceId } : {}),
+          ...(cell.error !== undefined ? { error: cell.error } : {}),
+          ...(cell.domainError !== undefined
+            ? { domainError: cell.domainError }
+            : {}),
+        },
+        datasetEntry,
+        occurredAt,
+      });
+      if (dispatch) targetResults.push({ ...dispatch, carriedOver: true });
+    }
+
+    for (const verdict of cell.evaluatorResults) {
+      const result = verdict.result as SingleEvaluationResult | undefined;
+      if (
+        !result ||
+        (result.status !== "processed" &&
+          result.status !== "error" &&
+          result.status !== "skipped")
+      ) {
+        continue;
+      }
+      evaluatorResults.push({
+        ...buildEvaluatorResultDispatch({
+          tenantId,
+          runId,
+          experimentId,
+          event: {
+            rowIndex: cell.rowIndex,
+            targetId: cell.targetId,
+            evaluatorId: verdict.evaluatorId,
+          },
+          result,
+          evaluatorName: evaluatorNameFor(verdict.evaluatorId),
+          occurredAt,
+        }),
+        carriedOver: true,
+      });
+    }
+  }
+
+  return { targetResults, evaluatorResults };
+};
+
+/**
+ * Writes the board cells the run carries into the run's stored results.
+ *
+ * Deliberately not routed through `processEventForStorage`, and deliberately
+ * not put on the SSE stream. That helper also reports every evaluator result
+ * into the evaluations pipeline, which would re-report verdicts from earlier
+ * runs as if they had just happened; and a carried cell on the stream would
+ * enter the backend runner's results draft and be written back over workbench
+ * cells this run never produced.
+ *
+ * A failure to write one carried row is logged and dropped. The board is
+ * context around the column the person asked for, so losing part of it must
+ * not stop the run they started.
+ */
+const recordCarriedOverBoard = async ({
+  projectId,
+  runId,
+  experimentId,
+  cells,
+  datasetRows,
+  state,
+  loadedEvaluators,
+  commands,
+}: {
+  projectId: string;
+  runId: string;
+  experimentId: string;
+  cells: CarriedOverCell[];
+  datasetRows: Array<Record<string, unknown>>;
+  state: EvaluationsV3State;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  commands: ReturnType<typeof getApp>["experimentRuns"];
+}): Promise<void> => {
+  if (cells.length === 0) return;
+
+  const { targetResults, evaluatorResults } = buildCarriedOverDispatches({
+    tenantId: projectId,
+    runId,
+    experimentId,
+    cells,
+    datasetRows,
+    evaluatorNameFor: (evaluatorId) => {
+      const config = state.evaluators.find(
+        (evaluator) => evaluator.id === evaluatorId,
+      );
+      const dbEvaluator = config?.dbEvaluatorId
+        ? loadedEvaluators?.get(config.dbEvaluatorId)
+        : null;
+      return dbEvaluator?.name ?? null;
+    },
+    occurredAt: Date.now(),
+  });
+
+  for (const dispatch of targetResults) {
+    await commands.recordTargetResult(dispatch).catch((err: unknown) => {
+      logger.warn(
+        { err, runId, targetId: dispatch.targetId, index: dispatch.index },
+        "Failed to record a carried-over target result",
+      );
+    });
+  }
+
+  for (const dispatch of evaluatorResults) {
+    await commands.recordEvaluatorResult(dispatch).catch((err: unknown) => {
+      logger.warn(
+        {
+          err,
+          runId,
+          targetId: dispatch.targetId,
+          evaluatorId: dispatch.evaluatorId,
+          index: dispatch.index,
+        },
+        "Failed to record a carried-over evaluator result",
+      );
+    });
+  }
+
+  logger.info(
+    {
+      runId,
+      experimentId,
+      carriedTargetResults: targetResults.length,
+      carriedEvaluatorResults: evaluatorResults.length,
+    },
+    "Carried the board into the run",
+  );
+};
+
+/**
  * Main orchestrator - executes all cells and yields SSE events.
  * Uses parallel execution with semaphore-based rate limiting.
  */
@@ -2554,6 +2753,7 @@ export async function* runOrchestrator(
     runId: providedRunId,
     concurrency: requestedConcurrency,
     seedTargetOutputs,
+    carriedOverCells,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -2682,6 +2882,17 @@ export async function* runOrchestrator(
       await abortManager.clearRunning(runId);
       throw err;
     }
+
+    await recordCarriedOverBoard({
+      projectId,
+      runId,
+      experimentId,
+      cells: carriedOverCells ?? [],
+      datasetRows,
+      state,
+      loadedEvaluators,
+      commands,
+    });
   }
 
   // Helper to process event for ClickHouse dispatch

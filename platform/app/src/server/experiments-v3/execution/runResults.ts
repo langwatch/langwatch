@@ -11,6 +11,7 @@
 import type { TargetRowMetadata } from "~/experiments-v3/types";
 import type { PersistedResults } from "~/experiments-v3/types/persistence";
 import {
+  type CarriedOverCell,
   type EvaluationV3Event,
   type ExecutionScope,
   UNNAMED_FAILURE,
@@ -304,6 +305,95 @@ const clearCoveredCell = ({
     if (plan.evaluatorId && evaluatorId !== plan.evaluatorId) continue;
     clearRow(byEvaluator, evaluatorId, rowIndex);
   }
+};
+
+/**
+ * The board's cells, minus the ones the run covers, as the run carries them.
+ *
+ * Reads the same four groups `mergeRunResults` writes, so there is one
+ * interpretation of the saved shape rather than two that can drift: a target's
+ * output, its metadata, its failure, and its verdicts, each a sparse array
+ * indexed by row.
+ *
+ * A cell with nothing on the board is not carried. Copying an empty cell would
+ * write a row saying the target produced nothing, which reads as a result.
+ */
+export const carriedOverCells = ({
+  results,
+  coveredCells,
+}: {
+  results?: PersistedResults;
+  /** `${rowIndex}:${targetId}` for every cell the run itself covers. */
+  coveredCells: ReadonlySet<string>;
+}): CarriedOverCell[] => {
+  if (!results) return [];
+
+  const cells = new Map<string, CarriedOverCell>();
+
+  const cellAt = ({
+    rowIndex,
+    targetId,
+  }: {
+    rowIndex: number;
+    targetId: string;
+  }): CarriedOverCell | null => {
+    const key = cellKey({ rowIndex, targetId });
+    if (coveredCells.has(key)) return null;
+    const existing = cells.get(key);
+    if (existing) return existing;
+    const created: CarriedOverCell = {
+      rowIndex,
+      targetId,
+      evaluatorResults: [],
+    };
+    cells.set(key, created);
+    return created;
+  };
+
+  for (const [targetId, outputs] of Object.entries(results.targetOutputs)) {
+    outputs.forEach((output, rowIndex) => {
+      if (output === undefined || output === null) return;
+      const cell = cellAt({ rowIndex, targetId });
+      if (cell) cell.output = output;
+    });
+  }
+
+  for (const [targetId, errors] of Object.entries(results.errors)) {
+    errors.forEach((error, rowIndex) => {
+      if (!error) return;
+      const cell = cellAt({ rowIndex, targetId });
+      if (cell) cell.error = error;
+    });
+  }
+
+  for (const [targetId, byEvaluator] of Object.entries(
+    results.evaluatorResults,
+  )) {
+    for (const [evaluatorId, verdicts] of Object.entries(byEvaluator)) {
+      verdicts.forEach((result, rowIndex) => {
+        if (result === undefined || result === null) return;
+        const cell = cellAt({ rowIndex, targetId });
+        if (cell) cell.evaluatorResults.push({ evaluatorId, result });
+      });
+    }
+  }
+
+  // Metadata last, and only onto cells something else already opened. A row
+  // holding cost but neither an output nor a failure is a leftover, not a
+  // result, and carrying it would draw an empty cell with a price on it.
+  for (const [targetId, metadata] of Object.entries(results.targetMetadata)) {
+    metadata.forEach((entry, rowIndex) => {
+      if (!entry) return;
+      const cell = cells.get(cellKey({ rowIndex, targetId }));
+      if (!cell) return;
+      if (entry.cost !== undefined) cell.cost = entry.cost;
+      if (entry.duration !== undefined) cell.duration = entry.duration;
+      if (entry.traceId !== undefined) cell.traceId = entry.traceId;
+      if (entry.domainError !== undefined) cell.domainError = entry.domainError;
+    });
+  }
+
+  return [...cells.values()];
 };
 
 export const mergeRunResults = ({

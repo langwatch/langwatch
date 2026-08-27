@@ -1,8 +1,10 @@
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type {
+  CarriedOverCell,
   ExecutionRequest,
   ExecutionScope,
 } from "~/server/experiments-v3/execution/types";
+import { carriedOverCells } from "~/server/experiments-v3/execution/runResults";
 import type {
   DatasetReference,
   EvaluationResults,
@@ -32,6 +34,12 @@ export type SeedableResults = Pick<
   "targetOutputs" | "targetMetadata"
 >;
 
+/** The saved cells a run reads when it carries the board in. */
+export type BoardResults = Pick<
+  EvaluationResults,
+  "targetOutputs" | "targetMetadata" | "evaluatorResults" | "errors"
+>;
+
 /** The workbench slice a request is built from. */
 export type ExecutionRequestState = {
   name: string;
@@ -41,7 +49,7 @@ export type ExecutionRequestState = {
   evaluators: EvaluatorConfig[];
   experimentId?: string;
   experimentSlug?: string;
-  results?: SeedableResults;
+  results?: SeedableResults & Partial<BoardResults>;
 };
 
 /**
@@ -198,6 +206,77 @@ const seedOneDependency = ({
   }
 };
 
+/**
+ * The cells a run covers itself, as `${rowIndex}:${targetId}` keys.
+ *
+ * `computeExecutionCells` answers this for every scope that names rows and
+ * columns. The single-cell `evaluator` scope names neither, so its one cell is
+ * added here; without it the run would carry that cell's old verdict in
+ * alongside the new one it is about to produce.
+ */
+const cellsCoveredByRun = ({
+  scope,
+  targetIds,
+  datasetRows,
+  extraCells,
+}: {
+  scope: ExecutionScope;
+  targetIds: string[];
+  datasetRows: Record<string, unknown>[];
+  extraCells: CellId[];
+}): Set<string> => {
+  const covered = new Set(
+    [
+      ...computeExecutionCells({ scope, targetIds, datasetRows }),
+      ...extraCells,
+    ].map((cell) => `${cell.rowIndex}:${cell.targetId}`),
+  );
+  if (scope.type === "evaluator") {
+    covered.add(`${scope.rowIndex}:${scope.targetId}`);
+  }
+  return covered;
+};
+
+/**
+ * The board cells a run carries rather than produces.
+ *
+ * One click stays one run. What the run CONTAINS grows: every cell the run does
+ * not cover is copied in from the board as it stood, so opening the run shows
+ * the whole board instead of the one column the person clicked.
+ *
+ * A full run carries nothing, because it covers every cell itself.
+ */
+export const planBoardCarryOver = ({
+  targets,
+  scope,
+  datasetRows,
+  results,
+  extraCells = [],
+}: {
+  targets: Pick<TargetConfig, "id">[];
+  scope: ExecutionScope;
+  datasetRows: Record<string, unknown>[];
+  results?: Partial<BoardResults>;
+  extraCells?: CellId[];
+}): CarriedOverCell[] => {
+  if (!results) return [];
+
+  return carriedOverCells({
+    results: {
+      targetOutputs: results.targetOutputs ?? {},
+      targetMetadata: results.targetMetadata ?? {},
+      evaluatorResults: results.evaluatorResults ?? {},
+      errors: results.errors ?? {},
+    },
+    coveredCells: cellsCoveredByRun({
+      scope,
+      targetIds: targets.map((target) => target.id),
+      datasetRows,
+      extraCells,
+    }),
+  });
+};
+
 /** The dataset a run evaluates: the active one, or the first one there is. */
 export const activeDatasetOf = (
   state: Pick<ExecutionRequestState, "datasets" | "activeDatasetId">,
@@ -301,6 +380,18 @@ export const buildExecutionRequest = ({
     results: state.results,
   });
 
+  // The board as it stands, minus what this run is about to produce. The page
+  // sends it rather than the server reading the saved state, because the page's
+  // board can be ahead of the last autosave and the run must hold what the
+  // person is actually looking at.
+  const carried = planBoardCarryOver({
+    targets: state.targets,
+    scope,
+    datasetRows,
+    results: state.results,
+    extraCells,
+  });
+
   const request: ExecutionRequest = {
     projectId,
     experimentId: state.experimentId ?? undefined,
@@ -321,6 +412,7 @@ export const buildExecutionRequest = ({
     ...(concurrency !== undefined ? { concurrency } : {}),
     seedTargetOutputs:
       Object.keys(seedTargetOutputs).length > 0 ? seedTargetOutputs : undefined,
+    carriedOverCells: carried.length > 0 ? carried : undefined,
   };
 
   return { request, executionCells: [...baseCells, ...extraCells] };
