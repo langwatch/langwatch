@@ -11,7 +11,6 @@ import {
   LuClock,
   LuCode,
   LuFileText,
-  LuTriangleAlert,
   LuTriangleRight,
 } from "react-icons/lu";
 import {
@@ -23,11 +22,11 @@ import {
   CostStatsTooltip,
   LatencyStatsTooltip,
 } from "~/components/shared/MetricStatsTooltip";
+import { PassRateCoverageChip } from "~/components/shared/PassRateCoverageChip";
 import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
-import { passRateCoverage } from "~/components/shared/passRateCoverage";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
@@ -233,11 +232,6 @@ const SummaryBadge = memo(function SummaryBadge({
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
 
-  const coverage = passRateCoverage({
-    completedRows: aggregates.completedRows,
-    totalRows: aggregates.totalRows,
-  });
-
   if (!hasResults) return null;
 
   return (
@@ -272,14 +266,10 @@ const SummaryBadge = memo(function SummaryBadge({
           the count beside it, a column at 30 of 40 rows reads as finished and
           invites a comparison against a column that did answer every row.
         */}
-        {!coverage.isComplete && (
-          <HStack gap={1}>
-            <Icon as={LuTriangleAlert} boxSize={3} color="orange.fg" />
-            <Text color="orange.fg" fontWeight="medium">
-              {aggregates.completedRows}/{aggregates.totalRows}
-            </Text>
-          </HStack>
-        )}
+        <PassRateCoverageChip
+          completedRows={aggregates.completedRows}
+          totalRows={aggregates.totalRows}
+        />
 
         {(aggregates.overallPassRate !== null ||
           aggregates.overallAverageScore !== null) && (

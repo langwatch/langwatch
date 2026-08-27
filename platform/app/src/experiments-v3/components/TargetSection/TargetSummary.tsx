@@ -3,7 +3,6 @@ import { memo } from "react";
 import {
   LuChevronRight,
   LuClock,
-  LuTriangleAlert,
   LuTriangleRight,
   LuZap,
 } from "react-icons/lu";
@@ -11,6 +10,7 @@ import {
   CostStatsTooltip,
   LatencyStatsTooltip,
 } from "~/components/shared/MetricStatsTooltip";
+import { PassRateCoverageChip } from "~/components/shared/PassRateCoverageChip";
 import {
   getPassRateGradientColor,
   PassRateCircle,
@@ -287,13 +287,11 @@ export const TargetSummary = memo(function TargetSummary({
           without the count a column at 30 of 40 rows reads as finished and
           invites a comparison against a column that did answer every row.
         */}
-        {!isRunning && !coverage.isComplete && hasResults && (
-          <HStack gap={1}>
-            <Icon as={LuTriangleAlert} boxSize={3} color="orange.fg" />
-            <Text color="orange.fg" fontWeight="medium">
-              {aggregates.completedRows}/{aggregates.totalRows}
-            </Text>
-          </HStack>
+        {!isRunning && hasResults && (
+          <PassRateCoverageChip
+            completedRows={aggregates.completedRows}
+            totalRows={aggregates.totalRows}
+          />
         )}
 
         {(aggregates.overallPassRate !== null ||
