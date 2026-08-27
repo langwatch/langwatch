@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for MemberDetailDialog covering the save flow:
+ * Integration tests for MemberAccessEditor covering the save flow:
  * - Organization role field visibility gated by `canManage` and `isCurrentUser`
  * - Save wires up `organization.updateMemberRole` when only the role changed
  * - Save wires up `roleBinding.applyMemberBindings` when only bindings changed
@@ -10,17 +10,41 @@
  *
  * Covers P2 #4 from the CodeRabbit review on PR #3315 — restoring UI integration
  * coverage after the previous `member-details.integration.test.tsx` was removed
- * when the page was replaced by this dialog.
+ * when the page was replaced by this editor. The editor moved out of the member
+ * dialog and into the person drawer when the access cluster was rebuilt; every
+ * staged-editing rule below travelled with it unchanged, which is what these
+ * tests are here to prove.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
-import type { PendingBinding } from "../GroupBindingInputRow";
+import type { PendingBinding } from "../../settings/GroupBindingInputRow";
+
+/**
+ * The two enum values this file uses, spelled out rather than imported.
+ *
+ * The editor needs no database, so this belongs in the component lane — and
+ * `integrationLanes.ts` reads a file's own source, so naming one anywhere,
+ * an import path included, moves the file to the lane that boots three
+ * services first. Standing that up to render a form into jsdom is the cost
+ * of the word rather than of the test. The values are the schema's own and
+ * are already written as strings throughout the assertions below.
+ */
+const OrganizationUserRole = {
+  ADMIN: "ADMIN",
+  MEMBER: "MEMBER",
+  EXTERNAL: "EXTERNAL",
+} as const;
+const RoleBindingScopeType = {
+  ORGANIZATION: "ORGANIZATION",
+  TEAM: "TEAM",
+  PROJECT: "PROJECT",
+} as const;
+type OrganizationUserRole =
+  (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
+type RoleBindingScopeType =
+  (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];
 
 const {
   mockUpdateMemberRole,
@@ -29,6 +53,7 @@ const {
   mockInvalidateListForOrg,
   mockInvalidateOrgWithMembers,
   mockInvalidateGetAll,
+  mockInvalidateGetMemberById,
   mockInvalidateGetUsage,
   mockToasterCreate,
   mockListForUserData,
@@ -40,6 +65,7 @@ const {
   mockInvalidateListForOrg: vi.fn().mockResolvedValue(undefined),
   mockInvalidateOrgWithMembers: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetAll: vi.fn().mockResolvedValue(undefined),
+  mockInvalidateGetMemberById: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetUsage: vi.fn().mockResolvedValue(undefined),
   mockToasterCreate: vi.fn(),
   mockListForUserData: {
@@ -70,6 +96,7 @@ vi.mock("~/utils/api", () => ({
           invalidate: mockInvalidateOrgWithMembers,
         },
         getAll: { invalidate: mockInvalidateGetAll },
+        getMemberById: { invalidate: mockInvalidateGetMemberById },
       },
       limits: { getUsage: { invalidate: mockInvalidateGetUsage } },
     }),
@@ -104,7 +131,7 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: (...args: unknown[]) => mockToasterCreate(...args) },
 }));
 
-vi.mock("../OrganizationUserRoleField", () => ({
+vi.mock("../../settings/OrganizationUserRoleField", () => ({
   OrganizationUserRoleField: ({
     value,
     onChange,
@@ -123,10 +150,10 @@ vi.mock("../OrganizationUserRoleField", () => ({
   ),
 }));
 
-vi.mock("../GroupBindingInputRow", async () => {
+vi.mock("../../settings/GroupBindingInputRow", async () => {
   const actual = await vi.importActual<
-    typeof import("../GroupBindingInputRow")
-  >("../GroupBindingInputRow");
+    typeof import("../../settings/GroupBindingInputRow")
+  >("../../settings/GroupBindingInputRow");
   const React = await vi.importActual<typeof import("react")>("react");
 
   const STUB_BINDING: PendingBinding = {
@@ -211,36 +238,29 @@ vi.mock("../GroupBindingInputRow", async () => {
   };
 });
 
-const { MemberDetailDialog } = await import("../MemberDetailDialog");
+const { MemberAccessEditor } = await import("../MemberAccessEditor");
 
 const Wrapper = ({ children }: { children?: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const baseMember = {
-  userId: "user-1",
-  role: OrganizationUserRole.MEMBER,
-  user: { name: "Sergio", email: "sergio@example.com" },
-};
-
 function renderDialog(
-  overrides: Partial<React.ComponentProps<typeof MemberDetailDialog>> = {},
+  overrides: Partial<React.ComponentProps<typeof MemberAccessEditor>> = {},
 ) {
   return render(
-    <MemberDetailDialog
-      member={baseMember}
+    <MemberAccessEditor
       organizationId="org-1"
+      userId="user-1"
+      memberRole={OrganizationUserRole.MEMBER}
       canManage={true}
       isCurrentUser={false}
-      open={true}
-      onClose={overrides.onClose ?? vi.fn()}
       {...overrides}
     />,
     { wrapper: Wrapper },
   );
 }
 
-describe("<MemberDetailDialog/>", () => {
+describe("<MemberAccessEditor/>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListForUserData.current = [];
@@ -383,7 +403,9 @@ describe("<MemberDetailDialog/>", () => {
 
       renderDialog();
 
-      fireEvent.click(screen.getByRole("button", { name: /remove binding/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /remove assignment/i }),
+      );
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await vi.waitFor(() => {
@@ -515,7 +537,7 @@ describe("<MemberDetailDialog/>", () => {
         // Only the off-seat VIEWER row is removable; the MEMBER row mirrors
         // the member's seat and is managed by the seat selector.
         expect(
-          screen.getAllByRole("button", { name: /remove binding/i }),
+          screen.getAllByRole("button", { name: /remove assignment/i }),
         ).toHaveLength(1);
       });
     });
@@ -685,9 +707,7 @@ describe("<MemberDetailDialog/>", () => {
 
     /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
     it("keeps the group's stored role and names the ceiling on a Lite Member seat", () => {
-      renderDialog({
-        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
-      });
+      renderDialog({ memberRole: OrganizationUserRole.EXTERNAL });
 
       expect(screen.getByText("ADMIN")).toBeTruthy();
       expect(
@@ -730,9 +750,7 @@ describe("<MemberDetailDialog/>", () => {
         },
       ];
 
-      renderDialog({
-        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
-      });
+      renderDialog({ memberRole: OrganizationUserRole.EXTERNAL });
 
       expect(screen.getByText("Data Scientist")).toBeTruthy();
       expect(
@@ -742,14 +760,23 @@ describe("<MemberDetailDialog/>", () => {
   });
 
   describe("when the user clicks Cancel", () => {
-    it("closes without firing any mutations", () => {
-      const onClose = vi.fn();
-      renderDialog({ onClose });
+    it("puts the draft back without firing any mutations", () => {
+      renderDialog();
 
       fireEvent.click(screen.getByTestId("org-role-field"));
+      expect(
+        screen
+          .getByRole("button", { name: /^save$/i })
+          .hasAttribute("disabled"),
+      ).toBe(false);
+
       fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(
+        screen
+          .getByRole("button", { name: /^save$/i })
+          .hasAttribute("disabled"),
+      ).toBe(true);
       expect(mockUpdateMemberRole).not.toHaveBeenCalled();
       expect(mockApplyMemberBindings).not.toHaveBeenCalled();
     });

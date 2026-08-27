@@ -149,6 +149,58 @@ async function bootUsageStatsWorker(
   }
 }
 
+// Warns the people who can renew a way back in that one is ending, at
+// fourteen, seven and one day. It never expires anything — a binding stops
+// being a way in because two numbers are compared, not because a job ran
+// (specs/identity/sso-onboarding-tiers.feature).
+async function bootBreakGlassExpiryWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startBreakGlassExpiryWorker } = await import(
+    "~/server/breakGlassExpiryWorker"
+  );
+  const worker = startBreakGlassExpiryWorker();
+  if (worker) {
+    shutdownHandles.push(() => worker.stop());
+    logger.info("break-glass expiry worker ready");
+  }
+}
+
+// Drops recorded SCIM requests once they age out (ADR-126). The table is
+// evidence rather than truth, so it has a retention window an event log would
+// never have, and this is the "somewhere that runs" enforcing it.
+async function bootScimRequestLogRetentionWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startScimRequestLogRetentionWorker } = await import(
+    "~/server/scimRequestLogRetentionWorker"
+  );
+  const worker = startScimRequestLogRetentionWorker();
+  if (worker) {
+    shutdownHandles.push(() => worker.stop());
+    logger.info("SCIM request log retention worker ready");
+  }
+}
+
+// Re-reads the TXT records that prove domains, and states what changed
+// (ADR-123). It never lapses anything on its own schedule: the deadline is
+// written on the wavering fact and compared when a check runs, so a missed
+// tick costs a late notice rather than a decision nobody made — and a lookup
+// that could not be answered costs nothing at all
+// (specs/identity/sso-domain-verification.feature).
+async function bootSsoDomainReproofWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startSsoDomainReproofWorker } = await import(
+    "~/server/ssoDomainReproofWorker"
+  );
+  const worker = startSsoDomainReproofWorker();
+  if (worker) {
+    shutdownHandles.push(() => worker.stop());
+    logger.info("sso domain re-proof worker ready");
+  }
+}
+
 /**
  * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
  * not `/metrics`.
@@ -519,6 +571,9 @@ export async function startWorkers(
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
     await bootUsageStatsWorker(shutdownHandles);
     await bootRealtimeSessionPoller(shutdownHandles);
+    await bootBreakGlassExpiryWorker(shutdownHandles);
+    await bootSsoDomainReproofWorker(shutdownHandles);
+    await bootScimRequestLogRetentionWorker(shutdownHandles);
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful

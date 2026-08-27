@@ -2,15 +2,14 @@ import {
   Badge,
   Box,
   Button,
-  Heading,
   HStack,
   Link,
-  Separator,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { LucideIcon } from "lucide-react";
 import {
+  Building2,
   ExternalLink,
   FileClock,
   KeyRound,
@@ -18,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { SettingsSection } from "~/components/settings/SettingsSection";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
@@ -127,8 +127,8 @@ function CapabilityRow({
  *
  * Cloud renders nothing: there these are provisioned by LangWatch as part of
  * the plan, so the section would be noise on a page about sign-in methods. The
- * leading separator belongs to the section for that reason, so Cloud does not
- * get a divider with nothing under it.
+ * panel belongs to the section for that reason — a Cloud deployment gets no
+ * empty card where this would have been.
  */
 /**
  * The states an operator cannot diagnose from the page alone: an identity
@@ -207,8 +207,19 @@ export function EnterpriseCapabilitiesSection() {
   if (!isSelfHosted) return null;
 
   return (
-    <>
-      <Separator />
+    // The section chrome and the header are the page's now (`SettingsSection`),
+    // so this no longer draws a separator above itself or a heading of a
+    // different size from every other section's.
+    <SettingsSection
+      icon={<Building2 size={18} />}
+      title="Organization sign-in and governance"
+      description={
+        isEnterprise
+          ? "Your license includes these capabilities. Each guide covers how to configure it on your deployment."
+          : "These run on the deployment you already have, unlocked by an Enterprise license."
+      }
+      testId="enterprise-capabilities-settings-section"
+    >
       <VStack
         align="start"
         gap={4}
@@ -217,16 +228,12 @@ export function EnterpriseCapabilitiesSection() {
       >
         <SsoConfiguredButNotInUseNotice />
 
-        <VStack align="start" gap={1}>
-          <Heading as="h2" size="md">
-            Organization sign-in and governance
-          </Heading>
-          <Text color="fg.muted" fontSize="sm">
-            {isEnterprise
-              ? "Your license includes these capabilities. Each guide covers how to configure it on your deployment."
-              : "These run on the deployment you already have, unlocked by an Enterprise license. Everything else in LangWatch, including unlimited members, teams, and projects, stays uncapped without one."}
+        {!isEnterprise ? (
+          <Text fontSize="sm" lineHeight="1.55" color="fg.muted">
+            Everything else in LangWatch, including unlimited members, teams,
+            and projects, stays uncapped without one.
           </Text>
-        </VStack>
+        ) : null}
 
         <VStack align="start" gap={3} width="full">
           {CAPABILITIES.map((capability) => (
@@ -255,6 +262,6 @@ export function EnterpriseCapabilitiesSection() {
           </HStack>
         )}
       </VStack>
-    </>
+    </SettingsSection>
   );
 }
