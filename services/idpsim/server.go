@@ -60,17 +60,49 @@ func (s *Server) tenantFor(r *http.Request) (*Tenant, bool) {
 	return s.Tenant(id)
 }
 
-// Handler is the full HTTP surface.
+// Handler is the full HTTP surface: the pages a person uses, the three
+// protocols a tenant speaks, and the control API that is the scriptable twin
+// of the pages.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	s.routePages(mux)
+	s.routeProtocols(mux)
+	s.routeControl(mux)
 
+	// HTTP (non-DNS) domain verification: any well-known path answers for the
+	// requested Host (or ?domain=).
+	mux.HandleFunc("GET /.well-known/{file...}", s.handleWellKnownVerification)
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "tenants": len(s.tenants)})
+	})
+	mux.HandleFunc("/", s.handleIndex)
+	return mux
+}
+
+// routePages is what a person clicks: a tenant's own page and the forms on it.
+func (s *Server) routePages(mux *http.ServeMux) {
 	// The tenant's own page: how to wire an application up, what is
 	// registered, and what it has been doing.
 	mux.HandleFunc("GET /t/{tenant}", s.handleTenantPage)
 	mux.HandleFunc("GET /t/{tenant}/{$}", s.handleTenantPage)
 	mux.HandleFunc("POST /t/{tenant}/apps", s.handleRegisterApplication)
+	// The DNS registry: this machine standing in for the registrar a reserved
+	// name has none of, so a domain proof can be walked the way a customer
+	// walks it rather than through a curl command.
+	mux.HandleFunc("POST /t/{tenant}/dns", s.handlePublishVerification)
+	mux.HandleFunc("POST /t/{tenant}/dns/delete", s.handleUnpublishVerification)
 	mux.HandleFunc("POST /t/{tenant}/apps/{client}/delete", s.handleRemoveApplication)
+	// Provisioning into a real service provider: the address and token that
+	// provider issued, then the two presses that use them.
+	mux.HandleFunc("POST /t/{tenant}/provisioning", s.handleSaveProvisioning)
+	mux.HandleFunc("POST /t/{tenant}/provisioning/delete", s.handleForgetProvisioning)
+	mux.HandleFunc("POST /t/{tenant}/provisioning/push", s.handlePushProvisioning)
+	mux.HandleFunc("POST /t/{tenant}/provisioning/pull", s.handlePullProvisioning)
+}
 
+// routeProtocols is what a tenant speaks to an application: OIDC, SAML and
+// SCIM, each of them per tenant.
+func (s *Server) routeProtocols(mux *http.ServeMux) {
 	// OIDC, per tenant.
 	mux.HandleFunc("GET /t/{tenant}/.well-known/openid-configuration", s.handleDiscovery)
 	mux.HandleFunc("GET /t/{tenant}/oauth/jwks", s.handleJWKS)
@@ -89,30 +121,25 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/t/{tenant}/scim/v2/Users/{id}", s.handleSCIMUser)
 	mux.HandleFunc("/t/{tenant}/scim/v2/Groups", s.handleSCIMGroups)
 	mux.HandleFunc("/t/{tenant}/scim/v2/Groups/{id}", s.handleSCIMGroup)
+}
 
-	// HTTP (non-DNS) domain verification: any well-known path answers for the
-	// requested Host (or ?domain=).
-	mux.HandleFunc("GET /.well-known/{file...}", s.handleWellKnownVerification)
-
-	// Control surface.
+// routeControl is the scriptable twin of the pages, for tests and setup
+// scripts.
+func (s *Server) routeControl(mux *http.ServeMux) {
 	mux.HandleFunc("GET /control/state", s.handleControlState)
 	mux.HandleFunc("POST /control/t/{tenant}/reset", s.handleControlReset)
 	mux.HandleFunc("POST /control/t/{tenant}/users", s.handleControlAddUser)
 	mux.HandleFunc("GET /control/t/{tenant}/activity", s.handleControlActivity)
 	mux.HandleFunc("POST /control/t/{tenant}/apps", s.handleControlRegisterApp)
 	mux.HandleFunc("POST /control/t/{tenant}/config", s.handleControlConfig)
+	mux.HandleFunc("PUT /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)
+	mux.HandleFunc("DELETE /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-push", s.handleControlSCIMPush)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-pull", s.handleControlSCIMPull)
 	mux.HandleFunc("PUT /control/dns/txt", s.handleControlDNS)
 	mux.HandleFunc("DELETE /control/dns/txt", s.handleControlDNS)
 	mux.HandleFunc("PUT /control/verification", s.handleControlVerification)
 	mux.HandleFunc("DELETE /control/verification", s.handleControlVerification)
-
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "tenants": len(s.tenants)})
-	})
-	mux.HandleFunc("/", s.handleIndex)
-	return mux
 }
 
 // startVerificationDNS binds the verification DNS listener.

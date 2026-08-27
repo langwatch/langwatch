@@ -62,7 +62,7 @@ Feature: The SCIM request log - what the provider asked, and what we answered
 
   # ── Reading it ─────────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: The requests a connection has served are on the SCIM settings page
     Given the directory has made several requests through "acme-okta"
     When "ana" opens the SCIM settings page
@@ -74,7 +74,7 @@ Feature: The SCIM request log - what the provider asked, and what we answered
     When "ana" reads the requests for "acme"
     Then none of "globex"'s requests are listed
 
-  @integration @unimplemented
+  @integration
   Scenario: Reading the requests takes seeing single sign-on, and writes nothing
     Given "acme" has a reader who may see single sign-on but not manage it
     When that reader opens the SCIM settings page
@@ -87,7 +87,7 @@ Feature: The SCIM request log - what the provider asked, and what we answered
   # honest signal available, so it is said in words rather than left for the
   # reader to infer from an empty feed that would be empty for other reasons
   # too.
-  @integration @unimplemented
+  @integration
   Scenario: A token nothing has presented says so, rather than only showing a date that is missing
     Given "acme" holds a token that has never verified
     When "ana" reads the provisioning tokens
@@ -103,7 +103,7 @@ Feature: The SCIM request log - what the provider asked, and what we answered
     Then those requests are gone
     And requests inside the window are untouched
 
-  @unit @unimplemented
+  @unit
   Scenario: An absent request is not evidence that it never happened
     Given a connection whose recorded requests have aged out
     When its requests are read

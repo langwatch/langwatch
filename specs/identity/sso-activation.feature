@@ -83,14 +83,14 @@ Feature: Going live with your own identity provider, without asking us
     When the setup screen is read
     Then the test sign-in step is not done
 
-  @unit @unimplemented
+  @unit
   Scenario: The test sign-in names the connection rather than waiting for routing
     Given sign-in routing is not switched on for the organization
     When the administrator starts a test sign-in
     Then it is sent to the connection this organization registered
     And nothing about anybody else's sign-in changes
 
-  @integration @unimplemented
+  @integration
   Scenario: The test sign-in is offered on the setup screen once a provider is registered
     When the administrator opens single sign-on setup
     Then they are offered a test sign-in
@@ -108,7 +108,7 @@ Feature: Going live with your own identity provider, without asking us
   # carries the state and leaves the cookie behind. Switching that check off to
   # save a step would weaken every sign-in on the installation.
 
-  @integration @unimplemented
+  @integration
   Scenario: Testing from another browser copies the page, never the sign-in
     When the administrator asks to test from another browser
     Then they are given a link to the page they are on
@@ -131,7 +131,7 @@ Feature: Going live with your own identity provider, without asking us
   # that answer is ROUTING, not the setting: an address only ever reaches a
   # connection whose domain that connection proved.
 
-  @integration @unimplemented
+  @integration
   Scenario: The journey asks who the connection lets in
     Given a connection whose domain is proved
     When the administrator reaches the step after the way back in
@@ -218,14 +218,14 @@ Feature: Going live with your own identity provider, without asking us
     Then that person is named
     And the date it ends is shown
 
-  @integration @unimplemented
+  @integration
   Scenario: Granting a way back in names a person and a date
     When the administrator grants a way back in to another administrator
     Then that person can sign in with a password even after single sign-on
     is on
     And the grant ends on the date that was chosen
 
-  @integration @unimplemented
+  @integration
   Scenario: A way back in can be extended before it ends
     Given somebody holds a way back in that ends soon
     When the administrator renews it
@@ -246,7 +246,7 @@ Feature: Going live with your own identity provider, without asking us
     Then it is refused with the code "sso_break_glass_last_way_in"
     And the refusal says to grant somebody else a way in first, or remove the connection itself
 
-  @integration @unimplemented
+  @integration
   Scenario: A way back in is not offered in our words
     When the administrator opens single sign-on setup
     Then the way back in is described as somebody who can still sign in with
@@ -259,7 +259,7 @@ Feature: Going live with your own identity provider, without asking us
     When the administrator grants a way back in
     Then the grant is accepted
 
-  @integration @unimplemented
+  @integration
   Scenario: A reader who may not manage single sign-on is offered no grant
     Given the administrator may see single sign-on but not change it
     When they open single sign-on setup
@@ -359,7 +359,7 @@ Feature: Going live with your own identity provider, without asking us
     And it says people in the proved domains now sign in through the
     identity provider
 
-  @integration @unimplemented
+  @integration
   Scenario: A step that cannot be read says so rather than looking finished
     Given the setup cannot be read
     When the administrator opens single sign-on setup

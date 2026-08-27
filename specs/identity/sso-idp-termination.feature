@@ -374,7 +374,7 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     published metadata address
     And they appear above the fields the administrator has to fill in
 
-  @integration @unimplemented
+  @integration
   Scenario: The administrator chooses which kind of provider they have
     When an administrator opens the registration form
     Then they can choose OpenID Connect or SAML, named by protocol and
@@ -384,7 +384,7 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And choosing SAML asks for the identity provider's metadata or its
     sign-in address, entity id and certificate
 
-  @integration @unimplemented
+  @integration
   Scenario: A reader who may not manage single sign-on is offered no form
     Given the administrator may see single sign-on but not change it
     When they open single sign-on setup
