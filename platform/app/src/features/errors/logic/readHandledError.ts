@@ -100,7 +100,7 @@ function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
   return {
     code,
     httpStatus: stampedStatus(err),
-    meta: envelopeMeta(envelope, code),
+    meta: envelopeMeta({ envelope, code }),
     fault: safeFault(ours ? envelope.fault : undefined),
     tips: safeTips(ours ? envelope.tips : undefined),
     docsUrl: ours ? safeDocsUrl(envelope.docs_url) : undefined,
@@ -130,10 +130,13 @@ function envelopeCode(envelope: Record<string, unknown>): string | null {
  * The structured detail, plus the envelope's own sentence kept under `message`
  * — where the registry looks for it when it has no copy of its own for a code.
  */
-function envelopeMeta(
-  envelope: Record<string, unknown>,
-  code: string,
-): Record<string, unknown> {
+function envelopeMeta({
+  envelope,
+  code,
+}: {
+  envelope: Record<string, unknown>;
+  code: string;
+}): Record<string, unknown> {
   const meta = isRecord(envelope.meta) ? { ...envelope.meta } : {};
   const message = str(envelope.message);
   if (message !== undefined && message !== code) {

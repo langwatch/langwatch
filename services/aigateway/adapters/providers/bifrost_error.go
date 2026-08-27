@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/bytedance/sonic"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
@@ -452,11 +453,18 @@ func bfDescribeUnquotableCause(category string, cause error) (string, bool) {
 // has a length of its own to fall back on.
 const bfMaxMetaValue = 120
 
+// bfClampMetaValue cuts at the last rune boundary at or before the limit, so a
+// model id ending in a multibyte character is not sliced into invalid UTF-8 on
+// its way to a JSON body and a log line.
 func bfClampMetaValue(v string) string {
 	if len(v) <= bfMaxMetaValue {
 		return v
 	}
-	return v[:bfMaxMetaValue] + "..."
+	cut := bfMaxMetaValue
+	for cut > 0 && !utf8.RuneStart(v[cut]) {
+		cut--
+	}
+	return v[:cut] + "..."
 }
 
 func bfStatus(e *bfschemas.BifrostError) int {

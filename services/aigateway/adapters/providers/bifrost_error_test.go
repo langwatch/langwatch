@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
@@ -353,6 +354,37 @@ func TestClassifyBifrostError_ClampsTheModelTheCallerSupplied(t *testing.T) {
 	require.True(t, ok)
 	assert.LessOrEqual(t, len(model), bfMaxMetaValue+len("..."))
 	assert.NotEqual(t, long, model)
+}
+
+// The clamp cuts bytes, and the limit lands mid-character for any model id
+// that is not ASCII. A cut rune is invalid UTF-8, which the JSON encoder
+// answers with U+FFFD and a log pipeline may reject outright — so the value
+// the customer sees to identify their own request would be corrupted by the
+// truncation meant to bound it.
+func TestClassifyBifrostError_ClampedModelStaysValidUTF8(t *testing.T) {
+	for name, long := range map[string]string{
+		// 3 bytes per rune: the 120-byte limit falls inside the 41st.
+		"CJK":   strings.Repeat("模", 200),
+		"emoji": strings.Repeat("🚀", 200),
+	} {
+		t.Run(name, func(t *testing.T) {
+			berr := &bfschemas.BifrostError{
+				Error:       &bfschemas.ErrorField{Message: bfNetworkErrorMessage},
+				ExtraFields: bfschemas.BifrostErrorExtraFields{ModelRequested: long},
+			}
+
+			var e herr.E
+			require.ErrorAs(t, classifyBifrostError(context.Background(), berr), &e)
+			model, ok := e.Meta["model"].(string)
+			require.True(t, ok)
+
+			assert.True(t, utf8.ValidString(model),
+				"the clamp split a multibyte character: %q", model)
+			assert.LessOrEqual(t, len(model), bfMaxMetaValue+len("..."),
+				"backing up to a rune boundary must not exceed the byte limit")
+			assert.NotEqual(t, long, model)
+		})
+	}
 }
 
 // The fallback copy must not relay Bifrost's own sentence. Its stream-read

@@ -35,13 +35,30 @@ type remediation struct {
 	docsPath string
 }
 
+// providerAlias folds the credential provider ids that name the same provider
+// onto one key. It is resolved once, before either map below is read, so the
+// docs page and the credential tips cannot disagree about who the provider is:
+// keying only providerDocsPath on the alias bought "vertex_ai" the Vertex page
+// and the generic tips, which is the copy this file exists to replace.
+var providerAlias = map[string]string{
+	"vertex_ai": "vertex",
+}
+
+// canonicalProvider resolves a credential provider id to the key both
+// providerDocsPath and providerCredentialTips are written against.
+func canonicalProvider(provider string) string {
+	if canonical, ok := providerAlias[provider]; ok {
+		return canonical
+	}
+	return provider
+}
+
 // providerDocsPath names the per-provider setup page for the providers that
 // have one, so a credential failure links to the page describing THAT
 // provider's credentials rather than the generic index. Keys are the
-// credential provider ids (domain.Provider*).
+// canonical credential provider ids (domain.Provider*, via canonicalProvider).
 var providerDocsPath = map[string]string{
 	"vertex":    "/ai-gateway/providers/vertex",
-	"vertex_ai": "/ai-gateway/providers/vertex",
 	"bedrock":   "/ai-gateway/providers/bedrock",
 	"azure":     "/ai-gateway/providers/azure-openai",
 	"gemini":    "/ai-gateway/providers/gemini",
@@ -53,12 +70,17 @@ var providerDocsPath = map[string]string{
 // differs: a service-account JSON document (Vertex), an access key and secret
 // (Bedrock), a key plus a resource endpoint (Azure), a project-scoped API key
 // (Gemini). Providers absent here fall back to the code's generic tips.
+//
+// Each list is ordered by descending value, because tipsFor reserves the last
+// slot for the terminality statement and drops the tail of this list to make
+// room. The line that survives longest should be the one that resolves the
+// most reports.
 var providerCredentialTips = map[string][]string{
 	"vertex": {
 		"Vertex AI authenticates with a Google Cloud service-account JSON document, not an API key — paste the whole file contents into the provider's credentials field",
 		"The document must be valid JSON with a top-level \"type\" of \"service_account\"; a file PATH, or the OAuth client JSON that has no \"type\", is rejected here",
-		"The service account needs the Vertex AI User role on the project named by Vertex Project ID",
 		"Vertex Location may be a region such as us-central1, or \"global\" — both are valid, and neither one causes this error",
+		"The service account needs the Vertex AI User role on the project named by Vertex Project ID",
 	},
 	"bedrock": {
 		"Bedrock authenticates with an AWS access key and secret (optionally a session token) — check all of them are present and current",
@@ -166,13 +188,23 @@ const maxTips = 4
 
 // tipsFor emits the provider-specific advice first so the cap keeps it, then
 // fills the remaining room from the code's generic tips.
+//
+// The first generic tip states that the failure is terminal, which the spec
+// requires of every credential answer ("it says the failure will repeat until
+// the credential is corrected"). A provider carrying maxTips specific lines
+// would push it past the cap and answer without it, so its slot is reserved
+// here rather than left to the truncation: the specific list is trimmed to
+// maxTips-1 and the generic tips supply the rest.
 func tipsFor(entry remediation, code herr.Code, provider string) []string {
 	if code != ErrProviderCredentialInvalid && code != ErrProviderCredentialRejected {
 		return capTips(entry.tips)
 	}
-	specific, ok := providerCredentialTips[provider]
+	specific, ok := providerCredentialTips[canonicalProvider(provider)]
 	if !ok {
 		return capTips(entry.tips)
+	}
+	if len(entry.tips) > 0 && len(specific) >= maxTips {
+		specific = specific[:maxTips-1]
 	}
 	tips := make([]string, 0, len(specific)+len(entry.tips))
 	tips = append(tips, specific...)
@@ -180,11 +212,12 @@ func tipsFor(entry remediation, code herr.Code, provider string) []string {
 	return capTips(tips)
 }
 
+// capTips copies rather than returning registry's own backing array, so a
+// caller appending to meta["tips"] cannot mutate the copy every later request
+// in this process reads.
 func capTips(tips []string) []string {
-	if len(tips) <= maxTips {
-		return tips
-	}
-	return tips[:maxTips]
+	n := min(len(tips), maxTips)
+	return append(make([]string, 0, n), tips[:n]...)
 }
 
 // docsFor resolves the provider's own setup page for the three codes whose fix
@@ -193,7 +226,7 @@ func capTips(tips []string) []string {
 func docsFor(entry remediation, code herr.Code, provider string) string {
 	if code == ErrProviderCredentialInvalid || code == ErrProviderCredentialRejected ||
 		code == ErrProviderConfigInvalid {
-		if path, ok := providerDocsPath[provider]; ok {
+		if path, ok := providerDocsPath[canonicalProvider(provider)]; ok {
 			return docsBase + path
 		}
 	}

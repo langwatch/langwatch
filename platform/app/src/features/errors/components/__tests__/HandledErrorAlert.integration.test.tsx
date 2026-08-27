@@ -96,11 +96,12 @@ describe("<HandledErrorAlert />", () => {
    * lower_snake_case fields, so these exercise `fromCanonicalEnvelope` rather
    * than the tRPC reading.
    *
-   * The tips are the four in
-   * `services/aigateway/domain/remediation.go#providerCredentialTips["vertex"]`,
-   * which is what the server sends and what `TestRemediate_Vertex…` pins on the
-   * Go side. Four, not more: `capTips` caps the server at the client's
-   * MAX_TIPS, so a fifth would be written only to be discarded.
+   * The tips are the four the server sends for this failure, pinned on the Go
+   * side by `TestRemediate_CapsTipsSoTheProviderSpecificOnesSurvive`: the top
+   * three of `remediation.go#providerCredentialTips["vertex"]`, then the
+   * statement that the failure is terminal, whose slot `tipsFor` reserves.
+   * Four, not more: `capTips` caps the server at the client's MAX_TIPS, so a
+   * fifth would be written only to be discarded.
    *
    * These failures used to reach customers as `provider_timeout`: "The model
    * provider timed out. Try again in a moment." for a pasted credential that
@@ -119,8 +120,8 @@ describe("<HandledErrorAlert />", () => {
       tips: [
         "Vertex AI authenticates with a Google Cloud service-account JSON document, not an API key — paste the whole file contents into the provider's credentials field",
         'The document must be valid JSON with a top-level "type" of "service_account"; a file PATH, or the OAuth client JSON that has no "type", is rejected here',
-        "The service account needs the Vertex AI User role on the project named by Vertex Project ID",
         'Vertex Location may be a region such as us-central1, or "global" — both are valid, and neither one causes this error',
+        "This failed before the request left LangWatch, so it is not a provider outage and retrying will not clear it",
       ],
     };
 

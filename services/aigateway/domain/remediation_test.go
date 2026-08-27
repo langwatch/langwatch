@@ -52,8 +52,53 @@ func TestRemediate_VertexCredentialFailureNamesWhatVertexNeeds(t *testing.T) {
 		"and what makes one valid, which is the failure they actually hit")
 	assert.Contains(t, joined, "global",
 		"and that the location is not the cause, which is where the report went first")
+	assert.Contains(t, joined, "retrying will not clear it",
+		"and that no retry helps — Vertex carries maxTips specific lines, so this "+
+			"is the tip the cap drops unless tipsFor reserves its slot")
 	assert.Equal(t, "https://docs.langwatch.ai/ai-gateway/providers/vertex", got.Meta["docs_url"],
 		"a Vertex failure links to the Vertex page, not the provider index")
+}
+
+// vertex_ai is the credential provider id the reported failure actually
+// carried. Keying only the docs map on it bought the Vertex page and the
+// generic two-line advice — the exact "check your credentials" answer this
+// file replaces, delivered under a link that looks specific.
+// @scenario "A terminal provider failure tells the caller how to fix it"
+func TestRemediate_VertexAliasResolvesTipsAndDocsAlike(t *testing.T) {
+	e := herr.E{
+		Code: ErrProviderCredentialInvalid,
+		Meta: herr.M{"message": "not accepted", "provider": "vertex_ai"},
+	}
+
+	got := Remediate(e)
+
+	tips, ok := got.Meta["tips"].([]string)
+	require.True(t, ok, "tips must be attached")
+	assert.Contains(t, strings.Join(tips, "\n"), "service-account JSON document",
+		"vertex_ai resolves the same credential artifact as vertex")
+	assert.Equal(t, "https://docs.langwatch.ai/ai-gateway/providers/vertex", got.Meta["docs_url"],
+		"and the same page, so the two cannot disagree about who the provider is")
+}
+
+// A truncating capTips used to hand back a prefix of its input, which keeps
+// the spare capacity of the array behind it. Appending to that prefix writes
+// through into the source — and every source here is either the package-level
+// registry or a slice built from it, so one consumer appending to meta["tips"]
+// would rewrite the advice every later request in the process reads.
+//
+// Asserted on capTips directly: no registry entry is long enough to truncate
+// today, so routing this through Remediate would assert nothing.
+// @scenario "A terminal provider failure tells the caller how to fix it"
+func TestCapTips_DoesNotAliasItsInput(t *testing.T) {
+	source := []string{"a", "b", "c", "d", "e", "f"}
+	require.Greater(t, len(source), maxTips, "the input must be long enough to truncate")
+
+	capped := capTips(source)
+	require.Len(t, capped, maxTips)
+	_ = append(capped, "appended by a consumer")
+
+	assert.Equal(t, "e", source[maxTips],
+		"the append wrote through the returned prefix into the source slice")
 }
 
 // Each provider's credential is a different artifact, and generic advice is
@@ -157,11 +202,21 @@ func TestRemediate_EveryNewProviderCodeHasAdvice(t *testing.T) {
 // is why the cap is applied here, where the ordering can decide what survives:
 // Vertex contributes four provider-specific tips on top of two generic ones,
 // and the provider-specific ones are the reason this registry exists.
+//
+// The last slot is not theirs to take, though. The spec requires every
+// credential answer to say the failure is terminal, and Vertex alone carries
+// enough specific lines to push that sentence out — so the surviving four are
+// the three highest-value Vertex lines plus the terminality statement, not the
+// four Vertex lines. Asserted as an exact list because the failure this guards
+// is a tip going missing.
 // @scenario "A provider-setup failure tells the customer how to fix it"
 func TestRemediate_CapsTipsSoTheProviderSpecificOnesSurvive(t *testing.T) {
 	generic := registry[ErrProviderCredentialInvalid].tips
-	require.Greater(t, len(providerCredentialTips["vertex"])+len(generic), maxTips,
+	specific := providerCredentialTips["vertex"]
+	require.Greater(t, len(specific)+len(generic), maxTips,
 		"vertex must over-fill the cap, or this test proves nothing")
+	require.GreaterOrEqual(t, len(specific), maxTips,
+		"vertex must fill the cap on its own, or the reserved slot proves nothing")
 
 	got := Remediate(herr.E{
 		Code: ErrProviderCredentialInvalid,
@@ -171,8 +226,9 @@ func TestRemediate_CapsTipsSoTheProviderSpecificOnesSurvive(t *testing.T) {
 	tips, ok := got.Meta["tips"].([]string)
 	require.True(t, ok)
 	assert.Len(t, tips, maxTips, "more than this and the client drops the tail unseen")
-	assert.Equal(t, providerCredentialTips["vertex"], tips,
-		"the cap keeps the provider-specific advice and drops the generic tail")
+	assert.Equal(t, append(append([]string{}, specific[:maxTips-1]...), generic[0]), tips,
+		"the cap keeps the top provider-specific advice and reserves the last slot "+
+			"for the terminality statement")
 }
 
 // The per-provider docs page is for the codes whose FIX is provider-specific.
