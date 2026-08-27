@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DisabledPipeline } from "../../disabledPipeline";
+import { createTenantId } from "../../domain/tenantId";
 import { defineAggregate, defineEvents } from "../../domain/definitions";
 import type { Event } from "../../domain/types";
 import { EventSourcing } from "../../eventSourcing";
 import { definePipeline } from "../../pipeline/staticBuilder";
-import { createMockEventStore } from "../../services/__tests__/testHelpers";
+import {
+  createMockEventStore,
+  createMockMapProjectionDefinition,
+} from "../../services/__tests__/testHelpers";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
 
 /**
@@ -139,6 +143,49 @@ describe("EventSourcing", () => {
       expect(pipeline.name).toBe("test-pipeline");
       expect(pipeline.aggregateType).toBe("trace");
     });
+
+    it("forwards projection payload preparation into the live pipeline", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const mapProjection = createMockMapProjectionDefinition<Event>("spanStorage", {
+        eventTypes: ["test.event"],
+      });
+      const prepare = vi.fn((event: Event) => ({
+        ...event,
+        data: { ...(event.data as Record<string, unknown>), leaned: true },
+      }));
+      const definition = definePipeline<Event>({
+        name: "prepared-pipeline",
+        aggregate: defineAggregate({
+          type: "trace",
+          events: defineEvents(["test.event"] as const),
+        }),
+      })
+        .withProjectionPayloadPreparation(prepare)
+        .withClickHouseMapProjection(mapProjection)
+        .build();
+      const eventSourcing = EventSourcing.createForTesting({ eventStore });
+      const pipeline = eventSourcing.register(definition);
+      const tenantId = createTenantId("project-1");
+      const event: Event = {
+        id: "event-1",
+        aggregateId: "trace-1",
+        aggregateType: "trace",
+        tenantId,
+        type: "test.event",
+        version: "2026-01-01",
+        createdAt: 1,
+        occurredAt: 1,
+        data: {},
+      };
+
+      await pipeline.service.storeEvents([event], { tenantId });
+
+      expect(eventStore.storeEvents).toHaveBeenCalledWith([event], { tenantId }, "trace");
+      expect(mapProjection.map).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { leaned: true } }),
+      );
+      await eventSourcing.close();
+    });
   });
 
   describe("close", () => {
@@ -151,9 +198,7 @@ describe("EventSourcing", () => {
       es.register(createTestPipelineDefinition());
       await es.close();
 
-      expect(() => es.getPipeline("test-pipeline")).toThrow(
-        'Pipeline "test-pipeline" not found',
-      );
+      expect(() => es.getPipeline("test-pipeline")).toThrow('Pipeline "test-pipeline" not found');
     });
   });
 
@@ -163,9 +208,7 @@ describe("EventSourcing", () => {
         eventStore: createMockEventStore<Event>(),
       });
 
-      expect(() => es.getPipeline("nonexistent")).toThrow(
-        'Pipeline "nonexistent" not found',
-      );
+      expect(() => es.getPipeline("nonexistent")).toThrow('Pipeline "nonexistent" not found');
     });
 
     it("returns a registered pipeline", () => {

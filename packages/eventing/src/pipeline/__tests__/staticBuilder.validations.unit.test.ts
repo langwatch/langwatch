@@ -46,6 +46,16 @@ describe("PipelineBuilder validations", () => {
     vi.restoreAllMocks();
   });
 
+  describe("when projection payload preparation is configured", () => {
+    it("keeps the transform on the built definition", () => {
+      const prepare = vi.fn((event: Event) => event);
+
+      const pipeline = testPipeline<Event>().withProjectionPayloadPreparation(prepare).build();
+
+      expect(pipeline.prepareEventForProjection).toBe(prepare);
+    });
+  });
+
   describe("when fold projection with custom key is registered", () => {
     it("builds successfully", () => {
       const fold = {
@@ -53,9 +63,7 @@ describe("PipelineBuilder validations", () => {
         key: (event: Event) => String(event.tenantId),
       };
 
-      expect(() =>
-        testPipeline<Event>().withClickHouseFoldProjection(fold).build(),
-      ).not.toThrow();
+      expect(() => testPipeline<Event>().withClickHouseFoldProjection(fold).build()).not.toThrow();
     });
   });
 
@@ -63,9 +71,7 @@ describe("PipelineBuilder validations", () => {
     it("builds successfully", () => {
       const fold = createMockFoldProjectionDefinition<Event>("simple");
 
-      expect(() =>
-        testPipeline<Event>().withClickHouseFoldProjection(fold).build(),
-      ).not.toThrow();
+      expect(() => testPipeline<Event>().withClickHouseFoldProjection(fold).build()).not.toThrow();
     });
   });
 
@@ -178,17 +184,16 @@ describe("PipelineBuilder validations", () => {
         })
         .build();
 
-      const deduplication =
-        pipeline.eventSubscribers.get("settle")?.options?.deduplication;
+      const deduplication = pipeline.eventSubscribers.get("settle")?.options?.deduplication;
       expect(deduplication).toMatchObject({
         ttlMs: 12_000,
         extend: false,
         replace: false,
         shouldSurviveDispatch: true,
       });
-      expect(
-        deduplication === "aggregate" ? undefined : deduplication?.makeId(event),
-      ).toBe("custom:trace-1");
+      expect(deduplication === "aggregate" ? undefined : deduplication?.makeId(event)).toBe(
+        "custom:trace-1",
+      );
     });
   });
 

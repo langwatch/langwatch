@@ -58,9 +58,7 @@ export interface CommandSerializationOptions<Payload = any> {
 /**
  * Options for configuring a command handler in a static pipeline definition.
  */
-export interface CommandHandlerOptions<
-  Payload = any,
-> extends CommandSerializationOptions<Payload> {
+export interface CommandHandlerOptions<Payload = any> extends CommandSerializationOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;
@@ -110,6 +108,13 @@ export interface StaticPipelineDefinition<
 
   /** Pipeline metadata for introspection and tooling */
   metadata: PipelineMetadata;
+
+  /**
+   * Process-composed payload preparation between durable event storage and
+   * live projection/subscriber dispatch. The event store always receives the
+   * original event.
+   */
+  prepareEventForProjection?: (event: EventType) => EventType;
 
   /** Fold projections (stateful, reduce events into state) registered in this pipeline */
   foldProjections: Map<

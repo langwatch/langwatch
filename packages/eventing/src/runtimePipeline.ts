@@ -35,10 +35,7 @@ export class EventSourcingPipeline<
       commands: [],
     };
 
-    pipelineLogger.debug(
-      { pipelineName: definition.name },
-      "Initialized event-sourcing pipeline",
-    );
+    pipelineLogger.debug({ pipelineName: definition.name }, "Initialized event-sourcing pipeline");
 
     this.service = new EventSourcingService<EventType, ProjectionTypes>({
       pipelineName: definition.name,
@@ -58,6 +55,7 @@ export class EventSourcingPipeline<
       executionTarget: definition.executionTarget,
       replayMarkerChecker: definition.replayMarkerChecker,
       retentionPolicyResolver: definition.retentionPolicyResolver,
+      prepareEventForProjection: definition.prepareEventForProjection,
     });
   }
 }

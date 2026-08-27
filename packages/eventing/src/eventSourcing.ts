@@ -67,9 +67,7 @@ interface RuntimeStores {
  * Type helper to convert registered commands union to a record of queue processors.
  */
 type CommandsToProcessors<Commands extends RegisteredCommand> = {
-  [K in Commands as K["name"]]: EventSourcedQueueProcessor<
-    K["payload"] & Record<string, unknown>
-  >;
+  [K in Commands as K["name"]]: EventSourcedQueueProcessor<K["payload"] & Record<string, unknown>>;
 };
 
 /**
@@ -287,6 +285,7 @@ export class EventSourcing {
           executionTarget: this._executionTarget,
           replayMarkerChecker: this._replayMarkerChecker,
           retentionPolicyResolver: this._retentionPolicyResolver,
+          prepareEventForProjection: definition.prepareEventForProjection,
         });
 
         // Get command dispatchers
@@ -371,10 +370,7 @@ export class EventSourcing {
     const jobName = payload.__jobName as string;
 
     if (!pipelineName || !jobType || !jobName) {
-      logger.debug(
-        { pipelineName, jobType, jobName },
-        "Job payload missing routing metadata",
-      );
+      logger.debug({ pipelineName, jobType, jobName }, "Job payload missing routing metadata");
       return null;
     }
 
@@ -425,10 +421,7 @@ export class EventSourcing {
    * worker that does have the pipeline picks it up. This generic path never
    * decides on its own that a record is disposable.
    */
-  private rejectUnroutableJob(
-    payload: Record<string, unknown>,
-    queueName: string,
-  ): never {
+  private rejectUnroutableJob(payload: Record<string, unknown>, queueName: string): never {
     const identity = EventSourcing.jobIdentity(payload);
     logger.error(
       identity,
@@ -506,10 +499,7 @@ export class EventSourcing {
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBytes;
       },
-      processBatch: async (
-        payloads: Record<string, unknown>[],
-        delivery?: JobDelivery,
-      ) => {
+      processBatch: async (payloads: Record<string, unknown>[], delivery?: JobDelivery) => {
         if (payloads.length === 0) return;
         // A coalesced batch is always one group → one registry entry. Resolve
         // every payload and guard against a mixed/unknown batch (should never
@@ -643,19 +633,15 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const foldSubscriberList = Array.from(definition.foldSubscribers.values()).map(
-    (entry) => ({
-      foldName: entry.projectionName as string,
-      definition: entry.definition,
-    }),
-  );
+  const foldSubscriberList = Array.from(definition.foldSubscribers.values()).map((entry) => ({
+    foldName: entry.projectionName as string,
+    definition: entry.definition,
+  }));
 
-  const mapSubscriberList = Array.from(definition.mapSubscribers.values()).map(
-    (entry) => ({
-      mapName: entry.projectionName as string,
-      definition: entry.definition,
-    }),
-  );
+  const mapSubscriberList = Array.from(definition.mapSubscribers.values()).map((entry) => ({
+    mapName: entry.projectionName as string,
+    definition: entry.definition,
+  }));
 
   const foldSubscribers = foldSubscriberList.length > 0 ? foldSubscriberList : undefined;
   const mapSubscribers = mapSubscriberList.length > 0 ? mapSubscriberList : undefined;

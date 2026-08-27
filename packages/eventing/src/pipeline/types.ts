@@ -77,6 +77,7 @@ export interface EventSourcingPipelineDefinition<
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  prepareEventForProjection?: (event: EventType) => EventType;
 }
 
 export interface RegisteredPipeline<
