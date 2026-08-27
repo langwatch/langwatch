@@ -23,11 +23,13 @@ class PostApiScenarioEventsBodyType0Metadata:
     Attributes:
         name (str | Unset):
         description (str | Unset):
+        note (str | Unset):
         langwatch (PostApiScenarioEventsBodyType0MetadataLangwatch | Unset):
     """
 
     name: str | Unset = UNSET
     description: str | Unset = UNSET
+    note: str | Unset = UNSET
     langwatch: PostApiScenarioEventsBodyType0MetadataLangwatch | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -35,6 +37,8 @@ class PostApiScenarioEventsBodyType0Metadata:
         name = self.name
 
         description = self.description
+
+        note = self.note
 
         langwatch: dict[str, Any] | Unset = UNSET
         if not isinstance(self.langwatch, Unset):
@@ -47,6 +51,8 @@ class PostApiScenarioEventsBodyType0Metadata:
             field_dict["name"] = name
         if description is not UNSET:
             field_dict["description"] = description
+        if note is not UNSET:
+            field_dict["note"] = note
         if langwatch is not UNSET:
             field_dict["langwatch"] = langwatch
 
@@ -63,6 +69,8 @@ class PostApiScenarioEventsBodyType0Metadata:
 
         description = d.pop("description", UNSET)
 
+        note = d.pop("note", UNSET)
+
         _langwatch = d.pop("langwatch", UNSET)
         langwatch: PostApiScenarioEventsBodyType0MetadataLangwatch | Unset
         if isinstance(_langwatch, Unset):
@@ -73,6 +81,7 @@ class PostApiScenarioEventsBodyType0Metadata:
         post_api_scenario_events_body_type_0_metadata = cls(
             name=name,
             description=description,
+            note=note,
             langwatch=langwatch,
         )
 

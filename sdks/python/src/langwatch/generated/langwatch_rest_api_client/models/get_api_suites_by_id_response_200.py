@@ -6,7 +6,13 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.get_api_suites_by_id_response_200_kind import GetApiSuitesByIdResponse200Kind
+
 if TYPE_CHECKING:
+    from ..models.get_api_suites_by_id_response_200_scope_type_0 import GetApiSuitesByIdResponse200ScopeType0
+    from ..models.get_api_suites_by_id_response_200_scope_type_1 import GetApiSuitesByIdResponse200ScopeType1
+    from ..models.get_api_suites_by_id_response_200_scope_type_2 import GetApiSuitesByIdResponse200ScopeType2
+    from ..models.get_api_suites_by_id_response_200_scope_type_3 import GetApiSuitesByIdResponse200ScopeType3
     from ..models.get_api_suites_by_id_response_200_targets_item import GetApiSuitesByIdResponse200TargetsItem
 
 
@@ -20,8 +26,15 @@ class GetApiSuitesByIdResponse200:
         id (str):
         name (str):
         slug (str):
+        kind (GetApiSuitesByIdResponse200Kind): custom is a hand-assembled run plan; folder is a test suite that groups
+            scenarios filed into it.
         description (None | str):
         scenario_ids (list[str]):
+        scope (GetApiSuitesByIdResponse200ScopeType0 | GetApiSuitesByIdResponse200ScopeType1 |
+            GetApiSuitesByIdResponse200ScopeType2 | GetApiSuitesByIdResponse200ScopeType3 | None): What the run plan covers:
+            all (every active scenario), folders (the cases filed in the named test suites), labels (the cases carrying any
+            of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a scenario
+            written later runs without editing the plan.
         targets (list[GetApiSuitesByIdResponse200TargetsItem]):
         repeat_count (float):
         labels (list[str]):
@@ -33,8 +46,16 @@ class GetApiSuitesByIdResponse200:
     id: str
     name: str
     slug: str
+    kind: GetApiSuitesByIdResponse200Kind
     description: None | str
     scenario_ids: list[str]
+    scope: (
+        GetApiSuitesByIdResponse200ScopeType0
+        | GetApiSuitesByIdResponse200ScopeType1
+        | GetApiSuitesByIdResponse200ScopeType2
+        | GetApiSuitesByIdResponse200ScopeType3
+        | None
+    )
     targets: list[GetApiSuitesByIdResponse200TargetsItem]
     repeat_count: float
     labels: list[str]
@@ -44,16 +65,35 @@ class GetApiSuitesByIdResponse200:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.get_api_suites_by_id_response_200_scope_type_0 import GetApiSuitesByIdResponse200ScopeType0
+        from ..models.get_api_suites_by_id_response_200_scope_type_1 import GetApiSuitesByIdResponse200ScopeType1
+        from ..models.get_api_suites_by_id_response_200_scope_type_2 import GetApiSuitesByIdResponse200ScopeType2
+        from ..models.get_api_suites_by_id_response_200_scope_type_3 import GetApiSuitesByIdResponse200ScopeType3
+
         id = self.id
 
         name = self.name
 
         slug = self.slug
 
+        kind = self.kind.value
+
         description: None | str
         description = self.description
 
         scenario_ids = self.scenario_ids
+
+        scope: dict[str, Any] | None
+        if isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType1):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType2):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType3):
+            scope = self.scope.to_dict()
+        else:
+            scope = self.scope
 
         targets = []
         for targets_item_data in self.targets:
@@ -77,8 +117,10 @@ class GetApiSuitesByIdResponse200:
                 "id": id,
                 "name": name,
                 "slug": slug,
+                "kind": kind,
                 "description": description,
                 "scenarioIds": scenario_ids,
+                "scope": scope,
                 "targets": targets,
                 "repeatCount": repeat_count,
                 "labels": labels,
@@ -92,6 +134,10 @@ class GetApiSuitesByIdResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_suites_by_id_response_200_scope_type_0 import GetApiSuitesByIdResponse200ScopeType0
+        from ..models.get_api_suites_by_id_response_200_scope_type_1 import GetApiSuitesByIdResponse200ScopeType1
+        from ..models.get_api_suites_by_id_response_200_scope_type_2 import GetApiSuitesByIdResponse200ScopeType2
+        from ..models.get_api_suites_by_id_response_200_scope_type_3 import GetApiSuitesByIdResponse200ScopeType3
         from ..models.get_api_suites_by_id_response_200_targets_item import GetApiSuitesByIdResponse200TargetsItem
 
         d = dict(src_dict)
@@ -101,6 +147,8 @@ class GetApiSuitesByIdResponse200:
 
         slug = d.pop("slug")
 
+        kind = GetApiSuitesByIdResponse200Kind(d.pop("kind"))
+
         def _parse_description(data: object) -> None | str:
             if data is None:
                 return data
@@ -109,6 +157,60 @@ class GetApiSuitesByIdResponse200:
         description = _parse_description(d.pop("description"))
 
         scenario_ids = cast(list[str], d.pop("scenarioIds"))
+
+        def _parse_scope(
+            data: object,
+        ) -> (
+            GetApiSuitesByIdResponse200ScopeType0
+            | GetApiSuitesByIdResponse200ScopeType1
+            | GetApiSuitesByIdResponse200ScopeType2
+            | GetApiSuitesByIdResponse200ScopeType3
+            | None
+        ):
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_0 = GetApiSuitesByIdResponse200ScopeType0.from_dict(data)
+
+                return scope_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_1 = GetApiSuitesByIdResponse200ScopeType1.from_dict(data)
+
+                return scope_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_2 = GetApiSuitesByIdResponse200ScopeType2.from_dict(data)
+
+                return scope_type_2
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_3 = GetApiSuitesByIdResponse200ScopeType3.from_dict(data)
+
+                return scope_type_3
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(
+                GetApiSuitesByIdResponse200ScopeType0
+                | GetApiSuitesByIdResponse200ScopeType1
+                | GetApiSuitesByIdResponse200ScopeType2
+                | GetApiSuitesByIdResponse200ScopeType3
+                | None,
+                data,
+            )
+
+        scope = _parse_scope(d.pop("scope"))
 
         targets = []
         _targets = d.pop("targets")
@@ -131,8 +233,10 @@ class GetApiSuitesByIdResponse200:
             id=id,
             name=name,
             slug=slug,
+            kind=kind,
             description=description,
             scenario_ids=scenario_ids,
+            scope=scope,
             targets=targets,
             repeat_count=repeat_count,
             labels=labels,

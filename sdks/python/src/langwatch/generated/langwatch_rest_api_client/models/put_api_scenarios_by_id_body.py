@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.put_api_scenarios_by_id_body_parameters_item import PutApiScenariosByIdBodyParametersItem
+
 
 T = TypeVar("T", bound="PutApiScenariosByIdBody")
 
@@ -19,12 +23,20 @@ class PutApiScenariosByIdBody:
         situation (str | Unset):
         criteria (list[str] | Unset):
         labels (list[str] | Unset):
+        parameters (list[PutApiScenariosByIdBodyParametersItem] | Unset): The parameters this scenario declares by name,
+            each with an optional description and default. A run supplies values for these names, readable from the
+            scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
+            encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
+        folder_id (None | str | Unset): The test suite (folder) to file this scenario in. It must name a non-archived
+            folder of the same project. null unfiles the scenario.
     """
 
     name: str | Unset = UNSET
     situation: str | Unset = UNSET
     criteria: list[str] | Unset = UNSET
     labels: list[str] | Unset = UNSET
+    parameters: list[PutApiScenariosByIdBodyParametersItem] | Unset = UNSET
+    folder_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -40,6 +52,19 @@ class PutApiScenariosByIdBody:
         if not isinstance(self.labels, Unset):
             labels = self.labels
 
+        parameters: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.parameters, Unset):
+            parameters = []
+            for parameters_item_data in self.parameters:
+                parameters_item = parameters_item_data.to_dict()
+                parameters.append(parameters_item)
+
+        folder_id: None | str | Unset
+        if isinstance(self.folder_id, Unset):
+            folder_id = UNSET
+        else:
+            folder_id = self.folder_id
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -51,11 +76,17 @@ class PutApiScenariosByIdBody:
             field_dict["criteria"] = criteria
         if labels is not UNSET:
             field_dict["labels"] = labels
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
+        if folder_id is not UNSET:
+            field_dict["folderId"] = folder_id
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.put_api_scenarios_by_id_body_parameters_item import PutApiScenariosByIdBodyParametersItem
+
         d = dict(src_dict)
         name = d.pop("name", UNSET)
 
@@ -65,11 +96,31 @@ class PutApiScenariosByIdBody:
 
         labels = cast(list[str], d.pop("labels", UNSET))
 
+        _parameters = d.pop("parameters", UNSET)
+        parameters: list[PutApiScenariosByIdBodyParametersItem] | Unset = UNSET
+        if _parameters is not UNSET:
+            parameters = []
+            for parameters_item_data in _parameters:
+                parameters_item = PutApiScenariosByIdBodyParametersItem.from_dict(parameters_item_data)
+
+                parameters.append(parameters_item)
+
+        def _parse_folder_id(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        folder_id = _parse_folder_id(d.pop("folderId", UNSET))
+
         put_api_scenarios_by_id_body = cls(
             name=name,
             situation=situation,
             criteria=criteria,
             labels=labels,
+            parameters=parameters,
+            folder_id=folder_id,
         )
 
         put_api_scenarios_by_id_body.additional_properties = d

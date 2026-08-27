@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+
+if TYPE_CHECKING:
+    from ..models.post_api_scenarios_response_201_parameters_item import PostApiScenariosResponse201ParametersItem
+
 
 T = TypeVar("T", bound="PostApiScenariosResponse201")
 
@@ -18,6 +22,8 @@ class PostApiScenariosResponse201:
         situation (str):
         criteria (list[str]):
         labels (list[str]):
+        parameters (list[PostApiScenariosResponse201ParametersItem]):
+        folder_id (None | str): The test suite (folder) this scenario is filed in, or null when unfiled.
         platform_url (str):
     """
 
@@ -26,6 +32,8 @@ class PostApiScenariosResponse201:
     situation: str
     criteria: list[str]
     labels: list[str]
+    parameters: list[PostApiScenariosResponse201ParametersItem]
+    folder_id: None | str
     platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -40,6 +48,14 @@ class PostApiScenariosResponse201:
 
         labels = self.labels
 
+        parameters = []
+        for parameters_item_data in self.parameters:
+            parameters_item = parameters_item_data.to_dict()
+            parameters.append(parameters_item)
+
+        folder_id: None | str
+        folder_id = self.folder_id
+
         platform_url = self.platform_url
 
         field_dict: dict[str, Any] = {}
@@ -51,6 +67,8 @@ class PostApiScenariosResponse201:
                 "situation": situation,
                 "criteria": criteria,
                 "labels": labels,
+                "parameters": parameters,
+                "folderId": folder_id,
                 "platformUrl": platform_url,
             }
         )
@@ -59,6 +77,8 @@ class PostApiScenariosResponse201:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_scenarios_response_201_parameters_item import PostApiScenariosResponse201ParametersItem
+
         d = dict(src_dict)
         id = d.pop("id")
 
@@ -70,6 +90,20 @@ class PostApiScenariosResponse201:
 
         labels = cast(list[str], d.pop("labels"))
 
+        parameters = []
+        _parameters = d.pop("parameters")
+        for parameters_item_data in _parameters:
+            parameters_item = PostApiScenariosResponse201ParametersItem.from_dict(parameters_item_data)
+
+            parameters.append(parameters_item)
+
+        def _parse_folder_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        folder_id = _parse_folder_id(d.pop("folderId"))
+
         platform_url = d.pop("platformUrl")
 
         post_api_scenarios_response_201 = cls(
@@ -78,6 +112,8 @@ class PostApiScenariosResponse201:
             situation=situation,
             criteria=criteria,
             labels=labels,
+            parameters=parameters,
+            folder_id=folder_id,
             platform_url=platform_url,
         )
 
