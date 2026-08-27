@@ -68,7 +68,8 @@ function makeRow({
     Status: status,
     Name: "Refund Flow",
     Description: null,
-    Metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
+    Metadata:
+      Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
     "Messages.Id": [],
     "Messages.Role": [],
     "Messages.Content": [],

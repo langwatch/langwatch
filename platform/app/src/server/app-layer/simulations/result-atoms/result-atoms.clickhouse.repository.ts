@@ -1,5 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { RUN_NOTE_EXPR } from "../repositories/simulation.clickhouse.repository";
+import type { ResultsFilter, ResultsGroupBy } from "./atom.types";
 import {
   ATOM_SORT_KEY,
   atomScopeSql,
@@ -11,11 +13,9 @@ import {
   groupKeyExpr,
   OUTCOME_EXPR,
   TARGET_KEY_EXPR,
-  trendKeyExpr,
   TRIGGER_EXPR,
+  trendKeyExpr,
 } from "./atom-sql";
-import { RUN_NOTE_EXPR } from "../repositories/simulation.clickhouse.repository";
-import type { ResultsFilter, ResultsGroupBy } from "./atom.types";
 
 /** Hard ceiling on one page of atoms, whatever the caller asks for. */
 export const MAX_ATOM_PAGE = 500;

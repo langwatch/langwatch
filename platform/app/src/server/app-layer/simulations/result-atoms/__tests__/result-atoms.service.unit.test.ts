@@ -12,7 +12,11 @@ import type {
   RawTrendRow,
   ResultAtomsClickHouseRepository,
 } from "../result-atoms.clickhouse.repository";
-import { bucketSecondsFor, rate, ResultAtomsService } from "../result-atoms.service";
+import {
+  bucketSecondsFor,
+  ResultAtomsService,
+  rate,
+} from "../result-atoms.service";
 
 const now = Date.UTC(2026, 1, 15);
 const startDate = now - 30 * 24 * 60 * 60 * 1000;
@@ -90,7 +94,11 @@ describe("getOverview", () => {
      */
     it("still lists the plan, reading as nothing in the period", async () => {
       const ranSuite = { id: "suite-ran", name: "Checkout", slug: "checkout" };
-      const quietSuite = { id: "suite-quiet", name: "Refunds", slug: "refunds" };
+      const quietSuite = {
+        id: "suite-quiet",
+        name: "Refunds",
+        slug: "refunds",
+      };
       const service = new ResultAtomsService(
         makeRepo({
           groups: [group({ GroupKey: getSuiteSetId(ranSuite.id) })],
@@ -160,9 +168,27 @@ describe("getOverview", () => {
     /** @scenario "A group carries one trend point per run" */
     it("reads oldest first", async () => {
       const trend: RawTrendRow[] = [
-        { GroupKey: "key", TrendKey: "b3", RunAt: "300", Passed: "0", Settled: "1" },
-        { GroupKey: "key", TrendKey: "b1", RunAt: "100", Passed: "1", Settled: "1" },
-        { GroupKey: "key", TrendKey: "b2", RunAt: "200", Passed: "1", Settled: "2" },
+        {
+          GroupKey: "key",
+          TrendKey: "b3",
+          RunAt: "300",
+          Passed: "0",
+          Settled: "1",
+        },
+        {
+          GroupKey: "key",
+          TrendKey: "b1",
+          RunAt: "100",
+          Passed: "1",
+          Settled: "1",
+        },
+        {
+          GroupKey: "key",
+          TrendKey: "b2",
+          RunAt: "200",
+          Passed: "1",
+          Settled: "2",
+        },
       ];
       const service = new ResultAtomsService(
         makeRepo({ groups: [group()], trend }),
@@ -198,7 +224,10 @@ describe("getOverview", () => {
           makePrisma(),
         );
 
-        const overview = await service.getOverview({ filter, groupBy: "target" });
+        const overview = await service.getOverview({
+          filter,
+          groupBy: "target",
+        });
         const keys = overview.groups[0]?.trend.map((point) => point.key) ?? [];
 
         expect(keys).toHaveLength(14);

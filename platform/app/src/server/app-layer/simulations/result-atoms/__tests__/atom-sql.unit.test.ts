@@ -34,8 +34,12 @@ describe("the outcome of a status", () => {
     it("agrees with categorizeRunStatus on every one of them", () => {
       for (const raw of RAW_STATUS_VALUES) {
         const category = categorizeRunStatus(mapStatus(raw));
-        const sqlSaysPassed = (PASSED_STATUS_VALUES as readonly string[]).includes(raw);
-        const sqlSaysFailed = (FAILED_STATUS_VALUES as readonly string[]).includes(raw);
+        const sqlSaysPassed = (
+          PASSED_STATUS_VALUES as readonly string[]
+        ).includes(raw);
+        const sqlSaysFailed = (
+          FAILED_STATUS_VALUES as readonly string[]
+        ).includes(raw);
 
         if (category === "success") {
           expect(sqlSaysPassed, `${raw} should read as passed`).toBe(true);
@@ -146,7 +150,10 @@ describe("buildAtomFilters", () => {
 
   describe("when the filter names the default set", () => {
     it("expands it to both stored spellings", () => {
-      const filters = buildAtomFilters({ ...base, scenarioSetIds: ["default"] });
+      const filters = buildAtomFilters({
+        ...base,
+        scenarioSetIds: ["default"],
+      });
 
       expect(filters.params.atomSetIds).toEqual(["default", ""]);
     });
