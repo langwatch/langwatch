@@ -3,7 +3,7 @@
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodeAgentData } from "../../types";
 
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
@@ -1075,6 +1075,107 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(
         codeNodeParameters().some((p) => p.identifier === "timeout_ms"),
       ).toBe(false);
+    });
+  });
+
+  describe("when the operator configures the platform's fetch ceiling", () => {
+    /** The fetch deadline this adapter armed, as reported on the span. */
+    const armedFetchTimeoutMs = (): unknown =>
+      withActiveSpanCalls[0]!.options.attributes["nlp.timeout_ms"];
+
+    /** A code budget large enough that only the ceiling can decide the result. */
+    const hugeBudget = { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER };
+
+    const callWith = async (config: CodeAgentData) => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+      await adapter.call(defaultInput);
+    };
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("falls back to 15 minutes when NLP_FETCH_MAX_TIMEOUT_MS is unset", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", undefined);
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(900_000);
+    });
+
+    it("honors a raised ceiling so the engine still gets to report its own timeout", async () => {
+      // An operator who raises NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS past
+      // 900s must be able to raise this one too, or the platform aborts the
+      // fetch first and the caller sees a generic fetch-side timeout instead
+      // of the engine's diagnosis.
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "1800000");
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(1_800_000);
+    });
+
+    it("honors a lowered ceiling", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(300_000);
+    });
+
+    it.each([
+      ["an empty value", ""],
+      ["a non-numeric value", "banana"],
+      ["a zero", "0"],
+      ["a negative value", "-5000"],
+      ["a whitespace-only value", "   "],
+      ["an infinite value", "Infinity"],
+    ])("falls back to 15 minutes on %s", async (_label, raw) => {
+      // Clamp, never reject: the same contract the engine keeps for its own
+      // knobs. A nonsensical ceiling must not fail the scenario run.
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", raw);
+
+      await callWith(hugeBudget);
+
+      expect(armedFetchTimeoutMs()).toBe(900_000);
+    });
+
+    it("clamps a large code budget down to the configured ceiling", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "200000");
+
+      // 300s + the 30s headroom would be 330s, above the 200s ceiling.
+      await callWith({ ...defaultConfig, timeoutMs: 300_000 });
+
+      expect(armedFetchTimeoutMs()).toBe(200_000);
+    });
+
+    it("bounds the default deadline too when set below the 2-minute floor", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "45000");
+
+      await callWith(defaultConfig);
+
+      expect(armedFetchTimeoutMs()).toBe(45_000);
+    });
+
+    it("leaves the default deadline at 2 minutes under the default ceiling", async () => {
+      await callWith(defaultConfig);
+
+      expect(armedFetchTimeoutMs()).toBe(120_000);
+    });
+
+    it("is read per call, so a change between turns takes effect", async () => {
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
+      await callWith(hugeBudget);
+      expect(armedFetchTimeoutMs()).toBe(300_000);
+
+      withActiveSpanCalls.length = 0;
+      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "600000");
+      await callWith(hugeBudget);
+      expect(armedFetchTimeoutMs()).toBe(600_000);
     });
   });
 });
