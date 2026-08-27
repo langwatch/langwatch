@@ -1659,6 +1659,14 @@ model ExperimentVersion {
   authorId String?
   /// Who wrote this version: "user", "langy" or "api".
   authorLabel String
+  /// The run that wrote this version, when a run wrote it.
+  ///
+  /// A run writes its cells into the workbench state, which advances the
+  /// counter. Without this, the page that started that run reads the bump as
+  /// somebody else's write, refuses to save, and asks the reader to reload
+  /// over their own unsaved edits. Named here, the page adopts the version and
+  /// carries on.
+  runId String?
 
   state Json
   /// Schema version of `state`, so a later shape change can be read forward.

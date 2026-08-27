@@ -183,6 +183,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     set({ staleWorkbench });
   },
 
+  rememberRunStartedHere: (runId) => {
+    set((state) => {
+      const known = state.runsStartedHere ?? [];
+      return known.includes(runId)
+        ? {}
+        : { runsStartedHere: [...known, runId] };
+    });
+  },
+
   // -------------------------------------------------------------------------
   // Dataset management actions
   // -------------------------------------------------------------------------

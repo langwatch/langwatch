@@ -335,6 +335,21 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
     chmod 0755 /workspace
 
 ENV HOME=/root
+# The `langwatch` CLI here is a Bun-compiled binary (the cli-builder stage
+# above), and Bun can auto-upload a crash report to a third party. A Bun crash
+# report reprints the process argv, and argv for `langwatch ui call` carries
+# the customer's own payload: prompt text, dataset field names, evaluator ids.
+# That data must never leave this worker, so the upload is turned off here
+# rather than left to the default of whichever platform the image runs on.
+# DO_NOT_TRACK is Bun's documented switch for it and is equivalent to
+# `telemetry = false` in bunfig.toml. It stops the upload only: Bun still
+# prints its crash banner to stderr, which no Bun setting suppresses.
+#
+# The manager passes an allowlisted environment to its workers, and the CLI
+# runs in a worker, so this ENV only reaches it because DO_NOT_TRACK is listed
+# in services/langyagent/internal/workerenv/workerenv.go. Both halves are
+# needed; a test asserts them together.
+ENV DO_NOT_TRACK=1
 WORKDIR /workspace
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/langyagent"]

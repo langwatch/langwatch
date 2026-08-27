@@ -71,6 +71,17 @@ export const targetResultEventDataSchema = z.object({
     .optional(),
   traceId: z.string().nullable().optional(),
   targets: z.array(targetSchema).optional(),
+  /**
+   * True when the cell was copied into this run from the board rather than
+   * produced by it.
+   *
+   * A run holds the whole board so the results page can draw every column, but
+   * a copied cell was paid for by the run that produced it. Counting its money
+   * or its time again reports spend that did not happen, and counting it as
+   * completed reports more cells done than the run dispatched. The fold reads
+   * this field to tell the two apart.
+   */
+  carriedOver: z.boolean().optional(),
 });
 
 export const targetResultEventSchema = EventSchema.extend({
@@ -100,6 +111,15 @@ export const evaluatorResultEventDataSchema = z.object({
   cost: z.number().nullable().optional(),
   inputs: z.record(z.unknown()).nullable().optional(),
   duration: z.number().nullable().optional(),
+  /**
+   * True when the verdict was copied into this run from the board rather than
+   * produced by it. See `targetResultEventDataSchema.carriedOver`.
+   *
+   * A carried verdict still counts toward what the run scored: the run stands
+   * for the board, and a reader comparing two columns needs both sides. Its
+   * money does not count, for the same reason a carried output's does not.
+   */
+  carriedOver: z.boolean().optional(),
 });
 
 export const evaluatorResultEventSchema = EventSchema.extend({

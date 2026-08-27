@@ -338,6 +338,10 @@ export const experimentsRouter = createTRPCRouter({
         ...(workbench.actorLabel !== undefined
           ? { actorLabel: workbench.actorLabel }
           : {}),
+        // The run that wrote it, when a run did. A tab coming back from the
+        // background adopts a version its own run wrote instead of standing
+        // down over a write it already holds every cell of.
+        ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
       };
     }),
 
