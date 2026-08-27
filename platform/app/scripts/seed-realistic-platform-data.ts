@@ -14,7 +14,7 @@ import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
-import { getSuiteSetId } from "../src/server/suites/suite-set-id";
+import { getSuiteSetId } from "@langwatch/suite-contract";
 import {
   EXPERIMENT_ROWS,
   EXPERIMENT_VARIANTS,
@@ -81,11 +81,8 @@ function buildHistoricalScenarioRuns(now = Date.now()): HistoricalScenarioRun[] 
       const passProbability = 0.62 + trend * 0.2 - scenarioIndex * 0.025;
       const passed = random() < passProbability;
       const variant = passed ? "improved" : "baseline";
-      const latencyMs = Math.round(
-        950 + random() * 3_800 + (passed ? 0 : random() * 2_500),
-      );
-      const startedAt =
-        dayStart + (8 * 60 + ordinal * 115 + Math.floor(random() * 35)) * 60_000;
+      const latencyMs = Math.round(950 + random() * 3_800 + (passed ? 0 : random() * 2_500));
+      const startedAt = dayStart + (8 * 60 + ordinal * 115 + Math.floor(random() * 35)) * 60_000;
       const runId = `demo-scenario-history-${day}-${ordinal + 1}-${scenarioIndex + 1}`;
       const batchRunId = `demo-history-batch-${day}`;
       const traceId = `demo-platform-history-${day}-${ordinal + 1}-${scenarioIndex + 1}`;
@@ -138,8 +135,7 @@ function buildTraceFixtures(historicalRuns: HistoricalScenarioRun[]): TraceFixtu
       latencyMs: variant.name === "baseline" ? 1850 + index * 190 : 1220 + index * 130,
       promptTokens: 75 + index * 9,
       completionTokens: 38 + index * 7,
-      cost:
-        variant.name === "baseline" ? 0.0038 + index * 0.0004 : 0.0029 + index * 0.0003,
+      cost: variant.name === "baseline" ? 0.0038 + index * 0.0004 : 0.0029 + index * 0.0003,
       metadata: {
         labels: ["demo-seed", "experiment", variant.name],
         "evaluation.run_id": variant.runId,
@@ -175,11 +171,7 @@ function buildTraceFixtures(historicalRuns: HistoricalScenarioRun[]): TraceFixtu
     }),
   );
 
-  return [
-    ...experimentTraces,
-    ...scenarioTraces,
-    ...historicalRuns.map((run) => run.trace),
-  ];
+  return [...experimentTraces, ...scenarioTraces, ...historicalRuns.map((run) => run.trace)];
 }
 
 async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
@@ -221,9 +213,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         entry: {
           input: row.input,
           expected_output: row.expected,
-          category: ["billing", "onboarding", "documentation", "incident", "escalation"][
-            index
-          ],
+          category: ["billing", "onboarding", "documentation", "incident", "escalation"][index],
         },
         predicted: { output: variant.outputs[index]! },
         cost: traces.find((trace) => trace.traceId === traceId)?.cost ?? null,
@@ -279,8 +269,7 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
       const runId = `demo-scenario-${scenarioIndex + 1}-${variant}`;
       const batchRunId = `demo-scenario-batch-${variant}`;
       const traceId = `demo-platform-sim-${scenarioIndex + 1}-${variant}`;
-      const startedAt =
-        BASE_TIME + (3 + variantIndex) * 60 * 60_000 + scenarioIndex * 5 * 60_000;
+      const startedAt = BASE_TIME + (3 + variantIndex) * 60 * 60_000 + scenarioIndex * 5 * 60_000;
       const passed = variant === "improved";
       await app.simulations.startRun({
         tenantId: PROJECT_ID,
@@ -440,10 +429,7 @@ async function main(): Promise<void> {
     // GroupQueue producer shutdown can wait on Redis's full graceful timeout
     // even though every seeded projection is already visible. Bound cleanup so
     // a successful one-shot seed cannot hold Haven open for minutes.
-    await Promise.race([
-      resetApp(),
-      new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
-    ]);
+    await Promise.race([resetApp(), new Promise<void>((resolve) => setTimeout(resolve, 2_000))]);
   }
 }
 

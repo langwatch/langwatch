@@ -35,9 +35,10 @@ import { randomBytes } from "node:crypto";
 import { constants } from "node:fs";
 import { access, mkdir } from "node:fs/promises";
 import { maybeExtractSpanMedia } from "~/server/app-layer/traces/edge-media-extraction";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { prisma } from "~/server/db";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { OtlpSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 
@@ -79,9 +80,7 @@ function assertLocalEndpoint(endpoint: string): void {
   }
   const isLocal = LOCAL_HOSTS.has(hostname) || hostname.endsWith(".langwatch.localhost");
   if (!isLocal) {
-    throw new Error(
-      `refusing to seed ${hostname}: this script only runs against a local app`,
-    );
+    throw new Error(`refusing to seed ${hostname}: this script only runs against a local app`);
   }
 }
 
@@ -243,6 +242,8 @@ async function main() {
 
   // The real ingestion hook: same call the collector makes, so the bytes are
   // stored and the parts rewritten exactly as they are in production.
+  const mediaFeatureFlags = MemoryFeatureFlagService.create();
+  mediaFeatureFlags.setFlag("release_trace_media_extraction", true);
   const extracted = await maybeExtractSpanMedia({
     data: {
       tenantId: project.id,
@@ -253,9 +254,7 @@ async function main() {
       occurredAt: startedAt,
     } as RecordSpanCommandData,
     deps: {
-      // The seeder's whole point is playable stored audio, so it does not ask
-      // the flag or the privacy policy whether to externalize; it always does.
-      isEnabled: async () => true,
+      featureFlags: mediaFeatureFlags,
       hasContentDropRules: async () => false,
     },
     logger: {
@@ -278,10 +277,7 @@ async function main() {
     resourceSpans: [
       {
         resource: {
-          attributes: [
-            attr("service.name", "acme-voice-agent"),
-            attr("service.version", "1.0.0"),
-          ],
+          attributes: [attr("service.name", "acme-voice-agent"), attr("service.version", "1.0.0")],
         },
         scopeSpans: [
           {

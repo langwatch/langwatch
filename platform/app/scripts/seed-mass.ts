@@ -30,9 +30,9 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
-import { DEFAULT_PII_REDACTION_LEVEL } from "../src/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
-import { getSuiteSetId } from "../src/server/suites/suite-set-id";
+import { getSuiteSetId } from "@langwatch/suite-contract";
 import {
   type CustomMetadata,
   customMetadataSchema,
@@ -92,9 +92,7 @@ async function dispatchDeepTrace({
     ),
   );
   const remainingMetadata = Object.fromEntries(
-    Object.entries(payload.metadata).filter(
-      ([key]) => !(key in reservedTraceMetadataSchema.shape),
-    ),
+    Object.entries(payload.metadata).filter(([key]) => !(key in reservedTraceMetadataSchema.shape)),
   );
   const customMetadata: CustomMetadata = customMetadataSchema.parse(remainingMetadata);
   const resource = CollectorSpanUtils.buildResource({
@@ -181,8 +179,7 @@ async function dispatchTimeline({
         run.scenarioIndex === 1
           ? DEMO_PLATFORM_IDS.evaluators.groundedness
           : DEMO_PLATFORM_IDS.evaluators.quality,
-      evaluatorType:
-        run.scenarioIndex === 1 ? "ragas/faithfulness" : "langevals/llm_score",
+      evaluatorType: run.scenarioIndex === 1 ? "ragas/faithfulness" : "langevals/llm_score",
       evaluatorName:
         run.scenarioIndex === 1 ? "Documentation Groundedness" : "Support Answer Quality",
       traceId: run.trace.traceId,
@@ -363,10 +360,7 @@ async function main(): Promise<void> {
       log: (message) => console.log(`   ${message}`),
     });
 
-    const traces = [
-      ...timeline.scenarioRuns.map((run) => run.trace),
-      ...timeline.organicTraces,
-    ];
+    const traces = [...timeline.scenarioRuns.map((run) => run.trace), ...timeline.organicTraces];
     // A day of margin under the collector's 31-day guard: everything at least
     // that fresh goes through the real collector, the rest rides the pipeline
     // command seam with backdated occurredAt.
@@ -388,9 +382,7 @@ async function main(): Promise<void> {
     for (const batch of metrics.batches) {
       await ingestOtlpMetrics({ target, request: batch.request });
     }
-    console.log(
-      `   ${metrics.totalPoints} metric points ingested through /api/otel/v1/metrics`,
-    );
+    console.log(`   ${metrics.totalPoints} metric points ingested through /api/otel/v1/metrics`);
 
     const app = initializeDefaultApp({ processRole: "web" });
     for (const trace of deep) {
@@ -417,10 +409,7 @@ async function main(): Promise<void> {
     await prisma.$disconnect();
     // Bounded cleanup, same rationale as the realistic seeder: a successful
     // one-shot seed must not hold Haven open on queue-producer shutdown.
-    await Promise.race([
-      resetApp(),
-      new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
-    ]);
+    await Promise.race([resetApp(), new Promise<void>((resolve) => setTimeout(resolve, 2_000))]);
   }
 }
 
