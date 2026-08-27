@@ -11,8 +11,11 @@ import {
   IdentityVerificationExpiredError,
   IdentityVerificationInvalidError,
 } from "@langwatch/identity";
+import { createLogger } from "@langwatch/observability";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
+
+const logger = createLogger("langwatch:better-auth:handled-errors");
 
 /**
  * better-auth's refusals, as OUR handled errors.
@@ -241,7 +244,25 @@ export async function translateBetterAuthError({
   });
   if (!handled) return response;
 
+  // THE LOG LINE THE `detail` ABOVE WAS ALWAYS FOR. Without it the precise
+  // reason went nowhere: `reasons` carries a plain Error, which serialises to
+  // `{"code":"unknown","kind":"unknown"}`, so the ONE fact that separates the
+  // causes behind a shared code — `PASSKEY_NOT_FOUND` from
+  // `AUTHENTICATION_FAILED`, both of which answer
+  // `identity_passkey_not_recognized` on purpose — existed nowhere at all. A
+  // refusal that leaves no trace is one nobody can diagnose from a report.
+  //
+  // WARN, not error: every one of these is a refusal working as intended.
+  // Nothing here is customer data — a better-auth code and the path it came
+  // from — and none of it reaches the response, which keeps saying only what
+  // the registry says.
   const { statusCode, body } = handledErrorResponseBody(handled);
+
+  logger.warn(
+    { path, betterAuthCode: code, code: handled.code, status: statusCode },
+    "an auth endpoint refused, and it is answered as a handled error",
+  );
+
   const headers = new Headers(response.headers);
   headers.set("content-type", "application/json");
   // The length of the body we are replacing is not the length of the one we
