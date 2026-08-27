@@ -25,7 +25,7 @@ import (
 const (
 	sharedSessionEntryName = "ACME_SESSION"
 	// The name one row takes to be the row that logs in.
-	sharedSessionClaimName = "ACME_LOGIN_CLAIM"
+	sharedSessionClaimName = "ACME_SESSION_CLAIM"
 	// The credential the platform mints for one run. It is not the project
 	// key: the cache stub accepts this and nothing else.
 	sharedSessionSandboxKey = "sk-lw-test-sandbox-run-key"
