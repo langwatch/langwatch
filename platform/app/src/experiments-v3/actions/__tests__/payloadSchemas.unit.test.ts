@@ -73,6 +73,7 @@ describe("payload schemas", () => {
       schema: addEvaluatorPayloadSchema,
       payload: {
         evaluatorType: "langevals/exact_match",
+        name: "scored",
         inputs: [{ identifier: "output", type: "str" }],
       },
     },
@@ -128,6 +129,7 @@ describe("payload schemas", () => {
    */
   describe("given an addEvaluator payload with a comparison config", () => {
     const withComparison = (evaluatorType: string) => ({
+      name: "scored",
       evaluatorType,
       inputs: [],
       comparison: {
@@ -171,6 +173,7 @@ describe("payload schemas", () => {
     it("refuses it on the evaluatorType field", () => {
       const result = addEvaluatorPayloadSchema.safeParse({
         evaluatorType: "langevals/does_not_exist",
+        name: "scored",
         inputs: [],
       });
 
@@ -188,6 +191,7 @@ describe("payload schemas", () => {
       expect(
         addEvaluatorPayloadSchema.safeParse({
           evaluatorType: "workflow",
+          name: "scored",
           inputs: [],
         }).success,
       ).toBe(true);
@@ -197,6 +201,7 @@ describe("payload schemas", () => {
       expect(
         addEvaluatorPayloadSchema.safeParse({
           evaluatorType: "code/evaluator_abc",
+          name: "scored",
           inputs: [],
         }).success,
       ).toBe(true);
@@ -206,6 +211,7 @@ describe("payload schemas", () => {
       expect(
         addEvaluatorPayloadSchema.safeParse({
           evaluatorType: "custom/",
+          name: "scored",
           inputs: [],
         }).success,
       ).toBe(false);
@@ -276,6 +282,7 @@ describe("payload schemas", () => {
         addEvaluatorPayloadSchema.safeParse({
           id: "",
           evaluatorType: "langevals/exact_match",
+          name: "scored",
           inputs: [],
         }).success,
       ).toBe(false);
