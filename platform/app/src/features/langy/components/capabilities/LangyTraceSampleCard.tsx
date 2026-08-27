@@ -17,7 +17,7 @@
  *
  *   THE WAY OUT LANDS ON THE SAME QUESTION. "View in Trace Explorer" carries the
  *   agent's actual query — the free text and the exact time window — into the
- *   Explorer's URL. See `logic/traceExplorerLink.ts` for how the CLI's grammar
+ *   Explorer's URL. See `@langwatch/langy-web` for how the CLI's grammar
  *   maps onto the Explorer's, and for the one dimension (`--limit`) that has
  *   nowhere to go in that URL.
  *
@@ -42,11 +42,11 @@ import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
   type TraceSearchQuery,
-} from "../../logic/traceExplorerLink";
+} from "@langwatch/langy-web";
 import { LangyContextTarget } from "../LangyContextTarget";
 import { LangySpaAnchor } from "../LangySpaAnchor";
 import type { CapabilityCardInput } from "./capabilityRegistry";
-import { collectionOf, textValue, totalOf } from "./cliResultDocument";
+import { collectionOf, textValue, totalOf } from "@langwatch/langy-web";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,

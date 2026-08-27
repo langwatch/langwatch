@@ -25,8 +25,8 @@
  */
 
 import type { api } from "~/utils/api";
-import { asFreeTextTerm } from "../../logic/traceExplorerLink";
-import { traceMetaLine, truncateRowText } from "./rowFormat";
+import { asFreeTextTerm } from "@langwatch/langy-web";
+import { traceMetaLine, truncateRowText } from "@langwatch/langy-web";
 
 /** The tRPC utils proxy (`api.useUtils()`), for imperative `.fetch` calls. */
 export type CapabilityTrpcUtils = ReturnType<typeof api.useUtils>;

@@ -49,7 +49,7 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       // Raised from the TOOL STREAM (the agent reached for `gh` with no token),
       // never from the model's prose. Produced by the manager's GitHub gate
       // (services/langyagent/app/githubgate.go); the command grammar lives in
-      // server/app-layer/langy/execution/githubCommand.ts.
+      // @langwatch/langy-contract github-command.ts.
       "langy_github_not_connected",
       // Same gate, credentialed variant: the app installation doesn't cover the
       // repository the agent reached for (the clone/push 404'd).

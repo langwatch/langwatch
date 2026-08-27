@@ -24,8 +24,6 @@ import type { Context, Next } from "hono";
 import { z } from "zod";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { appFromContext } from "~/app/api/middleware/app-context";
-import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
-import { prisma } from "~/server/db";
 import { getLangySessionKeysCounter, getLangyTurnResultsCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:internal");
@@ -202,8 +200,7 @@ secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
     throw ValidationError.fromZodError(parsed.error);
   }
 
-  const outcome = await revokeLangySessionApiKey({
-    prisma,
+  const outcome = await appFromContext(c).langy.revokeWorkerSessionKey({
     apiKeyId: parsed.data.apiKeyId,
     projectId: parsed.data.projectId,
   });

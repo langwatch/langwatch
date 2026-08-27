@@ -5,7 +5,10 @@ import type {
   LangyDerivedCard,
   LangyDerivedChoicesCard,
 } from "@langwatch/langy-contract";
-import { deriveLangyChoicesLockState } from "@langwatch/langy-contract";
+import {
+  deriveLangyChoicesLockState,
+  githubProgressFromToolParts,
+} from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
@@ -13,7 +16,6 @@ import { memo, useMemo } from "react";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "@langwatch/langy-web";
 import { isInternalHref, Markdown } from "~/components/Markdown";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -35,7 +37,7 @@ import {
 import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
-import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
+import { LangyFailedCard } from "@langwatch/langy-web";
 import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";

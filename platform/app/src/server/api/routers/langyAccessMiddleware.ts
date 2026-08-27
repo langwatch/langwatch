@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 
 import { isDemoProjectId, type PermissionMiddleware } from "~/server/api/rbac";
 import { LangyNotEnabledError } from "@langwatch/langy-contract";
-import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
+import { hasLangyAccess } from "~/runtime/app/features/langy-access.adapter";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 
 /**
@@ -41,6 +41,14 @@ export const enforceLangyAccess: PermissionMiddleware<{
   projectId?: string;
   organizationId?: string;
 }> = async ({ ctx, input, next }) => {
+  const app = ctx.app;
+  if (!app) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "The request application is unavailable.",
+    });
+  }
+
   // An ORG-scoped rollout rule needs an organization to match against, and the
   // project-scoped procedures (`langy`, `langyEgress`) only ever carry a
   // projectId — so reading the scope straight off the input silently evaluated
@@ -56,6 +64,7 @@ export const enforceLangyAccess: PermissionMiddleware<{
 
   const allowed = await hasLangyAccess({
     user: ctx.session.user,
+    featureFlags: app.featureFlags,
     ...(input.projectId ? { projectId: input.projectId } : {}),
     ...(organizationId ? { organizationId } : {}),
   });

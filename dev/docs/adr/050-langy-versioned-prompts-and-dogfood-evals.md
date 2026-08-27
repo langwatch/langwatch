@@ -44,7 +44,7 @@ Hard constraints that shape the design:
 
 ### 1. Read Langy's prompts through a fallback-first loader
 
-Add `src/server/app-layer/langy/langyPromptRegistry.ts`:
+Add `packages/features/langy/server/src/services/langy-prompt-registry.service.ts`:
 
 - `LANGY_PROMPT_HANDLES` — well-known slugs `langy-agent-definition` and
   `langy-turn-override`.
@@ -140,7 +140,7 @@ safe and reversible.
   (handled-error boundary), 043 (Langy egress).
 - Spec: `specs/langy/langy-versioned-prompts.feature`,
   `specs/langy/langy-dogfood-scenarios.feature`.
-- Code: `src/server/app-layer/langy/langyPromptRegistry.ts`,
+- Code: `packages/features/langy/server/src/services/langy-prompt-registry.service.ts`,
   `scripts/seed-langy-prompts.ts`, `platform/app/e2e/langy/`,
   `services/langyagent/internal/assets/AGENTS.md`.
 - Guard: `src/langwatchPlatformGuard.ts` (no `LANGWATCH_API_KEY` on the platform).

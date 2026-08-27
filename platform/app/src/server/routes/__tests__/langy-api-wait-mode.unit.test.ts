@@ -22,21 +22,18 @@
  *     means "keep waiting", not "gone".
  */
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
-import { getApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 
 // ─── Auth mocks (same seam as langy-api-refusal-chain.unit.test.ts) ───────────
-const mockResolve = vi.fn();
-const mockMarkUsed = vi.fn();
-
 const mockExtractCredentials = vi.fn();
 const mockEnforceApiKeyCeiling = vi.fn();
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     extractCredentials: (...args: unknown[]) => mockExtractCredentials(...args),
@@ -44,52 +41,30 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   };
 });
 
-vi.mock("~/server/db", () => ({ prisma: {} }));
-
-const mockIsEnabled = vi.fn();
-
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: {
-    isEnabled: (...args: unknown[]) => mockIsEnabled(...args),
-  },
-}));
-
 const mockResolveLangyKeyIdentity = vi.fn();
 const mockResolveLangyActorSession = vi.fn();
 
-vi.mock("~/server/app-layer/langy/langyApiKeyIdentity", () => ({
+vi.mock("~/runtime/app/features/langy-api-key-identity.adapter", () => ({
   resolveLangyKeyIdentity: (...args: unknown[]) => mockResolveLangyKeyIdentity(...args),
 }));
 
-vi.mock("~/server/app-layer/langy/langyApiKeyActorSession", () => ({
+vi.mock("~/runtime/app/features/langy-api-key-actor-session.adapter", () => ({
   resolveLangyActorSession: (...args: unknown[]) => mockResolveLangyActorSession(...args),
 }));
 
-// ─── App layer ────────────────────────────────────────────────────────────────
-const mockStartConversationTurn = vi.fn();
-const mockGetEventsAfter = vi.fn();
-
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: vi.fn(() => ({
-    apiKeys: {
-      tryResolveToken: mockResolve,
-      markUsed: mockMarkUsed,
-    },
-    langy: {
-      startConversationTurn: mockStartConversationTurn,
-      getEventsAfter: mockGetEventsAfter,
-    },
-  })),
-  // No Redis in this suite: awaitTurnSettlement exercises its fold-poll
-  // fallback, which is the deterministic path a unit suite can pin.
-  tryGetApp: vi.fn(() => null),
-}));
+const featureFlags = MemoryFeatureFlagService.create();
+const processApp = createTestApp({ featureFlags, redis: null });
+const mockIsEnabled = vi.spyOn(featureFlags, "isEnabled");
+const mockResolve = vi.spyOn(processApp.apiKeys, "tryResolveToken");
+const mockMarkUsed = vi.spyOn(processApp.apiKeys, "markUsed");
+const mockStartConversationTurn = vi.spyOn(processApp.langy, "startConversationTurn");
+const mockGetEventsAfter = vi.spyOn(processApp.langy, "getEventsAfter");
 
 // Imported AFTER every mock, same as the sibling suite.
 const { app: langyApp } = await import("../langy-api");
 
 const testApp = new Hono();
-testApp.use("*", appContextMiddlewareFor(getApp()));
+testApp.use("*", appContextMiddlewareFor(processApp));
 testApp.route("/", langyApp);
 
 const TURN_URL = "http://localhost/api/langy/conversations";

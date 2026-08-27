@@ -1,6 +1,6 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { Check, Copy } from "lucide-react";
-import { useCopyToClipboard } from "~/features/traces-v2/hooks/useCopyToClipboard";
+import { useCopyToClipboard } from "@langwatch/trace-web";
 
 /**
  * The platform's own code for a failure, verbatim and selectable, with the whole

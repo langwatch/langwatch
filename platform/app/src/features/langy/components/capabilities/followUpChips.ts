@@ -5,7 +5,7 @@
  * unit-testable on its own:
  *   - `cliFollowUps.ts` answers WHICH offers a result earns (from the feature
  *     map's produces/consumes relation).
- *   - `logic/traceExplorerLink.ts` answers WHERE a carried offer lands. It is
+ *   - `@langwatch/langy-web` answers WHERE a carried offer lands. It is
  *     the SAME reader the card's own "View in Trace Explorer" button uses
  *     (`readTraceSearchQuery`), so the chips and the card can never disagree
  *     about what the agent actually searched. The live transport hands us
@@ -38,12 +38,8 @@
  *
  * @see specs/langy/langy-followup-suggestions.feature
  */
-import {
-  buildAutomationHref,
-  readTraceSearchQuery,
-  type TraceSearchQuery,
-  type UnstatedWindow,
-} from "../../logic/traceExplorerLink";
+import { buildAutomationHref, readTraceSearchQuery } from "@langwatch/langy-web";
+import type { TraceSearchQuery, UnstatedWindow } from "@langwatch/langy-web";
 import {
   buildSurfaceHref,
   SURFACE_BY_FEATURE,

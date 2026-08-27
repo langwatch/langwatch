@@ -36,7 +36,7 @@ import {
   LANGY_PROMPT_DEFAULT_TAG,
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
-} from "~/server/app-layer/langy/langyPromptRegistry";
+} from "@langwatch/langy-contract";
 import { prisma } from "~/server/db";
 import type { PromptService } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";

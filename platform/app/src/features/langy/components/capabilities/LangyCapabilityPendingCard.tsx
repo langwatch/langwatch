@@ -22,10 +22,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useCapabilityData } from "../../hooks/useCapabilityData";
-import {
-  formatLangyPreviewCount,
-  formatLangyProgressCount,
-} from "../../logic/langyActivityOwnership";
+import { formatLangyPreviewCount, formatLangyProgressCount } from "@langwatch/langy-web";
 import {
   type CapabilityCommand,
   type LangyProgressSample,
@@ -33,7 +30,7 @@ import {
   langyThinkingShimmerStyles,
   useProjectedProgress,
 } from "@langwatch/langy-web";
-import type { CapabilitySurface } from "./capabilityCatalog";
+import type { CapabilitySurface } from "@langwatch/langy-web";
 import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 
 const rowAppear = keyframes`

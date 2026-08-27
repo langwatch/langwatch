@@ -1,106 +1,35 @@
 /**
- * Langy over a project API key — the PUBLIC turn surface.
+ * Public project-API-key turn surface. Refusal order is credential (401),
+ * per-project rollout (dark 404), ceiling and Langy access (403), then the
+ * composed Langy service. The rollout check must follow credential resolution
+ * and precede the ceiling: it is evaluated for that key's project and a dark
+ * route cannot reveal itself with a 403.
  *
- * Mounted under `/api/langy`, deliberately NOT under `/api/internal/langy`
- * where `langy-internal` and `langy-relay` live. Those two are worker-plane
- * routes behind `LANGY_INTERNAL_SECRET`, and the Helm chart blocks
- * `/api/internal` at the ingress by default (`charts/langwatch/README.md`
- * `ingress.blockedPaths`). Putting a customer-facing route there would either
- * be unreachable through the ingress or force that block open for everything
- * behind it. So this is a separate plane with a separate credential class.
+ * The dark branch must stay `c.notFound()`. `honoFetchForNode` normalises its
+ * sentinel to the same JSON response as an unmounted route; a handled 404 or
+ * bespoke body would expose Langy's canonical error envelope. Characterisation
+ * coverage is in `langy-api-refusal-chain.unit.test.ts`.
  *
- * The chain, in refusal order:
- *   1. credential resolves            → else 401
- *   2. `release_langy_api_key_turns_enabled` → else 404 (surface is dark)
- *   3. `langy:create` ceiling         → else 403
- *   4. key owns an actor + has Langy  → else 403
- *   5. actor row still exists         → else 403
- *   6. shared `startConversationTurn` → 202 — or, with `Prefer: wait=<seconds>`
- *      (RFC 7240), a 200 carrying the assistant's reply once the turn settles
- *      on the durable fold, degrading to the same 202 when the wait expires.
- *
- * The flag is checked AFTER authentication as a deliberate choice, NOT because
- * it is impossible to check earlier. Rollback is staged per project, so the
- * check that matters is the one evaluated against the caller's own project,
- * and that project is not known until a credential resolves. A project-less
- * evaluation is available -- `isEnabled` requires only `distinctId`, and
- * `resolveEffectiveForListing` in `featureFlag/rules.ts` already evaluates
- * against an empty context in production -- but it answers on the flag's
- * default rather than on the caller's project, so it cannot replace this
- * check. It could be added in front of it as an extra pre-auth filter, which
- * would also close the enumeration gap described below. That is not done here.
- * What the dark surface hides is therefore scoped, and worth stating exactly. A caller holding a real project API key cannot tell
- * whether Langy exists here — that is the rollback property this route is
- * built around. A caller holding no credential, or a bad one, still gets a 401
- * rather than a 404, and so can tell that SOME authenticated route is mounted
- * at this path. That is true of every guarded route on this API and reveals
- * nothing Langy-specific, but it does mean this mechanism is not a defence
- * against anonymous route enumeration, and should not be read as one.
- *
- * The flag is checked BEFORE the ceiling, and that ordering is load-bearing —
- * a key without `langy:create` must not get a 403 out of a surface that is
- * supposed to be dark, because no unmounted route can answer 403. Both this
- * ordering and the byte-parity below are pinned by
- * `__tests__/langy-api-refusal-chain.unit.test.ts`.
- *
- * Every refusal is THROWN, never a hand-built `c.json({...})` —
- * `createServiceApp`'s `onError` owns the wire shape, so this family publishes
- * the same envelope as every other route. The credential, authorization,
- * identity and validation refusals are `HandledError`s, so a caller keeps the
- * `code`, `meta` and remediation `tips` a bespoke `{ message }` would have
- * discarded (ADR-045). The family opts into the `canonical` envelope because it
- * is new: there is no existing consumer parsing the flat legacy shape.
- *
- * The dark-surface 404 is the one deliberate exception, and it does not throw
- * at all: the envelope that makes every other refusal legible is itself the
- * leak here. A thrown 404 comes back as canonical JSON carrying `trace_id` and
- * `span_id` — a shape no unmounted path can produce. So the dark refusal
- * returns `c.notFound()`, Hono's default handler, which is the same handler an
- * unmounted path falls through to.
- *
- * What that pair actually puts on the wire is worth stating precisely, because
- * it is not Hono's default and it is decided in another file. `honoFetchForNode`
- * (`src/start.ts`) intercepts every 404 leaving the app and, when the body is
- * exactly Hono's `404 Not Found` sentinel, rewrites it to
- * `{"error":"Not Found"}` with `Content-Type: application/json`. Production
- * therefore serves JSON here, not plain text. Parity survives because the
- * rewrite keys off that sentinel body and so applies identically to the dark
- * refusal and to an unmounted path — but note the carve-out: a 404 carrying any
- * OTHER body is passed through untouched. That is exactly why this refusal must
- * stay `c.notFound()` and must never hand-build its own 404 JSON; a bespoke body
- * would skip the rewrite and become distinguishable, even at an identical
- * status. The parity assertion in
- * `__tests__/langy-api-refusal-chain.unit.test.ts` compares the two responses at
- * the Hono layer, upstream of that bridge, and covers status, body and
- * Content-Type.
- *
- * Create and continue are the same service call — `conversationId` present or
- * absent is the only difference, exactly as the tRPC router does it. This route
- * owns transport concerns only; every domain rule (ownership, idempotency,
- * capacity, model policy) stays in the app layer and arrives here as a
- * HandledError that is re-thrown untouched.
+ * `Prefer: wait=<seconds>` waits for the durable fold and returns the same turn
+ * result with terminal fields; expiry preserves the normal 202 response.
  */
 
 import type { Context } from "hono";
 import { z } from "zod";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import {
-  enforceApiKeyCeiling,
-  extractCredentials,
-} from "~/server/api-key/auth-middleware";
+import { enforceApiKeyCeiling, extractCredentials } from "~/server/api-key/auth-middleware";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import {
   LangyApiCredentialInvalidError,
   LangyApiCredentialMissingError,
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
+  langyMessagePartSchema,
 } from "@langwatch/langy-contract";
-import type { LangyChatMessageInput } from "@langwatch/langy-server/services/langy-turn.service";
-import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
-import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
-import { awaitTurnSettlement } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
+import { resolveLangyActorSession } from "~/runtime/app/features/langy-api-key-actor-session.adapter";
+import { resolveLangyKeyIdentity } from "~/runtime/app/features/langy-api-key-identity.adapter";
+import { awaitLangyTurnSettlement } from "~/runtime/app/features/langy-turn-settlement.adapter";
 import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 import { bodyLimit } from "./_lib/body-limit";
 
 const AUTH_REASON =
@@ -141,7 +70,7 @@ const secured = createServiceApp({
 const messageSchema = z
   .object({
     role: z.enum(["user", "assistant", "system"]),
-    parts: z.array(z.record(z.string(), z.unknown())).optional(),
+    parts: z.array(langyMessagePartSchema).optional(),
     content: z.string().optional(),
   })
   .transform(({ role, parts, content }) => ({
@@ -203,30 +132,28 @@ async function authorizeTurn(c: Context) {
   // the leak this 404 exists to prevent. So the caller answers with
   // `c.notFound()`, which IS that default handler — no router in the chain
   // overrides it.
-  const surfaceOpen = await featureFlagService.isEnabled(
-    "release_langy_api_key_turns_enabled",
-    {
-      distinctId: resolved.project.id,
-      projectId: resolved.project.id,
-      organizationId: resolved.project.team.organizationId,
-    },
-  );
+  const surfaceOpen = await c.app.featureFlags.isEnabled("release_langy_api_key_turns_enabled", {
+    kind: "project",
+    projectId: resolved.project.id,
+    organizationId: resolved.project.team.organizationId,
+  });
   if (!surfaceOpen) return { dark: true as const };
 
   await enforceApiKeyCeiling({ resolved, permission: "langy:create" });
 
-  const identity = await resolveLangyKeyIdentity({ resolved });
+  const identity = await resolveLangyKeyIdentity({
+    resolved,
+    featureFlags: c.app.featureFlags,
+  });
   if (!identity.ok) {
     throw new LangyApiIdentityDeniedError(
-      identity.reason === "unowned"
-        ? "langy_api_key_unowned"
-        : "langy_api_key_no_langy_access",
+      identity.reason === "unowned" ? "langy_api_key_unowned" : "langy_api_key_no_langy_access",
       identity.message,
     );
   }
 
   const actor = await resolveLangyActorSession({
-    prisma,
+    users: prisma,
     userId: identity.userId,
     now: new Date(),
   });
@@ -295,13 +222,7 @@ async function parseTurnBody(c: Context, conversationId: string | null) {
  * fault the shared handler logs and masks behind a trace id — re-classifying
  * either one here could only lose information.
  */
-async function startTurn({
-  c,
-  conversationId,
-}: {
-  c: Context;
-  conversationId: string | null;
-}) {
+async function startTurn({ c, conversationId }: { c: Context; conversationId: string | null }) {
   const auth = await authorizeTurn(c);
   // Hono's default 404, byte-for-byte what an unmounted path returns.
   if (auth.dark) return c.notFound();
@@ -314,7 +235,7 @@ async function startTurn({
     session: auth.session,
     requestedConversationId: conversationId,
     ...(body.adoptConversationId ? { adoptConversationId: true } : {}),
-    messages: body.messages as LangyChatMessageInput[],
+    messages: body.messages,
     ...(body.modelOverride ? { modelOverride: body.modelOverride } : {}),
     isRetry: false,
     turnContext: {},
@@ -330,17 +251,14 @@ async function startTurn({
   if (waitSeconds && waitSeconds > 0) {
     // Client disconnect and the wait deadline are one signal: an abandoned
     // hold stops consuming fold reads (and its blocking Redis read) at once.
-    const settlement = await awaitTurnSettlement({
+    const settlement = await awaitLangyTurnSettlement({
       langy: appFromContext(c).langy,
       redis: appFromContext(c).redis ?? null,
       projectId: auth.projectId,
       conversationId: result.conversationId,
       turnId: result.turnId,
       userId: auth.session.user.id,
-      signal: AbortSignal.any([
-        c.req.raw.signal,
-        AbortSignal.timeout(waitSeconds * 1000),
-      ]),
+      signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(waitSeconds * 1000)]),
     });
     if (settlement) {
       // RFC 7240 §3: echo the applied value — it is how a caller asking for

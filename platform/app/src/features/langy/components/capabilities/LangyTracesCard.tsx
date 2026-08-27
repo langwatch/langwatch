@@ -17,10 +17,7 @@ import { Button, Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy-contract";
 import { Search } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  buildTraceExplorerHref,
-  readTraceSearchQuery,
-} from "../../logic/traceExplorerLink";
+import { buildTraceExplorerHref, readTraceSearchQuery } from "@langwatch/langy-web";
 import {
   buildSurfaceHref,
   type CapabilityCardInput,
@@ -28,7 +25,7 @@ import {
   extractToolText,
   summaryLines,
 } from "./capabilityRegistry";
-import { collectionOf, textValue, totalOf } from "./cliResultDocument";
+import { collectionOf, textValue, totalOf } from "@langwatch/langy-web";
 import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 
 interface ParsedTrace {
@@ -145,7 +142,7 @@ export function LangyTracesCard({
   const isSingle = descriptor.render === "trace";
   // The search Langy actually ran, offered back as somewhere to GO.
   //
-  // `logic/traceExplorerLink` owns this, and reusing it is not tidiness: the
+  // `@langwatch/langy-web` owns this, and reusing it is not tidiness: the
   // CLI's `--query` is FREE TEXT while the Explorer's `q` is a liqe expression,
   // so an unquoted `status:error` silently stops being a text search and
   // becomes a field filter — the user lands on a different result set than the

@@ -1,4 +1,4 @@
-import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
+import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import type { api } from "~/utils/api";
 import { useLangyStore } from "../stores/langyStore";
 

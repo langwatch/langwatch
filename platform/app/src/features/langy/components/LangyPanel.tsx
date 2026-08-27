@@ -68,7 +68,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjectReach } from "~/components/home/useProjectReach";
 import { allModelOptions } from "~/components/ModelSelector";
-import { Kbd } from "~/components/ops/shared/Kbd";
+import { Kbd } from "@langwatch/ops-web";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Menu } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
@@ -86,7 +86,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 // field, this stops compiling. That is the whole point: the last time these two
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
-import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyResourceContext } from "@langwatch/langy-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
@@ -108,7 +108,7 @@ import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
-import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
+import { resolveLangyActivityOwnership } from "@langwatch/langy-web";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,

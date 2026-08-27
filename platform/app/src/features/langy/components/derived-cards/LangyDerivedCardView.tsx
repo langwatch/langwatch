@@ -4,10 +4,7 @@ import {
   LangyDerivedCardView as LangyDerivedCardViewPresentation,
   type LangyExploreLinkProps,
 } from "@langwatch/langy-web";
-import {
-  buildTraceExplorerHref,
-  readTraceSearchQuery,
-} from "../../logic/traceExplorerLink";
+import { buildTraceExplorerHref, readTraceSearchQuery } from "@langwatch/langy-web";
 import { TimeseriesPlot } from "../capabilities/LangyTimeseriesCard";
 import { LangySpaAnchor } from "../LangySpaAnchor";
 import { useChoicesRefRows } from "./useChoicesRefRows";

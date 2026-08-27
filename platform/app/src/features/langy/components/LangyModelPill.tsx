@@ -28,8 +28,8 @@ import {
 } from "~/components/modelProviders/iconsMap";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
-import { getModelById } from "~/server/modelProviders/registry";
+import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
+import { getModelById } from "@langwatch/model-provider-contract";
 import {
   type LangyModelGroup,
   profileLangyModel,

@@ -118,8 +118,8 @@ Because the key is _owned by the user_, `ApiKeyService`'s ceiling check clamps
 it to the user's own authority — **a Langy tool call can never exceed what that
 user could do by hand.** The held-subset intersection guarantees the mint never
 throws for a legitimately-gated caller. The change lives in the langy service
-layer (`langyApiKey.ts` `mintLangySessionApiKey`, consumed by
-`LangyCredentialService`).
+layer (`LangyCredentialService`, which requests `mintLangySessionApiKey` from
+the composed API-key service).
 
 The route's coarse permission gate is **relaxed** to a single baseline
 project-read check (`evaluations:view`, consistent with the other `/langy/*`

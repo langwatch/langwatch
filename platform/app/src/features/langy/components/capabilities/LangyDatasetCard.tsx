@@ -14,7 +14,7 @@ import {
   extractPrimaryId,
   extractToolText,
 } from "./capabilityRegistry";
-import { collectionOf, totalOf } from "./cliResultDocument";
+import { collectionOf, totalOf } from "@langwatch/langy-web";
 import {
   CapabilityRow,
   CapabilityRowSkeletons,

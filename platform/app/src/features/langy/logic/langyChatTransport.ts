@@ -1,9 +1,6 @@
 import type { Unsubscribable } from "@trpc/server/observable";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
-import type {
-  LangyResourceContext,
-  LangySkillContext,
-} from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyResourceContext, LangySkillContext } from "@langwatch/langy-contract";
 import type { LangyStreamEntry } from "@langwatch/langy-server";
 import { trpcClient } from "~/utils/api";
 

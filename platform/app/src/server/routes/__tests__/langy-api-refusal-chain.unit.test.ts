@@ -38,22 +38,19 @@
  * dark 404 as a defence against anonymous route enumeration.
  */
 import { Hono } from "hono";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LangyIdentityDenialReason } from "~/server/app-layer/langy/langyApiKeyIdentity";
+import type { LangyIdentityDenialReason } from "~/runtime/app/features/langy-api-key-identity.adapter";
 import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
-import { getApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 
 // ─── Auth mocks ───────────────────────────────────────────────────────────────
 // The route resolves credentials through the process App service.
-const mockResolve = vi.fn();
-const mockMarkUsed = vi.fn();
-
 const mockExtractCredentials = vi.fn();
 const mockEnforceApiKeyCeiling = vi.fn();
 
 vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
+  const actual = await importOriginal<typeof import("~/server/api-key/auth-middleware")>();
   return {
     ...actual,
     extractCredentials: (...args: unknown[]) => mockExtractCredentials(...args),
@@ -61,49 +58,31 @@ vi.mock("~/server/api-key/auth-middleware", async (importOriginal) => {
   };
 });
 
-vi.mock("~/server/db", () => ({ prisma: {} }));
-
-// ─── Feature flag ─────────────────────────────────────────────────────────────
-const mockIsEnabled = vi.fn();
-
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: {
-    isEnabled: (...args: unknown[]) => mockIsEnabled(...args),
-  },
-}));
-
 // ─── Identity bridge ──────────────────────────────────────────────────────────
 const mockResolveLangyKeyIdentity = vi.fn();
 const mockResolveLangyActorSession = vi.fn();
 
-vi.mock("~/server/app-layer/langy/langyApiKeyIdentity", () => ({
+vi.mock("~/runtime/app/features/langy-api-key-identity.adapter", () => ({
   resolveLangyKeyIdentity: (...args: unknown[]) => mockResolveLangyKeyIdentity(...args),
 }));
 
-vi.mock("~/server/app-layer/langy/langyApiKeyActorSession", () => ({
+vi.mock("~/runtime/app/features/langy-api-key-actor-session.adapter", () => ({
   resolveLangyActorSession: (...args: unknown[]) => mockResolveLangyActorSession(...args),
 }));
 
-// ─── App layer ────────────────────────────────────────────────────────────────
-const mockStartConversationTurn = vi.fn();
-
-vi.mock("~/server/app-layer/app", () => ({
-  tryGetApp: () => null,
-  getApp: vi.fn(() => ({
-    apiKeys: {
-      tryResolveToken: mockResolve,
-      markUsed: mockMarkUsed,
-    },
-    langy: { startConversationTurn: mockStartConversationTurn },
-  })),
-}));
+const featureFlags = MemoryFeatureFlagService.create();
+const processApp = createTestApp({ featureFlags, redis: null });
+const mockIsEnabled = vi.spyOn(featureFlags, "isEnabled");
+const mockResolve = vi.spyOn(processApp.apiKeys, "tryResolveToken");
+const mockMarkUsed = vi.spyOn(processApp.apiKeys, "markUsed");
+const mockStartConversationTurn = vi.spyOn(processApp.langy, "startConversationTurn");
 
 // ─── App under test ───────────────────────────────────────────────────────────
 // Imported after the process App and transport dependencies are mocked.
 const { app: langyApp } = await import("../langy-api");
 
 const testApp = new Hono();
-testApp.use("*", appContextMiddlewareFor(getApp()));
+testApp.use("*", appContextMiddlewareFor(processApp));
 testApp.route("/", langyApp);
 
 const TURN_URL = "http://localhost/api/langy/conversations";
@@ -235,9 +214,7 @@ describe("/api/langy refusal chain", () => {
   describe("open surface (flag on)", () => {
     it("lets the ceiling denial through untranslated", async () => {
       const { ApiKeyPermissionDeniedError } = await import("@langwatch/api-key-contract");
-      mockEnforceApiKeyCeiling.mockRejectedValue(
-        new ApiKeyPermissionDeniedError("langy:create"),
-      );
+      mockEnforceApiKeyCeiling.mockRejectedValue(new ApiKeyPermissionDeniedError("langy:create"));
 
       const res = await postTurn();
       const body = (await res.json()) as { error?: { code?: string } };

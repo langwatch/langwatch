@@ -12,23 +12,21 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp, tryGetApp } from "~/server/app-layer/app";
 import type { App } from "~/server/app-layer/app";
-import {
-  AGENT_CHAT_TIMEOUT_MS,
-  ADOPTABLE_CONVERSATION_ID,
-  LangyTurnAccessStore,
-  LangyTokenBuffer,
-} from "@langwatch/langy-server";
-import type { LangyChatMessageInput } from "@langwatch/langy-server/services/langy-turn.service";
 import { isLangyConversationUpdateVisibleToUser } from "@langwatch/langy-contract";
 import {
   type LangyTurnContext,
   langyTurnContextSchema,
-} from "~/server/app-layer/langy/langyTurnContext.schema";
-import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
-import type { LangyStreamEntry } from "@langwatch/langy-server";
-import { decideSyntheticTerminal } from "@langwatch/langy-server/streaming/langy-turn-settlement";
+} from "~/runtime/app/features/langy-turn-context.adapter";
+import {
+  abortableDelay,
+  ADOPTABLE_CONVERSATION_ID,
+  AGENT_CHAT_TIMEOUT_MS,
+  decideSyntheticTerminal,
+  LangyTokenBuffer,
+  LangyTurnAccessStore,
+  type LangyStreamEntry,
+} from "~/runtime/app/features/langy-streaming.adapter";
 import type { Session } from "~/server/auth";
 import {
   checkLangyMessageRateLimit,
@@ -216,16 +214,17 @@ async function canWatchTurn({
   conversationId,
   turnId,
   userId,
+  redis,
 }: {
   langy: App["langy"];
   projectId: string;
   conversationId: string;
   turnId: string;
   userId: string;
+  redis: App["redis"];
 }): Promise<boolean> {
-  const connection = tryGetApp()?.redis ?? null;
-  if (connection) {
-    const access = LangyTurnAccessStore.create({ redis: connection });
+  if (redis) {
+    const access = LangyTurnAccessStore.create({ redis });
     if (await access.isTurnActor({ projectId, conversationId, turnId, userId })) {
       return true;
     }
@@ -260,6 +259,7 @@ async function watchForMissedTerminal({
   conversationId,
   turnId,
   userId,
+  langy,
   buffer,
   signal,
 }: {
@@ -267,6 +267,7 @@ async function watchForMissedTerminal({
   conversationId: string;
   turnId: string;
   userId: string;
+  langy: App["langy"];
   buffer: {
     liveness(a: { conversationId: string; turnId: string }): Promise<{ stale: boolean }>;
   };
@@ -276,9 +277,7 @@ async function watchForMissedTerminal({
   while (!signal.aborted) {
     if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
     const [conversation, liveness] = await Promise.all([
-      getApp()
-        .langy.getById({ id: conversationId, projectId, userId })
-        .catch(() => null),
+      langy.getById({ id: conversationId, projectId, userId }).catch(() => null),
       buffer.liveness({ conversationId, turnId }).catch(() => null),
     ]);
     if (!conversation || !liveness) {
@@ -946,7 +945,7 @@ export const langyRouter = createTRPCRouter({
   onConversationUpdate: langyReadProcedure.subscription(async function* (opts) {
     const { projectId } = opts.input;
     const userId = opts.ctx.session.user.id;
-    const emitter = getApp().broadcast.getTenantEmitter(projectId);
+    const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
     try {
       for await (const eventArgs of on(emitter, "langy_conversation_updated", {
         signal: opts.signal,
@@ -968,7 +967,7 @@ export const langyRouter = createTRPCRouter({
         yield data;
       }
     } finally {
-      getApp().broadcast.cleanupTenantEmitter(projectId);
+      opts.ctx.app.broadcast.cleanupTenantEmitter(projectId);
     }
   }),
 
@@ -1005,6 +1004,7 @@ export const langyRouter = createTRPCRouter({
           conversationId,
           turnId,
           userId,
+          redis: opts.ctx.app.redis,
         }))
       ) {
         logger.warn(
@@ -1019,7 +1019,7 @@ export const langyRouter = createTRPCRouter({
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres
       // conversation/message query.
-      const connection = tryGetApp()?.redis ?? null;
+      const connection = opts.ctx.app.redis;
       if (!connection) return;
 
       const blocking = connection.duplicate();
@@ -1060,6 +1060,7 @@ export const langyRouter = createTRPCRouter({
             conversationId,
             turnId,
             userId,
+            langy: opts.ctx.app.langy,
             buffer,
             signal: followSignal,
           })

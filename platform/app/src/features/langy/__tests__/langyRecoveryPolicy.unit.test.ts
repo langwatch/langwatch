@@ -101,7 +101,7 @@ describe("langyRecoveryPolicy", () => {
     // The SERVER already backed off and retried these, three times, on the live
     // stream. Reaching the browser means that budget is spent — retrying again
     // here would silently double it and hold the user in a spinner. See
-    // `server/app-layer/langy/execution/langy-turn-recovery.ts`.
+    // the package-owned Langy turn processor.
     it("does NOT retry again on the client — the server already spent the budget", () => {
       for (const kind of ["langy_agent_unavailable", "langy_agent_at_capacity"]) {
         const policy = langyRecoveryPolicy(kind);

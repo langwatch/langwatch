@@ -49,9 +49,9 @@ none of it is speculative. Traced 2026-07-21:
 { acceptedAt, eventId }` (KSUID tie-breaker) is defined in
   `event-sourcing/projections/stateProjection.types.ts`, persisted per document
   by `StateProjectionStore` (`StoredProjection.cursor`) — including by the
-  Langy turn fold — with a comparator in
-  `app-layer/langy/subscribers/projection-cursor.ts`. "Snapshot + cursor" means
-  exposing a stored field, not inventing one.
+  Langy turn fold — with the portable comparator in
+  `packages/features/langy/contract/src/event-sourcing/contracts/cursor.ts`.
+  "Snapshot + cursor" means exposing a stored field, not inventing one.
 - **The live push channel exists.** The
   `langyConversationUpdateBroadcast` subscriber receives every Langy event
   **in-band from the Redis queue** (no event-log read), waits until the

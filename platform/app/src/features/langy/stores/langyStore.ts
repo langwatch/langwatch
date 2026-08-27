@@ -17,7 +17,7 @@ import {
 import type { LangyProgressSample } from "@langwatch/langy-web";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
+import type { LangyResourceKind } from "@langwatch/langy-contract";
 
 export type { LangyProgressSample } from "@langwatch/langy-web";
 

@@ -387,6 +387,6 @@ observed-liveness input contract, and is the natural follow-up.
 - Behavioral spec: [`specs/langy/langy-projection-independent-reactions.feature`](../../../specs/langy/langy-projection-independent-reactions.feature)
 - Current pipeline: `platform/app/src/server/event-sourcing/pipelines/langy-conversation-processing/pipeline.ts`
 - Current process manager: `platform/app/src/server/event-sourcing/pipelines/langy-conversation-processing/process-manager/`
-- Current direct subscribers: `platform/app/src/server/app-layer/langy/subscribers/`
+- Current direct subscribers: `packages/features/langy/server/src/subscribers/`
 - Current registration: `platform/app/src/server/event-sourcing/pipelineRegistry.ts`
 - Related ADRs: [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md), ADR-034 (ClickHouse analytics materialization), ADR-046 (Langy event-sourced conversations)

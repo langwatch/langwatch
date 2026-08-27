@@ -6,7 +6,7 @@
  * via {@link githubProgressFromToolParts} — `git push` IS the push, so the card
  * reads what the agent actually ran rather than a `[langy:progress:...]` marker
  * the model was asked to print into its reply. See
- * server/app-layer/langy/execution/githubCommand.ts.
+ * @langwatch/langy-contract github-command.ts.
  *
  * Because tool parts are persisted with the message (the sentinels were stripped
  * before persistence), the card now survives a refresh. It did not used to.
@@ -15,10 +15,7 @@
  */
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Check } from "lucide-react";
-import type {
-  GithubProgressEvent,
-  GithubProgressStage,
-} from "~/server/app-layer/langy/execution/githubCommand";
+import type { GithubProgressEvent, GithubProgressStage } from "@langwatch/langy-contract";
 
 type Step = {
   stage: GithubProgressStage;

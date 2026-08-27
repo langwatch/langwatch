@@ -7,7 +7,7 @@ const { hasLangyAccess, resolveOrganizationId } = vi.hoisted(() => ({
   hasLangyAccess: vi.fn(),
   resolveOrganizationId: vi.fn(),
 }));
-vi.mock("~/server/app-layer/langy/langyAccessGate", () => ({ hasLangyAccess }));
+vi.mock("~/runtime/app/features/langy-access.adapter", () => ({ hasLangyAccess }));
 vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId,
 }));
@@ -16,11 +16,12 @@ import { LangyNotEnabledError } from "@langwatch/langy-contract";
 import { enforceLangyAccess } from "../langyAccessMiddleware";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };
+const featureFlags = { isEnabled: vi.fn() };
 
 function invoke(input: { projectId?: string; organizationId?: string }) {
   const next = vi.fn().mockResolvedValue("NEXT_RESULT");
   const result = enforceLangyAccess({
-    ctx: { session: { user } },
+    ctx: { session: { user }, app: { featureFlags } },
     input,
     next,
     // deliberately loose: this middleware only reads ctx.session.user + input
@@ -70,6 +71,7 @@ describe("enforceLangyAccess", () => {
 
       expect(hasLangyAccess).toHaveBeenCalledWith({
         user,
+        featureFlags,
         projectId: "project-1",
       });
     });
@@ -83,6 +85,7 @@ describe("enforceLangyAccess", () => {
 
       expect(hasLangyAccess).toHaveBeenCalledWith({
         user,
+        featureFlags,
         organizationId: "org-1",
       });
     });

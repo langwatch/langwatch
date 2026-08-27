@@ -8,7 +8,7 @@
  * the handle stays hidden — the exact asymmetry this test locks out.
  *
  * The `useFeatureFlag` mock reproduces the flag store's rule matcher
- * (server/featureFlag/rules.ts): a targeting rule only matches when every id it
+ * (`@langwatch/feature-flag-contract`): a targeting rule only matches when every id it
  * constrains is present in, and equal to, the evaluation context.
  *
  * Spec: specs/langy/langy-baseline.feature ("Access and rollout gating")

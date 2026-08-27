@@ -32,7 +32,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { LangyChoicesCard } from "./LangyChoicesCard";
 import { LangyDerivedCardView } from "./LangyDerivedCardView";
-import { LangyFailedCard } from "./LangyFailedCard";
+import { LangyFailedCard } from "@langwatch/langy-web";
 import type { ChoicesRefRow } from "./useChoicesRefRows";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────

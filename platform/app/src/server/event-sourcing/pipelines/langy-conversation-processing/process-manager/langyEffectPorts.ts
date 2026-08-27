@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
 import { serializeLangyTurnError } from "@langwatch/langy-server";
 import type { LangyEffectPorts } from "@langwatch/langy-server";
-import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
+import type { LangyTitleGenerator } from "~/runtime/app/features/langy-title-generation.adapter";
 import { LangyTurnDispatchRetry } from "@langwatch/langy-server/processes/langy-turn-dispatch-retry";
 import type { LangyWorkerPort } from "@langwatch/langy-server";
 import type { LangyTurnHandoff, LangyTurnHandoffStore } from "@langwatch/langy-server";

@@ -12,10 +12,7 @@ import { DIGEST_STRATEGIES } from "@langwatch/langy-contract";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import {
-  CAPABILITY_CATALOG,
-  CAPABILITY_SURFACES,
-} from "../components/capabilities/capabilityCatalog";
+import { CAPABILITY_CATALOG, CAPABILITY_SURFACES } from "@langwatch/langy-web";
 import {
   SURFACE_LABEL,
   SURFACE_PATH,
