@@ -7,7 +7,7 @@ import {
 import type React from "react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTokens } from "~/features/traces-v2/utils/formatters";
+import { formatTokens } from "@langwatch/trace-web";
 
 /**
  * The two token figures that answer different questions, and a bar comparing

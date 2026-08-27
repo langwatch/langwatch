@@ -1,6 +1,9 @@
 import { Table } from "@chakra-ui/react";
 import {
   ActiveAndWaitingCell,
+  PullRequestsCell,
+  SessionNameCell,
+  SessionRowActions,
   type SessionListRow,
   type SessionPullRequest,
   MISSING_VALUE,
@@ -11,10 +14,7 @@ import { AgentLabel } from "../AgentLabel";
 import { formatLastUpdate } from "../lastUpdate";
 import { CompactionsCell } from "./cells/CompactionsCell";
 import { ContextCell } from "./cells/ContextCell";
-import { PullRequestsCell } from "./cells/PullRequestsCell";
-import { SessionNameCell } from "./cells/SessionNameCell";
 import { TokenCostCell } from "./cells/TokenCostCell";
-import { SessionRowActions } from "./SessionRowActions";
 
 /**
  * One session, read left to right. The whole row is the target that opens the

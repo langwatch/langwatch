@@ -1,17 +1,7 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  IconButton,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
-import { CheckCircle, Code, Plus, Workflow } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
-import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import {
   COMPARISON_EVALUATOR_TYPE,
@@ -19,12 +9,10 @@ import {
 } from "~/experiments-v3/types";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
-import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
+import { EvaluatorListEmptyState, EvaluatorListItem } from "@langwatch/evaluator-web";
 import { api } from "~/utils/api";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
-import { Menu } from "@langwatch/design-system/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
 export type EvaluatorListDrawerProps = {
@@ -32,36 +20,17 @@ export type EvaluatorListDrawerProps = {
   onClose?: () => void;
   onSelect?: (evaluator: EvaluatorWithFields) => void;
   onCreateNew?: () => void;
-  /**
-   * Narrow the list to one evaluator type. Serializable, so the filtered list
-   * survives a URL paste. Used by the Comparison flow, which is a list of
-   * comparison evaluators and nothing else.
-   */
   filterEvaluatorType?: string;
-  /** Drawer heading. Defaults to "Choose Evaluator". */
   title?: string;
-  /** Label on the create button. Defaults to "New Evaluator". */
   createLabel?: string;
-  /** Noun used by the empty state. Defaults to "evaluator". */
   itemLabel?: string;
 };
 
-/**
- * Drawer for selecting an existing evaluator or creating a new one.
- * Features:
- * - Shows list of saved evaluators
- * - Empty state with create CTA
- * - "New Evaluator" button at top
- * - Reusable across the app via useDrawer
- * - Optionally narrowed to a single evaluator type via `filterEvaluatorType`
- */
 export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
   const utils = api.useUtils();
-
-  // Get flow callbacks for this drawer (set by parent drawer like OnlineEvaluationDrawer)
   const flowCallbacks = getFlowCallbacks("evaluatorList");
 
   const onClose = props.onClose ?? closeDrawer;
@@ -90,12 +59,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
           (evaluator.config as { evaluatorType?: string } | null)?.evaluatorType ===
           props.filterEvaluatorType,
       )
-    : // Comparison evaluators (current + legacy pairwise) judge target
-      // columns against each other and only make sense wired through the
-      // Comparison card in TargetTypeSelectorDrawer, which sets their
-      // `variants`/`goldenField`. Attached here as a per-target chip
-      // instead, they'd have no variants configured and nothing to judge.
-      evaluatorsQuery.data?.filter((evaluator) => {
+    : evaluatorsQuery.data?.filter((evaluator) => {
         const evaluatorType = (evaluator.config as { evaluatorType?: string } | null)
           ?.evaluatorType;
         return (
@@ -111,13 +75,6 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   });
 
   const handleSelectEvaluator = (evaluator: EvaluatorWithFields) => {
-    // IMPORTANT: Only call the callback - do NOT navigate here!
-    // Navigation (goBack/closeDrawer) is the CALLER'S responsibility.
-    // Different callers have different navigation needs:
-    // - OnlineEvaluationDrawer: opens evaluatorEditor with mappings config (no goBack here)
-    // - EvaluationsV3: adds to workbench and closes drawer (caller calls closeDrawer)
-    // - Other flows: may have different requirements
-    // If you add goBack() here, you WILL break existing flows.
     onSelect?.(evaluator);
   };
 
@@ -133,20 +90,11 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     });
   };
 
-  const handleDeleteEvaluator = (evaluator: EvaluatorWithFields) => {
-    setEvaluatorToDelete(evaluator);
-  };
-
-  // State for API usage dialog
   const [apiDialogEvaluator, setApiDialogEvaluator] =
     useState<EvaluatorWithFields | null>(null);
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<EvaluatorWithFields | null>(
     null,
   );
-
-  const handleUseFromApi = (evaluator: EvaluatorWithFields) => {
-    setApiDialogEvaluator(evaluator);
-  };
 
   return (
     <Drawer.Root
@@ -173,7 +121,6 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            {/* Evaluator list - scrollable */}
             <VStack
               gap={2}
               align="stretch"
@@ -187,16 +134,22 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                   <Spinner size="md" />
                 </HStack>
               ) : evaluators?.length === 0 ? (
-                <EmptyState onCreateNew={onCreateNew} itemLabel={itemLabel} />
+                <EvaluatorListEmptyState
+                  onCreateNew={onCreateNew}
+                  itemLabel={itemLabel}
+                />
               ) : (
                 evaluators?.map((evaluator) => (
-                  <EvaluatorCard
+                  <EvaluatorListItem
                     key={evaluator.id}
                     evaluator={evaluator}
+                    updatedAtLabel={formatDistanceToNow(new Date(evaluator.updatedAt), {
+                      addSuffix: true,
+                    })}
                     onClick={() => handleSelectEvaluator(evaluator)}
                     onEdit={() => handleEditEvaluator(evaluator)}
-                    onDelete={() => handleDeleteEvaluator(evaluator)}
-                    onUseFromApi={() => handleUseFromApi(evaluator)}
+                    onDelete={() => setEvaluatorToDelete(evaluator)}
+                    onUseFromApi={() => setApiDialogEvaluator(evaluator)}
                   />
                 ))
               )}
@@ -210,7 +163,6 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
 
-      {/* API Usage Dialog */}
       <EvaluatorApiUsageDialog
         evaluator={apiDialogEvaluator}
         open={!!apiDialogEvaluator}
@@ -219,8 +171,8 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 
       <ConfirmDialog
         open={!!evaluatorToDelete}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setEvaluatorToDelete(null);
+        onOpenChange={(open) => {
+          if (!open) setEvaluatorToDelete(null);
         }}
         title="Delete evaluator"
         message={`Are you sure you want to delete "${evaluatorToDelete?.name ?? ""}"?`}
@@ -236,196 +188,5 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         }}
       />
     </Drawer.Root>
-  );
-}
-
-// ============================================================================
-// Empty State Component
-// ============================================================================
-
-/**
- * The button here deliberately ignores the header's `createLabel` and derives
- * its own wording from `itemLabel`, so it always agrees with the heading right
- * above it ("Create your first X to get started"). The header button is the
- * caller's to word; this one belongs to the empty state.
- */
-function EmptyState({
-  onCreateNew,
-  itemLabel,
-}: {
-  onCreateNew: () => void;
-  itemLabel: string;
-}) {
-  return (
-    <VStack paddingY={24} gap={4} textAlign="center">
-      <Box padding={4} borderRadius="full" bg="green.subtle" color="green.fg">
-        <CheckCircle size={32} />
-      </Box>
-      <VStack gap={1}>
-        <Text fontWeight="medium" color="fg">
-          No {itemLabel}s yet
-        </Text>
-        <Text fontSize="sm" color="fg.muted">
-          Create your first {itemLabel} to get started
-        </Text>
-      </VStack>
-      <Button
-        colorScheme="blue"
-        onClick={onCreateNew}
-        data-testid="create-first-evaluator-button"
-      >
-        <Plus size={16} />
-        {`Create your first ${itemLabel}`}
-      </Button>
-    </VStack>
-  );
-}
-
-// ============================================================================
-// Evaluator Card Component
-// ============================================================================
-
-type EvaluatorCardProps = {
-  evaluator: EvaluatorWithFields;
-  onClick: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onUseFromApi: () => void;
-};
-
-const getEvaluatorDisplayName = (evaluatorType: string): string => {
-  if (!evaluatorType) return "";
-
-  const evaluatorDefinition = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
-  if (!evaluatorDefinition) return evaluatorType;
-
-  return evaluatorDisplayName(evaluatorDefinition.name);
-};
-
-function EvaluatorCard({
-  evaluator,
-  onClick,
-  onEdit,
-  onDelete,
-  onUseFromApi,
-}: EvaluatorCardProps) {
-  const config = evaluator.config as { evaluatorType?: string } | null;
-  const evaluatorType = config?.evaluatorType ?? "";
-  const displayName =
-    evaluator.type === "workflow"
-      ? "Workflow"
-      : evaluator.type === "code"
-        ? "Code"
-        : getEvaluatorDisplayName(evaluatorType);
-
-  return (
-    <Box
-      // role+tabIndex instead of as="button": the card hosts the Actions
-      // menu trigger, and nested native buttons are invalid HTML.
-      role="button"
-      tabIndex={0}
-      cursor="pointer"
-      onClick={onClick}
-      onKeyDown={(e) => {
-        // Keys bubbling up from the nested actions menu (trigger or items)
-        // must not select the card; only act when the card itself has focus.
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      padding={4}
-      borderRadius="md"
-      border="1px solid"
-      borderColor="border"
-      bg="bg.panel"
-      textAlign="left"
-      width="full"
-      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
-      transition="all 0.15s"
-      data-testid={`evaluator-card-${evaluator.id}`}
-      position="relative"
-    >
-      <HStack gap={3} align="start">
-        <Box color="green.fg" paddingTop={1}>
-          {evaluator.type === "workflow" ? (
-            <Workflow size={16} />
-          ) : evaluator.type === "code" ? (
-            <Code size={16} />
-          ) : (
-            <CheckCircle size={16} />
-          )}
-        </Box>
-        <VStack align="start" gap={0} flex={1}>
-          <Text fontWeight="medium" fontSize="13px">
-            {evaluator.name}
-          </Text>
-          <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-            {displayName && (
-              <>
-                <span>{displayName}</span>
-                <span style={{ margin: "0 4px" }}>{" • "}</span>
-              </>
-            )}
-            <span>
-              Updated{" "}
-              {formatDistanceToNow(new Date(evaluator.updatedAt), {
-                addSuffix: true,
-              })}
-            </span>
-          </Text>
-        </VStack>
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <IconButton
-              variant="ghost"
-              size="xs"
-              aria-label="Actions"
-              onClick={(e) => e.stopPropagation()}
-              data-testid={`evaluator-menu-${evaluator.id}`}
-            >
-              <LuEllipsisVertical />
-            </IconButton>
-          </Menu.Trigger>
-          <Menu.Content>
-            <Menu.Item
-              value="edit"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              data-testid={`evaluator-edit-${evaluator.id}`}
-            >
-              <LuPencil size={14} />
-              Edit
-            </Menu.Item>
-            <Menu.Item
-              value="use-from-api"
-              onClick={(e) => {
-                e.stopPropagation();
-                onUseFromApi();
-              }}
-              data-testid={`evaluator-use-api-${evaluator.id}`}
-            >
-              <Code size={14} />
-              Use via API
-            </Menu.Item>
-            <Menu.Item
-              value="delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              color="red.500"
-              data-testid={`evaluator-delete-${evaluator.id}`}
-            >
-              <LuTrash2 size={14} />
-              Delete
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Root>
-      </HStack>
-    </Box>
   );
 }

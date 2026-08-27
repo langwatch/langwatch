@@ -6,7 +6,7 @@ import {
 } from "@langwatch/coding-agent-web";
 import type React from "react";
 
-import { formatCost } from "~/features/traces-v2/utils/formatters";
+import { formatCost } from "@langwatch/trace-web";
 
 /** What the session's tokens cost, against the dearest one on the page. */
 export const TokenCostCell: React.FC<{
