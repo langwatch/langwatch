@@ -188,7 +188,7 @@ const CHAT = [
 describe("given a Copilot conversation stored in one row", () => {
   const spans = spansOf([copilotEvent(transcriptRow({ activities: CHAT }))]);
 
-  /** @scenario "Each turn becomes its own trace, grouped by thread" */
+  /** @scenario "Each turn in a conversation becomes its own trace, all sharing a thread" */
   it("records one trace per turn, all sharing the same thread", () => {
     const turns = spans.filter(
       (s: { name: string }) => s.name === COPILOT_TURN_SPAN_NAME,
@@ -207,7 +207,7 @@ describe("given a Copilot conversation stored in one row", () => {
     expect(rendered).toContain("Hold the power button for ten seconds.");
   });
 
-  /** @scenario "A conversation becomes one trace carrying what was said" */
+  /** @scenario "Each turn in a conversation becomes its own trace, all sharing a thread" */
   it("opens with the agent's greeting rather than dropping it", () => {
     expect(JSON.stringify(spans)).toContain("Hello! How can I help?");
   });
