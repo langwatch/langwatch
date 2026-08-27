@@ -147,7 +147,7 @@ func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
 		t.Fatalf("newCodeExecutor: %v", err)
 	}
 	if got, want := exec.DefaultTimeout(), 5*time.Minute; got != want {
-		t.Errorf("DefaultTimeout() = %v; want %v (CODE_BLOCK_TIMEOUT_SECONDS=300)", got, want)
+		t.Errorf("DefaultTimeout() = %v; want %v (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS=300)", got, want)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestNewCodeExecutor_UnsetTimeoutKeepsTheSixtySecondDefault(t *testing.T) {
 }
 
 // TestResolveCodeBlockTimeout covers the misconfiguration edge: a zero or
-// negative CODE_BLOCK_TIMEOUT_SECONDS must not become a negative duration.
+// negative NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS must not become a negative duration.
 // codeblock.Execute feeds this straight into context.WithTimeout, so a
 // negative value would produce an already-expired context and kill every
 // code block instantly. Zero defers to codeblock.New's 60s fallback.

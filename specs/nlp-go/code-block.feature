@@ -90,8 +90,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
   Rule: Wall-clock timeout terminates the subprocess
 
     @integration @unimplemented
-    Scenario: a code block exceeding NLP_CODE_BLOCK_TIMEOUT_SECONDS is killed and reports a timeout
-      Given NLP_CODE_BLOCK_TIMEOUT_SECONDS is set to 2
+    Scenario: a code block exceeding NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is killed and reports a timeout
+      Given NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS is set to 2
       And a code node whose body sleeps 10 seconds
       When I POST /go/studio/execute_sync
       Then within 3 seconds the response.result.status is "error"

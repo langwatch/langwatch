@@ -150,7 +150,7 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (
 	})
 }
 
-// resolveCodeBlockTimeout converts the operator's CODE_BLOCK_TIMEOUT_SECONDS
+// resolveCodeBlockTimeout converts the operator's NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
 // into the wall-clock timeout the code-block executor enforces.
 //
 // A zero or negative value returns zero, which hands the decision back to
