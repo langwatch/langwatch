@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 export { createRestService, createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
+export type { RestService } from "./builder.js";
 export type { DefaultsChain, RestChain, RouteChain, RpcChain, SseChain } from "./definition.js";
 export { DISCOVER_NAME, type DiscoveredOperation, type ServiceCatalogue } from "./discover.js";
 export {

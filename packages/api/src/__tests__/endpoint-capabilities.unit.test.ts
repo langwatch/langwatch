@@ -16,10 +16,9 @@ const logRecords: {
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@langwatch/observability")>();
-  const record =
-    (level: string) => (payload: Record<string, unknown>, message: string) => {
-      logRecords.push({ level, payload, message });
-    };
+  const record = (level: string) => (payload: Record<string, unknown>, message: string) => {
+    logRecords.push({ level, payload, message });
+  };
   return {
     ...actual,
     createLogger: () => ({
@@ -32,12 +31,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 const { createService: createRawService } = await import("../builder.js");
-const createService: typeof createRawService = ((
-  config: Parameters<typeof createRawService>[0],
-) =>
-  createRawService(config).withoutPermission(
-    "framework test endpoint",
-  )) as typeof createRawService;
+const createService: typeof createRawService = ((config: Parameters<typeof createRawService>[0]) =>
+  createRawService(config).withoutPermission("framework test endpoint")) as typeof createRawService;
 
 // ---------------------------------------------------------------------------
 // In-memory ports
@@ -63,10 +58,7 @@ class InMemoryRateLimiter implements RateLimiter {
 }
 
 class InMemoryCache implements ResponseCache {
-  readonly store = new Map<
-    string,
-    { tag: string; body: Uint8Array; ttlSeconds: number }
-  >();
+  readonly store = new Map<string, { tag: string; body: Uint8Array; ttlSeconds: number }>();
   failOnGet = false;
 
   async get(key: string) {
@@ -155,6 +147,10 @@ describe("withRateLimit", () => {
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("30");
     expect(res.headers.get("X-API-Version")).toBe("2026-08-07");
+    await expect(res.json()).resolves.toMatchObject({
+      code: "rate_limited",
+      retryable: true,
+    });
   });
 
   it("omits Retry-After when the limiter supplies none", async () => {
@@ -201,9 +197,34 @@ describe("withRateLimit", () => {
     await post(app, "/api/things/latest/things.create");
 
     expect(rateLimiter.keys).toEqual([
-      "things:/things.create:2026-08-07:user-1",
-      "things:/things.delete:2026-08-07:user-1",
-      "things:/things.create:latest:user-1",
+      "things:post:/things.create:2026-08-07:user-1",
+      "things:post:/things.delete:2026-08-07:user-1",
+      "things:post:/things.create:latest:user-1",
+    ]);
+  });
+
+  it("keeps operations on the same path in separate limiter budgets", async () => {
+    const app = createService({
+      name: "things",
+      basePath: "/api/things",
+      logger: false,
+      tracer: false,
+      rateLimiter,
+    })
+      .registerRoute("get", "/shared", "2026-08-07", async () => ({ method: "get" }), (b) =>
+        b.withOutput(z.object({ method: z.string() })).withRateLimit(),
+      )
+      .registerRoute("delete", "/shared", "2026-08-07", async () => ({ method: "delete" }), (b) =>
+        b.withOutput(z.object({ method: z.string() })).withRateLimit(),
+      )
+      .build();
+
+    await app.request("/api/things/2026-08-07/shared");
+    await app.request("/api/things/2026-08-07/shared", { method: "DELETE" });
+
+    expect(rateLimiter.keys).toEqual([
+      "things:get:/shared:2026-08-07:anonymous",
+      "things:delete:/shared:2026-08-07:anonymous",
     ]);
   });
 });
@@ -341,6 +362,37 @@ describe("withCache", () => {
     expect(cache.store.size).toBe(2);
   });
 
+  it("keeps cached operations on the same path isolated by method", async () => {
+    const getHandler = vi.fn(async () => ({ method: "get" }));
+    const deleteHandler = vi.fn(async () => ({ method: "delete" }));
+    const output = z.object({ method: z.string() });
+    const app = createService({
+      name: "things",
+      basePath: "/api/things",
+      logger: false,
+      tracer: false,
+      cache,
+    })
+      .registerRoute("get", "/shared", "2026-08-07", getHandler, (b) =>
+        b.withOutput(output).withCache("things", 60),
+      )
+      .registerRoute("delete", "/shared", "2026-08-07", deleteHandler, (b) =>
+        b.withOutput(output).withCache("things", 60),
+      )
+      .build();
+
+    const getResponse = await app.request("/api/things/2026-08-07/shared");
+    const deleteResponse = await app.request("/api/things/2026-08-07/shared", {
+      method: "DELETE",
+    });
+
+    await expect(getResponse.json()).resolves.toEqual({ method: "get" });
+    await expect(deleteResponse.json()).resolves.toEqual({ method: "delete" });
+    expect(getHandler).toHaveBeenCalledTimes(1);
+    expect(deleteHandler).toHaveBeenCalledTimes(1);
+    expect(cache.store.size).toBe(2);
+  });
+
   it("drops a family's entries when its tag is invalidated", async () => {
     const handler = vi.fn(async (_c: unknown, input: { id: string }) => ({
       id: input.id,
@@ -387,9 +439,7 @@ describe("withCache", () => {
     expect(res.status).toBe(200);
     expect(handler).toHaveBeenCalledTimes(1);
     expect(
-      logRecords.some(
-        (r) => r.level === "error" && r.message.includes("cache read failed"),
-      ),
+      logRecords.some((r) => r.level === "error" && r.message.includes("cache read failed")),
     ).toBe(true);
   });
 });
@@ -437,9 +487,7 @@ describe("withDeprecated", () => {
       name: "widget",
     });
     expect(ok.headers.get("Deprecation")).toBe("true");
-    expect(ok.headers.get("X-API-Deprecation-Notice")).toBe(
-      "use things.createV2 after 2026-11-01",
-    );
+    expect(ok.headers.get("X-API-Deprecation-Notice")).toBe("use things.createV2 after 2026-11-01");
 
     const failing = await post(app, "/api/things/2026-01-15/things.create", {
       name: 42,
@@ -506,8 +554,8 @@ describe("capability defaults", () => {
 
     // The default applied to list and get only; search opted out.
     expect(rateLimiter.keys.sort()).toEqual([
-      "things:/things.get:2026-08-07:anonymous",
-      "things:/things.list:2026-08-07:anonymous",
+      "things:post:/things.get:2026-08-07:anonymous",
+      "things:post:/things.list:2026-08-07:anonymous",
     ]);
 
     // get cached under its own tag, list under the service default, search nowhere.

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { Hono } from "hono";
 import { z } from "zod";
 
 import { createTestService as createService } from "./test-service.js";
 import type { EndpointRegistration, MountedRoute } from "../types.js";
 import { isDateVersion } from "../types.js";
+import { matchPath } from "../route-mounting.js";
 import { type RegistrationEvent, resolveVersions } from "../versioning.js";
 
 // ---------------------------------------------------------------------------
@@ -12,9 +14,7 @@ import { type RegistrationEvent, resolveVersions } from "../versioning.js";
 // at version V its latest registration dated on or before V.
 // ---------------------------------------------------------------------------
 
-function makeEndpoint(
-  overrides: Partial<EndpointRegistration> = {},
-): EndpointRegistration {
+function makeEndpoint(overrides: Partial<EndpointRegistration> = {}): EndpointRegistration {
   return {
     kind: "rpc",
     method: "post",
@@ -25,10 +25,7 @@ function makeEndpoint(
   };
 }
 
-function event(
-  version: string,
-  endpoint: Partial<EndpointRegistration> = {},
-): RegistrationEvent {
+function event(version: string, endpoint: Partial<EndpointRegistration> = {}): RegistrationEvent {
   return { version, endpoint: makeEndpoint(endpoint) };
 }
 
@@ -101,6 +98,116 @@ describe("resolveVersions", () => {
     expect(result.get("latest")![0]!.withdrawn).toBe(true);
   });
 
+  it("withdraws one method and path without withdrawing its sibling", () => {
+    const result = resolveVersions([
+      event("2025-01-01", { kind: "rest", method: "get", path: "/things/:id" }),
+      event("2025-01-01", { kind: "rest", method: "delete", path: "/things/:id" }),
+      {
+        version: "2025-06-01",
+        endpoint: makeEndpoint({
+          kind: "rest",
+          method: "get",
+          path: "/things/:id",
+          withdrawn: true,
+        }),
+      },
+    ]);
+
+    const endpoints = result.get("2025-06-01")!;
+    expect(endpoints.find((endpoint) => endpoint.method === "get")?.withdrawn).toBe(true);
+    expect(endpoints.find((endpoint) => endpoint.method === "delete")?.withdrawn).not.toBe(true);
+  });
+
+  it("refuses ambiguous public REST route shapes", () => {
+    expect(() =>
+      resolveVersions([
+        event("2025-01-01", {
+          kind: "public-rest",
+          method: "get",
+          path: "/things/:id",
+        }),
+        event("2025-01-01", {
+          kind: "public-rest",
+          method: "get",
+          path: "/things/:name",
+        }),
+      ]),
+    ).toThrow(/overlap/);
+  });
+
+  it("refuses public REST policy drift across date versions", () => {
+    expect(() =>
+      resolveVersions([
+        event("2025-01-01", {
+          kind: "public-rest",
+          method: "get",
+          path: "/things",
+          config: { meta: { policy: "one" } },
+        }),
+        event("2025-06-01", {
+          kind: "public-rest",
+          method: "get",
+          path: "/things",
+          config: { meta: { policy: "two" } },
+        }),
+      ]),
+    ).toThrow(/changes its mounted access policy/);
+  });
+
+  it("compares declarative access policy rather than middleware identity", () => {
+    expect(() =>
+      resolveVersions([
+        event("2025-01-01", {
+          kind: "public-rest",
+          method: "get",
+          path: "/things",
+          config: {
+            meta: { audience: ["member"], policy: "things:read" },
+            middleware: [async () => {}],
+          },
+        }),
+        event("2025-06-01", {
+          kind: "public-rest",
+          method: "get",
+          path: "/things",
+          config: {
+            cache: { tag: "things-v2", ttlSeconds: 30 },
+            deprecated: "Use /widgets",
+            meta: { policy: "things:read", audience: ["member"] },
+            middleware: [async () => {}],
+          },
+        }),
+      ]),
+    ).not.toThrow();
+  });
+
+  it.each(["/things/:id?", "/things/:id{\\d+}", "/things/*", "/things/:id/:id"])(
+    "rejects unsupported modern REST route grammar in %s",
+    (path) => {
+      expect(() =>
+        resolveVersions([
+          event("2025-01-01", {
+            kind: "public-rest",
+            method: "get",
+            path,
+          }),
+        ]),
+      ).toThrow(/unique, required, unconstrained :name parameters/);
+    },
+  );
+
+  it("leaves compatibility route grammar unchanged", () => {
+    expect(() =>
+      resolveVersions([
+        event("2025-01-01", {
+          kind: "rest",
+          method: "get",
+          path: "/things/:id?",
+        }),
+      ]),
+    ).not.toThrow();
+  });
+
   it("keeps preview endpoints in their own namespace, out of latest", () => {
     const result = resolveVersions([
       event("2025-01-01"),
@@ -136,6 +243,18 @@ describe("isDateVersion", () => {
     expect(isDateVersion("2025-13-01")).toBe(false);
     expect(isDateVersion("v1")).toBe(false);
   });
+});
+
+describe("date fallback path matching", () => {
+  it.each(["a%2Fb", "%41%ZZ"])(
+    "decodes path parameter %s exactly like Hono",
+    async (encoded) => {
+      const app = new Hono().get("/:id", (context) => context.json(context.req.param()));
+      const response = await app.request(`/${encoded}`);
+
+      await expect(response.json()).resolves.toEqual(matchPath("/:id", `/${encoded}`));
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -233,9 +352,7 @@ describe("explicit version namespaces", () => {
     const guards = mounted.filter((route) => route.isNamespaceGuard);
     expect(guards.length).toBeGreaterThan(0);
     expect(
-      mounted.some(
-        (route) => !route.isNamespaceGuard && route.path === "/api/things/things.list",
-      ),
+      mounted.some((route) => !route.isNamespaceGuard && route.path === "/api/things/things.list"),
     ).toBe(false);
     expect(res.headers.get("X-API-Version")).toBeNull();
   });
@@ -277,8 +394,8 @@ describe("explicit version namespaces", () => {
       method: "POST",
     });
     expect(withdrawn.status).toBe(410);
-    const body = (await withdrawn.json()) as { code: string };
-    expect(body.code).toBe("endpoint_withdrawn");
+    const body = (await withdrawn.json()) as { code: string; retryable: boolean };
+    expect(body).toEqual(expect.objectContaining({ code: "endpoint_withdrawn", retryable: false }));
     expect(withdrawn.headers.get("X-API-Version")).toBe("2026-08-07");
     expect(withdrawn.headers.get("X-API-Version-Status")).toBe("stable");
 
@@ -298,6 +415,43 @@ describe("explicit version namespaces", () => {
       method: "POST",
     });
     expect(earlier.status).toBe(200);
+  });
+
+  it("keeps the legacy name withdrawal compatible with SSE", async () => {
+    const app = createService({
+      name: "things",
+      basePath: "/api/things",
+      logger: false,
+      tracer: false,
+    })
+      .registerSse("things.watch", "2026-01-15", async (_context, stream) => {
+        stream.close();
+      })
+      .withdraw("things.watch", "2026-08-07")
+      .build();
+
+    const response = await app.request("/api/things/2026-08-07/things.watch");
+
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toMatchObject({ code: "endpoint_withdrawn" });
+  });
+
+  it("keeps the legacy path withdrawal compatible with one non-POST operation", async () => {
+    const app = createService({
+      name: "things",
+      basePath: "/api/things",
+      logger: false,
+      tracer: false,
+    })
+      .registerRoute("get", "/legacy", "2026-01-15", async () => ({ ok: true }), (builder) =>
+        builder.withOutput(z.object({ ok: z.boolean() })),
+      )
+      .withdraw("/legacy", "2026-08-07")
+      .build();
+
+    const response = await app.request("/api/things/2026-08-07/legacy");
+
+    expect(response.status).toBe(410);
   });
 
   it("carries the version headers on error responses too", async () => {

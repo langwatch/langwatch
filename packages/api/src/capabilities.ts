@@ -1,8 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { Context, MiddlewareHandler } from "hono";
 
+import { RateLimitedError } from "./errors.js";
 import type { RateLimiter, ResponseCache } from "./ports.js";
-import { ENDPOINT_INPUT } from "./types.js";
+import { ENDPOINT_INPUT, type HttpMethod } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Port-backed capabilities (ADR 003)
@@ -28,12 +29,12 @@ export function rateLimitMiddleware({
   keyParts,
 }: {
   rateLimiter: RateLimiter;
-  /** Service name, endpoint path and version namespace — fixed at mount time. */
-  keyParts: { service: string; path: string; version: string };
+  /** Service, HTTP operation and version namespace — fixed at mount time. */
+  keyParts: { service: string; method: HttpMethod; path: string; version: string };
 }): MiddlewareHandler {
   return async (c, next) => {
     const principal = rateLimitPrincipal(c);
-    const key = `${keyParts.service}:${keyParts.path}:${keyParts.version}:${principal}`;
+    const key = `${keyParts.service}:${keyParts.method}:${keyParts.path}:${keyParts.version}:${principal}`;
 
     let decision: { allowed: boolean; retryAfterSeconds?: number };
     try {
@@ -47,15 +48,7 @@ export function rateLimitMiddleware({
       if (decision.retryAfterSeconds !== undefined) {
         c.header("Retry-After", String(decision.retryAfterSeconds));
       }
-      return c.json(
-        {
-          code: "rate_limited",
-          message: "rate_limited",
-          kind: "rate_limited",
-          type: "rate_limited",
-        },
-        429,
-      );
+      throw new RateLimitedError();
     }
 
     await next();
@@ -70,9 +63,7 @@ export function rateLimitMiddleware({
 function rateLimitPrincipal(c: Context): string {
   const apiKeyId = c.get("apiKeyId") as string | undefined;
   if (apiKeyId) return apiKeyId;
-  const resolved = c.get("resolvedToken") as
-    | { apiKeyId?: string; id?: string }
-    | undefined;
+  const resolved = c.get("resolvedToken") as { apiKeyId?: string; id?: string } | undefined;
   if (resolved?.apiKeyId) return resolved.apiKeyId;
   if (resolved?.id) return resolved.id;
   const userId = (c.get("user") as { id?: string } | undefined)?.id;
@@ -91,16 +82,18 @@ function rateLimitPrincipal(c: Context): string {
  */
 export function cacheKeyFor({
   service,
+  method,
   path,
   version,
   input,
 }: {
   service: string;
+  method: HttpMethod;
   path: string;
   version: string;
   input: unknown;
 }): string {
-  return `${service}:${path}:${version}:${fnv1a(stableStringify(input))}`;
+  return `${service}:${method}:${path}:${version}:${fnv1a(stableStringify(input))}`;
 }
 
 /**
@@ -115,7 +108,7 @@ export function cacheReadMiddleware({
   declaredStatus,
 }: {
   cache: ResponseCache;
-  keyParts: { service: string; path: string; version: string };
+  keyParts: { service: string; method: HttpMethod; path: string; version: string };
   /**
    * The endpoint's declared success status, replayed verbatim on a hit. The
    * defaults mirror `serializeEndpointResult`: 204 for a no-body endpoint,
@@ -132,10 +125,7 @@ export function cacheReadMiddleware({
     try {
       cached = await cache.get(key);
     } catch (error) {
-      logger.error(
-        { error, cacheKey: key },
-        "response cache read failed; running handler",
-      );
+      logger.error({ error, cacheKey: key }, "response cache read failed; running handler");
       await next();
       return;
     }
@@ -177,10 +167,7 @@ export async function writeCachedResponse({
     const bytes = new Uint8Array(await response.clone().arrayBuffer());
     await cache.set(key, cacheConfig.tag, bytes, cacheConfig.ttlSeconds);
   } catch (error) {
-    logger.error(
-      { error, cacheKey: key },
-      "response cache write failed; response already served",
-    );
+    logger.error({ error, cacheKey: key }, "response cache write failed; response already served");
   }
 }
 
@@ -197,10 +184,7 @@ function stableStringify(value: unknown): string {
   }
   const entries = Object.keys(value)
     .sort()
-    .map(
-      (k) =>
-        `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`,
-    );
+    .map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`);
   return `{${entries.join(",")}}`;
 }
 

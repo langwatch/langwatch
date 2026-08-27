@@ -952,7 +952,7 @@ describe("group", () => {
       method: "POST",
     });
     expect(res.status).toBe(200);
-    expect(limiterKeys).toEqual(["test:/things.get:2026-08-07:anonymous"]);
+    expect(limiterKeys).toEqual(["test:post:/things.get:2026-08-07:anonymous"]);
   });
 
   it("runs middleware service first, group second, endpoint last", async () => {

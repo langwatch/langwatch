@@ -6,6 +6,8 @@ import { routeParameterNames } from "./definition.js";
 import { createApiSchemaError, parseApiSchema, type ApiSchema } from "./schema.js";
 import type { EndpointRegistration } from "./types.js";
 
+const inputObjectSchema = z.record(z.string(), z.unknown());
+
 export function appendPublicRestDocumentationValidators({
   stack,
   endpoint,
@@ -62,11 +64,13 @@ export function publicRestPathParams({
 
 export async function parsePublicRestInput({
   context,
+  maxInputBytes,
   method,
   params,
   schema,
 }: {
   context: Context;
+  maxInputBytes: number | undefined;
   method: EndpointRegistration["method"];
   params: unknown;
   schema: ApiSchema | undefined;
@@ -75,7 +79,8 @@ export async function parsePublicRestInput({
     return void 0;
   }
 
-  const source = method === "get" ? context.req.query() : await readJsonObject(context);
+  const source =
+    method === "get" ? readQueryObject(context) : await readJsonObject(context, maxInputBytes);
   const parsed = await parseApiSchema(schema, mergeInput({ params, source }));
   if (!parsed.success) {
     throw parsed.error;
@@ -83,8 +88,21 @@ export async function parsePublicRestInput({
   return parsed.data;
 }
 
-async function readJsonObject(context: Context): Promise<Record<string, unknown>> {
+async function readJsonObject(
+  context: Context,
+  maxInputBytes: number | undefined,
+): Promise<Record<string, unknown>> {
+  if (maxInputBytes === undefined) {
+    throw new Error("Modern REST JSON parsing requires maxInputBytes");
+  }
+  const contentLength = context.req.header("content-length");
+  if (contentLength !== undefined && Number(contentLength) > maxInputBytes) {
+    throw inputError("request_too_large", "Request body exceeds the configured size limit");
+  }
   const text = await context.req.text();
+  if (new TextEncoder().encode(text).byteLength > maxInputBytes) {
+    throw inputError("request_too_large", "Request body exceeds the configured size limit");
+  }
   if (text.trim() === "") {
     return {};
   }
@@ -95,10 +113,15 @@ async function readJsonObject(context: Context): Promise<Record<string, unknown>
   } catch {
     throw inputError("invalid_json", "Request body must be valid JSON");
   }
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw inputError("invalid_type", "Request body must be a JSON object");
+  return inputObjectSchema.parse(value);
+}
+
+function readQueryObject(context: Context): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
+  for (const [key, values] of Object.entries(context.req.queries())) {
+    query[key] = values.length === 1 ? values[0] : values;
   }
-  return value as Record<string, unknown>;
+  return query;
 }
 
 function mergeInput({
@@ -111,10 +134,7 @@ function mergeInput({
   if (params === void 0) {
     return source;
   }
-  if (params === null || typeof params !== "object" || Array.isArray(params)) {
-    throw inputError("invalid_type", "Path parameters must be an object");
-  }
-  return { ...source, ...params };
+  return { ...source, ...inputObjectSchema.parse(params) };
 }
 
 function inputError(code: string, message: string): Error {

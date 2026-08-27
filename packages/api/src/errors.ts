@@ -1,6 +1,7 @@
 import {
   HandledError,
   isZodLikeError,
+  serializedHandledErrorSchema,
   ValidationError,
   type ZodLikeError,
 } from "@langwatch/handled-error";
@@ -66,6 +67,29 @@ export class InvalidApiVersionError extends HandledError {
       { httpStatus: 400 },
     );
     this.name = "InvalidApiVersionError";
+  }
+}
+
+export class ApiVersionUnavailableError extends HandledError {
+  constructor() {
+    super("api_version_unavailable", "The requested API version is not available", {
+      httpStatus: 404,
+    });
+    this.name = "ApiVersionUnavailableError";
+  }
+}
+
+export class EndpointWithdrawnError extends HandledError {
+  constructor() {
+    super("endpoint_withdrawn", "This endpoint has been removed", { httpStatus: 410 });
+    this.name = "EndpointWithdrawnError";
+  }
+}
+
+export class RateLimitedError extends HandledError {
+  constructor() {
+    super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });
+    this.name = "RateLimitedError";
   }
 }
 
@@ -149,15 +173,35 @@ function handledErrorToResponse({ err }: { err: HandledError }): {
   status: ContentfulStatusCode;
   body: ErrorResponseBody;
 } {
-  const serialized = err.serialize();
+  let serialized: ReturnType<typeof HandledError.serializeTrusted>;
+  try {
+    const candidate = HandledError.serializeTrusted(err);
+    const json = JSON.stringify(candidate);
+    if (json === void 0) {
+      return internalErrorResponse();
+    }
+    const wire: unknown = JSON.parse(json);
+    const parsed = serializedHandledErrorSchema.safeParse(wire);
+    if (!parsed.success) {
+      return internalErrorResponse();
+    }
+    serialized = parsed.data;
+  } catch {
+    return internalErrorResponse();
+  }
+
+  const status = serialized.httpStatus;
+  if (!validHttpStatus(status)) {
+    return internalErrorResponse();
+  }
+
   return finalizeErrorResponse({
-    status: serialized.httpStatus as ContentfulStatusCode,
+    status,
     body: {
       code: serialized.code,
       // The code, never `err.message`. A HandledError's message is server copy
-      // — it can name env vars, hostnames or internal services (ADR-045) — and
-      // this body goes to external API callers. Consumers that need prose read
-      // `tips` / `docsUrl`, which are authored for exactly that.
+      // and the body is externally visible. Trusted handled metadata remains
+      // lossless; untrusted exceptions never reach this branch.
       message: serialized.code,
       retryable: serialized.retryable,
       meta: serialized.meta,
@@ -184,7 +228,7 @@ function formatError({ err }: { err: unknown }): {
   body: ErrorResponseBody;
 } {
   // 1. Handled errors -- the domain's own vocabulary, safe to show a caller.
-  if (HandledError.isHandled(err)) {
+  if (isTrustedHandledError(err)) {
     return handledErrorToResponse({ err });
   }
 
@@ -197,21 +241,29 @@ function formatError({ err }: { err: unknown }): {
     });
   }
 
-  // 3. Error with `status` property (e.g. Hono HTTPException)
+  // 3. Error with `status` property (e.g. Hono HTTPException). Its message is
+  // untrusted: an adapter may put a downstream response body in it.
   const errObj = err as Record<string, unknown>;
   if (err instanceof Error && typeof errObj.status === "number") {
-    const status = errObj.status as ContentfulStatusCode;
+    const status = validHttpStatus(errObj.status) ? errObj.status : 500;
     return finalizeErrorResponse({
       status,
       body: {
         code: status >= 500 ? "internal_error" : "http_error",
-        message: status >= 500 ? "An unknown error occurred" : err.message,
+        message: status >= 500 ? "internal_error" : "http_error",
         retryable: false,
       },
     });
   }
 
   // 4. Unknown errors -- 500
+  return internalErrorResponse();
+}
+
+function internalErrorResponse(): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
   const status: ContentfulStatusCode = 500;
   return finalizeErrorResponse({
     status,
@@ -221,6 +273,14 @@ function formatError({ err }: { err: unknown }): {
       retryable: false,
     },
   });
+}
+
+function isTrustedHandledError(error: unknown): error is HandledError {
+  return HandledError.isHandled(error);
+}
+
+function validHttpStatus(value: number): value is ContentfulStatusCode {
+  return Number.isInteger(value) && value >= 400 && value <= 599;
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +338,7 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
     const resolved: ResolvedError = {
       status,
       error: effective,
-      ...(HandledError.isHandled(effective) && effective.traceId
+      ...(isTrustedHandledError(effective) && effective.traceId
         ? { traceId: effective.traceId }
         : {}),
     };
@@ -288,4 +348,4 @@ export function createErrorHandler(): (err: Error, c: Context) => Response | Pro
   };
 }
 
-export { formatError, SchemaFailure, validationErrorFromZod };
+export { formatError, isTrustedHandledError, SchemaFailure, validationErrorFromZod };

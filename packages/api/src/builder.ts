@@ -1,4 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
+import { z } from "zod";
 import type { ApiSchema } from "./schema.js";
 
 import {
@@ -7,7 +8,9 @@ import {
   type InputDeclared,
   type OutputDeclared,
   type ParamsDeclared,
-  type RestChain,
+  type RestEndpoint,
+  type RestEndpointHandler,
+  type RestEndpointDocs,
   type RouteChain,
   type RpcChain,
   type SseChain,
@@ -90,15 +93,6 @@ type CompleteRouteDefinition<
 > = TChain &
   (TNeedsInput extends true ? InputDeclared : unknown) &
   (TNeedsParams extends true ? ParamsDeclared : unknown) &
-  OutputDeclared;
-
-type CompleteRestDefinition<
-  TChain,
-  TNeedsInput extends boolean,
-  TNeedsParams extends boolean,
-> = TChain &
-  (TNeedsInput extends true ? InputDeclared : unknown) &
-  (TNeedsParams extends true ? InputDeclared : unknown) &
   OutputDeclared;
 
 /** SSE handler: `(c, stream)` — a stream has no body. */
@@ -200,6 +194,11 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
     return this;
   }
 
+  withoutResourceLimit(reason: string): this {
+    this._defaults.withoutResourceLimit(reason);
+    return this;
+  }
+
   withMiddleware(...middleware: MiddlewareHandler[]): this {
     this._defaults.withMiddleware(...middleware);
     return this;
@@ -212,6 +211,11 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
 
   withRateLimit(): this {
     this._defaults.withRateLimit();
+    return this;
+  }
+
+  withoutRateLimit(reason: string): this {
+    this._defaults.withoutRateLimit(reason);
     return this;
   }
 
@@ -299,61 +303,6 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
     return this;
   }
 
-  get<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
-    path: TPath,
-    version: DateVersion,
-    handler: THandler,
-    define: (
-      b: RestChain,
-    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
-  ): this {
-    return this._registerPublicRest("get", path, version, handler, define);
-  }
-
-  post<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
-    path: TPath,
-    version: DateVersion,
-    handler: THandler,
-    define: (
-      b: RestChain,
-    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
-  ): this {
-    return this._registerPublicRest("post", path, version, handler, define);
-  }
-
-  put<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
-    path: TPath,
-    version: DateVersion,
-    handler: THandler,
-    define: (
-      b: RestChain,
-    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
-  ): this {
-    return this._registerPublicRest("put", path, version, handler, define);
-  }
-
-  patch<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
-    path: TPath,
-    version: DateVersion,
-    handler: THandler,
-    define: (
-      b: RestChain,
-    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
-  ): this {
-    return this._registerPublicRest("patch", path, version, handler, define);
-  }
-
-  delete<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
-    path: TPath,
-    version: DateVersion,
-    handler: THandler,
-    define: (
-      b: RestChain,
-    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
-  ): this {
-    return this._registerPublicRest("delete", path, version, handler, define);
-  }
-
   /**
    * A registrar sharing a chain across endpoints (ADR 001 §5). Dotted names
    * registered through the group are prefixed with the group's name and
@@ -374,6 +323,12 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
    */
   withdraw(name: string, version: VersionLabel): this {
     this._withdraw(name, version);
+    return this;
+  }
+
+  /** Withdraw an HTTP route without changing the method callers use to reach it. */
+  withdrawRoute(method: HttpMethod, path: string, version: VersionLabel): this {
+    this._withdrawRoute(method, path, version);
     return this;
   }
 
@@ -496,8 +451,8 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
     path: string,
     version: string,
     handler: unknown,
-    define: (b: ChainBuilder) => unknown,
-  ): this {
+    definition: RawEndpointDef,
+  ): void {
     if (!this._config.publicRest) {
       throw new Error(`The fluent ${method.toUpperCase()} API belongs to createRestService()`);
     }
@@ -506,8 +461,16 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
       throw new Error("Public REST registrations use dated versions, not preview");
     }
     assertRoutePath(path);
-    const def = collectDef(define);
-    const config = mergeDefs(this._defaults._def, def);
+    const config = mergeDefs(this._defaults._def, definition);
+    if (config.docs?.security !== void 0) {
+      throw new Error(
+        `Public REST endpoint ${method.toUpperCase()} ${path || "/"} cannot declare OpenAPI ` +
+          `security; declare it once through createRestService({ openapiSecurity })`,
+      );
+    }
+    if (config.auth !== "none" && this._config.auth && this._config.publicRest?.security) {
+      config.docs = { ...config.docs, security: this._config.publicRest.security };
+    }
     assertPublicRestDef({ method, path, def: config });
     assertStatusInvariant({ method, path, def: config });
     this._events.push({
@@ -520,18 +483,28 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
         handler: handler as (...args: unknown[]) => unknown,
       },
     });
-    return this;
   }
 
   /** @internal */
   _withdraw(name: string, version: string): void {
     assertVersionLabel(version);
     const path = name.startsWith("/") ? name : `/${name}`;
+    const matches = this._events.filter(
+      ({ endpoint }) => !endpoint.withdrawn && endpoint.path === path,
+    );
+    const methods = new Set(matches.map(({ endpoint }) => endpoint.method));
+    if (methods.size !== 1) {
+      throw new Error(
+        `Cannot infer one method for withdrawn endpoint "${path}"; use withdrawRoute(method, path, version)`,
+      );
+    }
+    const method = [...methods][0]!;
+    const prior = matches.at(-1)!.endpoint;
     this._events.push({
       version,
       endpoint: {
-        kind: "rest",
-        method: "get",
+        kind: prior.kind,
+        method,
         path,
         config: {},
         // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
@@ -539,6 +512,55 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
         withdrawn: true,
       },
     });
+  }
+
+  /** @internal Withdraw a REST route without changing its HTTP method. */
+  _withdrawRoute(method: HttpMethod, path: string, version: string): void {
+    assertVersionLabel(version);
+    assertRoutePath(path);
+    this._events.push({
+      version,
+      endpoint: {
+        kind: "rest",
+        method,
+        path,
+        config: {},
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
+        handler: () => {},
+        withdrawn: true,
+      },
+    });
+  }
+
+  /** @internal Withdraw a modern REST route with its public route kind intact. */
+  _withdrawPublicRestRoute(method: HttpMethod, path: string, version: string): void {
+    assertVersionLabel(version);
+    if (version === VERSION_PREVIEW) {
+      throw new Error("Public REST withdrawals use dated versions, not preview");
+    }
+    assertRoutePath(path);
+    this._events.push({
+      version,
+      endpoint: {
+        kind: "public-rest",
+        method,
+        path,
+        config: {},
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
+        handler: () => {},
+        withdrawn: true,
+      },
+    });
+  }
+
+  /** @internal Build only when every recorded endpoint belongs to modern REST. */
+  _buildPublicRest(): Hono {
+    if (this._events.some(({ endpoint }) => endpoint.kind !== "public-rest")) {
+      throw new Error(
+        "Modern REST cannot build a service containing non-REST endpoint registrations",
+      );
+    }
+    return this.build();
   }
 
   private _validateConfiguration(): void {
@@ -556,6 +578,14 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
       }
       if (optedOut && optedOut.reason.trim() === "") {
         throw new Error(`Endpoint ${route} opts out of its permission check with a blank reason`);
+      }
+      if (endpoint.kind === "public-rest") {
+        if (config.rateLimit !== true && !config.rateLimitOptOutReason?.trim()) {
+          throw new Error(`Public REST endpoint ${route} has no rate-limit decision`);
+        }
+        if (config.resourceLimit === void 0 && !config.resourceLimitOptOutReason?.trim()) {
+          throw new Error(`Public REST endpoint ${route} has no resource-limit decision`);
+        }
       }
       if (config.permission && !this._config.permissionEnforcer) {
         throw new Error(
@@ -662,6 +692,223 @@ class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown>
   }
 }
 
+/**
+ * The sealed author-facing surface for modern REST services.
+ *
+ * It deliberately exposes neither RPC registration nor provider composition:
+ * process composition happens before a REST service is handed to a transport.
+ * Endpoint schemas come before their handler so TypeScript can derive both
+ * handler input and result types from the Zod 4 schemas.
+ */
+export interface RestService<
+  TApp = unknown,
+  TPermission extends boolean = false,
+  TRateLimit extends boolean = false,
+  TResourceLimit extends boolean = false,
+> {
+  withDocs(docs: RestEndpointDocs): this;
+  withAuth(auth: "default" | "none"): this;
+  withPermission(
+    permission: Parameters<DefaultsChain["withPermission"]>[0],
+  ): RestService<TApp, true, TRateLimit, TResourceLimit>;
+  withoutPermission(reason: string): RestService<TApp, true, TRateLimit, TResourceLimit>;
+  withResourceLimit(limitType: string): RestService<TApp, TPermission, TRateLimit, true>;
+  withoutResourceLimit(reason: string): RestService<TApp, TPermission, TRateLimit, true>;
+  withRateLimit(): RestService<TApp, TPermission, true, TResourceLimit>;
+  withoutRateLimit(reason: string): RestService<TApp, TPermission, true, TResourceLimit>;
+  get<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this;
+  post<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this;
+  put<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this;
+  patch<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this;
+  delete<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this;
+  withdraw(method: HttpMethod, path: string, version: DateVersion): this;
+  build(): Hono;
+}
+
+/** The module-private implementation behind {@link RestService}. */
+class RestEndpointBuilder extends ChainBuilder {
+  handler: unknown;
+
+  handle(handler: unknown): this {
+    this.handler = handler;
+    return this;
+  }
+}
+
+class RestServiceBuilder<
+  TProject,
+  TApp = unknown,
+  TPermission extends boolean = false,
+  TRateLimit extends boolean = false,
+  TResourceLimit extends boolean = false,
+> implements RestService<TApp, TPermission, TRateLimit, TResourceLimit> {
+  constructor(private readonly service: ServiceBuilder<TProject, EndpointVariables, TApp>) {}
+
+  withDocs(docs: RestEndpointDocs): this {
+    this.service.withDocs(docs);
+    return this;
+  }
+
+  withAuth(auth: "default" | "none"): this {
+    this.service.withAuth(auth);
+    return this;
+  }
+
+  withPermission(
+    permission: Parameters<DefaultsChain["withPermission"]>[0],
+  ): RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit> {
+    this.service.withPermission(permission);
+    return this as RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit>;
+  }
+
+  withoutPermission(
+    reason: string,
+  ): RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit> {
+    this.service.withoutPermission(reason);
+    return this as RestServiceBuilder<TProject, TApp, true, TRateLimit, TResourceLimit>;
+  }
+
+  withResourceLimit(
+    limitType: string,
+  ): RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true> {
+    this.service.withResourceLimit(limitType);
+    return this as RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true>;
+  }
+
+  withoutResourceLimit(
+    reason: string,
+  ): RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true> {
+    this.service.withoutResourceLimit(reason);
+    return this as RestServiceBuilder<TProject, TApp, TPermission, TRateLimit, true>;
+  }
+
+  withRateLimit(): RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit> {
+    this.service.withRateLimit();
+    return this as RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit>;
+  }
+
+  withoutRateLimit(
+    reason: string,
+  ): RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit> {
+    this.service.withoutRateLimit(reason);
+    return this as RestServiceBuilder<TProject, TApp, TPermission, true, TResourceLimit>;
+  }
+
+  get<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this {
+    return this.register("get", path, version, define);
+  }
+
+  post<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this {
+    return this.register("post", path, version, define);
+  }
+
+  put<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this {
+    return this.register("put", path, version, define);
+  }
+
+  patch<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this {
+    return this.register("patch", path, version, define);
+  }
+
+  delete<TPath extends string>(
+    path: TPath,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this {
+    return this.register("delete", path, version, define);
+  }
+
+  withdraw(method: HttpMethod, path: string, version: DateVersion): this {
+    this.service._withdrawPublicRestRoute(method, path, version);
+    return this;
+  }
+
+  build(): Hono {
+    return this.service._buildPublicRest();
+  }
+
+  private register(
+    method: HttpMethod,
+    path: string,
+    version: DateVersion,
+    define: (
+      endpoint: RestEndpoint<TApp, undefined, undefined, TPermission, TRateLimit, TResourceLimit>,
+    ) => RestEndpoint<TApp, z.ZodObject, z.ZodType, true, true, true, true>,
+  ): this {
+    const endpoint = new RestEndpointBuilder();
+    const authoring: RestEndpoint<
+      TApp,
+      undefined,
+      undefined,
+      TPermission,
+      TRateLimit,
+      TResourceLimit
+    > = endpoint;
+    define(authoring);
+    if (!endpoint.handler) {
+      throw new Error("Modern REST endpoint definitions must finish with handle(...)");
+    }
+    this.service._registerPublicRest(method, path, version, endpoint.handler, endpoint._def);
+    return this;
+  }
+}
+
 /** Creates a new typed service builder. */
 export function createService<TProject = unknown, TApp = unknown>(
   config: ServiceConfig<TApp>,
@@ -670,18 +917,53 @@ export function createService<TProject = unknown, TApp = unknown>(
 }
 
 /** Creates the additive public REST builder rooted at `/api/v1/{service}`. */
-export function createRestService<TProject = unknown, TApp = unknown>(
+export function createRestService<TApp = unknown>(
   config: RestServiceConfig<TApp>,
-): ServiceBuilder<TProject, EndpointVariables, TApp> {
+): RestService<TApp> {
   if (!/^[a-z][a-z0-9-]*$/.test(config.name)) {
     throw new Error(`REST service name "${config.name}" must be a lower-kebab path segment`);
   }
+  if ("onError" in config) {
+    throw new Error("Modern REST uses the framework error boundary; do not configure onError");
+  }
+  if (!Number.isSafeInteger(config.maxInputBytes) || config.maxInputBytes < 1) {
+    throw new Error("Modern REST maxInputBytes must be a positive safe integer");
+  }
+  if (config.auth && config.openapiSecurity === void 0) {
+    throw new Error(
+      `REST service "${config.name}" configures auth but no openapiSecurity declaration`,
+    );
+  }
+  if (!config.auth && config.openapiSecurity !== void 0) {
+    throw new Error(
+      `REST service "${config.name}" declares openapiSecurity but has no auth middleware`,
+    );
+  }
+  if (config.auth && !hasOpenApiSecuritySchemes(config.openapiSecurity)) {
+    throw new Error(
+      `REST service "${config.name}" must declare at least one nonblank OpenAPI security scheme`,
+    );
+  }
 
-  return new ServiceBuilder({
-    ...config,
+  const { maxInputBytes, openapiSecurity, ...serviceConfig } = config;
+  const service = new ServiceBuilder<unknown, EndpointVariables, TApp>({
+    ...serviceConfig,
     basePath: `/api/v1/${config.name}`,
-    publicRest: { versionHeader: API_VERSION_HEADER },
+    publicRest: {
+      versionHeader: API_VERSION_HEADER,
+      maxInputBytes,
+      security: openapiSecurity,
+    },
   });
+  return new RestServiceBuilder(service);
+}
+
+function hasOpenApiSecuritySchemes(security: unknown): boolean {
+  const parsed = z
+    .array(z.record(z.string().trim().min(1), z.array(z.string())))
+    .min(1)
+    .safeParse(security);
+  return parsed.success && parsed.data.every((requirement) => Object.keys(requirement).length > 0);
 }
 
 export { ServiceBuilder, GroupRegistrar };

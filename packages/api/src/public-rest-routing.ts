@@ -2,7 +2,7 @@ import type { Context, Hono, MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 import { uniqueSymbol } from "hono-openapi";
 
-import { InvalidApiVersionError } from "./errors.js";
+import { ApiVersionUnavailableError, InvalidApiVersionError } from "./errors.js";
 import { runMiddlewareStack } from "./middleware-stack.js";
 import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
 import type { BaseApp, EndpointRegistration, HttpMethod, ServiceConfig } from "./types.js";
@@ -200,7 +200,7 @@ function optionalVersionDispatcher({
     const effective = effectiveVersion({ datedVersions, requested });
     const candidate = effective ? candidates.get(effective)?.get(endpointKey(endpoint)) : void 0;
     if (!candidate) {
-      return context.notFound();
+      throw new ApiVersionUnavailableError();
     }
 
     context.set("apiVersionRequest", requested);

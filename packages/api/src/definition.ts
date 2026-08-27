@@ -4,7 +4,13 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import { parseApiSchemaSync, type ApiSchema } from "./schema.js";
 
-import type { EndpointDef, EndpointDocs, HttpMethod, RawEndpointDef } from "./types.js";
+import type {
+  EndpointDef,
+  EndpointDocs,
+  HttpMethod,
+  RawEndpointDef,
+  ServiceContext,
+} from "./types.js";
 import { VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
 
 declare const inputDeclared: unique symbol;
@@ -41,6 +47,8 @@ export interface DefaultsChain {
   withoutPermission(reason: string): this;
   /** Resource limit type — requires `_legacy.resourceLimitMiddleware` on the service. */
   withResourceLimit(limitType: string): this;
+  /** Deliberately opt out of a resource limit with a written reason. */
+  withoutResourceLimit(reason: string): this;
   /** Middleware running after auth and before the handler; stacks across levels. */
   withMiddleware(...middleware: MiddlewareHandler[]): this;
   /** Opaque metadata for the mount report; never read by the framework. */
@@ -85,14 +93,99 @@ export interface RouteChain extends DefaultsChain {
  * The public REST chain. One object schema describes the complete request;
  * the HTTP method decides whether non-path fields come from query or JSON.
  */
-export interface RestChain extends DefaultsChain {
+/** OpenAPI fields REST authors may set per endpoint. Authentication comes from the service. */
+export type RestEndpointDocs = Omit<EndpointDocs, "security">;
+
+/** Endpoint capabilities available to modern REST routes. */
+export interface RestEndpointDefaults extends Omit<
+  DefaultsChain,
+  | "withAuth"
+  | "withDocs"
+  | "withPermission"
+  | "withoutPermission"
+  | "withRateLimit"
+  | "withoutRateLimit"
+  | "withResourceLimit"
+  | "withoutResourceLimit"
+> {
+  /** OpenAPI documentation except security, which is derived from service authentication. */
+  withDocs(docs: RestEndpointDocs): this;
+}
+
+type RestReady<
+  TInput extends z.ZodObject | undefined,
+  TOutput extends z.ZodType | undefined,
+  TPermission extends boolean,
+  TRateLimit extends boolean,
+  TResourceLimit extends boolean,
+> = TInput extends z.ZodObject
+  ? TOutput extends z.ZodType
+    ? TPermission extends true
+      ? TRateLimit extends true
+        ? TResourceLimit extends true
+          ? true
+          : false
+        : false
+      : false
+    : false
+  : false;
+
+export type RestEndpointHandler<TApp, TInput extends z.ZodObject, TOutput extends z.ZodType> = (
+  context: ServiceContext<Record<string, unknown>, TApp>,
+  input: z.output<TInput>,
+) => z.input<TOutput> | Promise<z.input<TOutput>>;
+
+/**
+ * The modern REST definition chain. Input and output schemas carry their
+ * static types through the schema-first registration callback.
+ */
+export interface RestEndpoint<
+  TApp = unknown,
+  TInput extends z.ZodObject | undefined = undefined,
+  TOutput extends z.ZodType | undefined = undefined,
+  TPermission extends boolean = false,
+  TRateLimit extends boolean = false,
+  TResourceLimit extends boolean = false,
+  THandled extends boolean = false,
+> extends RestEndpointDefaults {
   /** Complete path-plus-query/body input schema. */
-  withInput(schema: z.ZodObject): this & InputDeclared;
+  withInput<TSchema extends z.ZodObject>(
+    schema: TSchema,
+  ): RestEndpoint<TApp, TSchema, TOutput, TPermission, TRateLimit, TResourceLimit, THandled>;
   /** Response body schema, validated before serialization. */
-  withOutput(schema: z.ZodType): this & OutputDeclared;
+  withOutput<TSchema extends z.ZodType>(
+    schema: TSchema,
+  ): RestEndpoint<TApp, TInput, TSchema, TPermission, TRateLimit, TResourceLimit, THandled>;
   /** HTTP status code for successful responses (default: 200, or 204 with no body). */
   withStatus(status: ContentfulStatusCode): this;
+  withPermission(
+    permission: AuthzPermission,
+  ): RestEndpoint<TApp, TInput, TOutput, true, TRateLimit, TResourceLimit, THandled>;
+  withoutPermission(
+    reason: string,
+  ): RestEndpoint<TApp, TInput, TOutput, true, TRateLimit, TResourceLimit, THandled>;
+  withRateLimit(): RestEndpoint<TApp, TInput, TOutput, TPermission, true, TResourceLimit, THandled>;
+  withoutRateLimit(
+    reason: string,
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, true, TResourceLimit, THandled>;
+  withResourceLimit(
+    limitType: string,
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled>;
+  withoutResourceLimit(
+    reason: string,
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled>;
+  handle(
+    this: RestReady<TInput, TOutput, TPermission, TRateLimit, TResourceLimit> extends true
+      ? THandled extends false
+        ? RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, TResourceLimit, THandled>
+        : never
+      : never,
+    handler: RestEndpointHandler<TApp, Extract<TInput, z.ZodObject>, Extract<TOutput, z.ZodType>>,
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, TResourceLimit, true>;
 }
+
+/** @deprecated Use RestEndpoint for modern REST definitions. */
+export type RestChain = RestEndpoint;
 
 /**
  * The definition chain of an SSE endpoint. A stream has no request body and no
@@ -141,6 +234,13 @@ export class ChainBuilder {
 
   withResourceLimit(limitType: string): this {
     this._def.resourceLimit = limitType;
+    delete this._def.resourceLimitOptOutReason;
+    return this;
+  }
+
+  withoutResourceLimit(reason: string): this {
+    this._def.resourceLimit = false;
+    this._def.resourceLimitOptOutReason = reason;
     return this;
   }
 
@@ -156,6 +256,7 @@ export class ChainBuilder {
 
   withRateLimit(): this {
     this._def.rateLimit = true;
+    delete this._def.rateLimitOptOutReason;
     return this;
   }
 
@@ -174,8 +275,9 @@ export class ChainBuilder {
     return this;
   }
 
-  withoutRateLimit(): this {
+  withoutRateLimit(reason = ""): this {
     this._def.rateLimit = false;
+    this._def.rateLimitOptOutReason = reason;
     return this;
   }
 
@@ -211,10 +313,12 @@ export class ChainBuilder {
 }
 
 /** Runs a `define` callback over a fresh chain, tolerating its absence. */
-export function collectDef(define: ((b: ChainBuilder) => unknown) | undefined): RawEndpointDef {
+export function collectDef<TChain = ChainBuilder>(
+  define: ((builder: TChain) => unknown) | undefined,
+): RawEndpointDef {
   if (!define) return {};
   const builder = new ChainBuilder();
-  define(builder);
+  define(builder as TChain);
   return builder._def;
 }
 
@@ -244,6 +348,7 @@ export function mergeDefs(...levels: RawEndpointDef[]): EndpointDef {
 
   const resolved: EndpointDef = merged as EndpointDef;
   if (merged.rateLimit === false) delete resolved.rateLimit;
+  if (merged.resourceLimit === false) delete resolved.resourceLimit;
   if (merged.cache === false) delete resolved.cache;
   if (docs) resolved.docs = docs;
   if (middleware.length > 0) resolved.middleware = middleware;
@@ -360,10 +465,20 @@ export function assertPublicRestDef({
     );
   }
 
-  if (def.input && !(def.input instanceof z.ZodObject)) {
+  if (!(def.input instanceof z.ZodObject)) {
     throw new Error(
-      `Public REST endpoint ${method.toUpperCase()} ${path || "/"} input must be ` +
-        `one Zod 4 object schema`,
+      `Public REST endpoint ${method.toUpperCase()} ${path || "/"} must declare ` +
+        `one Zod 4 object input schema, including z.object({}) when it has no fields`,
+    );
+  }
+  if (def.rateLimit !== true && !def.rateLimitOptOutReason?.trim()) {
+    throw new Error(
+      `Public REST endpoint ${method.toUpperCase()} ${path || "/"} must declare a rate limit or a nonblank opt-out reason`,
+    );
+  }
+  if (def.resourceLimit === void 0 && !def.resourceLimitOptOutReason?.trim()) {
+    throw new Error(
+      `Public REST endpoint ${method.toUpperCase()} ${path || "/"} must declare a resource limit or a nonblank opt-out reason`,
     );
   }
 
@@ -372,12 +487,6 @@ export function assertPublicRestDef({
     return;
   }
   const input = def.input;
-  if (!(input instanceof z.ZodObject)) {
-    throw new Error(
-      `Public REST endpoint ${method.toUpperCase()} ${path} contains path parameters ` +
-        `but does not declare withInput`,
-    );
-  }
 
   const missing = parameterNames.filter((name) => !(name in input.shape));
   if (missing.length > 0) {

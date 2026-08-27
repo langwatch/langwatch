@@ -150,9 +150,7 @@ describe("OpenAPI documentation", () => {
     );
 
     expect(new Set(operationIds).size).toBe(operationIds.length);
-    expect(spec.paths["/api/things/latest/things.create"]?.post?.operationId).toBe(
-      "createThing",
-    );
+    expect(spec.paths["/api/things/latest/things.create"]?.post?.operationId).toBe("createThing");
     expect(spec.paths["/api/things/2025-06-01/things.create"]?.post?.operationId).toBe(
       "createThing_2025_06_01",
     );
@@ -162,15 +160,9 @@ describe("OpenAPI documentation", () => {
     const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);
 
     const parameters = spec.paths["/api/things/2025-03-15/{id}"]?.get?.parameters ?? [];
-    expect(parameters).toContainEqual(
-      expect.objectContaining({ in: "path", name: "id" }),
-    );
-    expect(parameters).toContainEqual(
-      expect.objectContaining({ in: "query", name: "verbose" }),
-    );
-    expect(
-      spec.paths["/api/things/2025-03-15/things.create"]?.post?.requestBody,
-    ).toBeDefined();
+    expect(parameters).toContainEqual(expect.objectContaining({ in: "path", name: "id" }));
+    expect(parameters).toContainEqual(expect.objectContaining({ in: "query", name: "verbose" }));
+    expect(spec.paths["/api/things/2025-03-15/things.create"]?.post?.requestBody).toBeDefined();
   });
 
   it("removes docs.hide endpoints from the document while still serving them", async () => {
@@ -186,9 +178,7 @@ describe("OpenAPI documentation", () => {
 
   it("keeps endpoints that declare nothing documentable out of the document", async () => {
     const app = createService({ name: "w", basePath: "/api/w" })
-      .register("things.undocumented", "2025-03-15", async (c) =>
-        c.json({ accepted: true }),
-      )
+      .register("things.undocumented", "2025-03-15", async (c) => c.json({ accepted: true }))
       .build();
     const spec = await generateSpecs(app, SPEC_OPTIONS);
 
@@ -235,9 +225,7 @@ describe("OpenAPI documentation", () => {
       expect(operation?.description).toContain("use things.new after 2026-01-01");
     }
     // The notice rides alongside the declared description, not instead of it.
-    expect(spec.paths["/api/w/2025-01-15/things.old"]?.post?.description).toContain(
-      "The old way.",
-    );
+    expect(spec.paths["/api/w/2025-01-15/things.old"]?.post?.description).toContain("The old way.");
   });
 
   describe("when an endpoint is withdrawn", () => {
@@ -248,12 +236,9 @@ describe("OpenAPI documentation", () => {
           "/old",
           "2025-01-01",
           async () => ({ ok: true }),
-          (b) =>
-            b
-              .withOutput(z.object({ ok: z.boolean() }))
-              .withDocs({ operationId: "getOld" }),
+          (b) => b.withOutput(z.object({ ok: z.boolean() })).withDocs({ operationId: "getOld" }),
         )
-        .withdraw("/old", "2025-06-01")
+        .withdrawRoute("get", "/old", "2025-06-01")
         .build();
 
       const spec = await generateSpecs(app, SPEC_OPTIONS);

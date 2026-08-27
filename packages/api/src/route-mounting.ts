@@ -2,6 +2,7 @@ import type { Context, Hono, MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 
 import { buildServiceCatalogue, DISCOVER_NAME, type ServiceCatalogue } from "./discover.js";
+import { ApiVersionUnavailableError } from "./errors.js";
 import { runMiddlewareStack } from "./middleware-stack.js";
 import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
 import { mountOptionalVersionRoutes } from "./public-rest-routing.js";
@@ -312,7 +313,12 @@ function buildDateFallback<TProject>({
     for (const version of datedVersions) {
       if (version <= requested) effective = version;
     }
-    if (!effective) return next();
+    if (!effective) {
+      if (serviceConfig.publicRest) {
+        throw new ApiVersionUnavailableError();
+      }
+      return next();
+    }
 
     const rest = c.req.path.slice(basePath.length + requested.length + 1) || "/";
     const method = c.req.method.toLowerCase();
@@ -353,13 +359,31 @@ export function matchPath(pattern: string, path: string): Record<string, string>
       if (constraint && !new RegExp(`^${constraint}$`).test(value)) {
         return null;
       }
-      params[name!] = value;
+      params[name!] = decodePathParam(value);
       continue;
     }
     if (segment !== value) return null;
   }
 
   return pathSegments.length === patternSegments.length ? params : null;
+}
+
+function decodePathParam(value: string): string {
+  if (!value.includes("%")) return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    // Hono still decodes each valid percent run when another run is malformed.
+    // Keep the invalid bytes verbatim without discarding valid decoding around
+    // them, so eager and fallback route params remain byte-for-byte equal.
+    return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, (encoded) => {
+      try {
+        return decodeURIComponent(encoded);
+      } catch {
+        return encoded;
+      }
+    });
+  }
 }
 
 function splitSegments(path: string): string[] {

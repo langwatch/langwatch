@@ -188,6 +188,10 @@ export interface EndpointDef {
   meta?: unknown;
   /** Rate limiting applies; requires the `rateLimiter` port on the service. */
   rateLimit?: true;
+  /** Written reason this public REST endpoint deliberately has no rate limit. */
+  rateLimitOptOutReason?: string;
+  /** Written reason this public REST endpoint deliberately has no resource limit. */
+  resourceLimitOptOutReason?: string;
   /** Response caching applies; requires the `cache` port and a declared `output`. */
   cache?: { tag: string; ttlSeconds: number };
   /** Deprecation notice; the endpoint still answers, and warns. */
@@ -207,9 +211,12 @@ export type EndpointConfig = Omit<EndpointDef, "permission" | "noPermission"> & 
  *
  * @internal
  */
-export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache"> {
+export interface RawEndpointDef extends Omit<EndpointDef, "rateLimit" | "cache" | "resourceLimit"> {
   rateLimit?: boolean;
   cache?: { tag: string; ttlSeconds: number } | false;
+  resourceLimit?: string | false;
+  rateLimitOptOutReason?: string;
+  resourceLimitOptOutReason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,10 +338,7 @@ export interface ServiceConfig<TApp = unknown> {
    * validated request data.
    */
   authorize?: (context: Context, permission: AuthzPermission) => Promise<void>;
-  /**
-   * Require a validated body `projectId` to equal the project selected and
-   * authorized by project authentication.
-   */
+  /** @deprecated RPC compatibility check; modern REST uses validated input before authorization. */
   projectIdInput?: true;
   /**
    * Rate limiter port backing `.withRateLimit()`. Declaring the capability
@@ -364,6 +368,9 @@ export interface ServiceConfig<TApp = unknown> {
   /** @internal Enables the additive `/api/v1/{service}` REST surface. */
   publicRest?: {
     versionHeader: string;
+    maxInputBytes: number;
+    /** OpenAPI security derived from the REST service's authentication configuration. */
+    security?: DescribeRouteOptions["security"];
   };
   /** Middleware that will be removed once services are fully migrated. */
   _legacy?: {
@@ -380,8 +387,16 @@ export interface ServiceConfig<TApp = unknown> {
  */
 export type RestServiceConfig<TApp = unknown> = Omit<
   ServiceConfig<TApp>,
-  "basePath" | "publicRest"
->;
+  "basePath" | "onError" | "publicRest"
+> & {
+  maxInputBytes: number;
+  /**
+   * The OpenAPI credential declaration for this REST service. It is required
+   * when the service has authentication and is applied to every authenticated
+   * endpoint, so route documentation cannot drift from enforcement.
+   */
+  openapiSecurity?: DescribeRouteOptions["security"];
+};
 
 // ---------------------------------------------------------------------------
 // Internal endpoint registration record

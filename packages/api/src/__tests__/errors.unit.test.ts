@@ -1,5 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type ZodError, z } from "zod";
 
 import { createErrorHandler, formatError } from "../errors.js";
@@ -62,7 +62,7 @@ describe("formatError", () => {
       expect(body.retryable).toBe(false);
     });
 
-    it("carries fault, tips and docsUrl when present", () => {
+    it("keeps trusted handled remediation metadata lossless", () => {
       const err = new TestError("query_memory_exceeded", "Query used too much memory", {
         httpStatus: 422,
         fault: "customer",
@@ -143,6 +143,82 @@ describe("formatError", () => {
       expect(body.code).toBe("internal_error");
       expect(body.message).toBe("An unknown error occurred");
     });
+
+    it("does not trust a copied handled brand without the trusted serializer", () => {
+      const impostor = Object.assign(new Error("not really handled"), {
+        isHandled: true,
+        code: "malicious_error",
+        docsUrl: "https://not-langwatch.example",
+      });
+
+      const { status, body } = formatError({ err: impostor });
+
+      expect(status).toBe(500);
+      expect(body).toMatchObject({ code: "internal_error", retryable: false });
+      expect(JSON.stringify(body)).not.toContain("not-langwatch.example");
+    });
+
+    it("does not call a serializer supplied by a branded impostor", () => {
+      const serialize = vi.fn(() => ({
+        code: "malicious_error",
+        docsUrl: "https://not-langwatch.example",
+        httpStatus: 418,
+        meta: { leaked: "credential" },
+        reasons: [],
+        retryable: false,
+      }));
+      const impostor = Object.assign(new Error("not really handled"), {
+        isHandled: true,
+        serialize,
+      });
+
+      const { status, body } = formatError({ err: impostor });
+
+      expect(serialize).not.toHaveBeenCalled();
+      expect(status).toBe(500);
+      expect(body).toMatchObject({ code: "internal_error", retryable: false });
+      expect(JSON.stringify(body)).not.toContain("credential");
+      expect(JSON.stringify(body)).not.toContain("not-langwatch.example");
+    });
+
+    it("bypasses an overridden serializer on a registry-issued error", () => {
+      class OverriddenSerializerError extends TestError {
+        override serialize(): never {
+          throw new Error("override must not run");
+        }
+      }
+
+      const { status, body } = formatError({
+        err: new OverriddenSerializerError("trusted_error", "server copy", {
+          httpStatus: 409,
+          meta: { field: "name" },
+        }),
+      });
+
+      expect(status).toBe(409);
+      expect(body).toMatchObject({ code: "trusted_error", meta: { field: "name" } });
+    });
+
+    it("degrades non-JSON metadata and invalid handled statuses to an internal error", () => {
+      const circular: Record<string, unknown> = {};
+      circular.self = circular;
+      const invalidMeta = new TestError("trusted_error", "server copy", {
+        httpStatus: 409,
+        meta: circular,
+      });
+      const invalidStatus = new TestError("trusted_error", "server copy", {
+        httpStatus: 200,
+      });
+
+      expect(formatError({ err: invalidMeta })).toMatchObject({
+        status: 500,
+        body: { code: "internal_error" },
+      });
+      expect(formatError({ err: invalidStatus })).toMatchObject({
+        status: 500,
+        body: { code: "internal_error" },
+      });
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -201,8 +277,28 @@ describe("formatError", () => {
 
       expect(status).toBe(403);
       expect(body.code).toBe("http_error");
-      expect(body.message).toBe("Forbidden");
+      expect(body.message).toBe("http_error");
       expect(body.retryable).toBe(false);
+    });
+
+    it("does not expose an adapter-provided HTTP error message", () => {
+      const err = Object.assign(new Error("upstream returned a customer token"), {
+        status: 400,
+      });
+
+      const { body } = formatError({ err });
+
+      expect(body.message).toBe("http_error");
+      expect(JSON.stringify(body)).not.toContain("customer token");
+    });
+
+    it("does not trust an invalid status property", () => {
+      const err = Object.assign(new Error("not a status"), { status: 999 });
+
+      const { status, body } = formatError({ err });
+
+      expect(status).toBe(500);
+      expect(body).toMatchObject({ code: "internal_error", retryable: false });
     });
   });
 

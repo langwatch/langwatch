@@ -15,10 +15,9 @@ import type { MountedRoute } from "../types.js";
 const GUARD_PATH = "/api/test/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
 const GUARD_WILDCARD_PATH = `${GUARD_PATH}/*`;
 
-type Summary = Pick<
-  MountedRoute,
-  "method" | "path" | "version" | "status" | "withdrawn"
-> & { isNamespaceGuard: boolean };
+type Summary = Pick<MountedRoute, "method" | "path" | "version" | "status" | "withdrawn"> & {
+  isNamespaceGuard: boolean;
+};
 
 function summarize(route: MountedRoute): Summary {
   return {
@@ -63,9 +62,7 @@ describe("onRouteMounted", () => {
           "2025-03-15",
           async (_c, input: { name: string }) => input,
           (b) =>
-            b
-              .withInput(z.object({ name: z.string() }))
-              .withOutput(z.object({ name: z.string() })),
+            b.withInput(z.object({ name: z.string() })).withOutput(z.object({ name: z.string() })),
         )
         .build();
       return { app, mounted };
@@ -162,9 +159,7 @@ describe("onRouteMounted", () => {
         ].sort(),
       );
 
-      for (const route of mounted.filter(
-        (r) => !r.isNamespaceGuard && !r.isDiscoverEndpoint,
-      )) {
+      for (const route of mounted.filter((r) => !r.isNamespaceGuard && !r.isDiscoverEndpoint)) {
         expect(route.config).not.toBeNull();
       }
     });
@@ -191,9 +186,7 @@ describe("onRouteMounted", () => {
           "2025-03-15",
           async (_c, input: { id: string }) => ({ id: input.id }),
           (b) =>
-            b
-              .withParams(z.object({ id: z.string() }))
-              .withOutput(z.object({ id: z.string() })),
+            b.withParams(z.object({ id: z.string() })).withOutput(z.object({ id: z.string() })),
         )
         .build();
 
@@ -233,7 +226,7 @@ describe("onRouteMounted", () => {
           async () => ({ ok: true }),
           (b) => b.withMeta(meta).withOutput(z.object({ ok: z.boolean() })),
         )
-        .withdraw("/old", "2025-06-01")
+        .withdrawRoute("get", "/old", "2025-06-01")
         .build();
 
       // 1 dated 2025-01-01 + 1 dated 2025-06-01 + 1 latest + 2 guards, plus
@@ -300,9 +293,7 @@ describe("onRouteMounted", () => {
         },
       ]);
 
-      const streamMounts = mounted.filter((route) =>
-        route.path.endsWith("/things.stream"),
-      );
+      const streamMounts = mounted.filter((route) => route.path.endsWith("/things.stream"));
       expect(streamMounts.length).toBeGreaterThan(0);
       for (const route of streamMounts) {
         expect(route.method).toBe("get");

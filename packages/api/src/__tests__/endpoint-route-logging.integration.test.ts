@@ -21,10 +21,9 @@ const logRecords: {
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@langwatch/observability")>();
-  const record =
-    (level: string) => (payload: Record<string, unknown>, message: string) => {
-      logRecords.push({ level, payload, message });
-    };
+  const record = (level: string) => (payload: Record<string, unknown>, message: string) => {
+    logRecords.push({ level, payload, message });
+  };
   return {
     ...actual,
     createLogger: () => ({
@@ -37,12 +36,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 const { createService: createRawService } = await import("../builder.js");
-const createService: typeof createRawService = ((
-  config: Parameters<typeof createRawService>[0],
-) =>
-  createRawService(config).withoutPermission(
-    "framework test endpoint",
-  )) as typeof createRawService;
+const createService: typeof createRawService = ((config: Parameters<typeof createRawService>[0]) =>
+  createRawService(config).withoutPermission("framework test endpoint")) as typeof createRawService;
 
 const requestRecords = () =>
   logRecords.filter(
@@ -65,9 +60,7 @@ describe("the endpoint a request matched", () => {
           "2026-08-07",
           async (_c, input: { id: string }) => ({ id: input.id }),
           (b) =>
-            b
-              .withParams(z.object({ id: z.string() }))
-              .withOutput(z.object({ id: z.string() })),
+            b.withParams(z.object({ id: z.string() })).withOutput(z.object({ id: z.string() })),
         )
         .build();
     }
@@ -92,9 +85,7 @@ describe("the endpoint a request matched", () => {
 
         await app.request("/api/things/2026-08-07/things/th_01J9Z");
 
-        expect(requestRecords()[0]?.payload.url).toBe(
-          "/api/things/2026-08-07/things/th_01J9Z",
-        );
+        expect(requestRecords()[0]?.payload.url).toBe("/api/things/2026-08-07/things/th_01J9Z");
       });
     });
   });
@@ -135,7 +126,7 @@ describe("the endpoint a request matched", () => {
             async () => "x",
             (b) => b.withOutput(z.string()),
           )
-          .withdraw("/legacy", "2026-09-01")
+          .withdrawRoute("get", "/legacy", "2026-09-01")
           .build();
 
         const res = await app.request("/api/things/2026-09-01/legacy");
@@ -169,9 +160,7 @@ describe("the endpoint a request matched", () => {
         const res = await app.request("/api/things/2026-08-07/broken");
 
         expect(res.status).toBe(500);
-        const cause = requestRecords()[0]?.payload.error as
-          | { message?: string }
-          | undefined;
+        const cause = requestRecords()[0]?.payload.error as { message?: string } | undefined;
         expect(cause?.message).toContain("Response failed output validation");
         expect(cause?.message).toContain("GET /broken");
       });
@@ -188,9 +177,10 @@ describe("the endpoint a request matched", () => {
           )
           .build();
 
-        const body = (await (
-          await app.request("/api/things/2026-08-07/broken")
-        ).json()) as Record<string, unknown>;
+        const body = (await (await app.request("/api/things/2026-08-07/broken")).json()) as Record<
+          string,
+          unknown
+        >;
 
         expect(JSON.stringify(body)).not.toContain("not-a-number");
       });

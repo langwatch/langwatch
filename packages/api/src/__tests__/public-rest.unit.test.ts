@@ -1,445 +1,380 @@
 import { generateSpecs } from "hono-openapi";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { HandledError } from "@langwatch/handled-error";
 
-import { createRestService } from "../builder.js";
-import type { InputDeclared, OutputDeclared, RestChain } from "../definition.js";
-import type { ServiceContext } from "../types.js";
+import { createRestService, createService } from "../builder.js";
+import type { RestEndpoint, RestEndpointHandler } from "../definition.js";
+import type { RestService } from "../builder.js";
+import { serializeEndpointResult } from "../response.js";
 
-const VERSION_HEADER = "X-API-Version";
+type AssertFalse<T extends false> = T;
+type IsAssignable<TFrom, TTo> = TFrom extends TTo ? true : false;
+type IsNever<T> = [T] extends [never] ? true : false;
+type AssertTrue<T extends true> = T;
+
+const typedInput = z.object({ id: z.string() });
+const typedOutput = z.string();
+type TypedHandler = RestEndpointHandler<unknown, typeof typedInput, typeof typedOutput>;
+type WrongInputIsRejected = AssertFalse<
+  IsAssignable<(context: never, input: { id: number }) => string, TypedHandler>
+>;
+type WrongOutputIsRejected = AssertFalse<
+  IsAssignable<(context: never, input: { id: string }) => number, TypedHandler>
+>;
+type ResponseOutputIsRejected = AssertFalse<
+  IsAssignable<(context: never, input: { id: string }) => Response, TypedHandler>
+>;
+type MissingRestInputCannotHandle = AssertTrue<IsNever<ThisParameterType<RestEndpoint["handle"]>>>;
+type RestFacadeHasNoRpcRegistration = AssertFalse<
+  "register" extends keyof RestService ? true : false
+>;
+type RestFacadeHasNoProviderRegistration = AssertFalse<
+  "provide" extends keyof RestService ? true : false
+>;
 
 function service() {
   return createRestService({
     name: "thing",
     logger: false,
+    maxInputBytes: 1_024,
     tracer: false,
-  }).withoutPermission("framework test endpoint");
+  })
+    .withoutPermission("framework test endpoint")
+    .withoutRateLimit("framework test endpoint")
+    .withoutResourceLimit("framework test endpoint");
 }
 
-type AssertFalse<T extends false> = T;
-type MissingInputCompiles = ReturnType<typeof service>["get"] extends (
-  path: "/items",
-  version: string,
-  handler: (context: ServiceContext, input: { id: string }) => Promise<{ id: string }>,
-  define: (builder: RestChain) => RestChain & OutputDeclared,
-) => unknown
-  ? true
-  : false;
-type MissingOutputCompiles = ReturnType<typeof service>["get"] extends (
-  path: "/items",
-  version: string,
-  handler: (context: ServiceContext, input: { id: string }) => Promise<{ id: string }>,
-  define: (builder: RestChain) => RestChain & InputDeclared,
-) => unknown
-  ? true
-  : false;
-
-export type MissingInputIsRejected = AssertFalse<MissingInputCompiles>;
-export type MissingOutputIsRejected = AssertFalse<MissingOutputCompiles>;
-export type RestChainHasNoQuerySource = AssertFalse<
-  "withQuery" extends keyof RestChain ? true : false
->;
-export type RestChainHasNoParamsSource = AssertFalse<
-  "withParams" extends keyof RestChain ? true : false
->;
-export type RestChainHasNoErrorList = AssertFalse<
-  "withErrors" extends keyof RestChain ? true : false
->;
-
-class SecretNotFoundError extends HandledError {
-  constructor() {
-    super("secret_not_found", "The requested secret does not exist", { httpStatus: 404 });
-    this.name = "SecretNotFoundError";
-  }
-}
-
-describe("public REST input", () => {
-  it("supports the Secret adoption shape without changing existing RPC routes", async () => {
-    const app = createRestService({
-      name: "secret",
-      logger: false,
-      tracer: false,
-    })
-      .withoutPermission("framework test endpoint")
-      .get(
-        "/lookup/:id",
-        "2026-01-15",
-        async (_context, input: { id: string; reveal: boolean }) => input,
-        (builder) =>
-          builder
-            .withInput(
-              z.object({
-                id: z.string(),
-                reveal: z.enum(["true", "false"]).transform((value) => value === "true"),
-              }),
-            )
-            .withOutput(z.object({ id: z.string(), reveal: z.boolean() })),
-      )
-      .post(
-        "/rotate/:id",
-        "2026-08-07",
-        async (_context, input: { id: string; value: string }) => input,
-        (builder) =>
-          builder
-            .withInput(z.object({ id: z.string(), value: z.string().min(1) }))
-            .withOutput(z.object({ id: z.string(), value: z.string() })),
-      )
-      .build();
-
-    const lookup = await app.request("/api/v1/secret/lookup/secret_1?reveal=true", {
-      headers: { [VERSION_HEADER]: "2026-01-15" },
-    });
-    const rotate = await app.request("/api/v1/secret/2026-08-07/rotate/secret_1", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        [VERSION_HEADER]: "2026-08-07",
-      },
-      body: JSON.stringify({ value: "rotated" }),
-    });
-
-    expect(lookup.status).toBe(200);
-    await expect(lookup.json()).resolves.toEqual({ id: "secret_1", reveal: true });
-    expect(rotate.status).toBe(200);
-    await expect(rotate.json()).resolves.toEqual({ id: "secret_1", value: "rotated" });
-  });
-
-  it("maps handled errors centrally, without endpoint error declarations", async () => {
+describe("modern REST", () => {
+  it("captures schemas before deriving the handler input and output", async () => {
     const app = service()
-      .get(
-        "/items/:id",
-        "2026-08-07",
-        async () => {
-          throw new SecretNotFoundError();
-        },
-        (builder) =>
-          builder.withInput(z.object({ id: z.string() })).withOutput(z.object({ id: z.string() })),
+      .get("/items/:id", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ id: z.string(), reveal: z.enum(["true", "false"]) }))
+          .withOutput(z.object({ id: z.string(), reveal: z.boolean() }))
+          .handle(async (_context, input) => ({
+            id: input.id,
+            reveal: input.reveal === "true",
+          })),
       )
       .build();
 
-    const response = await app.request("/api/v1/thing/items/item_1");
-
-    expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toMatchObject({ code: "secret_not_found" });
-  });
-
-  it("takes GET input from query and merges path parameters", async () => {
-    const app = service()
-      .get(
-        "/items/:id",
-        "2026-08-07",
-        async (_context, input: { id: string; include: boolean }) => input,
-        (builder) =>
-          builder
-            .withInput(
-              z.object({
-                id: z.string().startsWith("item_"),
-                include: z.enum(["true", "false"]).transform((value) => value === "true"),
-              }),
-            )
-            .withOutput(z.object({ id: z.string(), include: z.boolean() })),
-      )
-      .build();
-
-    const response = await app.request("/api/v1/thing/items/item_1?include=true&id=ignored");
+    const response = await app.request("/api/v1/thing/items/item_1?reveal=true");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ id: "item_1", include: true });
+    await expect(response.json()).resolves.toEqual({ id: "item_1", reveal: true });
   });
 
-  it("validates the complete input once", async () => {
-    let validations = 0;
-    const input = z.object({ id: z.string(), include: z.string() }).superRefine(() => {
-      validations++;
-    });
+  it("validates one merged request, output, and the JSON body limit", async () => {
+    let calls = 0;
     const app = service()
-      .get(
-        "/items/:id",
-        "2026-08-07",
-        async (_context, value: z.output<typeof input>) => value,
-        (builder) =>
-          builder.withInput(input).withOutput(
-            z.object({
-              id: z.string(),
-              include: z.string(),
-            }),
-          ),
+      .post("/items/:id", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ id: z.string(), name: z.string().min(1) }))
+          .withOutput(z.object({ id: z.string(), name: z.string() }))
+          .handle(async (_context, input) => {
+            calls++;
+            return input;
+          }),
       )
       .build();
 
-    const response = await app.request("/api/v1/thing/items/item_1?include=yes");
-
-    expect(response.status).toBe(200);
-    expect(validations).toBe(1);
-  });
-
-  it.each(["post", "put", "patch", "delete"] as const)(
-    "takes %s input from one JSON body and merges path parameters",
-    async (method) => {
-      const builder = service();
-      const register = builder[method].bind(builder);
-      register(
-        "/items/:id",
-        "2026-08-07",
-        async (_context, input: { id: string; name: string }) => input,
-        (definition) =>
-          definition
-            .withInput(z.object({ id: z.string(), name: z.string().trim().min(1) }))
-            .withOutput(z.object({ id: z.string(), name: z.string() })),
-      );
-      const app = builder.build();
-
-      const response = await app.request("/api/v1/thing/items/path-id", {
-        method: method.toUpperCase(),
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: "body-id", name: "  widget  " }),
-      });
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
-        id: "path-id",
-        name: "widget",
-      });
-    },
-  );
-
-  it("rejects malformed input before the handler", async () => {
-    let called = false;
-    const app = service()
-      .post(
-        "/items",
-        "2026-08-07",
-        async (_context, input: { name: string }) => {
-          called = true;
-          return input;
-        },
-        (builder) =>
-          builder
-            .withInput(z.object({ name: z.string().min(1) }))
-            .withOutput(z.object({ name: z.string() })),
-      )
-      .build();
-
-    const response = await app.request("/api/v1/thing/items", {
+    const invalid = await app.request("/api/v1/thing/items/item_1", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{",
     });
-
-    expect(response.status).toBe(422);
-    expect(called).toBe(false);
-  });
-
-  it("rejects a response that does not satisfy withOutput", async () => {
-    const app = service()
-      .get(
-        "/items",
-        "2026-08-07",
-        async () => ({ id: 42 }),
-        (builder) => builder.withOutput(z.object({ id: z.string() })),
-      )
-      .build();
-
-    const response = await app.request("/api/v1/thing/items");
-
-    expect(response.status).toBe(500);
-  });
-
-  it("does not let a Response bypass withOutput", async () => {
-    const app = service()
-      .get(
-        "/response",
-        "2026-08-07",
-        async () => Response.json({ id: "unvalidated" }),
-        (builder) => builder.withOutput(z.object({ id: z.string() })),
-      )
-      .build();
-
-    const response = await app.request("/api/v1/thing/response");
-
-    expect(response.status).toBe(500);
-  });
-
-  it("serves and documents z.void as a bodyless 204", async () => {
-    const app = service()
-      .delete(
-        "/items/:id",
-        "2026-08-07",
-        async () => void 0,
-        (builder) =>
-          builder
-            .withInput(z.object({ id: z.string() }))
-            .withOutput(z.void())
-            .withDocs({ operationId: "deleteThing" }),
-      )
-      .build();
-
-    const response = await app.request("/api/v1/thing/items/item_1", {
-      method: "DELETE",
+    const nonObject = await app.request("/api/v1/thing/items/item_1", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(["not an object"]),
     });
+    const oversized = await app.request("/api/v1/thing/items/item_1", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "x".repeat(2_000) }),
+    });
+    const valid = await app.request("/api/v1/thing/items/item_1", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "widget" }),
+    });
+
+    expect([invalid.status, nonObject.status, oversized.status]).toEqual([422, 422, 422]);
+    expect(valid.status).toBe(200);
+    expect(calls).toBe(1);
+  });
+
+  it("keeps repeated GET query values, merges path fields, and parses once", async () => {
+    let parses = 0;
+    const input = z
+      .object({ id: z.string(), tag: z.array(z.string()) })
+      .superRefine(() => void parses++);
+    const app = service()
+      .get("/items/:id", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(input)
+          .withOutput(z.object({ id: z.string(), tag: z.array(z.string()) }))
+          .handle(async (_context, value) => value),
+      )
+      .build();
+
+    const response = await app.request("/api/v1/thing/items/item_1?tag=error&tag=llm");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: "item_1", tag: ["error", "llm"] });
+    expect(parses).toBe(1);
+  });
+
+  it.each(["post", "put", "patch", "delete"] as const)(
+    "uses one JSON body for %s",
+    async (method) => {
+      const register = (rest: ReturnType<typeof service>) => {
+        type Definition = Parameters<typeof rest.post>[2];
+        const definition: Definition = (endpoint) =>
+          endpoint
+            .withInput(z.object({ id: z.string(), name: z.string().trim() }))
+            .withOutput(z.object({ id: z.string(), name: z.string() }))
+            .handle(async (_context, input) => input);
+        if (method === "post") return rest.post("/items/:id", "2026-08-07", definition);
+        if (method === "put") return rest.put("/items/:id", "2026-08-07", definition);
+        if (method === "patch") return rest.patch("/items/:id", "2026-08-07", definition);
+        return rest.delete("/items/:id", "2026-08-07", definition);
+      };
+      const app = register(service()).build();
+      const response = await app.request("/api/v1/thing/items/path-id", {
+        method: method.toUpperCase(),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "body-id", name: " widget " }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ id: "path-id", name: "widget" });
+    },
+  );
+
+  it("rejects invalid output and raw Response bypasses", async () => {
+    const app = service()
+      .get("/wrong", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({}))
+          .withOutput(z.object({ id: z.string().refine((value) => value.startsWith("ok")) }))
+          .handle(async () => ({ id: "wrong" })),
+      )
+      .build();
+
+    expect((await app.request("/api/v1/thing/wrong")).status).toBe(500);
+
+    let responseError: unknown;
+    const serializer = new Hono().get("/response", (context) => {
+      try {
+        serializeEndpointResult({
+          c: context,
+          config: { output: z.object({ id: z.string() }) },
+          kind: "public-rest",
+          result: Response.json({ id: "unvalidated" }),
+        });
+      } catch (error) {
+        responseError = error;
+      }
+      return context.body(null);
+    });
+    await serializer.request("/response");
+
+    expect(responseError).toBeInstanceOf(TypeError);
+  });
+
+  it("serves and documents z.void as bodyless 204", async () => {
+    const app = service()
+      .delete("/items/:id", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ id: z.string() }))
+          .withOutput(z.void())
+          .withDocs({ operationId: "deleteThing" })
+          .handle(async () => void 0),
+      )
+      .build();
+    const response = await app.request("/api/v1/thing/items/item_1", { method: "DELETE" });
     const spec = await generateSpecs(app, { excludeStaticFile: false });
-    const operation = spec.paths["/api/v1/thing/items/{id}"]?.delete;
 
     expect(response.status).toBe(204);
     expect(await response.text()).toBe("");
-    expect(operation?.responses).toHaveProperty("204");
-    expect(operation?.responses?.["204"]).not.toHaveProperty("content");
+    expect(spec.paths["/api/v1/thing/items/{id}"]?.delete?.responses?.["204"]).not.toHaveProperty(
+      "content",
+    );
   });
-});
 
-describe("public REST version axes", () => {
-  function versionedApp() {
-    return service()
-      .get(
-        "/items/:id",
-        "2026-01-15",
-        async (_context, input: { id: string }) => ({ id: input.id, value: "old" }),
-        (builder) =>
-          builder
-            .withInput(z.object({ id: z.string() }))
-            .withOutput(z.object({ id: z.string(), value: z.literal("old") }))
-            .withDocs({ operationId: "getThing" }),
-      )
-      .get(
-        "/items/:id",
-        "2026-08-07",
-        async (_context, input: { id: string }) => ({ id: input.id, value: "new" }),
-        (builder) =>
-          builder
-            .withInput(z.object({ id: z.string() }))
-            .withOutput(z.object({ id: z.string(), value: z.literal("new") }))
-            .withDocs({ operationId: "getThing" }),
+  it("documents the static v1 path and negotiated version paths", async () => {
+    const app = service()
+      .get("/items/:id", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ id: z.string() }))
+          .withOutput(z.object({ id: z.string() }))
+          .withDocs({ operationId: "getThing" })
+          .handle(async (_context, input) => input),
       )
       .build();
-  }
 
-  it("defaults an omitted date version to latest", async () => {
-    const app = versionedApp();
-    const response = await app.request("/api/v1/thing/items/item_1");
-    const explicit = await app.request("/api/v1/thing/latest/items/item_1");
+    const spec = await generateSpecs(app, { excludeStaticFile: false });
 
-    await expect(response.json()).resolves.toEqual({ id: "item_1", value: "new" });
-    await expect(explicit.json()).resolves.toEqual({ id: "item_1", value: "new" });
-    expect(response.headers.get(VERSION_HEADER)).toBe("latest");
-    expect(response.headers.get("X-API-Version-Status")).toBe("latest");
-  });
-
-  it("keeps the global v1 axis static", async () => {
-    const response = await versionedApp().request("/api/v2/thing/items/item_1");
-
-    expect(response.status).toBe(404);
-  });
-
-  it("selects the same inherited endpoint by URL or header", async () => {
-    const app = versionedApp();
-    const byUrl = await app.request("/api/v1/thing/2026-04-01/items/item_1");
-    const byHeader = await app.request("/api/v1/thing/items/item_1", {
-      headers: { [VERSION_HEADER]: "2026-04-01" },
-    });
-
-    expect(byUrl.status).toBe(200);
-    expect(byHeader.status).toBe(200);
-    expect(new Uint8Array(await byUrl.arrayBuffer())).toEqual(
-      new Uint8Array(await byHeader.arrayBuffer()),
-    );
-    expect(byUrl.headers.get(VERSION_HEADER)).toBe("2026-04-01");
-    expect(byHeader.headers.get(VERSION_HEADER)).toBe("2026-04-01");
-  });
-
-  it("accepts a matching URL and header version", async () => {
-    const response = await versionedApp().request("/api/v1/thing/2026-01-15/items/item_1", {
-      headers: { [VERSION_HEADER]: "2026-01-15" },
-    });
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ value: "old" });
-  });
-
-  it("rejects conflicting URL and header versions", async () => {
-    const response = await versionedApp().request("/api/v1/thing/2026-01-15/items/item_1", {
-      headers: { [VERSION_HEADER]: "latest" },
-    });
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      code: "api_version_conflict",
-    });
-  });
-
-  it("rejects an invalid header and does not serve a date before the service existed", async () => {
-    const app = versionedApp();
-    const invalid = await app.request("/api/v1/thing/items/item_1", {
-      headers: { [VERSION_HEADER]: "tomorrow" },
-    });
-    const tooOld = await app.request("/api/v1/thing/items/item_1", {
-      headers: { [VERSION_HEADER]: "2020-01-01" },
-    });
-
-    expect(invalid.status).toBe(400);
-    await expect(invalid.json()).resolves.toMatchObject({
-      code: "invalid_api_version",
-    });
-    expect(tooOld.status).toBe(404);
-  });
-
-  it("documents the global v1, explicit dates, latest and the optional header mount", async () => {
-    const spec = await generateSpecs(versionedApp(), { excludeStaticFile: false });
-
-    const optional = spec.paths["/api/v1/thing/items/{id}"]?.get;
-    expect(optional?.operationId).toBe("getThing");
-    expect(optional?.parameters).toContainEqual(
-      expect.objectContaining({ in: "header", name: VERSION_HEADER }),
-    );
-    expect(optional?.parameters).toContainEqual(
-      expect.objectContaining({ in: "path", name: "id" }),
-    );
-    expect(spec.paths["/api/v1/thing/2026-01-15/items/{id}"]?.get?.operationId).toBe(
-      "getThing_2026_01_15",
-    );
+    expect(spec.paths["/api/v1/thing/items/{id}"]?.get?.operationId).toBe("getThing");
     expect(spec.paths["/api/v1/thing/latest/items/{id}"]?.get?.operationId).toBe("getThing_latest");
   });
 
-  it("applies dated withdrawal through URL and header negotiation", async () => {
+  it("negotiates dated, inherited, latest and header versions without conflicts", async () => {
     const app = service()
-      .get(
-        "/retired",
-        "2026-01-15",
-        async () => ({ value: "kept" }),
-        (builder) => builder.withOutput(z.object({ value: z.string() })),
+      .get("/versioned/:id", "2026-01-15", (endpoint) =>
+        endpoint
+          .withInput(z.object({ id: z.string() }))
+          .withOutput(z.object({ value: z.literal("old") }))
+          .handle(async () => ({ value: "old" })),
       )
-      .withdraw("/retired", "2026-08-07")
+      .get("/versioned/:id", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ id: z.string() }))
+          .withOutput(z.object({ value: z.literal("new") }))
+          .handle(async () => ({ value: "new" })),
+      )
       .build();
-
-    const old = await app.request("/api/v1/thing/2026-01-15/retired");
-    const removed = await app.request("/api/v1/thing/retired");
-    const removedByHeader = await app.request("/api/v1/thing/retired", {
-      headers: { [VERSION_HEADER]: "2026-08-07" },
+    const inherited = await app.request("/api/v1/thing/2026-04-01/versioned/item_1");
+    const latest = await app.request("/api/v1/thing/versioned/item_1");
+    const byHeader = await app.request("/api/v1/thing/versioned/item_1", {
+      headers: { "X-API-Version": "2026-04-01" },
+    });
+    const conflict = await app.request("/api/v1/thing/2026-01-15/versioned/item_1", {
+      headers: { "X-API-Version": "latest" },
+    });
+    const invalid = await app.request("/api/v1/thing/versioned/item_1", {
+      headers: { "X-API-Version": "tomorrow" },
+    });
+    const tooOld = await app.request("/api/v1/thing/versioned/item_1", {
+      headers: { "X-API-Version": "2020-01-01" },
     });
 
-    expect(old.status).toBe(200);
-    expect(removed.status).toBe(410);
-    expect(removedByHeader.status).toBe(410);
+    await expect(inherited.json()).resolves.toEqual({ value: "old" });
+    await expect(latest.json()).resolves.toEqual({ value: "new" });
+    await expect(byHeader.json()).resolves.toEqual({ value: "old" });
+    expect([conflict.status, invalid.status, tooOld.status]).toEqual([400, 400, 404]);
   });
-});
 
-describe("public REST registration", () => {
-  it("requires path fields in the one input schema", () => {
+  it("rejects blank REST limit and permission opt-outs", () => {
+    const definition = (
+      endpoint: Parameters<Parameters<ReturnType<typeof service>["get"]>[2]>[0],
+    ) =>
+      endpoint
+        .withInput(z.object({}))
+        .withOutput(z.object({ ok: z.boolean() }))
+        .handle(async () => ({ ok: true }));
+
     expect(() =>
-      service().get(
-        "/items/:id",
-        "2026-08-07",
-        async () => ({ ok: true }),
-        (builder) =>
-          builder
-            .withInput(z.object({ another: z.string() }))
-            .withOutput(z.object({ ok: z.boolean() })),
-      ),
-    ).toThrow(/path parameters missing from withInput: id/);
+      service().withoutPermission(" ").get("/blank-permission", "2026-08-07", definition).build(),
+    ).toThrow(/blank reason/);
+    expect(() =>
+      service().withoutRateLimit(" ").get("/blank-rate", "2026-08-07", definition),
+    ).toThrow(/rate limit/);
+    expect(() =>
+      service().withoutResourceLimit(" ").get("/blank-resource", "2026-08-07", definition),
+    ).toThrow(/resource limit/);
   });
 
-  it("does not add the public REST mounts to createService consumers", async () => {
-    const { createService } = await import("../builder.js");
+  it("rejects empty authenticated OpenAPI security declarations", () => {
+    const auth = async (
+      _context: Parameters<NonNullable<Parameters<typeof createRestService>[0]["auth"]>>[0],
+      next: () => Promise<void>,
+    ) => next();
+    expect(() =>
+      createRestService({
+        name: "auth",
+        auth,
+        logger: false,
+        maxInputBytes: 1_024,
+        openapiSecurity: [],
+      }),
+    ).toThrow(/security scheme/);
+    expect(() =>
+      createRestService({
+        name: "auth",
+        auth,
+        logger: false,
+        maxInputBytes: 1_024,
+        openapiSecurity: [{}],
+      }),
+    ).toThrow(/security scheme/);
+  });
+
+  it("derives authenticated OpenAPI security from the service", async () => {
+    const app = createRestService({
+      name: "documented-auth",
+      logger: false,
+      maxInputBytes: 1_024,
+      tracer: false,
+      auth: async (_context, next) => next(),
+      openapiSecurity: [{ bearerAuth: [] }],
+    })
+      .withoutPermission("documentation probe")
+      .withoutRateLimit("documentation probe")
+      .withoutResourceLimit("documentation probe")
+      .get("/thing/:id", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ id: z.string() }))
+          .withOutput(z.object({ id: z.string() }))
+          .withDocs({ operationId: "getAuthenticatedThing" })
+          .handle(async (_context, input) => input),
+      )
+      .build();
+    const spec = await generateSpecs(app, { excludeStaticFile: false });
+    const operation = spec.paths["/api/v1/documented-auth/thing/{id}"]?.get;
+
+    expect(operation?.security).toEqual([{ bearerAuth: [] }]);
+    expect(operation?.responses).toHaveProperty("200");
+  });
+
+  it("rejects a validated project target before permissions, limits, and the handler", async () => {
+    let permissionCalls = 0;
+    let limitCalls = 0;
+    let handlerCalls = 0;
+    const app = createRestService({
+      name: "project",
+      logger: false,
+      maxInputBytes: 1_024,
+      projectIdInput: true,
+      rateLimiter: {
+        check: async () => {
+          limitCalls++;
+          return { allowed: true };
+        },
+      },
+      permissionEnforcer: () => async (_context, next) => {
+        permissionCalls++;
+        await next();
+      },
+      tracer: false,
+      auth: async (context, next) => {
+        context.set("project", { id: "project_a" });
+        await next();
+      },
+      openapiSecurity: [{ bearerAuth: [] }],
+    })
+      .withPermission("project:view")
+      .withRateLimit()
+      .withoutResourceLimit("no resource ceiling for this probe")
+      .get("/target", "2026-08-07", (endpoint) =>
+        endpoint
+          .withInput(z.object({ projectId: z.string() }))
+          .withOutput(z.object({ ok: z.boolean() }))
+          .handle(async () => {
+            handlerCalls++;
+            return { ok: true };
+          }),
+      )
+      .build();
+    const response = await app.request("/api/v1/project/target?projectId=project_b");
+
+    expect(response.status).toBe(403);
+    expect([permissionCalls, limitCalls, handlerCalls]).toEqual([0, 0, 0]);
+  });
+
+  it("keeps RPC services off the public REST mount", async () => {
     const app = createService({
       name: "thing",
       basePath: "/api/thing",
@@ -451,7 +386,7 @@ describe("public REST registration", () => {
         "things.get",
         "2026-08-07",
         async () => ({ ok: true }),
-        (builder) => builder.withOutput(z.object({ ok: z.boolean() })),
+        (definition) => definition.withOutput(z.object({ ok: z.boolean() })),
       )
       .build();
 

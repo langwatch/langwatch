@@ -1,5 +1,6 @@
 import { updateCurrentContext } from "@langwatch/observability/context";
 import type { Context, MiddlewareHandler } from "hono";
+import { z } from "zod";
 import {
   type DescribeRouteOptions,
   describeRoute,
@@ -10,7 +11,11 @@ import {
 
 import { cacheReadMiddleware, rateLimitMiddleware, writeCachedResponse } from "./capabilities.js";
 import { isNoBodySchema } from "./definition.js";
-import { ApiVersionConflictError, ProjectInputMismatchError } from "./errors.js";
+import {
+  ApiVersionConflictError,
+  EndpointWithdrawnError,
+  ProjectInputMismatchError,
+} from "./errors.js";
 import {
   createApiSchemaError,
   parseApiSchemaSync,
@@ -81,6 +86,23 @@ export function buildEndpointMiddlewareStack<TProject>(
   const documented = options.suppressDocs !== true && isDocumentedMount({ config, status });
 
   appendAuthMiddleware({ stack, config, serviceConfig });
+  if (ep.kind === "public-rest") {
+    appendValidationMiddleware({
+      stack,
+      ep,
+      documented,
+      paramSource: options.paramSource ?? "route",
+    });
+    stack.push(
+      validatedInputMiddleware({
+        config,
+        kind: ep.kind,
+        maxInputBytes: serviceConfig.publicRest?.maxInputBytes,
+        paramSource: options.paramSource ?? "route",
+      }),
+    );
+    stack.push(projectInputMiddleware(serviceConfig));
+  }
   appendPermissionMiddleware({ stack, config, serviceConfig });
   stack.push(
     requestCapabilitiesMiddleware({
@@ -95,6 +117,7 @@ export function buildEndpointMiddlewareStack<TProject>(
         rateLimiter: serviceConfig.rateLimiter!,
         keyParts: {
           service: serviceConfig.name,
+          method: ep.method === "sse" ? "get" : ep.method,
           path: ep.path,
           version,
         },
@@ -124,19 +147,22 @@ export function buildEndpointMiddlewareStack<TProject>(
     version,
     versionHeaderParameter: options.versionHeaderParameter,
   });
-  appendValidationMiddleware({
-    stack,
-    ep,
-    documented,
-    paramSource: options.paramSource ?? "route",
-  });
-  stack.push(
-    validatedInputMiddleware({
-      config,
-      kind: ep.kind,
+  if (ep.kind !== "public-rest") {
+    appendValidationMiddleware({
+      stack,
+      ep,
+      documented,
       paramSource: options.paramSource ?? "route",
-    }),
-  );
+    });
+    stack.push(
+      validatedInputMiddleware({
+        config,
+        kind: ep.kind,
+        maxInputBytes: serviceConfig.publicRest?.maxInputBytes,
+        paramSource: options.paramSource ?? "route",
+      }),
+    );
+  }
 
   if (config.cache && config.output && ep.method !== "sse") {
     stack.push(
@@ -144,6 +170,7 @@ export function buildEndpointMiddlewareStack<TProject>(
         cache: serviceConfig.cache!,
         keyParts: {
           service: serviceConfig.name,
+          method: ep.method,
           path: ep.path,
           version,
         },
@@ -241,15 +268,9 @@ export function buildWithdrawnMiddlewareStack({
     serviceConfig: options.serviceConfig,
   });
   if (ep.config.middleware) stack.push(...ep.config.middleware);
-  stack.push(async (c) =>
-    c.json(
-      {
-        code: "endpoint_withdrawn",
-        message: "This endpoint has been removed",
-      },
-      410,
-    ),
-  );
+  stack.push(async () => {
+    throw new EndpointWithdrawnError();
+  });
   return stack;
 }
 
@@ -489,10 +510,12 @@ function appendValidationMiddleware({
 function validatedInputMiddleware({
   config,
   kind,
+  maxInputBytes,
   paramSource,
 }: {
   config: EndpointDef;
   kind: EndpointRegistration["kind"];
+  maxInputBytes: number | undefined;
   paramSource: "route" | "context";
 }): MiddlewareHandler {
   return async (c, next) => {
@@ -511,6 +534,7 @@ function validatedInputMiddleware({
       const input = await parsePublicRestInput({
         context: c,
         method: c.req.method.toLowerCase() as EndpointRegistration["method"],
+        maxInputBytes,
         params,
         schema: config.input,
       });
@@ -641,11 +665,13 @@ function handlerMiddleware<TProject>({
 
   return async (c: Context) => {
     const input = c.get(ENDPOINT_INPUT);
-    assertAuthorizedProjectInput({
-      context: c,
-      input,
-      required: serviceConfig.projectIdInput === true,
-    });
+    if (ep.kind !== "public-rest") {
+      assertAuthorizedProjectInput({
+        context: c,
+        input,
+        required: serviceConfig.projectIdInput === true,
+      });
+    }
     const result = await ep.handler(c, input);
     const response = serializeEndpointResult({ c, config, kind: ep.kind, result });
     if (config.cache && config.output && !(result instanceof Response)) {
@@ -660,6 +686,17 @@ function handlerMiddleware<TProject>({
   };
 }
 
+function projectInputMiddleware(serviceConfig: ServiceConfig): MiddlewareHandler {
+  return async (context, next) => {
+    assertAuthorizedProjectInput({
+      context,
+      input: context.get(ENDPOINT_INPUT),
+      required: serviceConfig.projectIdInput === true,
+    });
+    await next();
+  };
+}
+
 function assertAuthorizedProjectInput({
   context,
   input,
@@ -670,19 +707,12 @@ function assertAuthorizedProjectInput({
   required: boolean;
 }): void {
   if (!required) return;
-  const inputProjectId =
-    typeof input === "object" && input !== null && "projectId" in input
-      ? input.projectId
-      : undefined;
-  const authorizedProject: unknown = context.get("project");
-  const authorizedProjectId =
-    typeof authorizedProject === "object" && authorizedProject !== null && "id" in authorizedProject
-      ? authorizedProject.id
-      : undefined;
+  const inputProject = z.object({ projectId: z.string() }).safeParse(input);
+  const authorizedProject = z.object({ id: z.string() }).safeParse(context.get("project"));
   if (
-    typeof inputProjectId !== "string" ||
-    typeof authorizedProjectId !== "string" ||
-    inputProjectId !== authorizedProjectId
+    !inputProject.success ||
+    !authorizedProject.success ||
+    inputProject.data.projectId !== authorizedProject.data.id
   ) {
     throw new ProjectInputMismatchError();
   }

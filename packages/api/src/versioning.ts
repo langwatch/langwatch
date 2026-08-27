@@ -52,20 +52,20 @@ function applyEvents({
 }): void {
   for (const { endpoint: ep } of events) {
     if (ep.withdrawn) {
-      // A withdrawal names the endpoint, not the method: mark every inherited
-      // registration at that path, keeping its config on the mount report. An
-      // endpoint that was never registered has nothing to withdraw — it stays
-      // a plain 404.
-      for (const [key, inherited] of target) {
-        if ((inherited.path || "/") !== (ep.path || "/")) continue;
-        target.set(key, {
-          kind: inherited.kind,
-          method: inherited.method,
-          path: inherited.path,
-          config: inherited.config,
-          withdrawn: true,
-        });
-      }
+      // A withdrawal identifies one HTTP operation, not a URL-shaped family.
+      // `GET /things/:id` and `DELETE /things/:id` can have independent
+      // lifecycles, so withdrawing either must leave its sibling live.
+      const key = endpointKey(ep);
+      const inherited = target.get(key);
+      if (!inherited) continue;
+
+      target.set(key, {
+        kind: inherited.kind,
+        method: inherited.method,
+        path: inherited.path,
+        config: inherited.config,
+        withdrawn: true,
+      });
     } else {
       target.set(endpointKey(ep), { ...ep, withdrawn: false });
     }
@@ -94,9 +94,7 @@ function applyEvents({
  *
  * @returns A map from version label to its resolved endpoint array.
  */
-export function resolveVersions(
-  events: RegistrationEvent[],
-): Map<string, ResolvedEndpoint[]> {
+export function resolveVersions(events: RegistrationEvent[]): Map<string, ResolvedEndpoint[]> {
   const datedVersions = [...new Set(events.map((event) => event.version))].filter(
     (version) => version !== VERSION_PREVIEW,
   );
@@ -121,7 +119,9 @@ export function resolveVersions(
       events: events.filter((event) => event.version === version),
     });
 
-    result.set(version, Array.from(currentMap.values()));
+    const endpoints = Array.from(currentMap.values());
+    assertNoOverlappingPublicRestRoutes({ endpoints, version });
+    result.set(version, endpoints);
     previousMap = currentMap;
   }
 
@@ -131,13 +131,196 @@ export function resolveVersions(
     result.set(VERSION_LATEST, result.get(latestVersion)!);
   }
 
+  assertPublicRestPolicyParity(result, datedVersions);
+
   // `preview` endpoints are separate
   const previewEvents = events.filter((event) => event.version === VERSION_PREVIEW);
   if (previewEvents.length > 0) {
     const previewMap = new Map<string, ResolvedEndpoint>();
     applyEvents({ target: previewMap, events: previewEvents });
-    result.set(VERSION_PREVIEW, Array.from(previewMap.values()));
+    const endpoints = Array.from(previewMap.values());
+    assertNoOverlappingPublicRestRoutes({ endpoints, version: VERSION_PREVIEW });
+    result.set(VERSION_PREVIEW, endpoints);
   }
 
   return result;
+}
+
+/**
+ * The bare public REST path chooses a dated stack from a request header. It
+ * has one physical Hono mount and one route-policy report, so anything that
+ * controls access or transport capability must be identical across its
+ * historical registrations. Schemas and handlers may evolve: that is what a
+ * date version is for.
+ */
+function assertPublicRestPolicyParity(
+  versionMap: Map<string, ResolvedEndpoint[]>,
+  datedVersions: string[],
+): void {
+  const policies = new Map<string, { fingerprint: string; version: string }>();
+
+  for (const version of datedVersions) {
+    for (const endpoint of versionMap.get(version) ?? []) {
+      if (endpoint.kind !== "public-rest") continue;
+
+      const key = endpointKey(endpoint);
+      const fingerprint = publicRestPolicyFingerprint(endpoint);
+      const previous = policies.get(key);
+      if (!previous) {
+        policies.set(key, { fingerprint, version });
+        continue;
+      }
+
+      if (previous.fingerprint !== fingerprint) {
+        throw new Error(
+          `Public REST ${endpoint.method.toUpperCase()} ${endpoint.path || "/"} changes ` +
+            `its mounted access policy between ` +
+            `${previous.version} and ${version}. Optional-version routes have one mounted policy; ` +
+            `register a new non-overlapping path instead.`,
+        );
+      }
+    }
+  }
+}
+
+function publicRestPolicyFingerprint(endpoint: ResolvedEndpoint): string {
+  const config = endpoint.config;
+  const policy = {
+    auth: config.auth ?? "default",
+    permission: config.permission ?? null,
+    publicReason: config.noPermission?.reason ?? null,
+    rateLimit: config.rateLimit === true,
+    resourceLimit: config.resourceLimit ?? null,
+    meta: config.meta ?? null,
+  };
+
+  try {
+    return stableDeclarativeValue(policy);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown non-declarative value";
+    throw new Error(
+      `Public REST ${endpoint.method.toUpperCase()} ${endpoint.path || "/"} has a ` +
+        `non-declarative mounted access policy: ${reason}`,
+    );
+  }
+}
+
+function stableDeclarativeValue(value: unknown, seen = new WeakSet<object>()): string {
+  if (value === null) return "null";
+  if (typeof value === "string" || typeof value === "boolean") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError("numbers must be finite");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    if (seen.has(value)) throw new TypeError("cycles are not supported");
+    seen.add(value);
+    const serialized = `[${value.map((entry) => stableDeclarativeValue(entry, seen)).join(",")}]`;
+    seen.delete(value);
+    return serialized;
+  }
+  if (typeof value === "object" && value !== null) {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError("only plain objects and arrays are supported");
+    }
+    if (seen.has(value)) throw new TypeError("cycles are not supported");
+    seen.add(value);
+    const entries = Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((key) => {
+        const entry = (value as Record<string, unknown>)[key];
+        if (entry === void 0) return void 0;
+        return `${JSON.stringify(key)}:${stableDeclarativeValue(entry, seen)}`;
+      })
+      .filter((entry): entry is string => entry !== void 0);
+    seen.delete(value);
+    return `{${entries.join(",")}}`;
+  }
+
+  throw new TypeError(`${typeof value} values are not supported`);
+}
+
+function assertNoOverlappingPublicRestRoutes({
+  endpoints,
+  version,
+}: {
+  endpoints: ResolvedEndpoint[];
+  version: string;
+}): void {
+  // A withdrawal is a real 410 route. It still participates in Hono matching,
+  // so an active sibling cannot be allowed to overlap it either.
+  const publicRestEndpoints = endpoints.filter((endpoint) => endpoint.kind === "public-rest");
+  for (const endpoint of publicRestEndpoints) {
+    assertSupportedPublicRestPath(endpoint);
+  }
+
+  for (let index = 0; index < publicRestEndpoints.length; index++) {
+    const left = publicRestEndpoints[index]!;
+    for (const right of publicRestEndpoints.slice(index + 1)) {
+      if (left.method !== right.method || !pathsOverlap(left.path, right.path)) continue;
+
+      throw new Error(
+        `Public REST ${left.method.toUpperCase()} routes "${left.path || "/"}" and ` +
+          `"${right.path || "/"}" overlap in version ${version}. Give each operation an ` +
+          `unambiguous path shape.`,
+      );
+    }
+  }
+}
+
+function assertSupportedPublicRestPath(endpoint: ResolvedEndpoint): void {
+  const parameterNames = new Set<string>();
+  for (const segment of splitPath(endpoint.path)) {
+    if (!segment.startsWith(":")) {
+      if (/[?*{}]/.test(segment)) {
+        throw unsupportedPublicRestPath(endpoint);
+      }
+      continue;
+    }
+
+    const match = /^:([A-Za-z_][A-Za-z0-9_]*)$/.exec(segment);
+    const name = match?.[1];
+    if (!name || parameterNames.has(name)) {
+      throw unsupportedPublicRestPath(endpoint);
+    }
+    parameterNames.add(name);
+  }
+}
+
+function unsupportedPublicRestPath(endpoint: ResolvedEndpoint): Error {
+  return new Error(
+    `Public REST ${endpoint.method.toUpperCase()} route "${endpoint.path || "/"}" uses an ` +
+      `unsupported path shape. Modern REST supports literal segments and unique, required, ` +
+      `unconstrained :name parameters only`,
+  );
+}
+
+function pathsOverlap(leftPath: string, rightPath: string): boolean {
+  const left = splitPath(leftPath);
+  const right = splitPath(rightPath);
+  const sharedLength = Math.min(left.length, right.length);
+
+  for (let index = 0; index < sharedLength; index++) {
+    const leftSegment = left[index]!;
+    const rightSegment = right[index]!;
+    if (leftSegment === "*" || rightSegment === "*") return true;
+    if (!segmentsOverlap(leftSegment, rightSegment)) return false;
+  }
+
+  if (left.length === right.length) return true;
+  return left[sharedLength] === "*" || right[sharedLength] === "*";
+}
+
+function splitPath(path: string): string[] {
+  return path.split("/").filter((segment) => segment.length > 0);
+}
+
+function segmentsOverlap(left: string, right: string): boolean {
+  const leftDynamic = left.startsWith(":");
+  const rightDynamic = right.startsWith(":");
+  if (leftDynamic || rightDynamic) return true;
+  return left === right;
 }
