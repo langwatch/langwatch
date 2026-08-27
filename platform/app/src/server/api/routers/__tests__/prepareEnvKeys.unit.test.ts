@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { prepareEnvKeys } from "../modelProviders.utils";
 
 // prepareEnvKeys reads the credential names off the provider's keysSchema.

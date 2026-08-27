@@ -242,6 +242,12 @@ export function createEnvConfig(source) {
       // graph) is never imported. Off by default so DLP stays available for
       // deployments that have configured GOOGLE_APPLICATION_CREDENTIALS.
       LANGWATCH_DISABLE_GOOGLE_DLP: z.boolean().optional(),
+      LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER: z.boolean().optional(),
+      // Evaluation input offload thresholds are parsed into semantic AppConfig
+      // at process boot; keep their raw values optional here for backwards
+      // compatibility with existing deployments.
+      LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES: z.string().optional(),
+      LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES: z.string().optional(),
       AZURE_OPENAI_ENDPOINT: z.string().optional(),
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
@@ -449,9 +455,8 @@ export function createEnvConfig(source) {
       // deployment; renaming them is an infra change of its own. All optional:
       // when the private key is unset the integration is silently off, the
       // settings card explains it is unavailable, and no installation token can
-      // be minted. Read through
-      // src/server/app-layer/github/githubAppConfig.ts, the only code site that
-      // names them.
+      // be minted. Boot composition reads these once and injects semantic
+      // configuration into the GitHub feature.
       //   GITHUB_LANGY_APP_ID        — numeric App ID (JWT `iss`).
       //   GITHUB_LANGY_PRIVATE_KEY   — the App's RSA private key PEM (signs the
       //                                app JWT used to mint installation tokens).
@@ -495,21 +500,6 @@ export function createEnvConfig(source) {
 
       POSTHOG_KEY: z.string().optional(),
       POSTHOG_HOST: z.string().optional(),
-      // Feature Flags Secure API key (phs_*) — or a legacy Personal API key
-      // (phx_*) — enables local feature flag evaluation in posthog-node. When
-      // set, server-side `isFeatureEnabled` does NOT hit /flags per call;
-      // instead the SDK polls flag definitions periodically and evaluates
-      // locally. See https://posthog.com/docs/feature-flags/local-evaluation
-      POSTHOG_FEATURE_FLAGS_KEY: z.string().optional(),
-      // Polling interval (ms) for local flag definition refresh. PostHog default
-      // is 30s; we default to 5min because each poll counts as 10 flag evaluations
-      // for billing. Lower this if you need flag changes to propagate faster.
-      // Empty-string values in .env are coerced to undefined so they fall back
-      // to the runtime default instead of failing .positive() with 0.
-      POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS: z.preprocess(
-        (value) => (value === "" ? undefined : value),
-        z.coerce.number().int().positive().optional(),
-      ),
       DISABLE_USAGE_STATS: z.boolean().optional(),
       LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
 
@@ -580,6 +570,12 @@ export function createEnvConfig(source) {
       GOOGLE_APPLICATION_CREDENTIALS: source.GOOGLE_APPLICATION_CREDENTIALS,
       LANGWATCH_DISABLE_GOOGLE_DLP:
         source.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
+      LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER:
+        source.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER?.toLowerCase() === "true",
+      LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES:
+        source.LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES,
+      LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES:
+        source.LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES,
       AZURE_OPENAI_ENDPOINT: source.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: source.AZURE_OPENAI_KEY,
       OPENAI_API_KEY: source.OPENAI_API_KEY,
@@ -672,9 +668,6 @@ export function createEnvConfig(source) {
       COGNITO_CLIENT_SECRET: source.COGNITO_CLIENT_SECRET,
       POSTHOG_KEY: source.POSTHOG_KEY,
       POSTHOG_HOST: source.POSTHOG_HOST,
-      POSTHOG_FEATURE_FLAGS_KEY: source.POSTHOG_FEATURE_FLAGS_KEY,
-      POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS:
-        source.POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS,
       DISABLE_USAGE_STATS:
         source.DISABLE_USAGE_STATS === "1" ||
         source.DISABLE_USAGE_STATS?.toLowerCase() === "true",
