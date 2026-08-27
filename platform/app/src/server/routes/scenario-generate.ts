@@ -143,6 +143,8 @@ secured
       const model = await getVercelAIModel({
         projectId,
         featureKey: "scenarios.generator",
+        modelProviders: c.app.modelProviders,
+        managedProviders: c.app.managedProviders,
       });
 
       const userPrompt = currentScenario

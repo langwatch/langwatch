@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { suiteTargetSchema } from "@langwatch/suite-contract";
 
 export type { SuiteTarget } from "@langwatch/suite-contract";

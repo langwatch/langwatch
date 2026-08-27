@@ -4,7 +4,7 @@ import {
   scenarioParameterDefinitionsSchema,
 } from "@langwatch/scenario-contract";
 import { TRPCError } from "@trpc/server";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { trackServerEvent } from "~/server/posthog";

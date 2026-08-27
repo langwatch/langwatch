@@ -7,7 +7,7 @@ import {
   type Scenario,
 } from "@langwatch/scenario-contract";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
