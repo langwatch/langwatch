@@ -1,60 +1,30 @@
 /**
- * End-to-end HTTP integration tests for /api/ingest/otel/:sourceId and
- * /api/ingest/webhook/:sourceId — the two governance ingest entry points
- * Sergey landed in 2b-ii-a (0d07ac371) + 2b-ii-b (33a8cf6d0).
+ * Public HTTP contract for the OTLP and webhook ingestion receivers.
  *
- * Proves the unified-substrate contract end-to-end through the public
- * HTTP surface:
- *   1. Bearer auth resolves the IngestionSource exactly once per request.
- *   2. Auth contract: missing / malformed / mismatched Bearer → 401;
- *      sourceId path param mismatching the resolved IngestionSource → 401.
- *   3. Source-type routing: only span-shaped sources (otel_generic,
- *      claude_cowork) on /otel/; only flat-event sources (workato,
- *      otel_generic-as-callback, s3_custom) on /webhook/. Wrong endpoint
- *      → 400 wrong_endpoint.
- *   4. Hidden Gov Project lazy-ensured on first valid POST per org via
- *      the single central helper (Sergey 2b-i e2c30961a) — verified by
- *      reading Prisma post-request.
- *   5. Origin metadata stamped on every span before handoff:
- *      langwatch.origin.kind = "ingestion_source"
- *      langwatch.ingestion_source.{id, organization_id, source_type}
- *   6. Handoff target is the EXISTING trace pipeline
- *      (handleOtlpTraceRequest with the Gov Project as tenant) — verified
- *      by spy on getApp().traces.collection. No parallel CH writes.
- *   7. Webhook envelope mapped to a single OTLP log_record with origin
- *      metadata in the attributes; handoff via handleOtlpLogRequest.
- *   8. lastEventAt advances on every successful post (recordEventReceived
- *      called) — composer status flips awaiting → active downstream.
+ * It covers bearer/source binding, source-type routing, lazy governance-project
+ * creation, authoritative origin attributes, trace/log handoff, and
+ * `lastEventAt`. Hono's request client exercises the route against Prisma while
+ * trace-pipeline spies keep downstream persistence out of this suite.
  *
- * Approach: Hono's app.request() test client + real Prisma against the
- * dev RDS (same pattern as auth-cli-governance.integration.test.ts) +
- * spy on getApp().traces.{collection,logCollection} via vi.spyOn so
- * the trace-pipeline downstream isn't required (already proven by
- * eventLogDurability.integration.test.ts).
- *
- * Spec coverage:
- *   - specs/ai-gateway/governance/receiver-shapes.feature (Lane-S)
- *   - specs/ai-gateway/governance/architecture-invariants.feature (Lane-B)
- *   - specs/ai-gateway/governance/compliance-baseline.feature (Lane-A)
- *
- * Pairs with:
- *   - parseOtlpBody.test.ts (38106f768 — parser-equivalence)
- *   - eventLogDurability.integration.test.ts (f25d713ab — durability)
- *   - governanceProject.service.integration.test.ts (0a2b7e8d9 — helper)
- *   - organization.prisma.repository.governance-filter.integration.test.ts
- *     (Alexis 94426716e — Layer-1 filter)
+ * See the receiver-shapes, architecture-invariants and compliance-baseline
+ * specifications for the complete contract.
  */
 
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { PROJECT_KIND } from "@langwatch/project-contract";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { App } from "~/server/app-layer/app";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 
 import { app as ingestApp } from "../ingestionRoutes";
 
 const suffix = nanoid(8);
 const NS = `ingest-http-${suffix}`;
+let testApp: App;
 
 interface SeededOrg {
   organizationId: string;
@@ -97,8 +67,7 @@ async function seedOrgWithIngestionSource({
       role: "ADMIN",
     },
   });
-  const service = IngestionSourceService.create(prisma);
-  const { source, ingestSecret } = await service.createSource({
+  const { source, ingestSecret } = await testApp.governance.ingestionSourceCreate({
     organizationId: org.id,
     sourceType,
     name: `Source ${NS}-${orgSuffix}`,
@@ -215,20 +184,17 @@ vi.mock("~/server/app-layer/app", async () => {
   return {
     ...actual,
     getApp: () =>
-      ({
-        traces: {
-          collection: { handleOtlpTraceRequest: handleTraceSpy },
-          logCollection: { handleOtlpLogRequest: handleLogSpy },
+      new Proxy(actual.getApp(), {
+        get(target, property, receiver) {
+          if (property === "traces") {
+            return {
+              collection: { handleOtlpTraceRequest: handleTraceSpy },
+              logCollection: { handleOtlpLogRequest: handleLogSpy },
+            };
+          }
+          return Reflect.get(target, property, receiver);
         },
-        // IngestionSourceService.createSource asserts an Enterprise plan
-        // (Phase 4b-4/5 service-layer 403). The seed flow below calls
-        // that service in beforeAll, so the mocked app needs a
-        // planProvider that returns ENTERPRISE — otherwise every seed
-        // throws TRPCError FORBIDDEN before the receiver tests run.
-        planProvider: {
-          getActivePlan: async () => ({ type: "ENTERPRISE" }),
-        },
-      }) as never,
+      }),
   };
 });
 
@@ -239,6 +205,13 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
   let crossOrgSeed: SeededOrg | null = null;
 
   beforeAll(async () => {
+    await resetApp();
+    testApp = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: async () => ({ ...FREE_PLAN, type: "ENTERPRISE" }),
+      }),
+    });
+    globalForApp.__langwatch_app = testApp;
     otelSeed = await seedOrgWithIngestionSource({ sourceType: "otel_generic" });
     coworkSeed = await seedOrgWithIngestionSource({
       sourceType: "claude_cowork",
@@ -254,6 +227,7 @@ describe("/api/ingest/* — end-to-end HTTP receiver contract", () => {
     await deleteSeededOrg(coworkSeed);
     await deleteSeededOrg(workatoSeed);
     await deleteSeededOrg(crossOrgSeed);
+    await resetApp();
   });
 
   describe("POST /api/ingest/otel/:sourceId — span-shaped sources", () => {

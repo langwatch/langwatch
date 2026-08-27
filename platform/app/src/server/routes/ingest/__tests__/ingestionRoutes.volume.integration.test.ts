@@ -1,74 +1,42 @@
 /**
  * Volume regression test for the governance ingest receiver.
  *
- * Locks production-quality invariants under concurrent + sustained load
- * that were flagged in the PM round-up (PR #3524 Phase 5 GTM-readiness gate
- * + Sergey's lane-S production gaps):
+ * Locks the receiver's concurrent-load invariants:
  *
- *   1. Slug-collision invariant: under N concurrent first-mints (cold start
- *      with no hidden Gov Project yet), the slug-uniqueness re-check at
- *      governanceProject.service.ts:82 must collapse to ONE Project, not N.
- *      The 8-test helper-integration suite proves 5-concurrent. This proves
- *      higher N + via the HTTP receiver entrypoint (not the helper directly).
+ *   1. Concurrent first requests create one hidden Governance Project, not N.
  *
- *   2. Receiver does not 5xx under concurrent load. Every POST returns 202
- *      regardless of how many neighbours are in flight.
+ *   2. Every concurrent POST returns 202 rather than a 5xx.
  *
- *   3. lastEventAt advances exactly once per successful POST. The
- *      `recordEventReceived` write is not skipped or batched away under
- *      load — proves the composer's "Awaiting → Active" status flip is
- *      reliable.
+ *   3. `lastEventAt` advances once for each successful POST.
  *
- *   4. p99 latency surfaces the cliff. Loose threshold (1500ms p99)
- *      catches catastrophic regressions; the goal is to *measure* the
- *      hot-path so the lane-S `prisma.findFirst` per-request gap can be
- *      addressed with concrete data, not block CI.
+ *   4. A loose 1500ms p99 threshold catches catastrophic latency regressions.
  *
- *   5. handleOtlpTraceRequest invoked exactly N times — the trace-pipeline
- *      handoff is not deduped or batched at the HTTP layer.
+ *   5. Trace-pipeline handoff runs once for every accepted request.
  *
- * Test scale: 50 concurrent + 100 sequential posts against ONE source
- * (proves the lazy-ensure happy-path under concurrent first-mint), plus
- * 20 concurrent first-mints across 20 *different* orgs (proves cross-org
- * concurrency doesn't break tenant isolation under load — Sergey's
- * "50 orgs × 100 concurrent first-mints" gap, scaled down for CI runtime).
+ * The scale mixes 50 concurrent plus 100 sequential posts for one source,
+ * 20 concurrent first-mints across organisations, and 50×5 competing
+ * first-mints. This exercises the P2002 re-fetch path without a stress-suite
+ * runtime.
  *
- * Higher-fan-out cross-org regression added in Phase 5: 50 orgs × 5
- * concurrent first-mints per org = 250 in-flight requests across 50
- * tenants. Each org's 5 concurrent POSTs race
- * `ensureHiddenGovernanceProject`, hitting the P2002-catch + re-fetch
- * path 4 times per org (200 P2002 catches across the suite). Pins the
- * slug-uniqueness invariant under heavy contention without burning CI
- * minutes the way 50×100=5000 would.
- *
- * Out of scope (deferred to `*.stress.test.ts` running against real
- * dev server — see `vitest.stress.config.ts`):
- *   - Sustained throughput cliff (1k spans/sec for 60s)
- *   - Memory leak detection
- *   - DB connection pool exhaustion
- *   - Receiver auth rate limiting (per-source Redis-token-bucket RPS)
- *
- * Pairs with:
- *   - ingestionRoutes.integration.test.ts (d20a1b403 — auth + routing + stamping contract)
- *   - governanceProject.service.integration.test.ts (0a2b7e8d9 — 5-concurrent helper)
- *   - eventLogDurability.integration.test.ts (f25d713ab — non-repudiation)
- *
- * Spec coverage:
- *   - specs/ai-gateway/governance/architecture-invariants.feature
- *     (lazy-ensure idempotency under load)
- *   - specs/ai-gateway/governance/receiver-shapes.feature
- *     (receiver returns 202 under load)
+ * Sustained throughput, leak detection, pool exhaustion and rate limiting
+ * belong in the real-server stress suite. See the receiver specifications for
+ * the non-volume contract.
  */
 
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { PROJECT_KIND } from "@langwatch/project-contract";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { App } from "~/server/app-layer/app";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 
 import { app as ingestApp } from "../ingestionRoutes";
 
 const NS = `volume-${nanoid(6)}`;
+let testApp: App;
 
 interface SeededOrg {
   organizationId: string;
@@ -98,8 +66,7 @@ async function seedOrgWithIngestionSource(orgSlug: string): Promise<SeededOrg> {
   await prisma.organizationUser.create({
     data: { userId: user.id, organizationId: org.id, role: "ADMIN" },
   });
-  const service = IngestionSourceService.create(prisma);
-  const { source, ingestSecret } = await service.createSource({
+  const { source, ingestSecret } = await testApp.governance.ingestionSourceCreate({
     organizationId: org.id,
     sourceType: "otel_generic",
     name: `Source ${orgSlug}`,
@@ -243,20 +210,17 @@ vi.mock("~/server/app-layer/app", async () => {
   return {
     ...actual,
     getApp: () =>
-      ({
-        traces: {
-          collection: { handleOtlpTraceRequest: handleTraceSpy },
-          logCollection: { handleOtlpLogRequest: handleLogSpy },
+      new Proxy(actual.getApp(), {
+        get(target, property, receiver) {
+          if (property === "traces") {
+            return {
+              collection: { handleOtlpTraceRequest: handleTraceSpy },
+              logCollection: { handleOtlpLogRequest: handleLogSpy },
+            };
+          }
+          return Reflect.get(target, property, receiver);
         },
-        // IngestionSourceService.createSource asserts an Enterprise plan
-        // (Phase 4b-4/5 service-layer 403, `f8eec569b`). The seed flow
-        // below calls that service in beforeAll, so the mocked app needs
-        // a planProvider that returns ENTERPRISE — otherwise every seed
-        // throws TRPCError FORBIDDEN before the volume scenarios run.
-        planProvider: {
-          getActivePlan: async () => ({ type: "ENTERPRISE" }),
-        },
-      }) as never,
+      }),
   };
 });
 
@@ -288,6 +252,13 @@ describe("ingestionRoutes — volume regression", () => {
   const crossOrgSeeds: SeededOrg[] = [];
 
   beforeAll(async () => {
+    await resetApp();
+    testApp = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: async () => ({ ...FREE_PLAN, type: "ENTERPRISE" }),
+      }),
+    });
+    globalForApp.__langwatch_app = testApp;
     mainSeed = await seedOrgWithIngestionSource(`${NS}-main`);
   });
 
@@ -296,6 +267,7 @@ describe("ingestionRoutes — volume regression", () => {
       deleteSeededOrg(mainSeed),
       ...crossOrgSeeds.map((s) => deleteSeededOrg(s)),
     ]);
+    await resetApp();
   }, 120_000);
 
   describe("given 50 concurrent POSTs to a single source", () => {

@@ -1,42 +1,17 @@
 /**
  * @vitest-environment node
  *
- * End-to-end customer dogfood smoke (Phase 5 cross-lane row).
+ * End-to-end customer dogfood smoke. It seeds an org, admin and ingestion
+ * source, posts an OTel trace, and proves receiver handoff/origin metadata
+ * plus `lastEventAt` persistence.
  *
- * Mints a fresh customer (org + admin + IngestionSource), POSTs an OTel
- * trace through the public HTTP receiver, then verifies the full
- * dogfood narrative end-to-end:
+ * It also proves the dashboard can list that source for the owning admin but
+ * not for another org's admin. That is the data-layer isolation assertion;
+ * receiver bearer rejection is covered separately.
  *
- *   1. Receiver auth + handoff: POST /api/ingest/otel/:sourceId with the
- *      bearer succeeds, handoff to handleOtlpTraceRequest fires with
- *      the hidden Governance Project as tenant + origin metadata
- *      stamped on every span.
- *   2. lastEventAt advances on Prisma — proves the receiver's
- *      recordEventReceived path runs (the dashboard-side composer-status
- *      flip awaiting→active downstream depends on this).
- *   3. tRPC dashboard query: orgA's admin sees the seeded source via
- *      ingestionSources.list (the receiver's source visibility from the
- *      caller's perspective).
- *   4. Layer-1 cross-org isolation: orgB's admin calling
- *      ingestionSources.list MUST NOT see orgA's source — proves the
- *      Prisma multitenancy middleware filters at the data layer (no
- *      reliance on the HTTP receiver's bearer mismatch alone).
- *
- * This complements the webhook cross-org auth-contract test
- * (fa1f304d3 — receiver-layer 401) with a data-layer isolation proof
- * via tRPC.
- *
- * Pairs with:
- *   - ingestionRoutes.integration.test.ts (auth/routing/handoff)
- *   - license-gate-governance.integration.test.ts (Sergey's f8eec569b
- *     — license + RBAC composition pattern; we reuse configureApp +
- *     createTestApp planProvider override here)
- *
- * Spec: specs/ai-gateway/governance/architecture-invariants.feature
- *       (cross-org isolation + receiver→dashboard round-trip)
+ * See `architecture-invariants.feature` for the receiver-to-dashboard path.
  */
 
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
@@ -46,6 +21,7 @@ import {
 } from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
+import type { App } from "~/server/app-layer/app";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
@@ -58,6 +34,7 @@ import { app as ingestApp } from "../ingestionRoutes";
 const ns = `dogfood-${nanoid(8)}`;
 
 const enterprisePlan: PlanInfo = { ...FREE_PLAN, type: "ENTERPRISE" };
+let testApp: App;
 
 interface SeededOrg {
   organizationId: string;
@@ -106,11 +83,12 @@ vi.mock("~/server/app-layer/app", async () => {
 
 async function configureApp(plan: PlanInfo) {
   await resetApp();
-  globalForApp.__langwatch_app = createTestApp({
+  testApp = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,
     }),
   });
+  globalForApp.__langwatch_app = testApp;
 }
 
 async function seedOrg(suffix: string): Promise<SeededOrg> {
@@ -147,8 +125,7 @@ async function seedOrg(suffix: string): Promise<SeededOrg> {
     },
   });
 
-  const service = IngestionSourceService.create(prisma);
-  const { source, ingestSecret } = await service.createSource({
+  const { source, ingestSecret } = await testApp.governance.ingestionSourceCreate({
     organizationId: org.id,
     sourceType: "otel_generic",
     name: `Dogfood Source ${suffix}`,

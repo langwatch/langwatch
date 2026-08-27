@@ -1,34 +1,16 @@
 /**
- * IngestionSource receivers — push-mode entry points for the Activity
- * Monitor pillar. Two endpoints:
+ * Push-mode IngestionSource receivers for the Activity Monitor:
  *
  *   POST /api/ingest/otel/:sourceId      OTLP/HTTP passthrough
  *   POST /api/ingest/webhook/:sourceId   Generic JSON webhook
  *
- * Auth: Authorization: Bearer <ingestSecret>. The IngestionSource is
- * resolved by raw secret → hash lookup, with a 24h grace window for
- * rotated secrets (see IngestionSourceService.findByIngestSecret).
+ * Auth is `Authorization: Bearer <ingestSecret>`, resolved by hash lookup
+ * with the rotated-secret grace window in `IngestionSourceService`.
  *
- * Architecture (rchaves + master_orchestrator directive 2026-04-27):
- * the receivers are thin auth/routing wrappers over the EXISTING trace
- * pipeline (recorded_spans + log_records + trace_summaries). Spans land
- * in the same store /api/otel/v1/traces uses; origin metadata
- * (`langwatch.origin.kind = "ingestion_source"`) distinguishes governance
- * data from application traces. The hidden per-org Governance Project
- * carries RBAC for governance data without leaking
- * into user-facing project surfaces.
- *
- * This commit is the FIRST step of the unified-trace branch correction:
- *   1. (this commit) delete the parallel governance-event backend
- *      (gateway_activity_events + activity-monitor-processing pipeline)
- *      that this receiver previously fed; receiver becomes a placeholder
- *      that 202-acks + records lastEventAt only.
- *   2. (next commit) wire the receiver to call the existing
- *      traces.collection.handleOtlpTraceRequest with origin metadata
- *      stamped on each span/log, routed through the hidden Governance
- *      Project.
- *   3. (commit 3) add governance fold projection (KPIs/anomaly) +
- *      OCSF read projection (SIEM export) on top of the unified store.
+ * Receivers are thin auth/routing wrappers over the existing trace pipeline.
+ * Origin metadata distinguishes ingestion data from application traces, while
+ * the hidden per-organisation Governance Project supplies governance RBAC.
+ * Do not add a parallel governance event store or write path here.
  */
 
 import {
@@ -44,16 +26,16 @@ import type {
   IKeyValue,
 } from "@opentelemetry/otlp-transformer";
 import type { Context } from "hono";
-import type { IngestionSource } from "~/generated/prisma/client";
-import type { CanonicalCostEvent } from "~/runtime/app/features/governance";
+import type {
+  CanonicalCostEvent,
+  GovernanceIngestionSource,
+} from "@langwatch/enterprise-governance-contract";
 import type { AppContextVariables } from "~/app/api/middleware/app-context";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import type { App } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
-import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
-import { usdToNanoUsd } from "~/server/gateway/wireMoney";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
+import { usdToNanoUsd } from "@langwatch/gateway-server";
 import {
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -72,7 +54,7 @@ import { checkIpRateLimit, extractClientIp } from "./rateLimit";
  *
  * Spec: receiver-shapes.feature.
  */
-function buildOriginAttrs(source: IngestionSource) {
+function buildOriginAttrs(source: GovernanceIngestionSource) {
   return [
     {
       key: "langwatch.origin.kind",
@@ -103,7 +85,7 @@ const RESERVED_ORIGIN_PREFIXES = [
  */
 function withOriginAttrs(
   existing: IKeyValue[] | undefined,
-  source: IngestionSource,
+  source: GovernanceIngestionSource,
 ): IKeyValue[] {
   const caller = (existing ?? []).filter(
     (attribute) =>
@@ -114,7 +96,7 @@ function withOriginAttrs(
 
 function stampOriginAttrs(
   request: IExportTraceServiceRequest,
-  source: IngestionSource,
+  source: GovernanceIngestionSource,
 ): void {
   for (const rs of request.resourceSpans ?? []) {
     for (const ss of rs.scopeSpans ?? []) {
@@ -127,7 +109,7 @@ function stampOriginAttrs(
 
 function stampLogOriginAttrs(
   request: IExportLogsServiceRequest,
-  source: IngestionSource,
+  source: GovernanceIngestionSource,
 ): void {
   for (const rl of request.resourceLogs ?? []) {
     for (const sl of rl.scopeLogs ?? []) {
@@ -143,7 +125,7 @@ function stampMetricOriginAttrs({
   source,
 }: {
   request: IExportMetricsServiceRequest;
-  source: IngestionSource;
+  source: GovernanceIngestionSource;
 }): void {
   for (const resourceMetrics of request.resourceMetrics ?? []) {
     const resource = resourceMetrics.resource ?? {
@@ -169,7 +151,7 @@ function stampMetricOriginAttrs({
  */
 function buildWebhookLogRequest(
   rawBody: string,
-  source: IngestionSource,
+  source: GovernanceIngestionSource,
 ): IExportLogsServiceRequest {
   const nowNanos = String(BigInt(Date.now()) * 1_000_000n);
   return {
@@ -217,39 +199,18 @@ const logger = createLogger("langwatch:ingest");
 /**
  * Cost-event extraction via OTTL.
  *
- * Runtime invariant (preserved across the platform-native lift
- * refactor in 713a36ed5..7b6fb20c0): OTTL is the future-extensible
- * catch-all surface, NOT a per-source-type opt-in at runtime. Any
- * IngestionSource whose `parserConfig.ottlStatements` is non-empty
- * gets the round-trip through the aigateway's `/internal/transform`
- * regardless of `sourceType`. The platform-known tools (claude_code,
- * codex, gemini, opencode, cursor) have their dedicated receiver-
- * side native TS extractors under canonicalisation/extractors/, but
- * an admin can still attach OTTL statements to those rows and they
- * will apply on top — useful for custom field mappings, in-house
- * derived attributes, or correcting upstream wire-shape drift.
- *
- * The UI gate (OTTL_ENABLED_SOURCE_TYPES in ottlStarterTemplates.ts)
- * controls whether the admin composer SHOWS the OTTL editor for a
- * given sourceType. Today it is "otel_generic" only. The runtime
- * pipeline below does NOT consult that gate — it acts purely on the
- * statements present on the source's parserConfig.
- *
- * `/v1/traces` (span-shaped ingestion) is a future extension point
- * for the same OTTL catch-all surface.
- *
- * On gateway/transform errors, falls back to canonical extraction
- * over the un-mutated payload so the receiver still 202-acks the
- * upstream (keeping the door open for a manual reconciliation later)
- * — better than dropping the whole batch when the UI-configured
- * statements have a bug.
+ * Any source with `parserConfig.ottlStatements` uses the gateway transform,
+ * regardless of source type. Native extractors and the UI editor gate do not
+ * change that runtime rule. A transform failure falls back to canonical
+ * extraction over the original payload so the receiver can still acknowledge
+ * the upstream batch.
  */
 async function extractCostEventsForSource(input: {
-  source: IngestionSource;
+  source: GovernanceIngestionSource;
   parsed: IExportLogsServiceRequest;
   rawBody: ArrayBuffer;
   contentType: string | undefined;
-  governance: Pick<App["governance"], "canonicalCostExtractor" | "ottlGateway">;
+  governance: Pick<App["governance"], "extractCanonicalCostEvents" | "ottlTransform">;
 }): Promise<CanonicalCostEvent[]> {
   const parserConfig =
     (input.source.parserConfig as Record<string, unknown> | null) ?? {};
@@ -271,7 +232,7 @@ async function extractCostEventsForSource(input: {
   const payloadB64 = Buffer.from(input.rawBody).toString("base64");
 
   try {
-    const result = await input.governance.ottlGateway.transform({
+    const result = await input.governance.ottlTransform({
       sourceId: input.source.id,
       kind: "log",
       encoding,
@@ -287,7 +248,7 @@ async function extractCostEventsForSource(input: {
         },
         "OTTL transform rejected statements at receive — falling back to un-mutated extraction",
       );
-      return input.governance.canonicalCostExtractor.extract(input.parsed);
+      return input.governance.extractCanonicalCostEvents(input.parsed);
     }
     const mutatedBuffer = Buffer.from(result.payloadB64, "base64");
     const mutatedBytes = mutatedBuffer.buffer.slice(
@@ -302,15 +263,15 @@ async function extractCostEventsForSource(input: {
         { sourceId: input.source.id, err: reparsed.error },
         "OTTL transform returned unparseable payload — falling back to un-mutated extraction",
       );
-      return input.governance.canonicalCostExtractor.extract(input.parsed);
+      return input.governance.extractCanonicalCostEvents(input.parsed);
     }
-    return input.governance.canonicalCostExtractor.extract(reparsed.request);
+    return input.governance.extractCanonicalCostEvents(reparsed.request);
   } catch (transformErr) {
     logger.warn(
       { sourceId: input.source.id, err: String(transformErr) },
       "OTTL transform request failed — falling back to un-mutated extraction",
     );
-    return input.governance.canonicalCostExtractor.extract(input.parsed);
+    return input.governance.extractCanonicalCostEvents(input.parsed);
   }
 }
 
@@ -335,8 +296,9 @@ async function authIngestionSource(c: IngestContext) {
   if (!header) return null;
   const match = /^Bearer\s+(lw_is_[A-Za-z0-9_\-]+)$/.exec(header.trim());
   if (!match) return null;
-  const service = c.var.langwatchApp.governance.ingestionSources;
-  return await service.tryFindByIngestSecret(match[1]!);
+  return await c.var.langwatchApp.governance.tryFindIngestionSourceByIngestSecret(
+    match[1]!,
+  );
 }
 
 /**
@@ -470,8 +432,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: IngestContext) => {
     );
   }
 
-  const service = c.var.langwatchApp.governance.ingestionSources;
-  await service.recordEventReceived(source.id);
+  await c.var.langwatchApp.governance.ingestionSourceRecordEventReceived(source.id);
   logger.info(
     {
       sourceId: source.id,
@@ -575,8 +536,7 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: IngestContext) =
     );
   }
 
-  const service = c.var.langwatchApp.governance.ingestionSources;
-  await service.recordEventReceived(source.id);
+  await c.var.langwatchApp.governance.ingestionSourceRecordEventReceived(source.id);
   logger.info(
     {
       sourceId: source.id,
@@ -697,8 +657,8 @@ secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: IngestConte
         const budgetCHRepo =
           events.length > 0 ? c.var.langwatchApp.gateway.budgets : undefined;
         if (events.length > 0 && budgetCHRepo) {
-          const budgetRepo = new GatewayBudgetRepository(prisma);
-          const changeEvents = new ChangeEventRepository(prisma);
+          const budgetDecisions = c.var.langwatchApp.gateway.budgetDecisions;
+          const changeEvents = c.var.langwatchApp.gateway.changes;
 
           for (const event of events) {
             try {
@@ -764,9 +724,9 @@ secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: IngestConte
               // filed under the same (budget, request) identity the
               // per-user row needs. Templates accrue on the gateway
               // spend pipeline alone.
-              const budgets = (await budgetRepo.applicableForRequest(scopes)).filter(
-                (b) => b.scopeType !== "ATTRIBUTED_USER",
-              );
+              const budgets = (await budgetDecisions.resolveApplicableBudgets(scopes))
+                .map(({ budget }) => budget)
+                .filter((budget) => budget.scopeType !== "ATTRIBUTED_USER");
               if (budgets.length === 0) continue;
 
               // The reported cost is a decimal string, so it is pinned to
@@ -856,8 +816,7 @@ secured.access(ingestAuth).post("/otel/:sourceId/v1/logs", async (c: IngestConte
     );
   }
 
-  const service = c.var.langwatchApp.governance.ingestionSources;
-  await service.recordEventReceived(source.id);
+  await c.var.langwatchApp.governance.ingestionSourceRecordEventReceived(source.id);
   logger.info(
     {
       sourceId: source.id,
@@ -981,8 +940,7 @@ secured
       parseHint = String(err);
     }
 
-    const service = c.var.langwatchApp.governance.ingestionSources;
-    await service.recordEventReceived(source.id);
+    await c.var.langwatchApp.governance.ingestionSourceRecordEventReceived(source.id);
     logger.info(
       {
         sourceId: source.id,

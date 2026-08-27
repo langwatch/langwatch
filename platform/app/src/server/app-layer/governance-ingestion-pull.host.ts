@@ -16,15 +16,12 @@ import type {
   GovernanceOrganizationContactPort,
 } from "@langwatch/enterprise-api/governance/governance-products.adapter";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
-import { EMPTY_SPEND_USAGE } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import { EMPTY_SPEND_USAGE } from "@langwatch/gateway-server";
 import { rateSpendNanoUsd } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
-import {
-  incrementIngestionPullTotal,
-  observeIngestionPullDuration,
-} from "~/server/metrics";
-import { modelProviders } from "~/server/modelProviders/registry";
+import { incrementIngestionPullTotal, observeIngestionPullDuration } from "~/server/metrics";
+import { modelProviders } from "@langwatch/model-provider-contract";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { captureException, toError, withScope } from "~/utils/posthogErrorCapture";
@@ -42,13 +39,11 @@ class AppGovernanceEncryption implements GovernanceEncryption {
 
 /** API-process infrastructure for the canonical ingestion-pull worker. */
 export class AppGovernanceIngestionPullHost extends GovernanceIngestionPullHost {
-  private constructor(private readonly featureFlags: FeatureFlagServiceInterface) {
+  private constructor(private readonly featureFlags: FeatureFlagService) {
     super();
   }
 
-  static create(
-    featureFlags: FeatureFlagServiceInterface,
-  ): AppGovernanceIngestionPullHost {
+  static create(featureFlags: FeatureFlagService): AppGovernanceIngestionPullHost {
     return new AppGovernanceIngestionPullHost(featureFlags);
   }
 
@@ -76,7 +71,7 @@ export class AppGovernanceIngestionPullHost extends GovernanceIngestionPullHost 
 
   isPulledUsageCostEnabled(organizationId: string): Promise<boolean> {
     return this.featureFlags.isEnabled("release_pulled_usage_cost_enabled", {
-      distinctId: organizationId,
+      kind: "organization",
       organizationId,
     });
   }
