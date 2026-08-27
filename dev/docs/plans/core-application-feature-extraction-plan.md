@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed baseline:** `a2bdd16fd1`
+**Committed baseline:** `d191ef8c32`
 
 **Goal:** delete `platform/app`.
 
@@ -24,7 +24,7 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Ledger item                                          |       Count | Status                                |
 | ---------------------------------------------------- | ----------: | ------------------------------------- |
 | Original application baseline                       | 6,398 files | Reference                             |
-| Committed `platform/app` at `a2bdd16fd1`             | 6,012 files | Authoritative current progress        |
+| Committed `platform/app` at `d191ef8c32`             | 5,991 files | Authoritative current progress        |
 | Current physical tree from `rg --files platform/app` | 5,898 files | Working-tree queue only; not progress |
 | Automation cut                                       |    73 fewer | Committed                             |
 | Coding Agent/GitHub cut                              |    36 fewer | Committed                             |
@@ -34,6 +34,7 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Model Provider application cut                       |    45 fewer | Committed                             |
 | Workflow application cut                             |     3 fewer | Committed                             |
 | Feature-web and Ops composition cuts                 |     5 fewer | Committed                             |
+| Legacy Feature Flag cut                              |    21 fewer | Committed                             |
 
 The Automation contract, server and web packages have 559 passing tests, and
 their displaced application roots are empty. Coding Agent/GitHub has 266
@@ -56,6 +57,7 @@ cutovers remain explicit ledger work.
 | Model Provider | Model Provider package work is committed at `435d8711d0`; its 130-file application cut is committed at `14fc0f4282`: `+1,315/-30,905`, for a net 45-file application reduction.                                                                                      | Prove the focused feature/app checks, then move the remaining UI and process composition without restoring the deleted repositories, catalogue or service. |
 | Gateway       | Gateway package implementation is checkpointed at `9b03f579ee`; the application cutover is active.                                                                                                                                                                   | Rewire the composed service graph, preserve money/auth/query behavior and delete the displaced Gateway, virtual-key, spend and realtime implementation. |
 | API framework | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                          | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first. |
+| Feature Flag  | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services. |
 
 Physical movement in the shared worktree is not progress until its exact paths
 are reviewed and committed. There is no time estimate in this ledger: the next
@@ -79,12 +81,11 @@ The next committed batches are:
 6. **API composition:** adopt the parked REST surface when `apps/api` is
    created; do not churn current routes before that physical cut.
 
-Feature Flag, the remainder of Evaluation and the other feature slices remain
-open. They are not completion fallout from the batches above:
+The remainder of Evaluation and the other feature slices remain open. They are
+not completion fallout from the batches above:
 
 | Remaining slice                                                            | Required deletion boundary                                                                                                                                            |
 | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Feature Flag                                                               | Rewire every application caller and Ops transport to the composed feature service, remove the displaced evaluation configuration, then delete the old implementation. |
 | Evaluation, Evaluator, Monitor, Experiment, Scenario, Simulation and Suite | Keep their singular services and eventing responsibilities separate; move each complete implementation with its tests and process composition.                        |
 | Identity and tenancy                                                       | Drain Auth, User, AuthZ, Role, Organization, Project and API Key without creating a second repository or service graph.                                               |
 | Product features                                                           | Drain Model Provider, Prompt, Dataset, Agent, Workflow, Analytics, Dashboard, Topic, Gateway, Langy, Annotation and Share as independent verticals.                   |
