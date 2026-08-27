@@ -186,8 +186,7 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
       code: "export abstract class AutomationGraphNotifierPort { abstract dispatch(): Promise<void>; }",
     },
     {
-      filename:
-        "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+      filename: "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
       code: "export class PrismaAgentRepository { static create() { return new PrismaAgentRepository(); } }",
     },
     {
@@ -370,8 +369,7 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
       code: 'import type { OrganizationRepository } from "./repositories/organization.repository"; import type { PromptTagService } from "../../prompt-config/prompt-tag.service"; export class OrganizationService {}',
     },
     {
-      filename:
-        "packages/features/organization/server/src/services/organization.service.ts",
+      filename: "packages/features/organization/server/src/services/organization.service.ts",
       code: 'import type { OrganizationRepository } from "../repositories/organization.repository"; import type { ProjectService } from "@langwatch/project-contract"; export class OrganizationService {}',
     },
   ],
@@ -387,8 +385,7 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
       errors: [{ messageId: "foreignRepository" }],
     },
     {
-      filename:
-        "packages/features/organization/server/src/services/organization.service.ts",
+      filename: "packages/features/organization/server/src/services/organization.service.ts",
       code: 'import type { ProjectRepository } from "@langwatch/project-server"; export class OrganizationService {}',
       errors: [{ messageId: "foreignRepository" }],
     },

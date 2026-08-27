@@ -18,7 +18,8 @@
     {
       "files": ["packages/architecture-lint/src/**/*.ts"],
       "rules": {
-        "langwatch/boolean-wall": "error"
+        "langwatch/boolean-wall": "error",
+        "langwatch/logical-statement-spacing": "error"
       }
     },
     {
@@ -28,6 +29,7 @@
       ],
       "rules": {
         "curly": "error",
+        "langwatch/logical-statement-spacing": "error",
         "langwatch/max-statements-per-line": "error",
         "langwatch/service-member-spacing": "error",
         "langwatch/service-quality": "error",

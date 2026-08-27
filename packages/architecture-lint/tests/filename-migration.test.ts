@@ -134,7 +134,7 @@ describe("strict filename migration", () => {
       "export const postgres = true;",
     );
     write(
-      "packages/features/agent/server/src/adapters/anthropic-admin-puller.anthropic-admin-puller.adapter.ts",
+      "packages/features/agent/server/src/adapters/anthropic-admin-puller.adapter.ts",
       "export const anthropic = true;",
     );
 
@@ -143,7 +143,7 @@ describe("strict filename migration", () => {
     );
     expect(relativeMappings).toEqual([
       [
-        "packages/features/agent/server/src/adapters/anthropic-admin-puller.anthropic-admin-puller.adapter.ts",
+        "packages/features/agent/server/src/adapters/anthropic-admin-puller.adapter.ts",
         "packages/features/agent/server/src/adapters/anthropic-admin-puller.adapter.ts",
       ],
       [

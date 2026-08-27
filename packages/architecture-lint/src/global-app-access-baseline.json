@@ -55,120 +55,30 @@
       "reference",
       "2e2a5983537df968"
     ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "import",
-      "180354a11fe5951a"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "reference",
-      "39ded4a1e25b4fbc"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "reference",
-      "a0e9c92dcd02d7c9"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "getApp",
-      "reference",
-      "a1f79fd5e475af23"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "tryGetApp",
-      "import",
-      "f3d391e5e45984a2"
-    ],
-    [
-      "platform/app/src/mcp/handler.ts",
-      "tryGetApp",
-      "reference",
-      "55e26e76b8651e15"
-    ],
-    [
-      "platform/app/src/mcp/oauthClientRegistry.ts",
-      "tryGetApp",
-      "import",
-      "4bac244fb7d9afbf"
-    ],
-    [
-      "platform/app/src/mcp/oauthClientRegistry.ts",
-      "tryGetApp",
-      "reference",
-      "55e26e76b8651e15"
-    ],
-    [
-      "platform/app/src/mcp/oauthClientRegistry.ts",
-      "tryGetApp",
-      "reference",
-      "e17425a0d2d08de6"
-    ],
-    [
-      "platform/app/src/pages/api/experiment/init.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/pages/api/experiment/init.ts",
-      "getApp",
-      "reference",
-      "efa79c7957bae588"
-    ],
-    [
-      "platform/app/src/runtime/app/licensing.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/runtime/app/licensing.ts",
-      "getApp",
-      "reference",
-      "19c7ae7b33a17f50"
-    ],
-    [
-      "platform/app/src/runtime/app/licensing.ts",
-      "getApp",
-      "reference",
-      "8dd5150d113c6178"
-    ],
-    [
-      "platform/app/src/runtime/app/licensing.ts",
-      "getApp",
-      "reference",
-      "ce60fd9b097eafb0"
-    ],
-    [
-      "platform/app/src/server/api-key/auth-middleware.ts",
-      "getApp",
-      "import",
-      "d59b078976e45023"
-    ],
+    ["platform/app/src/mcp/handler.ts", "getApp", "import", "180354a11fe5951a"],
+    ["platform/app/src/mcp/handler.ts", "getApp", "reference", "39ded4a1e25b4fbc"],
+    ["platform/app/src/mcp/handler.ts", "getApp", "reference", "a0e9c92dcd02d7c9"],
+    ["platform/app/src/mcp/handler.ts", "getApp", "reference", "a1f79fd5e475af23"],
+    ["platform/app/src/mcp/handler.ts", "tryGetApp", "import", "f3d391e5e45984a2"],
+    ["platform/app/src/mcp/handler.ts", "tryGetApp", "reference", "55e26e76b8651e15"],
+    ["platform/app/src/mcp/oauthClientRegistry.ts", "tryGetApp", "import", "4bac244fb7d9afbf"],
+    ["platform/app/src/mcp/oauthClientRegistry.ts", "tryGetApp", "reference", "55e26e76b8651e15"],
+    ["platform/app/src/mcp/oauthClientRegistry.ts", "tryGetApp", "reference", "e17425a0d2d08de6"],
+    ["platform/app/src/pages/api/experiment/init.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/pages/api/experiment/init.ts", "getApp", "reference", "efa79c7957bae588"],
+    ["platform/app/src/runtime/app/licensing.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/runtime/app/licensing.ts", "getApp", "reference", "19c7ae7b33a17f50"],
+    ["platform/app/src/runtime/app/licensing.ts", "getApp", "reference", "8dd5150d113c6178"],
+    ["platform/app/src/runtime/app/licensing.ts", "getApp", "reference", "ce60fd9b097eafb0"],
+    ["platform/app/src/server/api-key/auth-middleware.ts", "getApp", "import", "d59b078976e45023"],
     [
       "platform/app/src/server/api-key/auth-middleware.ts",
       "getApp",
       "reference",
       "ca323265a5b6186c"
     ],
-    [
-      "platform/app/src/server/api/rbac.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/api/rbac.ts",
-      "getApp",
-      "reference",
-      "52532633615cbe18"
-    ],
+    ["platform/app/src/server/api/rbac.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/api/rbac.ts", "getApp", "reference", "52532633615cbe18"],
     [
       "platform/app/src/server/api/routers/gatewaySpendEvents.ts",
       "getApp",
@@ -181,12 +91,7 @@
       "reference",
       "b457c90f5debf150"
     ],
-    [
-      "platform/app/src/server/api/routers/gatewayUsage.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
+    ["platform/app/src/server/api/routers/gatewayUsage.ts", "getApp", "import", "76f1251c03b899a6"],
     [
       "platform/app/src/server/api/routers/gatewayUsage.ts",
       "getApp",
@@ -199,228 +104,43 @@
       "reference",
       "153700555ae869ee"
     ],
-    [
-      "platform/app/src/server/api/routers/langy.ts",
-      "getApp",
-      "import",
-      "547db8caf2dda3cb"
-    ],
-    [
-      "platform/app/src/server/api/routers/langy.ts",
-      "getApp",
-      "reference",
-      "18afcc36d5b6485d"
-    ],
-    [
-      "platform/app/src/server/api/routers/langy.ts",
-      "getApp",
-      "reference",
-      "42e352296e2cb144"
-    ],
-    [
-      "platform/app/src/server/api/routers/langy.ts",
-      "getApp",
-      "reference",
-      "74731d18ef1a26aa"
-    ],
-    [
-      "platform/app/src/server/api/routers/langy.ts",
-      "tryGetApp",
-      "import",
-      "db70ec9621fffcdb"
-    ],
-    [
-      "platform/app/src/server/api/routers/langy.ts",
-      "tryGetApp",
-      "reference",
-      "0d42a14389b7227f"
-    ],
-    [
-      "platform/app/src/server/api/routers/langy.ts",
-      "tryGetApp",
-      "reference",
-      "9b252d8dc512a6b5"
-    ],
-    [
-      "platform/app/src/server/api/routers/traces.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/api/routers/traces.ts",
-      "getApp",
-      "reference",
-      "18afcc36d5b6485d"
-    ],
-    [
-      "platform/app/src/server/api/routers/traces.ts",
-      "getApp",
-      "reference",
-      "42e352296e2cb144"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "131beb853d9df549"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "18afcc36d5b6485d"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "1a70364a233ec564"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "1e99de77ec4bd642"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "2777259ce3aea50a"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "42e352296e2cb144"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "52773423ccc1d1bb"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "52e0674145727f56"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "7cc5706bcc67802c"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "913e84fbd5f25af6"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "9984d2912ea00fd6"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "a143a3b2ac27f931"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "a196ae8aa02b9d17"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "bb93e98f7caa601c"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "be149cf6f3df2951"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "c39a46f872fe33d5"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "d317e4c9d72da0fb"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "d61a97ca0036dce1"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "d849cb21be540f3f"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "da084a322938aaa6"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "e4cffe9417640066"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "ece740e3e04cb962"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "efa79c7957bae588"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "f209ea6b65c371f2"
-    ],
-    [
-      "platform/app/src/server/api/routers/tracesV2.ts",
-      "getApp",
-      "reference",
-      "fea134904a9df487"
-    ],
-    [
-      "platform/app/src/server/api/routers/virtualKeys.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
+    ["platform/app/src/server/api/routers/langy.ts", "getApp", "import", "547db8caf2dda3cb"],
+    ["platform/app/src/server/api/routers/langy.ts", "getApp", "reference", "18afcc36d5b6485d"],
+    ["platform/app/src/server/api/routers/langy.ts", "getApp", "reference", "42e352296e2cb144"],
+    ["platform/app/src/server/api/routers/langy.ts", "getApp", "reference", "74731d18ef1a26aa"],
+    ["platform/app/src/server/api/routers/langy.ts", "tryGetApp", "import", "db70ec9621fffcdb"],
+    ["platform/app/src/server/api/routers/langy.ts", "tryGetApp", "reference", "0d42a14389b7227f"],
+    ["platform/app/src/server/api/routers/langy.ts", "tryGetApp", "reference", "9b252d8dc512a6b5"],
+    ["platform/app/src/server/api/routers/traces.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/api/routers/traces.ts", "getApp", "reference", "18afcc36d5b6485d"],
+    ["platform/app/src/server/api/routers/traces.ts", "getApp", "reference", "42e352296e2cb144"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "131beb853d9df549"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "18afcc36d5b6485d"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "1a70364a233ec564"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "1e99de77ec4bd642"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "2777259ce3aea50a"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "42e352296e2cb144"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "52773423ccc1d1bb"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "52e0674145727f56"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "7cc5706bcc67802c"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "913e84fbd5f25af6"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "9984d2912ea00fd6"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "a143a3b2ac27f931"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "a196ae8aa02b9d17"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "bb93e98f7caa601c"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "be149cf6f3df2951"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "c39a46f872fe33d5"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "d317e4c9d72da0fb"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "d61a97ca0036dce1"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "d849cb21be540f3f"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "da084a322938aaa6"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "e4cffe9417640066"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "ece740e3e04cb962"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "efa79c7957bae588"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "f209ea6b65c371f2"],
+    ["platform/app/src/server/api/routers/tracesV2.ts", "getApp", "reference", "fea134904a9df487"],
+    ["platform/app/src/server/api/routers/virtualKeys.ts", "getApp", "import", "76f1251c03b899a6"],
     [
       "platform/app/src/server/api/routers/virtualKeys.ts",
       "getApp",
@@ -445,36 +165,11 @@
       "reference",
       "d85ab8bc9c4b5a52"
     ],
-    [
-      "platform/app/src/server/api/trpc.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/api/trpc.ts",
-      "getApp",
-      "reference",
-      "fa1b838a3a467d5b"
-    ],
-    [
-      "platform/app/src/server/api/utils.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/api/utils.ts",
-      "getApp",
-      "reference",
-      "315facaf8d3487ad"
-    ],
-    [
-      "platform/app/src/server/api/utils.ts",
-      "getApp",
-      "reference",
-      "9ea2a3de14098c44"
-    ],
+    ["platform/app/src/server/api/trpc.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/api/trpc.ts", "getApp", "reference", "fa1b838a3a467d5b"],
+    ["platform/app/src/server/api/utils.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/api/utils.ts", "getApp", "reference", "315facaf8d3487ad"],
+    ["platform/app/src/server/api/utils.ts", "getApp", "reference", "9ea2a3de14098c44"],
     [
       "platform/app/src/server/app-layer/authz/trpc-middleware.ts",
       "getApp",
@@ -697,12 +392,7 @@
       "reference",
       "f9e5cabe36b52307"
     ],
-    [
-      "platform/app/src/server/app-layer/index.ts",
-      "getApp",
-      "import",
-      "f45204b1ff63bf02"
-    ],
+    ["platform/app/src/server/app-layer/index.ts", "getApp", "import", "f45204b1ff63bf02"],
     [
       "platform/app/src/server/app-layer/organizations/repositories/organization.prisma.repository.ts",
       "getApp",
@@ -733,24 +423,9 @@
       "reference",
       "9cd9b5cf95b4ec48"
     ],
-    [
-      "platform/app/src/server/app-layer/presets.ts",
-      "getApp",
-      "import",
-      "209b7d86c75febe5"
-    ],
-    [
-      "platform/app/src/server/app-layer/presets.ts",
-      "getApp",
-      "reference",
-      "08855b81cad5334a"
-    ],
-    [
-      "platform/app/src/server/app-layer/presets.ts",
-      "getApp",
-      "reference",
-      "672be47344bdd3fd"
-    ],
+    ["platform/app/src/server/app-layer/presets.ts", "getApp", "import", "209b7d86c75febe5"],
+    ["platform/app/src/server/app-layer/presets.ts", "getApp", "reference", "08855b81cad5334a"],
+    ["platform/app/src/server/app-layer/presets.ts", "getApp", "reference", "672be47344bdd3fd"],
     [
       "platform/app/src/server/app-layer/system-migrations/runtime.ts",
       "tryGetApp",
@@ -811,48 +486,13 @@
       "reference",
       "df84c7cac6604147"
     ],
-    [
-      "platform/app/src/server/auth/permissions.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/auth/permissions.ts",
-      "getApp",
-      "reference",
-      "a3d8d8be7c30e2d7"
-    ],
-    [
-      "platform/app/src/server/better-auth/hooks.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/better-auth/hooks.ts",
-      "getApp",
-      "reference",
-      "201abdda6df0660a"
-    ],
-    [
-      "platform/app/src/server/better-auth/hooks.ts",
-      "getApp",
-      "reference",
-      "89e2137b922e2d18"
-    ],
-    [
-      "platform/app/src/server/better-auth/index.ts",
-      "tryGetApp",
-      "import",
-      "4bac244fb7d9afbf"
-    ],
-    [
-      "platform/app/src/server/better-auth/index.ts",
-      "tryGetApp",
-      "reference",
-      "681baf381d8e3053"
-    ],
+    ["platform/app/src/server/auth/permissions.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/auth/permissions.ts", "getApp", "reference", "a3d8d8be7c30e2d7"],
+    ["platform/app/src/server/better-auth/hooks.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/better-auth/hooks.ts", "getApp", "reference", "201abdda6df0660a"],
+    ["platform/app/src/server/better-auth/hooks.ts", "getApp", "reference", "89e2137b922e2d18"],
+    ["platform/app/src/server/better-auth/index.ts", "tryGetApp", "import", "4bac244fb7d9afbf"],
+    ["platform/app/src/server/better-auth/index.ts", "tryGetApp", "reference", "681baf381d8e3053"],
     [
       "platform/app/src/server/better-auth/revokeSessions.ts",
       "getApp",
@@ -1111,12 +751,7 @@
       "reference",
       "c5be007b221b2ea0"
     ],
-    [
-      "platform/app/src/server/invites/invite.service.ts",
-      "getApp",
-      "import",
-      "c122207fcb6ea8b2"
-    ],
+    ["platform/app/src/server/invites/invite.service.ts", "getApp", "import", "c122207fcb6ea8b2"],
     [
       "platform/app/src/server/invites/invite.service.ts",
       "getApp",
@@ -1250,18 +885,6 @@
       "9b252d8dc512a6b5"
     ],
     [
-      "platform/app/src/server/modelProviders/modelProvider.service.ts",
-      "getApp",
-      "import",
-      "c122207fcb6ea8b2"
-    ],
-    [
-      "platform/app/src/server/modelProviders/modelProvider.service.ts",
-      "getApp",
-      "reference",
-      "15c382089455bb7e"
-    ],
-    [
       "platform/app/src/server/onboarding-checks/onboarding-checks.service.ts",
       "getApp",
       "import",
@@ -1273,12 +896,7 @@
       "reference",
       "d25a71c5e49ff505"
     ],
-    [
-      "platform/app/src/server/rateLimit.ts",
-      "tryGetApp",
-      "reference",
-      "f43be470b1bd377d"
-    ],
+    ["platform/app/src/server/rateLimit.ts", "tryGetApp", "reference", "f43be470b1bd377d"],
     [
       "platform/app/src/server/rbac/role-binding-resolver.ts",
       "getApp",
@@ -1309,24 +927,9 @@
       "reference",
       "f396e4f852ac4e21"
     ],
-    [
-      "platform/app/src/server/routes/auth-cli.ts",
-      "tryGetApp",
-      "import",
-      "4bac244fb7d9afbf"
-    ],
-    [
-      "platform/app/src/server/routes/auth-cli.ts",
-      "tryGetApp",
-      "reference",
-      "3c88ca9ea9303d4a"
-    ],
-    [
-      "platform/app/src/server/routes/gateway-internal.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
+    ["platform/app/src/server/routes/auth-cli.ts", "tryGetApp", "import", "4bac244fb7d9afbf"],
+    ["platform/app/src/server/routes/auth-cli.ts", "tryGetApp", "reference", "3c88ca9ea9303d4a"],
+    ["platform/app/src/server/routes/gateway-internal.ts", "getApp", "import", "76f1251c03b899a6"],
     [
       "platform/app/src/server/routes/gateway-internal.ts",
       "getApp",
@@ -1501,42 +1104,12 @@
       "reference",
       "5d844c5a991f00ac"
     ],
-    [
-      "platform/app/src/server/traces/trace.service.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/traces/trace.service.ts",
-      "getApp",
-      "reference",
-      "d5019885f6c28dc9"
-    ],
-    [
-      "platform/app/src/server/utils/ttlCache.ts",
-      "tryGetApp",
-      "import",
-      "4bcd0b232144f4a7"
-    ],
-    [
-      "platform/app/src/server/utils/ttlCache.ts",
-      "tryGetApp",
-      "reference",
-      "31b4d4aec17ba4b1"
-    ],
-    [
-      "platform/app/src/task.ts",
-      "tryGetApp",
-      "import",
-      "115ed12424f3a267"
-    ],
-    [
-      "platform/app/src/task.ts",
-      "tryGetApp",
-      "reference",
-      "2745a51f01daacc5"
-    ],
+    ["platform/app/src/server/traces/trace.service.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/server/traces/trace.service.ts", "getApp", "reference", "d5019885f6c28dc9"],
+    ["platform/app/src/server/utils/ttlCache.ts", "tryGetApp", "import", "4bcd0b232144f4a7"],
+    ["platform/app/src/server/utils/ttlCache.ts", "tryGetApp", "reference", "31b4d4aec17ba4b1"],
+    ["platform/app/src/task.ts", "tryGetApp", "import", "115ed12424f3a267"],
+    ["platform/app/src/task.ts", "tryGetApp", "reference", "2745a51f01daacc5"],
     [
       "platform/app/src/tasks/backfillAnnotationsToClickhouse.ts",
       "getApp",
@@ -1567,17 +1140,7 @@
       "reference",
       "efa79c7957bae588"
     ],
-    [
-      "platform/app/src/test-utils/managementApiOrg.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/test-utils/managementApiOrg.ts",
-      "getApp",
-      "reference",
-      "4c6db421a75c7150"
-    ]
+    ["platform/app/src/test-utils/managementApiOrg.ts", "getApp", "import", "76f1251c03b899a6"],
+    ["platform/app/src/test-utils/managementApiOrg.ts", "getApp", "reference", "4c6db421a75c7150"]
   ]
 }

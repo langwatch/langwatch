@@ -13,7 +13,6 @@
     "packages/enterprise/features/governance/server/src/ports/ingestion-template.port.ts",
     "packages/enterprise/features/governance/server/src/ports/routing-policy.port.ts",
     "packages/enterprise/features/managed-provider/server/src/ports/managed-provider-project.port.ts",
-    "packages/enterprise/features/scim/server/src/ports/scim-token-database.port.ts",
     "packages/features/agent/server/src/ports/agent.port.ts",
     "packages/features/annotation/server/src/ports/annotation.port.ts",
     "packages/features/authz/server/src/ports/authz-grants-command-dispatcher.port.ts",

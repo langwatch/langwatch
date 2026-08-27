@@ -77,13 +77,7 @@ function featureLayoutVersion(cwd, enterprise, feature) {
 function strictPortBaseline(cwd) {
   const cached = strictPortBaselineCache.get(cwd);
   if (cached) return cached;
-  const file = join(
-    cwd,
-    "packages",
-    "architecture-lint",
-    "src",
-    "port-module-baseline.json",
-  );
+  const file = join(cwd, "packages", "architecture-lint", "src", "port-module-baseline.json");
   let ports = new Set();
   if (existsSync(file)) {
     try {
@@ -199,8 +193,7 @@ const boundaryRule = {
     messages: {
       compositionRoot:
         "Feature server packages may be imported only by app or worker runtime composition roots.",
-      crossFeature:
-        "Cross-feature collaboration must use the owning feature's contract package.",
+      crossFeature: "Cross-feature collaboration must use the owning feature's contract package.",
       packageEscape: "A relative import cannot escape its physical workspace package.",
       packageRole: "This dependency is not allowed in the current package role.",
       prismaContainment:
@@ -211,18 +204,16 @@ const boundaryRule = {
         "This package entry point belongs to a retired runtime or package surface; use {{replacement}}.",
       schemaBoundary:
         "Feature contracts remain transport-neutral; use the root hono-openapi API and Standard Schema instead of a Hono-specific schema adapter.",
-      sealedExports:
-        "This package subpath is not declared in the target package's exports map.",
+      sealedExports: "This package subpath is not declared in the target package's exports map.",
     },
   },
   create(context) {
     const filename = normalizedFilename(context);
     const classification = classifyFile(filename, context.cwd);
     const workspace = loadWorkspace(context.cwd);
-    const productionSource =
-      !/(\/__tests__\/|\/tests\/|\.(test|unit|integration)\.)/.test(
-        classification.workspacePath,
-      );
+    const productionSource = !/(\/__tests__\/|\/tests\/|\.(test|unit|integration)\.)/.test(
+      classification.workspacePath,
+    );
 
     const reportImport = (node, specifier) => {
       if (typeof specifier !== "string") return;
@@ -244,14 +235,8 @@ const boundaryRule = {
           const escaped = relative(packageRoot, targetPath).startsWith("..");
           if (escaped) context.report({ node, messageId: "packageEscape" });
 
-          if (
-            !escaped &&
-            classification.layoutVersion === 0 &&
-            classification.role === "server"
-          ) {
-            const targetWorkspacePath = relative(context.cwd, targetPath)
-              .split(sep)
-              .join("/");
+          if (!escaped && classification.layoutVersion === 0 && classification.role === "server") {
+            const targetWorkspacePath = relative(context.cwd, targetPath).split(sep).join("/");
             const importer = classification.workspacePath;
             const apiImportsImplementation =
               /\/server\/src\/api\//.test(importer) &&
@@ -341,8 +326,9 @@ const boundaryRule = {
 
       const nodeRuntime = specifier.startsWith("node:");
       const browserRuntime = /^(react|react-dom|@chakra-ui\/)/.test(specifier);
-      const serverRuntime =
-        /^(hono|@trpc\/server|@langwatch\/(eventing|group-queue))/.test(specifier);
+      const serverRuntime = /^(hono|@trpc\/server|@langwatch\/(eventing|group-queue))/.test(
+        specifier,
+      );
       if (
         productionSource &&
         classification.role === "contract" &&
@@ -350,11 +336,7 @@ const boundaryRule = {
       ) {
         context.report({ node, messageId: "packageRole" });
       }
-      if (
-        productionSource &&
-        classification.role === "web" &&
-        (nodeRuntime || serverRuntime)
-      ) {
+      if (productionSource && classification.role === "web" && (nodeRuntime || serverRuntime)) {
         context.report({ node, messageId: "packageRole" });
       }
       if (productionSource && classification.role === "server" && browserRuntime) {
@@ -412,10 +394,9 @@ const environmentBoundariesRule = {
       classification.feature ||
       classification.role === "config" ||
       classification.role === "design-system";
-    const productionSource =
-      !/(\/__tests__\/|\/tests\/|\.(test|unit|integration)\.)/.test(
-        classification.workspacePath,
-      );
+    const productionSource = !/(\/__tests__\/|\/tests\/|\.(test|unit|integration)\.)/.test(
+      classification.workspacePath,
+    );
     if (!governed || !productionSource) return {};
 
     return {
@@ -558,8 +539,7 @@ function sourceMethodNames(source, classBody) {
     entries.push(index);
     names.set(name, entries);
   };
-  const normal =
-    /\b([A-Za-z_$][\w$]*)\s*(?:<[^>{}]*>)?\s*\([^)]*\)\s*(?::[^{};]+)?\s*(?:\{|;)/g;
+  const normal = /\b([A-Za-z_$][\w$]*)\s*(?:<[^>{}]*>)?\s*\([^)]*\)\s*(?::[^{};]+)?\s*(?:\{|;)/g;
   for (const match of masked.matchAll(normal)) add(match[1], match.index);
   const computed =
     /\[\s*(["'])([^"']+)\1\s*\]\s*(?:<[^>{}]*>)?\s*\([^)]*\)\s*(?::[^{};]+)?\s*(?:\{|;)/g;
@@ -571,8 +551,7 @@ const serviceQualityRule = {
   meta: {
     type: "problem",
     messages: {
-      duplicateMember:
-        "A service class cannot declare the member {{name}} more than once.",
+      duplicateMember: "A service class cannot declare the member {{name}} more than once.",
       duplicateObjectKey:
         "A service object literal cannot declare the key {{name}} more than once.",
       publicConstructor:
@@ -613,10 +592,7 @@ const serviceQualityRule = {
         // Oxc drops an earlier duplicate class method while recovering from
         // the parser's duplicate-member early error. Recover that case from
         // the class source so the rule remains useful on real files.
-        for (const [name, occurrences] of sourceMethodNames(
-          context.sourceCode.text,
-          node,
-        )) {
+        for (const [name, occurrences] of sourceMethodNames(context.sourceCode.text, node)) {
           if (occurrences.length < 2) continue;
           const astMatches = node.body.filter((member) => memberName(member) === name);
           if (astMatches.length > 1) continue;
@@ -631,18 +607,13 @@ const serviceQualityRule = {
         if (!node.id?.name.endsWith("Service") || node.abstract) return;
         const hasStaticCreate = node.body.body.some(
           (member) =>
-            member.type === "MethodDefinition" &&
-            member.static &&
-            memberName(member) === "create",
+            member.type === "MethodDefinition" && member.static && memberName(member) === "create",
         );
         if (!hasStaticCreate) return;
         const constructor = node.body.body.find(
           (member) => member.type === "MethodDefinition" && member.kind === "constructor",
         );
-        if (
-          constructor &&
-          (!constructor.accessibility || constructor.accessibility === "public")
-        ) {
+        if (constructor && (!constructor.accessibility || constructor.accessibility === "public")) {
           context.report({ node: constructor, messageId: "publicConstructor" });
         }
       },
@@ -843,8 +814,7 @@ const runtimeUndefinedRule = {
       if (pattern.type === "Identifier") return pattern.name === "undefined";
       if (pattern.type === "AssignmentPattern") return hasUndefinedBinding(pattern.left);
       if (pattern.type === "RestElement") return hasUndefinedBinding(pattern.argument);
-      if (pattern.type === "ArrayPattern")
-        return pattern.elements.some(hasUndefinedBinding);
+      if (pattern.type === "ArrayPattern") return pattern.elements.some(hasUndefinedBinding);
       if (pattern.type === "ObjectPattern") {
         return pattern.properties.some((property) =>
           property.type === "RestElement"
@@ -877,8 +847,7 @@ const runtimeUndefinedRule = {
         ) {
           return true;
         }
-        if (current.type === "CatchClause" && hasUndefinedBinding(current.param))
-          return true;
+        if (current.type === "CatchClause" && hasUndefinedBinding(current.param)) return true;
         if (
           (current.type === "BlockStatement" || current.type === "Program") &&
           current.body.some(declaresUndefined)
@@ -892,11 +861,7 @@ const runtimeUndefinedRule = {
 
     return {
       Identifier(node) {
-        if (
-          node.name !== "undefined" ||
-          isNonValueIdentifier(node) ||
-          isShadowedUndefined(node)
-        ) {
+        if (node.name !== "undefined" || isNonValueIdentifier(node) || isShadowedUndefined(node)) {
           return;
         }
         context.report({
@@ -988,10 +953,7 @@ const logicalStatementSpacingRule = {
 };
 
 function booleanLeafCount(node) {
-  if (
-    node.type !== "LogicalExpression" ||
-    (node.operator !== "&&" && node.operator !== "||")
-  ) {
+  if (node.type !== "LogicalExpression" || (node.operator !== "&&" && node.operator !== "||")) {
     return 1;
   }
   return booleanLeafCount(node.left) + booleanLeafCount(node.right);
@@ -1026,10 +988,7 @@ function chainsOffAwait(node) {
   if (node.type === "AwaitExpression") return false;
   let current = node;
   while (current) {
-    if (
-      current.type === "MemberExpression" ||
-      current.type === "OptionalMemberExpression"
-    ) {
+    if (current.type === "MemberExpression" || current.type === "OptionalMemberExpression") {
       if (current.object.type === "AwaitExpression") return true;
       current = current.object;
       continue;
@@ -1053,8 +1012,7 @@ const awaitedReturnChainRule = {
   meta: {
     type: "problem",
     messages: {
-      awaitedReturnChain:
-        "Name the awaited result before chaining properties or calls from it.",
+      awaitedReturnChain: "Name the awaited result before chaining properties or calls from it.",
     },
   },
   create(context) {
@@ -1076,8 +1034,7 @@ function declaredClasses(program) {
   for (const statement of program.body) {
     let declaration = statement;
     const exported =
-      statement.type === "ExportNamedDeclaration" ||
-      statement.type === "ExportDefaultDeclaration";
+      statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration";
     if (statement.type === "ExportNamedDeclaration" && statement.declaration) {
       declaration = statement.declaration;
     }
@@ -1167,10 +1124,8 @@ const featureModuleClassesRule = {
     type: "problem",
     messages: {
       abstract: "A strict feature port module must export an abstract {{suffix}} class.",
-      concrete:
-        "A strict feature runtime module must export a concrete {{suffix}} class.",
-      create:
-        "A concrete strict feature class must expose construction through static create.",
+      concrete: "A strict feature runtime module must export a concrete {{suffix}} class.",
+      create: "A concrete strict feature class must expose construction through static create.",
       standalone:
         "Behaviour-bearing strict feature modules keep factories and behaviour on their class.",
     },
@@ -1243,9 +1198,7 @@ function serviceOwnerRoot(filename, cwd) {
     /^(packages\/(?:enterprise\/)?features\/[^/]+\/server)\/src\/services\//,
   );
   if (feature) return resolve(cwd, feature[1]);
-  const application = normalized.match(
-    /^(platform\/app\/src\/server\/(?:app-layer\/)?[^/]+)\//,
-  );
+  const application = normalized.match(/^(platform\/app\/src\/server\/(?:app-layer\/)?[^/]+)\//);
   return application ? resolve(cwd, application[1]) : dirname(filename);
 }
 
@@ -1372,8 +1325,7 @@ const apiContextServicesRule = {
   meta: {
     type: "problem",
     messages: {
-      contextCast:
-        "API context is already typed; do not cast it to recover application services.",
+      contextCast: "API context is already typed; do not cast it to recover application services.",
       construction:
         "API classes delegate through context.app; they do not construct services, repositories, stores, or adapters.",
       doubleAwait:
