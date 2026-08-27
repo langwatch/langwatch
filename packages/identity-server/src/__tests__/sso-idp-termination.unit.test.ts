@@ -12,6 +12,12 @@ import {
   validateOidcRegistration,
   validateSamlRegistration,
 } from "../sso-idp-registration";
+import {
+  isSealedProviderConfig,
+  plaintextProviderConfigCipher,
+  SSO_PROVIDER_CONFIG_SEAL,
+  type SsoProviderConfigCipher,
+} from "../sso-provider-config-cipher";
 import { SsoSelfServeService } from "../sso-self-serve.service";
 
 /**
@@ -295,22 +301,104 @@ describe("registering an identity provider", () => {
     });
   });
 
-  describe("when the vault holds a value", () => {
-    /** @scenario "A credential belongs to the organization that stored it" */
-    it("answers nothing to an organization reading another one's reference", async () => {
-      const ref = await credentials.put({
+  describe("when the vault holds a value another organization asks for", () => {
+    /**
+     * The rule is enforced by `PrismaSsoCredentialStore`, and the double in
+     * this file implements it too — so asserting against the double proves
+     * only that the double is written correctly. The binding for that
+     * scenario lives with the real store, in
+     * `platform/app/src/server/app-layer/identity/__tests__/sso-credential-store.unit.test.ts`,
+     * which drives Prisma. What is worth pinning HERE is what the derivation
+     * does with a reference it cannot read: it must produce no row at all
+     * rather than a row with a hole in it.
+     */
+    it("derives no engine row when the vault answers nothing", async () => {
+      const clientIdRef = await credentials.put({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        kind: "oidc-client-id",
+        value: "client_acme",
+      });
+      // A reference belonging to somebody else: present in the map, refused
+      // to this organization, which is indistinguishable from absent here.
+      const foreignSecretRef = await credentials.put({
+        organizationId: "org_other",
+        connectionId: CONNECTION,
+        kind: "oidc-client-secret",
+        value: "secret_other",
+      });
+
+      const row = await engineProviderFor({
+        connection: connection({
+          idpMetadata: {
+            issuer: "https://login.acme.okta.com",
+            providerId: "okta",
+            clientIdRef,
+            secretRef: foreignSecretRef,
+            certRefs: [],
+          },
+        }),
+        credentials,
+        baseUrl: BASE_URL,
+        providerConfig: plaintextProviderConfigCipher,
+      });
+
+      expect(row).toBeNull();
+    });
+  });
+
+  describe("what the engine row keeps the dialing document under", () => {
+    /**
+     * The document carries the client secret this derivation has just read
+     * out of the vault. Emitting it in the clear would put every customer's
+     * live identity-provider credential in a second table with nothing over
+     * it — the exact threat the vault exists to defeat.
+     */
+    const sealing: SsoProviderConfigCipher = {
+      seal: (document) => `${SSO_PROVIDER_CONFIG_SEAL}${btoa(document)}`,
+      open: (stored) =>
+        isSealedProviderConfig(stored)
+          ? atob(stored.slice(SSO_PROVIDER_CONFIG_SEAL.length))
+          : stored,
+    };
+
+    it("never writes the client secret where a database copy can read it", async () => {
+      const clientIdRef = await credentials.put({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        kind: "oidc-client-id",
+        value: "client_acme",
+      });
+      const secretRef = await credentials.put({
         organizationId: ORG,
         connectionId: CONNECTION,
         kind: "oidc-client-secret",
-        value: "secret_acme",
+        value: "secret_acme_live",
       });
 
-      expect(await credentials.read({ organizationId: ORG, ref })).toBe(
-        "secret_acme",
-      );
+      const row = await engineProviderFor({
+        connection: connection({
+          idpMetadata: {
+            issuer: "https://login.acme.okta.com",
+            providerId: "okta",
+            clientIdRef,
+            secretRef,
+            certRefs: [],
+          },
+        }),
+        credentials,
+        baseUrl: BASE_URL,
+        providerConfig: sealing,
+      });
+
+      expect(row?.oidcConfig).not.toBeNull();
+      // The stored column, as anybody reading the table sees it.
+      expect(row?.oidcConfig).not.toContain("secret_acme_live");
+      expect(isSealedProviderConfig(row?.oidcConfig ?? "")).toBe(true);
+      // And it is the real document underneath, not a lossy one.
       expect(
-        await credentials.read({ organizationId: "org_other", ref }),
-      ).toBeNull();
+        JSON.parse(sealing.open(row?.oidcConfig ?? "")).clientSecret,
+      ).toBe("secret_acme_live");
     });
   });
 });
@@ -345,6 +433,7 @@ describe("how many identity providers an organization may register", () => {
       credentials: new InMemoryCredentials(),
       discovery: reachable,
       baseUrl: BASE_URL,
+      providerConfig: plaintextProviderConfigCipher,
       // Not what this refusal reads, so each one answers its quietest.
       testSignIns: { findLatestForConnection: async () => null },
       breakGlass: { history: async () => [] },
@@ -440,6 +529,7 @@ describe("the engine's provider row", () => {
         }),
         credentials,
         baseUrl: BASE_URL,
+        providerConfig: plaintextProviderConfigCipher,
       });
 
       expect(row).toMatchObject({
@@ -488,6 +578,7 @@ describe("the engine's provider row", () => {
             }),
             credentials,
             baseUrl: BASE_URL,
+            providerConfig: plaintextProviderConfigCipher,
           });
         }),
       );
@@ -527,6 +618,7 @@ describe("the engine's provider row", () => {
         }),
         credentials,
         baseUrl: BASE_URL,
+        providerConfig: plaintextProviderConfigCipher,
       });
 
       expect(row?.oidcConfig).toBeNull();
@@ -548,6 +640,7 @@ describe("the engine's provider row", () => {
           connection: connection(),
           credentials,
           baseUrl: BASE_URL,
+          providerConfig: plaintextProviderConfigCipher,
         }),
       ).toBeNull();
     });
@@ -583,6 +676,7 @@ describe("the engine's provider row", () => {
           }),
           credentials,
           baseUrl: BASE_URL,
+          providerConfig: plaintextProviderConfigCipher,
         }),
       ).toBeNull();
     });
@@ -615,6 +709,7 @@ describe("the engine's provider row", () => {
           }),
           credentials,
           baseUrl: BASE_URL,
+          providerConfig: plaintextProviderConfigCipher,
         }),
       ).toBeNull();
     });
@@ -645,6 +740,7 @@ describe("the engine's provider row", () => {
           }),
           credentials,
           baseUrl: BASE_URL,
+          providerConfig: plaintextProviderConfigCipher,
         }),
       ).toBeNull();
     });
@@ -656,6 +752,7 @@ describe("what LangWatch is, to an identity provider", () => {
   it("answers every address before a connection exists", () => {
     const details = serviceProviderDetailsFor({
       baseUrl: BASE_URL,
+      providerConfig: plaintextProviderConfigCipher,
       connectionId: null,
     });
 
@@ -667,6 +764,7 @@ describe("what LangWatch is, to an identity provider", () => {
   it("keys the per-connection addresses on the connection once there is one", () => {
     const details = serviceProviderDetailsFor({
       baseUrl: BASE_URL,
+      providerConfig: plaintextProviderConfigCipher,
       connectionId: CONNECTION,
     });
 

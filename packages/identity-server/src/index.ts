@@ -238,6 +238,12 @@ export {
   type SsoServiceProviderDetails,
 } from "./sso-engine-provider";
 export {
+  isSealedProviderConfig,
+  plaintextProviderConfigCipher,
+  SSO_PROVIDER_CONFIG_SEAL,
+  type SsoProviderConfigCipher,
+} from "./sso-provider-config-cipher";
+export {
   discoveryEndpointFor,
   parseSamlIdpConfig,
   ssoIdpRegistrationSchema,

@@ -161,6 +161,7 @@ import {
   PrismaSsoTestSignInLookup,
   SsoSelfServeContextResolver,
 } from "./sso-self-serve-adapters";
+import { ssoProviderConfigCipher } from "./sso-provider-config-cipher";
 import {
   forgetIdentityWriteGate,
   isAnyoneOnIdentityWrites,
@@ -508,6 +509,7 @@ export const ssoEngineProviderDerivation = ({
     connection,
     credentials: ssoCredentials,
     baseUrl: env.NEXTAUTH_URL ?? "",
+    providerConfig: ssoProviderConfigCipher,
   });
 
 /**
@@ -911,6 +913,7 @@ const identityStorage = createIdentityStorageAdapter({
   isUserOnIdentityWrites: isLatched,
   isAnyoneOnIdentityWrites: isAnyoneLatched,
   birth: identityBirth(),
+  providerConfig: ssoProviderConfigCipher,
 });
 
 export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {

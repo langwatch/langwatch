@@ -618,9 +618,19 @@ model SsoCredential {
 /// The plugin's column is globally unique, and two organizations both calling
 /// their provider `okta` must both be able to.
 ///
-/// `oidcConfig` and `samlConfig` are the plugin's own JSON strings, rebuilt on
-/// every fold from `SsoCredential` — the vault is where the material lives,
-/// and this row is a derived copy the engine can read synchronously.
+/// `oidcConfig` and `samlConfig` are the plugin's own JSON documents, rebuilt
+/// on every fold from `SsoCredential` — the vault is where the material
+/// lives, and this row is a derived copy the engine can read synchronously.
+///
+/// SEALED AT REST, under the same key the vault uses. The document carries
+/// the client secret the derivation reads OUT of the vault, so a plaintext
+/// copy here would hand every customer's live identity-provider credential
+/// to anybody holding a database dump — the exact threat `SsoCredential`
+/// exists to defeat, reopened one table over. A stored value announces its
+/// form (`enc:v1:`), so a row written before the seal existed still opens;
+/// the one reader is the identity storage adapter, on the path that dials.
+/// The reader tolerates both forms, so this needs no backfill — but a pod
+/// without it cannot read a sealed row, so it must not be rolled back past.
 model SsoProvider {
   id             String  @id
   issuer         String

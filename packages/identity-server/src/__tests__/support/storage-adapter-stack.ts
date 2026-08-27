@@ -19,6 +19,7 @@ import {
   IdentityCeremonies,
 } from "../../better-auth/identity-ceremonies";
 import { createIdentityStorageAdapter } from "../../better-auth/identity-storage-adapter";
+import { plaintextProviderConfigCipher } from "../../sso-provider-config-cipher";
 import type {
   IdentityAccountsPort,
   IdentityConnectionIssuersPort,
@@ -391,6 +392,10 @@ export function identityStack({
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
       birth,
+      // These scenarios are about routing and linkage, not about what the
+      // engine row is kept under, so the stack reads documents in the form
+      // it wrote them.
+      providerConfig: plaintextProviderConfigCipher,
     }),
     // The application's own wiring, verbatim: the account ceremonies bound to
     // better-auth's `databaseHooks` alongside the adapter that also runs them.

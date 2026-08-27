@@ -1,5 +1,6 @@
 import type { SsoConnectionState } from "@langwatch/identity";
 import type { SsoCredentialStore } from "./sso-credential-store";
+import type { SsoProviderConfigCipher } from "./sso-provider-config-cipher";
 import { withoutTrailingSlashes } from "./trailing-slash";
 import {
   discoveryEndpointFor,
@@ -60,8 +61,11 @@ export interface SsoEngineProviderRow {
  * through the connection, so a connection under setup HAS to be dialable or
  * it could never be activated. What stops that from being a way in for
  * anybody is not this set — it is `ssoAssertionDecision`, which lets a
- * connection that is not yet ACTIVE assert only addresses already belonging
- * to its own organization's members.
+ * connection that is not yet ACTIVE assert ONE address: the one belonging to
+ * the administrator who registered it. Any member of the organization was
+ * too wide, and reading it that way was an account takeover of a colleague:
+ * proving the round trip works takes one person, and that person is the one
+ * doing the setup.
  *
  * `REJECTED` is not here. An operator turning a domain claim down is a
  * decision, and a connection that could still carry sign-ins afterwards would
@@ -94,6 +98,7 @@ export async function engineProviderFor({
   connection,
   credentials,
   baseUrl,
+  providerConfig,
 }: {
   connection: SsoConnectionState;
   credentials: SsoCredentialStore;
@@ -101,6 +106,16 @@ export async function engineProviderFor({
    *  has to say what it is called, and what LangWatch is called to an
    *  identity provider is where LangWatch lives. */
   baseUrl: string;
+  /**
+   * Seals the dialing document this derivation produces (D09).
+   *
+   * The document carries the client secret this function has just read OUT
+   * of the vault, so emitting it in the clear would put every customer's
+   * live credential in a second table with nothing over it. Sealing HERE
+   * rather than at the projection keeps the one place that assembles the
+   * document and the one place that protects it together.
+   */
+  providerConfig: SsoProviderConfigCipher;
 }): Promise<SsoEngineProviderRow | null> {
   if (!connectionIsDialable(connection.state)) return null;
 
@@ -131,19 +146,25 @@ export async function engineProviderFor({
     return {
       ...base,
       issuer,
-      oidcConfig: JSON.stringify({
-        clientId,
-        clientSecret,
-        // Discovery at sign-in rather than at registration, so this
-        // derivation stays a pure function of the log and the vault. The
-        // reachability check that would otherwise live here already ran at
-        // command time, where a refusal can reach the person who typed the
-        // address.
-        discoveryEndpoint: discoveryEndpointFor({ issuer }),
-        pkce: true,
-        scopes: ["openid", "email", "profile"],
-        mapping: { id: "sub", email: "email", emailVerified: "email_verified" },
-      }),
+      oidcConfig: providerConfig.seal(
+        JSON.stringify({
+          clientId,
+          clientSecret,
+          // Discovery at sign-in rather than at registration, so this
+          // derivation stays a pure function of the log and the vault. The
+          // reachability check that would otherwise live here already ran at
+          // command time, where a refusal can reach the person who typed the
+          // address.
+          discoveryEndpoint: discoveryEndpointFor({ issuer }),
+          pkce: true,
+          scopes: ["openid", "email", "profile"],
+          mapping: {
+            id: "sub",
+            email: "email",
+            emailVerified: "email_verified",
+          },
+        }),
+      ),
       samlConfig: null,
     };
   }
@@ -162,29 +183,33 @@ export async function engineProviderFor({
     ...base,
     issuer: config.entityId ?? connection.idpMetadata.issuer ?? base.issuer,
     oidcConfig: null,
-    samlConfig: JSON.stringify({
-      entryPoint: config.entryPoint,
-      ...(config.certificate === null ? {} : { cert: config.certificate }),
-      idpMetadata: config.metadataXml
-        ? {
-            metadata: config.metadataXml,
-            ...(config.entityId === null ? {} : { entityID: config.entityId }),
-          }
-        : { entityID: config.entityId },
-      // Stated rather than left to the engine's default, which falls back to
-      // a field SAML configuration does not have and would publish metadata
-      // naming nothing. What LangWatch is called has to be stable across
-      // every connection and every rebuild, because it is a value somebody
-      // typed into their identity provider once.
-      spMetadata: {
-        entityID: serviceProviderDetailsFor({
-          baseUrl,
-          connectionId: connection.connectionId,
-        }).entityId,
-      },
-      wantAssertionsSigned: true,
-      mapping: { id: "nameID", email: "email" },
-    }),
+    samlConfig: providerConfig.seal(
+      JSON.stringify({
+        entryPoint: config.entryPoint,
+        ...(config.certificate === null ? {} : { cert: config.certificate }),
+        idpMetadata: config.metadataXml
+          ? {
+              metadata: config.metadataXml,
+              ...(config.entityId === null
+                ? {}
+                : { entityID: config.entityId }),
+            }
+          : { entityID: config.entityId },
+        // Stated rather than left to the engine's default, which falls back
+        // to a field SAML configuration does not have and would publish
+        // metadata naming nothing. What LangWatch is called has to be stable
+        // across every connection and every rebuild, because it is a value
+        // somebody typed into their identity provider once.
+        spMetadata: {
+          entityID: serviceProviderDetailsFor({
+            baseUrl,
+            connectionId: connection.connectionId,
+          }).entityId,
+        },
+        wantAssertionsSigned: true,
+        mapping: { id: "nameID", email: "email" },
+      }),
+    ),
   };
 }
 

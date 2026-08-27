@@ -311,12 +311,22 @@ const joinSsoOrganization = async ({
  *     Nothing else is defensible; the proof is the entire basis for trusting
  *     the flag.
  *
- *   - A connection that is NOT live may only assert addresses that already
- *     belong to its own organization's members. This is not a loophole, it is
- *     the setup journey: activation refuses without a real sign-in through the
- *     connection (`SsoActivationTestSignInMissingError`), so the administrator
- *     doing the setup has to be able to sign in before the domain is proved.
- *     They are a member; an attacker asserting a stranger's address is not.
+ *   - A connection that is NOT live may only assert ONE address: the one
+ *     belonging to the administrator who registered it. This is the setup
+ *     journey and nothing wider: activation refuses without a real sign-in
+ *     through the connection (`SsoActivationTestSignInMissingError`), so the
+ *     administrator doing the setup has to be able to sign in before the
+ *     domain is proved — and proving the round trip works takes exactly one
+ *     person, the one doing it.
+ *
+ *     ANY MEMBER IS NOT THE RULE, and reading it that way was an account
+ *     takeover of a colleague. An administrator holding `sso:manage` can
+ *     point a DRAFT connection at a server they control; if the gate admits
+ *     every address in their organization, they assert a co-worker's address
+ *     with `email_verified: true` and are handed that co-worker's session —
+ *     including the co-worker's access to every OTHER organization and
+ *     project they belong to, which the administrator never had. The threat
+ *     the setup exemption has to survive is a colleague, not a stranger.
  *
  * The refusal is deliberately one code for every cause. Which of the two
  * questions failed is not something an unauthenticated caller gets to learn.
@@ -351,7 +361,12 @@ export const ssoAssertionDecision = async ({
 
   const connection = await prisma.ssoConnection.findUnique({
     where: { id: providerId },
-    select: { organizationId: true, state: true, verifiedDomains: true },
+    select: {
+      organizationId: true,
+      state: true,
+      verifiedDomains: true,
+      createdBy: true,
+    },
   });
   if (!connection) return refuse;
 
@@ -359,29 +374,45 @@ export const ssoAssertionDecision = async ({
     return connection.verifiedDomains.includes(domain) ? carryOn : refuse;
   }
 
-  const member = await memberAtAddress({
+  // A connection nobody is recorded as having registered has no setup
+  // administrator to make an exception for. Grandfathered connections end
+  // ACTIVE and never reach here, so this is a row that should not exist
+  // rather than a shape to wave through.
+  if (!connection.createdBy) return refuse;
+
+  const setupAdministrator = await registrantAtAddress({
     prisma,
     organizationId: connection.organizationId,
+    userId: connection.createdBy,
     email: email ?? "",
   });
-  return member ? carryOn : refuse;
+  return setupAdministrator ? carryOn : refuse;
 };
 
 /**
- * Whether this address already belongs to somebody in this organization.
+ * Whether this address belongs to the one person the setup exemption is for:
+ * the administrator who registered this connection, who is still a member of
+ * the organization it belongs to.
+ *
+ * BOTH HALVES ARE LOAD-BEARING. The address must resolve to `userId` — that
+ * is what keeps a colleague's address out of a connection under setup — and
+ * `userId` must still be a member here, so a registrant whose membership was
+ * revoked stops being able to dial the connection they left behind.
  *
  * Both places an address can live are asked, because the identity work moved
  * the truth to `Identifier` while `User.email` remains a copy for accounts the
  * backfill has not finalized (ADR-101 §5). Asking only one of them would make
  * the setup sign-in work for some administrators and not others.
  */
-const memberAtAddress = async ({
+const registrantAtAddress = async ({
   prisma,
   organizationId,
+  userId,
   email,
 }: {
   prisma: PrismaClient;
   organizationId: string;
+  userId: string;
   email: string;
 }): Promise<boolean> => {
   const address = email.trim().toLowerCase();
@@ -389,6 +420,7 @@ const memberAtAddress = async ({
   const membership = await prisma.organizationUser.findFirst({
     where: {
       organizationId,
+      userId,
       OR: [
         { user: { email: { equals: address, mode: "insensitive" } } },
         {

@@ -44,22 +44,43 @@ const { ssoAssertionDecision } = await import("../hooks");
 
 const CONNECTION_ID = "local_ssoc_0005NmMMMX8uk3JfupN0JsNdW368m";
 
+const REGISTRAR_ID = "user_ana";
+
 const connectionRow = (over: Record<string, unknown> = {}) => ({
   organizationId: "org_acme",
   state: "ACTIVE",
   verifiedDomains: ["acme.com"],
+  createdBy: REGISTRAR_ID,
   ...over,
 });
 
+/**
+ * A directory the membership lookup is answered FROM, rather than a canned
+ * row. The gate now narrows that lookup by `userId`, and a mock that answers
+ * the same way whatever it is asked cannot tell a colleague's address from
+ * the registrar's — which is the whole subject of the cases below.
+ */
 const prismaWith = ({
   connection,
-  member = null,
+  members = [],
 }: {
   connection: Record<string, unknown> | null;
-  member?: { userId: string } | null;
+  members?: { userId: string; address: string }[];
 }) => {
   const findUnique = vi.fn().mockResolvedValue(connection);
-  const findFirst = vi.fn().mockResolvedValue(member);
+  const findFirst = vi.fn(
+    async ({ where }: { where: Record<string, unknown> }) => {
+      const wanted = (
+        where.OR as [{ user: { email: { equals: string } } }, unknown]
+      )[0].user.email.equals;
+      const match = members.find(
+        (candidate) =>
+          candidate.address === wanted &&
+          (where.userId === undefined || candidate.userId === where.userId),
+      );
+      return match ? { userId: match.userId } : null;
+    },
+  );
   return {
     prisma: {
       ssoConnection: { findUnique },
@@ -124,13 +145,22 @@ describe("given a live connection", () => {
 });
 
 describe("given a connection that is not live yet", () => {
+  const underSetup = (over: Record<string, unknown> = {}) =>
+    connectionRow({ state: "DRAFT", verifiedDomains: [], ...over });
+
+  const directory = [
+    { userId: REGISTRAR_ID, address: "ana@acme.com" },
+    // A colleague in the SAME organization, who also works somewhere else.
+    { userId: "user_bob", address: "bob@acme.com" },
+  ];
+
   describe("when its own administrator signs in to test it", () => {
     it("lets them through even though no domain is proved", async () => {
       // Activation refuses without a real sign-in through the connection, so
       // this path has to exist or a connection could never be activated.
       const { prisma } = prismaWith({
-        connection: connectionRow({ state: "DRAFT", verifiedDomains: [] }),
-        member: { userId: "user_ana" },
+        connection: underSetup(),
+        members: directory,
       });
       expect(await decide(prisma, "ana@acme.com")).toEqual({
         action: "continue",
@@ -138,25 +168,66 @@ describe("given a connection that is not live yet", () => {
     });
   });
 
+  describe("when it asserts a colleague's address instead of its own administrator's", () => {
+    /** @scenario "A connection still being set up carries only its own people" */
+    it("refuses, though the colleague is a member of the same organization", async () => {
+      // The setup exemption is for ONE person: whoever registered the
+      // connection. Widening it to any member hands an administrator who
+      // holds `sso:manage` a colleague's session — and with it the
+      // colleague's access to every other organization they belong to,
+      // which the administrator never had.
+      const { prisma } = prismaWith({
+        connection: underSetup(),
+        members: directory,
+      });
+      const decision = await decide(prisma, "bob@acme.com");
+      expect(decision.action).toBe("reject");
+    });
+
+    it("narrows the membership lookup by the registrar, not just the organization", async () => {
+      const { prisma, findFirst } = prismaWith({
+        connection: underSetup(),
+        members: directory,
+      });
+      await decide(prisma, "bob@acme.com");
+      expect(findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: "org_acme",
+            userId: REGISTRAR_ID,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("when nobody is recorded as having registered it", () => {
+    it("refuses, because there is no administrator to make an exception for", async () => {
+      const { prisma, findFirst } = prismaWith({
+        connection: underSetup({ createdBy: null }),
+        members: directory,
+      });
+      const decision = await decide(prisma, "ana@acme.com");
+      expect(decision.action).toBe("reject");
+      expect(findFirst).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when it asserts an address belonging to nobody in its organization", () => {
     it("refuses", async () => {
       const { prisma } = prismaWith({
-        connection: connectionRow({ state: "DRAFT", verifiedDomains: [] }),
-        member: null,
+        connection: underSetup(),
+        members: directory,
       });
       const decision = await decide(prisma, "ceo@victim.test");
       expect(decision.action).toBe("reject");
     });
 
-    /** @scenario "A connection still being set up carries only its own people" */
     it("refuses even when that address is on a domain it has claimed", async () => {
       // Claiming is not proving. A claim is a sentence the customer typed.
       const { prisma } = prismaWith({
-        connection: connectionRow({
-          state: "CLAIMED",
-          verifiedDomains: [],
-        }),
-        member: null,
+        connection: underSetup({ state: "CLAIMED" }),
+        members: directory,
       });
       const decision = await decide(prisma, "ceo@victim.test");
       expect(decision.action).toBe("reject");

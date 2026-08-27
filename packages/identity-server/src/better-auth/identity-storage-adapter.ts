@@ -14,6 +14,7 @@ import type {
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../identity-user-gate";
 import { isSsoConnectionId } from "../sso-connection-id";
+import type { SsoProviderConfigCipher } from "../sso-provider-config-cipher";
 import {
   type AccountQuery,
   type AccountWhere,
@@ -93,6 +94,15 @@ export interface IdentityStorageAdapterDeps {
    * deploy of the entrance from changing anything on its own.
    */
   birth: IdentityBirthPort;
+  /**
+   * Opens the engine row's dialing configuration on its way out (D09).
+   *
+   * Required rather than optional, and for the reason the credential vault
+   * is: a cipher nobody passed would leave the document readable by anybody
+   * holding a database copy, and an optional dependency nobody wires is a
+   * protection that only looks present.
+   */
+  providerConfig: SsoProviderConfigCipher;
 }
 
 /**
@@ -179,6 +189,7 @@ function identityCustomAdapter({
   isUserOnIdentityWrites,
   isAnyoneOnIdentityWrites,
   birth,
+  providerConfig,
 }: Omit<IdentityStorageAdapterDeps, "legacyEngine"> & {
   legacy: DBAdapter;
 }): AdapterFactoryCustomizeAdapterCreator {
@@ -762,6 +773,41 @@ function identityCustomAdapter({
      * because the legacy table never stored a real one: a provider with an
      * issuer of its own arrived after the identity branch existed to hold it.
      */
+    /**
+     * The engine row's dialing configuration, opened on its way out.
+     *
+     * This is the ONLY reader — the plugin takes whatever the adapter hands
+     * it, and its own parse accepts a document that is already an object or
+     * still a string. So the row can be kept sealed at rest (D09) and opened
+     * here, once, on the path that is about to dial the provider.
+     *
+     * Total over both forms: a row written before the seal existed is
+     * returned unchanged, so this needs no backfill to be correct and no
+     * branch at the call sites.
+     */
+    const withOpenedProviderConfig = (model: string, row: Row): Row => {
+      if (modelOf(model) !== "ssoProvider") return row;
+      const opened = { ...row };
+      for (const field of ["oidcConfig", "samlConfig"] as const) {
+        const stored = opened[field];
+        if (typeof stored === "string" && stored.length > 0) {
+          opened[field] = providerConfig.open(stored);
+        }
+      }
+      return opened;
+    };
+
+    /**
+     * Everything a row needs on its way OUT of the store, in one place.
+     *
+     * Both halves are per-model no-ops for the model the other one serves, so
+     * every generic read path can call this without asking what it is holding
+     * — which is what keeps a new outbound rule from having to be remembered
+     * at four call sites.
+     */
+    const outbound = async (model: string, row: Row): Promise<Row> =>
+      withOpenedProviderConfig(model, await withLegacyIssuer(model, row));
+
     const withLegacyIssuer = async (model: string, row: Row): Promise<Row> => {
       if (modelOf(model) !== "account") return row;
       if (row.issuer != null) return row;
@@ -810,7 +856,7 @@ function identityCustomAdapter({
           // ceremony pinned would stop being the row's.
           forceAllowId: true,
         });
-        return toStorageKeys(model, await withLegacyIssuer(model, row)) as never;
+        return toStorageKeys(model, await outbound(model, row)) as never;
       },
 
       findOne: async ({ model, where, select, join }) => {
@@ -840,7 +886,7 @@ function identityCustomAdapter({
         });
         return found === null
           ? null
-          : (toStorageKeys(model, await withLegacyIssuer(model, found)) as never);
+          : (toStorageKeys(model, await outbound(model, found)) as never);
       },
 
       findMany: async ({
@@ -896,7 +942,7 @@ function identityCustomAdapter({
         });
         return (await Promise.all(
           found.map(async (row) =>
-            toStorageKeys(model, await withLegacyIssuer(model, row)),
+            toStorageKeys(model, await outbound(model, row)),
           ),
         )) as never;
       },
@@ -976,7 +1022,7 @@ function identityCustomAdapter({
         });
         return row === null
           ? null
-          : (toStorageKeys(model, await withLegacyIssuer(model, row)) as never);
+          : (toStorageKeys(model, await outbound(model, row)) as never);
       },
 
       updateMany: async ({ model, where, update }) => {
