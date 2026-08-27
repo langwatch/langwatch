@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed baseline:** `ef6c41f1f7`
+**Committed baseline:** `d4f11f4da7`
 
 **Goal:** delete `platform/app`.
 
@@ -24,24 +24,32 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Ledger item                                          |       Count | Status                                |
 | ---------------------------------------------------- | ----------: | ------------------------------------- |
 | Original application baseline                       | 6,398 files | Reference                             |
-| Committed `platform/app` at `ef6c41f1f7`             | 6,144 files | Authoritative current progress        |
+| Committed `platform/app` at `d4f11f4da7`             | 6,102 files | Authoritative current progress        |
 | Current physical tree from `rg --files platform/app` | 5,909 files | Working-tree queue only; not progress |
 | Automation cut                                       |    73 fewer | Committed                             |
 | Coding Agent/GitHub cut                              |    36 fewer | Committed                             |
 | Trace processing cut                                 |    45 fewer | Committed                             |
+| Evaluation processing cut                            |    42 fewer | Committed                             |
 
 The Automation contract, server and web packages have 559 passing tests, and
 their displaced application roots are empty. Coding Agent/GitHub has 266
 passing Coding Agent tests, 87 passing GitHub tests with 31 deliberately
 skipped, and both old application pipeline roots are empty.
 
+The package-only checkpoints for API, Gateway, Evaluation, Langy, Topic,
+Analytics, Workflow, Model Provider, Ops, Share and Secret preserve completed
+package work but do not count as application deletion. Their application
+cutovers remain explicit ledger work.
+
 ## Current gate
 
 | Area          | Current fact                                                                                                                                                                                                                                                                | Exit condition                                                                                                                                                                                                                                                         |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trace process | The 154-file cut is committed at `ef6c41f1f7`: `+2,208/-12,378`, with 50 application deletions and five named runtime adapters, for a net 45-file application reduction. The old 128-file processing root is now 18 files. Trace package tests pass: 39 files and 611 tests. | Repair the two recorded clean-index failures: remove the dependency on an unstaged Eventing builder API and replace the remaining old Trace schema import reached by Coding tests. Then re-run typechecks, package tests, the focused application cohort and boundary review. |
-| Trace reads   | At committed `HEAD`, `server/app-layer/traces` has 137 files and `server/traces` has 83. These are not one safe move.                                                                                                                                                        | Cut dependency-closed read cohorts while preserving every response field and keeping `trace_analytics`, `trace_summaries` and timeseries rollups distinct.                                                                                                            |
-| API framework | The first-class REST surface is implemented only in the unstaged `packages/api` queue. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first.                                                     |
+| Trace process | The 154-file cut is committed at `ef6c41f1f7`: `+2,208/-12,378`, for a net 45-file application reduction. The required Eventing preparation seam is committed at `cb5feeb6aa`. Old schema imports are zero; Coding tests pass 266/266 and Trace server typechecks. | Keep the remaining 18 files only while their named composition/effect responsibilities exist; delete each as its owning feature or worker composition moves. |
+| Trace reads   | At committed `HEAD`, `server/app-layer/traces` and `server/traces` remain large and are not one safe move. The 11-file projection-persistence cut is active.                                                                                                            | Cut dependency-closed read cohorts while preserving every response field and keeping `trace_analytics`, `trace_summaries` and timeseries rollups distinct. |
+| Evaluation    | Evaluation processing is committed at `d4f11f4da7`: 67 files, `+1,304/-8,875`, for a net 42-file application reduction. Package implementation is checkpointed separately at `48585548d6`.                                                                            | Prove the focused package/app checks, then drain remaining execution, evaluator, monitor and transport callers without collapsing the distinct Evaluation/Evaluator/Monitor/Experiment/Scenario/Simulation/Suite owners. |
+| Gateway       | Gateway package implementation is checkpointed at `9b03f579ee`; the application cutover is active.                                                                                                                                                                   | Rewire the composed service graph, preserve money/auth/query behavior and delete the displaced Gateway, virtual-key, spend and realtime implementation. |
+| API framework | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                          | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first. |
 
 Physical movement in the shared worktree is not progress until its exact paths
 are reviewed and committed. There is no time estimate in this ledger: the next
@@ -51,11 +59,11 @@ status changes when a named proof or commit changes.
 
 The next committed batches are:
 
-1. **Trace processing repair:** clear the two explicitly recorded clean-index
-   failures in the committed cut without restoring displaced application code.
-2. **Trace projection persistence:** move the 11 repository/adapter files for
+1. **Trace projection persistence:** move the 11 repository/adapter files for
    Trace summaries, Trace analytics and analytics rollups without merging their
    tables or query semantics.
+2. **Gateway application cutover:** delete the displaced Gateway, spend,
+   virtual-key and realtime implementation after caller rewiring.
 3. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
    one dependency-closed read-side collaborator.
 4. **Trace edit overlay and protection:** move the 18-file edit/protection core
@@ -65,8 +73,8 @@ The next committed batches are:
 6. **API composition:** adopt the parked REST surface when `apps/api` is
    created; do not churn current routes before that physical cut.
 
-Feature Flag, Evaluation and the other feature slices remain open. They are not
-completion fallout from the batches above:
+Feature Flag, the remainder of Evaluation and the other feature slices remain
+open. They are not completion fallout from the batches above:
 
 | Remaining slice                                                            | Required deletion boundary                                                                                                                                            |
 | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
