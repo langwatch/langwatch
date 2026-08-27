@@ -9,4 +9,4 @@ export type { BillingReportingPipelineDeps } from "./pipeline";
 export { createBillingReportingPipeline } from "./pipeline";
 // Schemas
 export * from "./schemas/commands";
-export * from "./schemas/constants";
+export * from "@langwatch/trace-contract";

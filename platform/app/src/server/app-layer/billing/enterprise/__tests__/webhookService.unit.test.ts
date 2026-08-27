@@ -18,11 +18,9 @@ vi.mock("../../../src/server/app-layer/app", () => ({
       sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
     },
     dataRetention: {
-      policy: {
-        setForScope: mockSetForScope,
-        removeForScope: mockRemoveForScope,
-        listOrganizationRules: mockListOrganizationRules,
-      },
+      setForScope: mockSetForScope,
+      removeForScope: mockRemoveForScope,
+      listOrganizationRules: mockListOrganizationRules,
     },
   }),
 }));

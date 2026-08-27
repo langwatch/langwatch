@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type Stripe from "stripe";
 
 const { mockGenerateLicenseKey } = vi.hoisted(() => ({
   mockGenerateLicenseKey: vi.fn().mockReturnValue({
@@ -39,11 +40,15 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 import { sendLicenseEmail } from "~/server/mailer/licenseEmail";
-import { LicensePurchaseService } from "../license-purchase.service";
+import { createLicensePurchaseService } from "../license-purchase.service";
 
 const mockSendLicenseEmail = sendLicenseEmail as ReturnType<typeof vi.fn>;
-const handleLicensePurchase = (input: Parameters<LicensePurchaseService["handle"]>[0]) =>
-  LicensePurchaseService.create({
+const handleLicensePurchase = (input: {
+  checkoutSession: Stripe.Checkout.Session;
+  stripe: Stripe;
+  privateKey: string;
+}) =>
+  createLicensePurchaseService({
     sendLicenseEmail,
     notifyLicensePurchase: mockSendSlackLicensePurchase,
   }).handle(input);

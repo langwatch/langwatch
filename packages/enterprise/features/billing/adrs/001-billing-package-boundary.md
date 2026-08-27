@@ -10,7 +10,8 @@
 
 Billing previously mixed portable plans and prices, Stripe orchestration,
 Customer.io nurturing, persistence, tRPC handlers, and React consumers beneath
-the application-owned `ee` directory.
+the application-owned `ee` directory. The remaining application references
+are composition adapters only.
 
 ## Decision
 
@@ -61,4 +62,7 @@ objects remain server-bound and never appear in browser exports.
 
 Billing's browser and backend dependency graphs can now be checked separately,
 while existing routes, jobs, and UI callers retain their behavior through
-explicit feature capabilities.
+explicit feature capabilities. `BillingSubscriptionService`,
+`UsageLimitService`, and `LicensePurchaseService` own their complete
+enterprise workflows in the server package; application code only supplies
+organization, persistence, provider, mail, and notification adapters.

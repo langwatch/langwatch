@@ -4,6 +4,7 @@ export {
   ClickHouseBillingAdapter,
   type BillingClickHouseClientResolver,
 } from "./adapters/clickhouse.clickhouse.adapter";
+export { PrismaBillingOrganizationRepository } from "./repositories/prisma/prisma.organization.repository";
 export {
   PostgresBillingAdapter,
   type PostgresBillingPersistence,
@@ -13,6 +14,14 @@ export {
   BillingErrorReporter,
   NullBillingErrorReporter,
 } from "./ports/error-reporter.port";
+export {
+  BillingOrganizationRepository,
+  NullBillingOrganizationRepository,
+} from "./ports/organization.port";
+export {
+  BillingSubscriptionNotifier,
+  NullBillingSubscriptionNotifier,
+} from "./ports/subscription-notifier.port";
 export {
   NullUsageLimitEmailAdapter,
   UsageLimitEmailAdapter,
@@ -35,6 +44,30 @@ export {
   type CurrencyRequest,
 } from "./services/currency.service";
 export { CustomerService } from "./services/customer.service";
+export {
+  UsageLimitService,
+  planLimitCooldown,
+  planLimitInFlight,
+  resourceLimitCooldown,
+  type BillingCooldownCache,
+  type BillingPlanResolver,
+  type BillingUsageCounter,
+  type BillingUsageLimitOrganization,
+  type UsageLimitData,
+} from "./services/usage-limit.service";
+export {
+  BillingSubscriptionService,
+  RECENT_INVOICES_LIMIT,
+  type BillingDisplayInvoice,
+} from "./services/subscription.service";
+export {
+  LicensePurchaseService,
+  LicenseGenerator,
+  LicensePurchaseDelivery,
+  type GeneratedLicense,
+  type LicenseEmailDelivery,
+  type LicensePurchaseNotification,
+} from "./services/license-purchase.service";
 export {
   NotificationService,
   type UsageLimitEmailData,

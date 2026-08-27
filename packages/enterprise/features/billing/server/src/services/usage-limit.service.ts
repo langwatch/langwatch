@@ -1,0 +1,777 @@
+import { createLogger } from "@langwatch/observability";
+import type {
+  PlanLimitNotifierInput,
+  ResourceLimitNotifierInput,
+} from "@langwatch/enterprise-billing-contract";
+import {
+  NotificationService as NotificationRecordService,
+  type CreateNotificationCommand,
+  type Notification,
+  type NotificationRecentQuery,
+} from "@langwatch/notification-contract";
+import { NotificationService, type UsageLimitEmailData } from "./notification.service";
+import type { BillingErrorReporter } from "../ports/error-reporter.port";
+import { NOTIFICATION_TYPES } from "@langwatch/enterprise-billing-contract";
+
+const logger = createLogger("langwatch:notifications:usageLimit");
+
+const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const; // Thresholds in ascending order
+const MIN_DAYS_BETWEEN_ALERTS = 30;
+
+// NOTE: In-memory cooldown does not survive restarts and does not coordinate across replicas. Accepted tradeoff: worst case is a duplicate Slack alert.
+const USAGE_UNKNOWN = "unknown" as const;
+const USAGE_UNIT_DISPLAY_LABELS = {
+  traces: "Monthly Traces",
+  events: "Monthly Events",
+} as const;
+const LIMIT_TYPE_DISPLAY_LABELS = {
+  members: "Team Members",
+  membersLite: "Lite Members",
+} as const;
+
+export interface BillingCooldownCache {
+  get(key: string): Promise<boolean | null>;
+  set(key: string, value: true): Promise<void>;
+  delete(key: string): Promise<void>;
+  claim?(key: string, value: true): Promise<boolean>;
+}
+
+class MemoryCooldownCache implements BillingCooldownCache {
+  private readonly values = new Map<string, number>();
+  constructor(private readonly ttlMs: number) {}
+  async get(key: string): Promise<boolean | null> {
+    const expiresAt = this.values.get(key);
+    if (!expiresAt || expiresAt <= Date.now()) {
+      this.values.delete(key);
+      return null;
+    }
+    return true;
+  }
+  async set(key: string, _value: true): Promise<void> {
+    this.values.set(key, Date.now() + this.ttlMs);
+  }
+  async delete(key: string): Promise<void> {
+    this.values.delete(key);
+  }
+  async claim(key: string): Promise<boolean> {
+    if (await this.get(key)) return false;
+    await this.set(key, true);
+    return true;
+  }
+}
+
+const resourceLimitCooldown = new MemoryCooldownCache(24 * 60 * 60 * 1000);
+
+export { resourceLimitCooldown };
+
+// Guards notifyPlanLimitReached against concurrent calls (burst of traces from
+// a single org hitting the limit middleware at the same time). Two layers:
+//
+// 1. planLimitInFlight (sync Set) — blocks same-tick races where multiple
+//    Promise.all callers interleave before any async operation resolves.
+// 2. planLimitCooldown (TtlCache) — blocks subsequent ticks and coordinates
+//    across pods via Redis. The DB 30-day window remains authoritative.
+const planLimitInFlight = new Set<string>();
+const planLimitCooldown = new MemoryCooldownCache(
+  MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000,
+);
+
+export { planLimitCooldown, planLimitInFlight };
+
+export interface UsageLimitData {
+  organizationId: string;
+  currentMonthMessagesCount: number;
+  maxMonthlyUsageLimit: number;
+}
+
+export interface BillingUsageLimitOrganization {
+  findWithAdmins(organizationId: string): Promise<{
+    id: string;
+    name: string;
+    sentPlanLimitAlert: Date | null;
+    members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+  } | null>;
+  updateSentPlanLimitAlert(organizationId: string, timestamp: Date): Promise<void>;
+  findProjectsWithName(
+    organizationId: string,
+  ): Promise<Array<{ id: string; name: string }>>;
+}
+
+export interface BillingUsageCounter {
+  getCountByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<Array<{ projectId: string; count: number }> | typeof USAGE_UNKNOWN>;
+}
+
+export interface BillingPlanResolver {
+  getActivePlan(input: { organizationId: string }): Promise<{ name?: string | null }>;
+}
+
+const getCurrentMonthStart = (): Date => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+};
+
+class NullNotificationRecordService extends NotificationRecordService {
+  listRecentByOrganization(_input: NotificationRecentQuery): Promise<Notification[]> {
+    return Promise.resolve([]);
+  }
+
+  create(input: CreateNotificationCommand): Promise<Notification> {
+    return Promise.resolve({
+      id: "notification_null",
+      organizationId: input.organizationId,
+      projectId: input.projectId ?? null,
+      metadata: input.metadata,
+      sentAt: input.sentAt,
+      createdAt: input.sentAt,
+      updatedAt: input.sentAt,
+    });
+  }
+}
+
+/**
+ * Service layer for usage limit notification business logic.
+ * Single Responsibility: Handle business logic for WHEN/WHAT to send.
+ *
+ * Delegates delivery to {@link NotificationService} (HOW to send).
+ * Framework-agnostic - no tRPC dependencies.
+ */
+export class UsageLimitService {
+  private readonly notificationRecords: NotificationRecordService;
+  private readonly organizationService: BillingUsageLimitOrganization;
+  private readonly usageService: BillingUsageCounter;
+  private readonly notificationService: NotificationService;
+  private readonly planProvider: BillingPlanResolver;
+  private readonly errorReporter: BillingErrorReporter;
+  private readonly resourceCooldown: BillingCooldownCache;
+  private readonly planCooldown: BillingCooldownCache;
+  private readonly isSaas: boolean;
+  private readonly baseHost: string;
+
+  private constructor({
+    notificationRecords,
+    organizationService,
+    usageService,
+    notificationService,
+    planProvider,
+    errorReporter,
+    resourceCooldown,
+    planCooldown,
+    isSaas,
+    baseHost,
+  }: {
+    notificationRecords: NotificationRecordService;
+    organizationService: BillingUsageLimitOrganization;
+    usageService: BillingUsageCounter;
+    notificationService: NotificationService;
+    planProvider: BillingPlanResolver;
+    errorReporter?: BillingErrorReporter;
+    resourceCooldown?: BillingCooldownCache;
+    planCooldown?: BillingCooldownCache;
+    isSaas: boolean;
+    baseHost: string;
+  }) {
+    this.notificationRecords = notificationRecords;
+    this.organizationService = organizationService;
+    this.usageService = usageService;
+    this.notificationService = notificationService;
+    this.planProvider = planProvider;
+    this.errorReporter = errorReporter ?? { capture: () => {} };
+    this.resourceCooldown = resourceCooldown ?? resourceLimitCooldown;
+    this.planCooldown = planCooldown ?? planLimitCooldown;
+    this.isSaas = isSaas;
+    this.baseHost = baseHost;
+  }
+
+  /**
+   * Static factory method for creating a UsageLimitService with proper DI.
+   */
+  static create({
+    notificationRecords,
+    organizationService,
+    usageService,
+    notificationService,
+    planProvider,
+    isSaas = false,
+    baseHost = "https://app.langwatch.ai",
+    errorReporter,
+    resourceCooldown,
+    planCooldown,
+  }: {
+    notificationRecords: NotificationRecordService;
+    organizationService: BillingUsageLimitOrganization;
+    usageService: BillingUsageCounter;
+    notificationService: NotificationService;
+    planProvider: BillingPlanResolver;
+    isSaas?: boolean;
+    baseHost?: string;
+    errorReporter?: BillingErrorReporter;
+    resourceCooldown?: BillingCooldownCache;
+    planCooldown?: BillingCooldownCache;
+  }): UsageLimitService {
+    return new UsageLimitService({
+      notificationRecords,
+      organizationService,
+      usageService,
+      notificationService,
+      planProvider,
+      isSaas,
+      baseHost,
+      errorReporter,
+      resourceCooldown,
+      planCooldown,
+    });
+  }
+
+  /**
+   * Null-object factory: every method is a silent noop.
+   * Use in tests or non-SaaS deployments where no notifications are needed.
+   */
+  static createNull(): UsageLimitService {
+    const noopRecords = new NullNotificationRecordService();
+    const noopOrg: BillingUsageLimitOrganization = {
+      findWithAdmins: async () => null,
+      updateSentPlanLimitAlert: async () => {},
+      findProjectsWithName: async () => [],
+    };
+    const noopUsage: BillingUsageCounter = {
+      getCountByProjects: async () => [],
+    };
+    const noopPlan: BillingPlanResolver = {
+      getActivePlan: async () => ({ name: "free" }),
+    };
+    return new UsageLimitService({
+      notificationRecords: noopRecords,
+      organizationService: noopOrg,
+      usageService: noopUsage,
+      notificationService: NotificationService.createNull(),
+      planProvider: noopPlan,
+      isSaas: false,
+      baseHost: "https://app.langwatch.ai",
+    });
+  }
+
+  /**
+   * Notifies internal channels that an organization has reached its plan limit.
+   * Absorbed from planLimitNotifier.ts.
+   *
+   * Checks IS_SAAS env, fetches org with admin members, enforces 30-day cooldown,
+   * then delegates to NotificationService for Slack and Hubspot delivery.
+   */
+  async notifyPlanLimitReached({
+    organizationId,
+    planName,
+    usageUnit,
+    current,
+    max,
+  }: PlanLimitNotifierInput): Promise<void> {
+    if (!this.isSaas) {
+      return;
+    }
+
+    // Synchronous guard: blocks same-tick concurrent calls (e.g. 5 trace
+    // requests hitting Promise.all) before any await yields execution.
+    if (planLimitInFlight.has(organizationId)) {
+      return;
+    }
+    planLimitInFlight.add(organizationId);
+
+    try {
+      // Atomic cross-pod guard: SET NX EX claims the cooldown slot in a
+      // single Redis round-trip, closing the distributed TOCTOU window.
+      const claimed = await (this.planCooldown.claim?.(organizationId, true) ?? false);
+      if (!claimed) {
+        return;
+      }
+
+      const organization = await this.organizationService.findWithAdmins(organizationId);
+
+      if (!organization) {
+        await this.planCooldown.delete(organizationId);
+        return;
+      }
+
+      if (organization.sentPlanLimitAlert) {
+        const timeSinceLastAlert = Date.now() - organization.sentPlanLimitAlert.getTime();
+        const daysSinceLastAlert = Math.floor(timeSinceLastAlert / (1000 * 60 * 60 * 24));
+
+        if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
+          return;
+        }
+      }
+
+      const admin = organization.members[0]?.user;
+
+      const context = {
+        organizationId,
+        organizationName: organization.name,
+        adminName: admin?.name ?? undefined,
+        adminEmail: admin?.email ?? undefined,
+        planName,
+        limitType: USAGE_UNIT_DISPLAY_LABELS[usageUnit],
+        current,
+        max,
+      };
+
+      // Both sends are fire-and-forget (errors swallowed internally),
+      // so use allSettled to await completion without short-circuiting.
+      await Promise.allSettled([
+        this.notificationService.sendSlackPlanLimitAlert(context),
+        this.notificationService.sendHubspotPlanLimitForm(context),
+      ]);
+
+      try {
+        await this.organizationService.updateSentPlanLimitAlert(
+          organizationId,
+          new Date(),
+        );
+      } catch (error) {
+        this.errorReporter.capture(
+          new Error(
+            `Critical: plan limit notification sent but DB timestamp update failed for org ${organizationId} on plan ${planName}`,
+            { cause: error },
+          ),
+        );
+      }
+    } finally {
+      planLimitInFlight.delete(organizationId);
+    }
+  }
+
+  /**
+   * Notifies internal channels that an organization has reached a resource limit.
+   *
+   * Uses an in-memory 24-hour cooldown keyed by organizationId:limitType to avoid
+   * duplicate Slack alerts. Each limit type has its own cooldown window.
+   */
+  async notifyResourceLimitReached({
+    organizationId,
+    limitType,
+    current,
+    max,
+  }: ResourceLimitNotifierInput): Promise<void> {
+    if (!this.isSaas) {
+      return;
+    }
+
+    const cooldownKey = `${organizationId}:${limitType}`;
+
+    if (await this.resourceCooldown.get(cooldownKey)) {
+      return;
+    }
+
+    await this.resourceCooldown.set(cooldownKey, true);
+
+    try {
+      const org = await this.organizationService.findWithAdmins(organizationId);
+
+      if (!org) {
+        await this.resourceCooldown.delete(cooldownKey);
+        return;
+      }
+
+      const admin = org.members[0]?.user;
+      const limitLabel = LIMIT_TYPE_DISPLAY_LABELS[limitType];
+
+      let planName = "unknown";
+      try {
+        planName =
+          (await this.planProvider.getActivePlan({ organizationId })).name ?? "unknown";
+      } catch {
+        // fall through with "unknown"
+      }
+
+      await this.notificationService.sendSlackResourceLimitAlert({
+        organizationId,
+        organizationName: org.name,
+        adminName: admin?.name ?? undefined,
+        adminEmail: admin?.email ?? undefined,
+        planName,
+        limitType: limitLabel,
+        current,
+        max,
+      });
+    } catch (error) {
+      // A silent catch here lost the whole "a customer hit a resource limit"
+      // signal whenever Slack was down — no log, no capture, just a released
+      // cooldown. Report it the way the sibling plan-limit path does, then
+      // release so the next attempt is allowed through.
+      logger.error(
+        { error, organizationId, limitType },
+        "[billing] Failed to send resource limit alert",
+      );
+      this.errorReporter.capture(
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      await this.resourceCooldown.delete(cooldownKey);
+    }
+  }
+
+  /**
+   * Checks if a usage limit warning notification should be sent and sends it if needed.
+   * Creates a notification record in the database after successfully sending the email.
+   *
+   * @param data Usage limit data including organization ID, current usage, and limit
+   * @returns The created notification record, or null if no notification was sent
+   */
+  async checkAndSendWarning(data: UsageLimitData) {
+    const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
+
+    const usagePercentage =
+      maxMonthlyUsageLimit > 0
+        ? (currentMonthMessagesCount / maxMonthlyUsageLimit) * 100
+        : 0;
+
+    const crossedThreshold = this.calculateThreshold(usagePercentage);
+
+    if (!crossedThreshold) {
+      logger.debug(
+        {
+          organizationId,
+          usagePercentage,
+          lowestThreshold: USAGE_WARNING_THRESHOLDS[0],
+        },
+        "Usage below all warning thresholds, skipping notification",
+      );
+      return null;
+    }
+
+    const organization = await this.organizationService.findWithAdmins(organizationId);
+
+    if (!organization) {
+      logger.warn({ organizationId }, "Organization not found");
+      return null;
+    }
+
+    if (organization.members.length === 0) {
+      logger.warn({ organizationId }, "No admin members found for organization");
+      return null;
+    }
+
+    // Check if we've sent a notification for this specific threshold in the current calendar month.
+    //
+    // NOTE: This check-then-insert pattern has a small race window where two concurrent
+    // workers could both pass the check and send duplicate emails. This is acceptable
+    // because: (1) this runs from a single cron worker and a user-initiated tRPC mutation
+    // that is unlikely to fire concurrently, and (2) the worst case is a duplicate email
+    // in the same month, which is benign. If a stronger guarantee is needed, add a unique
+    // constraint on (organizationId, threshold, yearMonth) via a database migration.
+    const currentMonthStart = getCurrentMonthStart();
+
+    const recentNotifications = await this.notificationRecords.listRecentByOrganization({
+      organizationId,
+      since: currentMonthStart,
+    });
+
+    const recentNotification = recentNotifications.find((notification) => {
+      if (!notification.metadata || typeof notification.metadata !== "object") {
+        return false;
+      }
+      const metadata = notification.metadata as Record<string, unknown>;
+      return (
+        metadata.type === NOTIFICATION_TYPES.USAGE_LIMIT_WARNING &&
+        metadata.threshold === crossedThreshold
+      );
+    });
+
+    if (recentNotification) {
+      logger.debug(
+        {
+          organizationId,
+          threshold: crossedThreshold,
+          lastSentAt: recentNotification.sentAt,
+          currentMonthStart,
+        },
+        "Notification already sent for this threshold in current calendar month, skipping duplicate",
+      );
+      return null;
+    }
+
+    // Fetch projects and their usage
+    const projects = await this.organizationService.findProjectsWithName(organizationId);
+
+    const projectIds = projects.map((p) => p.id);
+    const counts = await this.usageService.getCountByProjects({
+      organizationId,
+      projectIds,
+    });
+    // The per-project breakdown is the substance of this email. Sending it with
+    // every project reading 0 — which is what an unknown count used to become —
+    // tells an admin their usage collapsed, in a message whose entire premise
+    // is that their usage is high. Skip the send; the threshold is still
+    // crossed on the next run, when the numbers are real.
+    if (counts === USAGE_UNKNOWN) {
+      logger.warn(
+        { organizationId, crossedThreshold },
+        "usage is unknown, skipping usage-limit email rather than reporting zeros",
+      );
+      return;
+    }
+    const countsMap = new Map(counts.map((c) => [c.projectId, c.count]));
+    const projectUsageData = projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      messageCount: countsMap.get(p.id) ?? 0,
+    }));
+
+    const emailContext = this.buildEmailContext({
+      organizationName: organization.name,
+      usagePercentage,
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      crossedThreshold,
+      projectUsageData,
+    });
+
+    const deliverableAdmins = organization.members.filter((member) => member.user.email);
+
+    if (deliverableAdmins.length === 0) {
+      logger.info(
+        {
+          organizationId,
+          totalAdmins: organization.members.length,
+          usagePercentage: usagePercentage.toFixed(2),
+          threshold: crossedThreshold,
+        },
+        "No admins with email addresses found, skipping notification (no deliverable recipients)",
+      );
+      return null;
+    }
+
+    try {
+      const { recipientsSuccessCount, recipientsFailureCount, failedRecipients } =
+        await this.dispatchEmails({
+          organizationId,
+          organizationName: organization.name,
+          deliverableAdmins,
+          emailContext,
+        });
+
+      if (recipientsSuccessCount === 0) {
+        logger.error(
+          {
+            organizationId,
+            recipientsFailureCount,
+            failedRecipients,
+            usagePercentage: usagePercentage.toFixed(2),
+            threshold: crossedThreshold,
+          },
+          "All usage limit warning emails failed to send, aborting notification creation to allow retries",
+        );
+        throw new Error(
+          `All ${recipientsFailureCount} usage limit warning emails failed to send`,
+        );
+      }
+
+      const notification = await this.recordNotification({
+        organizationId,
+        currentMonthMessagesCount,
+        maxMonthlyUsageLimit,
+        usagePercentage,
+        crossedThreshold,
+        deliverableAdminsCount: deliverableAdmins.length,
+        recipientsSuccessCount,
+        recipientsFailureCount,
+        failedRecipients,
+      });
+
+      logger.info(
+        {
+          organizationId,
+          notificationId: notification.id,
+          recipientsCount: deliverableAdmins.length,
+          recipientsSuccessCount,
+          recipientsFailureCount,
+          ...(recipientsFailureCount > 0 && { failedRecipients }),
+          usagePercentage: usagePercentage.toFixed(2),
+          threshold: crossedThreshold,
+        },
+        "Usage limit warning notifications sent successfully",
+      );
+
+      return notification;
+    } catch (error) {
+      logger.error(
+        { error, organizationId },
+        "Error sending usage limit warning notifications",
+      );
+      throw error;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Private helpers for checkAndSendWarning
+  // -------------------------------------------------------------------------
+
+  /**
+   * Finds the highest warning threshold crossed by the current usage percentage.
+   */
+  private calculateThreshold(
+    usagePercentage: number,
+  ): (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined {
+    let crossed: (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined;
+    for (const threshold of USAGE_WARNING_THRESHOLDS) {
+      if (usagePercentage >= threshold) crossed = threshold;
+    }
+    return crossed;
+  }
+
+  /**
+   * Builds the email data object with severity, formatting, and presentation constants.
+   */
+  private buildEmailContext({
+    organizationName,
+    usagePercentage,
+    currentMonthMessagesCount,
+    maxMonthlyUsageLimit,
+    crossedThreshold,
+    projectUsageData,
+  }: {
+    organizationName: string;
+    usagePercentage: number;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    crossedThreshold: number;
+    projectUsageData: Array<{ id: string; name: string; messageCount: number }>;
+  }): UsageLimitEmailData {
+    const actionUrl = `${this.baseHost}/settings/usage`;
+
+    const logoUrl =
+      "https://hs-143534269.f.hubspotstarter-eu1.net/hub/143534269/hubfs/header-3.png?width=1116&upscale=true&name=header-3.png";
+
+    const cappedPercentage = Math.min(usagePercentage, 100);
+    const usagePercentageFormatted = Math.floor(cappedPercentage).toString();
+
+    let severity: string;
+    if (crossedThreshold >= 95) {
+      severity = "Critical";
+    } else if (crossedThreshold >= 90) {
+      severity = "High";
+    } else if (crossedThreshold >= 70) {
+      severity = "Medium";
+    } else {
+      severity = "Info";
+    }
+
+    return {
+      organizationName,
+      usagePercentage,
+      usagePercentageFormatted,
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      crossedThreshold,
+      projectUsageData,
+      actionUrl,
+      logoUrl,
+      severity,
+    };
+  }
+
+  /**
+   * Sends usage limit emails to all deliverable admins, tracking successes and failures.
+   */
+  private async dispatchEmails({
+    organizationId,
+    organizationName,
+    deliverableAdmins,
+    emailContext,
+  }: {
+    organizationId: string;
+    organizationName: string;
+    deliverableAdmins: Array<{ user: { id: string; email: string | null } }>;
+    emailContext: UsageLimitEmailData;
+  }) {
+    const emailResults = await Promise.allSettled(
+      deliverableAdmins.map(async (member) => {
+        await this.notificationService.sendUsageLimitEmail({
+          to: member.user.email!,
+          orgName: organizationName,
+          usageData: emailContext,
+        });
+      }),
+    );
+
+    let recipientsSuccessCount = 0;
+    let recipientsFailureCount = 0;
+    const failedRecipients: Array<{ userId: string; error: string }> = [];
+
+    emailResults.forEach((result, index) => {
+      const member = deliverableAdmins[index];
+      if (!member) {
+        logger.warn({ index, organizationId }, "Member not found at index, skipping");
+        return;
+      }
+
+      if (result.status === "fulfilled") {
+        recipientsSuccessCount++;
+      } else {
+        recipientsFailureCount++;
+        const errorMessage =
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
+        failedRecipients.push({
+          userId: member.user.id,
+          error: errorMessage,
+        });
+        logger.error(
+          {
+            userId: member.user.id,
+            error: errorMessage,
+            organizationId,
+          },
+          "Failed to send usage limit warning email",
+        );
+      }
+    });
+
+    return { recipientsSuccessCount, recipientsFailureCount, failedRecipients };
+  }
+
+  /**
+   * Creates a notification record through the canonical Notification service
+   * after successful email delivery.
+   */
+  private async recordNotification({
+    organizationId,
+    currentMonthMessagesCount,
+    maxMonthlyUsageLimit,
+    usagePercentage,
+    crossedThreshold,
+    deliverableAdminsCount,
+    recipientsSuccessCount,
+    recipientsFailureCount,
+    failedRecipients,
+  }: {
+    organizationId: string;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    usagePercentage: number;
+    crossedThreshold: number;
+    deliverableAdminsCount: number;
+    recipientsSuccessCount: number;
+    recipientsFailureCount: number;
+    failedRecipients: Array<{ userId: string; error: string }>;
+  }) {
+    return this.notificationRecords.create({
+      organizationId,
+      sentAt: new Date(),
+      metadata: {
+        type: NOTIFICATION_TYPES.USAGE_LIMIT_WARNING,
+        currentUsage: currentMonthMessagesCount,
+        limit: maxMonthlyUsageLimit,
+        percentage: usagePercentage,
+        threshold: crossedThreshold,
+        recipientsCount: deliverableAdminsCount,
+        recipientsSuccessCount,
+        recipientsFailureCount,
+        ...(recipientsFailureCount > 0 && {
+          failedRecipients: failedRecipients.map((f) => ({
+            userId: f.userId,
+            error: f.error,
+          })),
+        }),
+      },
+    });
+  }
+}

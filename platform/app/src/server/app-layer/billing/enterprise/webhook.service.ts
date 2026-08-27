@@ -952,8 +952,9 @@ export class EEWebhookService implements WebhookService {
     // opted to lose. Mirrors licenseHandler.provisionMissingRetentionPolicies.
     let covered: Set<string>;
     try {
-      const existing =
-        await getApp().dataRetention.policy.listOrganizationRules(organizationId);
+      const existing = await getApp().dataRetention.listOrganizationRules({
+        organizationId,
+      });
       covered = new Set(
         existing
           .filter(
@@ -975,7 +976,7 @@ export class EEWebhookService implements WebhookService {
     for (const category of RETENTION_CATEGORIES) {
       if (covered.has(category)) continue;
       try {
-        await getApp().dataRetention.policy.setForScope({
+        await getApp().dataRetention.setForScope({
           scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
           category,
           retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,

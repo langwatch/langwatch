@@ -9,7 +9,7 @@
 import { createTenantId, type Event } from "@langwatch/eventing";
 import type { SubscriberDispatchContext } from "@langwatch/eventing/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../../pipelines/trace-processing/schemas/constants";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
