@@ -636,7 +636,15 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		return true, nil
 	}
 	if !o.sys.ProcessAlive(st.LauncherPID) {
-		// A dead launcher's registry entry must never block up — clean it up.
+		// A dead launcher's registry entry must never block up. Clean it up
+		// and take its hostnames down with it. A route that outlives its stack
+		// is worse than no route: the kernel hands that loopback port to the
+		// next process that asks, and the proxy then serves an unrelated
+		// worktree's dev server on this stack's hostname (HTML 404s from a
+		// stranger, instead of a connection that fails).
+		if !st.PortlessDisabled {
+			o.removeStackRoutes(slug, st.Services)
+		}
 		o.store.RemoveStack(slug)
 		return true, nil
 	}
@@ -679,6 +687,31 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	return true, nil
 }
 
+// removeStackRoutes deregisters every hostname a slug can own: the ones every
+// stack always plans for, the ones this stack actually persisted, and the two
+// datastore aliases. The union is the point: a stack that died mid-provision,
+// or one written by an older haven, has fewer services on record than it
+// registered routes for, and any name left behind keeps resolving to a port the
+// kernel has since reissued.
+func (o *Orchestrator) removeStackRoutes(slug string, services []domain.Service) {
+	seen := make(map[string]bool)
+	remove := func(name string) {
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		o.proxy.Remove(name, slug)
+	}
+	for _, r := range domain.PerWorktreeServices {
+		remove(r.Name)
+	}
+	for _, s := range services {
+		remove(s.Name)
+	}
+	remove(domain.ClickHouseService)
+	remove(domain.PostgresService)
+}
+
 // Down tears the current worktree's stack down from anywhere: it stops a live
 // launcher (the supervised children die with their process group), removes the
 // routes, and drops the registry entry. Databases are KEPT, always — no flag
@@ -714,11 +747,7 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 		portlessDisabled = st.PortlessDisabled
 	}
 	if !portlessDisabled {
-		for _, r := range domain.PerWorktreeServices {
-			o.proxy.Remove(r.Name, slug)
-		}
-		o.proxy.Remove(domain.ClickHouseService, slug)
-		o.proxy.Remove(domain.PostgresService, slug)
+		o.removeStackRoutes(slug, st.Services)
 	}
 	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)

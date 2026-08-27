@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import type { Project } from "~/generated/prisma/client";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -134,6 +135,7 @@ function useCodingAgentLinks(): CodingAgentLinks {
   const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
+      projectId: project?.id,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
@@ -269,11 +271,19 @@ function TestSection({
   // One destination replaces the Simulations group, and the two cannot both
   // be offered: they address the same runs through different routes, so a menu
   // holding both would give a person two links to the same work.
-  const { enabled: agentTestingEnabled, isLoading: agentTestingFlagLoading } =
+  const { organization } = useOrganizationTeamProject();
+  const { enabled: agentTestingEnabled, isLoading: flagReadLoading } =
     useFeatureFlag("release_ui_agent_testing_v2_enabled", {
       projectId: project?.id,
-      enabled: !!project?.id,
+      organizationId: organization?.id,
+      // Both ids come from the same workspace query, and a rule may name
+      // either one, so the read waits until both are known.
+      enabled: !!project?.id && !!organization?.id,
     });
+  // The read stays idle until both ids arrive, so "not loading" alone does
+  // not mean the answer is in. The menu shows neither destination until it is.
+  const agentTestingFlagLoading =
+    flagReadLoading || !project?.id || !organization?.id;
 
   return (
     <SidebarSection
@@ -493,6 +503,10 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   // chrome retires.
   const envAlwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
   const { enabled: opsMenuPinned } = useFeatureFlag("ops_ui_ops_menu_pinned", {
+    // A per-browser pin for an operator, decided by ops access alone. No
+    // tenant takes part in it, so neither scope is targeted.
+    projectId: NOT_TARGETED,
+    organizationId: NOT_TARGETED,
     enabled: hasAccess,
   });
   const alwaysShow = envAlwaysShow || opsMenuPinned;

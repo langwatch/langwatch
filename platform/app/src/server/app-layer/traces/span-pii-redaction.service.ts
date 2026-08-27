@@ -34,6 +34,7 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] =
 
 import { createLogger } from "@langwatch/observability";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import type { PIIRedactionLevel } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
   OtlpAnyValue,
@@ -793,7 +794,13 @@ export class OtlpSpanPiiRedactionService {
   ): Promise<PIICheckOptions | null> {
     const disabled = await featureFlagService.isEnabled(
       "ops_pii_strict_presidio_redaction_disabled",
-      { distinctId: "span-pii-service", defaultValue: false },
+      {
+        distinctId: "span-pii-service",
+        defaultValue: false,
+        // A global kill switch for the whole service, not for one tenant.
+        projectId: NOT_TARGETED,
+        organizationId: NOT_TARGETED,
+      },
     );
     if (disabled) return null;
     if (piiRedactionLevel === "DISABLED") return null;

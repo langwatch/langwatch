@@ -1,6 +1,6 @@
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import type { SectionNavItemData } from "./sectionNavItems";
 
 /**
@@ -28,7 +28,7 @@ export function useVisibleSectionNavItems(
   // matching fails closed without ctx.organizationId), so the check must
   // carry the same org context the page guards pass — otherwise a per-org
   // enable shows the pages but never their nav items.
-  const { organization } = useOrganizationTeamProject({
+  const { project, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -41,6 +41,7 @@ export function useVisibleSectionNavItems(
   const billedCost = useFeatureFlag(
     "release_ui_governance_billed_cost_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id && needsBilledCost,
     },

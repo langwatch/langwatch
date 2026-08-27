@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -1044,6 +1045,14 @@ export function initializeDefaultApp(options?: {
     ? new PersonalUsageClickHouseRepository(resolveClickHouseClient)
     : undefined;
 
+  // The /governance activity-monitor read side (spend rollups, per-source
+  // events and health). Org-scoped aggregates, but the queries key on the
+  // hidden governance Project, so it takes the standard per-tenant resolver —
+  // getClickHouseClientForTenant maps a project id to its org's route.
+  const activityMonitorRepository = clickhouseEnabled
+    ? new ActivityMonitorClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
   // Billing-month usage rollups (billable_events + trace_summaries),
   // read by the billing pipeline and the usage-limit services.
   const billableEventsRepository = clickhouseEnabled
@@ -1849,6 +1858,7 @@ export function initializeDefaultApp(options?: {
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
+      activityMonitor: activityMonitorRepository,
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
@@ -2194,6 +2204,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       traceActivity: undefined,
       kpis: undefined,
       personalUsage: undefined,
+      activityMonitor: undefined,
     },
     billableEvents: undefined,
     codingAgents: {

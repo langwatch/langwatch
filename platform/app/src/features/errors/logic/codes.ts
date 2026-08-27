@@ -345,6 +345,7 @@ export const APP_ERROR_CODES = [
   "sso_connection_string_edit_retired",
   "sso_connection_teardown_strands_users",
   "sso_saml_not_self_serve",
+  "storage_not_writable",
   "subscription_ambiguous",
   "subscription_not_linked",
   "subscription_service_unavailable",

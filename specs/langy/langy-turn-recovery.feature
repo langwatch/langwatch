@@ -319,6 +319,33 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then the turn fails as a worker that stopped
     And no re-dispatch is attempted
 
+  # The record kept for reviving a turn was given its lifetime once, when the
+  # turn was dispatched, and nothing extended it. So a turn that ran longer than
+  # that lifetime lost the record while the worker was still working, and there
+  # was nothing to revive it with for the rest of the answer. The heartbeat is
+  # already the proof that the worker is alive, so it is what extends the
+  # record. It extends the lifetime only, because a heartbeat says the worker is
+  # alive, not that anything about the turn's resume inputs changed.
+  @unit
+  Scenario: A heartbeat keeps the turn's revival record alive
+    Given a turn that has been running for longer than the revival record lives
+    When the worker posts a heartbeat
+    Then the revival record is given its full lifetime again
+    And the record itself is not rewritten
+
+  @unit
+  Scenario: A revival record that already aged out is not recreated
+    Given a turn whose revival record has already expired
+    When the worker posts a heartbeat
+    Then nothing is written back, and the heartbeat still counts as liveness
+
+  @unit
+  Scenario: A heartbeat still counts when the revival record cannot be reached
+    Given the store holding revival records refuses the request
+    When the worker posts a heartbeat
+    Then the turn is still marked as alive
+    And the frame is not rejected
+
   @unit
   Scenario: A late failure never overwrites a completed answer
     Given a turn completed and the conversation is idle

@@ -11,7 +11,7 @@
  * Pairs with: activityMonitor.service.ts (orchestration + PG queries)
  * Spec: specs/ai-gateway/governance/folds.feature
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 import {
   ATTR_INGESTION_SOURCE_ID,
@@ -28,18 +28,19 @@ import {
 } from "./activityMonitor.clickhouse.schemas";
 
 export class ActivityMonitorEventsClickHouseRepository {
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
   /** Traced-event count per source, from `trace_summaries`. */
   async countTracedEventsBySource({
-    ch,
     tenantId,
     sourceIds,
     since,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
   }): Promise<SourceEventCountChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT ts.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
@@ -72,16 +73,15 @@ export class ActivityMonitorEventsClickHouseRepository {
 
   /** Logged-record count per source, from `stored_log_records`. */
   async countLoggedEventsBySource({
-    ch,
     tenantId,
     sourceIds,
     since,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
   }): Promise<SourceEventCountChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT lr.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
@@ -107,16 +107,15 @@ export class ActivityMonitorEventsClickHouseRepository {
 
   /** Pulled OCSF-event count per source, from `governance_ocsf_events`. */
   async countPulledEventsBySource({
-    ch,
     tenantId,
     sourceIds,
     since,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceIds: string[];
     since: number;
   }): Promise<SourceEventCountChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT SourceId AS sourceId, toString(count()) AS c
@@ -147,18 +146,17 @@ export class ActivityMonitorEventsClickHouseRepository {
    * cursor-paged via `beforeMs`.
    */
   async findPushedEventsForSource({
-    ch,
     tenantId,
     sourceId,
     beforeMs,
     limit,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     beforeMs: number;
     limit: number;
   }): Promise<PushedEventChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT
@@ -207,18 +205,17 @@ export class ActivityMonitorEventsClickHouseRepository {
    * cursor-paged via `beforeMs`.
    */
   async findPulledEventsForSource({
-    ch,
     tenantId,
     sourceId,
     beforeMs,
     limit,
   }: {
-    ch: ClickHouseClient;
     tenantId: string;
     sourceId: string;
     beforeMs: number;
     limit: number;
   }): Promise<PulledEventChRow[]> {
+    const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
       query: `
         SELECT

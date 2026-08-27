@@ -493,6 +493,43 @@ const applyLimit = (data: unknown, limit: number): unknown => {
 };
 
 /**
+ * The other names a paginated list has given "how many there are in all".
+ * `total` is the common one; the search-backed lists (traces, experiments) say
+ * `totalHits`, because each list follows the shape of the API it calls.
+ */
+const TOTAL_ALIASES = ["totalHits"] as const;
+
+/**
+ * One spelling of the total on every paginated envelope.
+ *
+ * Asked how many of something there are, a caller reads `.pagination.total`.
+ * On a search-backed list that answered null, and the count then came from
+ * guessing: `length` over a page that was already capped, or a second tool.
+ * The field the API sent is kept as well, so anything reading `totalHits` is
+ * unaffected; this only adds the name every other list already uses.
+ */
+const withNormalizedTotal = (data: unknown): unknown => {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const record = data as Record<string, unknown>;
+  const pagination = record.pagination;
+  if (!pagination || typeof pagination !== "object" || Array.isArray(pagination))
+    return data;
+
+  const paginationRecord = pagination as Record<string, unknown>;
+  if (typeof paginationRecord.total === "number") return data;
+
+  const named = TOTAL_ALIASES.find(
+    (field) => typeof paginationRecord[field] === "number",
+  );
+  if (!named) return data;
+
+  return {
+    ...record,
+    pagination: { ...paginationRecord, total: paginationRecord[named] },
+  };
+};
+
+/**
  * The payload as the caller asked to see it: cut to `--limit`, narrowed to
  * `--json <fields>`, then filtered through `--jq`.
  *
@@ -500,7 +537,9 @@ const applyLimit = (data: unknown, limit: number): unknown => {
  * say what to read off them, so `--limit 5 --jq length` answers 5.
  */
 const projectResult = (data: unknown, resolved: ResolvedOutput): unknown => {
-  let out = data;
+  // The total is normalized BEFORE the cap, so `--limit 5` still prints the
+  // total of the whole list rather than the size of the page.
+  let out = withNormalizedTotal(data);
   if (resolved.limit !== undefined) out = applyLimit(out, resolved.limit);
   if (resolved.fields) out = selectFields(out, resolved.fields);
   if (resolved.jq) out = applyJq(resolved.jq, out);

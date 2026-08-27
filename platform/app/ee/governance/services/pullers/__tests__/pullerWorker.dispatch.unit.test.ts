@@ -157,7 +157,11 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         targetName: "gpt-5-mini",
       });
       expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
-      expect(outcome).toEqual({ nextCursor: null, eventCount: 2 });
+      expect(outcome).toEqual({
+        nextCursor: null,
+        eventCount: 2,
+        errorCount: 0,
+      });
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
@@ -203,6 +207,27 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       await expect(
         runIngestionPull({ sourceId: "src-unknown", cursor: null }),
       ).rejects.toThrow("Unknown ingestion pull adapter");
+      expect(sourceUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the adapter refuses the config", () => {
+    it("fails before dispatching, so no request is made against a half-read config", async () => {
+      const { url: _dropped, ...withoutUrl } = HTTP_POLLING_CONFIG;
+      sourceFindUnique.mockResolvedValueOnce({
+        id: "src-bad-config",
+        organizationId: "org-1",
+        sourceType: "http_polling",
+        status: "active",
+        parserConfig: withoutUrl,
+        pollerCursor: null,
+      });
+      const { runIngestionPull } = await import("../pullerWorker");
+      await expect(
+        runIngestionPull({ sourceId: "src-bad-config", cursor: null }),
+      ).rejects.toThrow(/url/i);
+      expect(fetchStub).not.toHaveBeenCalled();
+      expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
