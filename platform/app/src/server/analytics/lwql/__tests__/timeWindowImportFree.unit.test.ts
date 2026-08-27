@@ -63,7 +63,7 @@ describe("the LangWatchQL time-window vocabulary", () => {
   describe("given sources that do name another module", () => {
     it("recognises each form it is meant to catch", () => {
       const samples: Record<string, string> = {
-        "a static import": 'import { a } from "./a";',
+        "a static import": 'import { a } from "@langwatch/trace-server";',
         "a re-export": 'export { a } from "./a";',
         "a dynamic import": 'const a = await import("./a");',
         "a CommonJS require": 'const a = require("./a");',

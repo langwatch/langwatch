@@ -162,7 +162,9 @@ export function registerLangWatchQLRoutes(
     zValidator("json", lwqlQuerySchema),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
       const { sql, parameters, timeWindow } = c.req.valid("json");
@@ -204,7 +206,9 @@ export function registerLangWatchQLRoutes(
     }),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
 

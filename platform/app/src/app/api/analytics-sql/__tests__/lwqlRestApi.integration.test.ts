@@ -54,10 +54,7 @@ import {
   isPostgresResident,
   type LangWatchQLViewDefinition,
 } from "~/server/analytics/lwql/catalog/types";
-import {
-  lwqlViewSetupStatements,
-  SHIPPED_LWQL_DEDUP,
-} from "~/server/analytics/lwql/views";
+import { lwqlViewSetupStatements, SHIPPED_LWQL_DEDUP } from "~/server/analytics/lwql/views";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -67,9 +64,9 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
-import { getFeatureFlagStore } from "~/server/featureFlag";
 import { pinTimezone } from "~/test-utils/pinTimezone";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import { createInMemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { app } from "../[[...route]]/app";
 
 /** Rows seeded per tenant, per dataset. Small: this suite proves shape, not scale. */
@@ -158,9 +155,7 @@ async function seedTenant({
   tenantId: string;
 }): Promise<void> {
   const marks = content(tenantId);
-  const traceIds = [...Array(SEEDED_TRACES).keys()].map(
-    (index) => `${tenantId}-trace-${index}`,
-  );
+  const traceIds = [...Array(SEEDED_TRACES).keys()].map((index) => `${tenantId}-trace-${index}`);
 
   await admin.insert({
     table: `${database}.trace_summaries`,
@@ -392,6 +387,7 @@ async function seedTenant({
 }
 
 describe("given the LangWatchQL analytics SQL REST endpoints", () => {
+  const { service: featureFlags } = createInMemoryFeatureFlagService();
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
@@ -405,8 +401,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
   const queryPath = (project: Project) =>
     `/api/v1/projects/${project.id}/analytics/query/clickhouse`;
-  const schemaPath = (project: Project) =>
-    `/api/v1/projects/${project.id}/analytics/schema`;
+  const schemaPath = (project: Project) => `/api/v1/projects/${project.id}/analytics/schema`;
 
   const post = (
     project: Project,
@@ -417,19 +412,13 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(options.token === null
-          ? {}
-          : { "X-Auth-Token": options.token ?? project.apiKey }),
+        ...(options.token === null ? {} : { "X-Auth-Token": options.token ?? project.apiKey }),
       },
       body: JSON.stringify(body),
     });
 
   /** Runs SQL through the endpoint and asserts it succeeded before returning it. */
-  const run = async (
-    project: Project,
-    sql: string,
-    parameters?: Record<string, unknown>,
-  ) => {
+  const run = async (project: Project, sql: string, parameters?: Record<string, unknown>) => {
     const response = await post(project, {
       sql,
       ...(parameters ? { parameters } : {}),
@@ -493,10 +482,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
    * catalog rather than assumed: a PostgreSQL-engine table sits beside the
    * LangWatchQL views, not with the migrated fact tables.
    */
-  const adminSourceRowCount = async (
-    view: LangWatchQLViewDefinition,
-    tenantId: string,
-  ) => {
+  const adminSourceRowCount = async (view: LangWatchQLViewDefinition, tenantId: string) => {
     const [row] = await selectRows<{ value: string }>(
       harness.admin,
       `SELECT count() AS value FROM ${isPostgresResident(view) ? database : facts}.${view.sourceTable} ` +
@@ -506,11 +492,11 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
   };
 
   beforeAll(async () => {
-    // The surface ships behind the experimental feature switch, off by
-    // default. The suite runs with it on via the flag's own env override —
-    // the same lever a deployment uses — and the flag-off cases below unset
-    // it for exactly one request.
-    process.env.RELEASE_LWQL_WORKBENCH = "1";
+    await featureFlags.setEnabled({
+      key: "release_lwql_workbench",
+      enabled: true,
+      lastEditedBy: null,
+    });
 
     // The catalog spans both residences; the LangWatchQL views over the
     // PostgreSQL-resident half read engine tables that must exist first.
@@ -532,10 +518,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
+      featureFlags,
       planProvider: PlanProviderService.create({
-        getActivePlan: vi
-          .fn()
-          .mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
+        getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
       }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
@@ -629,7 +614,10 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
   }, 600_000);
 
   afterAll(async () => {
-    delete process.env.RELEASE_LWQL_WORKBENCH;
+    await featureFlags.clearStoredFlag({
+      key: "release_lwql_workbench",
+      lastEditedBy: null,
+    });
     setLangWatchQLService(null);
     // Guarded on the identifier each statement actually uses: `team` gates
     // everything keyed by teamId (and the policy created after it), while
@@ -653,19 +641,25 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
   describe("when the LangWatchQL feature switch is off for the project", () => {
     /** Runs one request with the switch off, whatever else the suite set. */
     const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
-      process.env.RELEASE_LWQL_WORKBENCH = "0";
+      await featureFlags.setEnabled({
+        key: "release_lwql_workbench",
+        enabled: false,
+        lastEditedBy: null,
+      });
       try {
         return await request();
       } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
+        await featureFlags.setEnabled({
+          key: "release_lwql_workbench",
+          enabled: true,
+          lastEditedBy: null,
+        });
       }
     };
 
     /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
     it("refuses the query endpoint with the named refusal and touches no data", async () => {
-      const response = await withFlagOff(async () =>
-        post(openProject, { sql: "SELECT 1" }),
-      );
+      const response = await withFlagOff(async () => post(openProject, { sql: "SELECT 1" }));
       const body = (await response.json()) as Record<string, any>;
       expect(response.status).toBe(403);
       expect(body.error.code).toBe("lwql_not_enabled");
@@ -695,26 +689,29 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       organizationId: string,
       request: () => Promise<T>,
     ): Promise<T> => {
-      const store = getFeatureFlagStore();
-      await store.setRules(
-        "release_lwql_workbench",
-        [{ match: { organizationId }, enabled: true }],
-        null,
-      );
-      // Both env doors must be shut or the rule is never consulted: the
-      // dev .env force-enables this flag, and force-enable wins before the
-      // store — leaving it in place turns both of these tests vacuous.
-      const forceEnable = process.env.FEATURE_FLAG_FORCE_ENABLE;
-      delete process.env.RELEASE_LWQL_WORKBENCH;
-      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+      await featureFlags.setEnabled({
+        key: "release_lwql_workbench",
+        enabled: false,
+        lastEditedBy: null,
+      });
+      await featureFlags.setRules({
+        key: "release_lwql_workbench",
+        rules: [{ match: { organizationId }, enabled: true }],
+        lastEditedBy: null,
+      });
       try {
         return await request();
       } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
-        if (forceEnable !== undefined) {
-          process.env.FEATURE_FLAG_FORCE_ENABLE = forceEnable;
-        }
-        await store.clear("release_lwql_workbench", null);
+        await featureFlags.setRules({
+          key: "release_lwql_workbench",
+          rules: [],
+          lastEditedBy: null,
+        });
+        await featureFlags.setEnabled({
+          key: "release_lwql_workbench",
+          enabled: true,
+          lastEditedBy: null,
+        });
       }
     };
 
@@ -843,10 +840,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         `SELECT SpanCount FROM ${database}.traces WHERE TraceId = '${traceId}'`,
       );
       expect(body.rows).toHaveLength(1);
-      expect(
-        Number(body.rows[0].SpanCount),
-        "the endpoint returned the stale version",
-      ).toBe(DEDUP.latestSpanCount);
+      expect(Number(body.rows[0].SpanCount), "the endpoint returned the stale version").toBe(
+        DEDUP.latestSpanCount,
+      );
     });
 
     it("resolves an unqualified dataset name to the LangWatchQL database", async () => {
@@ -967,10 +963,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
           "the other tenant has no rows — 'no foreign rows returned' would be vacuous",
         ).toBeGreaterThan(0);
 
-        const body = await run(
-          caller,
-          `SELECT DISTINCT TenantId FROM ${database}.traces`,
-        );
+        const body = await run(caller, `SELECT DISTINCT TenantId FROM ${database}.traces`);
         expect(body.rows.map((row: any) => row.TenantId)).toEqual([caller.id]);
       }
     });
@@ -985,17 +978,15 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         `SELECT count() AS value FROM ${database}.traces ` +
           `WHERE TenantId = '${gatedProject.id}'`,
       );
-      expect(
-        Number(body.rows[0].value),
-        `the endpoint reached ${foreignRows} foreign rows`,
-      ).toBe(0);
+      expect(Number(body.rows[0].value), `the endpoint reached ${foreignRows} foreign rows`).toBe(
+        0,
+      );
 
       // The same shape with the caller's own id, so the zero above is the row
       // policy rather than a query that matches nothing.
       const own = await run(
         openProject,
-        `SELECT count() AS value FROM ${database}.traces ` +
-          `WHERE TenantId = '${openProject.id}'`,
+        `SELECT count() AS value FROM ${database}.traces ` + `WHERE TenantId = '${openProject.id}'`,
       );
       expect(Number(own.rows[0].value)).toBeGreaterThan(0);
     });
@@ -1010,9 +1001,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
           `SETTINGS ${harness.names.tenantSetting} = 'anything'`,
       );
       expect(body.error.code).toBe("lwql_not_permitted");
-      expect(
-        body.error.meta.violations.map((violation: any) => violation.code),
-      ).toContain("SETTINGS_CLAUSE");
+      expect(body.error.meta.violations.map((violation: any) => violation.code)).toContain(
+        "SETTINGS_CLAUSE",
+      );
     });
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
@@ -1040,14 +1031,11 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
     it("refuses the physical fact tables the views read", async () => {
-      const body = await refuse(
-        openProject,
-        `SELECT count() FROM ${facts}.trace_summaries`,
-      );
+      const body = await refuse(openProject, `SELECT count() FROM ${facts}.trace_summaries`);
       expect(body.error.code).toBe("lwql_not_permitted");
-      expect(
-        body.error.meta.violations.map((violation: any) => violation.code),
-      ).toContain("TABLE_NOT_ALLOWED");
+      expect(body.error.meta.violations.map((violation: any) => violation.code)).toContain(
+        "TABLE_NOT_ALLOWED",
+      );
     });
   });
 
@@ -1146,18 +1134,15 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     it("refuses a wildcard for the gated caller and permits it for the whole one", async () => {
       const sql = `SELECT * FROM ${database}.traces LIMIT 1`;
       const refused = await refuse(gatedProject, sql);
-      expect(
-        refused.error.meta.violations.map((violation: any) => violation.code),
-      ).toContain("WILDCARD_NOT_ALLOWED");
+      expect(refused.error.meta.violations.map((violation: any) => violation.code)).toContain(
+        "WILDCARD_NOT_ALLOWED",
+      );
 
       expect((await post(openProject, { sql })).status).toBe(200);
     });
 
     it("still answers ungated questions for the gated caller", async () => {
-      const body = await run(
-        gatedProject,
-        `SELECT count() AS value FROM ${database}.traces`,
-      );
+      const body = await run(gatedProject, `SELECT count() AS value FROM ${database}.traces`);
       expect(Number(body.rows[0].value)).toBeGreaterThan(0);
     });
   });
@@ -1380,9 +1365,9 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
 
         const refused = await refuse(gatedProject, sql);
         expect(refused.error.code).toBe("lwql_not_permitted");
-        expect(
-          refused.error.meta.violations.map((violation: any) => violation.code),
-        ).toContain("TABLE_NOT_ALLOWED");
+        expect(refused.error.meta.violations.map((violation: any) => violation.code)).toContain(
+          "TABLE_NOT_ALLOWED",
+        );
 
         // The permitted caller reads it, which is what proves the refusal was
         // the permission rather than a dataset that does not work.
@@ -1440,8 +1425,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         const schema = await readSchema(openProject);
         const contentColumns = schema.datasets.flatMap((dataset: any) =>
           dataset.columns.filter(
-            (column: any) =>
-              column.gates.includes("input") || column.gates.includes("output"),
+            (column: any) => column.gates.includes("input") || column.gates.includes("output"),
           ),
         );
         expect(
@@ -1449,19 +1433,15 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
           "no column is content-gated — this case is inspecting nothing",
         ).toBeGreaterThan(0);
         for (const column of contentColumns) {
-          expect(
-            column.available,
-            `${column.name} stayed readable through a resolver outage`,
-          ).toBe(false);
+          expect(column.available, `${column.name} stayed readable through a resolver outage`).toBe(
+            false,
+          );
         }
 
-        const refused = await refuse(
-          openProject,
-          `SELECT CapturedInput FROM ${database}.traces`,
+        const refused = await refuse(openProject, `SELECT CapturedInput FROM ${database}.traces`);
+        expect(refused.error.meta.violations.map((violation: any) => violation.code)).toContain(
+          "GATED_COLUMN",
         );
-        expect(
-          refused.error.meta.violations.map((violation: any) => violation.code),
-        ).toContain("GATED_COLUMN");
       } finally {
         outage.mockRestore();
       }
@@ -1548,9 +1528,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
         expect(capped.rows).toEqual(full.rows.slice(0, 2));
         expect(capped.truncated).toBe(true);
         expect(capped.statistics.rowsReturned).toBe(2);
-        expect(capped.diagnostics.map((entry: any) => entry.code)).toEqual([
-          "RESULT_TRUNCATED",
-        ]);
+        expect(capped.diagnostics.map((entry: any) => entry.code)).toEqual(["RESULT_TRUNCATED"]);
       } finally {
         restoreShippedService();
       }
@@ -1577,10 +1555,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
      */
     const SESSION_PROBES: readonly [string, (setting: string) => string][] = [
       ["the identity queries run as", () => "currentUser()"],
-      [
-        "the tenant capability the gateway sends",
-        (setting) => `getSetting('${setting}')`,
-      ],
+      ["the tenant capability the gateway sends", (setting) => `getSetting('${setting}')`],
       ["the machine the server runs on", () => "hostName()"],
       ["the server build", () => "version()"],
       ["the database the connection is bound to", () => "currentDatabase()"],
@@ -1599,10 +1574,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
     });
 
     it("still answers the same query shape with a function it does support", async () => {
-      const body = await run(
-        openProject,
-        `SELECT now() AS value FROM ${database}.traces LIMIT 1`,
-      );
+      const body = await run(openProject, `SELECT now() AS value FROM ${database}.traces LIMIT 1`);
       expect(body.rows).toHaveLength(1);
     });
   });

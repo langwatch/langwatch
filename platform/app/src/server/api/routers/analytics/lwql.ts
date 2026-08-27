@@ -83,8 +83,9 @@ const availability = protectedProcedure
   .permission("analytics:view")
   .query(async ({ ctx, input }): Promise<LangWatchQLAvailability> => {
     const enabled = await lwqlEnabled({
-      prisma: ctx.prisma,
+      featureFlags: ctx.app.featureFlags,
       projectId: input.projectId,
+      projects: ctx.app.projects,
     });
     if (!enabled) return { available: false, reason: "disabled" };
 

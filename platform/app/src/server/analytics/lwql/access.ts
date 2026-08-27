@@ -1,5 +1,5 @@
-import type { PrismaClient } from "~/generated/prisma/client";
-import { featureFlagService } from "~/server/featureFlag";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 
 /**
  * The experimental gate over the whole LangWatchQL surface.
@@ -31,24 +31,19 @@ export const LWQL_FLAG = "release_lwql_workbench";
  * The flag gates a surface, and the surface belongs to the project.
  */
 export async function lwqlEnabled({
-  prisma,
+  featureFlags,
   projectId,
+  projects,
 }: {
-  prisma: PrismaClient;
+  featureFlags: FeatureFlagService;
   projectId: string;
+  projects: ProjectService;
 }): Promise<boolean> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  const organizationId = project?.team?.organizationId;
+  const organizationId = await projects.getOrganizationId(projectId);
 
-  return featureFlagService.isEnabled(LWQL_FLAG, {
-    distinctId: projectId,
+  return featureFlags.isEnabled(LWQL_FLAG, {
+    kind: "project",
     projectId,
-    // Omitted rather than passed as undefined when the project cannot be read:
-    // a rule matching on the organization should not be handed a value this
-    // function guessed at.
-    ...(organizationId ? { organizationId } : {}),
+    organizationId,
   });
 }

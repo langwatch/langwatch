@@ -19,6 +19,7 @@ import {
   AppAutomationRuntime,
   createAppAutomationTestFirePort,
   createAppAutomationTestGraphPorts,
+  createAppAutomationTestPersistCaps,
 } from "~/runtime/app/features/automation";
 import { prisma } from "~/server/db";
 
@@ -240,6 +241,7 @@ describe("saved workbench charts (integration)", () => {
           redis: null,
           graph: createAppAutomationTestGraphPorts(),
           testFire: createAppAutomationTestFirePort(),
+          persistCaps: createAppAutomationTestPersistCaps(),
         }).build();
 
         expect(

@@ -6,29 +6,20 @@
  * is "a member who may read cannot write", and a mocked permission check can
  * only ever agree with whatever it was told to return.
  *
- * The feature-flag service is the one thing faked. It reads the environment,
- * Redis and Postgres behind a 60-second cache, and this repository's `.env`
- * force-enables the very flag under test — so consulting the real one would
- * make the switched-off case answer "on" and pass vacuously.
+ * A complete in-memory feature-flag service drives the gate without booting
+ * deployment infrastructure.
  *
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { nanoid } from "nanoid";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-
-const isEnabled = vi.fn();
-
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: {
-    isEnabled: (...args: unknown[]) => isEnabled(...args),
-  },
-}));
 
 /**
  * The one other fake, and it is about the harness rather than the subject.
@@ -52,13 +43,14 @@ vi.mock("../../utils", async (importOriginal) => {
 });
 
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
 import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
 
-wireDefaultTestApp();
+const featureFlags = MemoryFeatureFlagService.create();
+const testApp = createTestApp({ featureFlags });
 
 type Caller = ReturnType<typeof savedWorkbenchChartsRouter.createCaller>;
 
@@ -71,8 +63,7 @@ const OTHER_TEAM = `team-other-${ns}`;
 const OTHER_PROJECT = `proj-other-${ns}`;
 
 const SQL =
-  "SELECT count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {since:DateTime}";
+  "SELECT count() AS value FROM analytics.traces " + "WHERE OccurredAt >= {since:DateTime}";
 
 const SPEC = {
   $schema: VEGA_LITE_SCHEMA_URL,
@@ -160,6 +151,7 @@ async function seedCaller(orgId: string, perms: Permission[]): Promise<Caller> {
   });
   return savedWorkbenchChartsRouter.createCaller(
     createInnerTRPCContext({
+      app: testApp,
       session: {
         user: { id: uid, email, name: uid },
         expires: new Date(Date.now() + 3_600_000).toISOString(),
@@ -234,8 +226,7 @@ describe("the saved workbench chart router", () => {
   });
 
   beforeEach(async () => {
-    isEnabled.mockReset();
-    isEnabled.mockResolvedValue(true);
+    featureFlags.setFlag("release_lwql_workbench", true);
     await prisma.customGraph.deleteMany({ where: { projectId: PROJECT } });
     await prisma.customGraph.deleteMany({
       where: { projectId: OTHER_PROJECT },
@@ -250,14 +241,14 @@ describe("the saved workbench chart router", () => {
       /** @scenario "Saved charts stay unreachable while the workbench switch is off" */
       it("refuses every one of them the same way", async () => {
         const saved = await saveChart();
-        isEnabled.mockResolvedValue(false);
+        featureFlags.setFlag("release_lwql_workbench", false);
 
         expect(await refusalOf(() => author.getAll({ projectId: PROJECT }))).toBe(
           "lwql_not_enabled",
         );
-        expect(
-          await refusalOf(() => author.getById({ projectId: PROJECT, id: saved.id })),
-        ).toBe("lwql_not_enabled");
+        expect(await refusalOf(() => author.getById({ projectId: PROJECT, id: saved.id }))).toBe(
+          "lwql_not_enabled",
+        );
         expect(await refusalOf(() => saveChart("Another"))).toBe("lwql_not_enabled");
         expect(
           await refusalOf(() =>
@@ -268,9 +259,9 @@ describe("the saved workbench chart router", () => {
             }),
           ),
         ).toBe("lwql_not_enabled");
-        expect(
-          await refusalOf(() => author.delete({ projectId: PROJECT, id: saved.id })),
-        ).toBe("lwql_not_enabled");
+        expect(await refusalOf(() => author.delete({ projectId: PROJECT, id: saved.id }))).toBe(
+          "lwql_not_enabled",
+        );
       });
     });
   });
@@ -282,9 +273,9 @@ describe("the saved workbench chart router", () => {
         const saved = await saveChart();
 
         // The read they are entitled to.
-        expect((await reader.getAll({ projectId: PROJECT })).map(({ id }) => id)).toEqual(
-          [saved.id],
-        );
+        expect((await reader.getAll({ projectId: PROJECT })).map(({ id }) => id)).toEqual([
+          saved.id,
+        ]);
 
         // Each write, refused on its own permission rather than on the read one.
         expect(
@@ -305,9 +296,9 @@ describe("the saved workbench chart router", () => {
             }),
           ),
         ).toBe("permission_denied");
-        expect(
-          await refusalOf(() => reader.delete({ projectId: PROJECT, id: saved.id })),
-        ).toBe("permission_denied");
+        expect(await refusalOf(() => reader.delete({ projectId: PROJECT, id: saved.id }))).toBe(
+          "permission_denied",
+        );
 
         // Nothing the refused writes attempted actually happened.
         const after = await author.getById({
@@ -341,13 +332,11 @@ describe("the saved workbench chart router", () => {
           definition: DEFINITION,
         });
 
+        expect(await refusalOf(() => author.getById({ projectId: PROJECT, id: theirs.id }))).toBe(
+          "saved_workbench_chart_not_found",
+        );
         expect(
-          await refusalOf(() => author.getById({ projectId: PROJECT, id: theirs.id })),
-        ).toBe("saved_workbench_chart_not_found");
-        expect(
-          await refusalOf(() =>
-            author.getById({ projectId: PROJECT, id: `never-${nanoid()}` }),
-          ),
+          await refusalOf(() => author.getById({ projectId: PROJECT, id: `never-${nanoid()}` })),
         ).toBe("saved_workbench_chart_not_found");
         expect(
           await refusalOf(() =>
@@ -358,9 +347,9 @@ describe("the saved workbench chart router", () => {
             }),
           ),
         ).toBe("saved_workbench_chart_not_found");
-        expect(
-          await refusalOf(() => author.delete({ projectId: PROJECT, id: theirs.id })),
-        ).toBe("saved_workbench_chart_not_found");
+        expect(await refusalOf(() => author.delete({ projectId: PROJECT, id: theirs.id }))).toBe(
+          "saved_workbench_chart_not_found",
+        );
 
         // Still theirs, still named what they named it.
         expect(

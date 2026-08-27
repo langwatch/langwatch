@@ -31,10 +31,16 @@ import type { PermissionMiddleware } from "~/server/api/rbac";
 export const enforceWorkbenchEnabled: PermissionMiddleware<{
   projectId: string;
 }> = async ({ ctx, input, next }) => {
+  const app = ctx.app;
+  if (!app) {
+    throw new Error("Application context is missing from the LangWatchQL transport.");
+  }
+
   if (
     !(await lwqlEnabled({
+      featureFlags: app.featureFlags,
       projectId: input.projectId,
-      prisma: ctx.prisma,
+      projects: app.projects,
     }))
   ) {
     // A typed handled error, not a bare FORBIDDEN: `handledErrorMiddleware`

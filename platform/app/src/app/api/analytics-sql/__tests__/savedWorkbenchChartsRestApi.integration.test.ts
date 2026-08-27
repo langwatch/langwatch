@@ -51,13 +51,12 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { getFeatureFlagStore } from "~/server/featureFlag";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import { createInMemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { app } from "../[[...route]]/app";
 
 /** Names a LangWatchQL dataset every deployment publishes, and reads nothing gated. */
-const SQL =
-  "SELECT count() AS value FROM analytics.traces WHERE OccurredAt >= {since:DateTime}";
+const SQL = "SELECT count() AS value FROM analytics.traces WHERE OccurredAt >= {since:DateTime}";
 
 /** Names a column the gated project's data-privacy rule withholds. */
 const GATED_SQL = "SELECT CapturedInput FROM analytics.traces";
@@ -86,6 +85,7 @@ const NETWORK_SPEC = {
 type Body = Record<string, any>;
 
 describe("given the saved workbench chart REST endpoints", () => {
+  const { service: featureFlags } = createInMemoryFeatureFlagService();
   const ns = nanoid(8);
 
   let organization: Organization;
@@ -101,10 +101,8 @@ describe("given the saved workbench chart REST endpoints", () => {
   /** A scoped key holding `analytics:view` on this organization and nothing else. */
   let viewOnlyToken: string;
 
-  const chartsPath = (project: Project) =>
-    `/api/v1/projects/${project.id}/analytics/charts`;
-  const chartPath = (project: Project, chartId: string) =>
-    `${chartsPath(project)}/${chartId}`;
+  const chartsPath = (project: Project) => `/api/v1/projects/${project.id}/analytics/charts`;
+  const chartPath = (project: Project, chartId: string) => `${chartsPath(project)}/${chartId}`;
 
   /** The credential a request presents: a project's own key, unless told otherwise. */
   const asProject = (project: Project) => ({ "X-Auth-Token": project.apiKey });
@@ -161,8 +159,7 @@ describe("given the saved workbench chart REST endpoints", () => {
       status: 201,
       body: {
         name: overrides.name ?? "Traces per day",
-        definition:
-          overrides.definition === undefined ? DEFINITION : overrides.definition,
+        definition: overrides.definition === undefined ? DEFINITION : overrides.definition,
       },
     });
 
@@ -176,18 +173,17 @@ describe("given the saved workbench chart REST endpoints", () => {
   };
 
   beforeAll(async () => {
-    // The surface ships behind the experimental feature switch, off by
-    // default. The suite runs with it on via the flag's own env override —
-    // the same lever a deployment uses — and the flag-off cases below unset
-    // it for exactly one request.
-    process.env.RELEASE_LWQL_WORKBENCH = "1";
+    await featureFlags.setEnabled({
+      key: "release_lwql_workbench",
+      enabled: true,
+      lastEditedBy: null,
+    });
 
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
+      featureFlags,
       planProvider: PlanProviderService.create({
-        getActivePlan: vi
-          .fn()
-          .mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
+        getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
       }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
@@ -274,7 +270,10 @@ describe("given the saved workbench chart REST endpoints", () => {
   });
 
   afterAll(async () => {
-    delete process.env.RELEASE_LWQL_WORKBENCH;
+    await featureFlags.clearStoredFlag({
+      key: "release_lwql_workbench",
+      lastEditedBy: null,
+    });
     // Every statement is guarded on the identifier it actually uses, so a
     // failure half way through setup never turns an undefined id into a
     // `deleteMany` that matches every row in the database. The chart deletes
@@ -509,14 +508,19 @@ describe("given the saved workbench chart REST endpoints", () => {
   describe("when the LangWatchQL feature switch is off for the project", () => {
     /** Runs one request with the switch off, whatever else the suite set. */
     const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
-      // The env override is consulted before the force-enable list, so `0`
-      // really does switch it off on a deployment (and in this repository's
-      // own `.env`) that force-enables the flag.
-      process.env.RELEASE_LWQL_WORKBENCH = "0";
+      await featureFlags.setEnabled({
+        key: "release_lwql_workbench",
+        enabled: false,
+        lastEditedBy: null,
+      });
       try {
         return await request();
       } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
+        await featureFlags.setEnabled({
+          key: "release_lwql_workbench",
+          enabled: true,
+          lastEditedBy: null,
+        });
       }
     };
 
@@ -552,9 +556,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         }),
       ]);
 
-      expect(refusals.map((body) => body.error.code)).toEqual(
-        Array(5).fill("lwql_not_enabled"),
-      );
+      expect(refusals.map((body) => body.error.code)).toEqual(Array(5).fill("lwql_not_enabled"));
       // Neither the write nor the delete happened while the surface was off.
       expect(await listedIds(openProject)).toEqual([created.id]);
     });
@@ -571,26 +573,29 @@ describe("given the saved workbench chart REST endpoints", () => {
       organizationId: string,
       request: () => Promise<T>,
     ): Promise<T> => {
-      const store = getFeatureFlagStore();
-      await store.setRules(
-        "release_lwql_workbench",
-        [{ match: { organizationId }, enabled: true }],
-        null,
-      );
-      // Both env doors must be shut or the rule is never consulted: the dev
-      // `.env` force-enables this flag, and force-enable wins before the
-      // store — leaving it in place turns both of these tests vacuous.
-      const forceEnable = process.env.FEATURE_FLAG_FORCE_ENABLE;
-      delete process.env.RELEASE_LWQL_WORKBENCH;
-      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+      await featureFlags.setEnabled({
+        key: "release_lwql_workbench",
+        enabled: false,
+        lastEditedBy: null,
+      });
+      await featureFlags.setRules({
+        key: "release_lwql_workbench",
+        rules: [{ match: { organizationId }, enabled: true }],
+        lastEditedBy: null,
+      });
       try {
         return await request();
       } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
-        if (forceEnable !== undefined) {
-          process.env.FEATURE_FLAG_FORCE_ENABLE = forceEnable;
-        }
-        await store.clear("release_lwql_workbench", null);
+        await featureFlags.setRules({
+          key: "release_lwql_workbench",
+          rules: [],
+          lastEditedBy: null,
+        });
+        await featureFlags.setEnabled({
+          key: "release_lwql_workbench",
+          enabled: true,
+          lastEditedBy: null,
+        });
       }
     };
 
@@ -689,9 +694,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         ["DELETE", undefined],
       ] as const) {
         const path =
-          method === "POST"
-            ? chartsPath(openProject)
-            : chartPath(openProject, existing.id);
+          method === "POST" ? chartsPath(openProject) : chartPath(openProject, existing.id);
         const refusal = await refused({
           path,
           method,
@@ -738,10 +741,9 @@ describe("given the saved workbench chart REST endpoints", () => {
         // 200 carrying the raw row.
         expect(body.error.code, path).toBe("internal_error");
         expect(body.error.type, path).toBe("internal_error");
-        expect(
-          JSON.stringify(body),
-          "the unreadable payload reached the caller",
-        ).not.toContain("SELECT 1");
+        expect(JSON.stringify(body), "the unreadable payload reached the caller").not.toContain(
+          "SELECT 1",
+        );
       }
     });
   });

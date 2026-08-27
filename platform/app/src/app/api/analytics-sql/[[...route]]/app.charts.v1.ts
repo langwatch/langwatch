@@ -236,7 +236,9 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
     }),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
       const charts = await dashboardSavedChartCall(() =>
@@ -268,7 +270,9 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     zValidator("json", createChartSchema),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
@@ -309,7 +313,9 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
     }),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
       const chart = await dashboardSavedChartCall(() =>
@@ -343,7 +349,9 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
     zValidator("json", updateChartSchema),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
       const { name, definition } = c.req.valid("json");
@@ -389,7 +397,9 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
     }),
     async (c) => {
       const project = await lwqlProject({
+        featureFlags: c.app.featureFlags,
         project: c.get("project"),
+        projects: c.app.projects,
         requestedProjectId: c.req.param("projectId"),
       });
       await dashboardSavedChartCall(() =>

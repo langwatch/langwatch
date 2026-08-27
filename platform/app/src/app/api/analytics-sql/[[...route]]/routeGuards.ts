@@ -14,11 +14,12 @@
  */
 
 import { NotFoundError } from "@langwatch/handled-error";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { Project } from "~/generated/prisma/client";
 
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
 import { LangWatchQLNotEnabledError } from "~/server/analytics/lwql/errors";
-import { prisma } from "~/server/db";
 
 /**
  * The project this request runs for, having checked the URL agrees with the
@@ -52,11 +53,19 @@ export function callerProject({
  *
  * @throws {LangWatchQLNotEnabledError} when the flag is off for this project.
  */
-export async function requireLangWatchQLEnabled(project: Project): Promise<void> {
+export async function requireLangWatchQLEnabled(input: {
+  featureFlags: FeatureFlagService;
+  project: Project;
+  projects: ProjectService;
+}): Promise<void> {
   // Asked through `lwqlEnabled` rather than evaluated here: it is the
   // one place the flag is read, so this boundary and the tRPC one cannot drift
   // into answering the same question differently.
-  const enabled = await lwqlEnabled({ prisma, projectId: project.id });
+  const enabled = await lwqlEnabled({
+    featureFlags: input.featureFlags,
+    projectId: input.project.id,
+    projects: input.projects,
+  });
   if (!enabled) throw new LangWatchQLNotEnabledError();
 }
 
@@ -78,12 +87,16 @@ export async function requireLangWatchQLEnabled(project: Project): Promise<void>
  */
 export async function lwqlProject({
   project,
+  featureFlags,
+  projects,
   requestedProjectId,
 }: {
+  featureFlags: FeatureFlagService;
   project: Project;
+  projects: ProjectService;
   requestedProjectId: string | undefined;
 }): Promise<Project> {
   const resolved = callerProject({ project, requestedProjectId });
-  await requireLangWatchQLEnabled(resolved);
+  await requireLangWatchQLEnabled({ featureFlags, project: resolved, projects });
   return resolved;
 }
