@@ -112,7 +112,14 @@ describe("given the self-serve service", () => {
       expect(resolver).toContain("state.organizationId !== organizationId");
       // One sentence for both misses, or the refusal is an existence oracle
       // for connection ids — which the sign-in router hands out unauthenticated.
-      expect(occurrences(resolver, "throw new SsoDomainProofNotFoundError(")).toBe(
+      //
+      // Its OWN sentence, too: this used to answer the domain-proof code, so
+      // an administrator whose connection had been discarded was told to
+      // publish a DNS record. Behavioural coverage for every verb that
+      // resolves through here is in `sso-self-serve.integration.test.ts`
+      // under "a connection that belongs to another organization"; this scan
+      // is what catches a NEW verb reaching for a different read.
+      expect(occurrences(resolver, "throw new SsoConnectionNotFoundError(")).toBe(
         1,
       );
     });

@@ -320,6 +320,29 @@ export class SsoBreakGlassHolderIneligibleError extends SsoConnectionCommandRefu
 }
 
 /**
+ * The connection named does not exist, or is not this organization's.
+ *
+ * ONE SENTENCE FOR BOTH, deliberately: telling somebody a connection exists
+ * but is not theirs is a probe for other customers' connection ids. What
+ * changes is only that it is now its OWN sentence — every one of these used
+ * to be answered with `sso_domain_proof_not_found`, whose customer copy reads
+ * "We couldn't find that record yet — publish the record shown here on your
+ * domain, then check again." Two administrators with the page open, one of
+ * whom discards the connection, sent the other to argue with their DNS team
+ * about a record that was already published and a connection that was gone.
+ */
+export class SsoConnectionNotFoundError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_connection_not_found", "sso_connection_not_found", {
+      httpStatus: 404,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoConnectionNotFoundError";
+  }
+}
+
+/**
  * The expiry asked for is not one a grant may carry: in the past, or further
  * out than the window allows.
  *

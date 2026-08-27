@@ -2054,6 +2054,11 @@ const presentations = {
     describe: () =>
       "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
   },
+  sso_connection_not_found: {
+    title: "That single sign-on connection is not here any more",
+    describe: () =>
+      "It may have been removed while this page was open. Refresh to see what your organization has now.",
+  },
   sso_connection_domain_taken: {
     // Says the domain is spoken for and stops there: which organization holds
     // it is not something a second claimant is entitled to learn from a

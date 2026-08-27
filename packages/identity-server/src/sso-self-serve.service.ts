@@ -21,6 +21,7 @@ import {
   SsoActivationDomainUnprovedError,
   SsoActivationTestSignInMissingError,
   SsoConnectionAlreadyRegisteredError,
+  SsoConnectionNotFoundError,
   SSO_VERIFICATION_FILE_PATH,
   SsoDomainClaimPendingError,
   SsoDomainFetchFailedError,
@@ -1338,7 +1339,17 @@ export class SsoSelfServeService {
   }): Promise<SsoConnectionState> {
     const state = await this.deps.reads.findConnection({ connectionId });
     if (!state || state.organizationId !== organizationId) {
-      throw new SsoDomainProofNotFoundError(
+      // ITS OWN CODE. Every verb here resolves the connection through this,
+      // and answering `sso_domain_proof_not_found` meant a stale id — two
+      // administrators with the page open, one of whom discards the
+      // connection — told the other "We couldn't find that record yet:
+      // publish the record shown here on your domain". They went and argued
+      // with their DNS team about a record that was already published.
+      //
+      // One sentence for both misses, unchanged: a connection that exists but
+      // is not yours reads exactly like one that does not exist, or the
+      // refusal becomes a probe for other customers' connection ids.
+      throw new SsoConnectionNotFoundError(
         `connection ${connectionId} does not exist`,
       );
     }

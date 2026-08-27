@@ -248,6 +248,7 @@ export {
   SsoConnectionActivationBlockedError,
   SsoConnectionCommandRefusedError,
   SsoConnectionDomainTakenError,
+  SsoConnectionNotFoundError,
   SsoConnectionInvalidTransitionError,
   SsoCertificateInvalidError,
   SsoConnectionAlreadyRegisteredError,
