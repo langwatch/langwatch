@@ -222,7 +222,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     dirName: "run-plans",
     pathPrefixes: ["/api/v1/run-plans"],
     overviewDescription:
-      "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when nothing answers. List, read, run and archive run plans.",
+      "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.",
   },
   {
     name: "Test Suites",

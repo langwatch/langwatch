@@ -278,7 +278,7 @@ Also check: [Testing agents behind authentication](/agent-simulations/authentica
 | `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot carry a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
 | `scenario_secret_parameter_conflict` | One scenario in the run declares the name as secret and another declares it as plain. | Give the two parameters different names, or make both declarations agree. |
 
-The platform runs these checks before it schedules any jobs. A rejected run schedules nothing.
+The platform runs these checks before it schedules any jobs. A rejected run schedules no job at all.
 
 ## Where the values are recorded
 

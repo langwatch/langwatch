@@ -36825,7 +36825,7 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 | `--url <url>` | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`. |
 | `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
 | `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy: the command prints a notice, and your tunnel endpoint must supply its own access control. |
-| `--no-update-url` | Print the tunnel URL and change nothing on the agent. |
+| `--no-update-url` | Print the tunnel URL and leave the agent configuration as it is. |
 | `--no-auth` | Skip the session secret protection described below. |
 
 ## How the tunnel is protected
@@ -37651,7 +37651,7 @@ Also check: [Testing agents behind authentication](/agent-simulations/authentica
 | `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot carry a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
 | `scenario_secret_parameter_conflict` | One scenario in the run declares the name as secret and another declares it as plain. | Give the two parameters different names, or make both declarations agree. |
 
-The platform runs these checks before it schedules any jobs. A rejected run schedules nothing.
+The platform runs these checks before it schedules any jobs. A rejected run schedules no job at all.
 
 ## Where the values are recorded
 
@@ -61794,7 +61794,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.16.0
+    targetRevision: 3.17.0
     helm:
       releaseName: langwatch
       values: |
@@ -61843,7 +61843,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.16.0
+      targetRevision: 3.17.0
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62204,7 +62204,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.16.0
+VERSION=3.17.0
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62220,13 +62220,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.16.0"
+    tag: "3.17.0"
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.16.0"
+    tag: "3.17.0"
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.16.0"
+    tag: "3.17.0"
 
 imagePullSecrets:
   - name: registry-credentials
@@ -65893,7 +65893,7 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.16.0 \
+  --version 3.17.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -66225,7 +66225,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.16.0 \
+  --version 3.17.0 \
   -f values-production.yaml
 ```
 
@@ -69553,12 +69553,12 @@ openapi: "GET /api/v1/run-plans"
 
 ---
 title: "Overview"
-description: "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when nothing answers. List, read, run and archive run plans."
+description: "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans."
 ---
 
 ## Intro
 
-Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when nothing answers. List, read, run and archive run plans.
+Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.
 
 ---
 

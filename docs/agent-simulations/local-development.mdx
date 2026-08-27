@@ -39,7 +39,7 @@ If the agent is not registered yet, [Connect your agent](/agent-simulations/conn
 | `--url <url>` | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`. |
 | `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
 | `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy: the command prints a notice, and your tunnel endpoint must supply its own access control. |
-| `--no-update-url` | Print the tunnel URL and change nothing on the agent. |
+| `--no-update-url` | Print the tunnel URL and leave the agent configuration as it is. |
 | `--no-auth` | Skip the session secret protection described below. |
 
 ## How the tunnel is protected

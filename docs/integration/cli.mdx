@@ -55,7 +55,7 @@ macOS attaches a `com.apple.quarantine` attribute to anything downloaded from th
 xattr -d com.apple.quarantine langwatch-<version>-darwin-arm64
 ```
 
-Then run the binary as normal. (If `xattr` reports *"No such xattr"*, the attribute was never set, so there is nothing to do.)
+Then run the binary as normal. (If `xattr` reports *"No such xattr"*, the attribute was never set, so no action is needed.)
 
 <Note>
 Only clear quarantine on a binary whose checksum you have verified against the release's `SHA256SUMS`. Signing and notarization are tracked as follow-up work; until then, `npm install -g langwatch` avoids Gatekeeper entirely and is the smoother path on macOS.
@@ -344,7 +344,7 @@ langwatch projects list                              # projects the key can read
 langwatch trace search --project checkout-agent      # search another project by slug
 ```
 
-Agents use this to debug their own instrumentation: after running your code once, ask the assistant to run `langwatch trace search --limit 5` and verify traces are flowing. If nothing appears, the instrumentation is wrong, no need to read logs.
+Agents use this to debug their own instrumentation: after running your code once, ask the assistant to run `langwatch trace search --limit 5` and verify traces are flowing. If no trace appears, the instrumentation is wrong, no need to read logs.
 
 ## Query analytics
 
