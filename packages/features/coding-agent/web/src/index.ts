@@ -26,4 +26,7 @@ export { SortableColumnHeader } from "./sortable-column-header";
 export { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell";
 export { ComparisonBar } from "./cells/comparison-bar";
 export { MissingValue } from "./cells/missing-value";
+export { PullRequestsCell } from "./cells/pull-requests-cell";
+export { SessionNameCell } from "./cells/session-name-cell";
+export { SessionRowActions } from "./session-row-actions";
 export * from "./trace";

@@ -4,6 +4,12 @@ export { AnnotationHoverChip } from "./annotation-hover-chip";
 export { AnnotationScoresChip } from "./annotation-scores-chip";
 export { AnnotationSuggestionsChip } from "./annotation-suggestions-chip";
 export { AnnotationCard } from "./annotation-card";
+export {
+  AnnotationTable,
+  AnnotationTableSkeleton,
+  type AnnotationTableProps,
+  type AnnotationTableTraceField,
+} from "./annotation-table";
 export { AnnotateBody, FormFooter, SuggestBody } from "./annotation-form-body";
 export { DiffCounts, DiffPanel, useOutputDiff } from "./annotation-output-diff";
 export { ScoreFields, ScoreChip } from "./annotation-score-fields";
