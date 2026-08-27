@@ -2,18 +2,16 @@
 // @langwatch/api -- Public API
 // ---------------------------------------------------------------------------
 
-export { createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
-export type { DefaultsChain, RouteChain, RpcChain, SseChain } from "./definition.js";
-export {
-  DISCOVER_NAME,
-  type DiscoveredOperation,
-  type ServiceCatalogue,
-} from "./discover.js";
+export { createRestService, createService, GroupRegistrar, ServiceBuilder } from "./builder.js";
+export type { DefaultsChain, RestChain, RouteChain, RpcChain, SseChain } from "./definition.js";
+export { DISCOVER_NAME, type DiscoveredOperation, type ServiceCatalogue } from "./discover.js";
 export {
   AuthenticatedActorRequiredError,
+  ApiVersionConflictError,
   createErrorHandler,
   formatError,
   ProjectInputMismatchError,
+  InvalidApiVersionError,
 } from "./errors.js";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
 // Spec generation must come from the same hono-openapi package instance that
@@ -34,6 +32,7 @@ export function routeHandlers(app: Hono) {
 export { createSSEResponse, type SSEHandler, type TypedSSEStream } from "./sse.js";
 export {
   type BaseApp,
+  API_VERSION_HEADER,
   type DateVersion,
   type EndpointDef,
   type EndpointConfig,
@@ -44,6 +43,7 @@ export {
   isDateVersion,
   type MountedRoute,
   type RequestActor,
+  type RestServiceConfig,
   type ServiceConfig,
   type ServiceContext,
   VERSION_LATEST,
@@ -51,8 +51,4 @@ export {
   type VersionLabel,
   type VersionStatus,
 } from "./types.js";
-export {
-  type RegistrationEvent,
-  type ResolvedEndpoint,
-  resolveVersions,
-} from "./versioning.js";
+export { type RegistrationEvent, type ResolvedEndpoint, resolveVersions } from "./versioning.js";

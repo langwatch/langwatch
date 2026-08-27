@@ -18,10 +18,8 @@ export function serializeEndpointResult({
   if (result instanceof Response) {
     // RPC keeps its existing raw-response escape hatch for streams, redirects,
     // and compatibility handlers. REST always declares and validates output.
-    if (kind === "rest" && config.output) {
-      throw new TypeError(
-        "A handler with an output schema must return a value, not a Response",
-      );
+    if ((kind === "rest" || kind === "public-rest") && config.output) {
+      throw new TypeError("A handler with an output schema must return a value, not a Response");
     }
     return result;
   }

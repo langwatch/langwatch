@@ -8,18 +8,20 @@ import {
   validator as zValidator,
 } from "hono-openapi";
 
-import {
-  cacheReadMiddleware,
-  rateLimitMiddleware,
-  writeCachedResponse,
-} from "./capabilities.js";
-import { ProjectInputMismatchError } from "./errors.js";
+import { cacheReadMiddleware, rateLimitMiddleware, writeCachedResponse } from "./capabilities.js";
+import { isNoBodySchema } from "./definition.js";
+import { ApiVersionConflictError, ProjectInputMismatchError } from "./errors.js";
 import {
   createApiSchemaError,
   parseApiSchemaSync,
   type ApiSchema,
   type ApiSchemaIssue,
 } from "./schema.js";
+import {
+  appendPublicRestDocumentationValidators,
+  parsePublicRestInput,
+  publicRestPathParams,
+} from "./public-rest-input.js";
 import { serializeEndpointResult } from "./response.js";
 import { createSSEResponse } from "./sse.js";
 import { ENDPOINT_INPUT, ENDPOINT_ROUTE } from "./types.js";
@@ -32,10 +34,7 @@ import type {
 } from "./types.js";
 import type { ResolvedEndpoint } from "./versioning.js";
 
-type ProviderMap<TProject> = Record<
-  string,
-  (base: BaseApp<TProject>, context: Context) => unknown
->;
+type ProviderMap<TProject> = Record<string, (base: BaseApp<TProject>, context: Context) => unknown>;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 
 interface StackOptions<TProject> {
@@ -57,6 +56,10 @@ interface StackOptions<TProject> {
    * and must never reach the document.
    */
   suppressDocs?: boolean;
+  /** Appended to an explicitly mounted operation id when another canonical mount owns it. */
+  operationIdSuffix?: string;
+  /** Documents date negotiation on an optional-version REST mount. */
+  versionHeaderParameter?: string;
 }
 
 /**
@@ -75,8 +78,7 @@ export function buildEndpointMiddlewareStack<TProject>(
   if (serviceConfig.app) {
     stack.push(directAppMiddleware(serviceConfig.app));
   }
-  const documented =
-    options.suppressDocs !== true && isDocumentedMount({ config, status });
+  const documented = options.suppressDocs !== true && isDocumentedMount({ config, status });
 
   appendAuthMiddleware({ stack, config, serviceConfig });
   appendPermissionMiddleware({ stack, config, serviceConfig });
@@ -112,7 +114,16 @@ export function buildEndpointMiddlewareStack<TProject>(
 
   if (config.middleware) stack.push(...config.middleware);
 
-  appendOpenApiMiddleware({ stack, config, documented, status, version });
+  appendOpenApiMiddleware({
+    stack,
+    config,
+    documented,
+    kind: ep.kind,
+    operationIdSuffix: options.operationIdSuffix,
+    status,
+    version,
+    versionHeaderParameter: options.versionHeaderParameter,
+  });
   appendValidationMiddleware({
     stack,
     ep,
@@ -147,9 +158,7 @@ export function buildEndpointMiddlewareStack<TProject>(
   return stack;
 }
 
-function directAppMiddleware(
-  resolve: NonNullable<ServiceConfig["app"]>,
-): MiddlewareHandler {
+function directAppMiddleware(resolve: NonNullable<ServiceConfig["app"]>): MiddlewareHandler {
   return async (context, next) => {
     Object.defineProperty(context, "app", {
       configurable: true,
@@ -246,9 +255,10 @@ export function buildWithdrawnMiddlewareStack({
 
 function versionContextMiddleware({
   ep,
+  serviceConfig,
   status,
   version,
-}: Pick<StackOptions<unknown>, "status" | "version"> & {
+}: Pick<StackOptions<unknown>, "serviceConfig" | "status" | "version"> & {
   // Only what the route identity is built from. A withdrawn endpoint has no
   // handler, and asking for the whole registration would exclude it from the
   // one field that says which endpoint its 410s belong to.
@@ -258,14 +268,18 @@ function versionContextMiddleware({
 }): MiddlewareHandler {
   // Built once per endpoint at mount time rather than per request: the
   // registered path and method cannot change after the app is built.
-  const route = `${(ep.method === "sse" ? "get" : ep.method).toUpperCase()} ${
-    ep.path || "/"
-  }`;
+  const route = `${(ep.method === "sse" ? "get" : ep.method).toUpperCase()} ${ep.path || "/"}`;
   const deprecated = ep.config?.deprecated;
 
   return async (c, next) => {
     c.set(ENDPOINT_ROUTE, route);
     try {
+      const requested = (c.get("apiVersionRequest") as string | undefined) ?? version;
+      const versionHeader = serviceConfig.publicRest?.versionHeader;
+      const headerVersion = versionHeader ? c.req.header(versionHeader) : void 0;
+      if (headerVersion && headerVersion !== requested) {
+        throw new ApiVersionConflictError();
+      }
       await next();
     } finally {
       // The date-namespace fallback serves an UNREGISTERED date with the
@@ -328,20 +342,27 @@ function appendOpenApiMiddleware({
   stack,
   config,
   documented,
+  kind,
   status,
   version,
+  operationIdSuffix,
+  versionHeaderParameter,
 }: {
   stack: MiddlewareHandler[];
   config: EndpointDef;
   documented: boolean;
+  kind: EndpointRegistration["kind"];
   status: VersionStatus;
   version: string;
+  operationIdSuffix?: string;
+  versionHeaderParameter?: string;
 }): void {
   if (!documented) return;
 
-  const successStatus = String(config.status ?? 200);
+  const isPublicNoBody = kind === "public-rest" && config.output && isNoBodySchema(config.output);
+  const successStatus = String(config.status ?? (isPublicNoBody ? 204 : 200));
   const generatedSuccess: NonNullable<DescribeRouteOptions["responses"]>[string] =
-    config.output
+    config.output && !isPublicNoBody
       ? {
           description: "Success",
           content: {
@@ -354,6 +375,22 @@ function appendOpenApiMiddleware({
   const options: DescribeRouteOptions = {
     responses: { [successStatus]: generatedSuccess, ...docs?.responses },
   };
+  if (versionHeaderParameter) {
+    options.parameters = [
+      {
+        description:
+          "Optional date API version. Omit it for latest; use a dated URL to pin the same contract visibly.",
+        in: "header",
+        name: versionHeaderParameter,
+        required: false,
+        schema: {
+          default: "latest",
+          pattern: "^(latest|20\\d{2}-\\d{2}-\\d{2})$",
+          type: "string",
+        },
+      },
+    ];
+  }
   if (docs?.description !== undefined) options.description = docs.description;
   if (docs?.summary !== undefined) options.summary = docs.summary;
   if (docs?.tags !== undefined) options.tags = docs.tags;
@@ -361,10 +398,9 @@ function appendOpenApiMiddleware({
     // Keep the declared id for the moving `latest` surface. Dated mounts need
     // distinct ids because OpenAPI requires operationId to be unique across
     // the whole document, including inherited registrations.
-    options.operationId =
-      status === "latest"
-        ? docs.operationId
-        : `${docs.operationId}_${version.replaceAll("-", "_")}`;
+    const suffix =
+      operationIdSuffix ?? (status === "latest" ? void 0 : version.replaceAll("-", "_"));
+    options.operationId = suffix ? `${docs.operationId}_${suffix}` : docs.operationId;
   }
   if (docs?.security !== undefined) options.security = docs.security;
   if (config.deprecated !== undefined) {
@@ -372,9 +408,7 @@ function appendOpenApiMiddleware({
     // registration serves, so SDK generators surface it per version.
     options.deprecated = true;
     const notice = `Deprecated: ${config.deprecated}`;
-    options.description = options.description
-      ? `${options.description}\n\n${notice}`
-      : notice;
+    options.description = options.description ? `${options.description}\n\n${notice}` : notice;
   }
 
   stack.push(describeRoute(options) as unknown as MiddlewareHandler);
@@ -391,6 +425,13 @@ function appendValidationMiddleware({
   documented: boolean;
   paramSource: "route" | "context";
 }): void {
+  if (ep.kind === "public-rest") {
+    if (documented) {
+      appendPublicRestDocumentationValidators({ stack, endpoint: ep });
+    }
+    return;
+  }
+
   /**
    * The validation failure, as the error the boundary knows how to answer with.
    *
@@ -406,10 +447,7 @@ function appendValidationMiddleware({
   const asZodError = (error: unknown): unknown =>
     Array.isArray(error) ? createApiSchemaError(error as ApiSchemaIssue[]) : error;
 
-  const addValidator = (
-    target: "param" | "query" | "json",
-    schema: ApiSchema | undefined,
-  ) => {
+  const addValidator = (target: "param" | "query" | "json", schema: ApiSchema | undefined) => {
     if (!schema) return;
     const middleware = zValidator(target, schema, (result) => {
       if (!result.success) throw asZodError(result.error);
@@ -458,11 +496,7 @@ function validatedInputMiddleware({
   paramSource: "route" | "context";
 }): MiddlewareHandler {
   return async (c, next) => {
-    const params = config.params
-      ? paramSource === "route"
-        ? c.req.valid("param" as never)
-        : c.get("params")
-      : void 0;
+    const params = validatedPathParams({ c, config, kind, paramSource });
     const query = config.query ? c.req.valid("query" as never) : void 0;
 
     if (kind === "sse") {
@@ -473,11 +507,43 @@ function validatedInputMiddleware({
       return;
     }
 
+    if (kind === "public-rest") {
+      const input = await parsePublicRestInput({
+        context: c,
+        method: c.req.method.toLowerCase() as EndpointRegistration["method"],
+        params,
+        schema: config.input,
+      });
+      c.set(ENDPOINT_INPUT, input);
+      await next();
+      return;
+    }
+
     const body = config.input ? c.req.valid("json" as never) : void 0;
     const input = kind === "rest" ? mergeRestInput({ params, query, body }) : body;
     c.set(ENDPOINT_INPUT, input);
     await next();
   };
+}
+
+function validatedPathParams({
+  c,
+  config,
+  kind,
+  paramSource,
+}: {
+  c: Context;
+  config: EndpointDef;
+  kind: EndpointRegistration["kind"];
+  paramSource: "route" | "context";
+}): unknown {
+  if (kind === "public-rest") {
+    return publicRestPathParams({ context: c, source: paramSource });
+  }
+  if (!config.params) {
+    return void 0;
+  }
+  return paramSource === "route" ? c.req.valid("param" as never) : c.get("params");
 }
 
 function mergeRestInput({
@@ -522,9 +588,7 @@ function addRestInputPart(
   }
 }
 
-function providerMiddleware<TProject>(
-  providers: ProviderMap<TProject>,
-): MiddlewareHandler {
+function providerMiddleware<TProject>(providers: ProviderMap<TProject>): MiddlewareHandler {
   return async (c, next) => {
     const base: BaseApp<TProject> = {
       project: c.get("project"),
@@ -612,9 +676,7 @@ function assertAuthorizedProjectInput({
       : undefined;
   const authorizedProject: unknown = context.get("project");
   const authorizedProjectId =
-    typeof authorizedProject === "object" &&
-    authorizedProject !== null &&
-    "id" in authorizedProject
+    typeof authorizedProject === "object" && authorizedProject !== null && "id" in authorizedProject
       ? authorizedProject.id
       : undefined;
   if (

@@ -1,4 +1,4 @@
-# Every API URL carries an explicit version namespace; the bare alias is removed
+# RPC and compatibility URLs carry an explicit version namespace
 
 **Date:** 2026-08-20
 
@@ -26,6 +26,11 @@ API's life.
 Date-based versioning itself is unchanged and not re-litigated here: versions
 are real `YYYY-MM-DD` calendar dates, invalid or duplicate versions fail at
 registration, and later versions inherit earlier endpoints.
+
+This decision remains the contract for `createService`, RPC, SSE and
+compatibility `registerRoute`. The additive public REST surface has a static
+`v1` generation and an optional date/header version as decided in
+[004](./004-public-rest-v1-and-date-negotiation.md).
 
 ## Decision
 

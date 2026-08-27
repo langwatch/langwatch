@@ -1,8 +1,8 @@
 # See ../adrs/002-explicit-version-namespaces.md
-Feature: Explicit version namespaces
+Feature: Explicit compatibility version namespaces
 
   As an integrator
-  I want every API URL to name its version namespace
+  I want every createService URL to name its version namespace
   So that the URL I read in the documentation is the URL I should call, and
   nothing I call silently changes meaning
 

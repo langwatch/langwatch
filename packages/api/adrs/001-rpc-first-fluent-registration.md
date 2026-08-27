@@ -59,8 +59,7 @@ API-key-only management surface.
 service.register(
   "things.create",
   "2026-08-07",
-  async (context, input) =>
-    context.app.things.create({ ...input, actorId: context.actor().id }),
+  async (context, input) => context.app.things.create({ ...input, actorId: context.actor().id }),
   (b) =>
     b
       .withInput(z.object({ name: z.string() }))
@@ -77,12 +76,12 @@ feature handlers do not resolve or construct services per request. The host
 also exposes the authenticated principal as `context.actor()` and an
 input-dependent permission check as `context.authorize(permission)`. Static
 permissions still belong on `withPermission`; `authorize` is only for a second
-permission selected from already-validated input. REST path, query and body
-schemas are validated separately for OpenAPI, then their transformed object
-fields are merged into that same `input` argument. Fields may not be declared
-by more than one source. An endpoint with no request values receives `input`
-as `undefined`. `registerSse` handlers take `(context, stream)`, a stream having
-no body.
+permission selected from already-validated input. Compatibility
+`registerRoute` paths retain separate path, query and body schemas. New public
+REST uses one complete input schema and automatic source selection as decided
+in [004](./004-public-rest-v1-and-date-negotiation.md). Both reach the same
+`input` argument. `registerSse` handlers take `(context, stream)`, a stream
+having no body.
 
 Project-scoped RPCs carry `projectId` in their input so credentials that can
 reach more than one project can choose a target. The host must compare that
@@ -137,9 +136,7 @@ from a service-level `withDeprecated`: a deprecated service is deprecated.
 defaults for everything registered through it:
 
 ```ts
-const things = service.group("things", (b) =>
-  b.withDocs({ tags: ["Things"] }).withRateLimit(),
-);
+const things = service.group("things", (b) => b.withDocs({ tags: ["Things"] }).withRateLimit());
 
 things.register("create", "2026-08-07", createHandler, (b) =>
   b.withInput(createSchema).withOutput(thingSchema),
@@ -158,17 +155,16 @@ the grammar check runs on the full name, so a group cannot smuggle in a name
 already carry their shape. Groups do not nest, and a group carries no
 version: the version stays explicit on every registration.
 
-### 6. REST and SSE keep their own verbs
+### 6. HTTP and SSE keep their own verbs
 
 Two shapes cannot be dotted-name POSTs and get their own registration methods
 with the same chain:
 
-- `service.registerRoute(method, path, version, handler, define)` for the
-  HTTP surface. `withParams`, `withQuery` and `withInput` declare path, query
-  and body sources; handlers receive their parsed object fields as one input.
-  GET has no JSON body source, and every `:param` in the path requires
-  `withParams`. REST handlers return values, never a hand-built `Response` that
-  bypasses output validation.
+- `service.registerRoute(method, path, version, handler, define)` preserves the
+  existing HTTP surface and its explicit source schemas.
+- `createRestService(...).get/post/put/patch/delete` is the public REST surface.
+  It derives query or JSON input from the method and follows
+  [004](./004-public-rest-v1-and-date-negotiation.md).
 - `service.registerSse(name, version, handler, define?)` with
   `.withEvents(...)` / `.withQuery(...)`: a dotted name mounted as a GET, per
   [../specs/sse-streaming.feature](../specs/sse-streaming.feature).

@@ -1,6 +1,7 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { z } from "zod";
 import { parseApiSchemaSync, type ApiSchema } from "./schema.js";
 
 import type { EndpointDef, EndpointDocs, HttpMethod, RawEndpointDef } from "./types.js";
@@ -78,6 +79,19 @@ export interface RouteChain extends DefaultsChain {
   withParams(schema: ApiSchema): this & InputDeclared & ParamsDeclared;
   /** Query string schema; parsed fields are merged into the handler input. */
   withQuery(schema: ApiSchema): this & InputDeclared;
+}
+
+/**
+ * The public REST chain. One object schema describes the complete request;
+ * the HTTP method decides whether non-path fields come from query or JSON.
+ */
+export interface RestChain extends DefaultsChain {
+  /** Complete path-plus-query/body input schema. */
+  withInput(schema: z.ZodObject): this & InputDeclared;
+  /** Response body schema, validated before serialization. */
+  withOutput(schema: z.ZodType): this & OutputDeclared;
+  /** HTTP status code for successful responses (default: 200, or 204 with no body). */
+  withStatus(status: ContentfulStatusCode): this;
 }
 
 /**
@@ -197,9 +211,7 @@ export class ChainBuilder {
 }
 
 /** Runs a `define` callback over a fresh chain, tolerating its absence. */
-export function collectDef(
-  define: ((b: ChainBuilder) => unknown) | undefined,
-): RawEndpointDef {
+export function collectDef(define: ((b: ChainBuilder) => unknown) | undefined): RawEndpointDef {
   if (!define) return {};
   const builder = new ChainBuilder();
   define(builder);
@@ -260,9 +272,7 @@ export function assertRoutePath(path: string): void {
     firstSegment === VERSION_PREVIEW ||
     (firstSegment !== undefined && DATE_VERSION_SEGMENT_RE.test(firstSegment))
   ) {
-    throw new Error(
-      `Endpoint path "${path}" collides with the reserved API version namespace`,
-    );
+    throw new Error(`Endpoint path "${path}" collides with the reserved API version namespace`);
   }
 }
 
@@ -274,9 +284,7 @@ export function assertRoutePath(path: string): void {
  * would smuggle arguments back into the URL that the operation name owns.
  */
 export function assertRpcDef({ name, def }: { name: string; def: RawEndpointDef }): void {
-  const offending = (["params", "query"] as const).filter(
-    (key) => def[key] !== undefined,
-  );
+  const offending = (["params", "query"] as const).filter((key) => def[key] !== undefined);
 
   if (offending.length > 0) {
     throw new Error(
@@ -288,9 +296,7 @@ export function assertRpcDef({ name, def }: { name: string; def: RawEndpointDef 
 
 /** A stream has no request body and no path params; request data is query only. */
 export function assertSseDef({ name, def }: { name: string; def: RawEndpointDef }): void {
-  const offending = (["input", "params"] as const).filter(
-    (key) => def[key] !== undefined,
-  );
+  const offending = (["input", "params"] as const).filter((key) => def[key] !== undefined);
 
   if (offending.length > 0) {
     throw new Error(
@@ -312,8 +318,7 @@ export function assertRouteDef({
 }): void {
   if (method === "get" && def.input) {
     throw new Error(
-      `REST endpoint GET ${path || "/"} cannot declare a JSON body; use path ` +
-        `or query input`,
+      `REST endpoint GET ${path || "/"} cannot declare a JSON body; use path ` + `or query input`,
     );
   }
   if (routeHasParams(path) && !def.params) {
@@ -330,8 +335,69 @@ export function assertRouteDef({
   }
 }
 
+/** Rules specific to the additive public REST surface. */
+export function assertPublicRestDef({
+  method,
+  path,
+  def,
+}: {
+  method: HttpMethod;
+  path: string;
+  def: RawEndpointDef;
+}): void {
+  const explicitSources = (["params", "query"] as const).filter((source) => def[source] !== void 0);
+  if (explicitSources.length > 0) {
+    throw new Error(
+      `Public REST endpoint ${method.toUpperCase()} ${path || "/"} declares ` +
+        `${explicitSources.join(" and ")}; declare one withInput object instead`,
+    );
+  }
+
+  if (!def.output || !(def.output instanceof z.ZodType)) {
+    throw new Error(
+      `Public REST endpoint ${method.toUpperCase()} ${path || "/"} must declare ` +
+        `a Zod 4 output schema; use z.void() for no response body`,
+    );
+  }
+
+  if (def.input && !(def.input instanceof z.ZodObject)) {
+    throw new Error(
+      `Public REST endpoint ${method.toUpperCase()} ${path || "/"} input must be ` +
+        `one Zod 4 object schema`,
+    );
+  }
+
+  const parameterNames = routeParameterNames(path);
+  if (parameterNames.length === 0) {
+    return;
+  }
+  const input = def.input;
+  if (!(input instanceof z.ZodObject)) {
+    throw new Error(
+      `Public REST endpoint ${method.toUpperCase()} ${path} contains path parameters ` +
+        `but does not declare withInput`,
+    );
+  }
+
+  const missing = parameterNames.filter((name) => !(name in input.shape));
+  if (missing.length > 0) {
+    throw new Error(
+      `Public REST endpoint ${method.toUpperCase()} ${path} has path parameters ` +
+        `missing from withInput: ${missing.join(", ")}`,
+    );
+  }
+}
+
 function routeHasParams(path: string): boolean {
   return path.split("/").some((segment) => segment.startsWith(":"));
+}
+
+export function routeParameterNames(path: string): string[] {
+  return path
+    .split("/")
+    .filter((segment) => segment.startsWith(":"))
+    .map((segment) => /^:([^{?]+)/.exec(segment)?.[1])
+    .filter((name): name is string => name !== void 0);
 }
 
 // ---------------------------------------------------------------------------

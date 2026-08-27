@@ -1,30 +1,22 @@
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { mergePath } from "hono/utils/url";
 
-import {
-  buildServiceCatalogue,
-  DISCOVER_NAME,
-  type ServiceCatalogue,
-} from "./discover.js";
-import {
-  buildEndpointMiddlewareStack,
-  buildWithdrawnMiddlewareStack,
-} from "./pipeline.js";
+import { buildServiceCatalogue, DISCOVER_NAME, type ServiceCatalogue } from "./discover.js";
+import { runMiddlewareStack } from "./middleware-stack.js";
+import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
+import { mountOptionalVersionRoutes } from "./public-rest-routing.js";
 import type { BaseApp, HttpMethod, ServiceConfig, VersionStatus } from "./types.js";
 import { isDateVersion } from "./types.js";
 import { type ResolvedEndpoint, VERSION_LATEST, VERSION_PREVIEW } from "./versioning.js";
 
-type ProviderMap<TProject> = Record<
-  string,
-  (base: BaseApp<TProject>, context: Context) => unknown
->;
+type ProviderMap<TProject> = Record<string, (base: BaseApp<TProject>, context: Context) => unknown>;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 
 /**
  * Mounts every resolved version namespace and the two namespace guards.
  *
- * There is no bare alias (ADR 002): a request without a version segment is an
- * unknown namespace and answers 404 like any other unknown version.
+ * `createService` has no bare alias (ADR 002). Public REST adds its separate,
+ * optional date-version routes after the explicit mounts (ADR 004).
  */
 export function mountResolvedRoutes<TProject>({
   app,
@@ -53,13 +45,26 @@ export function mountResolvedRoutes<TProject>({
       status,
       version,
     });
-    mountDiscover({
+    if (!serviceConfig.publicRest) {
+      mountDiscover({
+        app,
+        basePath,
+        endpoints,
+        serviceConfig,
+        status,
+        version,
+      });
+    }
+  }
+
+  if (serviceConfig.publicRest) {
+    mountOptionalVersionRoutes({
       app,
       basePath,
-      endpoints,
+      onError,
+      providers,
       serviceConfig,
-      status,
-      version,
+      versionMap,
     });
   }
 
@@ -127,6 +132,7 @@ function mountVersion<TProject>({
           serviceConfig,
           status,
           version,
+          operationIdSuffix: serviceConfig.publicRest && status === "latest" ? "latest" : void 0,
         });
     mountRoute({ app, method, path, stack });
     serviceConfig.onRouteMounted?.({
@@ -316,40 +322,12 @@ function buildDateFallback<TProject>({
       if (!params) continue;
       c.set("routeParams", params);
       c.set("apiVersionRequest", requested);
-      const response = await runStack(candidate.stack, c);
+      const response = await runMiddlewareStack(candidate.stack, c);
       if (response) return response;
       return next();
     }
     return next();
   };
-}
-
-/**
- * Runs a pre-built middleware stack outside Hono's router: handlers that
- * answer without calling `next` (the 410, a 429, a cache hit) short-circuit,
- * and the final handler's response is the answer.
- *
- * Each returned response is assigned to `c.res`, mirroring Hono's own
- * dispatcher — without it, headers set in a `finally` after `next()` (the
- * version headers) would land on prepared headers that nothing merges.
- */
-async function runStack(
-  stack: MiddlewareHandler[],
-  c: Context,
-): Promise<Response | undefined> {
-  let index = 0;
-  const dispatch = async (): Promise<Response | undefined> => {
-    const handler = stack[index++];
-    if (!handler) return undefined;
-    let inner: Response | undefined;
-    const returned = await handler(c, async () => {
-      inner = await dispatch();
-    });
-    const response = returned instanceof Response ? returned : inner;
-    if (response) c.res = response;
-    return response;
-  };
-  return dispatch();
 }
 
 /**

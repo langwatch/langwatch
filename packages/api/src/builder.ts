@@ -7,11 +7,13 @@ import {
   type InputDeclared,
   type OutputDeclared,
   type ParamsDeclared,
+  type RestChain,
   type RouteChain,
   type RpcChain,
   type SseChain,
   assertRouteDef,
   assertRoutePath,
+  assertPublicRestDef,
   assertRpcDef,
   assertSseDef,
   assertStatusInvariant,
@@ -25,15 +27,17 @@ import { mountResolvedRoutes } from "./route-mounting.js";
 import type { TypedSSEStream } from "./sse.js";
 import type {
   BaseApp,
+  DateVersion,
   EndpointDocs,
   EndpointVariables,
   HttpMethod,
   RawEndpointDef,
+  RestServiceConfig,
   ServiceConfig,
   ServiceContext,
   VersionLabel,
 } from "./types.js";
-import { assertVersionLabel } from "./types.js";
+import { API_VERSION_HEADER, assertVersionLabel, VERSION_PREVIEW } from "./types.js";
 import { type RegistrationEvent, resolveVersions } from "./versioning.js";
 
 // ---------------------------------------------------------------------------
@@ -66,10 +70,7 @@ type RpcHandler<TVariables extends Record<string, unknown>, TApp> = (
   // oxlint-disable-next-line typescript/no-explicit-any -- inferred from each concrete handler.
 ) => any;
 
-type RouteHandler<TVariables extends Record<string, unknown>, TApp> = RpcHandler<
-  TVariables,
-  TApp
->;
+type RouteHandler<TVariables extends Record<string, unknown>, TApp> = RpcHandler<TVariables, TApp>;
 
 type NeedsOutput<TResult> = [Awaited<TResult>] extends [Response | void] ? false : true;
 type HasInput<THandler extends (...args: never[]) => unknown> =
@@ -81,9 +82,7 @@ type RequiredDefinition<TChain, TNeedsInput extends boolean, TResult> = TChain &
 type RouteChainFor<TMethod extends HttpMethod> = TMethod extends "get"
   ? RouteChain & { readonly withInput: never }
   : RouteChain;
-type PathNeedsParams<TPath extends string> = TPath extends `${string}:${string}`
-  ? true
-  : false;
+type PathNeedsParams<TPath extends string> = TPath extends `${string}:${string}` ? true : false;
 type CompleteRouteDefinition<
   TChain,
   TNeedsInput extends boolean,
@@ -91,6 +90,15 @@ type CompleteRouteDefinition<
 > = TChain &
   (TNeedsInput extends true ? InputDeclared : unknown) &
   (TNeedsParams extends true ? ParamsDeclared : unknown) &
+  OutputDeclared;
+
+type CompleteRestDefinition<
+  TChain,
+  TNeedsInput extends boolean,
+  TNeedsParams extends boolean,
+> = TChain &
+  (TNeedsInput extends true ? InputDeclared : unknown) &
+  (TNeedsParams extends true ? InputDeclared : unknown) &
   OutputDeclared;
 
 /** SSE handler: `(c, stream)` — a stream has no body. */
@@ -112,11 +120,7 @@ type BareHandler<TVariables extends Record<string, unknown>, TApp> = (
  * @typeParam TVariables - The context variable map: `EndpointVariables` widened
  *   by each `.provide()` call, so `c.get("things")` is typed in every handler.
  */
-class ServiceBuilder<
-  TProject,
-  TVariables extends Record<string, unknown>,
-  TApp = unknown,
-> {
+class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp = unknown> {
   private readonly _config: ServiceConfig<TApp>;
   private readonly _providers: Record<
     string,
@@ -127,10 +131,7 @@ class ServiceBuilder<
 
   constructor(
     config: ServiceConfig<TApp>,
-    providers: Record<
-      string,
-      (base: BaseApp<TProject>, context: Context) => unknown
-    > = {},
+    providers: Record<string, (base: BaseApp<TProject>, context: Context) => unknown> = {},
     events: RegistrationEvent[] = [],
     defaults: ChainBuilder = new ChainBuilder(),
   ) {
@@ -148,15 +149,9 @@ class ServiceBuilder<
    * Factories receive the base app context and cannot depend on one another.
    * Provided services reach handlers as typed context variables.
    */
-  provide<
-    P extends Record<string, (base: BaseApp<TProject>, context: Context) => unknown>,
-  >(
+  provide<P extends Record<string, (base: BaseApp<TProject>, context: Context) => unknown>>(
     providers: P,
-  ): ServiceBuilder<
-    TProject,
-    TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> },
-    TApp
-  > {
+  ): ServiceBuilder<TProject, TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> }, TApp> {
     for (const key of Object.keys(providers)) {
       if (key === "project" || key === "_legacy") {
         throw new Error(`Provider name "${key}" is reserved by BaseApp`);
@@ -170,12 +165,7 @@ class ServiceBuilder<
       TProject,
       TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> },
       TApp
-    >(
-      this._config,
-      { ...this._providers, ...providers },
-      [...this._events],
-      this._defaults,
-    );
+    >(this._config, { ...this._providers, ...providers }, [...this._events], this._defaults);
   }
 
   // -- service-level defaults (ADR 001 §4) -----------------------------------
@@ -252,9 +242,7 @@ class ServiceBuilder<
     name: TName & RpcName<TName>,
     version: VersionLabel,
     handler: THandler,
-    define: (
-      b: RpcChain,
-    ) => RequiredDefinition<RpcChain, HasInput<THandler>, ReturnType<THandler>>,
+    define: (b: RpcChain) => RequiredDefinition<RpcChain, HasInput<THandler>, ReturnType<THandler>>,
   ): this;
   register(
     name: string,
@@ -309,6 +297,61 @@ class ServiceBuilder<
   ): this {
     this._registerRoute(method, path, version, undefined, handler, define);
     return this;
+  }
+
+  get<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
+    path: TPath,
+    version: DateVersion,
+    handler: THandler,
+    define: (
+      b: RestChain,
+    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
+  ): this {
+    return this._registerPublicRest("get", path, version, handler, define);
+  }
+
+  post<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
+    path: TPath,
+    version: DateVersion,
+    handler: THandler,
+    define: (
+      b: RestChain,
+    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
+  ): this {
+    return this._registerPublicRest("post", path, version, handler, define);
+  }
+
+  put<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
+    path: TPath,
+    version: DateVersion,
+    handler: THandler,
+    define: (
+      b: RestChain,
+    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
+  ): this {
+    return this._registerPublicRest("put", path, version, handler, define);
+  }
+
+  patch<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
+    path: TPath,
+    version: DateVersion,
+    handler: THandler,
+    define: (
+      b: RestChain,
+    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
+  ): this {
+    return this._registerPublicRest("patch", path, version, handler, define);
+  }
+
+  delete<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
+    path: TPath,
+    version: DateVersion,
+    handler: THandler,
+    define: (
+      b: RestChain,
+    ) => CompleteRestDefinition<RestChain, HasInput<THandler>, PathNeedsParams<TPath>>,
+  ): this {
+    return this._registerPublicRest("delete", path, version, handler, define);
   }
 
   /**
@@ -448,6 +491,39 @@ class ServiceBuilder<
   }
 
   /** @internal */
+  _registerPublicRest(
+    method: HttpMethod,
+    path: string,
+    version: string,
+    handler: unknown,
+    define: (b: ChainBuilder) => unknown,
+  ): this {
+    if (!this._config.publicRest) {
+      throw new Error(`The fluent ${method.toUpperCase()} API belongs to createRestService()`);
+    }
+    assertVersionLabel(version);
+    if (version === VERSION_PREVIEW) {
+      throw new Error("Public REST registrations use dated versions, not preview");
+    }
+    assertRoutePath(path);
+    const def = collectDef(define);
+    const config = mergeDefs(this._defaults._def, def);
+    assertPublicRestDef({ method, path, def: config });
+    assertStatusInvariant({ method, path, def: config });
+    this._events.push({
+      version,
+      endpoint: {
+        kind: "public-rest",
+        method,
+        path,
+        config,
+        handler: handler as (...args: unknown[]) => unknown,
+      },
+    });
+    return this;
+  }
+
+  /** @internal */
   _withdraw(name: string, version: string): void {
     assertVersionLabel(version);
     const path = name.startsWith("/") ? name : `/${name}`;
@@ -475,14 +551,11 @@ class ServiceBuilder<
       const optedOut = config.noPermission;
       if (Boolean(config.permission) === Boolean(optedOut)) {
         throw new Error(
-          `Endpoint ${route} must declare exactly one of withPermission or ` +
-            `withoutPermission`,
+          `Endpoint ${route} must declare exactly one of withPermission or ` + `withoutPermission`,
         );
       }
       if (optedOut && optedOut.reason.trim() === "") {
-        throw new Error(
-          `Endpoint ${route} opts out of its permission check with a blank reason`,
-        );
+        throw new Error(`Endpoint ${route} opts out of its permission check with a blank reason`);
       }
       if (config.permission && !this._config.permissionEnforcer) {
         throw new Error(
@@ -531,18 +604,12 @@ class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown>
     private readonly _defaults: RawEndpointDef,
   ) {}
 
-  register(
-    name: string,
-    version: VersionLabel,
-    handler: BareHandler<TVariables, TApp>,
-  ): void;
+  register(name: string, version: VersionLabel, handler: BareHandler<TVariables, TApp>): void;
   register<THandler extends RpcHandler<TVariables, TApp>>(
     name: string,
     version: VersionLabel,
     handler: THandler,
-    define: (
-      b: RpcChain,
-    ) => RequiredDefinition<RpcChain, HasInput<THandler>, ReturnType<THandler>>,
+    define: (b: RpcChain) => RequiredDefinition<RpcChain, HasInput<THandler>, ReturnType<THandler>>,
   ): void;
   register(
     name: string,
@@ -550,13 +617,7 @@ class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown>
     handler: unknown,
     define?: (b: ChainBuilder) => unknown,
   ): void {
-    this._service._registerRpc(
-      `${this._name}.${name}`,
-      version,
-      this._defaults,
-      handler,
-      define,
-    );
+    this._service._registerRpc(`${this._name}.${name}`, version, this._defaults, handler, define);
   }
 
   registerSse(
@@ -565,13 +626,7 @@ class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown>
     handler: SseHandler<TVariables, TApp>,
     define?: (b: SseChain) => SseChain,
   ): void {
-    this._service._registerSse(
-      `${this._name}.${name}`,
-      version,
-      this._defaults,
-      handler,
-      define,
-    );
+    this._service._registerSse(`${this._name}.${name}`, version, this._defaults, handler, define);
   }
 
   registerRoute<
@@ -603,10 +658,7 @@ class GroupRegistrar<TVariables extends Record<string, unknown>, TApp = unknown>
   }
 
   withdraw(name: string, version: VersionLabel): void {
-    this._service._withdraw(
-      name.startsWith("/") ? name : `${this._name}.${name}`,
-      version,
-    );
+    this._service._withdraw(name.startsWith("/") ? name : `${this._name}.${name}`, version);
   }
 }
 
@@ -615,6 +667,21 @@ export function createService<TProject = unknown, TApp = unknown>(
   config: ServiceConfig<TApp>,
 ): ServiceBuilder<TProject, EndpointVariables, TApp> {
   return new ServiceBuilder(config);
+}
+
+/** Creates the additive public REST builder rooted at `/api/v1/{service}`. */
+export function createRestService<TProject = unknown, TApp = unknown>(
+  config: RestServiceConfig<TApp>,
+): ServiceBuilder<TProject, EndpointVariables, TApp> {
+  if (!/^[a-z][a-z0-9-]*$/.test(config.name)) {
+    throw new Error(`REST service name "${config.name}" must be a lower-kebab path segment`);
+  }
+
+  return new ServiceBuilder({
+    ...config,
+    basePath: `/api/v1/${config.name}`,
+    publicRest: { versionHeader: API_VERSION_HEADER },
+  });
 }
 
 export { ServiceBuilder, GroupRegistrar };

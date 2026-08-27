@@ -115,11 +115,12 @@ and its definition chain — never a version block the endpoint shares with its
 siblings. The full authoring contract is
 [001](./001-rpc-first-fluent-registration.md).
 
-### 5. URLs carry explicit version namespaces
+### 5. Version axes are explicit
 
-Every API URL names its version namespace; there is no bare alias that
-silently means latest. The full routing and documentation contract is
-[002](./002-explicit-version-namespaces.md).
+RPC and compatibility URLs always name their date namespace
+([002](./002-explicit-version-namespaces.md)). Public REST fixes the global
+generation at `v1` and permits its independent date version in the URL or
+header ([004](./004-public-rest-v1-and-date-negotiation.md)).
 
 ### 6. The public API is sealed
 

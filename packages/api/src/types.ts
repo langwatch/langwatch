@@ -15,6 +15,7 @@ export type DateVersion = string;
 
 export const VERSION_LATEST = "latest" as const;
 export const VERSION_PREVIEW = "preview" as const;
+export const API_VERSION_HEADER = "X-API-Version" as const;
 
 /**
  * The version argument of a registration: a real calendar date, or `"preview"`
@@ -33,9 +34,7 @@ export function isDateVersion(value: string): value is DateVersion {
   const date = new Date(Date.UTC(year!, month! - 1, day!));
 
   return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month! - 1 &&
-    date.getUTCDate() === day
+    date.getUTCFullYear() === year && date.getUTCMonth() === month! - 1 && date.getUTCDate() === day
   );
 }
 
@@ -199,8 +198,7 @@ export interface EndpointDef {
  * Author-facing endpoint configuration. Unlike the merged internal shape, an
  * endpoint must choose exactly one access declaration at compile time.
  */
-export type EndpointConfig = Omit<EndpointDef, "permission" | "noPermission"> &
-  AccessDeclaration;
+export type EndpointConfig = Omit<EndpointDef, "permission" | "noPermission"> & AccessDeclaration;
 
 /**
  * The definition shape the chain builder accumulates before precedence is
@@ -286,6 +284,8 @@ export interface MountedRoute {
    * any route policy registry built from this callback.
    */
   isDiscoverEndpoint?: boolean;
+  /** True for the public REST mount whose date version is optional in the URL. */
+  isOptionalVersionRoute?: boolean;
   /**
    * The resolved endpoint definition behind this mount. Withdrawn mounts carry
    * the inherited definition (including `meta`); namespace guards and discover
@@ -361,6 +361,10 @@ export interface ServiceConfig<TApp = unknown> {
    * re-deriving the route table.
    */
   onRouteMounted?: (route: MountedRoute) => void;
+  /** @internal Enables the additive `/api/v1/{service}` REST surface. */
+  publicRest?: {
+    versionHeader: string;
+  };
   /** Middleware that will be removed once services are fully migrated. */
   _legacy?: {
     /** Organization-resolution middleware. */
@@ -370,13 +374,22 @@ export interface ServiceConfig<TApp = unknown> {
   };
 }
 
+/**
+ * Configuration for the public REST surface. Its global `v1` prefix is fixed;
+ * date versions are negotiated by URL or `X-API-Version` within that surface.
+ */
+export type RestServiceConfig<TApp = unknown> = Omit<
+  ServiceConfig<TApp>,
+  "basePath" | "publicRest"
+>;
+
 // ---------------------------------------------------------------------------
 // Internal endpoint registration record
 // ---------------------------------------------------------------------------
 
 /** @internal Stored by the service builder when registering an endpoint. */
 export interface EndpointRegistration {
-  kind: "rpc" | "rest" | "sse";
+  kind: "rpc" | "rest" | "public-rest" | "sse";
   method: HttpMethod | "sse";
   /** URL path fragment: `/${name}` for RPC and SSE, the path as-is for REST. */
   path: string;

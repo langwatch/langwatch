@@ -42,12 +42,30 @@ export class ProjectInputMismatchError extends HandledError {
 
 export class AuthenticatedActorRequiredError extends HandledError {
   constructor() {
-    super(
-      "authenticated_actor_required",
-      "This operation requires a credential bound to a user",
-      { httpStatus: 403 },
-    );
+    super("authenticated_actor_required", "This operation requires a credential bound to a user", {
+      httpStatus: 403,
+    });
     this.name = "AuthenticatedActorRequiredError";
+  }
+}
+
+export class ApiVersionConflictError extends HandledError {
+  constructor() {
+    super("api_version_conflict", "The API version in the URL and header must match", {
+      httpStatus: 400,
+    });
+    this.name = "ApiVersionConflictError";
+  }
+}
+
+export class InvalidApiVersionError extends HandledError {
+  constructor() {
+    super(
+      "invalid_api_version",
+      "The API version must be latest or a real date in YYYY-MM-DD form",
+      { httpStatus: 400 },
+    );
+    this.name = "InvalidApiVersionError";
   }
 }
 
@@ -249,10 +267,7 @@ export interface ResolvedError {
  * record per failed request, from the resolved pair published here — a second
  * record from this side would double every error-log-derived alert and count.
  */
-export function createErrorHandler(): (
-  err: Error,
-  c: Context,
-) => Response | Promise<Response> {
+export function createErrorHandler(): (err: Error, c: Context) => Response | Promise<Response> {
   return (err: Error, c: Context) => {
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
