@@ -33,6 +33,11 @@ without the heavy `Inputs` column when the first read exceeds ClickHouse
 memory. An injected input-resolution port resolves durable ADR-040 markers at
 the Evaluation read boundary. `EvaluationAdapter` constructs the repositories.
 
+The Evaluation server package also owns the versioned evaluation event schemas,
+their pure start/complete/report command definitions, verdict gate and
+evaluation-run fold. The application pipeline only composes those values with
+its stores, execution command and automation subscribers.
+
 ## Dependencies
 
 The service receives the canonical Workflow service because it directly

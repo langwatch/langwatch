@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseEvaluationRepository } from "../src/repositories/clickhouse/clickhouse.evaluation.repository";
+import { ClickHouseEvaluationRepository } from "../src/repositories/clickhouse/evaluation.repository";
 import type {
   EvaluationClickHouseClient,
-  EvaluationRetentionFloorPort,
+  EvaluationClickHouseInsert,
+  EvaluationClickHouseQuery,
 } from "../src/ports/evaluation.port";
+import { EvaluationRetentionFloorPort } from "../src/ports/evaluation.port";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 
 const run: EvaluationRunData = {
@@ -31,8 +33,8 @@ const run: EvaluationRunData = {
   costId: null,
 };
 
-function result(rows: unknown[]): { json<T>(): Promise<T[]> } {
-  return { json: async <T>() => rows as T[] };
+function result(rows: Record<string, unknown>[]): { json<T>(): Promise<T[]> } {
+  return { json: async <T>() => rows.map((row) => row as T) };
 }
 
 function fixtureRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -68,38 +70,36 @@ function fixtureRow(overrides: Record<string, unknown> = {}): Record<string, unk
   };
 }
 
-function harness(rows: unknown[][] = []): {
-  client: EvaluationClickHouseClient & {
-    queries: string[];
-    queryParams: Array<Record<string, unknown>>;
-    inserts: unknown[];
-  };
-  floor: EvaluationRetentionFloorPort & { getFloorMs: ReturnType<typeof vi.fn> };
+type TestClient = EvaluationClickHouseClient & {
+  queries: string[];
+  queryParams: Array<Record<string, unknown>>;
+  inserts: unknown[];
+};
+
+class TestRetentionFloor extends EvaluationRetentionFloorPort {
+  readonly getFloorMs = vi.fn(async () => 1_600_000_000_000);
+}
+
+function harness(rows: Record<string, unknown>[][] = []): {
+  client: TestClient;
+  floor: TestRetentionFloor;
   repository: ClickHouseEvaluationRepository;
 } {
   const queue = [...rows];
-  const client = {
+  const client: TestClient = {
     queries: [],
     queryParams: [],
     inserts: [],
-    insert: vi.fn(async (input: { values: unknown[] }) => {
+    insert: vi.fn(async (input: EvaluationClickHouseInsert) => {
       client.inserts.push(input.values[0]);
     }),
-    query: vi.fn(
-      async (input: { query: string; query_params: Record<string, unknown> }) => {
-        client.queries.push(input.query);
-        client.queryParams.push(input.query_params);
-        return result(queue.shift() ?? []);
-      },
-    ),
-  } as unknown as EvaluationClickHouseClient & {
-    queries: string[];
-    queryParams: Array<Record<string, unknown>>;
-    inserts: unknown[];
+    query: vi.fn(async (input: EvaluationClickHouseQuery) => {
+      client.queries.push(input.query);
+      client.queryParams.push(input.query_params);
+      return result(queue.shift() ?? []);
+    }),
   };
-  const floor = {
-    getFloorMs: vi.fn(async () => 1_600_000_000_000),
-  } as EvaluationRetentionFloorPort & { getFloorMs: ReturnType<typeof vi.fn> };
+  const floor = new TestRetentionFloor();
   return {
     client,
     floor,
@@ -270,9 +270,7 @@ describe("ClickHouseEvaluationRepository", () => {
   });
 
   it("reads one evaluation's inputs by its sort key and degrades unavailable reads", async () => {
-    const { client, repository } = harness([
-      [{ Inputs: '{"input":"hello","output":"world"}' }],
-    ]);
+    const { client, repository } = harness([[{ Inputs: '{"input":"hello","output":"world"}' }]]);
 
     await expect(
       repository.tryFindInputs({

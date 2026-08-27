@@ -1,5 +1,3 @@
-import type { MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
-
 export type MonitorPerformanceBucket = {
   evaluatorId: string;
   period: "current" | "previous";
@@ -10,11 +8,16 @@ export type MonitorPerformanceBucket = {
   passCount: number;
 };
 
+export type MonitorPerformanceBucketQuery = {
+  tenantId: string;
+  evaluatorIds: string[];
+  previousStartMs: number;
+  currentStartMs: number;
+  endMs: number;
+  timeZone: string;
+};
+
 /** Private ClickHouse read model for monitor performance. */
 export abstract class MonitorPerformanceRepository {
-  abstract findBuckets(
-    input: Omit<MonitorPerformanceQuery, "monitors"> & {
-      evaluatorIds: string[];
-    },
-  ): Promise<MonitorPerformanceBucket[]>;
+  abstract findBuckets(input: MonitorPerformanceBucketQuery): Promise<MonitorPerformanceBucket[]>;
 }

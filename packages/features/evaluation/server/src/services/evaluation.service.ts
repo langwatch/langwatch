@@ -21,9 +21,9 @@ import {
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 import type {
   EvaluationExecutionPort,
-  EvaluationFeatureDependencies,
   EvaluationInputsResolutionPort,
 } from "../ports/evaluation.port";
 import type {
@@ -37,7 +37,7 @@ export type EvaluationServiceOptions = {
   monitorPerformance: MonitorPerformanceRepository;
   execution: EvaluationExecutionPort;
   inputResolution: EvaluationInputsResolutionPort;
-  workflows: EvaluationFeatureDependencies["workflows"];
+  workflows: WorkflowService;
 };
 
 /** One canonical Evaluation capability for API, workers and projections. */
@@ -50,9 +50,7 @@ export class EvaluationService extends EvaluationServiceContract {
     super();
   }
 
-  async executeForTrace(
-    input: ExecuteEvaluationCommand,
-  ): Promise<EvaluationExecutionResult> {
+  async executeForTrace(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult> {
     const command = executeEvaluationCommandSchema.parse(input);
     if (command.workflowId) {
       await this.options.workflows.assertInProject({
@@ -60,9 +58,8 @@ export class EvaluationService extends EvaluationServiceContract {
         projectId: command.projectId,
       });
     }
-    return evaluationExecutionResultSchema.parse(
-      await this.options.execution.execute(command),
-    );
+
+    return evaluationExecutionResultSchema.parse(await this.options.execution.execute(command));
   }
 
   async upsertRun(input: UpsertEvaluationRunCommand): Promise<void> {
@@ -94,7 +91,10 @@ export class EvaluationService extends EvaluationServiceContract {
   }): Promise<EvaluationRunData> {
     const query = evaluationRunLookupSchema.parse(input);
     const result = await this.options.repository.tryFindByEvaluationId(query);
-    if (!result) throw new EvaluationNotFoundError(input.evaluationId);
+    if (!result) {
+      throw new EvaluationNotFoundError(input.evaluationId);
+    }
+
     return result;
   }
 
@@ -104,18 +104,11 @@ export class EvaluationService extends EvaluationServiceContract {
     scheduledAt?: Date;
     scheduledAtSlackMs?: number;
   }): Promise<EvaluationRunData | null> {
-    return this.options.repository.tryFindByEvaluationId(
-      evaluationRunLookupSchema.parse(input),
-    );
+    return this.options.repository.tryFindByEvaluationId(evaluationRunLookupSchema.parse(input));
   }
 
-  findRunsByTraceId(input: {
-    tenantId: string;
-    traceId: string;
-  }): Promise<EvaluationRunData[]> {
-    return this.options.repository.findByTraceId(
-      evaluationRunsByTraceQuerySchema.parse(input),
-    );
+  findRunsByTraceId(input: { tenantId: string; traceId: string }): Promise<EvaluationRunData[]> {
+    return this.options.repository.findByTraceId(evaluationRunsByTraceQuerySchema.parse(input));
   }
 
   findSummariesByTraceIds(input: {
@@ -132,9 +125,7 @@ export class EvaluationService extends EvaluationServiceContract {
     tenantId: string;
     traceIds: string[];
   }): Promise<Record<string, TraceEvaluationData[]>> {
-    return this.options.repository.findTraceEvaluations(
-      traceEvaluationsQuerySchema.parse(input),
-    );
+    return this.options.repository.findTraceEvaluations(traceEvaluationsQuerySchema.parse(input));
   }
 
   async tryGetInputs(input: {
@@ -143,7 +134,8 @@ export class EvaluationService extends EvaluationServiceContract {
   }): Promise<Record<string, unknown> | null> {
     const query = evaluationInputsQuerySchema.parse(input);
     const inputs = await this.options.repository.tryFindInputs(query);
-    return this.options.inputResolution.resolve({
+
+    return this.options.inputResolution.tryResolve({
       tenantId: query.tenantId,
       inputs,
     });
@@ -161,55 +153,55 @@ export class EvaluationService extends EvaluationServiceContract {
       endMs: query.endMs,
       timeZone: query.timeZone,
     });
-    return summarizeMonitorPerformance(query.monitors, buckets).map((value) =>
+
+    return this.summarizeMonitorPerformance(query.monitors, buckets).map((value) =>
       onlineEvaluationPerformanceSchema.parse(value),
     );
   }
-}
 
-function summarizeMonitorPerformance(
-  monitors: MonitorPerformanceQuery["monitors"],
-  buckets: MonitorPerformanceBucket[],
-): OnlineEvaluationPerformance[] {
-  const bucketsByEvaluator = new Map<string, MonitorPerformanceBucket[]>();
-  for (const bucket of buckets) {
-    const evaluatorBuckets = bucketsByEvaluator.get(bucket.evaluatorId) ?? [];
-    evaluatorBuckets.push(bucket);
-    bucketsByEvaluator.set(bucket.evaluatorId, evaluatorBuckets);
+  private summarizeMonitorPerformance(
+    monitors: MonitorPerformanceQuery["monitors"],
+    buckets: MonitorPerformanceBucket[],
+  ): OnlineEvaluationPerformance[] {
+    const bucketsByEvaluator = new Map<string, MonitorPerformanceBucket[]>();
+    for (const bucket of buckets) {
+      const evaluatorBuckets = bucketsByEvaluator.get(bucket.evaluatorId) ?? [];
+      evaluatorBuckets.push(bucket);
+      bucketsByEvaluator.set(bucket.evaluatorId, evaluatorBuckets);
+    }
+
+    return monitors.map((monitor) => {
+      const monitorBuckets = bucketsByEvaluator.get(monitor.id) ?? [];
+      const current = monitorBuckets
+        .filter((bucket) => bucket.period === "current")
+        .map((bucket) => this.metricTotal(bucket, monitor.isGuardrail));
+      const previous = monitorBuckets
+        .filter((bucket) => bucket.period === "previous")
+        .map((bucket) => this.metricTotal(bucket, monitor.isGuardrail));
+
+      return {
+        monitorId: monitor.id,
+        metric: monitor.isGuardrail ? "pass_rate" : "score",
+        points: current.filter((total) => total.count > 0).map((total) => total.sum / total.count),
+        current: this.average(current),
+        previous: this.average(previous),
+      };
+    });
   }
 
-  return monitors.map((monitor) => {
-    const monitorBuckets = bucketsByEvaluator.get(monitor.id) ?? [];
-    const current = monitorBuckets
-      .filter((bucket) => bucket.period === "current")
-      .map((bucket) => metricTotal(bucket, monitor.isGuardrail));
-    const previous = monitorBuckets
-      .filter((bucket) => bucket.period === "previous")
-      .map((bucket) => metricTotal(bucket, monitor.isGuardrail));
+  private metricTotal(
+    bucket: MonitorPerformanceBucket,
+    isGuardrail: boolean,
+  ): { sum: number; count: number } {
+    return isGuardrail
+      ? { sum: bucket.passSum, count: bucket.passCount }
+      : { sum: bucket.scoreSum, count: bucket.scoreCount };
+  }
 
-    return {
-      monitorId: monitor.id,
-      metric: monitor.isGuardrail ? "pass_rate" : "score",
-      points: current
-        .filter((total) => total.count > 0)
-        .map((total) => total.sum / total.count),
-      current: average(current),
-      previous: average(previous),
-    };
-  });
-}
+  private average(totals: Array<{ sum: number; count: number }>): number | null {
+    const sum = totals.reduce((value, total) => value + total.sum, 0);
+    const count = totals.reduce((value, total) => value + total.count, 0);
 
-function metricTotal(
-  bucket: MonitorPerformanceBucket,
-  isGuardrail: boolean,
-): { sum: number; count: number } {
-  return isGuardrail
-    ? { sum: bucket.passSum, count: bucket.passCount }
-    : { sum: bucket.scoreSum, count: bucket.scoreCount };
-}
-
-function average(totals: Array<{ sum: number; count: number }>): number | null {
-  const sum = totals.reduce((value, total) => value + total.sum, 0);
-  const count = totals.reduce((value, total) => value + total.count, 0);
-  return count > 0 ? sum / count : null;
+    return count > 0 ? sum / count : null;
+  }
 }

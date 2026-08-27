@@ -23,6 +23,4 @@ export const onlineEvaluationPerformanceSchema = z.object({
   current: z.number().nullable(),
   previous: z.number().nullable(),
 });
-export type OnlineEvaluationPerformance = z.infer<
-  typeof onlineEvaluationPerformanceSchema
->;
+export type OnlineEvaluationPerformance = z.infer<typeof onlineEvaluationPerformanceSchema>;

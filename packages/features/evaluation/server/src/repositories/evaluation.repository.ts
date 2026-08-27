@@ -19,9 +19,7 @@ export abstract class EvaluationRunRepository {
   abstract upsertBatch(
     input: Array<{ data: EvaluationRunData; tenantId: string; retentionDays?: number }>,
   ): Promise<void>;
-  abstract tryFindByEvaluationId(
-    input: EvaluationRunLookup,
-  ): Promise<EvaluationRunData | null>;
+  abstract tryFindByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   abstract findByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
   abstract findSummariesByTraceIds(
     input: EvaluationSummariesByTraceIdsQuery,
@@ -29,7 +27,5 @@ export abstract class EvaluationRunRepository {
   abstract findTraceEvaluations(
     input: TraceEvaluationsQuery,
   ): Promise<Record<string, TraceEvaluationData[]>>;
-  abstract tryFindInputs(
-    input: EvaluationInputsQuery,
-  ): Promise<Record<string, unknown> | null>;
+  abstract tryFindInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
 }

@@ -13,6 +13,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./workflow-evaluation": {
+      "types": "./src/adapters/workflow-evaluation.adapter.ts",
+      "default": "./src/adapters/workflow-evaluation.adapter.ts"
+    },
+    "./internal": {
+      "types": "./src/testing.ts",
+      "default": "./src/testing.ts"
     }
   },
   "scripts": {
@@ -21,11 +29,20 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*"
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "safe-regex2": "^5.1.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

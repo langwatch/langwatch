@@ -1,18 +1,16 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
 import type { EvaluationClickHouseResolver } from "../../ports/evaluation.port";
 import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,
+  type MonitorPerformanceBucketQuery,
 } from "../monitor-performance.repository";
 
-const logger = createLogger(
-  "langwatch:evaluation:clickhouse.monitor-performance.repository",
-);
+const logger = createLogger("langwatch:evaluation:clickhouse.monitor-performance.repository");
 
 const ANALYTICS_CLICKHOUSE_SETTINGS = {
-  max_bytes_before_external_group_by: 500_000_000,
+  max_bytes_before_external_group_by: "500000000",
   max_execution_time: 15,
 } as const;
 
@@ -99,17 +97,11 @@ export class ClickHouseMonitorPerformanceRepository extends MonitorPerformanceRe
     return new ClickHouseMonitorPerformanceRepository(options);
   }
 
-  private constructor(
-    private readonly options: { resolveClient: EvaluationClickHouseResolver },
-  ) {
+  private constructor(private readonly options: { resolveClient: EvaluationClickHouseResolver }) {
     super();
   }
 
-  async findBuckets(
-    input: Omit<MonitorPerformanceQuery, "monitors"> & {
-      evaluatorIds: string[];
-    },
-  ): Promise<MonitorPerformanceBucket[]> {
+  async findBuckets(input: MonitorPerformanceBucketQuery): Promise<MonitorPerformanceBucket[]> {
     if (input.evaluatorIds.length === 0) return [];
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },

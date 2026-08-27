@@ -1,5 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import type { WorkflowService } from "@langwatch/workflow-contract";
+import {
+  WorkflowService,
+  type ArchiveWorkflowCommand,
+  type CopyWorkflowCommand,
+  type CreateWorkflowCommand,
+  type PublishWorkflowCommand,
+  type RunWorkflowCommand,
+  type SaveWorkflowVersionCommand,
+  type StudioClientEvent,
+  type UpdateWorkflowCommand,
+  type Workflow,
+  type WorkflowEvaluatorFields,
+  type WorkflowVersion,
+  type WorkflowVersionHistoryEntry,
+  type WorkflowVersionHistoryMode,
+  type WorkflowWithVersion,
+} from "@langwatch/workflow-contract";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import { EvaluationService } from "../src/services/evaluation.service";
 import {
@@ -11,10 +27,7 @@ import {
   MonitorPerformanceRepository,
   type MonitorPerformanceBucket,
 } from "../src/repositories/monitor-performance.repository";
-import type {
-  EvaluationRunData,
-  TraceEvaluationData,
-} from "@langwatch/evaluation-contract";
+import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
 
 const run: EvaluationRunData = {
   evaluationId: "evaluation_1",
@@ -69,9 +82,8 @@ class FakeExecution extends EvaluationExecutionPort {
 }
 
 class FakeInputsResolution extends EvaluationInputsResolutionPort {
-  resolve = vi.fn(
-    async (input: { tenantId: string; inputs: Record<string, unknown> | null }) =>
-      input.inputs,
+  tryResolve = vi.fn(
+    async (input: { tenantId: string; inputs: Record<string, unknown> | null }) => input.inputs,
   );
 }
 
@@ -82,6 +94,122 @@ class FakeMonitorPerformanceRepository extends MonitorPerformanceRepository {
 
   async findBuckets(): Promise<MonitorPerformanceBucket[]> {
     return this.buckets;
+  }
+}
+
+class TestWorkflowService extends WorkflowService {
+  readonly assertInProject = vi.fn(async (_input: { workflowId: string; projectId: string }) => {});
+
+  async enrichStudioEvent(_input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent> {
+    throw new Error("unused workflow capability");
+  }
+
+  async prepareStudioEvent(_input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent> {
+    throw new Error("unused workflow capability");
+  }
+
+  async getById(_input: {
+    id: string;
+    projectId: string;
+    includeVersion?: boolean;
+  }): Promise<WorkflowWithVersion> {
+    throw new Error("unused workflow capability");
+  }
+
+  async getFields(_input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowEvaluatorFields> {
+    throw new Error("unused workflow capability");
+  }
+
+  async list(_input: { projectId: string }): Promise<Workflow[]> {
+    return [];
+  }
+
+  async getVersions(_input: {
+    workflowId: string;
+    projectId: string;
+    includeDsl?: boolean;
+  }): Promise<WorkflowVersion[]> {
+    return [];
+  }
+
+  async getVersionHistory(_input: {
+    workflowId: string;
+    projectId: string;
+    mode: WorkflowVersionHistoryMode;
+  }): Promise<WorkflowVersionHistoryEntry[]> {
+    return [];
+  }
+
+  async restoreVersion(_input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
+    throw new Error("unused workflow capability");
+  }
+
+  async getPublishedVersion(_input: {
+    workflowId: string;
+    projectId: string;
+    versionId?: string;
+  }): Promise<WorkflowVersion> {
+    throw new Error("unused workflow capability");
+  }
+
+  async create(_input: CreateWorkflowCommand): Promise<{
+    workflow: WorkflowWithVersion;
+    version: WorkflowVersion;
+  }> {
+    throw new Error("unused workflow capability");
+  }
+
+  async update(_input: UpdateWorkflowCommand): Promise<Workflow> {
+    throw new Error("unused workflow capability");
+  }
+
+  async saveVersion(_input: SaveWorkflowVersionCommand): Promise<WorkflowVersion> {
+    throw new Error("unused workflow capability");
+  }
+
+  async publish(_input: PublishWorkflowCommand): Promise<Workflow> {
+    throw new Error("unused workflow capability");
+  }
+
+  async unpublish(_input: { id: string; projectId: string }): Promise<Workflow> {
+    throw new Error("unused workflow capability");
+  }
+
+  async archive(_input: ArchiveWorkflowCommand): Promise<Workflow> {
+    throw new Error("unused workflow capability");
+  }
+
+  async copy(_input: CopyWorkflowCommand): Promise<{
+    workflow: WorkflowWithVersion;
+    version: WorkflowVersion;
+  }> {
+    throw new Error("unused workflow capability");
+  }
+
+  async getCopies(_input: { workflowId: string; projectId: string }): Promise<Workflow[]> {
+    return [];
+  }
+
+  async pushToCopies(_input: {
+    workflowId: string;
+    projectId: string;
+    copyIds?: string[];
+    allowedProjectIds?: string[];
+  }): Promise<{ pushedTo: number; selectedCopies: number }> {
+    return { pushedTo: 0, selectedCopies: 0 };
+  }
+
+  async run(_input: RunWorkflowCommand): Promise<unknown> {
+    throw new Error("unused workflow capability");
   }
 }
 
@@ -96,7 +224,7 @@ describe("EvaluationService", () => {
       execution,
       inputResolution: new FakeInputsResolution(),
       monitorPerformance,
-      workflows: { assertInProject: vi.fn() } as unknown as WorkflowService,
+      workflows: new TestWorkflowService(),
     });
 
   it("validates and persists runs through the private repository", async () => {
@@ -117,9 +245,7 @@ describe("EvaluationService", () => {
   });
 
   it("validates workflow scope before dispatch", async () => {
-    const workflows = {
-      assertInProject: vi.fn(async () => undefined),
-    } as unknown as WorkflowService;
+    const workflows = new TestWorkflowService();
     const execution = new FakeExecution();
     const value = new FakeRepository();
     const evaluation = EvaluationService.create({
@@ -164,13 +290,13 @@ describe("EvaluationService", () => {
     const repository = new FakeRepository();
     repository.tryFindInputs = vi.fn(async () => ({ marker: "object_1" }));
     const inputResolution = new FakeInputsResolution();
-    inputResolution.resolve.mockResolvedValue({ question: "whole input" });
+    inputResolution.tryResolve.mockResolvedValue({ question: "whole input" });
     const evaluation = EvaluationService.create({
       repository,
       execution: new FakeExecution(),
       inputResolution,
       monitorPerformance: new FakeMonitorPerformanceRepository(),
-      workflows: { assertInProject: vi.fn() } as unknown as WorkflowService,
+      workflows: new TestWorkflowService(),
     });
 
     await expect(
@@ -179,7 +305,7 @@ describe("EvaluationService", () => {
         evaluationId: "evaluation_1",
       }),
     ).resolves.toEqual({ question: "whole input" });
-    expect(inputResolution.resolve).toHaveBeenCalledWith({
+    expect(inputResolution.tryResolve).toHaveBeenCalledWith({
       tenantId: "project_1",
       inputs: { marker: "object_1" },
     });

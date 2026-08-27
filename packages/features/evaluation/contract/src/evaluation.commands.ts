@@ -14,6 +14,7 @@ export const executeEvaluationCommandSchema = z.object({
   mappings: z.record(z.string(), z.unknown()).nullable(),
   level: z.enum(["trace", "thread"]).optional(),
   workflowId: z.string().nullable().optional(),
+  idempotencyKey: z.string().optional(),
 });
 
 export const upsertEvaluationRunCommandSchema = z.object({

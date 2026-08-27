@@ -6,8 +6,8 @@ import {
   type EvaluationClickHouseResolver,
   type EvaluationRetentionFloorPort,
 } from "../ports/evaluation.port";
-import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/clickhouse.evaluation.repository";
-import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/clickhouse.monitor-performance.repository";
+import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository";
+import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository";
 import { EvaluationService } from "../services/evaluation.service";
 
 export type EvaluationAdapterOptions = {
@@ -19,7 +19,7 @@ export type EvaluationAdapterOptions = {
 };
 
 class PassthroughEvaluationInputsResolution extends EvaluationInputsResolutionPort {
-  async resolve(input: {
+  async tryResolve(input: {
     tenantId: string;
     inputs: Record<string, unknown> | null;
   }): Promise<Record<string, unknown> | null> {
@@ -39,8 +39,7 @@ export class EvaluationAdapter {
         resolveClient: options.resolveClickHouse,
       }),
       execution: options.execution,
-      inputResolution:
-        options.inputResolution ?? new PassthroughEvaluationInputsResolution(),
+      inputResolution: options.inputResolution ?? new PassthroughEvaluationInputsResolution(),
       workflows: options.workflows,
     });
   }
