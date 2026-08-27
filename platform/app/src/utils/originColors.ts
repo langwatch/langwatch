@@ -7,7 +7,7 @@
  * "application" traces (no explicit origin) use the traces blue color,
  * while other origins match their corresponding feature colors.
  *
- * Origin LABELS live in `~/features/traces-v2/utils/originDisplay.ts`,
+ * Origin labels live in `@langwatch/trace-web`.
  * which pairs each label with its Chakra palette so the Trace Explorer
  * table and its filter sidebar can never disagree about one origin.
  */
