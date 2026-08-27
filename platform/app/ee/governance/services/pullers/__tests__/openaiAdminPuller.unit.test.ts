@@ -510,6 +510,121 @@ describe("given an OpenAI Admin cost source", () => {
     });
   });
 
+  describe("when the key-grouping upgrade crosses a drain boundary", () => {
+    const QUERY_ID = `cost:1d:project_id,line_item,user_id,api_key_id:${CONFIG.startingAt}`;
+
+    /** @scenario "Spend is not doubled when the grouping dimension changes across a drain" */
+    it("skips the lookback so the keyed window does not overlap the user-only window", async () => {
+      const puller = new OpenAiAdminPuller();
+
+      // Run 1: backfill below the floor — API refuses key grouping.
+      fetchMock
+        .mockResolvedValueOnce(KEY_GROUPING_REFUSAL)
+        .mockResolvedValueOnce(
+          jsonResponse(
+            page({
+              results: [
+                costRow({ api_key_id: null, project_id: null, line_item: null }),
+              ],
+            }),
+          ),
+        );
+
+      const run1 = await puller.runOnce(RUN_OPTIONS, CONFIG);
+      const cursor1 = JSON.parse(run1.cursor!);
+      expect(cursor1.hasKeyGrouping).toBe(true);
+      expect(cursor1.keyGroupingUpgrade).toBe(true);
+
+      // Run 2: API now accepts key grouping (window advanced past the floor).
+      fetchMock.mockResolvedValue(jsonResponse(page()));
+
+      const run2 = await puller.runOnce(
+        { ...RUN_OPTIONS, cursor: run1.cursor! },
+        CONFIG,
+      );
+
+      // The request must start at the stored watermark, NOT three days before.
+      // Three days before would re-read buckets that were emitted with user-only
+      // dimensions, producing different source_event_ids and doubling spend.
+      const run2Start = Number(
+        requestedUrl(2).searchParams.get("start_time"),
+      );
+      expect(run2Start).toBe(
+        Math.floor(Date.parse(cursor1.startingAt) / 1000),
+      );
+
+      // Key grouping was used.
+      expect(
+        requestedUrl(2).searchParams.getAll("group_by[]"),
+      ).toContain("api_key_id");
+
+      // The upgrade flag clears once key grouping succeeds.
+      const cursor2 = JSON.parse(run2.cursor!);
+      expect(cursor2.keyGroupingUpgrade).toBe(false);
+    });
+
+    /** @scenario "Spend is not doubled when the grouping dimension changes across a drain" */
+    it("keeps the upgrade flag when the API still refuses key grouping", async () => {
+      const puller = new OpenAiAdminPuller();
+      const cursor = JSON.stringify({
+        startingAt: BUCKET_START_ISO,
+        page: null,
+        query: QUERY_ID,
+        watermark: null,
+        hasKeyGrouping: true,
+        keyGroupingUpgrade: true,
+      });
+
+      // API still refuses key grouping below the floor.
+      fetchMock
+        .mockResolvedValueOnce(KEY_GROUPING_REFUSAL)
+        .mockResolvedValueOnce(
+          jsonResponse(
+            page({
+              results: [
+                costRow({ api_key_id: null, project_id: null, line_item: null }),
+              ],
+            }),
+          ),
+        );
+
+      const result = await puller.runOnce(
+        { ...RUN_OPTIONS, cursor },
+        CONFIG,
+      );
+
+      const nextCursor = JSON.parse(result.cursor!);
+      expect(nextCursor.hasKeyGrouping).toBe(true);
+      expect(nextCursor.keyGroupingUpgrade).toBe(true);
+    });
+
+    /** @scenario "Spend is not doubled when the grouping dimension changes across a drain" */
+    it("resumes normal lookback once key grouping is stable", async () => {
+      const puller = new OpenAiAdminPuller();
+
+      // A cursor from a successful keyed window — no upgrade pending.
+      const cursor = JSON.stringify({
+        startingAt: BUCKET_START_ISO,
+        page: null,
+        query: QUERY_ID,
+        watermark: null,
+        hasKeyGrouping: true,
+        keyGroupingUpgrade: false,
+      });
+
+      fetchMock.mockResolvedValue(jsonResponse(page()));
+
+      await puller.runOnce({ ...RUN_OPTIONS, cursor }, CONFIG);
+
+      // The lookback should be applied: start_time is BEFORE the stored start.
+      const requestedStart = Number(
+        requestedUrl(0).searchParams.get("start_time"),
+      );
+      const storedStart = Math.floor(Date.parse(BUCKET_START_ISO) / 1000);
+      expect(requestedStart).toBeLessThan(storedStart);
+    });
+  });
+
   describe("when a run cannot finish", () => {
     /** @scenario "A failed read leaves the source where it was" */
     it("holds the cursor still and reports the failure", async () => {

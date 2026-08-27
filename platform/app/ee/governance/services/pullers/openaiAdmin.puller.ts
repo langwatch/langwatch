@@ -159,6 +159,14 @@ const cursorSchema = z.object({
    */
   watermark: z.string().nullable().default(null),
   hasKeyGrouping: z.boolean().default(true),
+  /**
+   * True when the previous window drained with user-only grouping and the
+   * cursor was set to retry with key grouping. Tells parseCursor to skip the
+   * restatement lookback so the first keyed window does not overlap with the
+   * last user-only window — overlapping would emit different source_event_ids
+   * for the same buckets and double the reported spend.
+   */
+  keyGroupingUpgrade: z.boolean().default(false),
 });
 
 interface ParsedCursor {
@@ -217,9 +225,11 @@ function parseCursor({
         return {
           // Mid-window (a page token in hand) the start must stay exactly what
           // the token was minted against. Only a cursor with no token in hand
-          // gets the trailing re-read applied to it.
+          // gets the trailing re-read applied to it — UNLESS a key-grouping
+          // upgrade is pending, in which case the lookback is skipped so the
+          // first keyed window cannot overlap with user-only data.
           windowStart:
-            parsed.page === null
+            parsed.page === null && !parsed.keyGroupingUpgrade
               ? windowStartFor({ stored: parsed.startingAt, config })
               : parsed.startingAt,
           storedStart: parsed.startingAt,
@@ -500,6 +510,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             query,
             watermark,
             hasKeyGrouping,
+            keyGroupingUpgrade: false,
           }),
           errorCount: 0,
         };
@@ -535,6 +546,12 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             query,
             watermark: null,
             hasKeyGrouping: true,
+            // When this window was read without key grouping, the next run
+            // must try key grouping again — but without the restatement
+            // lookback. Overlapping a keyed window with a user-only window
+            // produces different source_event_ids for the same buckets, which
+            // doubles the reported spend instead of restating it.
+            keyGroupingUpgrade: !hasKeyGrouping,
           }),
           errorCount: 0,
         };
@@ -554,6 +571,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         query,
         watermark,
         hasKeyGrouping,
+        keyGroupingUpgrade: false,
       }),
       errorCount: 0,
     };
@@ -846,8 +864,16 @@ function encodeCursor({
   query,
   watermark,
   hasKeyGrouping,
+  keyGroupingUpgrade,
 }: Omit<z.infer<typeof cursorSchema>, "query"> & { query: string }): string {
-  return JSON.stringify({ startingAt, page, query, watermark, hasKeyGrouping });
+  return JSON.stringify({
+    startingAt,
+    page,
+    query,
+    watermark,
+    hasKeyGrouping,
+    keyGroupingUpgrade,
+  });
 }
 
 /** The later of two ISO instants, tolerating nulls and unparseable input. */

@@ -124,6 +124,14 @@ Feature: OpenAI Admin cost puller
       # a confident wrong name on months of history.
 
     @unit
+    Scenario: Spend is not doubled when the grouping dimension changes across a drain
+      Given a window that drained with user-only grouping
+      When the next run tries key grouping
+      Then the lookback is skipped so no bucket appears under two identities
+      # apiKeyId is part of source_event_id, so re-reading the same day with
+      # and without it produces two records instead of restating one.
+
+    @unit
     Scenario: A refusal about anything else is not mistaken for the cutoff
       Given the provider refuses a request for a reason unrelated to the cutoff
       When the puller reads the response
