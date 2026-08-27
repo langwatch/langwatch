@@ -426,10 +426,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
   /** One path for every method — that is the transport's whole shape. */
   const rpcPath = "/api/v1/query";
 
-  const post = (
-    body: unknown,
-    options: { token?: string | null } = {},
-  ) =>
+  const post = (body: unknown, options: { token?: string | null } = {}) =>
     app.request(rpcPath, {
       method: "POST",
       headers: {
@@ -482,7 +479,11 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
     project: Project,
     sql: string,
     parameters?: Record<string, unknown>,
-  ) => succeed(project, "query.run", { sql, ...(parameters ? { parameters } : {}) });
+  ) =>
+    succeed(project, "query.run", {
+      sql,
+      ...(parameters ? { parameters } : {}),
+    });
 
   /**
    * Runs SQL expected to be refused, and returns the *canonical* error body —
@@ -1128,9 +1129,8 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       ).toContain("WILDCARD_NOT_ALLOWED");
 
       expect(
-        (
-          await call("query.run", { sql }, { token: openProject.apiKey })
-        ).status,
+        (await call("query.run", { sql }, { token: openProject.apiKey }))
+          .status,
       ).toBe(200);
     });
 
@@ -1845,9 +1845,13 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       // refused as unknown rather than dispatched to anything — there is no
       // `query.run.postgres` or `query.runPostgres` to find.
       for (const method of ["query.run.postgres", "query.runPostgres"]) {
-        const response = await call(method, { sql: "SELECT 1" }, {
-          token: openProject.apiKey,
-        });
+        const response = await call(
+          method,
+          { sql: "SELECT 1" },
+          {
+            token: openProject.apiKey,
+          },
+        );
         const body = (await response.json()) as any;
         expect(response.status, method).toBe(400);
         expect(body.error.code, method).toBe(-32600);

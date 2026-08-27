@@ -736,8 +736,10 @@ describe("given the /api/v1/query JSON-RPC door and a seed with known answers", 
     });
     const body = (await response.json()) as Record<string, any>;
     expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(200);
-    expect(body.error, `query.run answered an error: ${JSON.stringify(body)}`)
-      .toBeUndefined();
+    expect(
+      body.error,
+      `query.run answered an error: ${JSON.stringify(body)}`,
+    ).toBeUndefined();
     return body.result as Record<string, any>;
   };
 
@@ -1473,7 +1475,9 @@ describe("given the /api/v1/query JSON-RPC door and a seed with known answers", 
   describe("when a dataset is read with no condition on its time column", () => {
     /** @scenario "An unbounded read is reported as covering the whole history" */
     it("answers, says the read covered the whole history, and stays quiet once it is bounded", async () => {
-      const result = await ask(`SELECT count() AS value FROM ${database}.traces`);
+      const result = await ask(
+        `SELECT count() AS value FROM ${database}.traces`,
+      );
 
       expect(Number(result.rows[0].value)).toBeGreaterThan(0);
       expect(codes(result)).toEqual(["UNBOUNDED_TIME_RANGE"]);

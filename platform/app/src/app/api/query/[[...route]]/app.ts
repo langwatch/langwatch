@@ -16,11 +16,14 @@
 
 import type { Context } from "hono";
 
-import { canonicalErrorFor, requestTraceIds } from "~/app/api/shared/canonical-error";
+import {
+  canonicalErrorFor,
+  requestTraceIds,
+} from "~/app/api/shared/canonical-error";
 import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { type QueryRpcVariables, rpcErrorBody } from "./rpc";
 import { registerQueryRoutes } from "./app.v1";
+import { type QueryRpcVariables, rpcErrorBody } from "./rpc";
 
 patchZodOpenapi();
 

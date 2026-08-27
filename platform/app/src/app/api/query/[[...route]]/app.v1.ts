@@ -65,10 +65,7 @@ import {
   getLangWatchQLService,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
 } from "~/server/analytics/lwql";
-import {
-  type createProjectApp,
-  apiKeyPermission,
-} from "~/server/api/security";
+import { apiKeyPermission, type createProjectApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
   RequestValidationError,
@@ -162,9 +159,7 @@ async function runQuery(c: Context, params: unknown): Promise<unknown> {
       violations: parsed.error.issues.map((issue) => ({
         // Reported under `params`, because that is where the caller wrote it.
         field:
-          issue.path.length > 0
-            ? `params.${issue.path.join(".")}`
-            : "params",
+          issue.path.length > 0 ? `params.${issue.path.join(".")}` : "params",
         type: issue.code,
         message: issue.message,
       })),
@@ -228,18 +223,20 @@ const METHODS: Record<
  */
 const RPC_WRAPPED_STATUSES = [400, 422] as const;
 
-const RPC_ERROR_DESCRIPTIONS: Record<(typeof RPC_WRAPPED_STATUSES)[number], string> =
-  {
-    400:
-      "The request was refused before the method ran: the JSON-RPC envelope was malformed, named a method this endpoint does not serve, or carried `params` that did not match the method. " +
-      "`error.code` is the JSON-RPC code (-32700, -32600, -32601 or -32602) and `error.data` is this API's canonical error envelope.",
-    422:
-      "The method ran and refused on a deliberate ceiling — a well-formed query whose scan volume is not allowed. " +
-      "`error.data` carries the canonical envelope, whose `code` names which ceiling.",
-  };
+const RPC_ERROR_DESCRIPTIONS: Record<
+  (typeof RPC_WRAPPED_STATUSES)[number],
+  string
+> = {
+  400:
+    "The request was refused before the method ran: the JSON-RPC envelope was malformed, named a method this endpoint does not serve, or carried `params` that did not match the method. " +
+    "`error.code` is the JSON-RPC code (-32700, -32600, -32601 or -32602) and `error.data` is this API's canonical error envelope.",
+  422:
+    "The method ran and refused on a deliberate ceiling — a well-formed query whose scan volume is not allowed. " +
+    "`error.data` carries the canonical envelope, whose `code` names which ceiling.",
+};
 
 const RPC_DESCRIPTION =
-  "A JSON-RPC 2.0 endpoint for LangWatchQL. Send `{ \"jsonrpc\": \"2.0\", \"id\": 1, \"method\": ..., \"params\": ... }`.\n\n" +
+  'A JSON-RPC 2.0 endpoint for LangWatchQL. Send `{ "jsonrpc": "2.0", "id": 1, "method": ..., "params": ... }`.\n\n' +
   "**`query.run`** — executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. " +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
   "**`query.schema`** — lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. Takes no `params`.\n\n" +
