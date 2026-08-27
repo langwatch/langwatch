@@ -1,9 +1,10 @@
 /**
- * `POST /api/v1/query`, the new JSON-RPC door onto LangWatchQL.
+ * `POST /api/v1/query` and `GET /api/v1/query/schema`, the new REST door onto
+ * LangWatchQL.
  *
  * The service, the executor and the tenant-isolation row policy are already
  * exhaustively proved — at the executor level by the proof suite, and through
- * this same HTTP door by `./queryRpcServiceProofs.integration.test.ts`, which
+ * this same HTTP door by `./queryRestServiceProofs.integration.test.ts`, which
  * drives the surface end to end: auth, RBAC, validator, gated columns,
  * diagnostics, truncation, credential leakage, all of it. Repeating that
  * coverage here would test the same service twice and miss the point of a
@@ -17,15 +18,15 @@
  *     there to be misread as a selector. This family has no project id
  *     anywhere in its paths at all, so there is nothing to misread: the
  *     credential is the only place a tenant can come from.
- *  2. **The method is in the body, not the path.** Which means a single URL
- *     now serves both calls, and the *envelope* is what routes them. The
- *     failure mode that creates is new: a reply that reaches the wrong caller,
- *     or a refusal a client cannot classify.
+ *  2. **The body IS the query, and a 200 IS the result.** Nothing is wrapped.
+ *     A refusal is this API's canonical error envelope at the top level, the
+ *     same shape every other REST family answers with — so a client that
+ *     already parses this platform's errors needs no second parser here.
  *
  * Those two properties are this suite's reason to exist. The isolation case
- * proves the first rather than assuming it; the envelope cases prove the
- * second at the level the pure-unit suite cannot — through real auth, with a
- * real service behind it.
+ * proves the first rather than assuming it; the request/refusal cases prove
+ * the second at the level the pure-unit suite cannot — through real auth, with
+ * a real service behind it.
  *
  * Three habits carried over from both suites above, for the same reasons:
  *
@@ -37,8 +38,8 @@
  *    something to fail on.
  *
  * @see specs/analytics/lwql-api.feature
- * @see ./queryRpc.unit.test.ts — the envelope proved without a database
- * @see ./queryRpcServiceProofs.integration.test.ts — the service/isolation proof this suite does not repeat
+ * @see ./queryRest.unit.test.ts — the surface proved without a database
+ * @see ./queryRestServiceProofs.integration.test.ts — the service/isolation proof this suite does not repeat
  * @see ~/server/analytics/lwql — the service under test
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
@@ -148,7 +149,7 @@ async function seedTenant({
   });
 }
 
-describe("given the /api/v1/query JSON-RPC family", () => {
+describe("given the /api/v1/query REST family", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
@@ -158,80 +159,85 @@ describe("given the /api/v1/query JSON-RPC family", () => {
   let database: string;
   let facts: string;
 
-  /** One path for every method — that is the transport's whole shape. */
-  const rpcPath = "/api/v1/query";
+  /** The two paths this family serves. */
+  const runPath = "/api/v1/query";
+  const schemaPath = "/api/v1/query/schema";
 
-  /** POSTs a raw body, so a malformed-envelope case can send whatever it likes. */
+  const authHeaders = (token?: string | null) => ({
+    "Content-Type": "application/json",
+    ...(token === null ? {} : { "X-Auth-Token": token ?? "" }),
+  });
+
+  /** POSTs a raw body, so a malformed-body case can send whatever it likes. */
   const post = (body: unknown, options: { token?: string | null } = {}) =>
-    app.request(rpcPath, {
+    app.request(runPath, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.token === null
-          ? {}
-          : { "X-Auth-Token": options.token ?? "" }),
-      },
+      headers: authHeaders(options.token),
       body: typeof body === "string" ? body : JSON.stringify(body),
     });
 
-  /** A well-formed JSON-RPC call, with an id the assertions can match on. */
-  const call = (
-    method: string,
-    params?: unknown,
-    options: { token?: string | null; id?: unknown } = {},
-  ) =>
-    post(
-      {
-        jsonrpc: "2.0",
-        id: options.id ?? 1,
-        method,
-        ...(params === undefined ? {} : { params }),
-      },
-      options,
-    );
+  /** GETs the schema door. */
+  const getSchema = (options: { token?: string | null } = {}) =>
+    app.request(schemaPath, {
+      method: "GET",
+      headers: authHeaders(options.token),
+    });
 
   /**
-   * Calls a method as one project and asserts it succeeded before returning
-   * `result`.
+   * Calls a door as one project and asserts it answered before returning the
+   * body.
    *
-   * The id check is not decoration: on a transport where one URL serves every
-   * call, the id is the only thing tying a reply to its request, so every
-   * success in this suite proves it survived the round trip.
+   * The body is returned as-is: on this transport a `200` IS the payload, so
+   * there is no envelope member to descend through and nothing to unwrap.
    */
-  const succeed = async (
-    project: Project,
-    method: string,
-    params?: unknown,
-  ) => {
-    const response = await call(method, params, {
-      token: project.apiKey,
-      id: 42,
-    });
+  const succeed = async (response: Response, what: string) => {
     const body = (await response.json()) as Record<string, any>;
     if (response.status !== 200) {
-      throw new Error(`${method} failed: ${JSON.stringify(body)}`);
-    }
-    if (body.jsonrpc !== "2.0") {
-      throw new Error(`${method} answered with jsonrpc ${body.jsonrpc}`);
-    }
-    if (body.id !== 42) {
-      throw new Error("the reply dropped the id it was called with");
+      throw new Error(`${what} failed: ${JSON.stringify(body)}`);
     }
     if (body.error !== undefined) {
-      throw new Error(`${method} answered an error`);
+      throw new Error(`${what} answered an error`);
     }
-    return body.result as Record<string, any>;
+    return body;
   };
 
+  /** Reads the queryable schema as one project, asserting it answered. */
+  const readSchema = async (project: Project) =>
+    succeed(
+      await getSchema({ token: project.apiKey }),
+      "GET /api/v1/query/schema",
+    );
+
   /** Runs SQL as one project and asserts it succeeded before returning it. */
-  const run = (project: Project, sql: string) =>
-    succeed(project, "query.run", { sql });
+  const run = async ({
+    project,
+    sql,
+    parameters,
+  }: {
+    project: Project;
+    sql: string;
+    parameters?: Record<string, string | number | boolean>;
+  }) =>
+    succeed(
+      await post(
+        { sql, ...(parameters ? { parameters } : {}) },
+        { token: project.apiKey },
+      ),
+      "POST /api/v1/query",
+    );
 
   /** Rows one tenant holds in a named fact table, read as the administrator. */
-  const adminRowCount = async (table: string, tenantId: string) => {
+  const adminRowCount = async ({
+    table,
+    tenantId,
+  }: {
+    table: string;
+    tenantId: string;
+  }) => {
     const [row] = await harness.admin
       .query({
-        query: `SELECT count() AS value FROM ${facts}.${table} WHERE TenantId = '${tenantId}'`,
+        query: `SELECT count() AS value FROM ${facts}.${table} WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId },
         format: "JSONEachRow",
       })
       .then((result) => result.json<{ value: string }>());
@@ -361,10 +367,10 @@ describe("given the /api/v1/query JSON-RPC family", () => {
   describe("when an authenticated project runs a query", () => {
     /** @scenario "Client executes native ClickHouse SQL through the documented REST endpoint" */
     it("returns 200 with typed columns and rows", async () => {
-      const body = await run(
-        projectA,
-        `SELECT TraceId, TotalDurationMs FROM ${database}.traces ORDER BY TraceId`,
-      );
+      const body = await run({
+        project: projectA,
+        sql: `SELECT TraceId, TotalDurationMs FROM ${database}.traces ORDER BY TraceId`,
+      });
 
       expect(body.columns).toEqual([
         { name: "TraceId", type: "String" },
@@ -374,15 +380,18 @@ describe("given the /api/v1/query JSON-RPC family", () => {
     });
 
     it("resolves an unqualified dataset name, the same as the credential-scoped door", async () => {
-      const body = await run(projectA, "SELECT count() AS value FROM traces");
+      const body = await run({
+        project: projectA,
+        sql: "SELECT count() AS value FROM traces",
+      });
       expect(Number(body.rows[0].value)).toBe(SEEDED_TRACES);
     });
   });
 
-  describe("when query.schema is called", () => {
+  describe("when the schema door is called", () => {
     /** @scenario "Authenticated client discovers its LangWatchQL schema scoped to its own permissions" */
     it("returns the queryable views", async () => {
-      const result = await succeed(projectA, "query.schema");
+      const result = await readSchema(projectA);
 
       expect(result.database).toBe(database);
       expect(result.datasets.map((dataset: any) => dataset.name)).toEqual(
@@ -391,11 +400,16 @@ describe("given the /api/v1/query JSON-RPC family", () => {
     });
 
     /**
-     * The method takes no arguments, and a client sending `params: {}` for
-     * uniformity across its call sites must not be punished for it.
+     * A GET, and therefore genuinely argument-free: the credential is the
+     * whole of its input. A query string it does not read must not change the
+     * answer.
      */
-    it("accepts an empty params object as readily as none at all", async () => {
-      const result = await succeed(projectA, "query.schema", {});
+    it("ignores a query string it does not read", async () => {
+      const response = await app.request(`${schemaPath}?nonsense=1`, {
+        method: "GET",
+        headers: authHeaders(projectA.apiKey),
+      });
+      const result = await succeed(response, "GET /api/v1/query/schema");
       expect(result.database).toBe(database);
     });
   });
@@ -415,34 +429,44 @@ describe("given the /api/v1/query JSON-RPC family", () => {
       // the credential is the only selector. Asserted against the real ids
       // rather than a shape heuristic — a heuristic here would pass against a
       // path that happened to look right while naming a tenant.
-      expect(rpcPath).not.toContain(projectA.id);
-      expect(rpcPath).not.toContain(projectB.id);
+      for (const path of [runPath, schemaPath]) {
+        expect(path).not.toContain(projectA.id);
+        expect(path).not.toContain(projectB.id);
+      }
 
       for (const [caller, other] of [
         [projectA, projectB],
         [projectB, projectA],
       ] as const) {
         expect(
-          await adminRowCount("trace_summaries", other.id),
+          await adminRowCount({ table: "trace_summaries", tenantId: other.id }),
           "the other tenant has no rows — 'no foreign rows returned' would be vacuous",
         ).toBeGreaterThan(0);
 
-        const body = await run(
-          caller,
-          `SELECT DISTINCT TenantId FROM ${database}.traces`,
-        );
+        const body = await run({
+          project: caller,
+          sql: `SELECT DISTINCT TenantId FROM ${database}.traces`,
+        });
         expect(body.rows.map((row: any) => row.TenantId)).toEqual([caller.id]);
       }
     });
 
     it("keeps the schema endpoint's dataset rows off the response for a query naming the other tenant", async () => {
-      const foreignRows = await adminRowCount("trace_summaries", projectB.id);
+      const foreignRows = await adminRowCount({
+        table: "trace_summaries",
+        tenantId: projectB.id,
+      });
       expect(foreignRows).toBeGreaterThan(0);
 
-      const body = await run(
-        projectA,
-        `SELECT count() AS value FROM ${database}.traces WHERE TenantId = '${projectB.id}'`,
-      );
+      // The foreign tenant id is *bound*, not interpolated: the claim under
+      // test is that the view refuses to reach another tenant's rows even when
+      // the caller names it, and a hand-built string literal would test the
+      // quoting as much as the isolation.
+      const body = await run({
+        project: projectA,
+        sql: `SELECT count() AS value FROM ${database}.traces WHERE TenantId = {foreignTenantId:String}`,
+        parameters: { foreignTenantId: projectB.id },
+      });
       expect(
         Number(body.rows[0].value),
         `the endpoint reached ${foreignRows} foreign rows`,
@@ -452,86 +476,57 @@ describe("given the /api/v1/query JSON-RPC family", () => {
 
   describe("when the credential is missing or invalid", () => {
     /**
-     * Every method, both credential failures. On this transport the method is
-     * a *body* field, so it is reached by the same route and the same
-     * middleware chain — which is exactly why each one is checked rather than
-     * assumed to follow from the other. A dispatch that ran before the auth
-     * gate would show up here and nowhere else.
+     * Both doors, both credential failures. Each is checked rather than
+     * assumed to follow from the other: the two routes carry their own access
+     * chain, and a gate dropped from one of them would show up here and
+     * nowhere else.
      */
     it.each([
       ["no credential", null],
       ["a credential that names no project", "sk-not-a-real-api-key"],
-    ])("refuses query.run with %s", async (_label, token) => {
-      const response = await call("query.run", { sql: "SELECT 1" }, { token });
+    ])("refuses POST /api/v1/query with %s", async (_label, token) => {
+      const response = await post({ sql: "SELECT 1" }, { token });
       expect(response.status).toBe(401);
     });
 
     it.each([
       ["no credential", null],
       ["a credential that names no project", "sk-not-a-real-api-key"],
-    ])("refuses query.schema with %s", async (_label, token) => {
-      const response = await call("query.schema", undefined, { token });
+    ])("refuses GET /api/v1/query/schema with %s", async (_label, token) => {
+      const response = await getSchema({ token });
       expect(response.status).toBe(401);
     });
 
     /**
-     * An unauthenticated caller must not be able to use the method name as an
-     * oracle. If dispatch ran first, a bad method would answer 404 and a good
-     * one 401 — turning this door into a free directory of what it serves.
-     */
-    /**
-     * The documented exception, pinned.
+     * One envelope for the whole platform.
      *
-     * Authentication answers BENEATH the family's error handler, so a 401 is
-     * the canonical envelope alone — not wrapped in a JSON-RPC `error`. That
-     * is a real seam in the contract, and the endpoint description tells
-     * integrators to branch on status before reading `error.code` precisely
-     * because of it. Asserted here so the description stays true: if the
-     * wrapping ever extends to cover auth, this fails and the docs get fixed
-     * with it.
+     * This family briefly wrapped its refusals in a JSON-RPC `error`, which
+     * meant an auth denial (raised beneath the family's own handler) and a
+     * query refusal answered in two different shapes — and an integrator had
+     * to branch on the HTTP status before it could read a `code` at all. Plain
+     * REST removes that seam; this pins it removed.
      */
-    it("answers a credential refusal in the canonical envelope, unwrapped", async () => {
-      const response = await call(
-        "query.run",
-        { sql: "SELECT 1" },
-        { token: null },
-      );
+    it("answers a credential refusal in the canonical envelope, at the top level", async () => {
+      const response = await post({ sql: "SELECT 1" }, { token: null });
       const body = (await response.json()) as Record<string, any>;
 
       expect(response.status).toBe(401);
       expect(
         body.jsonrpc,
-        "auth refusals are documented as unwrapped — update the endpoint description if this changed",
+        "a JSON-RPC envelope came back from a REST door",
       ).toBeUndefined();
-      // Still the canonical shape, so one parser reads it. Asserted against
-      // the string taxonomy at the TOP level — unwrapped, there is no
-      // `error.data` to descend into, and a numeric code here would mean the
-      // body had been wrapped after all.
+      // The canonical shape, so one parser reads it. Asserted against the
+      // string taxonomy at the TOP level — there is no `error.data` to descend
+      // into, and a numeric code here would mean the body had been wrapped.
       expect(body.error?.code).toBe("missing_credentials");
       expect(typeof body.error?.code).toBe("string");
     });
-
-    it("does not let an unauthenticated caller probe which methods exist", async () => {
-      const real = await call(
-        "query.run",
-        { sql: "SELECT 1" },
-        { token: null },
-      );
-      const fake = await call("query.nope", {}, { token: null });
-
-      expect(real.status).toBe(401);
-      expect(
-        fake.status,
-        "an unknown method answered differently from a known one without auth",
-      ).toBe(401);
-    });
   });
 
-  describe("when the envelope itself is wrong", () => {
+  describe("when the request body is wrong", () => {
     /**
-     * Authenticated throughout: these prove how the *envelope* is judged, and
-     * an unauthenticated request would be refused before the envelope is ever
-     * read.
+     * Authenticated throughout: these prove how the *body* is judged, and an
+     * unauthenticated request would be refused before the body is ever read.
      *
      * A function, not a captured object: `projectA` is seeded in `beforeAll`,
      * which runs after this block's body is collected.
@@ -546,31 +541,28 @@ describe("given the /api/v1/query JSON-RPC family", () => {
      * the remapped status — asserted here so a change to that mapping surfaces
      * as a failing contract rather than a silent shift under a client.
      */
-    const ENVELOPE_REFUSAL_STATUS = 400;
+    const BODY_REFUSAL_STATUS = 400;
 
-    it("refuses a method it does not serve, and says so in the envelope", async () => {
-      const response = await call("query.nope", {}, { token: projectA.apiKey });
+    it("refuses a body with no statement", async () => {
+      const response = await post({}, asProjectA());
       const body = (await response.json()) as Record<string, any>;
 
-      expect(response.status).toBe(ENVELOPE_REFUSAL_STATUS);
+      expect(response.status).toBe(BODY_REFUSAL_STATUS);
       expect(
         body.error,
         "a refusal arrived with no error member",
       ).toBeDefined();
-      // -32600: the envelope enumerates the methods, so an unknown one is
-      // refused as an invalid request before dispatch is ever reached.
-      expect(body.error.code).toBe(-32600);
     });
 
-    it("refuses a batch rather than answering one element of it", async () => {
-      const response = await post(
-        [{ jsonrpc: "2.0", id: 1, method: "query.schema" }],
-        asProjectA(),
-      );
+    it("refuses a top-level array rather than reading one element of it", async () => {
+      const response = await post([{ sql: "SELECT 1" }], asProjectA());
       const body = (await response.json()) as Record<string, any>;
 
-      expect(response.status).toBe(ENVELOPE_REFUSAL_STATUS);
-      expect(body.result, "a batch was partially answered").toBeUndefined();
+      expect(response.status).toBe(BODY_REFUSAL_STATUS);
+      expect(
+        body.columns,
+        "an array body was partially answered",
+      ).toBeUndefined();
     });
 
     it("refuses a body that is not JSON at all", async () => {
@@ -580,37 +572,29 @@ describe("given the /api/v1/query JSON-RPC family", () => {
     });
 
     /**
-     * The contract that lets one client parse both surfaces: an RPC failure
-     * carries this API's canonical error body, with its machine-readable
-     * `code`, inside `error.data`.
+     * The contract that lets one client parse the whole platform: a refusal
+     * here carries this API's canonical error body, with its machine-readable
+     * `code`, at the top level — the same place every other REST family puts
+     * it.
      */
-    it("carries the canonical error envelope inside error.data", async () => {
-      const response = await call(
-        "query.run",
-        { sql: 42 },
-        { token: projectA.apiKey },
-      );
+    it("carries the canonical error envelope at the top level", async () => {
+      const response = await post({ sql: 42 }, asProjectA());
       const body = (await response.json()) as Record<string, any>;
 
-      expect(response.status).toBe(ENVELOPE_REFUSAL_STATUS);
-      expect(body.error.data?.error?.code).toBeTruthy();
+      expect(response.status).toBe(BODY_REFUSAL_STATUS);
+      expect(body.error?.code).toBeTruthy();
+      expect(typeof body.error?.code).toBe("string");
     });
 
     /**
-     * A failure must still be routable. This is the case the unit suite proves
-     * against a stubbed context; here it is proved through the real error
-     * handler, which is the one that has to read the id back off a request
-     * whose body was already consumed.
+     * The per-field chain, which is what turns a refusal into something a
+     * caller can act on rather than merely observe.
      */
-    it("echoes the id on a failure, so the client can match the refusal", async () => {
-      const response = await call(
-        "query.run",
-        { sql: 42 },
-        { token: projectA.apiKey, id: "call-7" },
-      );
+    it("names the offending field in the refusal", async () => {
+      const response = await post({ sql: 42 }, asProjectA());
       const body = (await response.json()) as Record<string, any>;
 
-      expect(body.id, "the error reply dropped its id").toBe("call-7");
+      expect(JSON.stringify(body)).toContain("sql");
     });
   });
 });

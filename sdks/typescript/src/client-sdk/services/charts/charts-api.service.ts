@@ -32,7 +32,7 @@ export interface SavedChartDefinitionInput {
 }
 
 /**
- * The LangWatchQL analytics schema, as `query.schema` on the JSON-RPC query
+ * The LangWatchQL analytics schema, as `GET /api/v1/query/schema` on the query
  * door answers it — the discovery endpoint this used to derive from
  * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in favor
  * of that door (issue #7565). Re-exported under this family's own name so
@@ -45,7 +45,7 @@ export type AnalyticsSchema = QuerySchemaResult;
  * door. Re-exported from `QueryApiService`, which is what this now delegates
  * to — the dedicated REST endpoint this used to derive from
  * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
- * removed in favor of the shared JSON-RPC door (issue #7565).
+ * removed in favor of the shared query door (issue #7565).
  */
 export type ChartRunResult = QueryRunResult;
 
@@ -79,7 +79,7 @@ export class ChartsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly configuredProjectId: string | undefined;
   /**
-   * `schema()` and `runQuery()` delegate to the shared JSON-RPC query door
+   * `schema()` and `runQuery()` delegate to the shared query door
    * rather than a dedicated chart-family route (issue #7565) — built once,
    * from the same underlying `apiClient`, so it picks up the same auth and
    * base URL this service was configured with.
@@ -215,7 +215,7 @@ export class ChartsApiService {
   /**
    * The datasets and columns this key may write chart SQL against.
    *
-   * Delegates to the shared JSON-RPC query door's `query.schema` method — the
+   * Delegates to the shared query door's `GET /api/v1/query/schema` — the
    * dedicated discovery route this used to call
    * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in
    * favor of it (issue #7565). That door is project-implicit (the project is
@@ -233,7 +233,7 @@ export class ChartsApiService {
    * surface's time window and granularity for statements that declare the
    * reserved `period_*` parameters.
    *
-   * Delegates to the shared JSON-RPC query door's `query.run` method — the
+   * Delegates to the shared query door's `POST /api/v1/query` — the
    * dedicated execution route this used to call
    * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
    * removed in favor of it (issue #7565).

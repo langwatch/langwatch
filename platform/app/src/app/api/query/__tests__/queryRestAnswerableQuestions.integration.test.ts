@@ -1,6 +1,6 @@
 /**
  * The questions the LangWatchQL analytics SQL API exists to answer, each asked
- * through the public `POST /api/v1/query` JSON-RPC door against a seed whose
+ * through the public `POST /api/v1/query` REST door against a seed whose
  * answer is known before the query runs.
  *
  * ## What makes a case here evidence
@@ -32,7 +32,7 @@
  *
  * @see specs/analytics/lwql-api.feature
  * @see ~/server/analytics/lwql — the service under test
- * @see ./queryRpcApi.integration.test.ts — the envelope/isolation proof for this door
+ * @see ./queryRestApi.integration.test.ts — the request/isolation proof for this door
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 
@@ -694,7 +694,7 @@ async function seedTenant({
 
 // ---------------------------------------------------------------------------
 
-describe("given the /api/v1/query JSON-RPC door and a seed with known answers", () => {
+describe("given the /api/v1/query REST door and a seed with known answers", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
@@ -706,8 +706,8 @@ describe("given the /api/v1/query JSON-RPC door and a seed with known answers", 
   let database: string;
   let facts: string;
 
-  /** The one path every method — here, only `query.run` — is called through. */
-  const rpcPath = "/api/v1/query";
+  /** The door every question below is asked through. */
+  const runPath = "/api/v1/query";
 
   const shippedService = () =>
     new LangWatchQLService({
@@ -719,29 +719,24 @@ describe("given the /api/v1/query JSON-RPC door and a seed with known answers", 
       database,
     });
 
-  /** POSTs a well-formed `query.run` call and asserts it answered. */
+  /** POSTs a well-formed query and asserts it answered. */
   const ask = async (sql: string) => {
-    const response = await app.request(rpcPath, {
+    const response = await app.request(runPath, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Auth-Token": asking.apiKey,
       },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "query.run",
-        params: { sql },
-      }),
+      body: JSON.stringify({ sql }),
     });
     const body = (await response.json()) as Record<string, any>;
     if (response.status !== 200) {
       throw new Error(`query failed: ${JSON.stringify(body)}`);
     }
     if (body.error !== undefined) {
-      throw new Error(`query.run answered an error: ${JSON.stringify(body)}`);
+      throw new Error(`the query answered an error: ${JSON.stringify(body)}`);
     }
-    return body.result as Record<string, any>;
+    return body as Record<string, any>;
   };
 
   const codes = (result: Record<string, any>): string[] =>

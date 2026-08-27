@@ -111,8 +111,16 @@ export interface FieldViolation {
  * A reason is a HandledError like any other, so `serialize()` renders it with
  * the same `code`/`meta`/nested-`reasons` shape as the error it hangs off —
  * there is no second serialisation path to keep in step.
+ *
+ * Exported so a route can build the identical `reasons` chain for a violation
+ * it found itself, without going through `RequestValidationError` — needed
+ * when the violation is real but `RequestValidationError`'s own `code` would
+ * be misread by a caller that classifies by it (the query domain's `params`
+ * check does exactly this: `runQuery` in `app.v1.ts` reports the same kind of
+ * failure as `RpcMethodError`, so `codeFor` in `rpc.ts` can tell it apart from
+ * an envelope failure).
  */
-class SchemaFailure extends HandledError {
+export class SchemaFailure extends HandledError {
   constructor(violation: FieldViolation) {
     super("schema_failure", violation.message, {
       httpStatus: 422,

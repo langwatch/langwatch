@@ -861,18 +861,38 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Call a LangWatchQL method (JSON-RPC 2.0)
-         * @description A JSON-RPC 2.0 endpoint for LangWatchQL. Send `{ "jsonrpc": "2.0", "id": 1, "method": ..., "params": ... }`.
+         * Run a LangWatchQL query
+         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project.
          *
-         *     **`query.run`** — executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs as a restricted database identity scoped to the authenticated project. Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
+         *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
-         *     **`query.schema`** — lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. Takes no `params`.
+         *     The project is taken from the credential — no project id appears anywhere in the path or the body, and none can be sent to select another one.
          *
-         *     Failures answer with their real HTTP status (a refused query is 403, not 200) and a JSON-RPC `error` whose `data` is this API's canonical error envelope — the same `code` and `meta` the REST families publish.
-         *
-         *     One exception worth coding for: **authentication and authorization failures (401, 403) answer with the canonical error envelope alone, not wrapped in a JSON-RPC `error`.** They are raised before the request reaches this endpoint's own handler. Branch on the HTTP status first, and only then read `error.code` — a client that assumes every failure carries a JSON-RPC envelope will misread a refused credential.
+         *     Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.
          */
         post: operations["postApiV1Query"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/query/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover the queryable LangWatchQL schema
+         * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.
+         *
+         *     Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         */
+        get: operations["getApiV1QuerySchema"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6548,91 +6568,71 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @constant */
-                    jsonrpc: "2.0";
-                    id?: string | number | null;
-                    /** @enum {string} */
-                    method: "query.run" | "query.schema";
-                    params?: unknown;
+                    sql: string;
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    timeWindow?: {
+                        start: string | number;
+                        end: string | number;
+                    };
+                    granularitySeconds?: 1 | 60 | 3600;
                 };
             };
         };
         responses: {
-            /** @description The method ran. `result` is the payload for the method called: a query result for `query.run`, the queryable schema for `query.schema` — both scoped to the caller's project. */
+            /** @description The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @constant */
-                        jsonrpc: "2.0";
-                        id?: string | number | null;
-                        result: {
-                            columns: {
-                                name: string;
-                                type: string;
-                            }[];
-                            rows: {
-                                [key: string]: unknown;
-                            }[];
-                            statistics: {
-                                elapsedMs: number;
-                                rowsRead: number;
-                                bytesRead: number;
-                                rowsReturned: number;
-                            };
-                            truncated: boolean;
-                            followsTimeWindow: boolean;
-                            followsGranularity: boolean;
-                            granularitySeconds?: number;
-                            coarsenedFromSeconds?: number;
-                            diagnostics: {
-                                /** @enum {string} */
-                                code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
-                                message: string;
-                                meta?: {
-                                    [key: string]: unknown;
-                                };
-                            }[];
-                        } | {
-                            database: string;
-                            datasets: {
-                                name: string;
-                                description: string;
-                                grain: string;
-                                joinKeys: string[];
-                                timeColumn: string;
-                                freshness: string;
-                                columns: {
-                                    name: string;
-                                    type: string;
-                                    description: string;
-                                    /** @enum {string|null} */
-                                    unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
-                                    gates: ("input" | "output" | "costs")[];
-                                    available: boolean;
-                                }[];
-                                exampleSql: string;
-                            }[];
+                        columns: {
+                            name: string;
+                            type: string;
+                        }[];
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        statistics: {
+                            elapsedMs: number;
+                            rowsRead: number;
+                            bytesRead: number;
+                            rowsReturned: number;
                         };
+                        truncated: boolean;
+                        followsTimeWindow: boolean;
+                        followsGranularity: boolean;
+                        granularitySeconds?: number;
+                        coarsenedFromSeconds?: number;
+                        diagnostics: {
+                            /** @enum {string} */
+                            code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
                     };
                 };
             };
-            /** @description The request was refused before the method ran: the JSON-RPC envelope was malformed, named a method this endpoint does not serve, or carried `params` that did not match the method. `error.code` is the JSON-RPC code (-32700, -32600, -32601 or -32602) and `error.data` is this API's canonical error envelope. */
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @constant */
-                        jsonrpc: "2.0";
-                        id?: string | number | null;
                         error: {
-                            code: number;
+                            type: string;
+                            code: string;
                             message: string;
-                            data?: unknown;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
@@ -6677,20 +6677,142 @@ export interface operations {
                     };
                 };
             };
-            /** @description The method ran and refused on a deliberate ceiling — a well-formed query whose scan volume is not allowed. `error.data` carries the canonical envelope, whose `code` names which ceiling. */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @constant */
-                        jsonrpc: "2.0";
-                        id?: string | number | null;
                         error: {
-                            code: number;
+                            type: string;
+                            code: string;
                             message: string;
-                            data?: unknown;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiV1QuerySchema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The datasets and columns this key may query, with the permissions that unlock each one. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        database: string;
+                        datasets: {
+                            name: string;
+                            description: string;
+                            grain: string;
+                            joinKeys: string[];
+                            timeColumn: string;
+                            freshness: string;
+                            columns: {
+                                name: string;
+                                type: string;
+                                description: string;
+                                /** @enum {string|null} */
+                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                gates: ("input" | "output" | "costs")[];
+                                available: boolean;
+                            }[];
+                            exampleSql: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
                         };
                     };
                 };
