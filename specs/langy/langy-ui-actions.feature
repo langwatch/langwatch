@@ -113,6 +113,26 @@ Feature: Langy drives the open page through typed UI actions
     Then the agent is told to read the state again before it retries
     And it never retries a change that already landed
 
+  # `langwatch ui call` runs inside an agent worker whose harness stops any
+  # command at 30 seconds. The server ceiling was 30 seconds too and the CLI
+  # deadline was 60, so a slow action was always ended by the harness: the CLI
+  # never printed its own failure, and the agent never read the warning that
+  # the action may already have applied.
+  @unit
+  Scenario: The server gives up before the harness kills the command
+    Given an action whose declared budget is above the platform ceiling
+    When the page claims it and never answers
+    Then the dispatch gives up inside the platform ceiling
+    And the ceiling is under the deadline the CLI sets for itself
+    And that deadline is under the time the agent harness allows a command
+
+  @unit
+  Scenario: The CLI reports the missing answer itself
+    Given the page never answers the dispatch
+    When the CLI's own request deadline runs out
+    Then the CLI names the endpoint, the action and the deadline
+    And it tells the agent the action may still have applied
+
   @unit
   Scenario: A browser handler failure reaches the agent as langy_ui_handler_failed and the user as a toast
     Given the page's handler threw while applying the action

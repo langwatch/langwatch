@@ -9,7 +9,7 @@ vi.mock("../../../utils/apiKey", () => ({
 }));
 
 import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
-import { uiCallCommand } from "../call";
+import { REQUEST_TIMEOUT_MS, uiCallCommand } from "../call";
 
 /**
  * The dispatch body is always a JSON string. Reading it back is how these tests
@@ -59,6 +59,7 @@ describe("the ui call command", () => {
   });
 
   describe("given the platform never answers", () => {
+    /** @scenario "The CLI reports the missing answer itself" */
     it("names the deadline and warns the action may have applied", async () => {
       vi.stubGlobal(
         "fetch",
@@ -72,8 +73,28 @@ describe("the ui call command", () => {
       expect(result).toBeUndefined();
       expect(process.exitCode).toBe(1);
       expect(stderr.join("")).toContain("did not answer");
+      expect(stderr.join("")).toContain("workbench.setCellValue");
       expect(stderr.join("")).toContain("may still have applied");
       expect(stderr.join("")).not.toContain("TimeoutError");
+    });
+
+    /**
+     * This command runs inside an agent worker whose harness stops any command
+     * at 30 seconds. At 60s the deadline could never fire there: the harness
+     * killed the command first, so the warning above was unreachable in
+     * exactly the case it is written for. The order that has to hold is the
+     * server ceiling, then this deadline, then the harness.
+     */
+    /** @scenario "The server gives up before the harness kills the command" */
+    it("sets a deadline the agent harness cannot outrun", () => {
+      // Both numbers belong to other layers, so they are written here as the
+      // boundary this test pins. UI_ACTION_MAX_BUDGET_MS lives in
+      // platform/app/src/server/app-layer/langy/ui-actions/ui-action.service.ts.
+      const SERVER_BUDGET_CEILING_MS = 15_000;
+      const AGENT_HARNESS_COMMAND_LIMIT_MS = 30_000;
+
+      expect(REQUEST_TIMEOUT_MS).toBeGreaterThan(SERVER_BUDGET_CEILING_MS);
+      expect(REQUEST_TIMEOUT_MS).toBeLessThan(AGENT_HARNESS_COMMAND_LIMIT_MS);
     });
   });
 

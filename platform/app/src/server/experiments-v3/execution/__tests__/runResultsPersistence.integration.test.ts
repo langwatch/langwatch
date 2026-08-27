@@ -238,6 +238,31 @@ describe("backend run results in the workbench state", () => {
         ]);
         expect(after.version).toBeGreaterThan(version);
       });
+
+      /** @scenario "A version a run wrote names that run" */
+      it("names the run on the version it wrote", async () => {
+        // What lets a page tell its own run's write from a stranger's. Without
+        // it the page that started the run reads the bump as somebody else's,
+        // stands autosave down, and asks the reader to reload over edits the
+        // run had nothing to do with.
+        const { experimentId } = await createExperiment(savedState());
+        orchestratorEvents.current = [
+          { type: "execution_started", runId: "run-named", total: 1 },
+          ...cellEvents({ rowIndex: 0, output: "one", score: 1 }),
+          doneEvent(1),
+        ];
+
+        const started = await runToCompletion({
+          experimentId,
+          scope: { type: "full" },
+        });
+
+        await vi.waitFor(async () => {
+          const current = await readState(experimentId);
+          expect(current.state?.results?.runId).toBe("run-named");
+          expect(current.runId).toBe(started.runId);
+        });
+      });
     });
   });
 

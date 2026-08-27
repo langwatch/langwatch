@@ -40,6 +40,14 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     And the change is never applied a second time behind the page
 
   @unit
+  Scenario: A backend action that runs past the ceiling is reported by the server
+    Given no page answered and the backend took the action
+    And the backend does not finish inside the time the server allows
+    When the ceiling is reached
+    Then the agent is told the action timed out by the server
+    And the wait ends before the command's own deadline
+
+  @unit
   Scenario: A backend fallback without the experiment named is refused
     Given no page answered and the dispatch carried no experiment slug
     When the backend fallback would run

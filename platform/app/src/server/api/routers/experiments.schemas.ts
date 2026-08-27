@@ -12,6 +12,12 @@ export const experimentUpdateSignalSchema = z.object({
   slug: z.string(),
   version: z.number().int(),
   actorLabel: z.enum(["user", "langy", "api"]),
+  /**
+   * The run that wrote this version, when a run wrote it. The page that
+   * started that run adopts the version rather than treating its own run's
+   * write as a stranger's.
+   */
+  runId: z.string().optional(),
 });
 
 export type ExperimentUpdateSignal = z.infer<

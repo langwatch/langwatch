@@ -13,7 +13,12 @@ import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 const VISIBILITY_PROBE_MIN_INTERVAL_MS = 5_000;
 
 /** Applies a server version to the open workbench, and reloads it on demand. */
-type ApplyServerVersion = (serverVersion: number, actorLabel?: string) => void;
+type ApplyServerVersion = (update: {
+  serverVersion: number;
+  actorLabel?: string;
+  /** The run that wrote it, when a run did. */
+  runId?: string;
+}) => void;
 
 /**
  * True when this tab's own save is going to settle the version it just heard
@@ -41,21 +46,127 @@ function thisTabWillAnswerFirst(isDirty: boolean): boolean {
 }
 
 /** A version that landed while a reload was already running. */
-type MissedVersion = { serverVersion: number; actorLabel?: string };
+type MissedVersion = {
+  serverVersion: number;
+  actorLabel?: string;
+  runId?: string;
+};
 
 /** Keeps the newest missed version, since an older one is already covered. */
 const rememberMissedVersion = ({
   ref,
   serverVersion,
   actorLabel,
+  runId,
 }: {
   ref: MutableRefObject<MissedVersion | undefined>;
   serverVersion: number;
   actorLabel?: string;
+  runId?: string;
 }): void => {
   const missed = ref.current;
   if (missed && serverVersion <= missed.serverVersion) return;
-  ref.current = { serverVersion, ...(actorLabel && { actorLabel }) };
+  ref.current = {
+    serverVersion,
+    ...(actorLabel && { actorLabel }),
+    ...(runId && { runId }),
+  };
+};
+
+/**
+ * What the page does about a version somebody else announced.
+ *
+ * `ignore` covers two different reasons to do nothing: the version is not
+ * newer than the one held, or this tab is about to write a newer one itself.
+ */
+type VersionAction = "ignore" | "adopt" | "banner" | "remember" | "reload";
+
+/**
+ * The rule, in order. Reading it as one list is the point: the reasons overlap,
+ * and an earlier reason always wins.
+ */
+const decideVersionAction = ({
+  serverVersion,
+  known,
+  runId,
+  isDirty,
+  isReloading,
+}: {
+  serverVersion: number;
+  known: number | undefined;
+  runId?: string;
+  isDirty: boolean;
+  isReloading: boolean;
+}): VersionAction => {
+  if (known === undefined || serverVersion <= known) return "ignore";
+  // This page's own run, before every other rule.
+  if (isOwnRunVersion(runId)) return "adopt";
+  if (thisTabWillAnswerFirst(isDirty)) return "ignore";
+  if (isDirty) return "banner";
+  if (isReloading) return "remember";
+  return "reload";
+};
+
+/**
+ * Pulls, then runs the rule again over whatever was announced while it ran.
+ *
+ * Running the rule again rather than reloading outright: the pull that just
+ * finished may already carry the newer version, and the workbench may have
+ * gone dirty while it ran.
+ */
+const pullThenApplyMissed = async ({
+  serverVersion,
+  reload,
+  reloadingRef,
+  missedRef,
+  apply,
+}: {
+  serverVersion: number;
+  reload: () => Promise<void>;
+  reloadingRef: MutableRefObject<boolean>;
+  missedRef: MutableRefObject<MissedVersion | undefined>;
+  apply: ApplyServerVersion;
+}): Promise<void> => {
+  await pullQuietly({ reload, serverVersion });
+  reloadingRef.current = false;
+  const missed = missedRef.current;
+  missedRef.current = undefined;
+  if (missed) apply(missed);
+};
+
+/**
+ * True when this page started the run that wrote the version.
+ *
+ * That run's bump is the one write carrying nothing the page does not already
+ * have, so the page takes the version instead of reading it as a stranger's.
+ */
+const isOwnRunVersion = (runId: string | undefined): boolean =>
+  Boolean(
+    runId && useEvaluationsV3Store.getState().runsStartedHere?.includes(runId),
+  );
+
+/**
+ * Takes a version this page's own run wrote, and carries on saving.
+ *
+ * A run writes its cells into the saved state, which advances the counter. The
+ * page already holds every cell that run produced, because it streamed them, so
+ * there is nothing to reload and nothing to warn about. What there IS is the
+ * reader's other edits, still inside the autosave debounce: treating this bump
+ * as somebody else's write stands autosave down and loses them.
+ *
+ * Taking the version is the part that matters. A page that only skipped the
+ * warning would keep sending the version it had, and the next save would be
+ * refused for exactly the same reason one save later.
+ */
+const adoptOwnRunVersion = (serverVersion: number): void => {
+  const store = useEvaluationsV3Store.getState();
+  store.setWorkbenchVersion(serverVersion);
+  // Staleness this write already answers. A refusal raised by a DIFFERENT
+  // writer at a newer version still stands.
+  const stale = store.staleWorkbench;
+  if (stale && stale.serverVersion <= serverVersion) {
+    store.setStaleWorkbench(undefined);
+  }
 };
 
 /**
@@ -119,29 +230,43 @@ const useApplyServerVersion = ({
   const missedRef = useRef<MissedVersion | undefined>(undefined);
 
   const applyServerVersion = useCallback<ApplyServerVersion>(
-    (serverVersion, actorLabel) => {
-      const known = versionRef.current;
-      if (known === undefined || serverVersion <= known) return;
-      if (thisTabWillAnswerFirst(isDirtyRef.current)) return;
-      if (isDirtyRef.current) {
-        setStaleWorkbench({ serverVersion, actorLabel });
-        return;
+    ({ serverVersion, actorLabel, runId }) => {
+      const action = decideVersionAction({
+        serverVersion,
+        known: versionRef.current,
+        runId,
+        isDirty: isDirtyRef.current,
+        isReloading: reloadingRef.current,
+      });
+
+      switch (action) {
+        case "ignore":
+          return;
+        case "adopt":
+          adoptOwnRunVersion(serverVersion);
+          return;
+        case "banner":
+          setStaleWorkbench({ serverVersion, actorLabel });
+          return;
+        case "remember":
+          rememberMissedVersion({
+            ref: missedRef,
+            serverVersion,
+            actorLabel,
+            runId,
+          });
+          return;
+        case "reload":
+          reloadingRef.current = true;
+          void pullThenApplyMissed({
+            serverVersion,
+            reload: reloadRef.current,
+            reloadingRef,
+            missedRef,
+            apply: applyServerVersion,
+          });
+          return;
       }
-      if (reloadingRef.current) {
-        rememberMissedVersion({ ref: missedRef, serverVersion, actorLabel });
-        return;
-      }
-      reloadingRef.current = true;
-      void (async () => {
-        await pullQuietly({ reload: reloadRef.current, serverVersion });
-        reloadingRef.current = false;
-        const missed = missedRef.current;
-        missedRef.current = undefined;
-        // Re-run the same rule rather than reloading outright: the reload that
-        // just finished may already have carried this version, and the
-        // workbench may have gone dirty while it ran.
-        if (missed) applyServerVersion(missed.serverVersion, missed.actorLabel);
-      })();
     },
     [setStaleWorkbench],
   );
@@ -151,6 +276,26 @@ const useApplyServerVersion = ({
   }, []);
 
   return { applyServerVersion, reload };
+};
+
+/**
+ * The broadcast payload, or undefined when the frame is not one to act on.
+ *
+ * The frame arrives as a string on some transports and as an object on others,
+ * and a frame this page does not understand is not a failure worth reporting:
+ * the next signal, or the next time the tab becomes visible, tries again.
+ */
+const parseUpdateSignal = (
+  event: unknown,
+): ExperimentUpdateSignal | undefined => {
+  if (!event) return undefined;
+  try {
+    const raw = typeof event === "string" ? JSON.parse(event) : event;
+    const result = experimentUpdateSignalSchema.safeParse(raw);
+    return result.success ? result.data : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 /** The `experiment_updated` broadcast: a save landed, whoever wrote it. */
@@ -175,21 +320,13 @@ const useExperimentUpdateSignal = ({
     {
       enabled: Boolean(enabled && projectId && experimentSlug),
       onData: (data) => {
-        if (!data.event) return;
-        let parsed: ExperimentUpdateSignal;
-        try {
-          const raw =
-            typeof data.event === "string"
-              ? JSON.parse(data.event)
-              : data.event;
-          const result = experimentUpdateSignalSchema.safeParse(raw);
-          if (!result.success) return;
-          parsed = result.data;
-        } catch {
-          return;
-        }
-        if (parsed.slug !== experimentSlug) return;
-        applyServerVersion(parsed.version, parsed.actorLabel);
+        const parsed = parseUpdateSignal(data.event);
+        if (!parsed || parsed.slug !== experimentSlug) return;
+        applyServerVersion({
+          serverVersion: parsed.version,
+          actorLabel: parsed.actorLabel,
+          ...(parsed.runId ? { runId: parsed.runId } : {}),
+        });
       },
     },
   );
@@ -221,8 +358,12 @@ const useVisibilityVersionProbe = ({
       lastProbeAtRef.current = now;
       void trpcUtils.experiments.getWorkbenchVersion
         .fetch({ projectId, experimentSlug })
-        .then(({ version, actorLabel }) =>
-          applyServerVersion(version, actorLabel),
+        .then(({ version, actorLabel, runId }) =>
+          applyServerVersion({
+            serverVersion: version,
+            ...(actorLabel ? { actorLabel } : {}),
+            ...(runId ? { runId } : {}),
+          }),
         )
         .catch(() => undefined);
     };
