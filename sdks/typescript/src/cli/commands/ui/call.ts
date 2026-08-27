@@ -8,11 +8,17 @@ import type { CommandResult } from "../../utils/output";
  * Bound the request so a wedged control plane cannot hold the whole turn.
  *
  * This call blocks by design: the server keeps it open for the claim window
- * (3s) plus the action's execute budget, which the platform caps at 30s. 60s
- * clears that ceiling with room to spare, so a slow page still answers here
- * while a half-open socket fails instead of hanging the agent worker.
+ * plus the action's execute budget, and caps the two together at 15s
+ * (UI_ACTION_MAX_BUDGET_MS). It also runs inside an agent worker whose harness
+ * stops any command at 30 seconds. At 60s this deadline could never fire
+ * there: the harness always killed the command first, so the MAY_HAVE_APPLIED
+ * warning below was unreachable in the one case it was written for.
+ *
+ * 20s clears the server ceiling by 5 seconds and sits 10 seconds under the
+ * harness, so a slow page still answers here and a page that never answers is
+ * reported by this command rather than by a kill the caller cannot read.
  */
-const REQUEST_TIMEOUT_MS = 60_000;
+export const REQUEST_TIMEOUT_MS = 20_000;
 
 /**
  * True of EVERY failed dispatch, whichever way it failed.

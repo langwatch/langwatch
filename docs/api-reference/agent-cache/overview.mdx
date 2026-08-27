@@ -15,6 +15,10 @@ names none.
 
 There is no listing route: names come from the agent code that wrote them.
 
+A write replaces whatever the name held. To write only when the name is free,
+claim it instead: the claim route answers whether this caller is the one that
+took the name, which is how one row does work the rows beside it then reuse.
+
 Every route needs an API key that can manage the agent cache. A read returns the
 value, so a caller that can overwrite an entry can already choose what the next
 read answers.

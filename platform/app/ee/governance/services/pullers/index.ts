@@ -14,6 +14,7 @@ import { CopilotStudioReferencePuller } from "./copilotStudio.puller";
 import { CopilotStudioDataversePuller } from "./copilotStudioDataverse.puller";
 import { DatabricksGeniePuller } from "./databricksGenie.puller";
 import { HttpPollingPullerAdapter } from "./httpPollingPullerAdapter";
+import { OpenAiAdminPuller } from "./openaiAdmin.puller";
 import { OpenAiComplianceReferencePuller } from "./openaiCompliance.puller";
 import { pullerAdapterRegistry } from "./pullerAdapter";
 import { S3PollingPullerAdapter } from "./s3PollingPullerAdapter";
@@ -32,6 +33,7 @@ export function registerBuiltInPullers(): void {
   pullerAdapterRegistry.register(new OpenAiComplianceReferencePuller());
   pullerAdapterRegistry.register(new ClaudeComplianceReferencePuller());
   pullerAdapterRegistry.register(new AnthropicAdminPuller());
+  pullerAdapterRegistry.register(new OpenAiAdminPuller());
   pullerAdapterRegistry.register(new DatabricksGeniePuller());
   registered = true;
 }
@@ -42,7 +44,6 @@ export {
   anthropicAdminPullConfigSchema,
 } from "./anthropicAdmin.puller";
 export { CLAUDE_COMPLIANCE_PULL_CONFIG } from "./claudeCompliance.puller";
-export { COPILOT_STUDIO_PULL_CONFIG } from "./copilotStudio.puller";
 export {
   type CopilotStudioDataverseConfig,
   copilotStudioDataversePullConfigSchema,
@@ -54,6 +55,11 @@ export {
 } from "./databricksGenie.puller";
 export { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverseEnvironment";
 export type { HttpPollingConfig } from "./httpPollingPullerAdapter";
+export {
+  OPENAI_ADMIN_ADAPTER_ID,
+  type OpenAiAdminPullConfig,
+  openaiAdminPullConfigSchema,
+} from "./openaiAdmin.puller";
 export { OPENAI_COMPLIANCE_PULL_CONFIG } from "./openaiCompliance.puller";
 export type {
   NormalizedPullEvent,
@@ -69,6 +75,7 @@ export {
   CopilotStudioReferencePuller,
   DatabricksGeniePuller,
   HttpPollingPullerAdapter,
+  OpenAiAdminPuller,
   OpenAiComplianceReferencePuller,
   pullerAdapterRegistry,
   S3PollingPullerAdapter,

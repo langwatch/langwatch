@@ -17,9 +17,9 @@ import { docsUrl } from "~/utils/docsUrl";
  * nothing to explore, so the button stays out of the header entirely.
  */
 
-/** Docs path for the guide the menu links; page lives in docs/ai-governance. */
+/** Docs path for the guide the menu links; page lives in docs/coding-agents. */
 export const EXPLORE_USAGE_DOCS_PATH =
-  "/ai-governance/explore-your-usage-with-your-own-agent";
+  "/coding-agents/explore-your-usage-with-your-own-agent";
 
 /** What Langy is asked when the reader picks "Explore via Langy". */
 export const EXPLORE_USAGE_LANGY_PROMPT =

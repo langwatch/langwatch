@@ -1613,7 +1613,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--filter <filter>", "Filter rows: failed | all (default)", "all")
       .option("--evaluator <name>", "Show only this evaluator's column")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--limit <n>", "Maximum rows to print in table mode (default 20)", "20"),
+      .option("--limit <n>", "Maximum rows to print in the table; the JSON answer always carries every row (default 20)", "20"),
     async (
       experiment: string,
       options: {

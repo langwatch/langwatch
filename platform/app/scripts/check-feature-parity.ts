@@ -345,7 +345,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/puller-framework/http-custom-byo-admin-ui.feature",
   "specs/ai-governance/puller-framework/http-polling.feature",
   "specs/ai-governance/puller-framework/puller-adapter-contract.feature",
-  "specs/ai-governance/puller-framework/s3-polling.feature",
   "specs/ai-governance/sessions/admin-max-ttl.feature",
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",

@@ -666,9 +666,13 @@ function RuleRow({
 
 const SOURCE_TYPE_PICKER_OPTIONS = [
   { value: "otel_generic", label: "Generic OTel (otel_generic)" },
+  { value: "claude_code", label: "Claude Code (claude_code)" },
   { value: "claude_cowork", label: "Claude Cowork (claude_cowork)" },
   { value: "workato", label: "Workato (workato)" },
-  { value: "copilot_studio", label: "Copilot Studio (copilot_studio)" },
+  {
+    value: "copilot_studio_dataverse",
+    label: "Microsoft Copilot Studio (copilot_studio_dataverse)",
+  },
   {
     value: "openai_compliance",
     label: "OpenAI Compliance (openai_compliance)",
@@ -677,7 +681,16 @@ const SOURCE_TYPE_PICKER_OPTIONS = [
     value: "claude_compliance",
     label: "Claude Compliance (claude_compliance)",
   },
+  {
+    value: "anthropic_admin",
+    label: "Anthropic Admin (anthropic_admin)",
+  },
+  {
+    value: "databricks_genie",
+    label: "Databricks Genie (databricks_genie)",
+  },
   { value: "s3_custom", label: "S3 Custom (s3_custom)" },
+  { value: "http_custom", label: "Custom HTTP (http_custom)" },
 ];
 
 function RuleComposer({

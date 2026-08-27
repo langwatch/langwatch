@@ -112,7 +112,10 @@ const persistRunResults = async ({
     const saved = await persistence.experiments.applyWorkbenchTransform({
       projectId,
       id: experimentId,
-      actor: persistence.actor,
+      // The run names itself on the write. A page that started this run then
+      // reads the version bump as its own and adopts it, rather than standing
+      // down and asking the reader to reload over their unsaved edits.
+      actor: { ...persistence.actor, runId },
       commitMessage: `Results from run ${runId}`,
       transform: (state) => ({
         ...state,
