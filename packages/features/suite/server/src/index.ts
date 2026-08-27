@@ -10,7 +10,13 @@ export {
   ClickHouseSuiteEventingAdapter,
   type ClickHouseSuiteEventingAdapterOptions,
 } from "./adapters/clickhouse.suite-eventing.adapter";
-export { SuiteExecutionPort } from "./ports/suite-execution.port";
+export {
+  SuiteExecutionPort,
+  SuiteRunCommandsPort,
+  SuiteRunIdPort,
+  type QueueSimulationRunCommandData,
+} from "./ports/suite-execution.port";
+export { SuiteExecutionService } from "./services/suite-execution.service";
 export type { SuiteClickHouseClient } from "./ports/suite-clickhouse.port";
 export {
   CompleteSuiteRunItemCommand,

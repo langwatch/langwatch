@@ -129,7 +129,7 @@ import {
   UnavailableCancellationPublisherAdapter,
 } from "@langwatch/scenario-server";
 import { AppSimulationRuntime } from "~/runtime/app/features/simulation";
-import { PostgresSuiteAdapter } from "@langwatch/suite-server";
+import { PostgresSuiteAdapter, SuiteExecutionService } from "@langwatch/suite-server";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -374,7 +374,10 @@ import { createCompositePlanProvider } from "./subscription/composite-plan-provi
 import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
-import { AppSuiteExecutionPort } from "~/runtime/app/features/suite-execution.adapter";
+import {
+  AppSuiteRunCommandsPort,
+  AppSuiteRunIdPort,
+} from "~/runtime/app/features/suite-execution.adapter";
 import { startSystemMigrations } from "./system-migrations/boot";
 import {
   type ClusteringPageOutcome,
@@ -941,9 +944,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     scenarios,
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-    execution: AppSuiteExecutionPort.create({
-      startSuiteRun: suiteStartRun.fn,
-      queueSimulationRun: suiteQueueRun.fn,
+    execution: SuiteExecutionService.create({
+      commands: AppSuiteRunCommandsPort.create({
+        startSuiteRun: suiteStartRun.fn,
+        queueSimulationRun: suiteQueueRun.fn,
+      }),
+      ids: new AppSuiteRunIdPort(),
       scenarios,
     }),
     generateId: () => `suite_${nanoid()}`,
@@ -2551,9 +2557,12 @@ export function createTestApp(
     scenarios: testScenarios,
     resolveClickHouseClient: null,
     defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-    execution: AppSuiteExecutionPort.create({
-      startSuiteRun: overrides?.suiteCommands?.startSuiteRun ?? noop,
-      queueSimulationRun: overrides?.suiteCommands?.queueRun ?? noop,
+    execution: SuiteExecutionService.create({
+      commands: AppSuiteRunCommandsPort.create({
+        startSuiteRun: overrides?.suiteCommands?.startSuiteRun ?? noop,
+        queueSimulationRun: overrides?.suiteCommands?.queueRun ?? noop,
+      }),
+      ids: new AppSuiteRunIdPort(),
       scenarios: testScenarios,
     }),
     generateId: () => `suite_${nanoid()}`,
