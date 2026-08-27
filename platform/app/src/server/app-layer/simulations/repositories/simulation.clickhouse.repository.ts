@@ -5,6 +5,7 @@ import {
   expandSetIdFilter,
   INTERNAL_SET_PREFIX,
 } from "~/server/scenarios/internal-set-id";
+import { RUN_ACTOR_LABELS, type RunActor } from "~/server/scenarios/run-actor";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type {
   BatchHistoryItem,
@@ -105,12 +106,12 @@ type BatchAggregateRow = {
  *
  * stalledCount stays out: the history page counts it from the preview items it
  * already holds, and the single-batch summary reads the StalledCount column.
- * The note stays out for the same reason: the history page reads it off the
- * preview rows, the single-batch summary off its own aggregate.
+ * The note and the actor stay out for the same reason: the history page reads
+ * them off the preview rows, the single-batch summary off its own aggregate.
  */
 function mapBatchAggregateRow(
   row: BatchAggregateRow,
-): Omit<BatchSummary, "stalledCount" | "note"> {
+): Omit<BatchSummary, "stalledCount" | "note" | "startedBy"> {
   const firstCompletedAt = Number(row.FirstCompletedAt);
   const allCompletedAt = Number(row.AllCompletedAt);
 
@@ -359,6 +360,31 @@ const LIST_COLUMNS = `
 export const RUN_NOTE_EXPR =
   "JSONExtractString(ifNull(Metadata, '{}'), 'note')";
 
+/**
+ * Who started the run, read out of the reserved namespace of the run metadata
+ * server-side so only the two short strings cross the wire.
+ *
+ * The pair is written together, so an empty id means the run names no person
+ * and the label is not read on its own. A run started by a project key, and
+ * any run recorded before this was stamped, extracts as the empty string.
+ *
+ * @see specs/scenarios/run-actor-on-runs.feature
+ */
+export const RUN_ACTOR_ID_EXPR =
+  "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorId')";
+export const RUN_ACTOR_LABEL_EXPR =
+  "JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'actorLabel')";
+
+/** The actor a stored id and label name, or null when they name no person. */
+function readActor(params: {
+  id: string | null | undefined;
+  label: string | null | undefined;
+}): RunActor | null {
+  if (!params.id) return null;
+  const label = RUN_ACTOR_LABELS.find((known) => known === params.label);
+  return label ? { id: params.id, label } : null;
+}
+
 /** Columns for a slim batch-history preview — no full message arrays. */
 const PREVIEW_COLUMNS = `
   ScenarioRunId, BatchRunId, Name, Description, Status,
@@ -366,6 +392,8 @@ const PREVIEW_COLUMNS = `
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
   ${RUN_NOTE_EXPR} AS Note,
+  ${RUN_ACTOR_ID_EXPR} AS ActorId,
+  ${RUN_ACTOR_LABEL_EXPR} AS ActorLabel,
   arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
   arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
 
@@ -385,6 +413,8 @@ interface PreviewItemRow {
   UpdatedAt: string;
   FinishedAt: string | null;
   Note: string;
+  ActorId: string;
+  ActorLabel: string;
   MessagePreviewRoles: string[];
   MessagePreviewContents: string[];
 }
@@ -693,10 +723,22 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         (itemsByBatch.get(b.BatchRunId) ?? []).find((r) => r.Note !== "")
           ?.Note ?? null;
 
+      // The actor is stamped on every run of a batch at queue time, the same
+      // way the note is, so the first run that names one answers for the
+      // batch. It rides the preview rows already loaded, so it costs no query.
+      const actorRow = (itemsByBatch.get(b.BatchRunId) ?? []).find(
+        (r) => r.ActorId !== "",
+      );
+      const startedBy = readActor({
+        id: actorRow?.ActorId,
+        label: actorRow?.ActorLabel,
+      });
+
       return {
         ...mapBatchAggregateRow(b),
         stalledCount,
         note,
+        startedBy,
         items,
       };
     });
@@ -727,12 +769,16 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const whereFilters =
       "TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String}";
 
-    // The note read is safe here and not in BATCH_AGGREGATE_COLUMNS: this query
-    // is bounded to one batch, while the history page shares those columns with
-    // a step that aggregates over the whole run set.
-    const rows = await this.queryRows<BatchAggregateRow & { Note: string }>(
+    // The note and the actor are read here and not in BATCH_AGGREGATE_COLUMNS:
+    // this query is bounded to one batch, while the history page shares those
+    // columns with a step that aggregates over the whole run set.
+    const rows = await this.queryRows<
+      BatchAggregateRow & { Note: string; ActorId: string; ActorLabel: string }
+    >(
       `SELECT ${BATCH_AGGREGATE_COLUMNS},
-        anyIf(${RUN_NOTE_EXPR}, ${RUN_NOTE_EXPR} != '')                AS Note
+        anyIf(${RUN_NOTE_EXPR}, ${RUN_NOTE_EXPR} != '')                AS Note,
+        anyIf(${RUN_ACTOR_ID_EXPR}, ${RUN_ACTOR_ID_EXPR} != '')        AS ActorId,
+        anyIf(${RUN_ACTOR_LABEL_EXPR}, ${RUN_ACTOR_ID_EXPR} != '')     AS ActorLabel
        FROM ${TABLE_NAME}
        WHERE ${whereFilters}
          AND ArchivedAt IS NULL
@@ -748,6 +794,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       ...mapBatchAggregateRow(row),
       stalledCount: Number(row.StalledCount),
       note: row.Note === "" ? null : row.Note,
+      startedBy: readActor({ id: row.ActorId, label: row.ActorLabel }),
     };
   }
 

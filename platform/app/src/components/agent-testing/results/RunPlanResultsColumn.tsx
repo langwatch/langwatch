@@ -42,6 +42,7 @@ export function RunPlanResultsColumn({
     run,
     runSettings,
     runStartedLabel,
+    runStartedByLabel,
     isRunSettingsShown,
     toggleRunSettings,
     runDialog,
@@ -73,6 +74,7 @@ export function RunPlanResultsColumn({
           <RunSettingsBlock
             settings={runSettings}
             startedLabel={runStartedLabel}
+            startedByLabel={runStartedByLabel}
           />
         ) : null}
 

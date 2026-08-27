@@ -7,7 +7,8 @@
  * It reads only what the run itself recorded. When the run started reads here
  * rather than on the header line, with its date, because the header line and
  * the runs rail beside it would otherwise say the same thing three times. Who
- * started a run is not recorded on the run, so the block cannot name a person.
+ * started it reads on that same row, because when and who are one fact about
+ * the start of the run. A run that recorded no person reads the time alone.
  *
  * A parameter reads in a
  * monospace font, because a value like `eu-central` is a literal and a
@@ -82,11 +83,21 @@ function ModelRow({
 export function RunSettingsBlock({
   settings,
   startedLabel,
+  startedByLabel,
 }: {
   settings: RunSettings;
   /** The date and the age of the run, or nothing when neither is known. */
   startedLabel: string | null;
+  /**
+   * Who started the run, in the words the reader knows them by, or nothing
+   * when the run recorded no person. Never a placeholder.
+   */
+  startedByLabel: string | null;
 }) {
+  const startedRow = [startedLabel, startedByLabel]
+    .filter((part): part is string => !!part)
+    .join(" · ");
+
   return (
     <VStack
       align="stretch"
@@ -99,9 +110,9 @@ export function RunSettingsBlock({
       paddingY={2.5}
       data-testid="run-settings-block"
     >
-      {startedLabel ? (
+      {startedRow ? (
         <SettingRow label="Started" testId="run-settings-started">
-          <Text fontSize="12px">{startedLabel}</Text>
+          <Text fontSize="12px">{startedRow}</Text>
         </SettingRow>
       ) : null}
 

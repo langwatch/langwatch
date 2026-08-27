@@ -23,6 +23,7 @@ import {
   runParameterValuesSchema,
 } from "~/server/scenarios/parameters";
 import { resolveRunParameters } from "~/server/scenarios/resolve-run-parameters";
+import { type RunActor, withActor } from "~/server/scenarios/run-actor";
 import { runNoteSchema, withNote } from "~/server/scenarios/run-note";
 import {
   encryptRunSecretValues,
@@ -163,6 +164,7 @@ async function queueRun({
   secretParameters,
   note,
   scenarioVersion,
+  actor,
 }: {
   projectId: string;
   scenarioId: string;
@@ -175,15 +177,19 @@ async function queueRun({
   secretParameters: RunSecretCiphertext;
   note: string | undefined;
   scenarioVersion: number | undefined;
+  /** The person who started the run, or nothing when none is named. */
+  actor: RunActor | undefined;
 }): Promise<void> {
   const secretParameterNames = Object.keys(secretParameters);
   const metadata = {
-    // The reserved namespace records the target this run was pointed at and
-    // the scenario version it was queued from, the same way a suite run does.
+    // The reserved namespace records the target this run was pointed at, the
+    // scenario version it was queued from and who started it, the same way a
+    // suite run does.
     langwatch: {
       targetReferenceId: target.referenceId,
       targetType: target.type,
       ...(scenarioVersion !== undefined ? { scenarioVersion } : {}),
+      ...withActor(actor),
     },
     ...withNote(note),
     ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
@@ -296,6 +302,7 @@ export const simulationRunnerRouter = createTRPCRouter({
         secretParameters,
         note: input.note,
         scenarioVersion,
+        actor: { id: ctx.session.user.id, label: "user" },
       });
 
       // No explicit job scheduling — the execution subscriber picks up the queued

@@ -5,6 +5,8 @@ import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simu
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import type { RunParameterValues } from "~/server/scenarios/parameters";
+import type { RunActor } from "~/server/scenarios/run-actor";
+import { withActor } from "~/server/scenarios/run-actor";
 import { withNote } from "~/server/scenarios/run-note";
 import type { RunSecretCiphertext } from "~/server/scenarios/run-secret-values";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
@@ -195,6 +197,13 @@ export class SuiteRunService {
      */
     simulatorModel?: string | null;
     judgeModel?: string | null;
+    /**
+     * The person who started this batch, stamped onto every run of it. Absent
+     * when the caller named no person, which is every project-key run.
+     *
+     * @see specs/scenarios/run-actor-on-runs.feature
+     */
+    actor?: RunActor;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -209,6 +218,7 @@ export class SuiteRunService {
       parametersByScenarioId,
       secretParametersByScenarioId,
       note,
+      actor,
     } = params;
     const simulationModels = withSimulationModels(params);
 
@@ -282,6 +292,7 @@ export class SuiteRunService {
               targetReferenceId: item.target.referenceId,
               targetType: item.target.type,
               ...withScenarioVersion(scenarioVersionMap.get(item.scenarioId)),
+              ...withActor(actor),
               ...simulationModels,
             },
             ...withNote(note),

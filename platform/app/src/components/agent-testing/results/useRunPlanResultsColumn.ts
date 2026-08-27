@@ -12,11 +12,16 @@ import { useExportScenarioRuns } from "~/components/suites/useExportScenarioRuns
 import { useCan } from "~/hooks/useCan";
 import { useNow } from "~/hooks/useNow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSession } from "~/utils/auth-client";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { PeriodControls } from "./period-controls";
 import type { RunPlanDetailRun } from "./RunPlanDetailHeader";
 import type { RunPlan } from "./run-plans";
-import { type RunSettings, readRunSettings } from "./run-settings";
+import {
+  type RunSettings,
+  readRunSettings,
+  runActorName,
+} from "./run-settings";
 import type { RunPlanBatches, RunPlanSelection } from "./useRunPlanBatches";
 import { useRunPlanCancel } from "./useRunPlanCancel";
 import { useRunPlanRunDialog } from "./useRunPlanRunDialog";
@@ -37,6 +42,11 @@ export type RunPlanResultsColumnState = {
   runSettings: RunSettings | null;
   /** When the selected run started, as the settings block prints it. */
   runStartedLabel: string | null;
+  /**
+   * Who started the selected run, in the words this reader knows them by, or
+   * nothing when the run recorded no person.
+   */
+  runStartedByLabel: string | null;
   isRunSettingsShown: boolean;
   toggleRunSettings: () => void;
   runDialog: ReturnType<typeof useRunPlanRunDialog>;
@@ -54,6 +64,10 @@ export function useRunPlanResultsColumn({
   periodControls: PeriodControls;
 }): RunPlanResultsColumnState {
   const { project } = useOrganizationTeamProject();
+  // The reader's own id, which is what lets a run they started read as
+  // "You". Read without requiring a session: the page is already behind the
+  // sign-in gate, and a redirect does not belong to this hook.
+  const { data: session } = useSession();
   const { can } = useCan();
   const now = useNow();
   const canManage = can("scenarios:manage");
@@ -77,6 +91,11 @@ export function useRunPlanResultsColumn({
     startedAt === null
       ? null
       : `${format(new Date(startedAt), "d MMM yyyy, HH:mm")} · ${formatTimeAgoCompact(startedAt, now)}`;
+
+  const runStartedByLabel = runActorName({
+    actor: runSettings?.actor ?? null,
+    viewerUserId: session?.user?.id,
+  });
 
   const cancel = useRunPlanCancel({
     scenarioSetId: plan.scenarioSetId,
@@ -110,6 +129,7 @@ export function useRunPlanResultsColumn({
       : null,
     runSettings,
     runStartedLabel,
+    runStartedByLabel,
     isRunSettingsShown,
     toggleRunSettings,
     runDialog,

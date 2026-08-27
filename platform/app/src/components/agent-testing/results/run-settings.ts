@@ -8,6 +8,10 @@
  * resolved parameters sit beside it, and the repeat count is the number of
  * runs of one batch that share a scenario and a target.
  *
+ * Who started the run is stamped on it the same way, in the reserved
+ * `langwatch` namespace. A run started by a project key names no person and
+ * reads back as none.
+ *
  * A model reads back as the value the plan was CONFIGURED with, which is
  * absent when the plan named none. A run recorded before the models were
  * stamped is absent for the same reason and reads the same way: this
@@ -20,6 +24,7 @@
  * @see specs/scenarios/run-configuration-on-runs.feature
  */
 
+import type { RunActor } from "~/server/scenarios/run-actor";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 /** One resolved run parameter, as the block prints it. */
@@ -37,6 +42,12 @@ export type RunSettings = {
   simulatorModel: string | null;
   /** Null when the run names no judge model. */
   judgeModel: string | null;
+  /**
+   * Who started the run, or null when the run records no person. A run
+   * started with a project key, and a run recorded before the actor was
+   * stamped, both read as null and print no name.
+   */
+  actor: RunActor | null;
 };
 
 /**
@@ -97,6 +108,44 @@ function readModel(
   return null;
 }
 
+/**
+ * Who started the batch: the first run that names a person.
+ *
+ * Every run of a batch is stamped with the same actor at queue time, so the
+ * first one to carry it answers for the batch.
+ *
+ * @see specs/scenarios/run-actor-on-runs.feature
+ */
+function readActor(scenarioRuns: ScenarioRunData[]): RunActor | null {
+  for (const run of scenarioRuns) {
+    const id = run.metadata?.langwatch?.actorId;
+    const label = run.metadata?.langwatch?.actorLabel;
+    if (id && label) return { id, label };
+  }
+  return null;
+}
+
+/**
+ * What the settings row calls the person who started the run.
+ *
+ * A run the reader started themselves reads as "You", which is how the rest
+ * of the product names them. The two key surfaces name themselves. A run
+ * started by another person names no one: the run stores an id, and a name is
+ * never made up from an id.
+ */
+export function runActorName({
+  actor,
+  viewerUserId,
+}: {
+  actor: RunActor | null;
+  viewerUserId: string | null | undefined;
+}): string | null {
+  if (!actor) return null;
+  if (actor.label === "api") return "API";
+  if (actor.label === "cli") return "CLI";
+  return actor.id === viewerUserId ? "You" : null;
+}
+
 /** Everything the run settings block reads, or null when the batch is empty. */
 export function readRunSettings(
   scenarioRuns: ScenarioRunData[],
@@ -107,5 +156,6 @@ export function readRunSettings(
     repeatCount: readRepeatCount(scenarioRuns),
     simulatorModel: readModel(scenarioRuns, "simulatorModel"),
     judgeModel: readModel(scenarioRuns, "judgeModel"),
+    actor: readActor(scenarioRuns),
   };
 }

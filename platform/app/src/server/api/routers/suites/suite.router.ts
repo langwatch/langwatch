@@ -200,6 +200,7 @@ export const suiteRouter = createTRPCRouter({
         batchRunId: input.batchRunId,
         parameters: input.parameters,
         note: input.note,
+        actor: { id: ctx.session.user.id, label: "user" },
       });
 
       return {
@@ -259,6 +260,7 @@ export const suiteRouter = createTRPCRouter({
         batchRunId: input.batchRunId,
         parameters: input.parameters,
         note: input.note,
+        actor: { id: ctx.session.user.id, label: "user" },
       });
       return { scheduled: true, ...result };
     }),
@@ -300,6 +302,7 @@ export const suiteRouter = createTRPCRouter({
         targets: input.targets,
         parameters: input.parameters,
         note: input.note,
+        actor: { id: ctx.session.user.id, label: "user" },
       });
       return {
         scheduled: true,

@@ -9,6 +9,7 @@ import {
 } from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
+import { runActorLabelSchema } from "../run-actor";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
@@ -86,6 +87,18 @@ export const langwatchMetadataSchema = z.object({
    */
   simulatorModel: z.string().optional(),
   judgeModel: z.string().optional(),
+  /**
+   * Who started the run: the platform user id, and the surface that person
+   * acted through. Stamped at queue time, and absent whenever the caller
+   * named no person, which is every project-key and SDK run.
+   *
+   * The id and not a name, so a run still points at the right person after
+   * they rename themselves.
+   *
+   * @see specs/scenarios/run-actor-on-runs.feature
+   */
+  actorId: z.string().optional(),
+  actorLabel: runActorLabelSchema.optional(),
 });
 
 /**

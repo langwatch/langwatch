@@ -602,6 +602,27 @@ describe("Feature: Suites REST API", () => {
       });
     });
 
+    describe("when the key behind the run belongs to no person", () => {
+      /** @scenario "A REST run with a key that belongs to no person records no actor" */
+      it("records no actor on the queued run", async () => {
+        const { suite } = await createRunnableSuite();
+
+        const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-actor-1",
+        });
+
+        expect(res.status).toBe(200);
+        expect(queueSimulationRun).toHaveBeenCalledTimes(1);
+        const langwatch = (
+          queueSimulationRun.mock.calls[0]![0].metadata as {
+            langwatch: Record<string, unknown>;
+          }
+        ).langwatch;
+        expect(langwatch).not.toHaveProperty("actorId");
+        expect(langwatch).not.toHaveProperty("actorLabel");
+      });
+    });
+
     describe("when the run carries a note", () => {
       async function createRunnableSuiteWithThreeCasesAndTwoTargets() {
         const first = await createScenario("Refund Flow");

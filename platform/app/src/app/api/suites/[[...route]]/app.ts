@@ -10,6 +10,7 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runActorFromRequest } from "~/server/scenarios/run-actor";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
@@ -554,6 +555,12 @@ secured.access(requires("scenarios:create")).post(
         idempotencyKey,
         parameters: body.parameters,
         note: body.note,
+        // A user-bound key names the person it belongs to. A project key
+        // names nobody, and the run records no actor at all.
+        actor: runActorFromRequest({
+          userId: c.get("apiKeyUserId"),
+          surfaceHeader: c.req.header("X-LangWatch-Surface"),
+        }),
       });
 
       return c.json({

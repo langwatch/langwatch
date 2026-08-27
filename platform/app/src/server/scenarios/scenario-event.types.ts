@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { RunActor } from "./run-actor";
 import type { ScenarioRunStatus } from "./scenario-event.enums";
 import type {
   runDataSchema,
@@ -89,6 +90,14 @@ export type BatchSummary = {
    * @see specs/suites/run-notes.feature
    */
   note: string | null;
+  /**
+   * The person who started this batch, or null when the batch names none.
+   * Every run of a batch carries the same actor, so it is read back off the
+   * runs themselves, the same way the note is.
+   *
+   * @see specs/scenarios/run-actor-on-runs.feature
+   */
+  startedBy: RunActor | null;
 };
 
 /**

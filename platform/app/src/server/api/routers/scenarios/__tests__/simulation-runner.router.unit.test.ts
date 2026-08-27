@@ -385,7 +385,7 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called without explicit setId", () => {
-      /** @scenario "A single scenario run goes to the project internal run set" */
+      /** @scenario "A scenario run that names no run set goes to the internal run set" */
       /** @scenario "A run naming no set goes to this project's one-off bucket" */
       it("dispatches queueRun command before scheduling", async () => {
         await caller.run(defaultInput);
@@ -403,7 +403,7 @@ describe("simulationRunnerRouter.run", () => {
         );
       });
 
-      /** @scenario "A one-off batch carries the name of the scenario that ran" */
+      /** @scenario "A batch of the internal run set carries the name of the scenario that ran" */
       it("stamps the scenario name onto the queued run", async () => {
         await caller.run(defaultInput);
 
@@ -663,15 +663,18 @@ describe("simulationRunnerRouter.run", () => {
             targetReferenceId: "prompt_123",
             targetType: "prompt",
             scenarioVersion: 5,
+            actorId: "user_test_123",
+            actorLabel: "user",
           },
         });
       });
     });
 
     describe("the reserved langwatch namespace on a one-off run", () => {
-      /** @scenario "A one-off run records which target it ran against" */
-      /** @scenario "A one-off run of a single case records that case version" */
-      it("records the target, its kind and the scenario version read at queue time", async () => {
+      /** @scenario "A single-case run records which target it ran against" */
+      /** @scenario "A single-case run records that case version" */
+      /** @scenario "A one-off run started in the app records the person who started it" */
+      it("records the target, its kind, the case version read at queue time and the person who started it", async () => {
         await caller.run(defaultInput);
 
         expect(mockQueueRun).toHaveBeenCalledWith(
@@ -681,10 +684,27 @@ describe("simulationRunnerRouter.run", () => {
                 targetReferenceId: "prompt_123",
                 targetType: "prompt",
                 scenarioVersion: 5,
+                actorId: "user_test_123",
+                actorLabel: "user",
               },
             }),
           }),
         );
+      });
+
+      /** @scenario "The actor sits beside the scenario version, not at the top level" */
+      it("keeps the actor inside the reserved namespace and off the top level", async () => {
+        await caller.run(defaultInput);
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata: Record<string, unknown>;
+        };
+        expect(queued.metadata).not.toHaveProperty("actorId");
+        expect(queued.metadata).not.toHaveProperty("actorLabel");
+        expect(queued.metadata.langwatch).toMatchObject({
+          actorId: "user_test_123",
+          actorLabel: "user",
+        });
       });
     });
   });

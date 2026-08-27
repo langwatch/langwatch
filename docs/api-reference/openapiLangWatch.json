@@ -46778,6 +46778,17 @@
                               },
                               "judgeModel": {
                                 "type": "string"
+                              },
+                              "actorId": {
+                                "type": "string"
+                              },
+                              "actorLabel": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "api",
+                                  "cli"
+                                ]
                               }
                             },
                             "required": [

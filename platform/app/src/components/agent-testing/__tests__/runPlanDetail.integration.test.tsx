@@ -149,6 +149,17 @@ vi.mock("~/utils/formatTimeAgo", () => ({
   formatTimeAgoCompact: () => "2h ago",
 }));
 
+// The settings block names the reader by comparing the run's actor with the
+// signed-in user, so the test controls who is reading.
+const VIEWER_USER_ID = "user_lena";
+vi.mock("~/utils/auth-client", () => ({
+  useSession: () => ({
+    data: { user: { id: VIEWER_USER_ID } },
+    status: "authenticated",
+    update: vi.fn(),
+  }),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -902,9 +913,14 @@ describe("<RunPlanDetail/>", () => {
       "/api/export/scenario-runs/download",
       expect.objectContaining({ method: "POST" }),
     );
-    const body = JSON.parse(
-      (fetchSpy.mock.calls[0]![1] as { body: string }).body,
-    ) as { scenarioSetId: string; mode: string };
+    // Picked by URL, not by position: the page fetches other things too.
+    const exportCall = fetchSpy.mock.calls.find(
+      (call) => call[0] === "/api/export/scenario-runs/download",
+    );
+    const body = JSON.parse((exportCall![1] as { body: string }).body) as {
+      scenarioSetId: string;
+      mode: string;
+    };
     expect(body.scenarioSetId).toBe(SUITE_SET_ID);
     expect(body.mode).toBe("full");
   });
@@ -1052,6 +1068,80 @@ describe("<RunPlanDetail/>", () => {
     ).not.toBeInTheDocument();
     // The judge still reads, which is the point of the block.
     expect(within(block).getByTestId("run-settings-judge")).toBeInTheDocument();
+  });
+
+  /** @scenario "The first row of the block says when the run started and who started it" */
+  it("says when the run started and that the reader started it, on one row", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: VIEWER_USER_ID,
+        actorLabel: "user",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("2h ago");
+    // One row, not two: the person reads at the end of the row the time is on.
+    expect(screen.getAllByTestId("run-settings-started")).toHaveLength(1);
+    expect(started.textContent?.trim().endsWith("You")).toBe(true);
+  });
+
+  /** @scenario "A run started with a key that names no person shows only the time" */
+  it("reads the time alone when the run recorded no person", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("2h ago");
+    expect(started).not.toHaveTextContent("You");
+    expect(started).not.toHaveTextContent("Unknown");
+    // The row ends at the time, with no separator left behind it.
+    expect(started.textContent?.trim().endsWith("2h ago")).toBe(true);
+  });
+
+  /** @scenario "A run started through the CLI names the CLI, not a person" */
+  it("names the CLI on a run started through it, and invents no name", async () => {
+    const user = userEvent.setup();
+    setRuns(
+      configuredBatch({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        judgeModel: "openai/gpt-5",
+        actorId: "user_omar",
+        actorLabel: "cli",
+      }),
+    );
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: "Show run settings" }));
+
+    const started = within(
+      screen.getByTestId("run-settings-block"),
+    ).getByTestId("run-settings-started");
+    expect(started).toHaveTextContent("CLI");
+    // The run stores an id, so no name is made up from it.
+    expect(started).not.toHaveTextContent("user_omar");
+    expect(started).not.toHaveTextContent("You");
   });
 
   /** @scenario "The note stays in the header line and never moves into the block" */

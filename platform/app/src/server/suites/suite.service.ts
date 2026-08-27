@@ -24,6 +24,7 @@ import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import type { RunParameterValues } from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
+import type { RunActor } from "../scenarios/run-actor";
 import {
   encryptRunSecretValues,
   type RunSecretCiphertext,
@@ -590,6 +591,13 @@ export class SuiteService {
     parameters?: RunParameterValues;
     /** One short line describing why this batch was run. */
     note?: string;
+    /**
+     * The person who started the run, stamped onto every run of the batch.
+     * Absent when the caller named no person.
+     *
+     * @see specs/scenarios/run-actor-on-runs.feature
+     */
+    actor?: RunActor;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -640,6 +648,7 @@ export class SuiteService {
           parametersByScenarioId,
           secretParametersByScenarioId,
           note: params.note,
+          actor: params.actor,
           simulatorModel: suite.simulatorModel,
           judgeModel: suite.judgeModel,
         });
@@ -715,6 +724,7 @@ export class SuiteService {
     targets?: SuiteTarget[];
     parameters?: RunParameterValues;
     note?: string;
+    actor?: RunActor;
   }): Promise<SuiteRunResult & { suiteId: string }> {
     return tracer.withActiveSpan(
       "SuiteService.runAll",
@@ -782,6 +792,7 @@ export class SuiteService {
           batchRunId: params.batchRunId,
           parameters: params.parameters,
           note: params.note,
+          actor: params.actor,
         });
         return { ...result, suiteId: suite.id };
       },
@@ -821,6 +832,7 @@ export class SuiteService {
     batchRunId?: string;
     parameters?: RunParameterValues;
     note?: string;
+    actor?: RunActor;
   }): Promise<
     SuiteRunResult & { suiteId: string; planName: string; created: boolean }
   > {
@@ -856,6 +868,7 @@ export class SuiteService {
           batchRunId: params.batchRunId,
           parameters: params.parameters,
           note: params.note,
+          actor: params.actor,
         });
         return {
           ...result,

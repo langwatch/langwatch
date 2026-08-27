@@ -432,6 +432,29 @@ Feature: The Results tab
     And each model reads with the icon of its provider
 
   @integration
+  Scenario: The first row of the block says when the run started and who started it
+    Given a run started in the app by the person now reading it
+    When "Show run settings" is chosen
+    Then the first row of the block says when the run started
+    And the same row says the run was started by them
+    And no second row is added for the person
+
+  @integration
+  Scenario: A run started with a key that names no person shows only the time
+    Given a run whose metadata records no actor
+    When "Show run settings" is chosen
+    Then the first row of the block says when the run started
+    And no person reads on that row
+    And the row never reads "Unknown"
+
+  @integration
+  Scenario: A run started through the CLI names the CLI, not a person
+    Given a run whose metadata records the surface "cli"
+    When "Show run settings" is chosen
+    Then the row says the run was started through the CLI
+    And no name is made up from the recorded user id
+
+  @integration
   Scenario: The judge always reads, and a run that named no model says so
     Given a run whose metadata names neither simulation model
     When "Show run settings" is chosen
