@@ -2,13 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DatasetReference, TargetConfig } from "../../../types";
@@ -184,16 +178,12 @@ describe("TargetVariablesPanel", () => {
       };
 
       renderComponent({ target: fullyMappedTarget });
-      expect(
-        screen.queryByTestId("missing-mappings-error"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("missing-mappings-error")).not.toBeInTheDocument();
     });
 
     it("hides warning in readOnly mode", () => {
       renderComponent({ readOnly: true });
-      expect(
-        screen.queryByTestId("missing-mappings-error"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("missing-mappings-error")).not.toBeInTheDocument();
     });
   });
 
@@ -205,9 +195,7 @@ describe("TargetVariablesPanel", () => {
       // Find the mapping input for "context" (the unmapped one)
       const inputs = screen.getAllByRole("textbox");
       // Click on an empty mapping input to open dropdown
-      const emptyInput = inputs.find(
-        (input) => !(input as HTMLInputElement).value,
-      );
+      const emptyInput = inputs.find((input) => !(input as HTMLInputElement).value);
       if (emptyInput) {
         await user.click(emptyInput);
 
@@ -223,9 +211,7 @@ describe("TargetVariablesPanel", () => {
 
       // Click on an empty mapping input
       const inputs = screen.getAllByRole("textbox");
-      const emptyInput = inputs.find(
-        (input) => !(input as HTMLInputElement).value,
-      );
+      const emptyInput = inputs.find((input) => !(input as HTMLInputElement).value);
       if (emptyInput) {
         await user.click(emptyInput);
 
@@ -250,9 +236,7 @@ describe("TargetVariablesPanel", () => {
       renderComponent({ datasets: [datasetWithImage] });
 
       const inputs = screen.getAllByRole("textbox");
-      const emptyInput = inputs.find(
-        (input) => !(input as HTMLInputElement).value,
-      );
+      const emptyInput = inputs.find((input) => !(input as HTMLInputElement).value);
       expect(emptyInput).toBeDefined();
       await user.click(emptyInput!);
 
@@ -272,18 +256,14 @@ describe("TargetVariablesPanel", () => {
       renderComponent({ otherTargets: [upstream] });
 
       const inputs = screen.getAllByRole("textbox");
-      const emptyInput = inputs.find(
-        (input) => !(input as HTMLInputElement).value,
-      );
+      const emptyInput = inputs.find((input) => !(input as HTMLInputElement).value);
       expect(emptyInput).toBeDefined();
       await user.click(emptyInput!);
 
       await waitFor(() => {
         expect(screen.getByText("category_classifier")).toBeInTheDocument();
       });
-      expect(
-        screen.queryByText("target_1778838627724"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("target_1778838627724")).not.toBeInTheDocument();
     });
   });
 

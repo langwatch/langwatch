@@ -58,9 +58,7 @@ export const stateToWorkflow = (
 
   const entryNode = createEntryNode(activeDataset);
 
-  const targetNodes: Array<
-    Node<Signature> | Node<Code> | Node<HttpComponentConfig>
-  > = [];
+  const targetNodes: Array<Node<Signature> | Node<Code> | Node<HttpComponentConfig>> = [];
   const evaluatorNodes: Array<Node<Evaluator>> = [];
 
   // Create target nodes
@@ -90,11 +88,7 @@ export const stateToWorkflow = (
   });
 
   const targetEdges = buildTargetEdges(state.targets, datasetId);
-  const evaluatorEdges = buildEvaluatorEdges(
-    state.targets,
-    state.evaluators,
-    datasetId,
-  );
+  const evaluatorEdges = buildEvaluatorEdges(state.targets, state.evaluators, datasetId);
 
   return {
     spec_version: LATEST_SPEC_VERSION,
@@ -137,9 +131,7 @@ const createEntryNode = (dataset: DatasetReference): Node<Entry> => {
 /**
  * Convert dataset column type to DSL field type.
  */
-const columnTypeToFieldType = (
-  colType: DatasetColumn["type"],
-): Field["type"] => {
+const columnTypeToFieldType = (colType: DatasetColumn["type"]): Field["type"] => {
   switch (colType) {
     case "string":
       return "str";
@@ -297,10 +289,7 @@ const createEvaluatorNode = (
  * With per-dataset structure: mappings[datasetId][inputField]
  * Only creates edges for mappings that reference the active dataset.
  */
-const buildTargetEdges = (
-  targets: TargetConfig[],
-  activeDatasetId: string,
-): Edge[] => {
+const buildTargetEdges = (targets: TargetConfig[], activeDatasetId: string): Edge[] => {
   const edges: Edge[] = [];
 
   for (const target of targets) {
@@ -312,10 +301,7 @@ const buildTargetEdges = (
       // Skip value mappings - they don't create edges
       if (mapping.type === "value") continue;
 
-      if (
-        mapping.source === "dataset" &&
-        mapping.sourceId === activeDatasetId
-      ) {
+      if (mapping.source === "dataset" && mapping.sourceId === activeDatasetId) {
         edges.push({
           id: `entry->${target.id}.${inputField}`,
           source: "entry",
@@ -363,10 +349,7 @@ const buildEvaluatorEdges = (
         // Skip value mappings - they don't create edges
         if (mapping.type === "value") continue;
 
-        if (
-          mapping.source === "dataset" &&
-          mapping.sourceId === activeDatasetId
-        ) {
+        if (mapping.source === "dataset" && mapping.sourceId === activeDatasetId) {
           // From dataset
           edges.push({
             id: `entry->${evaluatorNodeId}.${inputField}`,
@@ -375,10 +358,7 @@ const buildEvaluatorEdges = (
             target: evaluatorNodeId,
             targetHandle: `input-${inputField}`,
           });
-        } else if (
-          mapping.source === "target" &&
-          mapping.sourceId === target.id
-        ) {
+        } else if (mapping.source === "target" && mapping.sourceId === target.id) {
           // From this target's output
           edges.push({
             id: `${target.id}->${evaluatorNodeId}.${inputField}`,
@@ -406,9 +386,7 @@ const buildEvaluatorEdges = (
 export const getActiveDatasetData = (
   state: EvaluationsV3State,
 ): InlineDataset | undefined => {
-  const activeDataset = state.datasets.find(
-    (d) => d.id === state.activeDatasetId,
-  );
+  const activeDataset = state.datasets.find((d) => d.id === state.activeDatasetId);
   if (activeDataset?.type !== "inline") {
     return undefined;
   }

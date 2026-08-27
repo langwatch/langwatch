@@ -270,9 +270,7 @@ describe("DSL Adapter", () => {
 
         const workflow = stateToWorkflow(state);
 
-        const evaluatorNode = workflow.nodes.find(
-          (n) => n.id === "target-1.eval-1",
-        );
+        const evaluatorNode = workflow.nodes.find((n) => n.id === "target-1.eval-1");
         expect(evaluatorNode).toBeDefined();
 
         // Output should NOT have a value (it's mapped to target)
@@ -402,23 +400,17 @@ describe("DSL Adapter", () => {
         const workflow = stateToWorkflow(state);
 
         // Check edges from entry node to HTTP node
-        const httpEdges = workflow.edges.filter(
-          (e) => e.target === "http-target-1",
-        );
+        const httpEdges = workflow.edges.filter((e) => e.target === "http-target-1");
         expect(httpEdges).toHaveLength(2);
 
         // thread_id edge
-        const threadIdEdge = httpEdges.find(
-          (e) => e.targetHandle === "input-thread_id",
-        );
+        const threadIdEdge = httpEdges.find((e) => e.targetHandle === "input-thread_id");
         expect(threadIdEdge).toBeDefined();
         expect(threadIdEdge?.source).toBe("entry");
         expect(threadIdEdge?.sourceHandle).toBe("output-id");
 
         // input edge
-        const inputEdge = httpEdges.find(
-          (e) => e.targetHandle === "input-input",
-        );
+        const inputEdge = httpEdges.find((e) => e.targetHandle === "input-input");
         expect(inputEdge).toBeDefined();
         expect(inputEdge?.source).toBe("entry");
         expect(inputEdge?.sourceHandle).toBe("output-input");

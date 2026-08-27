@@ -1,7 +1,7 @@
 import { HStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
+import { ColorfulBlockIcon } from "@langwatch/workflow-web";
 
 type SuperHeaderProps = {
   colSpan: number;

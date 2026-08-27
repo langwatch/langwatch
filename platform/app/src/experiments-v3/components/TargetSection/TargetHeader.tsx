@@ -28,7 +28,7 @@ import {
 } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
+import { ColorfulBlockIcon } from "@langwatch/workflow-web";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-web";
 import { VersionBadge } from "@langwatch/prompt-web";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";

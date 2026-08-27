@@ -142,18 +142,12 @@ describe("findMatchingColumn", () => {
   });
 
   it("matches expected_output -> ground_truth", () => {
-    const columns = [
-      createTestColumn("ground_truth"),
-      createTestColumn("input"),
-    ];
+    const columns = [createTestColumn("ground_truth"), createTestColumn("input")];
     expect(findMatchingColumn("expected_output", columns)).toBe("ground_truth");
   });
 
   it("matches expected -> expected_output", () => {
-    const columns = [
-      createTestColumn("expected_output"),
-      createTestColumn("input"),
-    ];
+    const columns = [createTestColumn("expected_output"), createTestColumn("input")];
     expect(findMatchingColumn("expected", columns)).toBe("expected_output");
   });
 
@@ -164,19 +158,13 @@ describe("findMatchingColumn", () => {
   });
 
   it("matches camelCase field to snake_case column", () => {
-    const columns = [
-      createTestColumn("thread_id"),
-      createTestColumn("user_name"),
-    ];
+    const columns = [createTestColumn("thread_id"), createTestColumn("user_name")];
     expect(findMatchingColumn("threadId", columns)).toBe("thread_id");
     expect(findMatchingColumn("userName", columns)).toBe("user_name");
   });
 
   it("matches snake_case field to camelCase column", () => {
-    const columns = [
-      createTestColumn("threadId"),
-      createTestColumn("userName"),
-    ];
+    const columns = [createTestColumn("threadId"), createTestColumn("userName")];
     expect(findMatchingColumn("thread_id", columns)).toBe("threadId");
     expect(findMatchingColumn("user_name", columns)).toBe("userName");
   });
@@ -186,20 +174,13 @@ describe("findMatchingColumn", () => {
       createTestColumn("my_variable_name"),
       createTestColumn("another_test_value"),
     ];
-    expect(findMatchingColumn("myVariableName", columns)).toBe(
-      "my_variable_name",
-    );
-    expect(findMatchingColumn("anotherTestValue", columns)).toBe(
-      "another_test_value",
-    );
+    expect(findMatchingColumn("myVariableName", columns)).toBe("my_variable_name");
+    expect(findMatchingColumn("anotherTestValue", columns)).toBe("another_test_value");
   });
 
   it("exact match takes priority over camelCase/snake_case normalization", () => {
     // If both "threadId" and "thread_id" exist, exact match wins
-    const columns = [
-      createTestColumn("threadId"),
-      createTestColumn("thread_id"),
-    ];
+    const columns = [createTestColumn("threadId"), createTestColumn("thread_id")];
     expect(findMatchingColumn("threadId", columns)).toBe("threadId");
     expect(findMatchingColumn("thread_id", columns)).toBe("thread_id");
   });
@@ -212,18 +193,12 @@ describe("findMatchingColumn", () => {
   });
 
   it("matches user_input field to user_input column exactly", () => {
-    const columns = [
-      createTestColumn("user_input"),
-      createTestColumn("expected_output"),
-    ];
+    const columns = [createTestColumn("user_input"), createTestColumn("expected_output")];
     expect(findMatchingColumn("user_input", columns)).toBe("user_input");
   });
 
   it("matches user_input field to input column via semantic equivalent", () => {
-    const columns = [
-      createTestColumn("input"),
-      createTestColumn("expected_output"),
-    ];
+    const columns = [createTestColumn("input"), createTestColumn("expected_output")];
     expect(findMatchingColumn("user_input", columns)).toBe("input");
   });
 });
@@ -268,9 +243,7 @@ describe("inferTargetMappings", () => {
   });
 
   it("does not override existing mappings", () => {
-    const dataset = createTestDataset("ds-1", "Dataset 1", [
-      createTestColumn("input"),
-    ]);
+    const dataset = createTestDataset("ds-1", "Dataset 1", [createTestColumn("input")]);
     const inputs: Field[] = [{ identifier: "input", type: "str" }];
     const existingMappings = {
       input: {
@@ -285,9 +258,7 @@ describe("inferTargetMappings", () => {
   });
 
   it("returns empty object when no matches", () => {
-    const dataset = createTestDataset("ds-1", "Dataset 1", [
-      createTestColumn("foo"),
-    ]);
+    const dataset = createTestDataset("ds-1", "Dataset 1", [createTestColumn("foo")]);
     const inputs: Field[] = [{ identifier: "bar", type: "str" }];
 
     const mappings = inferTargetMappings(inputs, dataset);
@@ -345,11 +316,7 @@ describe("propagateMappingsToNewDataset", () => {
       createTestColumn("output"),
     ]);
 
-    const mappings = propagateMappingsToNewDataset(
-      inputs,
-      existingMappings,
-      newDataset,
-    );
+    const mappings = propagateMappingsToNewDataset(inputs, existingMappings, newDataset);
 
     expect(mappings.question).toEqual({
       type: "source",
@@ -380,11 +347,7 @@ describe("propagateMappingsToNewDataset", () => {
       createTestColumn("output"),
     ]);
 
-    const mappings = propagateMappingsToNewDataset(
-      inputs,
-      existingMappings,
-      newDataset,
-    );
+    const mappings = propagateMappingsToNewDataset(inputs, existingMappings, newDataset);
 
     expect(mappings.question).toBeDefined();
     expect(mappings.question?.type).toBe("source");
@@ -403,11 +366,7 @@ describe("propagateMappingsToNewDataset", () => {
       createTestColumn("context"),
     ]);
 
-    const mappings = propagateMappingsToNewDataset(
-      inputs,
-      existingMappings,
-      newDataset,
-    );
+    const mappings = propagateMappingsToNewDataset(inputs, existingMappings, newDataset);
 
     expect(mappings.context).toBeDefined();
     expect(mappings.context?.type).toBe("source");
@@ -436,11 +395,7 @@ describe("propagateMappingsToNewDataset", () => {
       createTestColumn("bar"),
     ]);
 
-    const mappings = propagateMappingsToNewDataset(
-      inputs,
-      existingMappings,
-      newDataset,
-    );
+    const mappings = propagateMappingsToNewDataset(inputs, existingMappings, newDataset);
 
     expect(mappings.special).toBeUndefined();
   });
@@ -456,9 +411,7 @@ describe("inferEvaluatorMappings", () => {
       createTestColumn("input"),
       createTestColumn("expected_output"),
     ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
+    const target = createTestTarget("target-1", [{ identifier: "input", type: "str" }]);
     const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
     const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
@@ -476,12 +429,8 @@ describe("inferEvaluatorMappings", () => {
       createTestColumn("input"),
       createTestColumn("expected_output"),
     ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
-    const evaluatorInputs: Field[] = [
-      { identifier: "expected_output", type: "str" },
-    ];
+    const target = createTestTarget("target-1", [{ identifier: "input", type: "str" }]);
+    const evaluatorInputs: Field[] = [{ identifier: "expected_output", type: "str" }];
 
     const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
 
@@ -499,9 +448,7 @@ describe("inferEvaluatorMappings", () => {
       createTestColumn("output"), // Dataset also has "output"
       createTestColumn("expected_output"),
     ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
+    const target = createTestTarget("target-1", [{ identifier: "input", type: "str" }]);
     const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
     const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
@@ -515,9 +462,7 @@ describe("inferEvaluatorMappings", () => {
   });
 
   it("uses semantic equivalents for target outputs", () => {
-    const dataset = createTestDataset("ds-1", "Dataset 1", [
-      createTestColumn("input"),
-    ]);
+    const dataset = createTestDataset("ds-1", "Dataset 1", [createTestColumn("input")]);
     const target = createTestTarget(
       "target-1",
       [{ identifier: "input", type: "str" }],
@@ -550,15 +495,9 @@ describe("inferEvaluatorMappings", () => {
           // Single output whose name does not match "output" by any rule
           [{ identifier: "category", type: "str" }],
         );
-        const evaluatorInputs: Field[] = [
-          { identifier: "output", type: "str" },
-        ];
+        const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-        const mappings = inferEvaluatorMappings(
-          evaluatorInputs,
-          dataset,
-          target,
-        );
+        const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
 
         expect(mappings.output).toEqual({
           type: "source",
@@ -583,15 +522,9 @@ describe("inferEvaluatorMappings", () => {
             { identifier: "confidence", type: "str" },
           ],
         );
-        const evaluatorInputs: Field[] = [
-          { identifier: "output", type: "str" },
-        ];
+        const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-        const mappings = inferEvaluatorMappings(
-          evaluatorInputs,
-          dataset,
-          target,
-        );
+        const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
 
         expect(mappings.output).toBeUndefined();
       });
@@ -599,12 +532,8 @@ describe("inferEvaluatorMappings", () => {
   });
 
   it("does not override existing mappings", () => {
-    const dataset = createTestDataset("ds-1", "Dataset 1", [
-      createTestColumn("input"),
-    ]);
-    const target = createTestTarget("target-1", [
-      { identifier: "input", type: "str" },
-    ]);
+    const dataset = createTestDataset("ds-1", "Dataset 1", [createTestColumn("input")]);
+    const target = createTestTarget("target-1", [{ identifier: "input", type: "str" }]);
     const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
     const existingMappings = {
       output: {
@@ -635,9 +564,7 @@ describe("inferEvaluatorMappings", () => {
         { identifier: "expected_output", type: "str" }, // Target also has "expected_output"
       ],
     );
-    const evaluatorInputs: Field[] = [
-      { identifier: "expected_output", type: "str" },
-    ];
+    const evaluatorInputs: Field[] = [{ identifier: "expected_output", type: "str" }];
 
     const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
 
@@ -650,9 +577,7 @@ describe("inferEvaluatorMappings", () => {
   });
 
   it("prioritizes dataset column over target output for input field", () => {
-    const dataset = createTestDataset("ds-1", "Dataset 1", [
-      createTestColumn("input"),
-    ]);
+    const dataset = createTestDataset("ds-1", "Dataset 1", [createTestColumn("input")]);
     const target = createTestTarget(
       "target-1",
       [{ identifier: "input", type: "str" }],
@@ -716,9 +641,7 @@ describe("inferEvaluatorMappings", () => {
         [{ identifier: "input", type: "str" }],
         [{ identifier: "expected_output", type: "str" }], // target has expected_output
       );
-      const evaluatorInputs: Field[] = [
-        { identifier: "expected_output", type: "str" },
-      ];
+      const evaluatorInputs: Field[] = [{ identifier: "expected_output", type: "str" }];
 
       const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
 

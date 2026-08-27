@@ -189,10 +189,7 @@ export const inferTargetMappings = (
     }
 
     // Try to find a matching column
-    const matchingColumn = findMatchingColumn(
-      field.identifier,
-      dataset.columns,
-    );
+    const matchingColumn = findMatchingColumn(field.identifier, dataset.columns);
     if (matchingColumn) {
       newMappings[field.identifier] = {
         type: "source",
@@ -253,10 +250,7 @@ export const propagateMappingsToNewDataset = (
       }
     } else {
       // No existing mapping - try basic inference
-      const matchingColumn = findMatchingColumn(
-        field.identifier,
-        newDataset.columns,
-      );
+      const matchingColumn = findMatchingColumn(field.identifier, newDataset.columns);
       if (matchingColumn) {
         newMappings[field.identifier] = {
           type: "source",
@@ -372,9 +366,7 @@ export const inferEvaluatorMappings = (
       // sole output is named e.g. "category", not "output").
       const m =
         targetMatch() ??
-        (target.outputs.length === 1
-          ? target.outputs[0]?.identifier
-          : undefined);
+        (target.outputs.length === 1 ? target.outputs[0]?.identifier : undefined);
       if (m) {
         newMappings[input.identifier] = {
           type: "source",

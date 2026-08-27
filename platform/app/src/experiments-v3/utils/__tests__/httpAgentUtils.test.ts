@@ -107,9 +107,7 @@ describe("convertHttpComponentConfig", () => {
     expect(result.bodyTemplate).toBe('{"input": "{{input}}"}');
     expect(result.outputPath).toBe("$.result");
     expect(result.timeoutMs).toBe(30000);
-    expect(result.headers).toEqual([
-      { key: "Content-Type", value: "application/json" },
-    ]);
+    expect(result.headers).toEqual([{ key: "Content-Type", value: "application/json" }]);
   });
 
   it("defaults method to POST when not specified", () => {

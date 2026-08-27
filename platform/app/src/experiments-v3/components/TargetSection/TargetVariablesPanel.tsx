@@ -29,10 +29,7 @@ type TargetVariablesPanelProps = {
   /** Callback when inputs change */
   onInputsChange: (inputs: Field[]) => void;
   /** Callback when a single mapping changes for the active dataset */
-  onMappingChange: (
-    inputField: string,
-    mapping: FieldMapping | undefined,
-  ) => void;
+  onMappingChange: (inputField: string, mapping: FieldMapping | undefined) => void;
   /** Whether the inputs are read-only (e.g., for agents with fixed inputs) */
   readOnly?: boolean;
 };
@@ -200,10 +197,7 @@ export const TargetVariablesPanel = ({
   );
 
   // Convert target inputs to variables
-  const variables = useMemo(
-    () => fieldsToVariables(target.inputs),
-    [target.inputs],
-  );
+  const variables = useMemo(() => fieldsToVariables(target.inputs), [target.inputs]);
 
   // Get mappings for the active dataset
   const datasetMappings = target.mappings[activeDatasetId] ?? {};
@@ -222,8 +216,7 @@ export const TargetVariablesPanel = ({
   // "Undefined variables" (used but not in inputs) don't require mappings
   const missingMappings = useMemo(() => {
     return target.inputs.filter(
-      (input) =>
-        usedFields.has(input.identifier) && !datasetMappings[input.identifier],
+      (input) => usedFields.has(input.identifier) && !datasetMappings[input.identifier],
     );
   }, [target.inputs, datasetMappings, usedFields]);
 
@@ -271,8 +264,8 @@ export const TargetVariablesPanel = ({
       {/* Helper text */}
       {!readOnly && (
         <Text fontSize="xs" color="fg.muted">
-          Connect each input variable to a data source. Use the dropdown to map
-          to dataset columns or outputs from other targets.
+          Connect each input variable to a data source. Use the dropdown to map to dataset
+          columns or outputs from other targets.
         </Text>
       )}
     </VStack>

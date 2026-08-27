@@ -51,9 +51,7 @@ export const extractVariablesFromBodyTemplate = (
  * @param config - The HTTP component config from optimization studio
  * @returns The HttpConfig for experiments-v3
  */
-export const convertHttpComponentConfig = (
-  config: HttpComponentConfig,
-): HttpConfig => {
+export const convertHttpComponentConfig = (config: HttpComponentConfig): HttpConfig => {
   return {
     url: config.url,
     method: config.method ?? "POST",
