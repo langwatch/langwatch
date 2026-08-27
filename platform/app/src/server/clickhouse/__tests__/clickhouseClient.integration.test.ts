@@ -361,7 +361,7 @@ describe("ClickHouse routing via env vars", () => {
      * instance.
      */
     /** @scenario A user is a tenant in its own right */
-    it("routes a user with no private membership to the shared instance", async () => {
+    it("routes a user to the shared instance", async () => {
       const { getClickHouseClientForTenant } = await import(
         "../clickhouseClient"
       );
@@ -375,13 +375,18 @@ describe("ClickHouse routing via env vars", () => {
     });
 
     /**
-     * The one case the refusal is actually for. This person's identity events
-     * would land in the shared platform log while their organization's own
-     * data stays on its private instance, so there is no answer to give and
-     * the resolver says so rather than picking one.
+     * The case that decides whether membership enters into it at all: this
+     * person belongs to an organization with its own ClickHouse. They still
+     * route to the shared instance, because what is being written is how they
+     * sign in rather than any organization's data — true of them before,
+     * across and after every organization they belong to.
+     *
+     * Pinned because the cheap reading is that a private-dataplane member
+     * must follow their organization, and a membership lookup here would be
+     * both a query per resolution and an answer that changes under a join.
      */
-    /** @scenario A user inside a private-dataplane organization is refused */
-    it("refuses a user who belongs to a private-dataplane organization", async () => {
+    /** @scenario A user in a private-dataplane organization still routes to shared */
+    it("routes a user who belongs to a private-dataplane organization to the shared instance", async () => {
       const { getClickHouseClientForTenant } = await import(
         "../clickhouseClient"
       );
@@ -406,9 +411,7 @@ describe("ClickHouse routing via env vars", () => {
         data: { userId: user.id, organizationId, role: "MEMBER" },
       });
 
-      await expect(getClickHouseClientForTenant(user.id)).rejects.toThrow(
-        user.id,
-      );
+      expect(await getClickHouseClientForTenant(user.id)).toBe(sharedClient);
     });
   });
 

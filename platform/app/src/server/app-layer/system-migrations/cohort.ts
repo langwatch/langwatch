@@ -42,12 +42,12 @@
  * shared instance.
  *
  * What `userMigrationPassCohort` still excludes, there and only there, is a
- * private-dataplane MEMBER. That is a residency rule rather than a routing
- * gap: their identity events would land in the shared platform log while
- * their organization's own data stays on its private instance, and no
- * instance is the right answer for somebody who spans both. The resolver
- * refuses that case on its own account, so the exclusion is a backstop
- * rather than the only thing standing between us and a leak.
+ * private-dataplane MEMBER. That exclusion is now PACING, not correctness:
+ * the resolver routes every user tenant to the shared instance without
+ * consulting membership at all, so such a person has a perfectly good answer
+ * and would migrate like anybody else. Dropping the exclusion is a product
+ * call about backfilling those people, not a routing question - until it is
+ * made, they simply are not enrolled.
  *
  * SELF-HOSTED is paced per migration, at release time, by the migration's
  * own `runsAutomaticallyOnSelfHosted` declaration. There is no enrollment

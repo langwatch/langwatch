@@ -162,16 +162,22 @@ Feature: Private ClickHouse Routing
   # could not answer. A user is NOT resolved into an organization on the way
   # - somebody can be in several, and picking one would put their identity
   # history on an instance chosen by accident.
+  #
+  # User data always lands on the shared instance. What a user-tenanted event
+  # records is how somebody signs in, which is true of them before, across and
+  # after every organization they belong to - so membership does not enter
+  # into the routing at all.
 
   @integration
   Scenario: A user is a tenant in its own right
-    Given a user who belongs to no private-dataplane organization
+    Given a user
     When the routed client is resolved for that user as the tenant
     Then it answers the shared ClickHouse
     And the user is not resolved into any organization to get there
 
   @integration
-  Scenario: A user inside a private-dataplane organization is refused
+  Scenario: A user in a private-dataplane organization still routes to shared
     Given a user who is a member of an organization with a private ClickHouse
     When the routed client is resolved for that user as the tenant
-    Then the resolution is refused rather than falling back to the shared instance
+    Then it answers the shared ClickHouse
+    And their organization's private instance is not consulted
