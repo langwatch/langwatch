@@ -539,6 +539,15 @@ model SsoConnection {
   /// for a while - a boolean `allowsJit` beside it, kept in step by the
   /// fold - and they disagreed about the middle answer.
   arrivalPolicy       String    @default("refuse")
+  /// DEAD, AND STAYING FOR ONE RELEASE. Nothing reads or writes this; the
+  /// routing repository derives the same answer from `arrivalPolicy`. It is
+  /// declared so the schema still describes the table, and left in place so
+  /// the PREVIOUS release's pods — which select it by name on every
+  /// connection read — keep working through the rollout. Dropping it in the
+  /// release that stopped reading it would stop single sign-on routing and
+  /// the connection projection for the length of the deploy. Dropped by
+  /// `20260827120000_drop_sso_connection_allows_jit` in the next one.
+  allowsJit           Boolean   @default(false)
   /// When somebody CHOSE the policy above, and null while the registration
   /// default stands. A different fact from the policy rather than a second
   /// copy of it: a connection always has a behaviour, and separately
@@ -631,6 +640,35 @@ model SsoCredential {
 /// the one reader is the identity storage adapter, on the path that dials.
 /// The reader tolerates both forms, so this needs no backfill — but a pod
 /// without it cannot read a sealed row, so it must not be rolled back past.
+/// WHO OWNS A PROVED DOMAIN, as a row the database can refuse twice.
+///
+/// "First verifier owns" was enforced by reading `findDomainOwner` and then
+/// writing the fact — two different aggregates, so the per-connection queue
+/// never ordered them against each other, and `SsoConnection.verifiedDomains`
+/// is a `String[]` with only a GIN index behind it, which enforces nothing.
+/// Two organizations proving `acme.com` at the same moment both read "nobody
+/// owns it" and both committed; the sign-in router then picked between two
+/// live connections by planner order, so a member of one company could be
+/// handed to another company's identity provider — and with `arrivalPolicy`
+/// on `admit`, provisioned into it.
+///
+/// The legacy single-domain model had this: `Organization.ssoDomain` is
+/// `@unique`. The multi-domain rewrite dropped the guarantee, and self-serve
+/// proof is what made the race reachable by customers rather than by two
+/// operators working at once.
+///
+/// `domain` is the primary key, so the second writer loses on the constraint
+/// rather than on a check it raced. Written in the same transaction as the
+/// connection head, so the row and the array can never disagree.
+model SsoVerifiedDomain {
+  domain         String @id
+  connectionId   String
+  organizationId String
+
+  @@index([connectionId])
+  @@index([organizationId])
+}
+
 model SsoProvider {
   id             String  @id
   issuer         String

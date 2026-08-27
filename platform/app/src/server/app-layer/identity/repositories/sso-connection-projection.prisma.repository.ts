@@ -23,6 +23,12 @@ import type {
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
 
+/** A connection in one of these is gone, and gone connections own nothing. */
+const TERMINAL_STATES: readonly SsoConnectionLifecycleState[] = [
+  "DISCARDED",
+  "TORN_DOWN",
+];
+
 /**
  * The connection pipeline's projection store (D04, ADR-117 §5): the Postgres
  * `SsoConnection` head and its cursor, written under the queue's
@@ -133,12 +139,93 @@ export class PrismaSsoConnectionProjectionRepository
       createdAt: new Date(state.createdAtMs),
       updatedAt: new Date(state.updatedAtMs),
     };
-    await this.prisma.ssoConnection.upsert({
-      where: { id },
-      create: { id, ...columns },
-      update: columns,
+    // THE HEAD AND THE OWNERSHIP ROWS TOGETHER, or neither.
+    //
+    // `SsoVerifiedDomain` is what makes "first verifier owns" a rule the
+    // database enforces rather than a check two connections can race. It only
+    // does that if it is written with the array it mirrors: a domain in
+    // `verifiedDomains` with no ownership row would be a domain nobody owns,
+    // which is the state the whole table exists to make impossible.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ssoConnection.upsert({
+        where: { id },
+        create: { id, ...columns },
+        update: columns,
+      });
+      await this.projectDomainOwnership({ tx, connectionId: id, state });
     });
     await this.projectEngineProvider({ connectionId: id, state });
+  }
+
+  /**
+   * The ownership rows this connection's proved domains hold.
+   *
+   * The write is a plain insert rather than an upsert on purpose: the whole
+   * point of the row is that a SECOND connection inserting the same domain
+   * fails, which is how a race between two organizations proving `acme.com`
+   * is decided by the database instead of by whichever read happened first.
+   * The guard's refusal is still the sentence a customer reads; this is what
+   * makes the refusal true when two of them arrive at once.
+   *
+   * Rows this connection no longer holds are dropped — a withdrawn domain
+   * stops being owned, so the next organization to claim it can.
+   */
+  private async projectDomainOwnership({
+    tx,
+    connectionId,
+    state,
+  }: {
+    tx: Prisma.TransactionClient;
+    connectionId: string;
+    state: SsoConnectionState;
+  }): Promise<void> {
+    // A connection that is gone owns nothing. `findDomainOwner` already
+    // excludes the terminal states for this reason — holding a domain
+    // hostage after removal would make tearing a connection down something a
+    // customer could not undo, and the next organization to claim it could
+    // never win.
+    const held = TERMINAL_STATES.includes(state.state)
+      ? []
+      : state.verifiedDomains;
+
+    await tx.ssoVerifiedDomain.deleteMany({
+      where: { connectionId, domain: { notIn: held.length > 0 ? held : [""] } },
+    });
+    if (held.length === 0) return;
+
+    const existing = await tx.ssoVerifiedDomain.findMany({
+      where: { domain: { in: held } },
+      select: { domain: true, connectionId: true },
+    });
+    const ownedByUs = new Set(
+      existing
+        .filter((row) => row.connectionId === connectionId)
+        .map((row) => row.domain),
+    );
+    const ownedByAnother = existing.filter(
+      (row) => row.connectionId !== connectionId,
+    );
+    if (ownedByAnother.length > 0) {
+      // The guard should have refused this before the fact was ever
+      // appended, so reaching here means the two raced. Losing loudly is the
+      // point: the alternative is two connections holding one domain and the
+      // router picking by planner order.
+      throw new Error(
+        `sso_domain_owned_elsewhere: ${connectionId} folded ${ownedByAnother
+          .map((row) => row.domain)
+          .join(", ")}, already owned by another connection`,
+      );
+    }
+
+    const missing = held.filter((domain) => !ownedByUs.has(domain));
+    if (missing.length === 0) return;
+    await tx.ssoVerifiedDomain.createMany({
+      data: missing.map((domain) => ({
+        domain,
+        connectionId,
+        organizationId: state.organizationId,
+      })),
+    });
   }
 
   /**

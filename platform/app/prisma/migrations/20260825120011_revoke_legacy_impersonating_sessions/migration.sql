@@ -17,4 +17,21 @@
 -- back to. A deleted session row cannot be restored, and the operators it
 -- belonged to re-impersonate rather than recover it.
 
-DELETE FROM "Session" WHERE "impersonating" IS NOT NULL;
+-- GUARDED, because this migration can arrive at a database that no longer has
+-- the column. An earlier numbering of this branch carried
+-- `20260825050002_drop_session_impersonating`, which ran on developer
+-- databases before the rebase renumbered the branch and removed it.
+-- `20260826120003_restore_session_impersonating_for_one_release` exists to
+-- repair exactly those databases — and it sorts AFTER this one, so an
+-- unguarded DELETE here failed with "column does not exist" and aborted the
+-- run before the repair could execute. The repair was unreachable on every
+-- database that needed it.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'Session' AND column_name = 'impersonating'
+  ) THEN
+    DELETE FROM "Session" WHERE "impersonating" IS NOT NULL;
+  END IF;
+END $$;

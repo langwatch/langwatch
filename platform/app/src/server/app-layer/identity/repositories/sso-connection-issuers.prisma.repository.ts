@@ -42,13 +42,39 @@ export class PrismaSsoConnectionIssuers
     private readonly now: () => number = Date.now,
   ) {}
 
+  /**
+   * The one connection this issuer names, or none.
+   *
+   * AN ISSUER IS NOT A CONNECTION, and `find` pretended it was. Two
+   * organizations can legitimately register the same issuer — a shared
+   * multi-tenant endpoint like Entra's `/common/v2.0` is the ordinary case —
+   * and `SsoProvider.issuer` carries no uniqueness because of it. Taking the
+   * first row of an unordered `findMany` meant org B's returning member was
+   * looked up under org A's connection, and which one that was could change
+   * between deploys.
+   *
+   * SO AMBIGUITY ANSWERS NOTHING. A null here is "no rewrite", which the
+   * caller already handles as no-match; the alternative was a confident
+   * wrong answer that resolved somebody onto another tenant's account row.
+   * Refusing to guess costs a sign-in that has to name its connection —
+   * which the callback route does — and a wrong guess costs a stranger's
+   * session.
+   */
   async providerIdForIssuer({
     issuer,
   }: {
     issuer: string;
   }): Promise<string | null> {
     const rows = await this.rows();
-    return rows.find((row) => row.issuer === issuer)?.providerId ?? null;
+    const matches = rows.filter((row) => row.issuer === issuer);
+    if (matches.length === 1) return matches[0]?.providerId ?? null;
+    if (matches.length > 1) {
+      logger.warn(
+        { issuer, connections: matches.length },
+        "more than one connection registers this issuer; refusing to pick one",
+      );
+    }
+    return null;
   }
 
   async registeredIssuerFor({

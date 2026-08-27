@@ -32,5 +32,21 @@ WHERE "arrivalPolicy" IS NULL;
 ALTER TABLE "SsoConnection" ALTER COLUMN "arrivalPolicy" SET DEFAULT 'refuse';
 ALTER TABLE "SsoConnection" ALTER COLUMN "arrivalPolicy" SET NOT NULL;
 
--- 3. And the field that could disagree goes.
-ALTER TABLE "SsoConnection" DROP COLUMN "allowsJit";
+-- 3. And the field that could disagree stops being written.
+--
+-- IT IS NOT DROPPED HERE, and the reason is the same one
+-- `20260826120003_restore_session_impersonating_for_one_release` spells out
+-- for `Session.impersonating`: `prisma migrate deploy` runs at container
+-- start, so the first pod of a new release would drop the column while the
+-- PREVIOUS release's pods are still selecting it. Those pods read the
+-- connection with `findUnique` and no `select`, so Prisma emits an explicit
+-- column list including `allowsJit` — every read fails with "column does not
+-- exist", which is single sign-on routing and the connection projection both
+-- stopping for the length of the rollout, with the projection's failed
+-- applies stalling the fold behind them.
+--
+-- So this release stops READING it and leaves it in place, defaulted so a
+-- previous-release pod still writing one gets a row the new code ignores. The
+-- drop is `20260827120000_drop_sso_connection_allows_jit`, one release later,
+-- which is the same expand-then-contract this wave already applies.
+ALTER TABLE "SsoConnection" ALTER COLUMN "allowsJit" SET DEFAULT false;
