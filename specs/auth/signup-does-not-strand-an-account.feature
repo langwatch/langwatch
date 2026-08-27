@@ -73,6 +73,30 @@ Feature: Signing up never strands an account
   # Sign-in lowercases the address on every lookup, so an account stored as
   # typed, capitals and all, is one that sign-in can never find, no matter the
   # password. Autocapitalised addresses locked people out this way.
+  # Signing up with a passkey is two server calls with a browser prompt
+  # between them, and the account is written in the second. Nothing spans
+  # them, so a failure after that write leaves a User row holding the
+  # placeholder credential and no passkey: an account with no way in, that
+  # nobody has ever signed into. Treating that row as "registered" burned the
+  # address — sign-up called it taken while the sign-in screen said no account
+  # existed, and both were reading the same row. The recovery for a write that
+  # cannot be undone is one that can be repeated.
+  @unit
+  Scenario: A sign-up that died mid-ceremony leaves the address usable
+    Given a passkey sign-up for my address wrote the account and then failed
+    When I sign up with a passkey for that address again
+    Then the ceremony starts rather than telling me the address is taken
+    And finishing it signs me in to the account the first attempt left behind
+    And I am counted as having signed up once, not twice
+
+  # The other side of that boundary, and the reason the first one is safe:
+  # an account anybody can reach holds a credential, and is still refused.
+  @unit
+  Scenario: An address whose account can be signed into is still refused
+    Given an account for that address holds a password, a passkey, or a provider
+    When somebody starts a passkey sign-up for it
+    Then the ceremony is refused before any prompt opens
+
   @unit
   Scenario: A capitalised email creates an account sign-in can find
     When I sign up with "Joel.During@example.com"

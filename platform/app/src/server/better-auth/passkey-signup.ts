@@ -89,15 +89,94 @@ function requireEmail(context: string | null | undefined): string {
   return email;
 }
 
+/**
+ * A credential row somebody could actually present, from either branch.
+ *
+ * `provider` decides it rather than `password`: a row for an identity
+ * provider carries no password by design and is still a way in, while a
+ * `credential` row with a null password is the one shape that is not — it is
+ * what `createPasskeyUser` writes before the passkey lands beside it, and on
+ * its own it authenticates nobody (sign-in hashes a dummy and refuses it
+ * exactly as it refuses a missing row).
+ */
+function isUsableCredential(row: {
+  provider: string;
+  password: string | null;
+}): boolean {
+  return row.provider !== "credential" || row.password !== null;
+}
+
+/**
+ * Whether this address already has an account somebody can sign into.
+ *
+ * NOT "is there a User row", and the difference is the dead end this closes.
+ * A passkey sign-up is TWO calls a network round trip apart — `resolveUser`
+ * before the ceremony, `afterVerification` after it — and the account is
+ * written between them, in a transaction of its own that nothing spanning the
+ * ceremony can roll back. A failure after that write leaves a User row whose
+ * only credential is the null-password placeholder, with no passkey beside
+ * it: an account with no way in, that nobody has ever signed into. Reading
+ * "a row exists" as "registered" turned that residue into a permanent
+ * refusal — sign-up said the address was taken while the sign-in screen told
+ * the same person no account existed. Neither answer was wrong. They were
+ * answering different questions, and only one of them is the question the
+ * caller can act on.
+ *
+ * So this asks that one: is there a CREDENTIAL here. Both branches are read,
+ * because a user whose backfill has finalized keeps theirs in
+ * `AccountCredential` rather than `Account`, and a check that saw only one
+ * would refuse half the population for the wrong reason.
+ *
+ * ## Why this does not widen the takeover surface
+ *
+ * The guard above exists to stop a stranger attaching their passkey to
+ * somebody else's account by naming its address. It still does. Every account
+ * anybody can reach holds a credential by definition, so every account worth
+ * stealing is still refused; what became adoptable is only an account that
+ * has never been signed into and never could be.
+ *
+ * That set is exactly this file's own residue, which is what makes the
+ * relaxation safe rather than merely convenient. Nothing else in the product
+ * makes a credential-less user: `createCredentialUser` always writes a
+ * password, a social sign-up always writes its provider's account, an
+ * invitation creates no User row at all (`OrganizationInvite` is keyed by
+ * address and redeemed after sign-in), and SCIM provisioning has models but
+ * no write path. If that ever stops being true — a provisioning route that
+ * pre-creates members, say — this predicate is where it has to be reckoned
+ * with, because such a row WOULD be adoptable by a stranger.
+ */
 async function refuseIfRegistered(email: string): Promise<void> {
   // Case-insensitive for the same reason `user.register` is: rows written
   // before addresses were stored lowercased may carry capitals, and a
   // case-twin beside one is two Users answering for one person.
   const existing = await prisma.user.findFirst({
     where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true },
+    select: {
+      id: true,
+      accounts: { select: { provider: true, password: true } },
+      accountCredentials: { select: { provider: true, password: true } },
+      // One is enough: the question is only whether any exists.
+      passkeys: { select: { id: true }, take: 1 },
+    },
   });
   if (!existing) return;
+
+  const signable =
+    existing.passkeys.length > 0 ||
+    existing.accounts.some(isUsableCredential) ||
+    existing.accountCredentials.some(isUsableCredential);
+
+  if (!signable) {
+    // The recovery, and the one line that says it happened. Without it a
+    // resumed sign-up is indistinguishable from a first one in the logs,
+    // which is the difference between knowing this path is exercised and
+    // guessing at it from a support ticket.
+    logger.info(
+      { userId: existing.id },
+      "an address whose account holds no credential is being resumed rather than refused; an earlier ceremony did not finish",
+    );
+    return;
+  }
 
   throw new APIError("BAD_REQUEST", {
     code: PASSKEY_SIGNUP_EMAIL_TAKEN,

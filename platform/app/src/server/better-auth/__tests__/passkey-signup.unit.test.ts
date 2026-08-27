@@ -45,11 +45,36 @@ const fakeContext = () => {
 const resolveUser = passkeySignUpRegistration.resolveUser;
 const afterVerification = passkeySignUpRegistration.afterVerification;
 
+/**
+ * An account somebody can actually sign into — the shape the guard refuses.
+ * A password is the least interesting way to hold a credential and the
+ * easiest to write down; the passkey and identity-provider variants are
+ * exercised separately below.
+ */
+const signable = (id: string) => ({
+  id,
+  accounts: [{ provider: "credential", password: "argon2id$..." }],
+  accountCredentials: [],
+  passkeys: [],
+});
+
+/**
+ * The residue of a ceremony that died between writing the account and
+ * writing the passkey: the placeholder credential row, holding no password,
+ * and nothing else. Nobody has ever signed into this and nobody could.
+ */
+const stranded = (id: string) => ({
+  id,
+  accounts: [{ provider: "credential", password: null }],
+  accountCredentials: [],
+  passkeys: [],
+});
+
 describe("given passkey sign-up, which creates an account with no session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findFirst.mockResolvedValue(null);
-    createPasskeyUser.mockResolvedValue({ id: "user_1" });
+    createPasskeyUser.mockResolvedValue({ id: "user_1", created: true });
     requestVerification.mockResolvedValue(void 0);
   });
 
@@ -62,7 +87,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
      */
     /** @scenario A passkey is never registered against an address that already has an account */
     it("refuses to start a ceremony for somebody else's address", async () => {
-      findFirst.mockResolvedValue({ id: "someone_else" });
+      findFirst.mockResolvedValue(signable("someone_else"));
 
       await expect(
         resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
@@ -73,7 +98,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
     it("refuses again after the ceremony, in case it was taken in between", async () => {
       const { ctx } = fakeContext();
-      findFirst.mockResolvedValue({ id: "someone_else" });
+      findFirst.mockResolvedValue(signable("someone_else"));
 
       await expect(
         afterVerification({ ctx, context: "victim@corp.com" }),
@@ -82,7 +107,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     });
 
     it("matches the address whatever case it was stored in", async () => {
-      findFirst.mockResolvedValue({ id: "someone_else" });
+      findFirst.mockResolvedValue(signable("someone_else"));
 
       await resolveUser({
         ctx: fakeContext().ctx,
@@ -94,6 +119,89 @@ describe("given passkey sign-up, which creates an account with no session", () =
           where: { email: { equals: "victim@corp.com", mode: "insensitive" } },
         }),
       );
+    });
+  });
+
+  /**
+   * The guard has to tell two things apart that used to look identical: an
+   * account, and the wreckage of a ceremony that never made one. Both are a
+   * User row for the address. Only one of them is somebody's.
+   */
+  describe("when the address has an account nobody can sign into", () => {
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
+    it("lets the ceremony start again rather than calling the address taken", async () => {
+      findFirst.mockResolvedValue(stranded("half_made"));
+
+      const resolved = await resolveUser({
+        ctx: fakeContext().ctx,
+        context: "someone@example.com",
+      });
+
+      expect(resolved.name).toBe("someone@example.com");
+    });
+
+    /** @scenario A sign-up that died mid-ceremony leaves the address usable */
+    it("finishes onto the row the first attempt left behind", async () => {
+      const { ctx } = fakeContext();
+      findFirst.mockResolvedValue(stranded("half_made"));
+      createPasskeyUser.mockResolvedValue({ id: "half_made", created: false });
+
+      const result = await afterVerification({
+        ctx,
+        context: "someone@example.com",
+      });
+
+      expect(result.userId).toBe("half_made");
+    });
+
+    /**
+     * The placeholder is the only credential row that means nothing. A passkey
+     * beside it means the first attempt DID finish, and the address is taken
+     * in the way that matters — this is the boundary the takeover guard now
+     * sits on, so it is asserted from both sides.
+     */
+    /** @scenario An address whose account can be signed into is still refused */
+    it("refuses once a passkey has landed against it", async () => {
+      findFirst.mockResolvedValue({
+        ...stranded("finished"),
+        passkeys: [{ id: "passkey_1" }],
+      });
+
+      await expect(
+        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
+    });
+
+    it("refuses an account that signs in through an identity provider", async () => {
+      findFirst.mockResolvedValue({
+        ...stranded("sso_user"),
+        accounts: [{ provider: "okta", password: null }],
+      });
+
+      await expect(
+        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
+    });
+
+    /**
+     * A user whose backfill has finalized keeps their credential on the
+     * identity branch instead. Reading only `Account` would have called every
+     * one of them unregistered — the failure mode this half of the predicate
+     * exists to prevent, and the one worth pinning because the population it
+     * would have exposed grows every time the migration finalizes somebody.
+     */
+    it("refuses an account whose credential lives on the identity branch", async () => {
+      findFirst.mockResolvedValue({
+        ...stranded("latched_user"),
+        accounts: [],
+        accountCredentials: [
+          { provider: "credential", password: "argon2id$..." },
+        ],
+      });
+
+      await expect(
+        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
     });
   });
 
