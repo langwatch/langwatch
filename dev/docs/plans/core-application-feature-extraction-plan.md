@@ -28,8 +28,9 @@ separate reviewed batches after this frontend integration.
 
 Frontend checkpoint: `1d3e93022f` owns the Prompt boundary and lint,
 `897622d6b0` owns the exact shell and Storybook, and `cad35bcd19` contains only
-Oxfmt changes to touched legacy callers. Integration with the committed API
-checkpoint is in progress.
+Oxfmt changes to touched legacy callers. The combined frontend/API integration
+is committed at `13a0805bf3`; the operational hand-off is committed at
+`8f2986764e` and updated in the working tree as review facts change.
 
 Integration note for the concurrent Agent UI work: browser RPC ports and
 adapters belong under `apps/ui/src/platform/agent`, not directly under
@@ -65,6 +66,10 @@ Next hand-off:
   metrics to frontend lint before those capabilities spread.
 - Promote the first genuine app-independent Design System Pattern, then add
   Storybook Vitest/browser interaction coverage for interactive stories.
+- Review and commit the UI-local architecture records under `apps/ui/adrs`.
+- Keep Agent and Secret/API work in separate migration-review batches. The
+  applied Agent repair is incomplete, and the Secret cut still has live caller,
+  OpenAPI, baseline and real-auth coverage blockers named in the hand-off.
 
 ## Progress
 
