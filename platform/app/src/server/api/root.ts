@@ -18,7 +18,7 @@ import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
-import { codingAgentsRouter } from "./routers/codingAgents";
+import { codingAgentsRouter } from "./routers/coding-agent";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";

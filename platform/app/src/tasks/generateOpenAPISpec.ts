@@ -1,4 +1,4 @@
-import { SCIM_SPEC_OPTIONS } from "~/runtime/app/features/scim";
+import { SCIM_SPEC_OPTIONS } from "@langwatch/enterprise-scim-server";
 import { app as scimApp } from "~/server/enterprise/scim/routes";
 import { generateApiSpecs } from "@langwatch/api";
 import deepmerge from "deepmerge";
