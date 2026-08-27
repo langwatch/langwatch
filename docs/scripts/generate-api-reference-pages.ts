@@ -218,11 +218,25 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query simulation run results. List runs, get batch summaries, and retrieve individual run details.",
   },
   {
+    name: "Run Plans",
+    dirName: "run-plans",
+    pathPrefixes: ["/api/v1/run-plans"],
+    overviewDescription:
+      "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when nothing answers. List, read, run and archive run plans.",
+  },
+  {
+    name: "Test Suites",
+    dirName: "test-suites",
+    pathPrefixes: ["/api/v1/test-suites"],
+    overviewDescription:
+      "Organise agent tests. A test suite is a folder of scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.",
+  },
+  {
     name: "Suites",
     dirName: "suites",
     pathPrefixes: ["/api/suites"],
     overviewDescription:
-      "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs.",
+      "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs. Deprecated: this family is a frozen alias. New integrations use Run Plans (/api/v1/run-plans) and Test Suites (/api/v1/test-suites).",
   },
   {
     name: "Agents",
