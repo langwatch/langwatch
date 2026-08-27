@@ -19,7 +19,6 @@ import {
   KeyRound,
   Link2,
   Lock,
-  type LucideIcon,
   MailX,
   Network,
   RefreshCw,
@@ -27,8 +26,10 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  type LucideIcon,
   UserCog,
   Users,
+  UserSearch,
   UsersRound,
   Workflow,
 } from "lucide-react";
@@ -360,6 +361,11 @@ export function backofficeGroup(): SettingsMenuGroup {
         label: "Single Sign-On",
         href: "/ops/backoffice/sso-connections",
         icon: ShieldCheck,
+      },
+      {
+        label: "Identity Lookup",
+        href: "/ops/backoffice/identity-lookup",
+        icon: UserSearch,
       },
       {
         label: "Bug Reports",
