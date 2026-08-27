@@ -13,7 +13,10 @@ import {
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import type { ResultsFilter } from "../atom.types";
-import { ResultAtomsClickHouseRepository } from "../result-atoms.clickhouse.repository";
+import {
+  MAX_TREND_POINTS,
+  ResultAtomsClickHouseRepository,
+} from "../result-atoms.clickhouse.repository";
 
 const tenantId = `test-atoms-${nanoid()}`;
 const otherTenantId = `${tenantId}-other`;
@@ -420,8 +423,8 @@ describe("the cost of an atom", () => {
      * over 493 distinct traces, so a cost summed over that column instead of
      * over the trace map would report roughly three times the real spend.
      *
-     * @scenario "A trace listed twice on a run is counted once"
      */
+    /** @scenario "A trace listed twice on a run is counted once" */
     it("counts that trace once", async () => {
       const setId = `set-${nanoid(6)}`;
       await insertRows([
@@ -450,8 +453,8 @@ describe("the cost of an atom", () => {
      * never measured. Telling the two apart is what stops the page reporting a
      * total that looks complete and is not.
      *
-     * @scenario "A run that spent nothing reads as zero, not as unknown"
      */
+    /** @scenario "A run that spent nothing reads as zero, not as unknown" */
     it("reads as zero and not as unknown", async () => {
       const setId = `set-${nanoid(6)}`;
       await insertRows([
@@ -642,8 +645,8 @@ describe("filters", () => {
      * would resolve a finished run to whichever old version still said it was
      * running, which is a stale row that looks entirely plausible.
      *
-     * @scenario "A filter on status keeps only runs of that status"
      */
+    /** @scenario "A filter on status keeps only runs of that status" */
     it("keeps only the failed run, reading the latest version of each", async () => {
       const setId = `set-${nanoid(6)}`;
       const batchRunId = `batch-${nanoid(6)}`;
@@ -769,6 +772,73 @@ describe("aggregateGroups", () => {
       expect(Number(failedOnly?.Atoms)).toBe(1);
       expect(Number(failedOnly?.Passed)).toBe(0);
       expect(Number(failedOnly?.FailingScenarios)).toBe(1);
+    });
+  });
+});
+
+describe("aggregateTrend", () => {
+  describe("given a plan with more runs in the period than a sparkline draws", () => {
+    /** @scenario "A sparkline asks the database only for the points it draws" */
+    it("returns only the points drawn, and the most recent of them", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const runCount = MAX_TREND_POINTS + 6;
+      // One batch per hour, oldest first, so the newest batches are the ones
+      // with the largest index.
+      const batchRunIds = Array.from(
+        { length: runCount },
+        (_, index) => `batch-${String(index).padStart(3, "0")}-${nanoid(4)}`,
+      );
+
+      await insertRows(
+        batchRunIds.map((batchRunId, index) =>
+          makeRow({
+            batchRunId,
+            scenarioSetId: setId,
+            startedAt: new Date(now - (runCount - index) * 60 * 60 * 1000),
+          }),
+        ),
+      );
+
+      const rows = await repo.aggregateTrend({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        groupBy: "plan",
+      });
+
+      expect(rows).toHaveLength(MAX_TREND_POINTS);
+      expect(new Set(rows.map((row) => row.TrendKey))).toEqual(
+        new Set(batchRunIds.slice(-MAX_TREND_POINTS)),
+      );
+    });
+  });
+
+  describe("given a plan with fewer runs than a sparkline draws", () => {
+    /** @scenario "A group carries one trend point per run" */
+    it("returns one point per run", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const batchRunIds = ["a", "b", "c"].map(
+        (suffix) => `batch-${suffix}-${nanoid(4)}`,
+      );
+
+      await insertRows(
+        batchRunIds.map((batchRunId, index) =>
+          makeRow({
+            batchRunId,
+            scenarioSetId: setId,
+            status: index === 1 ? "FAILED" : "SUCCESS",
+            startedAt: new Date(now - (3 - index) * 60 * 60 * 1000),
+          }),
+        ),
+      );
+
+      const rows = await repo.aggregateTrend({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        groupBy: "plan",
+      });
+
+      expect(rows).toHaveLength(3);
+      const byKey = new Map(rows.map((row) => [row.TrendKey, row]));
+      expect(Number(byKey.get(batchRunIds[1]!)?.Passed)).toBe(0);
+      expect(Number(byKey.get(batchRunIds[1]!)?.Settled)).toBe(1);
     });
   });
 });

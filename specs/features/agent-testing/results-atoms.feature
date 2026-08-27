@@ -30,12 +30,18 @@ Feature: The results atom
     And it carries the id of the run and the number of that run
     And it carries the id and the name of the scenario
 
-  @integration
-  Scenario: An atom carries the folder and the labels of its scenario
-    Given a scenario in a suite and with two labels
-    When the atom of a run of that scenario is read
-    Then it carries the id of the suite as its folder
-    And it carries both labels
+  @unit
+  Scenario: An atom names its scenario and leaves the folder and the labels out
+    Given a run of a scenario that sits in a suite and carries two labels
+    When the atom of that run is read
+    Then it carries the id of the scenario
+    And it carries neither the folder nor the labels
+
+    Labels and folder membership live in Postgres and the run row holds
+    neither, so joining them onto every atom would put a second store in the
+    hot path of a read that returns one row per scenario run. They are filter
+    inputs instead, resolved to scenario ids before the query runs, and the
+    page names a scenario from the id the atom already carries.
 
   @integration
   Scenario: An atom carries the target the run was pointed at
@@ -212,6 +218,29 @@ Feature: The results atom
     Then the group of that plan carries three trend points
     And they read oldest first
     And each point carries the pass rate of its run
+
+  @integration
+  Scenario: A sparkline asks the database only for the points it draws
+    Given a plan with more runs inside the period than a sparkline draws
+    When the trend of that period is read grouped by run plan
+    Then the database returns no more points for that plan than a sparkline draws
+    And the points it returns are the most recent runs of the plan
+
+    A plan run twice a day for 30 days holds 60 runs and a sparkline draws 14,
+    so trimming after the rows arrive sent 46 rows per plan across the wire to
+    be dropped. The Results tab is the default view of the page, so this is the
+    common path and not an occasional read.
+
+  @unit
+  Scenario: A run plan bar folds a whole run, a scenario bar folds one execution
+    Given the run plan grouping and the scenario grouping
+    When each names the grain of one sparkline bar
+    Then the run plan grouping folds a whole run
+    And the scenario and target groupings fold one execution
+
+    A plan row spans many scenarios, so a single scenario's verdict says
+    nothing about the plan. A scenario row or a target row already names one
+    thing, so each bar is one execution of it.
 
   # --- Paging the atom list ---
 

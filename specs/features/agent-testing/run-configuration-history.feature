@@ -53,7 +53,7 @@ Feature: The previous configurations of a scope, read back from the runs
     Then the newer configuration is listed first
 
   @integration
-  Scenario: The note is never part of a configuration
+  Scenario: The note text is never part of a configuration
     Given two runs of one plan that share every setting and carry different notes
     When the configurations of that scope are read
     Then one configuration is listed
@@ -110,3 +110,16 @@ Feature: The previous configurations of a scope, read back from the runs
     part of the configuration key, so taking them from the plan row cannot
     change which configurations are listed, and without them a picked entry
     would refill the dialog with a prompt target that lost its bindings.
+
+  @integration
+  Scenario: A configuration remembers that it takes a note
+    Given a run plan run once with a note and once without one
+    When the list of previous configurations is read
+    Then the entry says a note was used
+    And it carries no note text
+
+  @integration
+  Scenario: A configuration that never took a note says so
+    Given a run plan whose runs carried no note
+    When the list of previous configurations is read
+    Then the entry says no note was used

@@ -308,11 +308,29 @@ export class ResultAtomsClickHouseRepository {
   }
 
   /**
-   * The sparkline points of every group, at the grain that grouping calls for.
+   * The sparkline points of every group, at the grain that grouping calls for,
+   * trimmed to the points a sparkline actually draws.
    *
    * Read whole rather than per group: one aggregate over the window is cheaper
    * than one query per row of the table, and the result is bounded by the run
    * count, not the atom count.
+   *
+   * The trim happens HERE and not after the rows land. A plan grouping keys a
+   * point per batch, so a plan run twice a day for 30 days sent 60 rows for the
+   * 14 a sparkline shows; the Results tab is now the default view of the page,
+   * so those rows crossed the wire on the common path to be dropped. The newest
+   * are the ones kept, because a sparkline is read to see where a plan is
+   * heading.
+   *
+   * `LIMIT n BY` is safe in this position and would not be one level down. The
+   * warning it carries is about running it against the table, where it
+   * materialises every selected column for whole granules and the heavy
+   * payload columns make that an out-of-memory risk. Here it runs over the
+   * output of a GROUP BY: five scalar columns, one row per group and trend key,
+   * with no granule to materialise.
+   *
+   * The caller re-sorts and re-slices, which is now a no-op and stays as the
+   * guard for a caller that asks for a different cap.
    */
   async aggregateTrend({
     filter,
@@ -327,19 +345,33 @@ export class ResultAtomsClickHouseRepository {
       `SELECT
          GroupKey,
          TrendKey,
-         toString(min(RunAt))                    AS RunAt,
-         toString(countIf(Outcome = 'passed'))   AS Passed,
-         toString(countIf(Outcome != 'pending')) AS Settled
+         toString(RunAtMs)  AS RunAt,
+         toString(Passed)   AS Passed,
+         toString(Settled)  AS Settled
        FROM (
          SELECT
-           ${groupKeyExpr(groupBy)} AS GroupKey,
-           ${trendKeyExpr(groupBy)} AS TrendKey,
-           ${ATOM_SORT_KEY} AS RunAt,
-           ${OUTCOME_EXPR} AS Outcome
-         ${atomScopeSql(filters)}
+           GroupKey,
+           TrendKey,
+           min(RunAtMs)                   AS RunAtMs,
+           countIf(Outcome = 'passed')    AS Passed,
+           countIf(Outcome != 'pending')  AS Settled
+         FROM (
+           SELECT
+             ${groupKeyExpr(groupBy)} AS GroupKey,
+             ${trendKeyExpr(groupBy)} AS TrendKey,
+             ${ATOM_SORT_KEY} AS RunAtMs,
+             ${OUTCOME_EXPR} AS Outcome
+           ${atomScopeSql(filters)}
+         )
+         GROUP BY GroupKey, TrendKey
        )
-       GROUP BY GroupKey, TrendKey`,
-      { tenantId: filter.projectId, ...filters.params },
+       ORDER BY GroupKey ASC, RunAtMs DESC, TrendKey DESC
+       LIMIT {atomTrendPoints:UInt32} BY GroupKey`,
+      {
+        tenantId: filter.projectId,
+        ...filters.params,
+        atomTrendPoints: String(MAX_TREND_POINTS),
+      },
     );
   }
 

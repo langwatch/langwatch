@@ -37,6 +37,8 @@ function row(
     SimulatorModel: "",
     JudgeModel: "",
     Parameters: "",
+    // The flag saying a note was taken, never the note. Off by default.
+    UsesNote: "0",
     LastRunAtMs: String(LAST_RUN_MS),
     ...overrides,
   };

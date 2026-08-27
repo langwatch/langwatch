@@ -289,7 +289,7 @@ type GroupTitles =
   | { kind: Exclude<ResultsGroupBy, "scenario">; plans: PlanIndex };
 
 const runKey = (setId: string, batchRunId: string): string =>
-  `${setId} ${batchRunId}`;
+  `${setId}\0${batchRunId}`;
 
 /**
  * How a set id reads when no suite owns it.

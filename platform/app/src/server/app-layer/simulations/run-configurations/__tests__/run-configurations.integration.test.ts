@@ -321,8 +321,8 @@ describe("Feature: the previous configurations of a scope", () => {
   });
 
   describe("given two runs of one plan that differ only by their note", () => {
-    /** @scenario "The note is never part of a configuration" */
-    it("lists one configuration and carries no note on it", async () => {
+    /** @scenario "The note text is never part of a configuration" */
+    it("lists one configuration and carries no note text on it", async () => {
       const suiteId = `suite-${nanoid()}`;
       const scenarioId = `scenario-${nanoid()}`;
 
@@ -345,6 +345,50 @@ describe("Feature: the previous configurations of a scope", () => {
       const served = JSON.stringify(entries);
       expect(served).not.toContain("before the refactor");
       expect(served).not.toContain("after the refactor");
+    });
+  });
+
+  describe("given a plan whose runs carried a note", () => {
+    /** @scenario "A configuration remembers that it takes a note" */
+    it("says a note was used, and says so on a run that skipped one", async () => {
+      const suiteId = `suite-${nanoid()}`;
+      const scenarioId = `scenario-${nanoid()}`;
+
+      await runBatch({
+        suiteId,
+        scenarioIds: [scenarioId],
+        note: "checking the stricter judge",
+        runAt: NOW - 3 * HOUR_MS,
+      });
+      // The newest run skipped the note. The plan still takes one.
+      await runBatch({
+        suiteId,
+        scenarioIds: [scenarioId],
+        runAt: NOW - HOUR_MS,
+      });
+
+      const entries = await readConfigurations([plan({ id: suiteId })]);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.usesNote).toBe(true);
+    });
+  });
+
+  describe("given a plan whose runs carried no note", () => {
+    /** @scenario "A configuration that never took a note says so" */
+    it("says no note was used", async () => {
+      const suiteId = `suite-${nanoid()}`;
+
+      await runBatch({
+        suiteId,
+        scenarioIds: [`scenario-${nanoid()}`],
+        runAt: NOW - HOUR_MS,
+      });
+
+      const entries = await readConfigurations([plan({ id: suiteId })]);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.usesNote).toBe(false);
     });
   });
 

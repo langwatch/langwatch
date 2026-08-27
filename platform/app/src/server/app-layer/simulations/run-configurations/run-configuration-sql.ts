@@ -7,7 +7,10 @@
  * parameters beside it. Nothing needs a new column and nothing needs a
  * migration.
  *
- * The run NOTE sits in the same blob and is read by none of these on purpose.
+ * The run NOTE sits in the same blob and no expression here reads it. One
+ * expression answers WHETHER a run carried one, which is a different question:
+ * a run plan that takes a note opens its note field ready on the next run, and
+ * the text itself changes every run.
  *
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
@@ -55,3 +58,12 @@ export const RUN_PARAMETERS_EXPR = `JSONExtractRaw(ifNull(Metadata, '{}'), 'para
  * pair from ever reading as a bare ':'.
  */
 export const HAS_TARGET_CLAUSE = `AND JSONExtractString(${LANGWATCH_METADATA}, 'targetReferenceId') != ''`;
+
+/**
+ * Whether the run carried a note, as 1 or 0. It never reads the note.
+ *
+ * A run plan that took a note last time takes one again, so the dialog opens
+ * the note block expanded and empty. The text belongs to one run and is
+ * carried over by nothing.
+ */
+export const HAS_NOTE_EXPR = `JSONExtractString(ifNull(Metadata, '{}'), 'note') != ''`;

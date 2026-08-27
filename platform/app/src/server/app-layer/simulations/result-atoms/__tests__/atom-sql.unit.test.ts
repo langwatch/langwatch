@@ -165,7 +165,9 @@ describe("the grain of a grouping", () => {
     /**
      * A plan row covers many scenarios, so one scenario's verdict says nothing
      * about the plan and a bar has to fold a whole run.
+     *
      */
+    /** @scenario "A run plan bar folds a whole run, a scenario bar folds one execution" */
     it("draws one sparkline bar per run", () => {
       expect(trendKeyExpr("plan")).toBe("BatchRunId");
       expect(groupKeyExpr("plan")).toBe("ScenarioSetId");
@@ -173,6 +175,7 @@ describe("the grain of a grouping", () => {
   });
 
   describe("when grouping by scenario or by target", () => {
+    /** @scenario "A run plan bar folds a whole run, a scenario bar folds one execution" */
     it("draws one sparkline bar per execution", () => {
       expect(trendKeyExpr("scenario")).toBe("ScenarioRunId");
       expect(trendKeyExpr("target")).toBe("ScenarioRunId");

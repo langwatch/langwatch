@@ -7,7 +7,9 @@
  * share a plan name and differ by parameters or repeat count alone.
  *
  * The run NOTE is not here. It is not part of a configuration, is never
- * carried over, and is never listed.
+ * carried over, and is never listed. `usesNote` is not the note: it says only
+ * that a run of this configuration carried one, which is what tells the dialog
+ * to open the note block ready and empty.
  *
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
@@ -50,6 +52,13 @@ export interface RunConfigurationEntry {
   configuration: RunConfiguration;
   /** The parameter values this configuration ran with. */
   runParameters: RunParameterValues;
+  /**
+   * Whether a run of this configuration carried a note.
+   *
+   * A run plan that takes a note takes one every run, and the text changes
+   * every run, so the fact is worth remembering and the text is not.
+   */
+  usesNote: boolean;
   /** When the newest run of this configuration started. */
   lastRunAt: Date;
 }

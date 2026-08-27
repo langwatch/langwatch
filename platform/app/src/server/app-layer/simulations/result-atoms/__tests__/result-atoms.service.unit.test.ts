@@ -89,9 +89,8 @@ describe("getOverview", () => {
      * The person who opens this page to check on a plan they are worried about
      * is exactly the person whose plan has been quiet, so dropping it is the
      * opposite of what they came for.
-     *
-     * @scenario "The overview groups by run plan"
      */
+    /** @scenario "The overview groups by run plan" */
     it("still lists the plan, reading as nothing in the period", async () => {
       const ranSuite = { id: "suite-ran", name: "Checkout", slug: "checkout" };
       const quietSuite = {
@@ -143,9 +142,8 @@ describe("getOverview", () => {
     /**
      * The denominator is given, never inferred, so the page can say "across 4
      * of 6 runs" instead of printing a total that looks complete.
-     *
-     * @scenario "The overview says how many atoms have no known cost"
      */
+    /** @scenario "The overview says how many atoms have no known cost" */
     it("states its own coverage alongside the total", async () => {
       const service = new ResultAtomsService(
         makeRepo({
@@ -272,9 +270,8 @@ describe("getOverview", () => {
     /**
      * Labels live in Postgres and the run row carries none, so they are turned
      * into scenario ids before the query runs.
-     *
-     * @scenario "A filter on labels keeps only scenarios carrying a label"
      */
+    /** @scenario "A filter on labels keeps only scenarios carrying a label" */
     it("resolves it to the scenarios that carry it", async () => {
       const repo = makeRepo({});
       const prisma = makePrisma({
@@ -420,6 +417,49 @@ describe("bucketSecondsFor", () => {
       expect(
         bucketSecondsFor({ startDate: now - 365 * 86400_000, endDate: now }),
       ).toBe(7 * 86400);
+    });
+  });
+});
+
+describe("the shape of an atom", () => {
+  describe("given a scenario that sits in a suite and carries labels", () => {
+    /** @scenario "An atom names its scenario and leaves the folder and the labels out" */
+    it("names the scenario and carries neither the folder nor the labels", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          atoms: [
+            {
+              SetId: getSuiteSetId("suite-1"),
+              BatchRunId: "batch-1",
+              ScenarioRunId: "run-1",
+              ScenarioId: "scen-1",
+              Status: "SUCCESS",
+              Outcome: "passed",
+              RunAt: String(now),
+              DurationMs: "1500",
+              Note: "",
+              TargetKey: "agent_dev",
+              Trigger: "app",
+              CostUsd: "0.01",
+              CostSource: "run",
+              SortKey: String(now),
+            },
+          ],
+        }),
+        makePrisma({
+          suites: [{ id: "suite-1", name: "Refunds", slug: "refunds" }],
+          scenarios: [
+            { id: "scen-1", name: "Refund flow", labels: ["checkout", "beta"] },
+          ],
+        }),
+      );
+
+      const page = await service.getAtoms({ filter, limit: 10 });
+      const atom = page.atoms[0]!;
+
+      expect(atom.scenarioId).toBe("scen-1");
+      expect(atom).not.toHaveProperty("folderId");
+      expect(atom).not.toHaveProperty("labels");
     });
   });
 });

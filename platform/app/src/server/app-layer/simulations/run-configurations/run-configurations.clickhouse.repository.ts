@@ -7,6 +7,7 @@ import {
   buildAtomFilters,
 } from "../result-atoms/atom-sql";
 import {
+  HAS_NOTE_EXPR,
   HAS_TARGET_CLAUSE,
   JUDGE_MODEL_EXPR,
   RUN_PARAMETERS_EXPR,
@@ -40,6 +41,8 @@ export interface RawRunConfigurationRow {
   JudgeModel: string;
   /** The raw parameters object, or '' when the run resolved none. */
   Parameters: string;
+  /** "1" when any run of this configuration carried a note, never the note. */
+  UsesNote: string;
   LastRunAtMs: string;
 }
 
@@ -101,6 +104,7 @@ export class RunConfigurationsClickHouseRepository {
           SimulatorModel,
           JudgeModel,
           Parameters,
+          toString(max(HasNote))    AS UsesNote,
           toString(max(BatchRunAt)) AS LastRunAtMs
         FROM (
           SELECT
@@ -110,6 +114,7 @@ export class RunConfigurationsClickHouseRepository {
             max(SimulatorModel)                    AS SimulatorModel,
             max(JudgeModel)                        AS JudgeModel,
             argMin(Parameters, FirstRunId)         AS Parameters,
+            max(HasNote)                           AS HasNote,
             max(PairRunAt)                         AS BatchRunAt
           FROM (
             SELECT
@@ -120,6 +125,7 @@ export class RunConfigurationsClickHouseRepository {
               max(SimulatorModel)        AS SimulatorModel,
               max(JudgeModel)            AS JudgeModel,
               any(Parameters)            AS Parameters,
+              max(HasNote)               AS HasNote,
               min(ScenarioRunId)         AS FirstRunId,
               max(RunAt)                 AS PairRunAt
             FROM (
@@ -132,6 +138,7 @@ export class RunConfigurationsClickHouseRepository {
                 ${SIMULATOR_MODEL_EXPR}    AS SimulatorModel,
                 ${JUDGE_MODEL_EXPR}        AS JudgeModel,
                 ${RUN_PARAMETERS_EXPR}     AS Parameters,
+                ${HAS_NOTE_EXPR}           AS HasNote,
                 ${ATOM_SORT_KEY}           AS RunAt
               ${atomScopeSql(filters)}
                 ${HAS_TARGET_CLAUSE}

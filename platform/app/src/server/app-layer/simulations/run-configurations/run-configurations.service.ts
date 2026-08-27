@@ -273,6 +273,8 @@ function toEntry({
     planName: plan.name,
     configuration,
     runParameters,
+    // The fact, never the note: ClickHouse serialises the flag as "1" or "0".
+    usesNote: row.UsesNote === "1",
     lastRunAt: new Date(Number(row.LastRunAtMs)),
   };
 }
@@ -289,9 +291,16 @@ function collapse(entries: RunConfigurationEntry[]): RunConfigurationEntry[] {
   const newestByKey = new Map<string, RunConfigurationEntry>();
   for (const entry of entries) {
     const seen = newestByKey.get(entry.key);
-    if (!seen || entry.lastRunAt.getTime() > seen.lastRunAt.getTime()) {
+    if (!seen) {
       newestByKey.set(entry.key, entry);
+      continue;
     }
+    // The newest run wins every field but one. A configuration that ever took
+    // a note takes one, so the flag survives a run that skipped it.
+    const usesNote = seen.usesNote || entry.usesNote;
+    const newest =
+      entry.lastRunAt.getTime() > seen.lastRunAt.getTime() ? entry : seen;
+    newestByKey.set(entry.key, { ...newest, usesNote });
   }
   return [...newestByKey.values()].sort(
     (left, right) => right.lastRunAt.getTime() - left.lastRunAt.getTime(),
