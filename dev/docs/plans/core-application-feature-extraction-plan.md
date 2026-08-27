@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed application baseline:** `45aa52e4f5` before the `origin/main` merge
+**Committed application baseline:** `5770224e31`
 
 **Goal:** delete `platform/app`.
 
@@ -25,7 +25,7 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | --------------------------------------------------------- | ----------: | ----------------------------------------- |
 | Original application baseline                             | 6,398 files | Reference                                 |
 | Committed `platform/app` at `45aa52e4f5`                  | 5,804 files | Last pre-merge extraction checkpoint      |
-| Resolved `origin/main` merge index                        | 6,404 files | Awaiting the merge commit                 |
+| Committed `platform/app` at `5770224e31`                  | 6,404 files | Authoritative integrated baseline         |
 | Automation cut                                            |    73 fewer | Committed                                 |
 | Coding Agent/GitHub cut                                   |    36 fewer | Committed                                 |
 | Trace processing cut                                      |    45 fewer | Committed                                 |
@@ -66,7 +66,7 @@ cutovers remain explicit ledger work.
 | Feature Flag           | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                                                                          | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services.                                                                                |
 | Evaluation wave        | Evaluator application implementations and its displaced API middleware are deleted. Experiment, Simulation and Suite old eventing roots are deleted. Their package and caller work is checkpointed, but strict-layout findings, subscriber guarantees, nullable repository naming, execution adapters and some behavioural proof remain red. | Repair the named package findings, prove each singular feature, then drain the remaining transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature.                        |
 | Trace boundary         | The old request-collection service, its app-owned types and its unit suite are deleted. Server and transport callers now use the Trace contract/server surfaces. The app-owned query/facet compiler and 18 trace-processing subscribers/utilities remain deliberate residue.                                                                 | Prove trace response and ingestion parity, then move the query/facet compiler, protection/edit and usage-reader cohorts without changing `trace_analytics`, `trace_summaries`, rollups or public response fields.        |
-| Integration checkpoint | The one merge of `origin/main` at `5a9cd02001` is resolved with no unmerged paths, conflict markers, stale `@ee` imports, old Prisma migration root or `platform/app/ee`. Upstream added 600 net application files to the 5,804-file pre-merge checkpoint, leaving a 6,404-file merge index.                                                 | Commit and push the resolved merge, then resume deletion from the named residuals below. Do not count upstream integration as extraction progress.                                                                       |
+| Integration checkpoint | The one merge of `origin/main` at `5a9cd02001` is committed at `5770224e31` with no unmerged paths, conflict markers, stale `@ee` imports, old Prisma migration root or `platform/app/ee`. Upstream added 600 net application files to the 5,804-file pre-merge checkpoint, leaving a 6,404-file integrated baseline.                        | Push the resolved merge, then resume deletion from the named residuals below. Do not count upstream integration as extraction progress.                                                                                  |
 
 Physical movement in the shared worktree is not progress until its exact paths
 are reviewed and committed. There is no time estimate in this ledger: the next
