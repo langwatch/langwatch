@@ -19,9 +19,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
   mockRequestPasswordReset: vi.fn(),
   publicEnvRef: {
+    // `IS_SAAS` is stated everywhere rather than left off, because it is the
+    // thing this screen now turns on: reset follows the IDENTIFIER, not the
+    // deployment, so the refusal is the HOSTED rule and a self-hosted install
+    // keeps the door open however it federates. A case that does not say
+    // which kind of deployment it is would be leaving out its own premise.
     current: {
       NEXTAUTH_PROVIDER: "email" as string | undefined,
       HAS_EMAIL_PROVIDER_KEY: true,
+      IS_SAAS: false,
     },
   },
 }));
@@ -70,6 +76,7 @@ describe("ForgotPassword page", () => {
     publicEnvRef.current = {
       NEXTAUTH_PROVIDER: "email",
       HAS_EMAIL_PROVIDER_KEY: true,
+      IS_SAAS: false,
     };
   });
 
@@ -148,6 +155,7 @@ describe("ForgotPassword page", () => {
       publicEnvRef.current = {
         NEXTAUTH_PROVIDER: "email",
         HAS_EMAIL_PROVIDER_KEY: false,
+        IS_SAAS: false,
       };
     });
 

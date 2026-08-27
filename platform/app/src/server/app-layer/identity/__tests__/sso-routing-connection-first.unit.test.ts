@@ -1,4 +1,4 @@
-import type { RoutableConnection } from "@langwatch/identity";
+import { type RoutableConnection, routingStateOf } from "@langwatch/identity";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
 import { ConnectionFirstDomainRoutingRepository } from "../repositories/sso-routing-connection-first.repository";
@@ -87,7 +87,18 @@ describe("given an organization part-way through registering a connection", () =
   ] as const)("keeps the legacy answer while the connection is %s", async (state) => {
     const repository = new ConnectionFirstDomainRoutingRepository({
       legacy: port(legacyConnection, [legacyConnection]),
-      connections: port({ ...projectedConnection, state }),
+      // Through `routingStateOf`, because that is the only way one of these
+      // states reaches routing: the port hands back a `RoutableConnection`,
+      // whose `state` is deliberately the narrow ROUTING union, and every
+      // lifecycle state that is not serving collapses to INACTIVE on the way.
+      // Naming the LIFECYCLE state is what makes the case readable — this is
+      // the connection somebody has started registering — and running it
+      // through the mapper is what keeps the fixture honest about what the
+      // repository can actually be handed.
+      connections: port({
+        ...projectedConnection,
+        state: routingStateOf(state),
+      }),
     });
 
     expect(
@@ -111,7 +122,10 @@ describe("given an organization part-way through registering a connection", () =
   it("still answers nothing when neither side has one", async () => {
     const repository = new ConnectionFirstDomainRoutingRepository({
       legacy: port(null),
-      connections: port({ ...projectedConnection, state: "VERIFIED" }),
+      connections: port({
+        ...projectedConnection,
+        state: routingStateOf("VERIFIED"),
+      }),
     });
 
     expect(
