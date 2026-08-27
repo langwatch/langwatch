@@ -20,6 +20,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 import type { CustomizeChip } from "../shared/CustomizeChips";
+import { applyConfigurationTo } from "./apply-configuration";
 import type { PromptEntry } from "./PromptPicker";
 import {
   formatParameterLine,
@@ -37,13 +38,10 @@ import {
   toStorableRowParameters,
 } from "./parameter-rows";
 import { type ScopeScenario, scenariosInScope } from "./RunScopeSection";
-import {
-  normaliseRunScope,
-  type RunConfigurationEntry,
-  type RunScope,
-} from "./run-configuration";
+import { normaliseRunScope, type RunScope } from "./run-configuration";
 import type { RunDialogMode, RunDialogSubject } from "./run-dialog-types";
 import { useRunConfigurationHistory } from "./useRunConfigurationHistory";
+import { useRunHistorySeed } from "./useRunHistorySeed";
 import { buildTargetLabels, scopeLabelOf, useRunName } from "./useRunName";
 import { type RunPlanFields, useRunPlanFields } from "./useRunPlanFields";
 
@@ -183,7 +181,7 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
   };
 }
 
-type RunDialogFields = ReturnType<typeof useRunDialogFields>;
+export type RunDialogFields = ReturnType<typeof useRunDialogFields>;
 
 /** The agents, the published prompts and the cases the project holds. */
 function useRunDialogChoices(subject: RunDialogSubject | null) {
@@ -612,55 +610,6 @@ function runTargetsOf({
 }
 
 /**
- * Puts a configuration picked from the run name dropdown back into the dialog,
- * opening the blocks it used and folding away the ones it did not.
- *
- * The note is left alone: it belongs to one run, not to a configuration.
- */
-function applyConfigurationTo({
-  entry,
-  fields,
-  planFields,
-  pinRunName,
-}: {
-  entry: RunConfigurationEntry;
-  fields: RunDialogFields;
-  planFields: RunPlanFields;
-  pinRunName: (name: string) => void;
-}) {
-  const { configuration, runParameters } = entry;
-  const [primary, second] = configuration.targets;
-
-  pinRunName(entry.planName);
-
-  if (primary) {
-    fields.setTarget({ type: primary.type, id: primary.referenceId });
-    fields.setMode(primary.type === "prompt" ? "prompts" : "agents");
-  }
-  planFields.setShowCompare(!!second);
-  planFields.setCompareTarget(
-    second ? { type: second.type, id: second.referenceId } : null,
-  );
-
-  const hasParameters = Object.keys(runParameters).length > 0;
-  fields.setShowParams(hasParameters);
-  fields.setParameterLine(
-    hasParameters ? formatStoredParameterLine(runParameters) : "",
-  );
-  fields.setParameterRows(null);
-  fields.setRowsRequested(false);
-  fields.setSecretValues({});
-
-  planFields.setRepeatCount(configuration.repeatCount);
-  planFields.setShowRepeat(configuration.repeatCount > 1);
-  planFields.setSimulatorModel(configuration.simulatorModel);
-  planFields.setJudgeModel(configuration.judgeModel);
-  planFields.setShowModels(
-    !!configuration.simulatorModel || !!configuration.judgeModel,
-  );
-}
-
-/**
  * The name of the run, and the configurations this scope already ran with.
  *
  * The scope is folded the way the server folds it before the history is read:
@@ -734,6 +683,14 @@ function useRunDialogNaming({
     },
     [historyEntries, fields, planFields, name.pinRunName],
   );
+
+  useRunHistorySeed({
+    subject,
+    subjectKey,
+    entries: historyEntries,
+    fields,
+    planFields,
+  });
 
   return { name, runScope, applyConfiguration };
 }

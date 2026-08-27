@@ -100,6 +100,10 @@ vi.mock("~/utils/api", () => ({
     },
     agents: { getAll: { useQuery: mockAgentsGetAll } },
     prompts: { getAllPromptsForProject: { useQuery: mockPromptsGetAll } },
+    modelProvider: {
+      listAllForProjectForFrontend: { useQuery: emptyQuery },
+      getResolvedDefault: { useQuery: emptyQuery },
+    },
   },
 }));
 
@@ -390,7 +394,7 @@ describe("<RunDialog/>", () => {
     });
   });
 
-  /** @scenario "The override parameters chip adds one input line for the values" */
+  /** @scenario "The parameters chip adds one input line for the values" */
   it("adds exactly one input line, prefilled with the declared values", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
@@ -425,7 +429,7 @@ describe("<RunDialog/>", () => {
     expect(line).toHaveValue("model=gpt-5-mini, locale=de");
   });
 
-  /** @scenario "The override parameters chip adds one input line for the values" */
+  /** @scenario "The parameters chip adds one input line for the values" */
   it("sends what the line holds as the run parameters", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
@@ -1175,5 +1179,621 @@ describe("run entries on the Scenarios tab", () => {
     expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe(
       "batch_new",
     );
+  });
+});
+
+/** A stored run plan, in the shape the plans read returns it. */
+function planRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "plan_1",
+    name: "Refunds prod-agent",
+    kind: "custom",
+    scope: { mode: "folders", folderIds: ["suite_refunds"] },
+    scenarioIds: [],
+    targets: [{ type: "http", referenceId: "agent_1" }],
+    repeatCount: 1,
+    simulatorModel: null,
+    judgeModel: null,
+    updatedAt: new Date("2026-08-01T10:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+describe("the run name", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockHasProviders.value = true;
+    useAgentTestingStore.setState({ lastRunTarget: null, pendingRun: null });
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT, OFFLINE_AGENT] });
+    mockPromptsGetAll.mockReturnValue({ data: [] });
+    mockScenariosGetAll.mockReturnValue({
+      data: [
+        {
+          id: "case_1",
+          name: "Double charge",
+          labels: ["billing"],
+          folderId: "suite_refunds",
+          parameters: null,
+          createdAt: new Date("2026-07-06T12:00:00.000Z"),
+          lastUpdatedById: null,
+          version: 1,
+        },
+      ],
+      isLoading: false,
+    });
+    mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
+      jobCount: 1,
+      suiteId: "plan_1",
+      planName: "Refunds prod-agent",
+      created: true,
+    });
+  });
+
+  afterEach(cleanup);
+
+  /** @scenario "The run name is the first field and holds the derived name" */
+  it("reads first, holds the derived name, and explains nothing under it", () => {
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    const name = screen.getByTestId("run-dialog-name");
+    expect(name).toHaveValue("Refunds prod-agent");
+
+    // The name comes before the agent section, not after it.
+    const agentLabel = screen.getByText("Agent to be tested");
+    expect(
+      name.compareDocumentPosition(agentLabel) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // The block holds the label and the field, and explains nothing.
+    expect(screen.getByTestId("run-dialog-name-block")).toHaveTextContent(
+      /^Run name$/,
+    );
+  });
+
+  /** @scenario "The derived name follows the agent until the person types" */
+  it("follows the agent, and stops the moment a name is typed", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("run-dialog-agent-agent_2"));
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Refunds staging-agent",
+    );
+
+    await user.clear(screen.getByTestId("run-dialog-name"));
+    await user.type(screen.getByTestId("run-dialog-name"), "Nightly refunds");
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Nightly refunds",
+    );
+  });
+
+  /** @scenario "A comparison run derives both targets into the name" */
+  it("reads both agents of a comparison, joined by vs", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    await user.click(
+      within(screen.getByTestId("run-dialog-compare")).getByTestId(
+        "run-dialog-agent-agent_2",
+      ),
+    );
+
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Refunds prod-agent vs staging-agent",
+    );
+  });
+
+  /** @scenario "The name field lists the configurations this scope ran with before" */
+  it("lists the configurations of this scope newest first, each saying what it ran with", async () => {
+    const user = userEvent.setup();
+    // Fed oldest first, so an order that is merely preserved fails here.
+    mockSuitesGetAll.mockReturnValue({
+      data: [
+        planRow({
+          id: "plan_old",
+          name: "Refunds prod-agent",
+          updatedAt: new Date("2026-08-01T10:00:00.000Z"),
+        }),
+        planRow({
+          id: "plan_new",
+          name: "Nightly refunds",
+          targets: [{ type: "http", referenceId: "agent_2" }],
+          updatedAt: new Date("2026-08-20T10:00:00.000Z"),
+        }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+
+    const options = within(
+      screen.getByTestId("run-dialog-name-options"),
+    ).getAllByRole("button");
+    expect(options.map((option) => option.textContent)).toEqual([
+      expect.stringContaining("Nightly refunds"),
+      expect.stringContaining("Refunds prod-agent"),
+    ]);
+    // Each row says what it goes against, which is what tells them apart.
+    expect(options[0]).toHaveTextContent("staging-agent");
+    expect(options[1]).toHaveTextContent("prod-agent");
+  });
+
+  /** @scenario "A scope with no history offers a plain field" */
+  it("offers a plain field with no caret when the scope never ran", () => {
+    renderDialog(suiteSubject());
+
+    expect(screen.getByTestId("run-dialog-name")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-dialog-name-caret"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The note is never part of a configuration" */
+  it("never lists a note and never brings one back", async () => {
+    const user = userEvent.setup();
+    mockSuitesGetAll.mockReturnValue({
+      data: [
+        // The stored plan carries the note of its last run; it is not part of
+        // the configuration and must reach neither the list nor the dialog.
+        planRow({ note: "checking the stricter criterion" }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    const list = screen.getByTestId("run-dialog-name-options");
+    expect(list).not.toHaveTextContent("stricter criterion");
+
+    await user.click(within(list).getAllByRole("button")[0]!);
+    expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
+    expect(screen.getByTestId("customize-chip-note")).toBeInTheDocument();
+  });
+
+  /** @scenario "Picking a configuration refills the dialog and opens what it used" */
+  it("refills the dialog, opens the blocks that entry used, and pins the name", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "locale", defaultValue: "en" }]),
+    );
+    mockSuitesGetAll.mockReturnValue({
+      data: [
+        planRow({
+          name: "Nightly refunds",
+          repeatCount: 3,
+          targets: [
+            {
+              type: "http",
+              referenceId: "agent_1",
+              runParameters: { locale: "de" },
+            },
+            { type: "http", referenceId: "agent_2" },
+          ],
+        }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    await user.click(
+      within(screen.getByTestId("run-dialog-name-options")).getAllByRole(
+        "button",
+      )[0]!,
+    );
+
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Nightly refunds",
+    );
+    expect(screen.getByTestId("run-dialog-compare")).toBeInTheDocument();
+    expect(screen.getByLabelText("Repeat count")).toHaveValue(3);
+    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
+      "locale=de",
+    );
+    // The name was taken over, so it no longer follows the agent.
+    await user.click(
+      within(screen.getByTestId("run-dialog-target-section")).getByTestId(
+        "run-dialog-agent-agent_2",
+      ),
+    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Nightly refunds",
+    );
+  });
+
+  /** @scenario "Typing filters the list and opens it" */
+  it("narrows the list to what is typed, and offers none for a new name", async () => {
+    const user = userEvent.setup();
+    mockSuitesGetAll.mockReturnValue({
+      data: [
+        planRow({ id: "plan_a", name: "Refunds prod-agent" }),
+        planRow({
+          id: "plan_b",
+          name: "Nightly refunds",
+          targets: [{ type: "http", referenceId: "agent_2" }],
+        }),
+        planRow({
+          id: "plan_c",
+          name: "Weekly refunds",
+          repeatCount: 2,
+        }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    const field = screen.getByTestId("run-dialog-name");
+    await user.clear(field);
+    await user.type(field, "Nightly");
+
+    const shown = within(
+      screen.getByTestId("run-dialog-name-options"),
+    ).getAllByRole("button");
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toHaveTextContent("Nightly refunds");
+
+    await user.clear(field);
+    await user.type(field, "Something else entirely");
+    expect(
+      screen.queryByTestId("run-dialog-name-options"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The arrow keys move and Enter takes the highlighted entry" */
+  it("moves down the list and takes the highlighted entry on Enter", async () => {
+    const user = userEvent.setup();
+    mockSuitesGetAll.mockReturnValue({
+      data: [
+        planRow({
+          id: "plan_new",
+          name: "Nightly refunds",
+          targets: [{ type: "http", referenceId: "agent_2" }],
+          updatedAt: new Date("2026-08-20T10:00:00.000Z"),
+        }),
+        planRow({
+          id: "plan_old",
+          name: "Refunds prod-agent",
+          updatedAt: new Date("2026-08-01T10:00:00.000Z"),
+        }),
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
+
+    // The second row, not the first: the arrows moved off the top of the list.
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Refunds prod-agent",
+    );
+  });
+
+  /** @scenario "Escape closes the list and leaves the dialog open" */
+  it("closes the list on Escape and leaves the dialog standing", async () => {
+    const user = userEvent.setup();
+    mockSuitesGetAll.mockReturnValue({
+      data: [planRow()],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    // Opened from the caret, which is where the key lands: the caret took the
+    // focus off the field.
+    await user.click(screen.getByTestId("run-dialog-name-caret"));
+    expect(screen.getByTestId("run-dialog-name-options")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    expect(
+      screen.queryByTestId("run-dialog-name-options"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog")).toBeInTheDocument();
+  });
+
+  /** @scenario "A run with no name cannot start" */
+  it("keeps Run off while the name is empty", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.clear(screen.getByTestId("run-dialog-name"));
+
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+  });
+});
+
+describe("what the run covers", () => {
+  const planSubject = (): RunDialogSubject => ({
+    kind: "plan",
+    initialTarget: null,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockHasProviders.value = true;
+    useAgentTestingStore.setState({ lastRunTarget: null, pendingRun: null });
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT, OFFLINE_AGENT] });
+    mockPromptsGetAll.mockReturnValue({ data: [] });
+    mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockFoldersGetAll.mockReturnValue({
+      data: [
+        { id: "suite_refunds", name: "Refunds", slug: "refunds" },
+        { id: "suite_billing", name: "Billing", slug: "billing" },
+      ],
+      isLoading: false,
+    });
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
+      jobCount: 2,
+      suiteId: "plan_1",
+      planName: "2 scenarios prod-agent",
+      created: true,
+    });
+    mockScenariosGetAll.mockReturnValue({
+      data: [
+        {
+          id: "case_1",
+          name: "Double charge",
+          labels: ["billing"],
+          folderId: "suite_refunds",
+          parameters: null,
+          createdAt: new Date("2026-07-06T12:00:00.000Z"),
+          lastUpdatedById: null,
+          version: 1,
+        },
+        {
+          id: "case_2",
+          name: "Late invoice",
+          labels: ["invoices"],
+          folderId: "suite_billing",
+          parameters: null,
+          createdAt: new Date("2026-07-06T12:00:00.000Z"),
+          lastUpdatedById: null,
+          version: 1,
+        },
+      ],
+      isLoading: false,
+    });
+  });
+
+  afterEach(cleanup);
+
+  /** @scenario "An entry point that fixed the scope says nothing about it" */
+  it("says nothing about the scope when the entry point already fixed it", () => {
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    expect(screen.queryByTestId("run-scope")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog")).not.toHaveTextContent("Runs as");
+    expect(screen.getByTestId("run-dialog")).not.toHaveTextContent("will run");
+  });
+
+  /** @scenario "New run plan opens the same dialog with the scope picker" */
+  it("opens the same dialog with the four scopes, on all scenarios", () => {
+    renderDialog(planSubject());
+
+    expect(screen.getByTestId("run-dialog")).toBeInTheDocument();
+    const scope = screen.getByTestId("run-scope");
+    expect(within(scope).getByTestId("run-scope-all")).toBeChecked();
+    expect(within(scope).getByTestId("run-scope-folders")).not.toBeChecked();
+    expect(within(scope).getByTestId("run-scope-labels")).not.toBeChecked();
+    expect(within(scope).getByTestId("run-scope-cases")).not.toBeChecked();
+    expect(scope).toHaveTextContent("2 scenarios will run.");
+  });
+
+  /** @scenario "A run can be scoped to chosen test suites" */
+  it("counts the scenarios of the test suites that are ticked", async () => {
+    const user = userEvent.setup();
+    renderDialog(planSubject());
+
+    await user.click(screen.getByTestId("run-scope-folders"));
+    expect(screen.getByTestId("run-scope")).toHaveTextContent(
+      "0 scenarios will run.",
+    );
+
+    await user.click(screen.getByTestId("run-scope-folder-suite_refunds"));
+    expect(screen.getByTestId("run-scope")).toHaveTextContent(
+      "1 scenario will run.",
+    );
+  });
+
+  /** @scenario "A run can be scoped to chosen labels" */
+  it("reads every label of the project and counts the ones that are on", async () => {
+    const user = userEvent.setup();
+    renderDialog(planSubject());
+
+    await user.click(screen.getByTestId("run-scope-labels"));
+    const labels = screen.getByTestId("run-scope-labels-list");
+    expect(
+      within(labels).getByTestId("run-scope-label-billing"),
+    ).toBeInTheDocument();
+    expect(
+      within(labels).getByTestId("run-scope-label-invoices"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("run-scope-label-invoices"));
+    expect(screen.getByTestId("run-scope")).toHaveTextContent(
+      "1 scenario will run.",
+    );
+  });
+
+  /** @scenario "A run can hold a hand-picked list of scenarios" */
+  /** @scenario "A custom run plan can select single test cases grouped by their folder" */
+  it("lists the scenarios under their test suite and runs the ticked ones", async () => {
+    const user = userEvent.setup();
+    renderDialog(planSubject());
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+
+    await user.click(screen.getByTestId("run-scope-cases"));
+    const cases = screen.getByTestId("run-scope-cases-list");
+    expect(cases).toHaveTextContent("Refunds");
+    expect(cases).toHaveTextContent("Billing");
+
+    await user.click(screen.getByTestId("run-scope-case-case_2"));
+    expect(screen.getByTestId("run-scope")).toHaveTextContent(
+      "1 scenario will run.",
+    );
+
+    // One case out of each test suite, which is the plan that picker exists for.
+    await user.click(screen.getByTestId("run-scope-case-case_1"));
+    expect(screen.getByTestId("run-scope")).toHaveTextContent(
+      "2 scenarios will run.",
+    );
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    const sent = mockSuitesRunPlan.mock.calls[0]![0] as {
+      config: { scope: { mode: string }; scenarioIds?: string[] };
+    };
+    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual([
+      "case_1",
+      "case_2",
+    ]);
+  });
+
+  /** @scenario "The derived name follows the scope while it is being picked" */
+  it("names the test suite that was ticked, beside the agent", async () => {
+    const user = userEvent.setup();
+    renderDialog(planSubject());
+
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "All scenarios prod-agent",
+    );
+
+    await user.click(screen.getByTestId("run-scope-folders"));
+    await user.click(screen.getByTestId("run-scope-folder-suite_billing"));
+
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
+      "Billing prod-agent",
+    );
+  });
+});
+
+describe("the chips that add a run option", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockHasProviders.value = true;
+    useAgentTestingStore.setState({ lastRunTarget: null, pendingRun: null });
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT, OFFLINE_AGENT] });
+    mockPromptsGetAll.mockReturnValue({ data: [] });
+    mockScenariosGetAll.mockReturnValue({
+      data: [
+        {
+          id: "case_1",
+          name: "Double charge",
+          labels: [],
+          folderId: "suite_refunds",
+          parameters: null,
+          createdAt: new Date("2026-07-06T12:00:00.000Z"),
+          lastUpdatedById: null,
+          version: 1,
+        },
+      ],
+      isLoading: false,
+    });
+    mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
+      jobCount: 1,
+      suiteId: "plan_1",
+      planName: "Refunds prod-agent",
+      created: true,
+    });
+  });
+
+  afterEach(cleanup);
+
+  /** @scenario "The compare chip adds a second agent to the run" */
+  it("adds a second agent, sends both, and leaves the first alone on removal", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("customize-chip-compare"));
+    await user.click(
+      within(screen.getByTestId("run-dialog-compare")).getByTestId(
+        "run-dialog-agent-agent_2",
+      ),
+    );
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
+      config: {
+        targets: [
+          { type: "http", referenceId: "agent_1" },
+          { type: "http", referenceId: "agent_2" },
+        ],
+      },
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove the comparison" }),
+    );
+    expect(screen.queryByTestId("run-dialog-compare")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  /** @scenario "The simulation models chip adds the user simulator and the judge" */
+  it("adds the user simulator and the judge", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("customize-chip-models"));
+
+    const models = screen.getByTestId("run-dialog-models");
+    expect(models).toHaveTextContent("User simulator");
+    expect(models).toHaveTextContent("Judge");
+    expect(
+      screen.queryByTestId("customize-chip-models"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The repeat chip adds the repeat count" */
+  it("adds a repeat count and sends it with the run", async () => {
+    const user = userEvent.setup();
+    renderDialog(
+      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
+    );
+
+    await user.click(screen.getByTestId("customize-chip-repeat"));
+    const count = screen.getByLabelText("Repeat count");
+    await user.clear(count);
+    await user.type(count, "3");
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(mockSuitesRunPlan.mock.calls[0]![0]).toMatchObject({
+      config: { repeatCount: 3 },
+    });
   });
 });

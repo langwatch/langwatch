@@ -9,7 +9,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import type { PromptEntry } from "./PromptPicker";
 import type { RunNameOption } from "./RunNameField";
@@ -127,9 +127,12 @@ export function useRunName({
   /** The configurations this scope ran with, newest first. */
   entries: readonly RunConfigurationEntry[];
 }) {
-  const [runName, setRunNameState] = useState("");
-  // Until the person types a name of their own, the name follows the run.
-  const [isRunNameEdited, setIsRunNameEdited] = useState(false);
+  // The name of one's own, or nothing while the name still follows the run.
+  // Holding only the taken-over name keeps the field's value a plain read of
+  // what the dialog holds, so it can never render one frame behind the agent
+  // or the scope it names.
+  const [takenOverName, setTakenOverName] = useState<string | null>(null);
+  const openedOn = useRef(subjectKey);
 
   const derivedName = useMemo(
     () =>
@@ -140,24 +143,22 @@ export function useRunName({
     [scopeLabel, targets, targetLabels],
   );
 
-  useEffect(() => {
-    setIsRunNameEdited(false);
-  }, [subjectKey]);
+  // The dialog opened on another subject: the name follows again.
+  if (openedOn.current !== subjectKey) {
+    openedOn.current = subjectKey;
+    if (takenOverName !== null) setTakenOverName(null);
+  }
 
-  useEffect(() => {
-    if (!isRunNameEdited) setRunNameState(derivedName);
-  }, [derivedName, isRunNameEdited]);
+  const runName = takenOverName ?? derivedName;
 
   /** Typing a name pins it, so it no longer follows the agent or the scope. */
   const setRunName = useCallback((value: string) => {
-    setRunNameState(value);
-    setIsRunNameEdited(true);
+    setTakenOverName(value);
   }, []);
 
   /** Taking a name from the dropdown pins it the same way. */
   const pinRunName = useCallback((value: string) => {
-    setRunNameState(value);
-    setIsRunNameEdited(true);
+    setTakenOverName(value);
   }, []);
 
   const options = useMemo((): RunNameOption[] => {
@@ -170,5 +171,5 @@ export function useRunName({
     }));
   }, [entries, targetLabels]);
 
-  return { runName, setRunName, pinRunName, isRunNameEdited, options };
+  return { runName, setRunName, pinRunName, options };
 }

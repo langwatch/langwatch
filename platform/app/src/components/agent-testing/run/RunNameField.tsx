@@ -231,7 +231,7 @@ export function RunNameField({
   const hasHistory = options.length > 0;
 
   return (
-    <Box>
+    <Box data-testid="run-dialog-name-block">
       <FieldLabel>Run name</FieldLabel>
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <Box position="relative" onKeyDown={listKeyHandler(list)}>
