@@ -238,7 +238,13 @@ export interface SsoBreakGlassReadPort {
 /** One domain's claim as the setup surface renders it. */
 export interface SelfServeDomainClaimView {
   domain: string;
-  state: SsoDomainClaim["state"];
+  /**
+   * NEVER `WITHDRAWN`. That state is a tombstone the claim rate limit reads —
+   * the domain is gone from every list the connection derives — and the view
+   * filters those out before building this, so a screen has no branch to
+   * write for it. Stated in the type so it cannot become one silently.
+   */
+  state: Exclude<SsoDomainClaim["state"], "WITHDRAWN">;
   claimedAtMs: number;
   decidedAtMs: number | null;
   waitedMs: number | null;
@@ -497,7 +503,13 @@ export class SsoSelfServeService {
       // this connection has. It never reaches a screen.
       claims: await Promise.all(
         (state?.domainClaims ?? [])
-          .filter((claim) => claim.state !== "WITHDRAWN")
+          .filter(
+            (
+              claim,
+            ): claim is SsoDomainClaim & {
+              state: Exclude<SsoDomainClaim["state"], "WITHDRAWN">;
+            } => claim.state !== "WITHDRAWN",
+          )
           .map(async (claim) => ({
           ...toClaimView(claim),
           waitsForReview:
@@ -1405,7 +1417,13 @@ function recordLocationFor({
   };
 }
 
-function toClaimView(claim: SsoDomainClaim): SelfServeDomainClaimView {
+/** Takes a claim the caller has already established is not withdrawn — see
+ *  the filter in `getSetup`, and the note on the view's own `state`. */
+function toClaimView(
+  claim: SsoDomainClaim & {
+    state: Exclude<SsoDomainClaim["state"], "WITHDRAWN">;
+  },
+): SelfServeDomainClaimView {
   return {
     domain: claim.domain,
     state: claim.state,

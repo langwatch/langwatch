@@ -126,7 +126,6 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
       clearTimeout(timer);
     }
   }
-
 }
 
 /** How many redirects a domain may spend before we stop following. */

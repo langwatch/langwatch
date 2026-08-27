@@ -134,7 +134,10 @@ describe("given a name whose answer changes between the check and the socket", (
       const answers = [["93.184.216.34"], ["127.0.0.1"]];
       let call = 0;
       const seen: (RequestInit & { dispatcher?: unknown })[] = [];
-      const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const fetchImpl = (async (
+        _input: RequestInfo | URL,
+        init?: RequestInit,
+      ) => {
         seen.push(init ?? {});
         return respond(200, "lw-token-123");
       }) as typeof fetch;

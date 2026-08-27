@@ -56,10 +56,7 @@ export function ServerUnreachableNotice({
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
       if (attempt >= MAX_RETRIES) return;
-      const wait = Math.min(
-        RETRY_EVERY_MS * 2 ** attempt,
-        RETRY_CEILING_MS,
-      );
+      const wait = Math.min(RETRY_EVERY_MS * 2 ** attempt, RETRY_CEILING_MS);
       timer = setTimeout(() => {
         attempt += 1;
         retry.current?.();

@@ -84,19 +84,16 @@ describe("given an organization part-way through registering a connection", () =
     ["APPROVED"],
     ["VERIFICATION_PENDING"],
     ["VERIFIED"],
-  ] as const)(
-    "keeps the legacy answer while the connection is %s",
-    async (state) => {
-      const repository = new ConnectionFirstDomainRoutingRepository({
-        legacy: port(legacyConnection, [legacyConnection]),
-        connections: port({ ...projectedConnection, state }),
-      });
+  ] as const)("keeps the legacy answer while the connection is %s", async (state) => {
+    const repository = new ConnectionFirstDomainRoutingRepository({
+      legacy: port(legacyConnection, [legacyConnection]),
+      connections: port({ ...projectedConnection, state }),
+    });
 
-      expect(
-        await repository.findConnectionForDomain({ domain: "acme.com" }),
-      ).toBe(legacyConnection);
-    },
-  );
+    expect(
+      await repository.findConnectionForDomain({ domain: "acme.com" }),
+    ).toBe(legacyConnection);
+  });
 
   it("hands over the moment the connection is carrying sign-ins", async () => {
     const repository = new ConnectionFirstDomainRoutingRepository({

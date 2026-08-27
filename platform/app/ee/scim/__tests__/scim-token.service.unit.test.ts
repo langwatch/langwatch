@@ -296,11 +296,13 @@ describe("ScimTokenService", () => {
       it("returns ok with the organization id", async () => {
         (
           prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{
-          id: "token-1",
-          organizationId: "org-1",
-          hashedToken,
-        }]);
+        ).mockResolvedValue([
+          {
+            id: "token-1",
+            organizationId: "org-1",
+            hashedToken,
+          },
+        ]);
         (
           prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue({});
@@ -319,11 +321,13 @@ describe("ScimTokenService", () => {
       it("reports the plan as not entitled so the token cannot outlive Enterprise", async () => {
         (
           prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{
-          id: "token-1",
-          organizationId: "org-1",
-          hashedToken,
-        }]);
+        ).mockResolvedValue([
+          {
+            id: "token-1",
+            organizationId: "org-1",
+            hashedToken,
+          },
+        ]);
         (
           prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue({});
@@ -404,11 +408,13 @@ describe("ScimTokenService", () => {
 
         (
           prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{
-          id: "token-1",
-          organizationId: "org-1",
-          hashedToken,
-        }]);
+        ).mockResolvedValue([
+          {
+            id: "token-1",
+            organizationId: "org-1",
+            hashedToken,
+          },
+        ]);
         (
           prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue({});
@@ -433,14 +439,16 @@ describe("ScimTokenService", () => {
       it("still answers the caller instead of failing on the vanished row", async () => {
         (
           prisma.scimToken.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{
-          id: "token-1",
-          organizationId: "org-1",
-          hashedToken: crypto
-            .createHash("sha256")
-            .update("valid-token")
-            .digest("hex"),
-        }]);
+        ).mockResolvedValue([
+          {
+            id: "token-1",
+            organizationId: "org-1",
+            hashedToken: crypto
+              .createHash("sha256")
+              .update("valid-token")
+              .digest("hex"),
+          },
+        ]);
         // What the revoke leaves behind: the row is gone by the time the use
         // is recorded, so the write matches nothing. A single-row `update`
         // would raise P2025 here and turn the race into a 500.

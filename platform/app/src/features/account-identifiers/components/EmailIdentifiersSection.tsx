@@ -17,10 +17,10 @@ import { SettingsSectionRow } from "~/components/settings/SettingsSection";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
+import { readHandledError } from "~/features/errors/logic/readHandledError";
 import type { AccountIdentifier } from "~/server/app-layer/identity/account-identifiers.service";
 import { api } from "~/utils/api";
 import { useSearchParams } from "~/utils/compat/next-navigation";
-import { readHandledError } from "~/features/errors/logic/readHandledError";
 import { useResendBackoff } from "../hooks/useResendBackoff";
 import {
   forgetAddressVerifier,
@@ -129,9 +129,7 @@ export function EmailIdentifiersSection({
    * the local three seconds and every press produced another error toast for
    * the rest of the window.
    */
-  const resend = async (
-    row: (typeof rows)[number],
-  ): Promise<number | null> => {
+  const resend = async (row: (typeof rows)[number]): Promise<number | null> => {
     try {
       if (row.value && row.value === ownAddress) {
         // Reuses the shell nudge's own mutation: one address, one sender.

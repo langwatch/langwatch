@@ -150,6 +150,7 @@ import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
 import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { HttpSsoIssuerDiscovery } from "./sso-issuer-discovery";
 import { ssoMethodIsConfiguredWith } from "./sso-method-configured";
+import { ssoProviderConfigCipher } from "./sso-provider-config-cipher";
 import {
   DnsDomainProofLookup,
   EmailSsoDomainReproofNotifier,
@@ -161,7 +162,6 @@ import {
   PrismaSsoTestSignInLookup,
   SsoSelfServeContextResolver,
 } from "./sso-self-serve-adapters";
-import { ssoProviderConfigCipher } from "./sso-provider-config-cipher";
 import {
   forgetIdentityWriteGate,
   isAnyoneOnIdentityWrites,

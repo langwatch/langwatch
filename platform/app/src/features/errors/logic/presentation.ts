@@ -2088,10 +2088,10 @@ const presentations = {
   },
   sso_break_glass_expiry_out_of_range: {
     title: "Choose a date inside the allowed window",
-    describe: (meta) =>
-      `A way back in is temporary on purpose, so it can be granted for up to ${
-        typeof meta?.maxWindowDays === "number" ? meta.maxWindowDays : 90
-      } days at a time. Pick a date in the future and inside that window, and renew it if you still need it.`,
+    describe: (error) => {
+      const days = num(error, "maxWindowDays", 90);
+      return `A way back in is temporary on purpose, so it can be granted for up to ${days} days at a time. Pick a date in the future and inside that window, and renew it if you still need it.`;
+    },
   },
   sso_break_glass_holder_ineligible: {
     title: "Choose an administrator for the way back in",

@@ -46,10 +46,7 @@ import {
   beforeUserCreate,
   ssoAssertionDecision,
 } from "./hooks";
-import {
-  isLastWayInPath,
-  refuseIfItClosesTheLastDoor,
-} from "./last-way-in";
+import { isLastWayInPath, refuseIfItClosesTheLastDoor } from "./last-way-in";
 import { passkeySignUpRegistration } from "./passkey-signup";
 import { issuersForRequest } from "./registeredIssuers";
 import { revokeAllSessionsForUser } from "./revokeSessions";

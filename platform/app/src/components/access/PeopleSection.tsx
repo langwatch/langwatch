@@ -17,8 +17,8 @@ import {
   IdentityRowList,
 } from "~/components/access/IdentityRow";
 import { ProvenanceChip } from "~/components/access/ProvenanceChip";
-import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { CopyInput } from "~/components/CopyInput";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { AutomaticJoinsNotice } from "~/components/members/AutomaticJoinsNotice";
 import { InviteRow } from "~/components/members/InvitesTable";
 import { JoinRequestRow } from "~/components/members/JoinRequestsTable";

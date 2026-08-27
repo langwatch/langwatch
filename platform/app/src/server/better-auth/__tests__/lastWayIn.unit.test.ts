@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import {
-  isLastWayInPath,
-  refuseIfItClosesTheLastDoor,
-} from "../last-way-in";
+import { isLastWayInPath, refuseIfItClosesTheLastDoor } from "../last-way-in";
 
 /**
  * ADR-119 on the two removals that reached no ceremony
@@ -70,10 +67,7 @@ describe("given somebody removing a passkey", () => {
 
   describe("when another way in survives it", () => {
     it.each([
-      [
-        "a second passkey",
-        { otherPasskeys: 1, accounts: [] },
-      ],
+      ["a second passkey", { otherPasskeys: 1, accounts: [] }],
       [
         "a password",
         {

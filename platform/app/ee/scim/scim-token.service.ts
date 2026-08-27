@@ -208,10 +208,7 @@ export class ScimTokenService {
     const taken = await this.prisma.scimToken.findFirst({
       where: {
         hashedToken: {
-          in: [
-            hashedToken,
-            this.hashToken(token, "sha256"),
-          ],
+          in: [hashedToken, this.hashToken(token, "sha256")],
         },
       },
       select: { id: true },
