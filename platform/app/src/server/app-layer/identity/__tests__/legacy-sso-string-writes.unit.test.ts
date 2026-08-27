@@ -31,6 +31,7 @@ const holdsNone = vi.fn().mockResolvedValue(false);
 describe("the legacy sso string columns", () => {
   describe("given an organization that never registered a connection", () => {
     /** @scenario "After the flip, the strings stop being written" */
+    /** @scenario "Which routing decides is asked per organization, never set fleet-wide" */
     it("keeps accepting edits, because the strings still decide its sign-in", async () => {
       await expect(
         assertLegacySsoStringWriteAllowed({
@@ -56,6 +57,7 @@ describe("the legacy sso string columns", () => {
 
   describe("given an organization whose connection decides its sign-in", () => {
     /** @scenario "After the flip, the strings stop being written" */
+    /** @scenario "Which routing decides is asked per organization, never set fleet-wide" */
     it("refuses a string edit and names the columns that are now derived", async () => {
       await expect(
         assertLegacySsoStringWriteAllowed({

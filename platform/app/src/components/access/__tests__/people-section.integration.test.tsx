@@ -447,6 +447,21 @@ describe("given the directory's people tab", () => {
       };
     });
 
+    /** @scenario Every tab puts its action in the same place */
+    it("puts its own action at the end of its first heading row, where every tab does", () => {
+      const { container } = renderPeople();
+
+      // The same kit and the same slot the departments tab uses. The two were
+      // written separately, so agreeing here is the invariant rather than a
+      // coincidence of one component.
+      const heading = container.querySelector("header");
+      if (!heading) throw new Error("the tab drew no heading row");
+      expect(heading.textContent).toContain("People");
+      expect(
+        within(heading).getByRole("button", { name: /invite/i }),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario A member's department is readable at a glance */
     it("names it beside their name, and says nothing for anybody else", () => {
       renderPeople();

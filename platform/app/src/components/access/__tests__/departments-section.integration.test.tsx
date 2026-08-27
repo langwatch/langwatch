@@ -109,6 +109,22 @@ describe("given an organization with departments", () => {
     expect(screen.getByText("1 person unassigned")).toBeInTheDocument();
   });
 
+  /** @scenario Every tab puts its action in the same place */
+  it("puts its own action at the end of its first heading row", () => {
+    const { container } = renderDepartments();
+
+    // Every tab of the directory leads with the kit's SectionTitle, which
+    // renders a header whose last child is the `right` slot. A tab that put
+    // its action anywhere else would read as a different product from the
+    // one next to it.
+    const heading = container.querySelector("header");
+    if (!heading) throw new Error("the tab drew no heading row");
+    expect(heading.textContent).toContain("Departments");
+    expect(
+      within(heading).getByRole("link", { name: /manage in governance/i }),
+    ).toBeInTheDocument();
+  });
+
   /** @scenario Assignment stays where it is managed */
   it("sends assignment to Governance rather than offering a second place for it", () => {
     renderDepartments();

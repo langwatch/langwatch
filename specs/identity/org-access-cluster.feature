@@ -782,7 +782,14 @@ Feature: The people and access settings, as one cluster
       And it says asking to join needs only one member with a verified address,
       because "ana" approves each request herself
 
-    @integration
+    # UNIMPLEMENTED, and specific about which half. The card already refuses
+    # to draw a second proof flow, and it already hands a reader with a live
+    # connection to the connection's own answer. What it cannot yet do is name
+    # WHICH of the organization's domains are proved: it takes the domains
+    # auto-join is configured for and knows nothing about their proof, so a
+    # reader is told "each must be verified as yours first" and left to go and
+    # look. Wiring it needs the verified-domain read this card does not have.
+    @integration @unimplemented
     Scenario: A domain is proved in one place, and the policy points at it
       When "ana" reads the who-can-join policy
       Then she is told which of her domains are proved

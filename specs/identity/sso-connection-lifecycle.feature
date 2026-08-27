@@ -293,12 +293,17 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
 
   # ── Routing flip ───────────────────────────────────────────────────────
 
+  # There is no fleet-wide flip, and the staged flag that was going to carry
+  # one was designed out rather than built. Routing asks the connection
+  # projection first and falls back to the columns per organization, so which
+  # of the two decides differs BY ORGANIZATION -- and a switch thrown for
+  # everybody could only ever have been wrong for somebody.
   @unit
-  Scenario: Shadow mode compares connection routing against string routing
-    Given the connection routing flag is in shadow
-    When any user signs in through a routed domain
-    Then both lookups run and a disagreement is logged with both answers
-    And the string-based answer keeps deciding the sign-in
+  Scenario: Which routing decides is asked per organization, never set fleet-wide
+    Given "acme"'s connection decides its sign-in and "globex" has none
+    When a staff member edits the legacy single sign-on strings
+    Then the edit is refused for "acme", named as derived from its connection
+    And it is still accepted for "globex", whose strings still decide
 
   @unit
   Scenario: After the flip, the strings stop being written

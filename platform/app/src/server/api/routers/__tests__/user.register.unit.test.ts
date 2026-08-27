@@ -46,6 +46,24 @@ vi.mock("~/utils/getClientIp", () => ({
 const { resolveAuthProviderMock } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
 }));
+const { requestVerificationMock } = vi.hoisted(() => ({
+  requestVerificationMock: vi.fn(),
+}));
+
+// The account-creating call is what sends the confirmation link, so the
+// service it sends through is the seam this suite drives. Its other two
+// methods answer "no proof was carried in", which is the plain sign-up path.
+vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/identity/runtime")
+  >()),
+  signUpVerification: () => ({
+    claimAddressProof: vi.fn().mockResolvedValue(null),
+    markAddressConfirmed: vi.fn().mockResolvedValue(undefined),
+    requestVerification: requestVerificationMock,
+  }),
+}));
+
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
 }));
@@ -76,6 +94,7 @@ describe("userRouter.register()", () => {
     // Most cases here are the coerced/email-mode deployment; the licensed-SSO
     // case overrides this.
     resolveAuthProviderMock.mockResolvedValue("email");
+    requestVerificationMock.mockResolvedValue(undefined);
   });
 
   const createCaller = () => {
@@ -202,6 +221,43 @@ describe("userRouter.register()", () => {
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(userCreateMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the account has just been created", () => {
+    /** @scenario "The confirmation link is sent by the call that creates the account" */
+    it("sends the link to the address the account was created for", async () => {
+      const caller = createCaller();
+
+      await caller.register({
+        email: "sam@acme.com",
+        password: "correct horse battery staple",
+        name: "Sam",
+      });
+
+      // Not from the screen, which holds no session to send from, and not
+      // from a public "mail this address" endpoint, which would be a mailer
+      // pointed at anything anybody types.
+      expect(requestVerificationMock).toHaveBeenCalledWith({
+        email: "sam@acme.com",
+      });
+    });
+
+    /** @scenario "The confirmation link is sent by the call that creates the account" */
+    it("keeps the account when the mailer is down", async () => {
+      requestVerificationMock.mockRejectedValue(new Error("smtp unreachable"));
+      const caller = createCaller();
+
+      // The account exists and the way on is the "send it again" the next
+      // screen offers; losing the registration over a mail failure would cost
+      // somebody the account they just made.
+      await expect(
+        caller.register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          name: "Sam",
+        }),
+      ).resolves.toEqual({ id: "user-1" });
     });
   });
 });
