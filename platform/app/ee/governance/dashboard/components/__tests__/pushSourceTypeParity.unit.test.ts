@@ -22,13 +22,15 @@ describe("given the catalog and service both classify source types", () => {
       const catalogSecret = SOURCE_TYPE_OPTIONS.filter((o) =>
         needsIngestSecret({ sourceType: o.value }),
       ).map((o) => o.value);
-      const missing = catalogSecret.filter((t) => !isPushSourceType(t));
+      const missing = catalogSecret.filter(
+        (t) => !isPushSourceType({ sourceType: t }),
+      );
       expect(missing).toEqual([]);
     });
 
     it("every service push type is secret-bearing in the catalog", () => {
       const servicePush = SOURCE_TYPE_OPTIONS.filter((o) =>
-        isPushSourceType(o.value),
+        isPushSourceType({ sourceType: o.value }),
       ).map((o) => o.value);
       const missing = servicePush.filter(
         (t) => !needsIngestSecret({ sourceType: t }),

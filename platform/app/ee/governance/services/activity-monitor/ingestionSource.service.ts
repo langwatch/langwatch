@@ -88,8 +88,12 @@ const PUSH_SOURCE_TYPES: ReadonlySet<SourceType> = new Set([
   "s3_custom", // webhook callback path authenticated by ingest secret
 ]);
 
-export function isPushSourceType(t: SourceType): boolean {
-  return PUSH_SOURCE_TYPES.has(t);
+export function isPushSourceType({
+  sourceType,
+}: {
+  sourceType: SourceType;
+}): boolean {
+  return PUSH_SOURCE_TYPES.has(sourceType);
 }
 
 export interface CreateIngestionSourceInput {
@@ -587,7 +591,7 @@ export class IngestionSourceService {
     // lazy-create logic anywhere else (master_orchestrator constraint).
     await ensureHiddenGovernanceProject(this.prisma, input.organizationId);
 
-    const isPush = isPushSourceType(input.sourceType);
+    const isPush = isPushSourceType({ sourceType: input.sourceType });
     const ingestSecret = isPush ? generateIngestSecret() : null;
     const ingestSecretHash = ingestSecret ? hashIngestSecret(ingestSecret) : "";
 
@@ -829,7 +833,7 @@ export class IngestionSourceService {
     organizationId: string,
   ): Promise<{ source: IngestionSource; ingestSecret: string }> {
     const existing = await this.requireById(id, organizationId);
-    if (!isPushSourceType(existing.sourceType as SourceType)) {
+    if (!isPushSourceType({ sourceType: existing.sourceType as SourceType })) {
       throw new ValidationError(
         "Only push-mode sources have an ingest secret to rotate.",
         {
