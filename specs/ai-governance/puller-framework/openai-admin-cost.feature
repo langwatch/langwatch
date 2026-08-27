@@ -247,14 +247,4 @@ Feature: OpenAI Admin cost puller
       # The reason is logged and shown on the source, so anything it carries is
       # readable by people who were never given the credential.
 
-  Rule: The source that never worked is retired without disappearing
 
-    @unit
-    Scenario: The old OpenAI source is still listed and cannot be chosen
-      Given an admin opens the list of source types to add
-      Then the earlier OpenAI compliance source is still shown
-      And it is marked as retired
-      And it cannot be selected for a new source
-      # Removing it from the list would contradict the promise that the menu
-      # shows every supported type. Showing it retired tells the truth to anyone
-      # who went looking for it.

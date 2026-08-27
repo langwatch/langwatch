@@ -78,31 +78,6 @@ describe("given the ingestion-source catalog", () => {
     });
   });
 
-  describe("when the old OpenAI compliance source has been retired", () => {
-    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
-    it("is not offered on any plan", () => {
-      for (const isEnterprise of [true, false]) {
-        const offered = gatedSourceTypeOptions({ isEnterprise }).map(
-          (o) => o.value,
-        );
-        expect(offered).not.toContain("openai_compliance");
-      }
-    });
-
-    /** @scenario "Sources already configured on the old type still display" */
-    it("still resolves a label for sources already configured on it", () => {
-      expect(SOURCE_TYPE_LABEL.openai_compliance).toBeTruthy();
-      expect(
-        SOURCE_TYPE_OPTIONS.some((o) => o.value === "openai_compliance"),
-      ).toBe(true);
-    });
-
-    /** @scenario "The old OpenAI source is still listed and cannot be chosen" */
-    it("offers the replacement that reads the same vendor", () => {
-      expect(SOURCE_TYPE_OPTIONS.map((o) => o.value)).toContain("openai_admin");
-    });
-  });
-
   describe("when a vendor's spend can only be read once", () => {
     /** @scenario "Adding a second source for the same organization warns the admin" */
     it("says in the OpenAI Admin blurb that a second source counts the spend twice", () => {

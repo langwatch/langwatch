@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * OpenAI Admin API puller — organization spend, attributed to the person and
+ * OpenAI Admin puller — organization spend, attributed to the person and
  * the API key it was billed to (ADR-122).
  *
  * Like the Anthropic Admin puller it cannot be an `HttpPollingPullerAdapter`

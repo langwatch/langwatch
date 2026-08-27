@@ -64,7 +64,8 @@ describe("given the Add source menu", () => {
         "Anthropic Claude (Cowork)",
         "Workato",
         "Microsoft Copilot Studio",
-        "OpenAI Admin API (spend)",
+        "OpenAI Enterprise Compliance",
+        "OpenAI Admin",
         "Anthropic Claude Enterprise Compliance",
         "Anthropic Admin API (usage & cost)",
         "Databricks AI/BI Genie",
@@ -74,11 +75,11 @@ describe("given the Add source menu", () => {
         expect(screen.getByText(label)).toBeTruthy();
       }
 
-      // Retired sources are filtered out of the picker.
+      // The retired directory-audit source is filtered out of the picker, so
+      // the offer carries one Copilot entry, not two near-identical ones.
       expect(
         screen.queryByText("Microsoft Copilot Studio (Purview)"),
       ).toBeNull();
-      expect(screen.queryByText("OpenAI Enterprise Compliance")).toBeNull();
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */
