@@ -32,9 +32,10 @@ vi.mock("@langwatch/experiment-server", async (importOriginal) => ({
   ExperimentRunStateRepositoryClickHouse: class {},
 }));
 
-vi.mock("@langwatch/simulation-server", () => ({
-  SimulationRunStateRepositoryClickHouse: class {},
-  SIMULATION_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
+vi.mock("@langwatch/scenario-server", () => ({
+  SimulationRunStateStoreAdapter: {
+    create: vi.fn(() => ({ createFoldStore: vi.fn(() => ({})) })),
+  },
 }));
 
 vi.mock("~/runtime/app/features/suite", () => ({

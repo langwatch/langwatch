@@ -23,7 +23,7 @@ import {
   ScenarioRunStatusIcon,
   SimulationConsole,
   hasNoResults,
-} from "@langwatch/simulation-web";
+} from "@langwatch/scenario-web";
 import { useRunAgainActions } from "./useRunAgainActions";
 import { useRunDetailFacts } from "./useRunDetailFacts";
 import { useRunStateStream } from "./useRunStateStream";

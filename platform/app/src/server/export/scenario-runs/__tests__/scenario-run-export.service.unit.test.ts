@@ -12,14 +12,8 @@
  */
 
 import Parse from "papaparse";
-import type {
-  SimulationExportRun,
-  SimulationService,
-} from "@langwatch/simulation-contract";
-import {
-  SimulationClickHouseAdapter,
-  SimulationExecutionPort,
-} from "@langwatch/simulation-server";
+import type { SimulationExportRun, SimulationService } from "@langwatch/scenario-contract";
+import { SimulationClickHouseAdapter, SimulationExecutionPort } from "@langwatch/scenario-server";
 import { describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { ScenarioRunExportService } from "../scenario-run-export.service";
@@ -86,26 +80,22 @@ function pagingService(pages: SimulationExportRun[][]): {
   const calls: FindCall[] = [];
   const simulations = createSimulationService();
   vi.spyOn(simulations, "countRunsForExport").mockResolvedValue(pages.flat().length);
-  vi.spyOn(simulations, "findRunsForExport").mockImplementation(
-    async (params: FindCall) => {
-      calls.push(params);
-      const index = params.cursor ? Number(params.cursor) : 0;
-      const runs = pages[index] ?? [];
-      const hasMore = index < pages.length - 1;
-      return {
-        runs,
-        hasMore,
-        ...(hasMore ? { nextCursor: String(index + 1) } : {}),
-      };
-    },
-  );
+  vi.spyOn(simulations, "findRunsForExport").mockImplementation(async (params: FindCall) => {
+    calls.push(params);
+    const index = params.cursor ? Number(params.cursor) : 0;
+    const runs = pages[index] ?? [];
+    const hasMore = index < pages.length - 1;
+    return {
+      runs,
+      hasMore,
+      ...(hasMore ? { nextCursor: String(index + 1) } : {}),
+    };
+  });
 
   return { simulations, calls };
 }
 
-function request(
-  overrides: Partial<ScenarioRunExportRequest> = {},
-): ScenarioRunExportRequest {
+function request(overrides: Partial<ScenarioRunExportRequest> = {}): ScenarioRunExportRequest {
   return { projectId: "project_1", mode: "criteria", ...overrides };
 }
 
@@ -147,13 +137,9 @@ describe("ScenarioRunExportService", () => {
       ]);
       const service = new ScenarioRunExportService(simulations);
 
-      const { csv } = await collect(
-        service.exportRuns({ request: request({ mode: "full" }) }),
-      );
+      const { csv } = await collect(service.exportRuns({ request: request({ mode: "full" }) }));
 
-      const headerLines = csv
-        .split("\n")
-        .filter((line) => line.startsWith("run_scenario_name,"));
+      const headerLines = csv.split("\n").filter((line) => line.startsWith("run_scenario_name,"));
       expect(headerLines).toHaveLength(1);
       expect(rowsOf(csv).map((row) => row.run_scenario_run_id)).toEqual(["a", "b", "c"]);
     });
@@ -248,10 +234,7 @@ describe("ScenarioRunExportService", () => {
 
       // ERROR and FAILED are both "failure" — the filter is by category, so a
       // run that died before the judge saw it is a failure like any other.
-      expect(rowsOf(csv).map((row) => row.run_scenario_run_id)).toEqual([
-        "failed",
-        "errored",
-      ]);
+      expect(rowsOf(csv).map((row) => row.run_scenario_run_id)).toEqual(["failed", "errored"]);
     });
 
     /**

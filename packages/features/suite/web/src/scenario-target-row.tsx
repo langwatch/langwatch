@@ -17,7 +17,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunData as ScenarioRunData,
-} from "@langwatch/simulation-contract";
+} from "@langwatch/scenario-contract";
 import type { ReactNode } from "react";
 import { formatRunStatusLabel } from "./format-run-status-label";
 import { buildDisplayTitle } from "./run-history-transforms";
@@ -228,9 +228,7 @@ export function ScenarioTargetRow({
             cursor={isCancelling ? "default" : "pointer"}
             opacity={isCancelling ? 0.6 : 1}
             flexShrink={0}
-            _hover={
-              isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }
-            }
+            _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               if (!isCancelling) onCancel?.();

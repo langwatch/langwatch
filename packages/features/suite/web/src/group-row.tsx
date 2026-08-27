@@ -13,7 +13,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
-import type { SimulationRunData as ScenarioRunData } from "@langwatch/simulation-contract";
+import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { BatchSection } from "./batch-section";
 import { RunMetricsSummary } from "./run-metrics-summary";
 import type { ScenarioRunContextRenderer } from "./scenario-target-row";
@@ -58,14 +58,7 @@ export function GroupRow({
   return (
     <Box>
       {/* Group header — same card style as RunRow */}
-      <Box
-        padding={2}
-        paddingBottom={0}
-        width="full"
-        position="sticky"
-        top={0}
-        zIndex={20}
-      >
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
           as="button"
           width="full"

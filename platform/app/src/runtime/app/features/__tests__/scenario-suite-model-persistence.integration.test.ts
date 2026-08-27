@@ -22,7 +22,7 @@ import {
   AppScenarioSecretCipher,
 } from "~/runtime/app/features/scenario";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
-import { SimulationService } from "@langwatch/simulation-contract";
+import { SimulationService } from "@langwatch/scenario-contract";
 import { PostgresSuiteAdapter, SuiteExecutionPort } from "@langwatch/suite-server";
 import type { SuiteRunResult } from "@langwatch/suite-contract";
 

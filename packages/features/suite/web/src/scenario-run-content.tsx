@@ -11,7 +11,7 @@
 import { Grid, VStack } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { SimulationRunData as ScenarioRunData } from "@langwatch/simulation-contract";
+import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { ScenarioGridCard } from "./scenario-grid-card";
 import { type ScenarioRunContextRenderer, ScenarioTargetRow } from "./scenario-target-row";
 import type { ViewMode } from "./use-run-history-store";

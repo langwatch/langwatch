@@ -7,8 +7,8 @@ import {
 } from "../../server/event-sourcing/__tests__/integration/testContainers";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
-  ClickHouseStalledRunFinder,
-} from "@langwatch/simulation-server";
+  SimulationStalledRunAdapter,
+} from "@langwatch/scenario-server";
 
 const tenantId = `test-stalled-backfill-${nanoid()}`;
 const otherTenantId = `test-stalled-backfill-other-${nanoid()}`;
@@ -70,12 +70,12 @@ async function insertRows(ch: ClickHouseClient, rows: ReturnType<typeof makeRow>
 }
 
 let ch: ClickHouseClient;
-let finder: ClickHouseStalledRunFinder;
+let finder: SimulationStalledRunAdapter;
 
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  finder = new ClickHouseStalledRunFinder(ch);
+  finder = SimulationStalledRunAdapter.create(ch);
 }, 60_000);
 
 afterAll(async () => {
@@ -90,7 +90,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("ClickHouseStalledRunFinder.findStalledRuns (integration)", () => {
+describe("SimulationStalledRunAdapter.findStalledRuns (integration)", () => {
   describe("given a mix of abandoned, active, terminal and archived runs", () => {
     /** @scenario "The backfill only selects abandoned non-terminal runs" */
     it("surfaces only the abandoned non-terminal runs, with the ids needed to finish them", async () => {

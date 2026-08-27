@@ -35,10 +35,7 @@ import type { GatewaySpendEventsService } from "@langwatch/gateway-server";
 import type { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import type { StoredObjectOwnerLookupService } from "~/server/stored-objects/stored-object-owner-lookup.service";
 import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
-import type {
-  NotificationService,
-  NurturingService,
-} from "~/runtime/app/features/billing";
+import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
 import type { UsageLimitService } from "./billing/enterprise/usage-limit.service";
 import type { WebhookService } from "./billing/enterprise/webhook.service";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
@@ -52,7 +49,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import type { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
 import type { SuiteService } from "@langwatch/suite-contract";
-import type { SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";

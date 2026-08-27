@@ -1,5 +1,5 @@
 import Parse from "papaparse";
-import type { SimulationExportRun } from "@langwatch/simulation-contract";
+import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } from "../csv-serializer";
@@ -79,9 +79,7 @@ describe("scenario run CSV serializers", () => {
           ).filter((i) => i >= 0),
         );
         const verdictAt = header.findIndex((h) => h.replace(/^run_/, "") === "verdict");
-        const reasoningAt = header.findIndex(
-          (h) => h.replace(/^run_/, "") === "reasoning",
-        );
+        const reasoningAt = header.findIndex((h) => h.replace(/^run_/, "") === "reasoning");
 
         expect(verdictAt).toBeLessThan(firstIdentifier);
         expect(reasoningAt).toBeLessThan(firstIdentifier);
@@ -102,12 +100,8 @@ describe("scenario run CSV serializers", () => {
         .split("\r\n")[0]!
         .split(",");
 
-      expect(criteria.indexOf("criterion")).toBeLessThan(
-        criteria.indexOf("scenario_run_id"),
-      );
-      expect(full.indexOf("message_content")).toBeLessThan(
-        full.indexOf("run_scenario_run_id"),
-      );
+      expect(criteria.indexOf("criterion")).toBeLessThan(criteria.indexOf("scenario_run_id"));
+      expect(full.indexOf("message_content")).toBeLessThan(full.indexOf("run_scenario_run_id"));
     });
   });
 
@@ -260,9 +254,7 @@ describe("scenario run CSV serializers", () => {
           buildRun({
             scenarioRunId: "run_b",
             name: "Password Reset",
-            messages: [
-              { role: "user", content: "help" },
-            ] as SimulationExportRun["messages"],
+            messages: [{ role: "user", content: "help" }] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -271,9 +263,7 @@ describe("scenario run CSV serializers", () => {
       const rows = parse(csv);
       expect(rows).toHaveLength(4);
 
-      const deduped = [
-        ...new Map(rows.map((row) => [row.run_scenario_run_id, row])).values(),
-      ];
+      const deduped = [...new Map(rows.map((row) => [row.run_scenario_run_id, row])).values()];
       expect(deduped).toHaveLength(2);
       expect(deduped.map((row) => row.run_scenario_name)).toEqual([
         "Refund Request",
@@ -315,9 +305,7 @@ describe("scenario run CSV serializers", () => {
         includeHeader: true,
       });
 
-      expect(parse(csv)[0]!.run_scenario_description).toBe(
-        "Tests refund policy under pressure",
-      );
+      expect(parse(csv)[0]!.run_scenario_description).toBe("Tests refund policy under pressure");
     });
 
     it("unions run-level and per-message trace ids without duplicating", () => {
@@ -334,11 +322,7 @@ describe("scenario run CSV serializers", () => {
         includeHeader: true,
       });
 
-      expect(JSON.parse(parse(csv)[0]!.run_trace_ids!)).toEqual([
-        "trace_a",
-        "trace_b",
-        "trace_c",
-      ]);
+      expect(JSON.parse(parse(csv)[0]!.run_trace_ids!)).toEqual(["trace_a", "trace_b", "trace_c"]);
     });
 
     it("leaves target columns empty when metadata has no langwatch namespace", () => {
@@ -400,11 +384,7 @@ describe("scenario run CSV serializers", () => {
     });
 
     it("leaves the parameters column empty for a run that resolved none", () => {
-      for (const metadata of [
-        null,
-        { langwatch: { targetType: "http" } },
-        { parameters: {} },
-      ]) {
+      for (const metadata of [null, { langwatch: { targetType: "http" } }, { parameters: {} }]) {
         const csv = serializeRunsToFullCsv({
           runs: [buildRun({ metadata } as Partial<SimulationExportRun>)],
           includeHeader: true,
@@ -461,9 +441,7 @@ describe("scenario run CSV serializers", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
-            messages: [
-              { role: "user", content: DANGEROUS },
-            ] as SimulationExportRun["messages"],
+            messages: [{ role: "user", content: DANGEROUS }] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -653,9 +631,7 @@ describe("scenario run CSV serializers", () => {
 
       const rows = parse(serializeRunsToCriteriaCsv({ runs, includeHeader: true }));
 
-      const failuresOfTerse = rows.filter(
-        (row) => row.criterion === terse && row.met === "false",
-      );
+      const failuresOfTerse = rows.filter((row) => row.criterion === terse && row.met === "false");
       expect(failuresOfTerse).toHaveLength(18);
       // Across 18 distinct scenarios, which is the part no per-scenario view
       // can show — the same rule breaking everywhere.

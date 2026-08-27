@@ -12,7 +12,7 @@ import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNow } from "./now-provider";
-import type { SimulationRunData as ScenarioRunData } from "@langwatch/simulation-contract";
+import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "./format-time-ago";
 import { RunMetricsSummary } from "./run-metrics-summary";
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -60,14 +60,7 @@ export function RunRow(props: RunRowProps) {
 function RunRowLoading({ suiteName }: { suiteName?: string }) {
   return (
     <Box>
-      <Box
-        padding={2}
-        paddingBottom={0}
-        width="full"
-        position="sticky"
-        top={0}
-        zIndex={20}
-      >
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
           width="full"
           paddingX={4}
@@ -163,14 +156,7 @@ function RunRowData({
       }
     >
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
-      <Box
-        padding={2}
-        paddingBottom={0}
-        width="full"
-        position="sticky"
-        top={0}
-        zIndex={20}
-      >
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
           as="button"
           width="full"
@@ -233,9 +219,7 @@ function RunRowData({
               flexShrink={0}
               opacity={isCancellingBatch ? 0.6 : 1}
               _hover={
-                isCancellingBatch
-                  ? undefined
-                  : { bg: "bg.muted", borderColor: "border.emphasized" }
+                isCancellingBatch ? undefined : { bg: "bg.muted", borderColor: "border.emphasized" }
               }
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
@@ -298,8 +282,8 @@ function RunRowData({
             <Dialog.Body>
               <Text fontSize="sm" color="fg.muted">
                 This will cancel {cancellableCount} remaining{" "}
-                {cancellableCount === 1 ? "job" : "jobs"} in this batch run. This action
-                cannot be undone.
+                {cancellableCount === 1 ? "job" : "jobs"} in this batch run. This action cannot be
+                undone.
               </Text>
             </Dialog.Body>
             <Dialog.Footer>

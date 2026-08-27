@@ -14,8 +14,8 @@ import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import type { ScenarioMessageSnapshotEvent } from "@langwatch/scenario-contract";
 import { Drawer } from "../../ui/drawer";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
-import { ScenarioRunHeader } from "@langwatch/simulation-web";
-import { SimulationConsole } from "@langwatch/simulation-web";
+import { ScenarioRunHeader } from "@langwatch/scenario-web";
+import { SimulationConsole } from "@langwatch/scenario-web";
 
 // MediaPart fires a tRPC existence probe on a media error event; stub it so the
 // probe never resolves to a placeholder on the happy path (mirrors the
@@ -131,10 +131,9 @@ describe("ScenarioRunDetailDrawer", () => {
 
     describe("given a pending run", () => {
       it("displays running status without criteria", () => {
-        render(
-          <SimulationConsole results={null} status={ScenarioRunStatus.IN_PROGRESS} />,
-          { wrapper: Wrapper },
-        );
+        render(<SimulationConsole results={null} status={ScenarioRunStatus.IN_PROGRESS} />, {
+          wrapper: Wrapper,
+        });
 
         expect(screen.getByText("simulation-results.log")).toBeInTheDocument();
       });

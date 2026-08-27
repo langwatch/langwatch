@@ -1,6 +1,6 @@
 import type { ScenarioService as ScenarioServiceContract } from "@langwatch/scenario-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import type { ScenarioClockPort } from "../../ports/scenario-clock.port";
 import type { ScenarioFolderIdPort, ScenarioIdPort } from "../../ports/scenario-id.port";
 import type { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port";

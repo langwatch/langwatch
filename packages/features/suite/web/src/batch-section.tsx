@@ -6,7 +6,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useNow } from "./now-provider";
-import type { SimulationRunData as ScenarioRunData } from "@langwatch/simulation-contract";
+import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { formatTimeAgoCompact } from "./format-time-ago";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeBatchRunSummary, computeIterationMap } from "./run-history-transforms";
@@ -35,10 +35,7 @@ export function BatchSection({
   onPrefetchRun,
   renderScenarioContext,
 }: BatchSectionProps) {
-  const batchSummary = useMemo(
-    () => computeBatchRunSummary({ batchRun: batch }),
-    [batch],
-  );
+  const batchSummary = useMemo(() => computeBatchRunSummary({ batchRun: batch }), [batch]);
 
   const iterationMap = useMemo(
     () => computeIterationMap({ scenarioRuns: batch.scenarioRuns }),
@@ -120,13 +117,7 @@ function BatchStatusCounts({ summary }: { summary: BatchRunSummary }) {
     <HStack gap={2}>
       {items.map((item) => (
         <HStack key={item.label} gap={1}>
-          <Box
-            width="6px"
-            height="6px"
-            borderRadius="full"
-            bg={item.color}
-            flexShrink={0}
-          />
+          <Box width="6px" height="6px" borderRadius="full" bg={item.color} flexShrink={0} />
           <Text fontSize="xs" color="fg.subtle">
             {item.count} {item.label}
           </Text>

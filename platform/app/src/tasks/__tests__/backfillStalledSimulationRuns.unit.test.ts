@@ -7,13 +7,13 @@ import {
   type ScenarioUnsuccessfulExecutionInput,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { StalledHistoricalRun } from "@langwatch/simulation-server";
+import type { SimulationStalledRun } from "@langwatch/scenario-server";
 import { backfillStalledRuns } from "../backfillStalledSimulationRuns";
 
 vi.mock("~/server/app-layer/app", () => ({ getApp: vi.fn() }));
 vi.mock("~/server/app-layer/presets", () => ({ initializeDefaultApp: vi.fn() }));
 
-function makeRun(overrides: Partial<StalledHistoricalRun> = {}): StalledHistoricalRun {
+function makeRun(overrides: Partial<SimulationStalledRun> = {}): SimulationStalledRun {
   return {
     tenantId: "tenant-1",
     scenarioRunId: "run-1",
@@ -25,7 +25,7 @@ function makeRun(overrides: Partial<StalledHistoricalRun> = {}): StalledHistoric
   };
 }
 
-function makeFinder(runs: StalledHistoricalRun[]) {
+function makeFinder(runs: SimulationStalledRun[]) {
   return { findStalledRuns: vi.fn().mockResolvedValue(runs) };
 }
 

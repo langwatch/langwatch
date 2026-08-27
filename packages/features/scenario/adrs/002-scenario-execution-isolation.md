@@ -16,8 +16,8 @@ depend on whichever helper a caller happened to use.
 The Scenario server package owns execution prefetch, its bounded process pool,
 failure completion, cancellation subscription and the isolated child lifecycle.
 It consumes complete Project, Suite, Prompt, Agent, Workflow, Model Provider,
-Secret, Trace and Simulation services. Simulation owns the deterministic
-run-execution process manager and calls Scenario through its execution service.
+Secret and Trace services. Scenario's run-lifecycle collaborator owns the
+deterministic process manager and calls the execution service.
 `ScenarioExecutionService` is the narrow second public service because
 preparation, queue submission and cancellation share a worker lifecycle
 distinct from CRUD. Transports, process managers and workers use that one

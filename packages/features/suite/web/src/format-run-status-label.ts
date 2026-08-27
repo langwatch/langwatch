@@ -7,7 +7,7 @@
  * @see specs/features/suites/suite-list-view-status.feature
  */
 
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/simulation-contract";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 type CriteriaResults = {
   metCriteria: string[];
@@ -44,10 +44,7 @@ const TERMINAL_WITH_CRITERIA: Set<ScenarioRunStatus> = new Set([
  * criteria count in parentheses when criteria exist, e.g. "Passed (4/5)".
  * Non-terminal statuses return their label as-is: "Running", "Pending", etc.
  */
-export function formatRunStatusLabel({
-  status,
-  results,
-}: FormatRunStatusLabelInput): string {
+export function formatRunStatusLabel({ status, results }: FormatRunStatusLabelInput): string {
   const label = STATUS_LABELS[status];
 
   if (!TERMINAL_WITH_CRITERIA.has(status) || !results) {

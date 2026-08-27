@@ -19,7 +19,7 @@
  */
 
 import Parse from "papaparse";
-import type { SimulationExportRun } from "@langwatch/simulation-contract";
+import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { categorizeRunStatus } from "@langwatch/scenario-contract";
 
 /**

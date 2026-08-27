@@ -1,4 +1,4 @@
-import type { QueueRunCommandData } from "@langwatch/simulation-server";
+import type { QueueRunCommandData } from "@langwatch/scenario-contract";
 import {
   SuiteRunCommandsPort,
   SuiteRunIdPort,

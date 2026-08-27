@@ -8,7 +8,7 @@
 import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunData as ScenarioRunData,
-} from "@langwatch/simulation-contract";
+} from "@langwatch/scenario-contract";
 
 type SuiteRunSummary = {
   passedCount: number;

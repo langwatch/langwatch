@@ -1,7 +1,7 @@
 import { on } from "node:events";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import type { SimulationBatchRunData, SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationBatchRunData, SimulationService } from "@langwatch/scenario-contract";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { startScenarioTabPresence } from "@langwatch/scenario-contract";

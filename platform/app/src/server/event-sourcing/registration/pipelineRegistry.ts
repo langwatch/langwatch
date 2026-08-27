@@ -131,7 +131,7 @@ import type { TraceSummaryService } from "../../app-layer/traces/trace-summary.s
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
-import type { SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import {
   createAutomationsPipeline,
   createGraphTriggerActivityHandler,
@@ -185,17 +185,17 @@ import { createProcessManagerMaintenancePipeline } from "../pipelines/process-ma
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
-  createSimulationProcessingPipeline,
+  SimulationProcessingPipelineAdapter,
   FinishRunCommand,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
-  SIMULATION_PROJECTION_VERSIONS,
+  SimulationRunMetricsStoreAdapter,
+  SimulationRunStateStoreAdapter,
+  simulationRunExecutionPM,
+} from "@langwatch/scenario-server";
+import {
   type ComputeRunMetricsCommandData,
   type SimulationProcessingEvent,
-  type SimulationRunMetricsProjectionRecord,
-  type SimulationRunStateData,
-  type SimulationRunStateRepository,
-  simulationRunExecutionPM,
-} from "@langwatch/simulation-server";
+} from "@langwatch/scenario-contract";
 import {
   createSuiteRunProcessingPipeline,
   SUITE_RUN_PROJECTION_VERSIONS,
@@ -348,9 +348,9 @@ function createInMemoryDeferredFallback<P>({
  */
 export interface PipelineRepositories {
   /** Primary replica for read-after-write consistency. */
-  simulationRunState: SimulationRunStateRepository;
+  simulationRunState: SimulationRunStateStoreAdapter;
   /** Write side of the simulationRunMetrics map projection (migration 00078). */
-  simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
+  simulationRunMetricsStore: SimulationRunMetricsStoreAdapter;
   /** Primary replica for read-after-write consistency. */
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
@@ -1392,11 +1392,8 @@ export class PipelineRegistry {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     simComputeRunMetrics: Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>;
   }) {
-    const simulationRunStore = this.cached<SimulationRunStateData>(
-      new RepositoryFoldStore<SimulationRunStateData>(
-        this.deps.repositories.simulationRunState,
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+    const simulationRunStore = this.cached(
+      this.deps.repositories.simulationRunState.createFoldStore(),
       "simulation_runs",
     );
 
@@ -1431,7 +1428,7 @@ export class PipelineRegistry {
     });
 
     const simulationPipeline = this.deps.eventSourcing.register(
-      createSimulationProcessingPipeline({
+      SimulationProcessingPipelineAdapter.create({
         simulationRunStore,
         simulationRunMetricsStore: this.deps.repositories.simulationRunMetricsStore,
         finishRunCommand,

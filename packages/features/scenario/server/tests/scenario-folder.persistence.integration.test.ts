@@ -1,5 +1,5 @@
 import type { ScenarioService as ScenarioServiceContract } from "@langwatch/scenario-contract";
-import { SimulationService } from "@langwatch/simulation-contract";
+import { SimulationService } from "@langwatch/scenario-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,

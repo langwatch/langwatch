@@ -2,8 +2,8 @@ import {
   ScenarioMessageRenderer as FeatureScenarioMessageRenderer,
   type ScenarioMessageRendererProps as FeatureScenarioMessageRendererProps,
   type StreamingMessage,
-} from "@langwatch/simulation-web";
-import type { SimulationMessage } from "@langwatch/simulation-contract";
+} from "@langwatch/scenario-web";
+import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { Bubble } from "~/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble";
 import { getDisplayRoleVisuals } from "~/features/traces-v2/components/TraceDrawer/scenarioRoles";
 import { RenderInputOutput } from "../traces/RenderInputOutput";

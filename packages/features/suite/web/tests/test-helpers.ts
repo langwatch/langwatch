@@ -8,12 +8,10 @@ import {
   SimulationRunStatus as ScenarioRunStatus,
   SimulationVerdict as Verdict,
   type SimulationRunData as ScenarioRunData,
-} from "@langwatch/simulation-contract";
+} from "@langwatch/scenario-contract";
 import type { BatchRun, BatchRunSummary } from "../src/run-history-transforms";
 
-export function makeScenarioRunData(
-  overrides: Partial<ScenarioRunData> = {},
-): ScenarioRunData {
+export function makeScenarioRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
     scenarioId: "scen_1",
     batchRunId: "batch_1",

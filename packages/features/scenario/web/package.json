@@ -25,10 +25,13 @@
     "@hookform/resolvers": "^5.4.0",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@tanstack/react-table": "^8.21.3",
     "lucide-react": "^1.22.0",
     "react": "^19.2.7",
+    "react-feather": "^2.0.10",
     "react-hook-form": "^7.80.0",
+    "react-icons": "^5.7.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

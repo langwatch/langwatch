@@ -10,7 +10,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SimulationService } from "@langwatch/simulation-contract";
+import { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { ScenarioRepository } from "../src/repositories/scenario.repository";
 import { ScenarioService } from "../src/services/scenario.service";

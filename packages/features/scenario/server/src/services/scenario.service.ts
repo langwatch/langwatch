@@ -44,7 +44,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { resolveRunParameters } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import type { ScenarioRepository } from "../repositories/scenario.repository";
 import type { ScenarioClockPort } from "../ports/scenario-clock.port";
 import type { ScenarioFolderIdPort, ScenarioIdPort } from "../ports/scenario-id.port";

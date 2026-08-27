@@ -9,15 +9,9 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  SimulationExportRun,
-  SimulationService,
-} from "@langwatch/simulation-contract";
+import type { SimulationExportRun, SimulationService } from "@langwatch/scenario-contract";
 import { traced } from "~/server/app-layer/tracing";
-import {
-  categorizeRunStatus,
-  type RunStatusCategory,
-} from "@langwatch/scenario-contract";
+import { categorizeRunStatus, type RunStatusCategory } from "@langwatch/scenario-contract";
 import { serializeRunsToCriteriaCsv, serializeRunsToFullCsv } from "./csv-serializer";
 import type {
   ScenarioRunExportProgress,
@@ -64,11 +58,7 @@ export class ScenarioRunExportService {
    * than written rows, because criteria mode emits several rows per run and a
    * category filter drops runs entirely.
    */
-  async getTotalCount({
-    request,
-  }: {
-    request: ScenarioRunExportRequest;
-  }): Promise<number> {
+  async getTotalCount({ request }: { request: ScenarioRunExportRequest }): Promise<number> {
     return this.simulations.countRunsForExport({
       projectId: request.projectId,
       scenarioSetId: request.scenarioSetId,
@@ -154,10 +144,7 @@ export class ScenarioRunExportService {
       if (!page.hasMore || !cursor || page.runs.length === 0) break;
     }
 
-    logger.info(
-      { projectId: request.projectId, visited, total },
-      "Scenario run export completed",
-    );
+    logger.info({ projectId: request.projectId, visited, total }, "Scenario run export completed");
   }
 }
 

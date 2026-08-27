@@ -7,7 +7,7 @@ import { startTestContainers, stopTestContainers } from "../integration/testCont
 import {
   type SimulationRunState,
   SimulationRunStateRepositoryClickHouse,
-} from "@langwatch/simulation-server";
+} from "@langwatch/scenario-server/testing";
 
 const tenantId = `test-sim-proj-${nanoid()}`;
 const now = Date.now();

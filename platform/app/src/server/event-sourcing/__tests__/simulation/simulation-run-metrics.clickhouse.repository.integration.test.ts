@@ -6,7 +6,7 @@ import { startTestContainers, stopTestContainers } from "../integration/testCont
 import {
   type SimulationRunMetricsProjectionRecord,
   SimulationRunMetricsRepositoryClickHouse,
-} from "@langwatch/simulation-server";
+} from "@langwatch/scenario-server/testing";
 
 const tenantId = `test-sim-metrics-${nanoid()}`;
 const scenarioRunId = `run-${nanoid()}`;

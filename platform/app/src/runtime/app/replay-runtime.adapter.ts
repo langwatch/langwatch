@@ -13,10 +13,7 @@ import {
   createExperimentRunStateFoldStore,
   ExperimentRunStateRepositoryClickHouse,
 } from "@langwatch/experiment-server";
-import {
-  SimulationRunStateRepositoryClickHouse,
-  SIMULATION_PROJECTION_VERSIONS,
-} from "@langwatch/simulation-server";
+import { SimulationRunStateStoreAdapter } from "@langwatch/scenario-server";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { createAppTraceSummaryStore } from "~/runtime/app/trace-summary-fold.adapter";
 import { AppTraceWindowedReadMetricsAdapter } from "~/runtime/app/trace-windowed-read-metrics.adapter";
@@ -112,13 +109,11 @@ export function createReplayRuntime(config: {
     ],
     [
       "simulation_processing",
-      new RepositoryFoldStore(
-        new SimulationRunStateRepositoryClickHouse({
-          resolveClient: clientResolver,
-          defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        }),
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      SimulationRunStateStoreAdapter.create({
+        type: "clickhouse",
+        resolveClient: clientResolver,
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      }).createFoldStore(),
     ],
     [
       "suite_run_processing",

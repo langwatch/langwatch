@@ -4,7 +4,7 @@
  * @see specs/features/suites/suite-list-view-status.feature
  */
 import { describe, expect, it } from "vitest";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/simulation-contract";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { formatRunStatusLabel } from "../src/format-run-status-label";
 
 describe("formatRunStatusLabel()", () => {

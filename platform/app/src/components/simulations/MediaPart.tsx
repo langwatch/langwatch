@@ -2,17 +2,13 @@ import {
   MediaPart as SimulationMediaPart,
   type MediaPartProps,
   type MediaProbeResult,
-} from "@langwatch/simulation-web";
+} from "@langwatch/scenario-web";
 import { useEffect, useState } from "react";
 import { api } from "~/utils/api";
 
 function storedObjectIdForPart(part: MediaPartProps["part"]): string | undefined {
   const url =
-    part.type === "binary"
-      ? part.url
-      : part.source.type === "url"
-        ? part.source.value
-        : undefined;
+    part.type === "binary" ? part.url : part.source.type === "url" ? part.source.value : undefined;
   const match = url ? /^\/api\/files\/(?:[^/?#]+\/)?([^/?#]+)/.exec(url) : undefined;
   return match?.[1];
 }

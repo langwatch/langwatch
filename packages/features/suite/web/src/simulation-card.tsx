@@ -1,5 +1,5 @@
 import { Box, Card, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/simulation-contract";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { SimulationStatusOverlay } from "./simulation-status-overlay";
 import {
   SCENARIO_RUN_STATUS_CONFIG,
@@ -22,21 +22,10 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
-function SimulationCardHeader({
-  title,
-  isComplete,
-}: {
-  title: string;
-  isComplete: boolean;
-}) {
+function SimulationCardHeader({ title, isComplete }: { title: string; isComplete: boolean }) {
   return (
     <Box py={2} px={3} w="100%" position="relative" zIndex={2}>
-      <Text
-        fontSize="xs"
-        fontWeight="semibold"
-        color={isComplete ? "white" : "fg"}
-        lineClamp={2}
-      >
+      <Text fontSize="xs" fontWeight="semibold" color={isComplete ? "white" : "fg"} lineClamp={2}>
         {title}
       </Text>
     </Box>
@@ -179,8 +168,7 @@ function SimulationStatusBadge({ status }: { status: ScenarioRunStatus }) {
   const Icon = SCENARIO_RUN_STATUS_ICONS[status];
   const isRunning =
     status === ScenarioRunStatus.RUNNING || status === ScenarioRunStatus.IN_PROGRESS;
-  const isPending =
-    status === ScenarioRunStatus.PENDING || status === ScenarioRunStatus.QUEUED;
+  const isPending = status === ScenarioRunStatus.PENDING || status === ScenarioRunStatus.QUEUED;
 
   return (
     <Box
@@ -207,12 +195,7 @@ function SimulationStatusBadge({ status }: { status: ScenarioRunStatus }) {
         ) : (
           <Icon size={12} color="currentColor" />
         )}
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          textTransform="capitalize"
-          lineHeight="1"
-        >
+        <Text fontSize="xs" fontWeight="semibold" textTransform="capitalize" lineHeight="1">
           {config.label}
         </Text>
       </HStack>

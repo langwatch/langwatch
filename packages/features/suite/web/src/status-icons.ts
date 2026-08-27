@@ -7,7 +7,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import { AlertTriangle, Ban, CheckCircle, Clock, Loader, XCircle } from "lucide-react";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/simulation-contract";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 export interface StatusIconConfig {
   icon: LucideIcon;

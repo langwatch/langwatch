@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SimulationRunStatus as ScenarioRunStatus,
   SimulationVerdict as Verdict,
-} from "@langwatch/simulation-contract";
+} from "@langwatch/scenario-contract";
 import { ScenarioTargetRow } from "../src/scenario-target-row";
 import { makeScenarioRunData } from "./test-helpers";
 
@@ -105,9 +105,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText("Prod Agent: Angry refund request (#3)"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Prod Agent: Angry refund request (#3)")).toBeInTheDocument();
     });
   });
 
@@ -276,9 +274,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      const row = screen.getByLabelText(
-        "View details for Prod Agent: Angry refund request",
-      );
+      const row = screen.getByLabelText("View details for Prod Agent: Angry refund request");
       await user.click(row);
       expect(onClick).toHaveBeenCalledOnce();
     });
@@ -299,9 +295,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      await user.hover(
-        screen.getByLabelText("View details for Prod Agent: Angry refund request"),
-      );
+      await user.hover(screen.getByLabelText("View details for Prod Agent: Angry refund request"));
 
       expect(prefetchMock).toHaveBeenCalledWith("run_hover");
     });

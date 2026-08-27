@@ -18,7 +18,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import type { QueueRunCommandData } from "@langwatch/simulation-server";
+import type { QueueRunCommandData } from "@langwatch/scenario-contract";
 import type { StartSuiteRunCommandData } from "@langwatch/suite-server";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";

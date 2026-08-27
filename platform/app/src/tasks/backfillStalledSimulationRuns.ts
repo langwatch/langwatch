@@ -4,9 +4,13 @@ import { getApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
-  ClickHouseStalledRunFinder,
-  type StalledRunFinder,
-} from "@langwatch/simulation-server";
+  SimulationStalledRunAdapter,
+  type SimulationStalledRun,
+} from "@langwatch/scenario-server";
+
+type StalledRunFinder = {
+  findStalledRuns(input: { now: number; thresholdMs: number }): Promise<SimulationStalledRun[]>;
+};
 
 const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
 
@@ -100,7 +104,7 @@ export default async function execute(...args: string[]) {
   const dryRun = args.includes("--dry-run");
   const finders = (await app.clickhouse.allInstances()).map(({ target, client }) => ({
     target,
-    finder: new ClickHouseStalledRunFinder(client),
+    finder: SimulationStalledRunAdapter.create(client),
   }));
 
   if (finders.length === 0) {

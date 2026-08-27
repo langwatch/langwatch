@@ -9,17 +9,14 @@ import {
   type AgentWithFields,
   type HttpAgentConfig,
 } from "@langwatch/agent-contract";
-import { SimulationService } from "@langwatch/simulation-contract";
+import { SimulationService } from "@langwatch/scenario-contract";
 import {
   type ScenarioFailureResults,
   ScenarioRunStatus,
   Verdict,
 } from "@langwatch/scenario-contract";
 import { ScenarioFailureHandlerService } from "@langwatch/scenario-server";
-import {
-  decodeScenarioError,
-  ScenarioInfraErrorCode,
-} from "@langwatch/scenario-contract";
+import { decodeScenarioError, ScenarioInfraErrorCode } from "@langwatch/scenario-contract";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 

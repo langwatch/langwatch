@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/simulation-contract";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import {
   availableGroupByOptions,
   computeBatchRunSummary,
@@ -935,9 +935,7 @@ describe("groupRunsByTarget()", () => {
 describe("groupRunsByBatchId() RunGroup fields", () => {
   describe("when grouping by batch", () => {
     it("returns groups with groupType none", () => {
-      const runs = [
-        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_1" }),
-      ];
+      const runs = [makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_1" })];
 
       const result = groupRunsByBatchId({ runs });
 
@@ -1155,9 +1153,7 @@ describe("getScenarioDisplayNames()", () => {
 
   describe("when there is a single scenario run", () => {
     it("returns the single name", () => {
-      const scenarioRuns = [
-        makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
-      ];
+      const scenarioRuns = [makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" })];
 
       const result = getScenarioDisplayNames({ scenarioRuns });
       expect(result).toBe("Login Flow");

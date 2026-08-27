@@ -19,7 +19,7 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
-import { SimulationService } from "@langwatch/simulation-contract";
+import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 import { ScenarioRepository } from "../src/repositories/scenario.repository";
 import { ScenarioService } from "../src/services/scenario.service";

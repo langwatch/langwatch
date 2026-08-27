@@ -1,4 +1,4 @@
-import { SimulationRunStatus } from "@langwatch/simulation-contract";
+import { SimulationRunStatus } from "@langwatch/scenario-contract";
 
 export const CANCELLABLE_STATUSES = new Set<SimulationRunStatus>([
   SimulationRunStatus.QUEUED,

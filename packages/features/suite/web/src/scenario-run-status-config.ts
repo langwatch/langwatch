@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, Clock, type LucideIcon, XCircle } from "lucide-react";
-import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/simulation-contract";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 export interface ScenarioRunStatusConfig {
   /** Chakra colorPalette token */
@@ -12,10 +12,7 @@ export interface ScenarioRunStatusConfig {
   fgColor: string;
 }
 
-export const SCENARIO_RUN_STATUS_CONFIG: Record<
-  ScenarioRunStatus,
-  ScenarioRunStatusConfig
-> = {
+export const SCENARIO_RUN_STATUS_CONFIG: Record<ScenarioRunStatus, ScenarioRunStatusConfig> = {
   [ScenarioRunStatus.SUCCESS]: {
     colorPalette: "green",
     label: "completed",

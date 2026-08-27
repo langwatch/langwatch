@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import type {
-  SimulationBatchRunData,
-  SimulationRunData,
-} from "@langwatch/simulation-contract";
+import type { SimulationBatchRunData, SimulationRunData } from "@langwatch/scenario-contract";
 import { filterRunsByTimestamp } from "../scenario-events.router";
 
 function createRun(overrides: Partial<SimulationRunData> = {}): SimulationRunData {

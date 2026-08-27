@@ -267,11 +267,9 @@ import {
 } from "@langwatch/langy-server";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
-  SimulationRunMetricsAppendStore,
-  SimulationRunMetricsRepositoryClickHouse,
-  SimulationRunStateRepositoryClickHouse,
-  SimulationRunStateRepositoryMemory,
-} from "@langwatch/simulation-server";
+  SimulationRunMetricsStoreAdapter,
+  SimulationRunStateStoreAdapter,
+} from "@langwatch/scenario-server";
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { ExportService } from "../export/export.service";
 import { InviteService } from "../invites/invite.service";
@@ -1160,24 +1158,18 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     simulationRunState: clickhouseEnabled
-      ? new SimulationRunStateRepositoryClickHouse({
+      ? SimulationRunStateStoreAdapter.create({
+          type: "clickhouse",
           resolveClient: resolveClickHouseClient,
           defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
         })
-      : new SimulationRunStateRepositoryMemory(),
+      : SimulationRunStateStoreAdapter.create({ type: "memory" }),
     simulationRunMetricsStore: clickhouseEnabled
-      ? new SimulationRunMetricsAppendStore(
-          new SimulationRunMetricsRepositoryClickHouse(resolveClickHouseClient),
-        )
-      : // No ClickHouse → event sourcing is disabled; the append store is a noop.
-        {
-          append: async () => {
-            /* noop */
-          },
-          bulkAppend: async () => {
-            /* noop */
-          },
-        },
+      ? SimulationRunMetricsStoreAdapter.create({
+          type: "clickhouse",
+          resolveClient: resolveClickHouseClient,
+        })
+      : SimulationRunMetricsStoreAdapter.create({ type: "null" }),
     experimentRunState: ExperimentEventingAdapter.createStateRepository({
       resolveClient: resolveClickHouseClient,
       clickhouseEnabled,

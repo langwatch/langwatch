@@ -11,7 +11,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SimulationExportRun } from "@langwatch/simulation-contract";
+import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { globalForApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";

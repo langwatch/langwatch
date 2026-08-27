@@ -1,7 +1,7 @@
 import type { Event, MapProjectionDefinition } from "@langwatch/eventing";
 import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "@langwatch/experiment-server";
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/simulation-contract";
+import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import {
   type BillableEventRecord,

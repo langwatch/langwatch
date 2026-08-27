@@ -1,7 +1,7 @@
 import {
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunData,
-} from "@langwatch/simulation-contract";
+} from "@langwatch/scenario-contract";
 
 const FAST_INTERVAL_MS = 3000;
 const SLOW_INTERVAL_MS = 15000;

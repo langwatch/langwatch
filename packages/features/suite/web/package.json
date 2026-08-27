@@ -30,7 +30,6 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
-    "@langwatch/simulation-contract": "workspace:*",
     "@tanstack/react-virtual": "^3.14.5",
     "lucide-react": "^1.22.0",
     "react": "^19.2.7",

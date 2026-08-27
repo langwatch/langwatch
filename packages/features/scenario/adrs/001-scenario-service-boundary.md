@@ -36,20 +36,22 @@ archive confirmation, target selection, the controlled form and parameter
 controls. Application composition retains routes, tRPC, project context,
 drawer submission and Langy row integration through explicit render ports.
 Child-process execution is the separate worker lifecycle recorded in
-[ADR-002](./002-scenario-execution-isolation.md). Simulation owns its run process
-manager; Suite owns orchestration; Trace owns ingest-lag measurement. Scenario
-does not own exports, trace analytics or page composition.
+[ADR-002](./002-scenario-execution-isolation.md). Scenario's run-lifecycle
+collaborator owns the process manager; Suite owns orchestration; Trace owns
+ingest-lag measurement. Scenario does not own exports, trace analytics or page
+composition.
 
 ## Dependencies
 
 Scenario consumes complete Agent, Model Provider, Project, Prompt, Secret,
-Simulation, Suite, Trace and Workflow contracts. It imports no foreign
-repository or feature server implementation.
+Suite, Trace and Workflow contracts. It imports no foreign repository or
+feature server implementation.
 
 ## Persistence
 
 The private Prisma repository scopes every definition query by project. Run
-state and execution intents remain in Simulation and Eventing stores.
+state belongs to Scenario's private ClickHouse projections; execution intents
+remain in Eventing stores.
 
 ## Runtime and registration
 

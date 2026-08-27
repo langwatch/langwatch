@@ -14,28 +14,11 @@ import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import {
-  NullSimulationRepository,
-  SimulationExecutionPort,
-  SimulationService,
-} from "@langwatch/simulation-server";
+import { TestSimulationService } from "@langwatch/scenario-server/testing";
 import { prisma } from "~/server/db";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { app } from "../[[...route]]/app";
-
-class ReadOnlySimulationExecutionPort extends SimulationExecutionPort {
-  private readonly unused = async (): Promise<void> => undefined;
-
-  queueRun = this.unused;
-  startRun = this.unused;
-  messageSnapshot = this.unused;
-  textMessageStart = this.unused;
-  textMessageEnd = this.unused;
-  finishRun = this.unused;
-  cancelRun = this.unused;
-  deleteRun = this.unused;
-}
 
 function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
@@ -104,30 +87,10 @@ describe("Feature: run responses carry the note and the scenario version", () =>
     await prisma.organization.delete({ where: { id: testOrganization.id } });
   });
 
-  class StubSimulationRepository extends NullSimulationRepository {
-    constructor(private readonly run: ScenarioRunData) {
-      super();
-    }
-
-    override async getScenarioRunData() {
-      return this.run;
-    }
-
-    override async getRunDataForBatchRun() {
-      return {
-        changed: true as const,
-        lastUpdatedAt: Date.now(),
-        runs: [this.run],
-      };
-    }
-  }
-
   function withRun(run: ScenarioRunData) {
-    const repository = new StubSimulationRepository(run);
     globalForApp.__langwatch_app = createTestApp({
-      simulations: SimulationService.create(repository, new ReadOnlySimulationExecutionPort()),
+      simulations: TestSimulationService.create({ run }),
     });
-    return repository;
   }
 
   const get = (path: string) => app.request(path, { headers: { "X-Auth-Token": testApiKey } });

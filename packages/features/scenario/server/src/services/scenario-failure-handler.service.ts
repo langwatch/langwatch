@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { AgentService } from "@langwatch/agent-contract";
-import type { SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
@@ -34,18 +34,19 @@ export class ScenarioFailureHandlerService {
    * common failure paths never pay for the agent lookup; a lookup failure
    * degrades to the generic classification rather than blocking the event.
    */
-  private async targetHasDevTunnel(
-    params: ScenarioUnsuccessfulExecutionInput,
-  ): Promise<boolean> {
+  private async targetHasDevTunnel(params: ScenarioUnsuccessfulExecutionInput): Promise<boolean> {
     if (params.cancelled) {
       return false;
     }
+
     if (params.target?.type !== "http") {
       return false;
     }
+
     if (!isTransportLevelScenarioFailure(params.error)) {
       return false;
     }
+
     try {
       const agent = await this.options.agents.getById({
         projectId: params.projectId,
@@ -57,6 +58,7 @@ export class ScenarioFailureHandlerService {
       }
 
       const config = agent.config;
+
       return typeof config.devTunnel === "object" && config.devTunnel !== null;
     } catch (err) {
       logger.warn(
@@ -67,6 +69,7 @@ export class ScenarioFailureHandlerService {
         },
         "Could not read the target agent config for dev tunnel classification",
       );
+
       return false;
     }
   }
@@ -121,6 +124,7 @@ export class ScenarioFailureHandlerService {
           span.setAttribute("result.emitted_run_finished", true);
         } catch (err) {
           logger.error({ err, scenarioRunId }, "Failed to dispatch finishRun event");
+
           throw err;
         }
 

@@ -11,7 +11,7 @@ import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { MessagePreview } from "./message-preview";
 import { SimulationCard } from "./simulation-card";
 import { Square } from "lucide-react";
-import type { SimulationRunData as ScenarioRunData } from "@langwatch/simulation-contract";
+import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { isCancellableStatus } from "./run-status";
 
@@ -75,11 +75,7 @@ export function ScenarioGridCard({
           bg="bg.panel"
           cursor={isCancelling ? "default" : "pointer"}
           opacity={isCancelling ? 0.6 : 1}
-          _hover={
-            isCancelling
-              ? undefined
-              : { bg: "bg.muted", borderColor: "border.emphasized" }
-          }
+          _hover={isCancelling ? undefined : { bg: "bg.muted", borderColor: "border.emphasized" }}
           position="absolute"
           top={2}
           right={2}

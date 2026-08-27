@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { SimulationRunData } from "@langwatch/simulation-contract";
+import type { SimulationRunData } from "./simulation";
 import type { ScenarioRunStatus } from "./scenario-run";
 import type {
   scenarioBatchSchema,
@@ -19,13 +19,9 @@ import type {
 export type ScenarioRunStartedEvent = z.infer<typeof scenarioRunStartedSchema>;
 export type ScenarioRunFinishedEvent = z.infer<typeof scenarioRunFinishedSchema>;
 export type ScenarioMessageSnapshotEvent = z.infer<typeof scenarioMessageSnapshotSchema>;
-export type ScenarioTextMessageStartEvent = z.infer<
-  typeof scenarioTextMessageStartSchema
->;
+export type ScenarioTextMessageStartEvent = z.infer<typeof scenarioTextMessageStartSchema>;
 export type ScenarioTextMessageEndEvent = z.infer<typeof scenarioTextMessageEndSchema>;
-export type ScenarioTextMessageContentEvent = z.infer<
-  typeof scenarioTextMessageContentSchema
->;
+export type ScenarioTextMessageContentEvent = z.infer<typeof scenarioTextMessageContentSchema>;
 export type ScenarioToolCallStartEvent = z.infer<typeof scenarioToolCallStartSchema>;
 export type ScenarioToolCallArgsEvent = z.infer<typeof scenarioToolCallArgsSchema>;
 export type ScenarioToolCallEndEvent = z.infer<typeof scenarioToolCallEndSchema>;

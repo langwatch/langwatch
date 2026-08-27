@@ -7,7 +7,7 @@ import {
   ScenarioSecretCipherPort,
 } from "@langwatch/scenario-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import { decrypt, encrypt } from "~/utils/encryption";
 
 export class AppScenarioRuntime {

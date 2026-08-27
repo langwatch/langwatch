@@ -26,7 +26,6 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
-    "@langwatch/simulation-contract": "workspace:*",
     "liquidjs": "^10.27.1",
     "zod": "^4.4.3"
   },

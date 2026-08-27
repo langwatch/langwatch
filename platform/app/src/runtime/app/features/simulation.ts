@@ -1,11 +1,11 @@
-import type { SimulationService } from "@langwatch/simulation-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import {
   SimulationClickHouseAdapter,
   SimulationExecutionPort,
   SimulationWindowedReadPort,
   type SimulationReadClient,
   type SimulationWindowedReadInput,
-} from "@langwatch/simulation-server";
+} from "@langwatch/scenario-server";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-read";
 

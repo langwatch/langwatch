@@ -34,3 +34,30 @@ export * from "./adapters/serialized-http-agent.adapter";
 export * from "./adapters/serialized-prompt-config.adapter";
 export * from "./adapters/serialized-workflow-agent.adapter";
 export * from "./services/scenario-workflow-mapping.service";
+export { SimulationClickHouseAdapter } from "./adapters/simulation.clickhouse.adapter";
+export type { SimulationReadClient } from "./adapters/simulation.clickhouse.adapter";
+export {
+  SimulationRunMetricsStoreAdapter,
+  SimulationRunStateStoreAdapter,
+  SimulationStalledRunAdapter,
+  BACKFILL_STALE_THRESHOLD_MS,
+  type SimulationStalledRun,
+} from "./adapters/simulation-eventing.adapter";
+export { SimulationExecutionPort } from "./ports/simulation-execution.port";
+export * from "./processes/simulation-run-execution.process";
+export {
+  SimulationWindowedReadPort,
+  type SimulationWindowedReadInput,
+} from "./ports/simulation-windowed-read.port";
+export { SimulationService } from "./services/simulation.service";
+export { STALL_THRESHOLD_MS } from "./processes/simulation-run-execution-evolution.process";
+export * from "./adapters/simulation-processing-commands.adapter";
+export {
+  COMPUTE_METRICS_RETRY_DELAY_MS,
+  ComputeRunMetricsAdapter,
+  ComputeRunMetricsCommand,
+} from "./adapters/compute-run-metrics.adapter";
+export {
+  SimulationProcessingPipelineAdapter,
+  type SimulationProcessingPipelineDeps,
+} from "./adapters/simulation-processing-pipeline.adapter";
