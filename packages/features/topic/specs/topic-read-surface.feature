@@ -2,8 +2,9 @@ Feature: Topic read surface
 
   The Topic service is the single read capability for the projected topic
   model and its clustering status, exposed through the process-owned
-  application's `app.topics`. Clustering commands, process logic and
-  projections remain application-owned.
+  application's `app.topics`. The Topic server owns clustering commands,
+  process logic, projections, and private persistence; the application only
+  composes its technical ports and transports.
 
   Scenario: list topics for a project
     When a caller asks the Topic service for a project's topics

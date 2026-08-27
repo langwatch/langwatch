@@ -210,8 +210,8 @@ without new infrastructure.
   project's hash slot, not relative to now), and affordable because the
   injected implementation is rate-limited per project
   (`createRateLimitedBootstrap`, one commit per project per claim window).
-- `seedClusteringSchedules` (`app-layer/topic-clustering/
-seedClusteringSchedules.ts`) seeds processes for existing eligible
+- `LegacyImportTopicClusteringMigration` (`packages/features/topic/server/src/
+migrations/legacy-import.topic-clustering.migration.ts`) seeds processes for existing eligible
   projects (`firstMessage: true`). Safe to re-run: bootstrap is idempotent.
 - **It covers dormant projects only.** Any project that ingests re-asserts
   its own schedule, so its remaining job is projects that have ingested
@@ -275,10 +275,12 @@ them.
 
 ### 9. Code home and identifiers
 
-The whole domain lives in `app-layer/topic-clustering/` (clustering
-core, process manager, repositories, status service) — the legacy
-`server/topicClustering/` module is gone. New row identifiers use KSUIDs
-(`topicrun_…`) per platform convention, not nanoid.
+The Topic feature server owns the clustering core, process manager,
+repositories, projections, and status service under
+`packages/features/topic/server/`; `platform/app` only composes its runtime
+ports and transports. The legacy `server/topicClustering/` module is gone.
+New row identifiers use KSUIDs (`topicrun_…`) per platform convention, not
+nanoid.
 
 ## Implementation and validation
 

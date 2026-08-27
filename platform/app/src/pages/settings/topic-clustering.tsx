@@ -12,11 +12,8 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import type { ClusteringErrorCode } from "~/server/app-layer/topic-clustering/clustering-error";
-import type {
-  TopicClusteringRunMode,
-  TopicClusteringSkipReason,
-} from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
+import type { ClusteringErrorCode } from "@langwatch/topic-contract";
+import type { TopicClusteringRunMode, TopicClusteringSkipReason } from "@langwatch/topic-contract";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
@@ -154,16 +151,16 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         <Card.Body width="full">
           <VStack align="start" gap={4}>
             <Text>
-              Group your recent traces into topics and subtopics without waiting for the
-              next scheduled run.
+              Group your recent traces into topics and subtopics without waiting for the next
+              scheduled run.
             </Text>
 
             <Alert.Root>
               <Alert.Indicator />
               <Alert.Content>
                 <Alert.Description>
-                  Topic clustering needs at least 10 traces to group anything, and can
-                  take several minutes.
+                  Topic clustering needs at least 10 traces to group anything, and can take several
+                  minutes.
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
@@ -186,8 +183,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 // Exhaustive over the union on purpose: adding a skip reason without copy for
 // it is a compile error here, not a blank line in the UI.
 const SKIP_REASON_COPY: Record<TopicClusteringSkipReason, string> = {
-  recently_clustered:
-    "Skipped, your topics were rebuilt recently so this run was not needed yet",
+  recently_clustered: "Skipped, your topics were rebuilt recently so this run was not needed yet",
   not_enough_traces: "Skipped, not enough new traces to group yet",
   not_configured: "Skipped, no topic clustering model is set up",
 };
@@ -228,10 +224,7 @@ function ClusteringStatusCard({
     {
       refetchInterval: (query) => {
         if (query.state.data?.isRunInFlight) return RUNNING_POLL_MS;
-        if (
-          lastTriggeredAt !== null &&
-          Date.now() - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS
-        ) {
+        if (lastTriggeredAt !== null && Date.now() - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS) {
           return RUNNING_POLL_MS;
         }
         return false;
@@ -268,18 +261,15 @@ function ClusteringStatusCard({
                   return modeCopy ? `${modeCopy}. ` : null;
                 })()}
                 Organized {status.data.lastRunTracesProcessed} traces into{" "}
-                {status.data.lastRunTopicsCount} topics and{" "}
-                {status.data.lastRunSubtopicsCount} subtopics.
+                {status.data.lastRunTopicsCount} topics and {status.data.lastRunSubtopicsCount}{" "}
+                subtopics.
               </Text>
             )}
-            {status.data.lastRunOutcome === "skipped" &&
-              status.data.lastRunSkippedReason && (
-                <Text fontSize="sm" color="fg.muted">
-                  {copyFor(SKIP_REASON_COPY, status.data.lastRunSkippedReason) ??
-                    "Skipped"}
-                  .
-                </Text>
-              )}
+            {status.data.lastRunOutcome === "skipped" && status.data.lastRunSkippedReason && (
+              <Text fontSize="sm" color="fg.muted">
+                {copyFor(SKIP_REASON_COPY, status.data.lastRunSkippedReason) ?? "Skipped"}.
+              </Text>
+            )}
             {status.data.lastRunOutcome === "failed" &&
               (() => {
                 const guidance = status.data.isLastRunErrorUserActionable
@@ -295,17 +285,15 @@ function ClusteringStatusCard({
                   </Alert.Root>
                 ) : (
                   <Text fontSize="sm" color="red.fg">
-                    The last run failed on our side. It will retry automatically at the
-                    next scheduled run.
+                    The last run failed on our side. It will retry automatically at the next
+                    scheduled run.
                   </Text>
                 );
               })()}
             <HStack gap={3}>
               <Text fontWeight="medium">Next scheduled run</Text>
               <Text color="fg.muted">
-                {status.data.nextRunAt
-                  ? formatTimeAgo(status.data.nextRunAt)
-                  : "Not scheduled yet"}
+                {status.data.nextRunAt ? formatTimeAgo(status.data.nextRunAt) : "Not scheduled yet"}
               </Text>
             </HStack>
           </VStack>
@@ -362,9 +350,7 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
     { projectId },
     {
       refetchInterval: (query) =>
-        query.state.data?.some((run) => run.outcome === "running")
-          ? RUNNING_POLL_MS
-          : false,
+        query.state.data?.some((run) => run.outcome === "running") ? RUNNING_POLL_MS : false,
     },
   );
 
@@ -392,9 +378,7 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
             <Table.Body>
               {history.data.map((run) => (
                 <Table.Row key={run.runId}>
-                  <Table.Cell whiteSpace="nowrap">
-                    {formatTimeAgo(run.startedAt)}
-                  </Table.Cell>
+                  <Table.Cell whiteSpace="nowrap">{formatTimeAgo(run.startedAt)}</Table.Cell>
                   <Table.Cell whiteSpace="nowrap">
                     {run.trigger === "manual" ? "You" : "Schedule"}
                   </Table.Cell>

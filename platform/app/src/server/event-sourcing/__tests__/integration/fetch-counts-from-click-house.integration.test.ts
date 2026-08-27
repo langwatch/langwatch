@@ -14,11 +14,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
-import {
-  cleanupTestData,
-  getTestClickHouseClient,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
-import { fetchCountsFromClickHouse } from "../clustering";
+import { cleanupTestData, getTestClickHouseClient } from "./testContainers";
+import { fetchCountsFromClickHouse } from "@langwatch/topic-server";
 
 const TENANT_ID = `topic-counts-test-${nanoid(6)}`;
 

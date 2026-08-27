@@ -1,39 +1,65 @@
-import { EventSourcing } from "@langwatch/eventing";
+import { EventSourcing, type EventSourcedQueueProcessor } from "@langwatch/eventing";
+import {
+  type TopicClusteringRequestedEventData,
+  type TopicClusteringRunCompletedEventData,
+  type TopicClusteringRunStartedEventData,
+  type TopicClusteringTopicsRecordedEventData,
+} from "@langwatch/topic-contract";
+import {
+  createTopicClusteringProcessingPipeline,
+  LegacyImportTopicClusteringMigration,
+  PostgresTopicAdapter,
+} from "@langwatch/topic-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaTopicClusteringRunHistoryProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
-import { PrismaTopicClusteringRunProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
-import { PrismaTopicModelProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-model-projection.prisma.repository";
-import { seedProjectTopicModel } from "~/server/app-layer/topic-clustering/seedTopicModel";
-import { AppTopicRuntime } from "~/runtime/app/features/topic";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
 import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
-import {
-  cleanupTestData,
-  getTestClickHouseClient,
-} from "../../../__tests__/integration/testContainers";
-import { createTopicClusteringProcessingPipeline } from "../pipeline";
+import { cleanupTestData, getTestClickHouseClient } from "./testContainers";
+import { AppTopicRuntime } from "~/runtime/app/features/topic";
 
 /**
- * Full-stack lifecycle tests (specs: topic-clustering/event-sourced-scheduling
- * .feature, topic-clustering/topics-source-of-truth.feature): real commands →
- * real ClickHouse event log → real fold projections → real Postgres rows read
- * back through the same repositories and services production uses. The
- * process-manager/outbox layer has its own integration test
- * (topicClusteringProcessFlow); here the outcome commands are driven the way
- * the intent executor drives them, and the assertions are on what the
- * settings page and topic surfaces actually read.
+ * Full-stack lifecycle tests (specs: packages/features/topic/specs/
+ * event-sourced-scheduling.feature, topics-source-of-truth.feature): real
+ * commands → real ClickHouse event log → real fold projections → real
+ * Postgres rows read back through the same repositories and services
+ * production uses. The process-manager/outbox layer has its own integration
+ * test in @langwatch/topic-server (topic-clustering-process-flow); here the
+ * outcome commands are driven the way the intent executor drives them, and
+ * the assertions are on what the settings page and topic surfaces actually
+ * read.
+ *
+ * Named residual: this suite stays app-side until the projection stores and
+ * seeds it wires (this directory) move to the topic server package in a
+ * later slice.
  */
 
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL
-);
+const hasTestcontainers = !!(process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL);
 
 const ns = `tclc${nanoid(8)
   .toLowerCase()
   .replace(/[^a-z0-9]/g, "x")}`;
+
+type TopicCommandEnvelope<Data> = Data & {
+  tenantId: string;
+  occurredAt: number;
+};
+
+type TopicClusteringCommands = {
+  requestClustering: EventSourcedQueueProcessor<
+    TopicCommandEnvelope<TopicClusteringRequestedEventData>
+  >;
+  recordClusteringRunStarted: EventSourcedQueueProcessor<
+    TopicCommandEnvelope<TopicClusteringRunStartedEventData>
+  >;
+  recordClusteringRunCompleted: EventSourcedQueueProcessor<
+    TopicCommandEnvelope<TopicClusteringRunCompletedEventData>
+  >;
+  recordTopics: EventSourcedQueueProcessor<
+    TopicCommandEnvelope<TopicClusteringTopicsRecordedEventData>
+  >;
+};
 
 async function waitFor<T>(
   probe: () => Promise<T | null | undefined | false>,
@@ -128,9 +154,23 @@ describe.skipIf(!hasTestcontainers)(
     }).build();
     // The registered pipeline's command handles (send-capable), assigned in
     // beforeAll once the pipeline is registered.
-    let commands: any;
+    let commands: TopicClusteringCommands;
     const projectIdFlow = `${ns}flow`;
     const projectIdMigration = `${ns}mig`;
+
+    // The package's Postgres persistence (projection stores + repository),
+    // built once like composition does.
+    const persistence = PostgresTopicAdapter.createClusteringPersistence({
+      database: prisma,
+    });
+    const migration = LegacyImportTopicClusteringMigration.create({
+      repository: persistence.repository,
+      redis: null,
+      commands: {
+        recordTopics: (args) => commands.recordTopics.send(args),
+        requestClustering: () => Promise.reject(new Error("requestClustering unused in this test")),
+      },
+    });
 
     beforeAll(async () => {
       const clickhouse = getTestClickHouseClient();
@@ -145,19 +185,20 @@ describe.skipIf(!hasTestcontainers)(
 
       const pipeline = eventSourcing.register(
         createTopicClusteringProcessingPipeline({
-          topicClusteringRunStatusStore: new PrismaTopicClusteringRunProjectionRepository(
-            prisma,
-          ),
-          topicClusteringRunHistoryStore:
-            new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
-          topicModelStore: new PrismaTopicModelProjectionRepository(prisma),
+          topicClusteringRunStatusStore: persistence.topicClusteringRunStatus,
+          topicClusteringRunHistoryStore: persistence.topicClusteringRunHistory,
+          topicModelStore: persistence.topicModel,
           dispatch: {
             runPort: {
-              runClusteringPage: () =>
-                Promise.reject(new Error("run port unused in this test")),
+              runClusteringPage: () => Promise.reject(new Error("run port unused in this test")),
             },
             commands: () => {
               throw new Error("outcome commands unused in this test");
+            },
+            classifyError: () => ({ code: "internal", isUserActionable: false }),
+            metrics: {
+              incrementPageTotal: () => undefined,
+              observePageDuration: () => undefined,
             },
           },
         }),
@@ -298,14 +339,9 @@ describe.skipIf(!hasTestcontainers)(
             where: { projectId },
             select: { id: true },
           });
-          return found.length === 2 && found.every((r) => r.id.endsWith("2"))
-            ? found
-            : null;
+          return found.length === 2 && found.every((r) => r.id.endsWith("2")) ? found : null;
         }, "the batch replace to reconcile the previous model away");
-        expect(replaced.map((r) => r.id).sort()).toEqual([
-          `${ns}-child2`,
-          `${ns}-parent2`,
-        ]);
+        expect(replaced.map((r) => r.id).sort()).toEqual([`${ns}-child2`, `${ns}-parent2`]);
       }, 60_000);
     });
 
@@ -344,11 +380,7 @@ describe.skipIf(!hasTestcontainers)(
 
         // Seed: the migration records the legacy rows as the model's first
         // event...
-        const first = await seedProjectTopicModel({
-          prisma,
-          recordTopics: (args) => commands.recordTopics.send(args),
-          projectId,
-        });
+        const first = await migration.trySeedProjectTopicModel(projectId);
         expect(first).toBe("seeded");
 
         // ...and once the fold owns the model, ids/names/hierarchy are
@@ -376,13 +408,15 @@ describe.skipIf(!hasTestcontainers)(
         }
 
         // Re-running the migration is a no-op.
-        const again = await seedProjectTopicModel({
-          prisma,
-          recordTopics: () => {
-            throw new Error("an owned project must not be re-seeded");
+        const guardedMigration = LegacyImportTopicClusteringMigration.create({
+          repository: persistence.repository,
+          redis: null,
+          commands: {
+            recordTopics: () => Promise.reject(new Error("an owned project must not be re-seeded")),
+            requestClustering: () => Promise.reject(new Error("unused")),
           },
-          projectId,
         });
+        const again = await guardedMigration.trySeedProjectTopicModel(projectId);
         expect(again).toBe("skipped");
 
         // Post-migration clustering extends the model through the stream.

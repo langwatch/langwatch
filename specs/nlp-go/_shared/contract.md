@@ -229,7 +229,7 @@ Workflows pass `chat_messages` between nodes. The engine MUST:
 - Backend: `featureFlagService` (PostHog when configured, in-memory otherwise).
 - Distinct id: **projectId**. Per-project rollout / opt-out.
 - Env override: `RELEASE_NLP_GO_ENGINE_ENABLED=0` to force-disable; `FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled` to pin it on regardless of backend state.
-- Decision points (TS app): `runWorkflow.ts`, `playground.ts`, `topicClustering.ts`. **All three** flip together so a project sees the same path everywhere.
+- Decision points (TS app): `runWorkflow.ts`, `playground.ts`, and the Topic runner. **All three** flip together so a project sees the same path everywhere.
 - When on (default):
   - **runWorkflow + playground:** TS app prepends `/go` and routes to nlpgo (single container with Go front-door + Python child).
   - **topic clustering:** TS app routes to **langevals** at `${LANGEVALS_BASE_URL}/topics/{batch,incremental}_clustering` (new langevals workspace member). The langwatch_nlp side is bypassed.
@@ -274,7 +274,7 @@ or to the AI Gateway. nlpgo:
 | `evaluation`       | `runEvaluation.ts` — evaluation suite runs                                                                               |
 | `playground`       | `playground.ts` — Prompt Playground                                                                                      |
 | `scenario`         | `scenarios/.../*-agent.adapter.ts`                                                                                       |
-| `topic_clustering` | `topicClustering.ts` — worker batches                                                                                    |
+| `topic_clustering` | `packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts` — worker batches                          |
 | `optimize`         | (LEGACY only) — DSPy optimization runs; never produced by Go engine. If observed in /go/* traffic, nlpgo logs a warning. |
 | `unknown`          | Default when no header is present                                                                                        |
 

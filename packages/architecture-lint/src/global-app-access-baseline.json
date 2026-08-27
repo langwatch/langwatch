@@ -451,30 +451,6 @@
       "a138a5242d292802"
     ],
     [
-      "platform/app/src/server/app-layer/topic-clustering/clustering.ts",
-      "getApp",
-      "import",
-      "d2ae122749e52e3c"
-    ],
-    [
-      "platform/app/src/server/app-layer/topic-clustering/clustering.ts",
-      "getApp",
-      "reference",
-      "063ca5a1af47bd63"
-    ],
-    [
-      "platform/app/src/server/app-layer/topic-clustering/clustering.ts",
-      "getApp",
-      "reference",
-      "7c517c01a5c63bcd"
-    ],
-    [
-      "platform/app/src/server/app-layer/topic-clustering/clustering.ts",
-      "getApp",
-      "reference",
-      "efa79c7957bae588"
-    ],
-    [
       "platform/app/src/server/app-layer/traces/trace-metadata.service.ts",
       "getApp",
       "import",

@@ -39,7 +39,7 @@ Feature: Telemetry — every span carries the correct origin
       | platform/app/src/server/routes/playground.ts                     | playground       |
       | packages/features/scenario/server/src/adapters/serialized-workflow-agent.adapter.ts | scenario |
       | packages/features/scenario/server/src/adapters/serialized-code-agent.adapter.ts     | scenario |
-      | platform/app/src/server/app-layer/topic-clustering/clustering.ts | topic_clustering |
+      | packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts | topic_clustering |
       | platform/app/src/server/evaluations/runEvaluation.ts             | evaluation       |
 
   @integration @v1 @unimplemented

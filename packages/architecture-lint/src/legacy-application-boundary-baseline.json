@@ -59,7 +59,6 @@
         "~/components/analytics/CustomGraph"
       ],
       "platform/app/src/server/app-layer/system-migrations/runtime.ts": ["~/env.mjs"],
-      "platform/app/src/server/app-layer/topic-clustering/clustering.ts": ["../../../env.mjs"],
       "platform/app/src/server/app-layer/traces/edge-media-extraction.ts": [
         "~/shared/content-parts/media-markers"
       ],
@@ -416,9 +415,6 @@
         "~/server/license-enforcement/constants"
       ],
       "platform/app/src/components/LLMMetrics.tsx": ["../server/analytics/registry"],
-      "platform/app/src/components/llmPromptConfigs/LlmConfigField.tsx": [
-        "~/server/app-layer/topic-clustering/clustering.types"
-      ],
       "platform/app/src/components/ModelSelector.tsx": [
         "../server/modelProviders/customModelDisplayNames"
       ],
@@ -1226,10 +1222,6 @@
       "platform/app/src/pages/settings/roles.tsx": ["../../server/api/rbac"],
       "platform/app/src/pages/settings/teams/[team].tsx": [
         "../../../server/app-layer/organizations/repositories/organization.repository"
-      ],
-      "platform/app/src/pages/settings/topic-clustering.tsx": [
-        "~/server/app-layer/topic-clustering/clustering-error",
-        "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants"
       ],
       "platform/app/src/prompts/components/PromptEditorFooter.tsx": [
         "~/server/prompt-config/prompt.service"

@@ -23,11 +23,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
-import {
-  cleanupTestData,
-  getTestClickHouseClient,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
-import { fetchTracesFromClickHouse } from "../clustering";
+import { cleanupTestData, getTestClickHouseClient } from "./testContainers";
+import { fetchTracesFromClickHouse } from "@langwatch/topic-server";
 
 const TENANT_ID = "topic-fetch-test";
 // A bit more than one page (2000) so a second page exists for the cursor test.
@@ -117,14 +114,7 @@ describe("fetchTracesFromClickHouse integration", () => {
   describe("when the search cursor advances", () => {
     it("returns strictly older, non-overlapping traces", async () => {
       const first = await fetchTracesFromClickHouse(ch, TENANT_ID, false, [], []);
-      const second = await fetchTracesFromClickHouse(
-        ch,
-        TENANT_ID,
-        false,
-        [],
-        [],
-        first.lastSort!,
-      );
+      const second = await fetchTracesFromClickHouse(ch, TENANT_ID, false, [], [], first.lastSort!);
 
       expect(second.traces.length).toBeGreaterThan(0);
       const firstIds = new Set(first.traces.map((t) => t.trace_id));

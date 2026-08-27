@@ -52,12 +52,13 @@ the database's order.
 executor (`intents/topic-clustering.intent.ts`), the three fold projections
 (`projections/`), the `topicClustering` process manager
 (`processes/topic-clustering.process.ts`), and the pipeline factory
-(`adapters/eventing.topic-clustering.adapter.ts`). Registration remains app
-composition: `pipelineRegistry.ts` builds the pipeline with the app-owned
-Prisma projection stores, the clustering run port, and the late-bound outcome
-commands. The app-layer clustering execution, boot seeds, and Prisma
-projection repositories remain app-owned for a later slice; the full-stack
-lifecycle integration test stays with them.
+(`adapters/eventing.topic-clustering.adapter.ts`). It also owns the clustering
+runner, boot migration, and private Prisma projection adapters. Registration
+remains app composition: `pipelineRegistry.ts` supplies the package pipeline
+with its private stores, the app-owned ClickHouse/model-provider/langevals
+ports, metrics, and late-bound outcome commands. The full-stack lifecycle
+integration test stays app-side because it composes the application event-log
+and Prisma infrastructure.
 
 ## Environment and configuration
 
