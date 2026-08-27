@@ -7,8 +7,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { GatewaySpendState } from "~/server/event-sourcing/pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
-import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import type { GatewaySpendState } from "@langwatch/gateway-server";
+import { GatewaySpendEventsRepository } from "@langwatch/gateway-server";
 import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 
 const tenantId = `test-webhook-events-${nanoid(8)}`;

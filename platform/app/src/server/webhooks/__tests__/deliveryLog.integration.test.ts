@@ -4,6 +4,7 @@ import {
   AppAutomationRuntime,
   createAppAutomationTestFirePort,
   createAppAutomationTestGraphPorts,
+  createAppAutomationTestPersistCaps,
 } from "~/runtime/app/features/automation";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -156,6 +157,7 @@ describe("the shared webhook delivery log", () => {
         redis: null,
         graph: createAppAutomationTestGraphPorts(),
         testFire: createAppAutomationTestFirePort(),
+        persistCaps: createAppAutomationTestPersistCaps(),
       })
         .build()
         .getRecentWebhookDeliveries({ projectId, triggerId, limit: 50 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
+import type { SpendEventRow } from "@langwatch/gateway-server";
 import { spendRowToEnvelope } from "~/runtime/app/features/webhooks";
 
 function row(overrides: Partial<SpendEventRow> = {}): SpendEventRow {

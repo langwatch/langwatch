@@ -29,7 +29,7 @@ import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
-import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
+import { toStoredEnum, toWireEnum } from "@langwatch/gateway-server";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";

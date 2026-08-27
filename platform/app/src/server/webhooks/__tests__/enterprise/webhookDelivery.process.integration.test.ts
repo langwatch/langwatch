@@ -29,7 +29,7 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+} from "@langwatch/gateway-server";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryProcessDeps,

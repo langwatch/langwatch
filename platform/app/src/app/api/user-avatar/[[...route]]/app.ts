@@ -30,7 +30,6 @@ import {
   rateLimitedResponse,
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
 } from "~/server/stored-objects/media-response";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { DualAuthVariables } from "../../middleware/dual-auth";
 import { dualAuth } from "../../middleware/dual-auth";
 
@@ -100,7 +99,7 @@ async function handleAvatarRead(
 
   let result;
   try {
-    result = await createStoredObjectsService({ projectId }).getById({
+    result = await c.app.storedObjects.getById({
       projectId,
       id,
     });

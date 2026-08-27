@@ -12,11 +12,7 @@ import {
   safeMediaType,
   sanitizeFilenameSegment,
 } from "~/server/stored-objects/media-response";
-import {
-  resolveStoredObjectOwner,
-  StoredObjectOwnerLookupUnavailableError,
-} from "~/server/stored-objects/stored-objects-cross-tenant-lookup";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
+import { StoredObjectOwnerLookupUnavailableError } from "~/server/stored-objects/stored-object-owner-lookup.service";
 import type { DualAuthVariables } from "../../middleware/dual-auth";
 import { dualAuth } from "../../middleware/dual-auth";
 
@@ -293,7 +289,7 @@ async function handleFileRead(
     owner = { projectId: projectIdFromUrl };
   } else {
     try {
-      owner = await resolveStoredObjectOwner({ id });
+      owner = await c.app.storedObjectOwners.resolve({ id });
     } catch (err) {
       if (err instanceof StoredObjectOwnerLookupUnavailableError) {
         return jsonResponse({ error: "file temporarily unavailable" }, 502);
@@ -319,13 +315,12 @@ async function handleFileRead(
   });
 
   // Step 4: project-scoped read.
-  const service = createStoredObjectsService({
-    projectId: authorizedProjectId,
-  });
-
   let result;
   try {
-    result = await service.getById({ projectId: authorizedProjectId, id });
+    result = await c.app.storedObjects.getById({
+      projectId: authorizedProjectId,
+      id,
+    });
   } catch {
     return jsonResponse({ error: "file temporarily unavailable" }, 502);
   }

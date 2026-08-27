@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
+import { provisionLangyVirtualKey } from "~/runtime/app/features/langy-virtual-key.adapter";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   DestinationTeamNotFoundError,
@@ -106,6 +106,7 @@ export const projectRouter = createTRPCRouter({
       try {
         await provisionLangyVirtualKey({
           prisma,
+          virtualKeys: ctx.app.gateway.virtualKeys,
           projectId: project.id,
           organizationId: input.organizationId,
           actorUserId: userId,
@@ -266,7 +267,8 @@ export const projectRouter = createTRPCRouter({
   // Legacy default-model mutations have been removed alongside the
   // Organization/Team/Project scalar columns they wrote to. Defaults
   // now live in ModelDefaultConfig; the canonical mutation surface is
-  // modelProvider.{createConfig,updateConfig,deleteConfig,setRoleAtScope,setFeatureAtScope}.
+  // modelProvider.{saveDefaultModelsConfig,deleteDefaultModelsConfig,setRoleAssignmentForScope,
+  // setFeatureOverrideForScope}.
   getFieldRedactionStatus: protectedProcedure
     .input(
       z.object({
