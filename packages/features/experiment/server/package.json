@@ -21,12 +21,17 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

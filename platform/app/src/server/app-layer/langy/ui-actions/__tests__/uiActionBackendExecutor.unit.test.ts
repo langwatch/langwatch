@@ -5,8 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKBENCH_ACTIONS } from "~/experiments-v3/actions/manifest";
-import { StaleWorkbenchStateError } from "~/server/experiments/errors";
-import type { ExperimentService } from "~/server/experiments/experiment.service";
+import { StaleWorkbenchStateError, type ExperimentService } from "@langwatch/experiment-contract";
 import { executeBackendAction } from "../uiActionBackendExecutor";
 
 vi.mock(

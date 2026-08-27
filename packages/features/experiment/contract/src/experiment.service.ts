@@ -1,6 +1,4 @@
-import type {
-  DSPyRunsSummary,
-} from "./experiment-legacy";
+import type { DSPyRunsSummary } from "./experiment-legacy";
 import type {
   Experiment,
   ExperimentLookup,
@@ -30,10 +28,23 @@ import type {
   ExperimentDspyStepSummary,
   ExperimentDspyStepsLookup,
 } from "./experiment-dspy";
+import type {
+  CommitWorkbenchVersionInput,
+  CreateEvaluationsV3Input,
+  GetWorkbenchStateInput,
+  ListWorkbenchVersionsInput,
+  RecordWorkbenchRunResultsInput,
+  RestoreWorkbenchVersionInput,
+  SaveWorkbenchStateInput,
+  WorkbenchSaveResult,
+  WorkbenchStateView,
+  WorkbenchVersionsPage,
+} from "./experiment-workbench-version";
 
 export abstract class ExperimentService {
   abstract getById(input: ExperimentLookup): Promise<Experiment>;
   abstract getBySlug(input: ExperimentSlugLookup): Promise<Experiment>;
+  abstract getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment>;
   abstract tryGetById(input: ExperimentLookup): Promise<Experiment | null>;
   abstract tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null>;
   abstract tryGetBySlugAndType(
@@ -52,9 +63,7 @@ export abstract class ExperimentService {
   ): Promise<{ id: string; slug: string }>;
   abstract findNextDraftName(input: { projectId: string }): Promise<string>;
   abstract archive(input: ExperimentLookup): Promise<{ success: true }>;
-  abstract listRuns(
-    input: ExperimentRunListInput,
-  ): Promise<Record<string, ExperimentRun[]>>;
+  abstract listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>>;
   abstract getRunAggregates(
     input: ExperimentRunListInput,
   ): Promise<Record<string, ExperimentRunAggregate>>;
@@ -73,9 +82,18 @@ export abstract class ExperimentService {
   abstract recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
   abstract completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
   abstract upsertDspyStep(input: ExperimentDspyStep): Promise<void>;
-  abstract listDspySteps(
-    input: ExperimentDspyStepsLookup,
-  ): Promise<ExperimentDspyStepSummary[]>;
+  abstract listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]>;
   abstract listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]>;
   abstract getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep>;
+  abstract getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView>;
+  abstract saveWorkbenchState(input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult>;
+  abstract createEvaluationsV3(input: CreateEvaluationsV3Input): Promise<WorkbenchSaveResult>;
+  abstract commitWorkbenchVersion(input: CommitWorkbenchVersionInput): Promise<WorkbenchSaveResult>;
+  abstract listWorkbenchVersions(input: ListWorkbenchVersionsInput): Promise<WorkbenchVersionsPage>;
+  abstract restoreWorkbenchVersion(
+    input: RestoreWorkbenchVersionInput,
+  ): Promise<WorkbenchSaveResult>;
+  abstract recordWorkbenchRunResults(
+    input: RecordWorkbenchRunResultsInput,
+  ): Promise<WorkbenchSaveResult>;
 }

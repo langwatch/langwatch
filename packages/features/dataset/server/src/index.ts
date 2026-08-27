@@ -3,7 +3,6 @@ export {
   type PostgresDatasetAdapterOptions,
 } from "./adapters/postgres.dataset.adapter";
 export {
-  DatasetExperimentPort,
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
   DatasetContentPort,
@@ -16,10 +15,7 @@ export {
   type DatasetAzureConfig,
   type DatasetS3Client,
 } from "./ports/dataset-storage.port";
-export {
-  S3DatasetStorage,
-  S3DatasetStorageAdapter,
-} from "./adapters/s3.dataset-storage.adapter";
+export { S3DatasetStorage, S3DatasetStorageAdapter } from "./adapters/s3.dataset-storage.adapter";
 export {
   AzureDatasetStorage,
   AzureDatasetStorageAdapter,

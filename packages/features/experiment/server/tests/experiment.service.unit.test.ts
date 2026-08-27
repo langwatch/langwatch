@@ -6,6 +6,8 @@ import {
   type Experiment,
   type ExperimentRun,
   type SaveExperimentInput,
+  type PersistedEvaluationsV3State,
+  persistedEvaluationsV3StateSchema,
 } from "@langwatch/experiment-contract";
 import type {
   ExperimentRepository,
@@ -15,6 +17,27 @@ import { ExperimentRunRepository } from "../src/repositories/experiment-run.repo
 import { ExperimentDspyRepository } from "../src/repositories/experiment-dspy.repository";
 import { ExperimentService } from "../src/services/experiment.service";
 import { ExperimentExecutionPort } from "../src/ports/experiment-execution.port";
+import { AgentService } from "@langwatch/agent-contract";
+import { DatasetService } from "@langwatch/dataset-contract";
+import { EvaluatorService } from "@langwatch/evaluator-contract";
+import { PromptService } from "@langwatch/prompt-contract";
+import { WorkflowService } from "@langwatch/workflow-contract";
+
+const prompts: PromptService = Object.create(PromptService.prototype);
+prompts.getAllPrompts = async () => [];
+const agents: AgentService = Object.create(AgentService.prototype);
+agents.exists = async () => false;
+const evaluators: EvaluatorService = Object.create(EvaluatorService.prototype);
+evaluators.getById = async () => {
+  throw new Error("missing");
+};
+const workflows: WorkflowService = Object.create(WorkflowService.prototype);
+workflows.getById = async () => {
+  throw new Error("missing");
+};
+const dataset: DatasetService = Object.create(DatasetService.prototype);
+dataset.getByIds = async () => [];
+const references = { prompts, agents, evaluators, workflows, dataset };
 
 const row = (overrides: Partial<Experiment> = {}): Experiment => ({
   id: "experiment_1",
@@ -33,19 +56,28 @@ const row = (overrides: Partial<Experiment> = {}): Experiment => ({
 class MemoryExperimentRepository implements ExperimentRepository {
   values: Experiment[] = [];
   states = new Map<string, ExperimentRowState>();
+  workbenches = new Map<
+    string,
+    {
+      experimentId: string;
+      slug: string;
+      name: string | null;
+      state: PersistedEvaluationsV3State | null;
+      version: number;
+      updatedAt: Date;
+      actorLabel?: "user" | "langy" | "api";
+      runId?: string;
+      versions: Array<{ version: number; autoSaved: boolean; state: unknown }>;
+    }
+  >();
 
   async tryFindById(input: { id: string; projectId: string }) {
     return (
-      this.values.find(
-        (value) => value.id === input.id && value.projectId === input.projectId,
-      ) ?? null
+      this.values.find((value) => value.id === input.id && value.projectId === input.projectId) ??
+      null
     );
   }
-  async tryFindBySlug(input: {
-    slug: string;
-    projectId: string;
-    type?: Experiment["type"];
-  }) {
+  async tryFindBySlug(input: { slug: string; projectId: string; type?: Experiment["type"] }) {
     return (
       this.values.find(
         (value) =>
@@ -70,8 +102,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
   async tryFindForWorkflow(input: { projectId: string; workflowId: string }) {
     return (
       this.values.find(
-        (value) =>
-          value.projectId === input.projectId && value.workflowId === input.workflowId,
+        (value) => value.projectId === input.projectId && value.workflowId === input.workflowId,
       ) ?? null
     );
   }
@@ -79,14 +110,18 @@ class MemoryExperimentRepository implements ExperimentRepository {
     const value = await this.tryFindBySlug(input);
     return value ? { id: value.id, slug: value.slug } : null;
   }
+  getBySlugOrId(
+    _input: Parameters<ExperimentRepository["getBySlugOrId"]>[0],
+  ): ReturnType<ExperimentRepository["getBySlugOrId"]> {
+    throw new Error("Experiment lookup is not configured for this test repository");
+  }
   async tryGetRowState(input: { projectId: string; id: string }) {
     return this.states.get(`${input.projectId}:${input.id}`) ?? null;
   }
   async findSlugsByPrefix(input: { projectId: string; slugPrefix: string }) {
     return this.values
       .filter(
-        (value) =>
-          value.projectId === input.projectId && value.slug.startsWith(input.slugPrefix),
+        (value) => value.projectId === input.projectId && value.slug.startsWith(input.slugPrefix),
       )
       .map((value) => value.slug);
   }
@@ -129,6 +164,112 @@ class MemoryExperimentRepository implements ExperimentRepository {
       archived: true,
     });
     return true;
+  }
+  getWorkbenchState(
+    input: Parameters<ExperimentRepository["getWorkbenchState"]>[0],
+  ): ReturnType<ExperimentRepository["getWorkbenchState"]> {
+    const workbench = [...this.workbenches.values()].find(
+      (candidate) => candidate.experimentId === input.id || candidate.slug === input.slug,
+    );
+    if (
+      !workbench ||
+      !this.values.some(
+        (value) => value.id === workbench.experimentId && value.projectId === input.projectId,
+      )
+    ) {
+      throw new ExperimentNotFoundError(input.id ?? input.slug ?? "unknown");
+    }
+    return Promise.resolve({ ...workbench });
+  }
+  resolveWorkbenchSaveTarget(
+    input: Parameters<ExperimentRepository["resolveWorkbenchSaveTarget"]>[0],
+  ): ReturnType<ExperimentRepository["resolveWorkbenchSaveTarget"]> {
+    const current = [...this.workbenches.values()].find(
+      (candidate) => candidate.experimentId === input.id || candidate.slug === input.slug,
+    );
+    return Promise.resolve(
+      current
+        ? { kind: "update", state: { ...current } }
+        : { kind: "create", ...(input.id ? { id: input.id } : {}) },
+    );
+  }
+  writeWorkbenchState(
+    input: Parameters<ExperimentRepository["writeWorkbenchState"]>[0],
+  ): ReturnType<ExperimentRepository["writeWorkbenchState"]> {
+    const workbench = this.workbenches.get(input.id);
+    if (!workbench) throw new ExperimentNotFoundError(input.id);
+    if (input.expectedVersion !== undefined && input.expectedVersion !== workbench.version) {
+      return Promise.resolve({
+        kind: "stale",
+        currentVersion: workbench.version,
+        actorLabel: workbench.actorLabel,
+        ...(workbench.runId ? { runId: workbench.runId } : {}),
+      });
+    }
+    workbench.version += 1;
+    workbench.name = input.name;
+    workbench.state = persistedEvaluationsV3StateSchema.parse(input.state);
+    workbench.actorLabel = input.actor.label;
+    workbench.runId = input.actor.runId;
+    workbench.versions.push({
+      version: workbench.version,
+      autoSaved: !input.commitMessage,
+      state: input.snapshot,
+    });
+    return Promise.resolve({
+      kind: "saved",
+      experimentId: input.id,
+      slug: workbench.slug,
+      version: workbench.version,
+    });
+  }
+  createWorkbenchState(
+    input: Parameters<ExperimentRepository["createWorkbenchState"]>[0],
+  ): ReturnType<ExperimentRepository["createWorkbenchState"]> {
+    this.values.push(
+      row({ id: input.id, projectId: input.projectId, slug: input.slug, name: input.name }),
+    );
+    this.workbenches.set(input.id, {
+      experimentId: input.id,
+      slug: input.slug,
+      name: input.name,
+      state: persistedEvaluationsV3StateSchema.parse(input.state),
+      version: 1,
+      updatedAt: new Date(),
+      actorLabel: input.actor.label,
+      ...(input.actor.runId ? { runId: input.actor.runId } : {}),
+      versions: [{ version: 1, autoSaved: !input.commitMessage, state: input.snapshot }],
+    });
+    return Promise.resolve({ id: input.id, slug: input.slug });
+  }
+  listWorkbenchVersions(
+    input: Parameters<ExperimentRepository["listWorkbenchVersions"]>[0],
+  ): ReturnType<ExperimentRepository["listWorkbenchVersions"]> {
+    const workbench = this.workbenches.get(input.experimentId);
+    return Promise.resolve(
+      (workbench?.versions ?? [])
+        .map((version) => ({
+          counterVersion: version.version,
+          version: version.version,
+          autoSaved: version.autoSaved,
+          commitMessage: null,
+          authorId: null,
+          authorLabel: "user",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
+        .reverse()
+        .slice(0, input.take),
+    );
+  }
+  getWorkbenchVersion(
+    input: Parameters<ExperimentRepository["getWorkbenchVersion"]>[0],
+  ): ReturnType<ExperimentRepository["getWorkbenchVersion"]> {
+    const found = this.workbenches
+      .get(input.experimentId)
+      ?.versions.find((version) => version.version === input.version);
+    if (!found) throw new Error("missing version");
+    return Promise.resolve(found);
   }
 }
 
@@ -178,8 +319,7 @@ class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
   async list(input: { tenantId: string; experimentId: string }) {
     return this.values
       .filter(
-        (value) =>
-          value.tenantId === input.tenantId && value.experimentId === input.experimentId,
+        (value) => value.tenantId === input.tenantId && value.experimentId === input.experimentId,
       )
       .map((value) => ({
         tenantId: value.tenantId,
@@ -234,11 +374,26 @@ const build = (
       slugify: (value) => value.toLowerCase().replaceAll(" ", "-"),
       newId: () => "generated",
       now: () => new Date(1),
+      references,
     }),
   };
 };
 
 describe("ExperimentService", () => {
+  const workbenchState = (name = "Workbench"): PersistedEvaluationsV3State => ({
+    name,
+    datasets: [
+      {
+        id: "dataset_1",
+        name: "Inline",
+        type: "inline",
+        columns: [{ id: "input", name: "input", type: "string" }],
+      },
+    ],
+    activeDatasetId: "dataset_1",
+    targets: [],
+    evaluators: [],
+  });
   const dspyStep: ExperimentDspyStep = {
     tenantId: "project_1",
     experimentId: "experiment_1",
@@ -255,6 +410,86 @@ describe("ExperimentService", () => {
     insertedAt: 1,
     updatedAt: 1,
   };
+
+  it("refuses malformed workbench state before it can create a row", async () => {
+    const { service, repository } = build();
+
+    await expect(
+      service.createEvaluationsV3({
+        projectId: "project_1",
+        state: { name: "Broken" },
+        actor: { label: "user" },
+      }),
+    ).rejects.toMatchObject({ code: "experiment_invalid_workbench_state" });
+    expect(repository.values).toEqual([]);
+  });
+
+  it("enforces expectedVersion as a compare-and-set", async () => {
+    const { service } = build();
+    const created = await service.createEvaluationsV3({
+      projectId: "project_1",
+      state: workbenchState(),
+      actor: { label: "user" },
+    });
+    await service.saveWorkbenchState({
+      projectId: "project_1",
+      id: created.experimentId,
+      state: workbenchState("First"),
+      expectedVersion: created.version,
+      actor: { label: "user" },
+    });
+
+    await expect(
+      service.saveWorkbenchState({
+        projectId: "project_1",
+        id: created.experimentId,
+        state: workbenchState("Stale"),
+        expectedVersion: created.version,
+        actor: { label: "user" },
+      }),
+    ).rejects.toMatchObject({
+      code: "experiment_stale_workbench_state",
+      meta: { currentVersion: 2 },
+    });
+  });
+
+  it("restores setup without discarding current run results", async () => {
+    const { service } = build();
+    const created = await service.createEvaluationsV3({
+      projectId: "project_1",
+      state: workbenchState("Original"),
+      actor: { label: "user" },
+    });
+    await service.saveWorkbenchState({
+      projectId: "project_1",
+      id: created.experimentId,
+      state: {
+        ...workbenchState("Changed"),
+        results: {
+          runId: "run_1",
+          targetOutputs: {},
+          targetMetadata: {},
+          evaluatorResults: {},
+          errors: {},
+        },
+      },
+      expectedVersion: created.version,
+      actor: { label: "user" },
+    });
+    await service.restoreWorkbenchVersion({
+      projectId: "project_1",
+      id: created.experimentId,
+      version: created.version,
+      actor: { label: "user" },
+    });
+
+    const restored = await service.getWorkbenchState({
+      projectId: "project_1",
+      id: created.experimentId,
+    });
+    expect(restored.state?.name).toBe("Original");
+    expect(restored.state?.results?.runId).toBe("run_1");
+  });
 
   it("owns DSPy step writes and reads", async () => {
     const { service } = build();
@@ -357,9 +592,9 @@ describe("ExperimentService", () => {
       workflowId: "workflow_1",
       archived: false,
     });
-    await expect(
-      service.archive({ projectId: "project_1", id: "experiment_1" }),
-    ).resolves.toEqual({ success: true });
+    await expect(service.archive({ projectId: "project_1", id: "experiment_1" })).resolves.toEqual({
+      success: true,
+    });
     expect(
       await repository.tryGetRowState({
         projectId: "project_1",

@@ -2,6 +2,9 @@ import type {
   Experiment,
   ExperimentType,
   SaveExperimentInput,
+  WorkbenchActor,
+  WorkbenchStateView,
+  WorkbenchVersionSummary,
 } from "@langwatch/experiment-contract";
 
 export type ExperimentRowState = {
@@ -9,6 +12,15 @@ export type ExperimentRowState = {
   workflowId: string | null;
   archived: boolean;
 };
+
+export type WorkbenchWriteResult =
+  | { kind: "saved"; experimentId: string; slug: string; version: number }
+  | {
+      kind: "stale";
+      currentVersion: number;
+      actorLabel?: string;
+      runId?: string;
+    };
 
 export class ArchivedExperimentWriteError extends Error {
   constructor(readonly experimentId: string) {
@@ -18,10 +30,7 @@ export class ArchivedExperimentWriteError extends Error {
 }
 
 export abstract class ExperimentRepository {
-  abstract tryFindById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Experiment | null>;
+  abstract tryFindById(input: { id: string; projectId: string }): Promise<Experiment | null>;
   abstract tryFindBySlug(input: {
     slug: string;
     projectId: string;
@@ -43,6 +52,7 @@ export abstract class ExperimentRepository {
     projectId: string;
     slug: string;
   }): Promise<{ id: string; slug: string } | null>;
+  abstract getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment>;
   abstract tryGetRowState(input: {
     projectId: string;
     id: string;
@@ -52,9 +62,7 @@ export abstract class ExperimentRepository {
     slugPrefix: string;
     excludeId?: string;
   }): Promise<string[]>;
-  abstract findDraftNames(input: {
-    projectId: string;
-  }): Promise<Array<{ name: string | null }>>;
+  abstract findDraftNames(input: { projectId: string }): Promise<Array<{ name: string | null }>>;
   abstract findAllSlugs(input: { projectId: string }): Promise<string[]>;
   abstract saveActive(
     input: SaveExperimentInput & {
@@ -72,4 +80,45 @@ export abstract class ExperimentRepository {
     archivedSlug: string;
     archivedAt: Date;
   }): Promise<boolean>;
+  abstract getWorkbenchState(input: {
+    projectId: string;
+    id?: string;
+    slug?: string;
+  }): Promise<WorkbenchStateView>;
+  abstract resolveWorkbenchSaveTarget(input: {
+    projectId: string;
+    id?: string;
+    slug?: string;
+  }): Promise<{ kind: "create"; id?: string } | { kind: "update"; state: WorkbenchStateView }>;
+  abstract writeWorkbenchState(input: {
+    projectId: string;
+    id: string;
+    name: string;
+    state: unknown;
+    snapshot: unknown;
+    expectedVersion?: number;
+    actor: WorkbenchActor;
+    commitMessage?: string;
+  }): Promise<WorkbenchWriteResult>;
+  abstract createWorkbenchState(input: {
+    projectId: string;
+    id: string;
+    slug: string;
+    name: string;
+    state: unknown;
+    snapshot: unknown;
+    actor: WorkbenchActor;
+    commitMessage?: string;
+  }): Promise<{ id: string; slug: string }>;
+  abstract listWorkbenchVersions(input: {
+    projectId: string;
+    experimentId: string;
+    take: number;
+    beforeCounterVersion?: number;
+  }): Promise<WorkbenchVersionSummary[]>;
+  abstract getWorkbenchVersion(input: {
+    projectId: string;
+    experimentId: string;
+    version: number;
+  }): Promise<{ autoSaved: boolean; state: unknown }>;
 }

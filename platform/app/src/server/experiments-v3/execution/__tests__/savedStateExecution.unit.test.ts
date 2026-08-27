@@ -11,9 +11,6 @@ const findBySlugAndType = vi.hoisted(() => vi.fn());
 const loadExecutionData = vi.hoisted(() => vi.fn());
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/experiments/experiment.service", () => ({
-  ExperimentService: { create: () => ({ findBySlugAndType }) },
-}));
 vi.mock("../dataLoader", () => ({ loadExecutionData }));
 
 import { buildStateFromWorkbench, prepareSavedStateExecution } from "../savedStateExecution";

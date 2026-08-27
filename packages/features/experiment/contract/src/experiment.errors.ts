@@ -48,3 +48,77 @@ export class InvalidExperimentConfigurationError extends HandledError {
     this.name = "InvalidExperimentConfigurationError";
   }
 }
+
+export class ExperimentTypeMismatchError extends HandledError {
+  declare readonly code: "experiment_type_mismatch";
+
+  constructor() {
+    super("experiment_type_mismatch", "This experiment is not an evaluation workbench", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "ExperimentTypeMismatchError";
+  }
+}
+
+export class StaleWorkbenchStateError extends HandledError {
+  declare readonly code: "experiment_stale_workbench_state";
+
+  constructor({
+    currentVersion,
+    actorLabel,
+    runId,
+  }: {
+    currentVersion: number;
+    actorLabel?: string;
+    runId?: string;
+  }) {
+    super("experiment_stale_workbench_state", "This evaluation changed since you loaded it", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: {
+        currentVersion,
+        ...(actorLabel !== undefined ? { actorLabel } : {}),
+        ...(runId !== undefined ? { runId } : {}),
+      },
+    });
+    this.name = "StaleWorkbenchStateError";
+  }
+}
+
+export class WorkbenchMissingReferenceError extends HandledError {
+  declare readonly code: "experiment_workbench_missing_reference";
+
+  constructor({ refType, refId }: { refType: string; refId: string }) {
+    super(
+      "experiment_workbench_missing_reference",
+      "This evaluation points at something that no longer exists",
+      { httpStatus: 400, fault: "customer", meta: { refType, refId } },
+    );
+    this.name = "WorkbenchMissingReferenceError";
+  }
+}
+
+export class InvalidWorkbenchStateError extends HandledError {
+  declare readonly code: "experiment_invalid_workbench_state";
+
+  constructor({ issues }: { issues: readonly { path: string; message: string }[] }) {
+    super("experiment_invalid_workbench_state", "This evaluation's setup could not be saved", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { issues },
+    });
+    this.name = "InvalidWorkbenchStateError";
+  }
+}
+
+export class ExperimentVersionNotFoundError extends NotFoundError {
+  declare readonly code: "experiment_version_not_found";
+
+  constructor({ experimentId, version }: { experimentId: string; version: number }) {
+    super("experiment_version_not_found", "Experiment version", String(version), {
+      meta: { experimentId, version },
+    });
+    this.name = "ExperimentVersionNotFoundError";
+  }
+}

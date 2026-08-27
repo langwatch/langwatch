@@ -5,7 +5,6 @@ import { DatasetRepository } from "../repositories/dataset.repository";
 import { PrismaDatasetRecordRepository } from "../repositories/prisma/prisma.dataset-record.repository";
 import { PrismaDatasetRepository } from "../repositories/prisma/prisma.dataset.repository";
 import type {
-  DatasetExperimentPort,
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
   DatasetContentPort,
@@ -21,7 +20,6 @@ import type { DatasetNormalizePayload } from "../jobs/dataset-normalize.job";
 
 export type PostgresDatasetAdapterOptions = {
   database: PrismaClient;
-  experiments?: DatasetExperimentPort;
   storage?: DatasetUploadPort;
   queue?: DatasetNormalizeQueuePort;
   content?: DatasetContentPort;
@@ -34,16 +32,10 @@ export class PostgresDatasetAdapter {
   private readonly normalization: DatasetNormalizationService | null;
 
   private constructor(options: PostgresDatasetAdapterOptions) {
-    const repository: DatasetRepository = PrismaDatasetRepository.create(
-      options.database,
-    );
-    const records: DatasetRecordRepository = PrismaDatasetRecordRepository.create(
-      options.database,
-    );
+    const repository: DatasetRepository = PrismaDatasetRepository.create(options.database);
+    const records: DatasetRecordRepository = PrismaDatasetRecordRepository.create(options.database);
     const contentRepository = DatasetContentRepository.create(options.database);
-    const recordContentRepository = DatasetRecordContentRepository.create(
-      options.database,
-    );
+    const recordContentRepository = DatasetRecordContentRepository.create(options.database);
     this.normalization = options.storageResolver
       ? DatasetNormalizationService.create({
           datasets: contentRepository,
@@ -53,7 +45,6 @@ export class PostgresDatasetAdapter {
     this.service = DatasetService.create({
       repository,
       records,
-      experiments: options.experiments,
       uploads:
         options.storage ??
         (options.storageResolver
@@ -88,9 +79,7 @@ export class PostgresDatasetAdapter {
     return this.service;
   }
 
-  connectNormalization(
-    sender: (payload: DatasetNormalizePayload) => Promise<void>,
-  ): void {
+  connectNormalization(sender: (payload: DatasetNormalizePayload) => Promise<void>): void {
     this.requireNormalization().connect(sender);
   }
 

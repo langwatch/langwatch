@@ -107,6 +107,7 @@ import {
   AppExperimentRuntime,
 } from "~/runtime/app/features/experiment";
 import { AppExperimentEventingAdapter } from "~/runtime/app/features/experiment-eventing";
+import { AppExperimentWorkbenchUpdatesAdapter } from "~/runtime/app/features/experiment-workbench-updates.adapter";
 import { AppExperimentRunHistoryObservability } from "~/runtime/app/features/experiment-run-history.observability";
 import {
   AppScenarioClock,
@@ -733,19 +734,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     }),
     "LogRecordStorageService",
   );
-  const experiments = traced(
-    AppExperimentRuntime.create({
-      database: prisma,
-      resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : async () => null,
-      tupleParam: (values) => new TupleParam(values),
-      runHistoryTelemetry: AppExperimentRunHistoryObservability.create(),
-      dspyRetention: AppExperimentDspyRetentionPort.create(dataRetentionService),
-      execution: AppExperimentEventingAdapter.create(() => commands.experimentRuns).build(),
-      slugify,
-      newId: () => nanoid(8),
-    }).build(),
-    "ExperimentService",
-  );
   const simulationQueueRun = new Deferred<AppCommands["simulations"]["queueRun"]>(
     "simulationQueueRun",
   );
@@ -800,21 +788,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     }).build(),
     "ScenarioService",
   );
-  const datasetRuntime = AppDatasetRuntime.create({
-    database: prisma,
-    experiments: {
-      getName: async ({ projectId, experimentId }) => {
-        const name = (
-          await experiments.getById({
-            projectId,
-            id: experimentId,
-          })
-        ).name;
-        if (!name) throw new Error(`Experiment ${experimentId} has no name`);
-        return name;
-      },
-    },
-  });
+  const datasetRuntime = AppDatasetRuntime.create({ database: prisma });
   const dataset = traced(datasetRuntime.build(), "DatasetService");
   const annotations = traced(
     PostgresAnnotationAdapter.create({
@@ -849,6 +823,21 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const evaluators = traced(
     EvaluatorFeature.create({ prisma, workflows, nlpRuntime: workflowNlpRuntime }),
     "EvaluatorService",
+  );
+  const experiments = traced(
+    AppExperimentRuntime.create({
+      database: prisma,
+      resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : async () => null,
+      tupleParam: (values) => new TupleParam(values),
+      runHistoryTelemetry: AppExperimentRunHistoryObservability.create(),
+      dspyRetention: AppExperimentDspyRetentionPort.create(dataRetentionService),
+      execution: AppExperimentEventingAdapter.create(() => commands.experimentRuns).build(),
+      slugify,
+      newId: () => nanoid(8),
+      references: { prompts, agents, evaluators, workflows, dataset },
+      updates: AppExperimentWorkbenchUpdatesAdapter.create(broadcast),
+    }).build(),
+    "ExperimentService",
   );
   const traceService = TraceService.create({
     prisma,
@@ -2749,6 +2738,13 @@ export function createTestApp(
       dspyRetention: AppExperimentDspyRetentionPort.create(testDataRetentionService),
       slugify,
       newId: () => nanoid(8),
+      references: {
+        prompts,
+        agents,
+        evaluators: testEvaluators,
+        workflows: testWorkflows,
+        dataset: testDataset,
+      },
     }).build(),
     scenarios: testScenarios,
     scenarioTabs: testScenarioTabs,

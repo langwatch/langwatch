@@ -222,6 +222,18 @@ export const COMPARISON_EVALUATOR_TYPE = "langevals/select_best_compare";
 /** @deprecated Legacy two-slot judge. Read for back-compat; never written. */
 export const LEGACY_PAIRWISE_EVALUATOR_TYPE = "langevals/pairwise_compare";
 
+/**
+ * The only evaluator types allowed to carry a standalone comparison column.
+ * Saved legacy rows use the two-slot judge and are repaired to the current
+ * judge on read, so both values remain valid while that history exists.
+ */
+export const isComparisonEvaluatorType = (evaluatorType: string | undefined): boolean =>
+  evaluatorType === COMPARISON_EVALUATOR_TYPE || evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+
+export const COMPARISON_COLUMN_REFUSAL =
+  `Only the Comparison judge (${COMPARISON_EVALUATOR_TYPE}) can be a standalone comparison column. ` +
+  `Omit "comparison" and this evaluator attaches to every target column as a score.`;
+
 export const comparisonEvaluatorConfigSchema = z.object({
   variants: z.array(z.string()).default([]),
   variantOutputPaths: z.record(z.string(), z.array(z.string())).optional(),
@@ -243,10 +255,8 @@ export type ComparisonEvaluatorConfig = z.infer<typeof comparisonEvaluatorConfig
  * Tolerates the legacy `pairwise` shape so that a saved experiment is
  * classified correctly even before `toComparisonConfig` has folded it in.
  */
-export const isComparisonEvaluator = (e: {
-  pairwise?: unknown;
-  comparison?: unknown;
-}): boolean => !!e.comparison || !!e.pairwise;
+export const isComparisonEvaluator = (e: { pairwise?: unknown; comparison?: unknown }): boolean =>
+  !!e.comparison || !!e.pairwise;
 
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
@@ -255,10 +265,7 @@ export const evaluatorConfigSchema = z.object({
   settings: z.record(z.string(), z.unknown()).optional(),
   inputs: z.array(fieldSchema),
   // Per-dataset, per-target mappings: datasetId -> targetId -> inputFieldName -> FieldMapping
-  mappings: z.record(
-    z.string(),
-    z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
-  ),
+  mappings: z.record(z.string(), z.record(z.string(), z.record(z.string(), fieldMappingSchema))),
   /** Reference to the database evaluator - settings are fetched from here */
   dbEvaluatorId: z.string().optional(),
   /** Local unsaved evaluator settings that override DB values during execution */
@@ -394,10 +401,7 @@ export const targetConfigSchema = z
     }
   });
 export type TargetType = "prompt" | "agent" | "evaluator" | "workflow";
-export type TargetConfig = Omit<
-  z.infer<typeof targetConfigSchema>,
-  "inputs" | "outputs"
-> & {
+export type TargetConfig = Omit<z.infer<typeof targetConfigSchema>, "inputs" | "outputs"> & {
   inputs: Field[];
   outputs: Field[];
 };
@@ -427,9 +431,7 @@ export const targetRowMetadataSchema = z.object({
    * must survive the round trip rather than be silently stripped.
    */
   domainError: z
-    .custom<SerializedHandledError>(
-      (value) => typeof value === "object" && value !== null,
-    )
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
     .optional(),
 });
 
@@ -595,11 +597,7 @@ export type EvaluationsV3Actions = {
   addColumn: (datasetId: string, column: DatasetColumn) => void;
   removeColumn: (datasetId: string, columnId: string) => void;
   renameColumn: (datasetId: string, columnId: string, newName: string) => void;
-  updateColumnType: (
-    datasetId: string,
-    columnId: string,
-    type: DatasetColumnType,
-  ) => void;
+  updateColumnType: (datasetId: string, columnId: string, type: DatasetColumnType) => void;
 
   // Target actions
   addTarget: (target: TargetConfig) => void;
@@ -619,10 +617,7 @@ export type EvaluationsV3Actions = {
    * deterministically derive the per-row field mappings on the same target.
    * Leaves non-comparison targets untouched.
    */
-  updateTargetComparison: (
-    targetId: string,
-    comparison: ComparisonEvaluatorConfig,
-  ) => void;
+  updateTargetComparison: (targetId: string, comparison: ComparisonEvaluatorConfig) => void;
 
   // Global evaluator actions (evaluators apply to ALL targets automatically)
   addEvaluator: (evaluator: EvaluatorConfig) => void;
@@ -654,10 +649,7 @@ export type EvaluationsV3Actions = {
   closeOverlay: () => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
-  setHighlightedVariantTargetId: (
-    targetId: string | undefined,
-    outcome?: "won" | "lost",
-  ) => void;
+  setHighlightedVariantTargetId: (targetId: string | undefined, outcome?: "won" | "lost") => void;
   toggleRowSelection: (row: number) => void;
   selectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;
@@ -672,11 +664,7 @@ export type EvaluationsV3Actions = {
   toggleCellExpanded: (row: number, columnId: string) => void;
   toggleColumnVisibility: (columnName: string) => void;
   setHiddenColumns: (columnNames: Set<string>) => void;
-  setAutosaveStatus: (
-    type: "evaluation" | "dataset",
-    state: AutosaveState,
-    error?: string,
-  ) => void;
+  setAutosaveStatus: (type: "evaluation" | "dataset", state: AutosaveState, error?: string) => void;
 
   // Reset
   reset: () => void;
@@ -748,11 +736,7 @@ export type TableMeta = {
   handleRunRow?: (rowIndex: number) => void;
   handleRunCell?: (rowIndex: number, targetId: string) => void;
   /** Re-run a single evaluator for a specific cell */
-  handleRerunEvaluator?: (
-    rowIndex: number,
-    targetId: string,
-    evaluatorId: string,
-  ) => void;
+  handleRerunEvaluator?: (rowIndex: number, targetId: string, evaluatorId: string) => void;
   /** Run an evaluator on all rows that have target outputs */
   handleRunEvaluatorOnAllRows?: (targetId: string, evaluatorId: string) => void;
   /** Check if any row has a target output for a given target */
@@ -765,11 +749,7 @@ export type TableMeta = {
   /** Check if a specific cell is being executed */
   isCellExecuting?: (rowIndex: number, targetId: string) => boolean;
   /** Check if a specific evaluator is currently running */
-  isEvaluatorRunning?: (
-    rowIndex: number,
-    targetId: string,
-    evaluatorId: string,
-  ) => boolean;
+  isEvaluatorRunning?: (rowIndex: number, targetId: string, evaluatorId: string) => boolean;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
   allSelected: boolean;

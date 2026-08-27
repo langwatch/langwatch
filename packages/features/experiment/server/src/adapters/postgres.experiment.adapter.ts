@@ -2,6 +2,11 @@ import type {
   ExperimentService as ExperimentServiceContract,
   SerializedHandledError,
 } from "@langwatch/experiment-contract";
+import type { AgentService } from "@langwatch/agent-contract";
+import type { DatasetService } from "@langwatch/dataset-contract";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   PrismaExperimentRepository,
@@ -137,6 +142,13 @@ export type PostgresExperimentAdapterOptions = {
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Date;
+  references: {
+    prompts: PromptService;
+    agents: AgentService;
+    evaluators: EvaluatorService;
+    workflows: WorkflowService;
+    dataset: DatasetService;
+  };
 };
 
 export class PostgresExperimentAdapter {

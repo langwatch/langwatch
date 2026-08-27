@@ -169,15 +169,12 @@ export const datasetRecordMutationResultSchema = z.object({
   record: datasetRecordSchema,
   created: z.boolean(),
 });
-export type DatasetRecordMutationResult = z.infer<
-  typeof datasetRecordMutationResultSchema
->;
+export type DatasetRecordMutationResult = z.infer<typeof datasetRecordMutationResultSchema>;
 
 export const upsertDatasetInputSchema = z
   .object({
     projectId: z.string().min(1),
-    name: z.string().min(1).optional(),
-    experimentId: z.string().min(1).optional(),
+    name: z.string().min(1),
     columnTypes: datasetColumnsSchema,
     datasetId: z.string().min(1).optional(),
     datasetRecords: z.array(datasetRecordInputSchema).optional(),
@@ -274,9 +271,7 @@ export const createDatasetFromUploadInputSchema = z.object({
   content: z.string(),
   fileSize: z.number().nonnegative(),
 });
-export type CreateDatasetFromUploadInput = z.infer<
-  typeof createDatasetFromUploadInputSchema
->;
+export type CreateDatasetFromUploadInput = z.infer<typeof createDatasetFromUploadInputSchema>;
 
 export type CreateDatasetFromUploadResult = {
   id: string;

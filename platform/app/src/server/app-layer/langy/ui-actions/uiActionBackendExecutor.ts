@@ -5,8 +5,7 @@ import { getStatePayloadSchema, runPayloadSchema } from "~/experiments-v3/action
 import type { WorkbenchState } from "~/experiments-v3/actions/transforms/types";
 import { isTransformError } from "~/experiments-v3/actions/transforms/types";
 import type { EvaluationResults } from "~/experiments-v3/types";
-import { StaleWorkbenchStateError } from "~/server/experiments/errors";
-import type { ExperimentService } from "~/server/experiments/experiment.service";
+import { StaleWorkbenchStateError, type ExperimentService } from "@langwatch/experiment-contract";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import {
   planSavedRunCarryOver,

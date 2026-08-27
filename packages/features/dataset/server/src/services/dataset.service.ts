@@ -43,22 +43,17 @@ import {
   upsertDatasetInputSchema,
 } from "@langwatch/dataset-contract";
 import type {
-  DatasetExperimentPort,
   DatasetNormalizeQueuePort,
   DatasetUploadPort,
   DatasetContentPort,
 } from "../ports/dataset.port";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
-import type {
-  DatasetRepository,
-  DatasetUpdateInput,
-} from "../repositories/dataset.repository";
+import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository";
 
 export type DatasetServiceOptions = {
   repository: DatasetRepository;
   records: DatasetRecordRepository;
-  experiments?: DatasetExperimentPort;
   uploads?: DatasetUploadPort;
   queue?: DatasetNormalizeQueuePort;
   content?: DatasetContentPort;
@@ -80,7 +75,7 @@ export class DatasetService extends DatasetServiceContract {
 
   async upsertDataset(input: UpsertDatasetInput): Promise<Dataset> {
     const parsed = upsertDatasetInputSchema.parse(input);
-    const name = await this.resolveName(parsed);
+    const name = parsed.name.trim();
     const slug = slugify(name);
     if (parsed.datasetId) {
       const existing = await this.getBySlugOrId({
@@ -240,9 +235,7 @@ export class DatasetService extends DatasetServiceContract {
     };
   }
 
-  async archiveDataset(
-    input: DatasetLookupInput,
-  ): Promise<{ id: string; archived: true }> {
+  async archiveDataset(input: DatasetLookupInput): Promise<{ id: string; archived: true }> {
     const parsed = datasetLookupInputSchema.parse(input);
     const dataset = await this.getBySlugOrId({
       slugOrId: parsed.slugOrId,
@@ -518,44 +511,38 @@ export class DatasetService extends DatasetServiceContract {
   async uploadToExistingDataset(
     input: UploadExistingDatasetInput,
   ): Promise<{ datasetId: string; recordsCreated: number }> {
-    if (!this.options.uploads)
-      throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
     return this.options.uploads.uploadToExistingDataset(input);
   }
 
   async createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<import("@langwatch/dataset-contract").CreateDatasetFromUploadResult> {
-    if (!this.options.uploads)
-      throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
     return this.options.uploads.createDatasetFromUpload(input);
   }
 
   async createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
-    if (!this.options.uploads)
-      throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
     return this.options.uploads.createPendingUpload(input);
   }
 
   async writeStagedUpload(input: StagedUploadInput): Promise<void> {
-    if (!this.options.uploads)
-      throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
     return this.options.uploads.writeStagedUpload(input);
   }
 
   async abortPendingUpload(
     input: AbortPendingUploadInput,
   ): Promise<{ datasetId: string; aborted: true }> {
-    if (!this.options.uploads)
-      throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
     return this.options.uploads.abortPendingUpload(input);
   }
 
   async finalizeUpload(
     input: FinalizeUploadInput,
   ): Promise<{ datasetId: string; status: "processing" }> {
-    if (!this.options.uploads)
-      throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
     const result = await this.options.uploads.finalizeUpload(input);
     await this.enqueueNormalize(input.projectId, input.datasetId);
     return result;
@@ -564,8 +551,7 @@ export class DatasetService extends DatasetServiceContract {
   async retryNormalize(
     input: RetryNormalizeInput,
   ): Promise<{ datasetId: string; status: "processing" }> {
-    if (!this.options.uploads)
-      throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
     const result = await this.options.uploads.retryNormalize(input);
     await this.enqueueNormalize(input.projectId, input.datasetId);
     return result;
@@ -616,17 +602,6 @@ export class DatasetService extends DatasetServiceContract {
       });
     }
     return target;
-  }
-
-  private async resolveName(input: UpsertDatasetInput): Promise<string> {
-    if (input.name) return input.name.trim();
-    if (input.experimentId && this.options.experiments) {
-      return this.options.experiments.getName({
-        projectId: input.projectId,
-        experimentId: input.experimentId,
-      });
-    }
-    throw new Error("Dataset name or experimentId is required");
   }
 
   private assertReady(dataset: Dataset): void {

@@ -9,12 +9,13 @@
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { nanoid } from "nanoid";
+import type { ExperimentService } from "@langwatch/experiment-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
 import type { PersistedEvaluationsV3State } from "~/experiments-v3/types/persistence";
 import type { Project } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import { ExperimentService } from "~/server/experiments/experiment.service";
+import { getApp } from "~/server/app-layer";
 import { getTestProject } from "~/utils/testUtils";
 import type { EvaluationV3Event, ExecutionScope } from "../types";
 
@@ -116,7 +117,7 @@ describe("backend run results in the workbench state", () => {
 
   beforeAll(async () => {
     project = await getTestProject("backend-run-results");
-    experiments = ExperimentService.create({ prisma });
+    experiments = getApp().experiments;
   });
 
   afterAll(async () => {
@@ -351,7 +352,7 @@ describe("backend run results in the workbench state", () => {
         ];
 
         const refusing = {
-          applyWorkbenchTransform: vi.fn(async () => {
+          recordWorkbenchRunResults: vi.fn(async () => {
             throw new Error("the workbench could not be written");
           }),
         } as unknown as ExperimentService;

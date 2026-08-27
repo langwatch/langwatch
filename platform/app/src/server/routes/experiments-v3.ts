@@ -36,6 +36,7 @@ import {
   InvalidExperimentConfigurationError,
 } from "@langwatch/experiment-contract";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
+import { workbenchActorFrom } from "~/server/experiments-v3/workbench-actor";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 import { requestAbort, runOrchestrator } from "~/server/experiments-v3/execution/orchestrator";
@@ -761,7 +762,7 @@ secured.access(apiKeyAuthRun).post(
       ...(runsSavedDataset(runInputs)
         ? {
             persistResults: {
-              experiments: getApp().experiments,
+              experiments: c.app.experiments,
               actor: workbenchActorFrom({ resolved }),
             },
           }
@@ -1160,9 +1161,7 @@ secured.access(apiKeyAuthExperimentsView).get(
     }
     const { project, markUsed } = authResult;
 
-    const workbench = await ExperimentService.create({
-      prisma,
-    }).getWorkbenchState({
+    const workbench = await c.app.experiments.getWorkbenchState({
       projectId: project.id,
       slug,
     });
@@ -1227,7 +1226,7 @@ secured.access(apiKeyAuthExperimentsUpdate).put(
 
     const body = c.req.valid("json");
 
-    const saved = await getApp().experiments.saveWorkbenchState({
+    const saved = await c.app.experiments.saveWorkbenchState({
       projectId: project.id,
       slug,
       state: body.state,
@@ -1290,7 +1289,7 @@ secured.access(apiKeyAuthExperimentsView).get(
     }
     const { project, markUsed } = authResult;
 
-    const experiments = ExperimentService.create({ prisma });
+    const experiments = c.app.experiments;
     // The service lists by id; the REST surface addresses experiments by slug
     // everywhere else, so the read that resolves one to the other also answers
     // the 404 for a slug this project does not have.
@@ -1372,7 +1371,7 @@ secured.access(apiKeyAuthExperimentsUpdate).post(
     }
     const { project, resolved, markUsed } = authResult;
 
-    const experiments = getApp().experiments;
+    const experiments = c.app.experiments;
     const workbench = await experiments.getWorkbenchState({
       projectId: project.id,
       slug,

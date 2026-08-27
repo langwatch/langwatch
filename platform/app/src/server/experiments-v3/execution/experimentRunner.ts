@@ -9,8 +9,12 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { StaleWorkbenchStateError } from "~/server/experiments/errors";
-import type { ExperimentService, WorkbenchActor } from "~/server/experiments/experiment.service";
+import {
+  InvalidExperimentConfigurationError,
+  StaleWorkbenchStateError,
+  type ExperimentService,
+  type WorkbenchActor,
+} from "@langwatch/experiment-contract";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { countScopedCells, type OrchestratorInput, runOrchestrator } from "./orchestrator";
@@ -91,18 +95,24 @@ const persistRunResults = async ({
   const plan = planRunMerge(scope);
 
   try {
-    const saved = await persistence.experiments.applyWorkbenchTransform({
+    const current = await persistence.experiments.getWorkbenchState({
       projectId,
       id: experimentId,
+    });
+    if (!current.state) {
+      throw new InvalidExperimentConfigurationError(current.slug);
+    }
+
+    const saved = await persistence.experiments.recordWorkbenchRunResults({
+      projectId,
+      id: experimentId,
+      expectedVersion: current.version,
       // The run names itself on the write. A page that started this run then
       // reads the version bump as its own and adopts it, rather than standing
       // down and asking the reader to reload over their unsaved edits.
       actor: { ...persistence.actor, runId },
       commitMessage: `Results from run ${runId}`,
-      transform: (state) => ({
-        ...state,
-        results: mergeRunResults({ existing: state.results, draft, plan }),
-      }),
+      results: mergeRunResults({ existing: current.state.results, draft, plan }),
     });
     logger.info(
       {

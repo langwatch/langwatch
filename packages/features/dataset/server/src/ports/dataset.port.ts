@@ -24,10 +24,6 @@ import type {
   UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
 
-export abstract class DatasetExperimentPort {
-  abstract getName(input: { projectId: string; experimentId: string }): Promise<string>;
-}
-
 /**
  * Upload and object-storage behavior is a Dataset capability, but its concrete
  * provider is selected by the application composition root. Keeping this port
@@ -56,10 +52,7 @@ export abstract class DatasetUploadPort {
 
 /** Durable queue seam used by normalize/finalize work. */
 export abstract class DatasetNormalizeQueuePort {
-  abstract enqueueNormalize(input: {
-    datasetId: string;
-    projectId: string;
-  }): Promise<void>;
+  abstract enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void>;
 }
 
 /**

@@ -1,9 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  datasetRecordFormSchema,
-  datasetRecordInputSchema,
-} from "@langwatch/dataset-contract";
+import { datasetRecordFormSchema, datasetRecordInputSchema } from "@langwatch/dataset-contract";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { datasetErrorHandler } from "../middleware/dataset-error";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -51,11 +48,22 @@ export const datasetRouter = createTRPCRouter({
     .permission("datasets:manage")
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
+      const experimentId = "experimentId" in input ? input.experimentId : undefined;
+      const experiment = experimentId
+        ? await ctx.app.experiments.getById({
+            projectId: input.projectId,
+            id: experimentId,
+          })
+        : undefined;
+      const name = "name" in input ? input.name : experiment?.name;
+      if (!name) {
+        throw new Error(`Experiment ${experimentId} has no name`);
+      }
+
       // Delegate all business logic to service
       return await ctx.app.dataset.upsertDataset({
         projectId: input.projectId,
-        name: "name" in input ? input.name : undefined,
-        experimentId: "experimentId" in input ? input.experimentId : undefined,
+        name,
         columnTypes: input.columnTypes,
         datasetId: "datasetId" in input ? input.datasetId : undefined,
         datasetRecords: input.datasetRecords,

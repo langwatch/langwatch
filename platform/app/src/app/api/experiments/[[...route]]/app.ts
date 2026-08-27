@@ -27,6 +27,8 @@ import type { Experiment } from "@langwatch/experiment-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
+import { createBlankWorkbenchState } from "~/server/experiments-v3/blank-workbench-state";
+import { workbenchActorFrom } from "~/server/experiments-v3/workbench-actor";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -251,26 +253,16 @@ secured.access(requires("experiments:view")).get(
     const project = c.get("project");
     const slugOrId = c.req.param("slug");
 
-    const service = ExperimentService.create({ prisma });
     // Slug first, because that is what the list route returns as `slug` and
     // what every sibling route in this namespace takes. The id is accepted too
     // rather than refused, since the same list row carries both and a caller
     // reaching for `id` is not making a mistake worth a 404.
-    const experiment =
-      (await service.findBySlug({ projectId: project.id, slug: slugOrId })) ??
-      (await service.findById({ projectId: project.id, id: slugOrId }));
+    const experiment = await c.app.experiments.getBySlugOrId({
+      projectId: project.id,
+      slugOrId,
+    });
 
-    if (!experiment) {
-      logger.info(
-        { projectId: project.id, slugOrId },
-        "Experiment not found over REST",
-      );
-      throw new ExperimentNotFoundError(slugOrId);
-    }
-
-    const aggregates = await ExperimentRunService.create(
-      prisma,
-    ).getRunAggregatesForExperimentIds({
+    const aggregates = await c.app.experiments.getRunAggregates({
       projectId: project.id,
       experimentIds: [experiment.id],
     });
@@ -327,20 +319,14 @@ secured.access(requires("experiments:create")).post(
     // create-then-save pair.
     const state = body.state ?? createBlankWorkbenchState({ name: body.name });
 
-    // The wired instance, not a fresh one: only it carries the broadcaster, so
-    // only it tells the tenant a new experiment exists. An open experiments
-    // list picks the row up from that signal instead of waiting for a reload.
-    const created = await getApp().experiments.createEvaluationsV3({
+    const created = await c.app.experiments.createEvaluationsV3({
       projectId: project.id,
       ...(body.name ? { name: body.name } : {}),
       state,
       actor: workbenchActorFrom({ resolved: c.get("resolvedToken") }),
     });
 
-    logger.info(
-      { projectId: project.id, slug: created.slug },
-      "Experiment created over REST",
-    );
+    logger.info({ projectId: project.id, slug: created.slug }, "Experiment created over REST");
 
     return c.json({
       id: created.experimentId,

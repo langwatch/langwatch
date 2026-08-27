@@ -1,6 +1,10 @@
 export * from "./adapters/postgres.experiment.adapter";
 export { ExperimentDspyRetentionPort } from "./ports/experiment-dspy-retention.port";
 export {
+  ExperimentWorkbenchUpdatesPort,
+  NoopExperimentWorkbenchUpdatesPort,
+} from "./ports/experiment-workbench-updates.port";
+export {
   ExperimentEventingAdapter,
   createExperimentRunProcessingPipeline,
   type ExperimentRunEventingIdLookup,

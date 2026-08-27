@@ -6,6 +6,8 @@ import {
   experimentDspyStepsLookupSchema,
   ExperimentDspyStepNotFoundError,
   ExperimentNotFoundError,
+  InvalidExperimentConfigurationError,
+  StaleWorkbenchStateError,
   ExperimentService as ExperimentServiceContract,
   experimentLookupSchema,
   experimentPageInputSchema,
@@ -43,7 +45,36 @@ import {
   type RecordEvaluatorResultInput,
   type RecordTargetResultInput,
   type StartExperimentRunInput,
+  createEvaluationsV3InputSchema,
+  getWorkbenchStateInputSchema,
+  saveWorkbenchStateInputSchema,
+  commitWorkbenchVersionInputSchema,
+  listWorkbenchVersionsInputSchema,
+  restoreWorkbenchVersionInputSchema,
+  recordWorkbenchRunResultsInputSchema,
+  collectWorkbenchReferences,
+  WorkbenchMissingReferenceError,
+  parseWorkbenchState,
+  repairWorkbenchState,
+  stripWorkbenchResults,
+  type CommitWorkbenchVersionInput,
+  type CreateEvaluationsV3Input,
+  type GetWorkbenchStateInput,
+  type ListWorkbenchVersionsInput,
+  type RestoreWorkbenchVersionInput,
+  type RecordWorkbenchRunResultsInput,
+  type SaveWorkbenchStateInput,
+  type WorkbenchSaveResult,
+  type WorkbenchStateView,
+  type WorkbenchVersionsPage,
+  type WorkbenchActor,
 } from "@langwatch/experiment-contract";
+import type { AgentService } from "@langwatch/agent-contract";
+import type { DatasetService } from "@langwatch/dataset-contract";
+import { EvaluatorNotFoundError, type EvaluatorService } from "@langwatch/evaluator-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
+import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
+import { z } from "zod";
 import {
   ArchivedExperimentWriteError,
   type ExperimentRepository,
@@ -54,6 +85,10 @@ import {
   UnavailableExperimentExecutionPort,
   type ExperimentExecutionPort,
 } from "../ports/experiment-execution.port";
+import {
+  NoopExperimentWorkbenchUpdatesPort,
+  type ExperimentWorkbenchUpdatesPort,
+} from "../ports/experiment-workbench-updates.port";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
@@ -63,13 +98,62 @@ export type ExperimentServiceOptions = {
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Date;
+  references: {
+    prompts: PromptService;
+    agents: AgentService;
+    evaluators: EvaluatorService;
+    workflows: WorkflowService;
+    dataset: DatasetService;
+  };
+  updates?: ExperimentWorkbenchUpdatesPort;
 };
 
-const isUniqueConflict = (error: unknown): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  error.code === "P2002";
+const uniqueConflictSchema = z.object({
+  code: z.literal("P2002"),
+  meta: z
+    .object({
+      target: z.union([z.string(), z.array(z.string())]).optional(),
+      driverAdapterError: z
+        .object({
+          cause: z
+            .object({
+              constraint: z
+                .object({
+                  fields: z.array(z.string()).optional(),
+                  index: z.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+const isUniqueConflict = (error: unknown): boolean => uniqueConflictSchema.safeParse(error).success;
+
+const uniqueConflictTargets = (error: unknown): string[] => {
+  const parsed = uniqueConflictSchema.safeParse(error);
+  if (!parsed.success) return [];
+
+  const target = parsed.data.meta?.target;
+  if (Array.isArray(target)) {
+    return target.map(String);
+  }
+
+  if (typeof target === "string") {
+    return [target];
+  }
+
+  const constraint = parsed.data.meta?.driverAdapterError?.cause?.constraint;
+  if (!constraint) return [];
+  if (constraint.fields) {
+    return constraint.fields.map(String);
+  }
+
+  return constraint.index ? [constraint.index] : [];
+};
 
 export class ExperimentService extends ExperimentServiceContract {
   static create(options: ExperimentServiceOptions): ExperimentService {
@@ -77,10 +161,12 @@ export class ExperimentService extends ExperimentServiceContract {
   }
 
   private readonly execution: ExperimentExecutionPort;
+  private readonly updates: ExperimentWorkbenchUpdatesPort;
 
   private constructor(private readonly options: ExperimentServiceOptions) {
     super();
     this.execution = options.execution ?? new UnavailableExperimentExecutionPort();
+    this.updates = options.updates ?? new NoopExperimentWorkbenchUpdatesPort();
   }
 
   async getById(input: ExperimentLookup): Promise<Experiment> {
@@ -95,6 +181,10 @@ export class ExperimentService extends ExperimentServiceContract {
     const experiment = await this.options.repository.tryFindBySlug(lookup);
     if (!experiment) throw new ExperimentNotFoundError(lookup.slug);
     return experiment;
+  }
+
+  getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment> {
+    return this.options.repository.getBySlugOrId(input);
   }
 
   async tryGetById(input: ExperimentLookup): Promise<Experiment | null> {
@@ -137,12 +227,8 @@ export class ExperimentService extends ExperimentServiceContract {
     return this.options.repository.tryFindLatest(input);
   }
 
-  async tryGetIdBySlug(
-    input: ExperimentSlugLookup,
-  ): Promise<{ id: string; slug: string } | null> {
-    return this.options.repository.tryFindIdBySlug(
-      experimentSlugLookupSchema.parse(input),
-    );
+  async tryGetIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null> {
+    return this.options.repository.tryFindIdBySlug(experimentSlugLookupSchema.parse(input));
   }
 
   async isActive(input: ExperimentLookup): Promise<boolean> {
@@ -248,33 +334,25 @@ export class ExperimentService extends ExperimentServiceContract {
   }
 
   async recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void> {
-    await this.execution.recordEvaluatorResult(
-      recordEvaluatorResultInputSchema.parse(input),
-    );
+    await this.execution.recordEvaluatorResult(recordEvaluatorResultInputSchema.parse(input));
   }
 
   async completeExperimentRun(input: CompleteExperimentRunInput): Promise<void> {
-    await this.execution.completeExperimentRun(
-      completeExperimentRunInputSchema.parse(input),
-    );
+    await this.execution.completeExperimentRun(completeExperimentRunInputSchema.parse(input));
   }
 
   async upsertDspyStep(input: ExperimentDspyStep): Promise<void> {
     await this.options.dspyRepository.upsert(experimentDspyStepSchema.parse(input));
   }
 
-  async listDspySteps(
-    input: ExperimentDspyStepsLookup,
-  ): Promise<ExperimentDspyStepSummary[]> {
+  async listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
     const values = await this.options.dspyRepository.list(
       experimentDspyStepsLookupSchema.parse(input),
     );
     return values.map((value) => experimentDspyStepSummarySchema.parse(value));
   }
 
-  async listDspyRuns(
-    input: ExperimentDspyStepsLookup,
-  ): Promise<DSPyRunsSummary[]> {
+  async listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]> {
     const query = experimentDspyStepsLookupSchema.parse(input);
     const steps = await this.listDspySteps(query);
     const versionIds = steps.flatMap((step) =>
@@ -292,8 +370,7 @@ export class ExperimentService extends ExperimentServiceContract {
     }
 
     return Array.from(stepsByRun, ([runId, runSteps]) => {
-      const versionId = runSteps.find((step) => step.workflowVersionId)
-        ?.workflowVersionId;
+      const versionId = runSteps.find((step) => step.workflowVersionId)?.workflowVersionId;
       return {
         runId,
         workflow_version: versionId ? versions[versionId] : void 0,
@@ -328,16 +405,214 @@ export class ExperimentService extends ExperimentServiceContract {
     return experimentDspyStepSchema.parse(value);
   }
 
+  async getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView> {
+    const query = getWorkbenchStateInputSchema.parse(input);
+    const state = await this.options.repository.getWorkbenchState(query);
+
+    return { ...state, state: repairWorkbenchState(state.state) };
+  }
+
+  async saveWorkbenchState(input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult> {
+    const command = saveWorkbenchStateInputSchema.parse(input);
+    const state = parseWorkbenchState(command.state);
+    const target = await this.options.repository.resolveWorkbenchSaveTarget(command);
+    if (target.kind === "create") {
+      return await this.createEvaluationsV3({
+        ...command,
+        ...(target.id ? { id: target.id } : {}),
+      });
+    }
+    const current = target.state;
+    await this.assertWorkbenchReferencesExist({ projectId: command.projectId, state });
+
+    const written = await this.options.repository.writeWorkbenchState({
+      projectId: command.projectId,
+      id: current.experimentId,
+      name: state.name || (await this.findNextDraftName({ projectId: command.projectId })),
+      state,
+      snapshot: stripWorkbenchResults(state),
+      expectedVersion: command.expectedVersion,
+      actor: command.actor,
+      commitMessage: command.commitMessage,
+    });
+    if (written.kind === "stale") {
+      throw new StaleWorkbenchStateError(written);
+    }
+
+    await this.publishWorkbenchUpdate({
+      projectId: command.projectId,
+      saved: written,
+      actor: command.actor,
+    });
+    return written;
+  }
+
+  async createEvaluationsV3(input: CreateEvaluationsV3Input): Promise<WorkbenchSaveResult> {
+    const command = createEvaluationsV3InputSchema.parse(input);
+    const state = parseWorkbenchState(command.state);
+    await this.assertWorkbenchReferencesExist({ projectId: command.projectId, state });
+    const id = command.id ?? this.options.newId();
+    const name =
+      state.name ||
+      command.name ||
+      (await this.findNextDraftName({ projectId: command.projectId }));
+    const baseSlug = state.experimentSlug ?? id.slice(-8);
+    const slug = await this.generateUniqueSlug({ baseSlug, projectId: command.projectId });
+    const created = await this.createWorkbenchState({
+      projectId: command.projectId,
+      id,
+      requestedId: command.id,
+      slug,
+      baseSlug,
+      name,
+      state,
+      actor: command.actor,
+      commitMessage: command.commitMessage,
+    });
+    const result = { experimentId: created.id, slug: created.slug, version: 1 };
+    await this.publishWorkbenchUpdate({
+      projectId: command.projectId,
+      saved: result,
+      actor: command.actor,
+    });
+    return result;
+  }
+
+  async commitWorkbenchVersion(input: CommitWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
+    const command = commitWorkbenchVersionInputSchema.parse(input);
+    const current = await this.getWorkbenchState(command);
+    if (!current.state) {
+      throw new InvalidExperimentConfigurationError(current.slug);
+    }
+
+    return await this.saveWorkbenchState({
+      ...command,
+      state: current.state,
+      expectedVersion: current.version,
+    });
+  }
+
+  async listWorkbenchVersions(input: ListWorkbenchVersionsInput): Promise<WorkbenchVersionsPage> {
+    const query = listWorkbenchVersionsInputSchema.parse(input);
+    const current = await this.getWorkbenchState({ projectId: query.projectId, id: query.id });
+    const take = Math.min(Math.max(query.limit ?? 50, 1), 100);
+    const versions = await this.options.repository.listWorkbenchVersions({
+      projectId: query.projectId,
+      experimentId: current.experimentId,
+      take,
+      ...(query.cursor === undefined ? {} : { beforeCounterVersion: query.cursor }),
+    });
+    const last = versions.at(-1);
+
+    return { versions, nextCursor: versions.length === take && last ? last.counterVersion : null };
+  }
+
+  async restoreWorkbenchVersion(input: RestoreWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
+    const command = restoreWorkbenchVersionInputSchema.parse(input);
+    const current = await this.getWorkbenchState(command);
+    const version = await this.options.repository.getWorkbenchVersion({
+      projectId: command.projectId,
+      experimentId: current.experimentId,
+      version: command.version,
+    });
+    const restored = parseWorkbenchState(version.state);
+
+    return await this.saveWorkbenchState({
+      projectId: command.projectId,
+      id: current.experimentId,
+      state: current.state?.results ? { ...restored, results: current.state.results } : restored,
+      expectedVersion: current.version,
+      actor: command.actor,
+      commitMessage: version.autoSaved
+        ? "Restored from the autosave"
+        : `Restored from v${command.version}`,
+    });
+  }
+
+  async recordWorkbenchRunResults(
+    input: RecordWorkbenchRunResultsInput,
+  ): Promise<WorkbenchSaveResult> {
+    const command = recordWorkbenchRunResultsInputSchema.parse(input);
+    const current = await this.getWorkbenchState({
+      projectId: command.projectId,
+      id: command.id,
+    });
+    if (!current.state) {
+      throw new InvalidExperimentConfigurationError(current.slug);
+    }
+
+    return await this.saveWorkbenchState({
+      projectId: command.projectId,
+      id: current.experimentId,
+      state: { ...current.state, results: command.results },
+      expectedVersion: command.expectedVersion,
+      actor: command.actor,
+      commitMessage: command.commitMessage,
+    });
+  }
+
+  private async createWorkbenchState(input: {
+    projectId: string;
+    id: string;
+    requestedId?: string;
+    slug: string;
+    baseSlug: string;
+    name: string;
+    state: ReturnType<typeof parseWorkbenchState>;
+    actor: CreateEvaluationsV3Input["actor"];
+    commitMessage?: string;
+  }): Promise<{ id: string; slug: string }> {
+    try {
+      return await this.options.repository.createWorkbenchState({
+        projectId: input.projectId,
+        id: input.id,
+        slug: input.slug,
+        name: input.name,
+        state: input.state,
+        snapshot: stripWorkbenchResults(input.state),
+        actor: input.actor,
+        commitMessage: input.commitMessage,
+      });
+    } catch (error) {
+      if (!isUniqueConflict(error)) {
+        throw error;
+      }
+
+      const retrySlug = await this.generateUniqueSlug({
+        baseSlug: input.baseSlug,
+        projectId: input.projectId,
+      });
+      try {
+        return await this.options.repository.createWorkbenchState({
+          projectId: input.projectId,
+          id: input.id,
+          slug: retrySlug,
+          name: input.name,
+          state: input.state,
+          snapshot: stripWorkbenchResults(input.state),
+          actor: input.actor,
+          commitMessage: input.commitMessage,
+        });
+      } catch (retryError) {
+        const targets = uniqueConflictTargets(retryError).map((target) => target.toLowerCase());
+        const slugConflict = targets.some((target) => target.includes("slug"));
+        if (input.requestedId && isUniqueConflict(retryError) && !slugConflict) {
+          const reasons = retryError instanceof Error ? [retryError] : [];
+
+          throw new ExperimentNotFoundError(input.requestedId, { reasons });
+        }
+
+        throw retryError;
+      }
+    }
+  }
+
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
     return this.options.runRepository.list(experimentRunListInputSchema.parse(input));
   }
 
-  getRunAggregates(
-    input: ExperimentRunListInput,
-  ): Promise<Record<string, ExperimentRunAggregate>> {
-    return this.options.runRepository.getAggregates(
-      experimentRunListInputSchema.parse(input),
-    );
+  getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
+    return this.options.runRepository.getAggregates(experimentRunListInputSchema.parse(input));
   }
 
   getRunsPage(
@@ -370,14 +645,91 @@ export class ExperimentService extends ExperimentServiceContract {
     return { experiment, ...page };
   }
 
+  private async publishWorkbenchUpdate({
+    projectId,
+    saved,
+    actor,
+  }: {
+    projectId: string;
+    saved: WorkbenchSaveResult;
+    actor: WorkbenchActor;
+  }): Promise<void> {
+    await this.updates.publish({
+      projectId,
+      experimentId: saved.experimentId,
+      slug: saved.slug,
+      version: saved.version,
+      actorLabel: actor.label,
+      ...(actor.runId ? { runId: actor.runId } : {}),
+    });
+  }
+
+  private async assertWorkbenchReferencesExist({
+    projectId,
+    state,
+  }: {
+    projectId: string;
+    state: ReturnType<typeof parseWorkbenchState>;
+  }): Promise<void> {
+    const references = collectWorkbenchReferences(state);
+    const prompts = references.has("prompt")
+      ? await this.options.references.prompts.getAllPrompts({ projectId, version: "latest" })
+      : [];
+
+    for (const [type, ids] of references) {
+      for (const id of ids) {
+        const exists = await this.workbenchReferenceExists({ projectId, type, id, prompts });
+        if (!exists) throw new WorkbenchMissingReferenceError({ refType: type, refId: id });
+      }
+    }
+  }
+
+  private async workbenchReferenceExists({
+    projectId,
+    type,
+    id,
+    prompts,
+  }: {
+    projectId: string;
+    type: "prompt" | "agent" | "evaluator" | "workflow" | "dataset";
+    id: string;
+    prompts: Awaited<ReturnType<PromptService["getAllPrompts"]>>;
+  }): Promise<boolean> {
+    switch (type) {
+      case "prompt":
+        return prompts.some((prompt) => prompt.id === id || prompt.handle === id);
+      case "agent":
+        return await this.options.references.agents.exists({ id, projectId });
+      case "dataset":
+        return (
+          (await this.options.references.dataset.getByIds({ projectId, datasetIds: [id] }))
+            .length === 1
+        );
+      case "evaluator":
+        return await this.options.references.evaluators
+          .getById({ id, projectId })
+          .then(() => true)
+          .catch((error: unknown) => {
+            if (error instanceof EvaluatorNotFoundError) return false;
+            throw error;
+          });
+      case "workflow":
+        return await this.options.references.workflows
+          .getById({ id, projectId })
+          .then(() => true)
+          .catch((error: unknown) => {
+            if (error instanceof WorkflowNotFoundError) return false;
+            throw error;
+          });
+    }
+  }
+
   private async generateUniqueSlug(input: {
     baseSlug: string;
     projectId: string;
     excludeExperimentId?: string;
   }): Promise<string> {
-    const suffixPattern = new RegExp(
-      `^${ExperimentService.escapeRegExp(input.baseSlug)}(-\\d+)?$`,
-    );
+    const suffixPattern = new RegExp(`^${ExperimentService.escapeRegExp(input.baseSlug)}(-\\d+)?$`);
     const existing = new Set(
       (
         await this.options.repository.findSlugsByPrefix({

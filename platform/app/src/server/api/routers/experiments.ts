@@ -20,20 +20,14 @@ import {
 } from "@langwatch/workflow-contract";
 import { slugify } from "../../../utils/slugify";
 import { prisma } from "../../db";
-import type {
-  DSPyStep,
-} from "@langwatch/experiment-contract";
+import type { DSPyStep } from "@langwatch/experiment-contract";
 import { isLegacyOnlineEvaluationWorkbenchState } from "@langwatch/experiment-contract";
 import {
   type WizardState,
   workbenchStateSchema,
-} from "../../experiments/legacy-experiment-workbench.schema";
+} from "../../experiments-v3/legacy-workbench.schema";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
-import {
-  type createInnerTRPCContext,
-  createTRPCRouter,
-  protectedProcedure,
-} from "../trpc";
+import { type createInnerTRPCContext, createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } from "./workflows";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
@@ -49,7 +43,7 @@ const mapExperimentError = (error: unknown): never => {
   if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
-  if (error instanceof ExperimentTypeMismatchError) {
+  if (HandledError.isHandled(error) && error.code === "experiment_type_mismatch") {
     throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
   }
   throw error;
@@ -191,28 +185,19 @@ export const experimentsRouter = createTRPCRouter({
     .permission("experiments:update")
     .mutation(async ({ ctx, input }) => {
       const experiments = ctx.app.experiments;
-      const experimentId =
-        input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
+      const experimentId = input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
-      const name =
-        input.state.name ||
-        (await experiments.findNextDraftName({
+      const saved = await experiments
+        .saveWorkbenchState({
           projectId: input.projectId,
-        }));
-
-      const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
-      const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
-      return experiments
-        .save({
           id: experimentId,
-          projectId: input.projectId,
-          name,
-          type: ExperimentType.EVALUATIONS_V3,
-          requestedSlug: rawSlug,
-          slugMode: input.experimentId ? "preserve-existing" : "deduplicate",
-          workflowId: null,
-          workbenchState: workbenchStateJson,
+          state: input.state,
+          expectedVersion: input.expectedVersion,
+          actor: { userId: ctx.session?.user?.id, label: "user" },
         })
+        .catch(mapExperimentError);
+      return await experiments
+        .getById({ projectId: input.projectId, id: saved.experimentId })
         .catch(mapExperimentError);
     }),
 
@@ -225,23 +210,20 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("experiments:view")
     .query(async ({ ctx, input }) => {
-      const experiment = await ctx.app.experiments
-        .getBySlug({
-          projectId: input.projectId,
-          slug: input.experimentSlug,
-        })
+      const workbench = await ctx.app.experiments
+        .getWorkbenchState({ projectId: input.projectId, slug: input.experimentSlug })
         .catch(mapExperimentError);
       return {
-        experimentId: workbench.experimentId,
+        id: workbench.experimentId,
+        slug: workbench.slug,
+        workbenchState: workbench.state,
         version: workbench.version,
         updatedAt: workbench.updatedAt,
         // Who wrote the version the probing tab is comparing against. A tab
         // that has to tell its reader their work is out of date owes them the
         // name: Langy usually wrote it, on their behalf, in the page they are
         // looking at, and "somewhere else" reads as a stranger.
-        ...(workbench.actorLabel !== undefined
-          ? { actorLabel: workbench.actorLabel }
-          : {}),
+        ...(workbench.actorLabel !== undefined ? { actorLabel: workbench.actorLabel } : {}),
         // The run that wrote it, when a run did. A tab coming back from the
         // background adopts a version its own run wrote instead of standing
         // down over a write it already holds every cell of.
@@ -260,7 +242,7 @@ export const experimentsRouter = createTRPCRouter({
     .permission("experiments:view")
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
-      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
       try {
         for await (const eventArgs of on(emitter, "experiment_updated", {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- input-bearing subscriptions leave opts.signal untyped (same as langy/traces routers)
@@ -269,7 +251,7 @@ export const experimentsRouter = createTRPCRouter({
           yield eventArgs[0] as { event?: unknown; timestamp?: number };
         }
       } finally {
-        getApp().broadcast.cleanupTenantEmitter(projectId);
+        opts.ctx.app.broadcast.cleanupTenantEmitter(projectId);
       }
     }),
 
@@ -283,8 +265,8 @@ export const experimentsRouter = createTRPCRouter({
       }),
     )
     .permission("experiments:view")
-    .query(async ({ input }) => {
-      const page = await experimentService()
+    .query(async ({ ctx, input }) => {
+      const page = await ctx.app.experiments
         .listWorkbenchVersions({
           projectId: input.projectId,
           id: input.experimentId,
@@ -299,9 +281,7 @@ export const experimentsRouter = createTRPCRouter({
       // the caller decide, while this list is read straight into a drawer.
       const authorIds = [
         ...new Set(
-          page.versions
-            .map((version) => version.authorId)
-            .filter((id): id is string => !!id),
+          page.versions.map((version) => version.authorId).filter((id): id is string => !!id),
         ),
       ];
       const authors =
@@ -311,17 +291,13 @@ export const experimentsRouter = createTRPCRouter({
               select: { id: true, name: true },
             })
           : [];
-      const nameById = new Map(
-        authors.map((author) => [author.id, author.name]),
-      );
+      const nameById = new Map(authors.map((author) => [author.id, author.name]));
 
       return {
         ...page,
         versions: page.versions.map((version) => ({
           ...version,
-          authorName: version.authorId
-            ? (nameById.get(version.authorId) ?? null)
-            : null,
+          authorName: version.authorId ? (nameById.get(version.authorId) ?? null) : null,
         })),
       };
     }),
@@ -336,7 +312,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("experiments:update")
     .mutation(async ({ ctx, input }) => {
-      return await experimentService()
+      return await ctx.app.experiments
         .commitWorkbenchVersion({
           projectId: input.projectId,
           id: input.experimentId,
@@ -356,7 +332,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .permission("experiments:update")
     .mutation(async ({ ctx, input }) => {
-      return await experimentService()
+      return await ctx.app.experiments
         .restoreWorkbenchVersion({
           projectId: input.projectId,
           id: input.experimentId,
@@ -410,10 +386,7 @@ export const experimentsRouter = createTRPCRouter({
         slug: experiment.slug,
         preconditions: workbenchState.realTimeExecution?.preconditions ?? [],
         parameters: Object.fromEntries(
-          (evaluator.data.parameters ?? []).map((param) => [
-            param.identifier,
-            param.value,
-          ]),
+          (evaluator.data.parameters ?? []).map((param) => [param.identifier, param.value]),
         ) as Record<string, any>,
         mappings: coerceMonitorMappings(workbenchState.realTimeTraceMappings),
         sample: workbenchState.realTimeExecution?.sample ?? 1,
@@ -555,8 +528,7 @@ export const experimentsRouter = createTRPCRouter({
         ),
       );
       const nonLegacyExperiments = allExperiments.filter(
-        (experiment) =>
-          !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
+        (experiment) => !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
       );
       const totalHits = nonLegacyExperiments.length;
 
@@ -566,8 +538,8 @@ export const experimentsRouter = createTRPCRouter({
       const getDatasetId = (dsl: unknown) => {
         const parsed = studioWorkflowSchema.safeParse(dsl);
         if (!parsed.success) return undefined;
-        return (parsed.data.nodes.find((node) => node.type === "entry") as Node<Entry>)
-          ?.data.dataset?.id;
+        return (parsed.data.nodes.find((node) => node.type === "entry") as Node<Entry>)?.data
+          .dataset?.id;
       };
 
       const datasetIds = experiments
@@ -593,9 +565,7 @@ export const experimentsRouter = createTRPCRouter({
       const experimentsWithDatasetsAndRuns = experiments
         .map((experiment) => {
           const runs = runsByExperimentId[experiment.id] ?? [];
-          const latestRun = runs.sort(
-            (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
-          )[0];
+          const latestRun = runs.sort((a, b) => b.timestamps.createdAt - a.timestamps.createdAt)[0];
           const primaryMetric = latestRun
             ? Object.values(latestRun?.summary.evaluations)[0]
             : undefined;
@@ -610,8 +580,7 @@ export const experimentsRouter = createTRPCRouter({
                 timestamps: latestRun?.timestamps,
               },
             },
-            dataset:
-              datasetsById[getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""],
+            dataset: datasetsById[getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""],
             updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
           };
         })
@@ -819,8 +788,7 @@ export const experimentsRouter = createTRPCRouter({
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message:
-            "You do not have permission to manage evaluations in the source project",
+          message: "You do not have permission to manage evaluations in the source project",
         });
       }
 
@@ -966,9 +934,10 @@ const copyEvaluationsV3Experiment = async ({
   copyDatasets?: boolean;
 }) => {
   // Deep clone the workbenchState
-  const workbenchState = JSON.parse(
-    JSON.stringify(experiment.workbenchState ?? {}),
-  ) as Record<string, unknown>;
+  const workbenchState = JSON.parse(JSON.stringify(experiment.workbenchState ?? {})) as Record<
+    string,
+    unknown
+  >;
 
   // Clear execution results (don't copy them to new project)
   delete workbenchState.results;
@@ -1004,11 +973,7 @@ const copyEvaluationsV3Experiment = async ({
       type: string;
       datasetId?: string;
     }>) {
-      if (
-        dataset.type === "saved" &&
-        dataset.datasetId &&
-        datasetIdMap[dataset.datasetId]
-      ) {
+      if (dataset.type === "saved" && dataset.datasetId && datasetIdMap[dataset.datasetId]) {
         dataset.datasetId = datasetIdMap[dataset.datasetId];
       }
     }

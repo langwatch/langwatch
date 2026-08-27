@@ -5,6 +5,7 @@ export * from "./experiment-legacy";
 export * from "./experiment-legacy-workbench";
 export * from "./experiment-workbench";
 export * from "./experiment-workbench-persistence";
+export * from "./experiment-workbench-version";
 export * from "./experiment-run";
 export * from "./experiment-run-eventing.commands";
 export * from "./experiment-run-eventing.events";
