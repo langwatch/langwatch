@@ -110,9 +110,7 @@ export const applyMemberRoleChange = async ({
       currentUserId: actorUserId,
       ...(actorUserId ? { planUser: { id: actorUserId } } : {}),
     });
-    return result.teamsLeftWithoutAdmin.length > 0
-      ? result.teamsLeftWithoutAdmin
-      : undefined;
+    return result.teamsLeftWithoutAdmin.length > 0 ? result.teamsLeftWithoutAdmin : undefined;
   } catch (error) {
     return rethrowSeatLimit(error);
   }
@@ -223,7 +221,7 @@ export const memberAccessHandler = async (
     action: "management.organizationMember.readAccess",
     args: { userId: input.userId },
   });
-  return c.get("roleBindings").getMyAccessBreakdown({
+  return c.get("authz").getAccessBreakdown({
     organizationId: organization.id,
     userId: member.userId,
     userName: member.user.name,
@@ -290,10 +288,7 @@ export const createInvitesHandler = async (
   }
 };
 
-export const revokeInviteHandler = async (
-  c: OrganizationContext,
-  input: { id: string },
-) => {
+export const revokeInviteHandler = async (c: OrganizationContext, input: { id: string }) => {
   const organization = organizationOf(c);
   await c.get("invites").revokeInvite({
     organizationId: organization.id,

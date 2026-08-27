@@ -3,6 +3,7 @@
  * This is the package's only public entry point.
  */
 export * from "./authz";
+export * from "./authz.binding-management";
 export * from "./authz.commands";
 export * from "./authz.errors";
 export * from "./authz-grant.events";

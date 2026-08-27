@@ -2,6 +2,7 @@ import { ALL_PERMISSIONS, type CollectedBinding } from "@langwatch/authz-contrac
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzReadRepository } from "../src/repositories/authz-read.repository";
 import { AuthzService, type AuthzServiceOptions } from "../src/services/authz.service";
+import { StubAuthzBindingRepository } from "./support/authz-binding.stub";
 import { StubAuthzEpoch } from "./support/authz-epoch.stub";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub";
 import { makeReader } from "./support/authz-read.stub";
@@ -44,6 +45,7 @@ function makeService({
   return AuthzService.create({
     repository: reader,
     listing: new StubAuthzListingRepository(),
+    bindings: new StubAuthzBindingRepository(),
     epoch: epochPort,
     cacheEnabled: () => cacheEnabled,
     cacheMaxAgeMs,
@@ -56,6 +58,7 @@ function makeUncachedService(reader: AuthzReadRepository) {
   return AuthzService.create({
     repository: reader,
     listing: new StubAuthzListingRepository(),
+    bindings: new StubAuthzBindingRepository(),
   });
 }
 

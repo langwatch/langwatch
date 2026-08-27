@@ -7,10 +7,7 @@ import {
   type ScimGrantBindingScope,
   type ScimRoleBindingRecord,
 } from "../src/ports/scim-repository.port";
-import {
-  type DesiredScimGrant,
-  ScimGrantsService,
-} from "../src/services/scim-grants.service";
+import { type DesiredScimGrant, ScimGrantsService } from "../src/services/scim-grants.service";
 
 const organizationId = "org_1";
 const userId = "user_1";
@@ -36,6 +33,10 @@ class GrantsFake extends AuthzGrantsService {
   readonly offboardMember = vi.fn();
   readonly defineRole = vi.fn();
   readonly deleteRole = vi.fn();
+  readonly createBinding = vi.fn();
+  readonly updateBinding = vi.fn();
+  readonly deleteBinding = vi.fn();
+  readonly applyMemberBindings = vi.fn();
 }
 
 const memberGrant: DesiredScimGrant = {
@@ -135,8 +136,6 @@ describe("SCIM grant reconciliation", () => {
       organizationId,
       userId,
     });
-    expect(grants.revokeBindings).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationId }),
-    );
+    expect(grants.revokeBindings).toHaveBeenCalledWith(expect.objectContaining({ organizationId }));
   });
 });

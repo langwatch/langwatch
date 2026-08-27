@@ -4,6 +4,7 @@ import {
 } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import { AuthzService } from "../src/services/authz.service";
+import { StubAuthzBindingRepository } from "./support/authz-binding.stub";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub";
 import { makeReader } from "./support/authz-read.stub";
 
@@ -11,13 +12,14 @@ const ORG = "org-1";
 const TEAM = "team-1";
 const PROJECT = "project-1";
 
-function makeService({
-  listing = new StubAuthzListingRepository(),
-  reader = makeReader(),
-} = {}) {
+function makeService({ listing = new StubAuthzListingRepository(), reader = makeReader() } = {}) {
   return {
     listing,
-    service: AuthzService.create({ repository: reader, listing }),
+    service: AuthzService.create({
+      repository: reader,
+      listing,
+      bindings: new StubAuthzBindingRepository(),
+    }),
   };
 }
 
@@ -111,9 +113,7 @@ describe("AuthzService portable facade", () => {
   it("keeps access-list persistence behind the service", async () => {
     const { service, listing } = makeService();
 
-    await expect(
-      service.listOrganizationBindings({ organizationId: ORG }),
-    ).resolves.toEqual([]);
+    await expect(service.listOrganizationBindings({ organizationId: ORG })).resolves.toEqual([]);
     expect(listing.findOrganizationBindings).toHaveBeenCalledWith({
       organizationId: ORG,
     });

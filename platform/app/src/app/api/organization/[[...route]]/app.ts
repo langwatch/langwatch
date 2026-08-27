@@ -21,10 +21,8 @@ import { z } from "zod";
 import { appFromContext } from "~/app/api/middleware/app-context";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { prisma } from "~/server/db";
 import { InviteService } from "~/server/invites/invite.service";
-import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import {
   createInvitesHandler,
   getMemberHandler,
@@ -65,12 +63,7 @@ export const app = service
   .provide({
     organizations: (_base, context) => appFromContext(context).organizations,
     invites: () => InviteService.create(prisma),
-    roleBindings: (_base, context) =>
-      new RoleBindingService({
-        prisma,
-        repo: new PrismaRoleBindingRepository(prisma),
-        roleService: appFromContext(context).roles,
-      }),
+    authz: (_base, context) => appFromContext(context).permissions,
   })
   // ── profile ────────────────────────────────────────────────────────────────
   .registerRoute("get", "/", MANAGEMENT_API_VERSION, getOrganizationHandler, (b) =>
@@ -111,21 +104,16 @@ export const app = service
           "List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true.",
       }),
   )
-  .registerRoute(
-    "get",
-    "/members/:userId",
-    MANAGEMENT_API_VERSION,
-    getMemberHandler,
-    (b) =>
-      guard("organization:view")(b)
-        .withParams(userIdParamsSchema)
-        .withOutput(memberWithTeamsSchema)
-        .withDocs({
-          operationId: "getOrganizationMember",
-          tags: ["Members"],
-          description:
-            "Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages.",
-        }),
+  .registerRoute("get", "/members/:userId", MANAGEMENT_API_VERSION, getMemberHandler, (b) =>
+    guard("organization:view")(b)
+      .withParams(userIdParamsSchema)
+      .withOutput(memberWithTeamsSchema)
+      .withDocs({
+        operationId: "getOrganizationMember",
+        tags: ["Members"],
+        description:
+          "Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages.",
+      }),
   )
   .registerRoute(
     "get",
@@ -144,38 +132,28 @@ export const app = service
         }),
   )
   // ── member writes ──────────────────────────────────────────────────────────
-  .registerRoute(
-    "patch",
-    "/members/:userId",
-    MANAGEMENT_API_VERSION,
-    updateMemberHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(userIdParamsSchema)
-        .withInput(updateMemberSchema)
-        .withOutput(updatedMemberSchema)
-        .withDocs({
-          operationId: "updateOrganizationMember",
-          tags: ["Members"],
-          description:
-            "Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.",
-        }),
+  .registerRoute("patch", "/members/:userId", MANAGEMENT_API_VERSION, updateMemberHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(userIdParamsSchema)
+      .withInput(updateMemberSchema)
+      .withOutput(updatedMemberSchema)
+      .withDocs({
+        operationId: "updateOrganizationMember",
+        tags: ["Members"],
+        description:
+          "Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.",
+      }),
   )
-  .registerRoute(
-    "delete",
-    "/members/:userId",
-    MANAGEMENT_API_VERSION,
-    removeMemberHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(userIdParamsSchema)
-        .withOutput(successSchema)
-        .withDocs({
-          operationId: "removeOrganizationMember",
-          tags: ["Members"],
-          description:
-            "Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.",
-        }),
+  .registerRoute("delete", "/members/:userId", MANAGEMENT_API_VERSION, removeMemberHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(userIdParamsSchema)
+      .withOutput(successSchema)
+      .withDocs({
+        operationId: "removeOrganizationMember",
+        tags: ["Members"],
+        description:
+          "Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.",
+      }),
   )
   // ── invites ────────────────────────────────────────────────────────────────
   .registerRoute("get", "/invites", MANAGEMENT_API_VERSION, listInvitesHandler, (b) =>
@@ -200,20 +178,15 @@ export const app = service
           "Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered.",
       }),
   )
-  .registerRoute(
-    "delete",
-    "/invites/:id",
-    MANAGEMENT_API_VERSION,
-    revokeInviteHandler,
-    (b) =>
-      guard("organization:manage")(b)
-        .withParams(z.object({ id: z.string().min(1) }))
-        .withOutput(successSchema)
-        .withDocs({
-          operationId: "revokeOrganizationInvite",
-          tags: ["Invites"],
-          description:
-            "Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.",
-        }),
+  .registerRoute("delete", "/invites/:id", MANAGEMENT_API_VERSION, revokeInviteHandler, (b) =>
+    guard("organization:manage")(b)
+      .withParams(z.object({ id: z.string().min(1) }))
+      .withOutput(successSchema)
+      .withDocs({
+        operationId: "revokeOrganizationInvite",
+        tags: ["Invites"],
+        description:
+          "Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.",
+      }),
   )
   .build();

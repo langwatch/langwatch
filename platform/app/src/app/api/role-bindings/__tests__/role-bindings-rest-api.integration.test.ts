@@ -31,7 +31,6 @@ import {
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
-import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
@@ -43,8 +42,7 @@ import {
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
-const sessionFor = (userId: string): Session =>
-  ({ user: { id: userId } }) as unknown as Session;
+const sessionFor = (userId: string): Session => ({ user: { id: userId } }) as unknown as Session;
 
 describe("Feature: Role bindings REST API", () => {
   const ns = `rb-rest-${nanoid(8)}`;
@@ -332,9 +330,7 @@ describe("Feature: Role bindings REST API", () => {
         { headers: authHeaders() },
       );
       const listBody = await list.json();
-      const row = listBody.bindings.find(
-        (binding: { id: string }) => binding.id === created.id,
-      );
+      const row = listBody.bindings.find((binding: { id: string }) => binding.id === created.id);
       expect(row).toMatchObject({
         customRoleId,
         customRoleName: `RB Custom Role ${ns}`,
@@ -536,7 +532,7 @@ describe("Feature: Role bindings REST API", () => {
         // and the writer's wait for it is bounded and timeout-tolerant, so an
         // empty listing right after a successful append is ordinary lag.
         const lagging = vi
-          .spyOn(RoleBindingService.prototype, "listForOrg")
+          .spyOn(getApp().permissions, "listManagedBindingsForOrganization")
           .mockResolvedValue([]);
 
         try {

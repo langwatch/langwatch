@@ -46,6 +46,10 @@ class GrantsFake extends AuthzGrantsService {
   readonly offboardMember = vi.fn();
   readonly defineRole = vi.fn();
   readonly deleteRole = vi.fn();
+  readonly createBinding = vi.fn();
+  readonly updateBinding = vi.fn();
+  readonly deleteBinding = vi.fn();
+  readonly applyMemberBindings = vi.fn();
 }
 
 class ScimServiceFake extends ScimService {

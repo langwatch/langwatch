@@ -34,6 +34,10 @@ class GrantsFake extends AuthzGrantsService {
   offboardMember = vi.fn();
   defineRole = vi.fn();
   deleteRole = vi.fn();
+  createBinding = vi.fn();
+  updateBinding = vi.fn();
+  deleteBinding = vi.fn();
+  applyMemberBindings = vi.fn();
 }
 
 function repository(): ScimRepositoryPort {
@@ -110,9 +114,7 @@ describe("SCIM group PATCH parity", () => {
 
   it("ignores an unsupported filtered member attribute", async () => {
     const { repo, update } = harness();
-    await update([
-      { op: "replace", path: 'members[value eq "user-1"].display', value: "Alice" },
-    ]);
+    await update([{ op: "replace", path: 'members[value eq "user-1"].display', value: "Alice" }]);
     expect(repo.removeGroupMembers).not.toHaveBeenCalled();
   });
 

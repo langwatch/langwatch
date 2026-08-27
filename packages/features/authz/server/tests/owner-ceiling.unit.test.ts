@@ -2,6 +2,7 @@ import type { CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthzReadRepository } from "../src/repositories/authz-read.repository";
 import { AuthzService } from "../src/services/authz.service";
+import { StubAuthzBindingRepository } from "./support/authz-binding.stub";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub";
 import { makeReader } from "./support/authz-read.stub";
 
@@ -32,6 +33,7 @@ function makeAuthz(reader: AuthzReadRepository) {
   return AuthzService.create({
     repository: reader,
     listing: new StubAuthzListingRepository(),
+    bindings: new StubAuthzBindingRepository(),
   });
 }
 

@@ -2,7 +2,7 @@
  * ADR-092 delivery-plan PR 3 follow-up — the Access surface's legacy reader.
  *
  * These are the queries the settings pages ran inline before the port existed
- * (`RoleBindingService`, `TeamService`, the role-binding repository, the group
+ * (the former role-binding reader, `TeamService`, the group
  * and API-key repositories), moved here so the per-org fork has a legacy side
  * to delegate to. The WHERE predicates carry over unchanged, with one
  * exception: the group listing gained the organization bound it never had.

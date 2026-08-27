@@ -9,6 +9,7 @@
  * endpoints.
  */
 import type { EndpointVariables, ServiceContext } from "@langwatch/api";
+import type { AuthzService } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import { z } from "zod";
 import {
@@ -24,7 +25,6 @@ import type { OrganizationService } from "~/server/app-layer/organizations/organ
 import type { OrganizationMemberSummary } from "~/server/app-layer/organizations/repositories/organization.repository";
 import type { InviteService } from "~/server/invites/invite.service";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
-import type { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
 
 /**
@@ -36,7 +36,7 @@ export type OrganizationContext = ServiceContext<
   EndpointVariables & {
     organizations: OrganizationService;
     invites: InviteService;
-    roleBindings: RoleBindingService;
+    authz: AuthzService;
   }
 >;
 
@@ -112,9 +112,7 @@ export const memberWithTeamsSchema = memberSchema.extend({
 });
 
 export const updatedMemberSchema = memberSchema.extend({
-  teamsLeftWithoutAdmin: z
-    .array(z.object({ id: z.string(), name: z.string() }))
-    .optional(),
+  teamsLeftWithoutAdmin: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
 });
 
 export const accessBindingSchema = z.object({
@@ -273,8 +271,7 @@ export const inviteWire = (
   createdAt: invite.createdAt,
 });
 
-export const organizationOf = (c: Context): Organization =>
-  c.get("organization") as Organization;
+export const organizationOf = (c: Context): Organization => c.get("organization") as Organization;
 
 /** The member the credential acts as; null for a service key. */
 export const actorUserIdOf = (c: Context): string | null =>

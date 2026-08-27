@@ -163,12 +163,15 @@ class RecordingGrants extends AuthzGrantsService {
   readonly replace = unsupported<AuthzGrantsService["replace"]>();
   readonly offboard = unsupported<AuthzGrantsService["offboard"]>();
   readonly attachResourceGrant = unsupported<AuthzGrantsService["attachResourceGrant"]>();
-  readonly revokeResourceGrants =
-    unsupported<AuthzGrantsService["revokeResourceGrants"]>();
+  readonly revokeResourceGrants = unsupported<AuthzGrantsService["revokeResourceGrants"]>();
   readonly changeBindingRole = unsupported<AuthzGrantsService["changeBindingRole"]>();
   readonly offboardMember = unsupported<AuthzGrantsService["offboardMember"]>();
   readonly defineRole = unsupported<AuthzGrantsService["defineRole"]>();
   readonly deleteRole = unsupported<AuthzGrantsService["deleteRole"]>();
+  readonly createBinding = unsupported<AuthzGrantsService["createBinding"]>();
+  readonly updateBinding = unsupported<AuthzGrantsService["updateBinding"]>();
+  readonly deleteBinding = unsupported<AuthzGrantsService["deleteBinding"]>();
+  readonly applyMemberBindings = unsupported<AuthzGrantsService["applyMemberBindings"]>();
 
   constructor(private readonly failure?: Error) {
     super();
@@ -358,18 +361,18 @@ describe("OrganizationService", () => {
 
   it("returns and atomically claims the billing profile", async () => {
     const service = createService(new StubRepository("team"));
-    await expect(
-      service.getBillingProfile({ organizationId: "org" }),
-    ).resolves.toMatchObject({ billingCustomerId: null });
+    await expect(service.getBillingProfile({ organizationId: "org" })).resolves.toMatchObject({
+      billingCustomerId: null,
+    });
     await expect(
       service.claimBillingCustomerId({
         organizationId: "org",
         billingCustomerId: "customer-1",
       }),
     ).resolves.toBe(true);
-    await expect(
-      service.getBillingProfile({ organizationId: "org" }),
-    ).resolves.toMatchObject({ billingCustomerId: "customer-1" });
+    await expect(service.getBillingProfile({ organizationId: "org" })).resolves.toMatchObject({
+      billingCustomerId: "customer-1",
+    });
   });
 
   it("owns team creation behind the canonical service", async () => {
@@ -385,11 +388,7 @@ describe("OrganizationService", () => {
   it("protects personal teams from archive and membership mutation", async () => {
     const teams = new MemoryTeams();
     teams.team = { ...sharedTeam, isPersonal: true, ownerUserId: "owner" };
-    const service = createService(
-      new StubRepository("team"),
-      new RecordingGrants(),
-      teams,
-    );
+    const service = createService(new StubRepository("team"), new RecordingGrants(), teams);
     await expect(
       service.archiveTeam({ organizationId: "org", teamId: "team" }),
     ).rejects.toBeInstanceOf(PersonalTeamProtectedError);
@@ -435,11 +434,7 @@ describe("OrganizationService", () => {
     const teams = new MemoryTeams();
     teams.member = false;
     await expect(
-      createService(
-        new StubRepository("team"),
-        new RecordingGrants(),
-        teams,
-      ).addTeamMember({
+      createService(new StubRepository("team"), new RecordingGrants(), teams).addTeamMember({
         organizationId: "org",
         teamId: "team",
         userId: "stranger",

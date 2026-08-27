@@ -17,12 +17,6 @@
  * store the A4 mismatch dashboard reads lands with it. Allows are not
  * logged at all yet, for the same reason.
  *
- * The §12 L1 epoch cache lives inside the instance: an entry is valid only
- * while its organization's epoch is unchanged, so a revoked binding is dead
- * on the caller's next request (the grant write bumps the epoch). An entry
- * also expires on absolute age, so a wedged epoch store cannot pin a stale
- * snapshot indefinitely. No epoch reader wired, epoch store down, or flag
- * off all mean the same thing - no caching, always correct, just slower.
  */
 import {
   ALL_PERMISSIONS,
@@ -36,6 +30,8 @@ import {
   type AuthzAccessBinding,
   type AuthzBindingForSynthesis,
   type AuthzCustomRole,
+  type AuthzAccessBreakdownInput,
+  type AuthzAccessBreakdownOutput,
   type AuthzDeclaredScopeId,
   type AuthzDecision,
   type AuthzGetApiKeyProjectDecisionInput,
@@ -43,6 +39,10 @@ import {
   type AuthzGetProjectAnyDecisionInput,
   type AuthzListBindingsForSynthesisInput,
   type AuthzListGroupBindingsInput,
+  type AuthzListManagedBindingsForOrganizationInput,
+  type AuthzListManagedBindingsForOrganizationOutput,
+  type AuthzListManagedBindingsForUserInput,
+  type AuthzListManagedBindingsForUserOutput,
   type AuthzListOrganizationBindingsInput,
   type AuthzListScopeBindingsInput,
   type AuthzListTeamMemberBindingsInput,
@@ -50,6 +50,7 @@ import {
   type AuthzListUserBindingsInput,
   type AuthzPermission,
   type AuthzPrincipalRef,
+  type AuthzLegacyAccessNoticeInput,
   type AuthzRequireProjectPermissionInput,
   type AuthzScopeRef,
   type AuthzTeamMemberBinding,
@@ -58,23 +59,19 @@ import {
   type CollectedGrants,
   type PermissionDecision,
   type PermissionScopeArg,
-  type ResourceGrant,
   type TierOfScopeArg,
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzEpochPort } from "../ports/authz-epoch.port";
+import type { AuthzBindingRepository } from "../repositories/authz-binding.repository";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository";
+import { AuthzBindingReaderService } from "./authz-binding-reader.service";
 import { AuthzCollectorService } from "./authz-collector.service";
+import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service";
 
 const decisions = createLogger("langwatch:authz:decisions");
-
-const MAX_CACHE_ENTRIES = 10_000;
-/** Absolute ceiling on a cached snapshot's life, epoch agreement or not. */
-const DEFAULT_CACHE_MAX_AGE_MS = 30_000;
-
-type CacheEntry = { epoch: number; grants: CollectedGrants; storedAt: number };
 
 /** The loose ids a caller holds before a scope ref has been resolved. */
 type ScopeIds = {
@@ -94,6 +91,7 @@ type CheckArgs = {
 export type AuthzServiceOptions = {
   repository: AuthzReadRepository;
   listing: AuthzListingRepository;
+  bindings: AuthzBindingRepository;
   /** Omitted = never cache. */
   epoch?: AuthzEpochPort;
   /** Internal rollout knob; omitted = cache off. The composition root
@@ -112,17 +110,25 @@ export type AuthzServiceOptions = {
 
 export class AuthzService extends AuthzServiceContract {
   static create(options: AuthzServiceOptions): AuthzService {
+    const collector = AuthzCollectorService.create({ reader: options.repository });
+
     return new AuthzService(
-      AuthzCollectorService.create({ reader: options.repository }),
+      collector,
+      AuthzBindingReaderService.create({
+        bindings: options.bindings,
+        listing: options.listing,
+      }),
+      AuthzGrantSnapshotService.create(collector, options),
       options,
     );
   }
 
   private readonly engine = new AuthzEngine();
-  private readonly cache = new Map<string, CacheEntry>();
 
   private constructor(
     private readonly collector: AuthzCollectorService,
+    private readonly bindingReader: AuthzBindingReaderService,
+    private readonly snapshots: AuthzGrantSnapshotService,
     private readonly options: AuthzServiceOptions,
   ) {
     super();
@@ -130,6 +136,7 @@ export class AuthzService extends AuthzServiceContract {
 
   async check(args: CheckArgs): Promise<AuthzDecision> {
     const { decision } = await this.checkDetailed(args);
+
     return decision;
   }
 
@@ -145,24 +152,26 @@ export class AuthzService extends AuthzServiceContract {
   }> {
     const organizationId = scopeOrganizationId(scope);
     const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId }),
-      this.tryResourceGrantsFor(scope),
-      this.tryOwnerGrantsFor({ principal, organizationId }),
+      this.snapshots.collectCached({ principal, organizationId }),
+      this.snapshots.tryResourceGrantsFor(scope),
+      this.snapshots.tryOwnerGrantsFor({ principal, organizationId }),
     ]);
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
       ownerGrants,
       permission,
       scope,
-      demoProjectId: this.tryDemoProjectId(),
+      demoProjectId: this.snapshots.tryDemoProjectId(),
       resourceGrants,
     });
     this.recordDenial(decision);
+
     return { decision, grants };
   }
 
   async can(args: CheckArgs): Promise<boolean> {
     const decision = await this.check(args);
+
     return decision.allowed;
   }
 
@@ -195,7 +204,9 @@ export class AuthzService extends AuthzServiceContract {
         denialReason: decision.denialReason ?? "no-binding",
       });
     }
+
     const authorizedScope = scope as { type: Tier; id: string };
+
     return this.mintAuthorizationWitness({
       tier: authorizedScope.type,
       id: authorizedScope.id,
@@ -219,11 +230,12 @@ export class AuthzService extends AuthzServiceContract {
   }): Promise<AuthzPermission[]> {
     const organizationId = scopeOrganizationId(scope);
     const [grants, resourceGrants, ownerGrants] = await Promise.all([
-      this.collectCached({ principal, organizationId }),
-      this.tryResourceGrantsFor(scope),
-      this.tryOwnerGrantsFor({ principal, organizationId }),
+      this.snapshots.collectCached({ principal, organizationId }),
+      this.snapshots.tryResourceGrantsFor(scope),
+      this.snapshots.tryOwnerGrantsFor({ principal, organizationId }),
     ]);
-    const demo = this.tryDemoProjectId();
+    const demo = this.snapshots.tryDemoProjectId();
+
     return ALL_PERMISSIONS.filter(
       (permission) =>
         this.engine.decideWithCeiling({
@@ -265,7 +277,9 @@ export class AuthzService extends AuthzServiceContract {
       teamId,
       organizationId,
     });
-    if (!scope) return { allowed: false, organizationRole: null };
+    if (!scope) {
+      return { allowed: false, organizationRole: null };
+    }
 
     const scopeOrg = scopeOrganizationId(scope);
     const pass = this.collector.beginPass();
@@ -276,7 +290,7 @@ export class AuthzService extends AuthzServiceContract {
         reader: pass,
       }),
       ceiling
-        ? this.tryOwnerGrantsFor({
+        ? this.snapshots.tryOwnerGrantsFor({
             principal,
             organizationId: scopeOrg,
             reader: pass,
@@ -288,9 +302,10 @@ export class AuthzService extends AuthzServiceContract {
       ownerGrants,
       permission,
       scope,
-      demoProjectId: this.tryDemoProjectId(),
+      demoProjectId: this.snapshots.tryDemoProjectId(),
     });
     this.recordDenial(decision);
+
     return {
       allowed: decision.allowed,
       organizationRole: grants.organizationRole,
@@ -316,7 +331,9 @@ export class AuthzService extends AuthzServiceContract {
     organizationRole: OrganizationRoleOrNull;
   }> {
     const scope = await this.collector.tryResolveScopeRef({ projectId });
-    if (!scope) return { allowed: false, organizationRole: null };
+    if (!scope) {
+      return { allowed: false, organizationRole: null };
+    }
 
     // Same api-key owner ceiling every other decision path applies: an
     // api-key principal is capped at its owner's grants, so demoting the owner
@@ -332,13 +349,13 @@ export class AuthzService extends AuthzServiceContract {
         organizationId: scopeOrg,
         reader: pass,
       }),
-      this.tryOwnerGrantsFor({
+      this.snapshots.tryOwnerGrantsFor({
         principal,
         organizationId: scopeOrg,
         reader: pass,
       }),
     ]);
-    const demoProjectId = this.tryDemoProjectId();
+    const demoProjectId = this.snapshots.tryDemoProjectId();
     const matched = permissions.find(
       (permission) =>
         this.engine.decideWithCeiling({
@@ -357,7 +374,10 @@ export class AuthzService extends AuthzServiceContract {
       allowed: matched !== undefined,
       organizationRole: grants.organizationRole,
     };
-    if (matched) result.matchedPermission = matched;
+    if (matched) {
+      result.matchedPermission = matched;
+    }
+
     return result;
   }
 
@@ -395,9 +415,9 @@ export class AuthzService extends AuthzServiceContract {
         organizationId,
         reader: pass,
       }),
-      this.tryOwnerGrantsFor({ principal, organizationId, reader: pass }),
+      this.snapshots.tryOwnerGrantsFor({ principal, organizationId, reader: pass }),
     ]);
-    const demoProjectId = this.tryDemoProjectId();
+    const demoProjectId = this.snapshots.tryDemoProjectId();
     const allowedAt = (scope: AuthzScopeRef | null): boolean =>
       scope
         ? this.engine.decideWithCeiling({
@@ -439,11 +459,18 @@ export class AuthzService extends AuthzServiceContract {
     teamId,
     organizationId,
   }: ScopeIds): Promise<AuthzScopeRef | null> {
-    if (projectId) return this.collector.tryResolveScopeRef({ projectId });
-    if (teamId) return this.collector.tryResolveScopeRef({ teamId });
+    if (projectId) {
+      return this.collector.tryResolveScopeRef({ projectId });
+    }
+
+    if (teamId) {
+      return this.collector.tryResolveScopeRef({ teamId });
+    }
+
     if (organizationId) {
       return this.collector.tryResolveScopeRef({ organizationId });
     }
+
     return null;
   }
 
@@ -453,14 +480,24 @@ export class AuthzService extends AuthzServiceContract {
     scope,
   }: AuthzGetDecisionInput): Promise<PermissionDecision> {
     const ids: ScopeIds = {};
-    if (scope.tier === "project") ids.projectId = scope.id;
-    if (scope.tier === "team") ids.teamId = scope.id;
-    if (scope.tier === "organization") ids.organizationId = scope.id;
+    if (scope.tier === "project") {
+      ids.projectId = scope.id;
+    }
+
+    if (scope.tier === "team") {
+      ids.teamId = scope.id;
+    }
+
+    if (scope.tier === "organization") {
+      ids.organizationId = scope.id;
+    }
+
     const result = await this.checkByIds({
       principal: { type: "user", id: userId },
       permission,
       ...ids,
     });
+
     return {
       permitted: result.allowed,
       organizationRole: result.organizationRole,
@@ -477,6 +514,7 @@ export class AuthzService extends AuthzServiceContract {
       projectId,
       permissions,
     });
+
     return {
       permitted: result.allowed,
       organizationRole: result.organizationRole,
@@ -490,12 +528,16 @@ export class AuthzService extends AuthzServiceContract {
     } & PermissionScopeArg<Permission>,
   ): Promise<boolean> {
     const scope = this.tryScopeOf(check);
-    if (!scope) return false;
+    if (!scope) {
+      return false;
+    }
+
     const decision = await this.getDecision({
       userId: check.userId,
       permission: check.permission,
       scope,
     });
+
     return decision.permitted;
   }
 
@@ -514,6 +556,7 @@ export class AuthzService extends AuthzServiceContract {
     } else if (declaredScope?.tier === "organization") {
       scope = await this.tryResolveScope({ organizationId: declaredScope.id });
     }
+
     if (!scope || scope.type === "resource") {
       throw new PermissionDeniedError({
         permission: check.permission,
@@ -524,11 +567,13 @@ export class AuthzService extends AuthzServiceContract {
         denialReason: "no-binding",
       });
     }
+
     const witness = await this.authorize({
       principal: { type: "user", id: check.userId },
       permission: check.permission,
       scope,
     });
+
     return witness as Authorized<TierOfScopeArg<ScopeArg>, Permission>;
   }
 
@@ -542,10 +587,14 @@ export class AuthzService extends AuthzServiceContract {
       projectId,
       permission,
     });
-    if (result.allowed) return;
+    if (result.allowed) {
+      return;
+    }
+
     if (result.organizationRole === "EXTERNAL") {
       throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
     }
+
     throw new ProjectPermissionDeniedError(permission);
   }
 
@@ -568,6 +617,7 @@ export class AuthzService extends AuthzServiceContract {
     } else {
       resolvedScope = { type: "organization", id: scope.id };
     }
+
     return this.can({
       principal: { type: "apiKey", id: apiKeyId },
       permission,
@@ -585,11 +635,13 @@ export class AuthzService extends AuthzServiceContract {
     if (scope?.type !== "project" || scope.organizationId !== organizationId) {
       return { outcome: "project_not_found" };
     }
+
     const allowed = await this.can({
       principal: { type: "apiKey", id: apiKeyId },
       permission,
       scope,
     });
+
     return allowed
       ? {
           outcome: "allowed",
@@ -602,9 +654,7 @@ export class AuthzService extends AuthzServiceContract {
       : { outcome: "denied" };
   }
 
-  async listUserBindings(
-    args: AuthzListUserBindingsInput,
-  ): Promise<AuthzAccessBinding[]> {
+  async listUserBindings(args: AuthzListUserBindingsInput): Promise<AuthzAccessBinding[]> {
     return this.options.listing.findUserBindings(args);
   }
 
@@ -620,15 +670,11 @@ export class AuthzService extends AuthzServiceContract {
     return this.options.listing.findUserAndGroupBindings(args);
   }
 
-  async listScopeBindings(
-    args: AuthzListScopeBindingsInput,
-  ): Promise<AuthzAccessBinding[]> {
+  async listScopeBindings(args: AuthzListScopeBindingsInput): Promise<AuthzAccessBinding[]> {
     return this.options.listing.findScopeBindings(args);
   }
 
-  async listGroupBindings(
-    args: AuthzListGroupBindingsInput,
-  ): Promise<AuthzAccessBinding[]> {
+  async listGroupBindings(args: AuthzListGroupBindingsInput): Promise<AuthzAccessBinding[]> {
     return this.options.listing.findGroupBindings(args);
   }
 
@@ -644,10 +690,28 @@ export class AuthzService extends AuthzServiceContract {
     return this.options.listing.findBindingsForSynthesis(args);
   }
 
-  async listUserCreatedRoles(
-    args: AuthzListOrganizationBindingsInput,
-  ): Promise<AuthzCustomRole[]> {
+  async listUserCreatedRoles(args: AuthzListOrganizationBindingsInput): Promise<AuthzCustomRole[]> {
     return this.options.listing.findUserCreatedRoles(args);
+  }
+
+  wouldFirstBindingDisableLegacyAccess(args: AuthzLegacyAccessNoticeInput): Promise<boolean> {
+    return this.bindingReader.wouldFirstBindingDisableLegacyAccess(args);
+  }
+
+  listManagedBindingsForUser(
+    args: AuthzListManagedBindingsForUserInput,
+  ): Promise<AuthzListManagedBindingsForUserOutput> {
+    return this.bindingReader.listForUser(args);
+  }
+
+  listManagedBindingsForOrganization(
+    args: AuthzListManagedBindingsForOrganizationInput,
+  ): Promise<AuthzListManagedBindingsForOrganizationOutput> {
+    return this.bindingReader.listForOrganization(args);
+  }
+
+  getAccessBreakdown(args: AuthzAccessBreakdownInput): Promise<AuthzAccessBreakdownOutput> {
+    return this.bindingReader.getAccessBreakdown(args);
   }
 
   /**
@@ -657,112 +721,12 @@ export class AuthzService extends AuthzServiceContract {
    * the decision's own snapshot lands with the stage E explain surface.
    */
   async explainDecision({ decision }: { decision: AuthzDecision }): Promise<string[]> {
-    const grants = await this.collectCached({
+    const grants = await this.snapshots.collectCached({
       principal: decision.principal,
       organizationId: scopeOrganizationId(decision.scope),
     });
+
     return this.engine.explain({ decision, grants });
-  }
-
-  /**
-   * The ADR-092 §9 ceiling snapshot: an api-key principal's owner, or null
-   * for every other principal AND for a service key (one with no owner) -
-   * both of which the engine reads as "no ceiling".
-   */
-  private async tryOwnerGrantsFor({
-    principal,
-    organizationId,
-    reader,
-  }: {
-    principal: AuthzPrincipalRef;
-    organizationId: string;
-    /** Present when the ceiling must come off the same snapshot as the key's
-     *  own grants. Intersecting two heads would let a gate expiry between the
-     *  two collections cap a ledger binding list with a legacy one. Passing a
-     *  reader also means not using the cache, which is the point. */
-    reader?: AuthzReadRepository;
-  }): Promise<CollectedGrants | null> {
-    if (principal.type !== "apiKey") return null;
-    const owner = await this.collector.tryFindApiKeyOwner({
-      apiKeyId: principal.id,
-    });
-    if (!owner?.userId) return null;
-    const ownerPrincipal: AuthzPrincipalRef = {
-      type: "user",
-      id: owner.userId,
-    };
-    return reader
-      ? this.collector.collectGrants({
-          principal: ownerPrincipal,
-          organizationId,
-          reader,
-        })
-      : this.collectCached({ principal: ownerPrincipal, organizationId });
-  }
-
-  private async tryResourceGrantsFor(
-    scope: AuthzScopeRef,
-  ): Promise<readonly ResourceGrant[] | undefined> {
-    if (scope.type !== "resource") return undefined;
-    return this.collector.collectResourceGrants({ scope });
-  }
-
-  private tryDemoProjectId(): string | undefined {
-    return this.options.demoProjectId?.();
-  }
-
-  private cacheEnabled(): boolean {
-    return this.options.cacheEnabled?.() ?? false;
-  }
-
-  /**
-   * Collect grants for a principal, via the epoch cache when the flag is on
-   * and the epoch store is reachable. Anonymous collects are constant-empty
-   * and touch no storage — nothing to cache, and no id to key on.
-   */
-  private async collectCached({
-    principal,
-    organizationId,
-  }: {
-    principal: AuthzPrincipalRef;
-    organizationId: string;
-  }): Promise<CollectedGrants> {
-    const { epoch } = this.options;
-    if (!this.cacheEnabled() || !epoch || principal.type === "anonymous") {
-      return this.collector.collectGrants({ principal, organizationId });
-    }
-
-    const currentEpoch = await epoch.tryRead({ organizationId });
-    if (currentEpoch === null) {
-      return this.collector.collectGrants({ principal, organizationId });
-    }
-
-    const maxAgeMs = this.options.cacheMaxAgeMs ?? DEFAULT_CACHE_MAX_AGE_MS;
-    const key = `${principal.type}:${principal.id}:${organizationId}`;
-    const entry = this.cache.get(key);
-    // The epoch is the correctness bound and the age is the safety net: an
-    // epoch that stops advancing (a wedged or silently-reset store) would
-    // otherwise pin this snapshot for the process's whole life.
-    if (entry && entry.epoch === currentEpoch && Date.now() - entry.storedAt < maxAgeMs) {
-      return entry.grants;
-    }
-
-    const grants = await this.collector.collectGrants({
-      principal,
-      organizationId,
-    });
-    if (this.cache.size >= MAX_CACHE_ENTRIES) {
-      // Plain FIFO eviction: authz entries are tiny and refresh cheaply, so
-      // a smarter LRU buys nothing worth its bookkeeping.
-      const oldest = this.cache.keys().next().value;
-      if (oldest !== undefined) this.cache.delete(oldest);
-    }
-    this.cache.set(key, {
-      epoch: currentEpoch,
-      grants,
-      storedAt: Date.now(),
-    });
-    return grants;
   }
 
   /**
@@ -772,12 +736,14 @@ export class AuthzService extends AuthzServiceContract {
    * is a decision store behind it, which lands with the A4 dashboard.
    */
   private recordDenial(decision: AuthzDecision): void {
-    if (decision.allowed) return;
+    if (decision.allowed) {
+      return;
+    }
+
     decisions.info(
       {
         principalType: decision.principal.type,
-        principalId:
-          decision.principal.type === "anonymous" ? undefined : decision.principal.id,
+        principalId: decision.principal.type === "anonymous" ? undefined : decision.principal.id,
         permission: decision.permission,
         scopeType: decision.scope.type,
         scopeId: decision.scope.id,
@@ -791,11 +757,18 @@ export class AuthzService extends AuthzServiceContract {
   private tryScopeOf(
     scope: Partial<Record<"projectId" | "teamId" | "organizationId", string>>,
   ): AuthzDeclaredScopeId | null {
-    if (scope.projectId) return { tier: "project", id: scope.projectId };
-    if (scope.teamId) return { tier: "team", id: scope.teamId };
+    if (scope.projectId) {
+      return { tier: "project", id: scope.projectId };
+    }
+
+    if (scope.teamId) {
+      return { tier: "team", id: scope.teamId };
+    }
+
     if (scope.organizationId) {
       return { tier: "organization", id: scope.organizationId };
     }
+
     return null;
   }
 }

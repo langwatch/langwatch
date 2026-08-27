@@ -3,6 +3,15 @@ import type { PermissionScopeArg, TierOfScopeArg } from "./declaration";
 import type { AuthzPermission } from "./registry";
 import type { BindingScopeTier } from "./vocabulary";
 import type {
+  AuthzAccessBreakdownInput,
+  AuthzAccessBreakdownOutput,
+  AuthzLegacyAccessNoticeInput,
+  AuthzListManagedBindingsForOrganizationInput,
+  AuthzListManagedBindingsForOrganizationOutput,
+  AuthzListManagedBindingsForUserInput,
+  AuthzListManagedBindingsForUserOutput,
+} from "./authz.binding-management";
+import type {
   ApiKeyPermissionCheck,
   ApiKeyProjectDecision,
   AuthzAccessBindingsOutput,
@@ -72,10 +81,7 @@ export abstract class AuthzService {
   abstract can(args: AuthzCheckInput): Promise<boolean>;
 
   /** The only public operation that returns an authorization witness. */
-  abstract authorize<
-    Tier extends BindingScopeTier,
-    Permission extends AuthzPermission,
-  >(args: {
+  abstract authorize<Tier extends BindingScopeTier, Permission extends AuthzPermission>(args: {
     principal: AuthzPrincipalRef;
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;
@@ -89,15 +95,11 @@ export abstract class AuthzService {
 
   abstract canAnyByIds(args: AuthzCanAnyByIdsInput): Promise<AuthzCanAnyByIdsOutput>;
 
-  abstract canBatchByIds(
-    args: AuthzCanBatchByIdsInput,
-  ): Promise<AuthzCanBatchByIdsOutput>;
+  abstract canBatchByIds(args: AuthzCanBatchByIdsInput): Promise<AuthzCanBatchByIdsOutput>;
 
   abstract tryResolveScope(args: AuthzResolveScopeInput): Promise<AuthzScopeRef | null>;
 
-  abstract explainDecision(
-    args: AuthzExplainDecisionInput,
-  ): Promise<AuthzExplainDecisionOutput>;
+  abstract explainDecision(args: AuthzExplainDecisionInput): Promise<AuthzExplainDecisionOutput>;
 
   // Composed compatibility capability replacing the app PermissionsService.
   abstract getDecision(args: AuthzGetDecisionInput): Promise<PermissionDecision>;
@@ -120,9 +122,7 @@ export abstract class AuthzService {
     check: { userId: string; permission: Permission } & ScopeArg,
   ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>>;
 
-  abstract authorizeProjectPermission(
-    args: AuthzRequireProjectPermissionInput,
-  ): Promise<void>;
+  abstract authorizeProjectPermission(args: AuthzRequireProjectPermissionInput): Promise<void>;
 
   abstract hasApiKeyPermission(args: ApiKeyPermissionCheck): Promise<boolean>;
 
@@ -131,9 +131,7 @@ export abstract class AuthzService {
   ): Promise<ApiKeyProjectDecision>;
 
   // Access listing is part of this capability, not a public repository.
-  abstract listUserBindings(
-    args: AuthzListUserBindingsInput,
-  ): Promise<AuthzAccessBindingsOutput>;
+  abstract listUserBindings(args: AuthzListUserBindingsInput): Promise<AuthzAccessBindingsOutput>;
 
   abstract listOrganizationBindings(
     args: AuthzListOrganizationBindingsInput,
@@ -143,13 +141,9 @@ export abstract class AuthzService {
     args: AuthzListUserAndGroupBindingsInput,
   ): Promise<AuthzAccessBindingsOutput>;
 
-  abstract listScopeBindings(
-    args: AuthzListScopeBindingsInput,
-  ): Promise<AuthzAccessBindingsOutput>;
+  abstract listScopeBindings(args: AuthzListScopeBindingsInput): Promise<AuthzAccessBindingsOutput>;
 
-  abstract listGroupBindings(
-    args: AuthzListGroupBindingsInput,
-  ): Promise<AuthzAccessBindingsOutput>;
+  abstract listGroupBindings(args: AuthzListGroupBindingsInput): Promise<AuthzAccessBindingsOutput>;
 
   abstract listTeamMemberBindings(
     args: AuthzListTeamMemberBindingsInput,
@@ -163,17 +157,27 @@ export abstract class AuthzService {
     args: AuthzListOrganizationBindingsInput,
   ): Promise<AuthzCustomRole[]>;
 
+  abstract wouldFirstBindingDisableLegacyAccess(
+    args: AuthzLegacyAccessNoticeInput,
+  ): Promise<boolean>;
+
+  abstract listManagedBindingsForUser(
+    args: AuthzListManagedBindingsForUserInput,
+  ): Promise<AuthzListManagedBindingsForUserOutput>;
+
+  abstract listManagedBindingsForOrganization(
+    args: AuthzListManagedBindingsForOrganizationInput,
+  ): Promise<AuthzListManagedBindingsForOrganizationOutput>;
+
+  abstract getAccessBreakdown(args: AuthzAccessBreakdownInput): Promise<AuthzAccessBreakdownOutput>;
+
   /** Temporary rollout boundary for legacy callers that still own their
    * pre-engine fallback. Persistence and migration state remain private. */
   abstract isOnEngine(args: AuthzListOrganizationBindingsInput): Promise<boolean>;
 
   /** Finalized migration time for compatibility facts, or null before cutover. */
-  abstract tryGetEngineCutoverAt(
-    args: AuthzListOrganizationBindingsInput,
-  ): Promise<Date | null>;
+  abstract tryGetEngineCutoverAt(args: AuthzListOrganizationBindingsInput): Promise<Date | null>;
 }
 
 /** Useful structural union for adapters that accept either typed path form. */
-export type AuthzPermissionCapabilityInput =
-  | AuthzPermissionByIdsInput
-  | AuthzGetDecisionInput;
+export type AuthzPermissionCapabilityInput = AuthzPermissionByIdsInput | AuthzGetDecisionInput;

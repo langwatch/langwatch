@@ -72,6 +72,10 @@ class GrantsFake extends AuthzGrantsService {
   readonly revokeBindingsWhere = vi.fn();
   readonly defineRole = vi.fn();
   readonly deleteRole = vi.fn();
+  readonly createBinding = vi.fn();
+  readonly updateBinding = vi.fn();
+  readonly deleteBinding = vi.fn();
+  readonly applyMemberBindings = vi.fn();
 }
 
 class EnterpriseEntitlements extends EntitlementService {
@@ -421,9 +425,7 @@ describe("SCIM enterprise cost-center parity", () => {
     schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
     userName: "alice@acme.com",
     name: { givenName: "Alice", familyName: "Smith" },
-    ...(costCenter === undefined
-      ? {}
-      : { [SCIM_ENTERPRISE_USER_SCHEMA]: { costCenter } }),
+    ...(costCenter === undefined ? {} : { [SCIM_ENTERPRISE_USER_SCHEMA]: { costCenter } }),
   });
 
   it("assigns a named department on create", async () => {

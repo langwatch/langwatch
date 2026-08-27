@@ -13,13 +13,17 @@ import {
   AuthzGrantsService as AuthzGrantsServiceContract,
   DuplicateGrantError,
   GrantValidationError,
-  OffboardIncompleteError,
   type AuthzAttachGrantInput,
   type AuthzAttachBindingsInput,
   type AuthzAttachBindingsOutput,
+  type AuthzApplyMemberBindingsInput,
   type AuthzAttachResourceGrantInput,
+  type AuthzBindingMutationSuccess,
   type AuthzChangeBindingRoleInput,
+  type AuthzCreateBindingInput,
+  type AuthzCreateBindingOutput,
   type AuthzDefineRoleInput,
+  type AuthzDeleteBindingInput,
   type AuthzDeleteRoleInput,
   type AuthzOffboardMemberInput,
   type AuthzOffboardInput,
@@ -32,22 +36,23 @@ import {
   type AuthzRevokeResourceGrantsInput,
   type AuthzScopeRef,
   type AuthzUpdateGrantInput,
+  type AuthzUpdateBindingInput,
   type GrantPrincipal,
   type GrantRole,
   type GrantableAuthzScopeRef,
-  type OffboardCounts,
   isRegistryPermission,
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
 import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
 import type { AuthzEpochPort } from "../ports/authz-epoch.port";
+import type { AuthzBindingRepository } from "../repositories/authz-binding.repository";
 import type {
   AuthzGrantRepository,
   BindingPrincipalWhere,
   RoleBindingWrite,
 } from "../repositories/authz-grant.repository";
-import type { AuthzReadRepository } from "../repositories/authz-read.repository";
-import { AuthzCollectorService } from "./authz-collector.service";
+import { AuthzBindingWriterService } from "./authz-binding-writer.service";
+import { AuthzOffboardingService } from "./authz-offboarding.service";
 
 /**
  * The app-owned effect seams, composed once in the app's runtime
@@ -63,6 +68,7 @@ export type AuthzGrantsServiceOptions = {
   ledger: AuthzCompatibilityLedgerPort;
   epoch: AuthzEpochPort;
   newBindingId: () => string;
+  bindings: AuthzBindingRepository;
 };
 
 type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "where"> & {
@@ -87,10 +93,22 @@ const RESOURCE_SCOPE_REJECTION =
 
 export class AuthzGrantsService extends AuthzGrantsServiceContract {
   static create(options: AuthzGrantsServiceOptions): AuthzGrantsService {
-    return new AuthzGrantsService(options);
+    return new AuthzGrantsService(
+      options,
+      AuthzBindingWriterService.create({
+        bindings: options.bindings,
+        ledger: options.ledger,
+        newBindingId: options.newBindingId,
+      }),
+      AuthzOffboardingService.create(options.repository),
+    );
   }
 
-  private constructor(private readonly options: AuthzGrantsServiceOptions) {
+  private constructor(
+    private readonly options: AuthzGrantsServiceOptions,
+    private readonly bindingWriter: AuthzBindingWriterService,
+    private readonly offboarding: AuthzOffboardingService,
+  ) {
     super();
   }
 
@@ -107,6 +125,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         resourceId: where.id,
       });
     }
+
     const organizationId = scopeOrganizationId(where);
     const { repository } = this.options;
     await this.assertScopeBelongsToOrganization({
@@ -127,16 +146,12 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     }
 
     await this.options.epoch.bump({ organizationId });
+
     return { bindingId: row.bindingId };
   }
 
   /** UPDATE the row's role — visible on the next check. */
-  async update({
-    actor,
-    bindingId,
-    organizationId,
-    role,
-  }: AuthzUpdateGrantInput): Promise<void> {
+  async update({ actor, bindingId, organizationId, role }: AuthzUpdateGrantInput): Promise<void> {
     const { repository } = this.options;
     await this.assertBindingInOrganization({
       repository,
@@ -157,15 +172,12 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       // already holds at the same scope - same knowable failure as attach.
       this.rethrowKnownWriteFailure(error, { bindingId });
     }
+
     await this.options.epoch.bump({ organizationId });
   }
 
   /** DELETE the row — access gone on the next check. */
-  async revoke({
-    actor,
-    bindingId,
-    organizationId,
-  }: AuthzRevokeGrantInput): Promise<void> {
+  async revoke({ actor, bindingId, organizationId }: AuthzRevokeGrantInput): Promise<void> {
     const { repository } = this.options;
     await this.assertBindingInOrganization({
       repository,
@@ -181,6 +193,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     } catch (error) {
       this.rethrowKnownWriteFailure(error, { bindingId });
     }
+
     await this.options.epoch.bump({ organizationId });
   }
 
@@ -199,10 +212,12 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     if (from.type === "resource" || to.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION);
     }
+
     const organizationId = scopeOrganizationId(from);
     if (scopeOrganizationId(to) !== organizationId) {
       throw new GrantValidationError("replace() must stay within one organization");
     }
+
     const { repository } = this.options;
     await this.assertScopeBelongsToOrganization({
       repository,
@@ -228,7 +243,9 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         scopeId: to.id,
       });
     }
+
     await this.options.epoch.bump({ organizationId });
+
     return { bindingId: row.bindingId };
   }
 
@@ -242,8 +259,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     userId,
     organizationId,
   }: AuthzOffboardInput): Promise<AuthzOffboardOutput> {
-    const result = await this.offboardUserFromOrganization({
-      repository: this.options.repository,
+    const result = await this.offboarding.offboard({
       actor: this.writeActor(actor),
       userId,
       organizationId,
@@ -254,9 +270,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return result;
   }
 
-  async attachBindings(
-    args: AuthzAttachBindingsInput,
-  ): Promise<AuthzAttachBindingsOutput> {
+  async attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> {
     return this.options.ledger.attachBindings(args);
   }
 
@@ -292,6 +306,22 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
 
   async deleteRole(args: AuthzDeleteRoleInput): Promise<void> {
     return this.options.ledger.deleteRole(args);
+  }
+
+  createBinding(args: AuthzCreateBindingInput): Promise<AuthzCreateBindingOutput> {
+    return this.bindingWriter.create(args);
+  }
+
+  updateBinding(args: AuthzUpdateBindingInput): Promise<AuthzCreateBindingOutput> {
+    return this.bindingWriter.update(args);
+  }
+
+  deleteBinding(args: AuthzDeleteBindingInput): Promise<AuthzBindingMutationSuccess> {
+    return this.bindingWriter.delete(args);
+  }
+
+  applyMemberBindings(args: AuthzApplyMemberBindingsInput): Promise<AuthzBindingMutationSuccess> {
+    return this.bindingWriter.applyMemberBindings(args);
   }
 
   private bindingRow({
@@ -333,6 +363,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     ) {
       return (error as { code: string }).code;
     }
+
     return undefined;
   }
 
@@ -342,13 +373,18 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   ): never {
     const code = this.tryPortErrorCode(error);
     const errorMeta = { ...meta };
-    if (bindingId) errorMeta.bindingId = bindingId;
+    if (bindingId) {
+      errorMeta.bindingId = bindingId;
+    }
+
     if (code === "role_binding_already_exists") {
       throw new DuplicateGrantError(errorMeta);
     }
+
     if (code === "role_binding_not_found") {
       throw this.bindingNotFound(errorMeta);
     }
+
     throw error;
   }
 
@@ -376,7 +412,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     where: GrantableScope;
     organizationId: string;
   }): Promise<void> {
-    if (where.type === "organization") return;
+    if (where.type === "organization") {
+      return;
+    }
+
     if (where.type === "team") {
       const team = await repository.tryFindTeamOrganization({ teamId: where.id });
       if (team?.organizationId !== organizationId) {
@@ -384,8 +423,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
           teamId: where.id,
         });
       }
+
       return;
     }
+
     const lineage = await repository.tryFindProjectLineage({
       projectId: where.id,
     });
@@ -405,7 +446,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     role: GrantRole;
     organizationId: string;
   }): Promise<void> {
-    if (!("customRoleId" in role)) return;
+    if (!("customRoleId" in role)) {
+      return;
+    }
+
     const { customRoleId } = role;
     const customRole = await repository.tryFindCustomRole({ customRoleId });
     if (!customRole || customRole.organizationId !== organizationId) {
@@ -413,6 +457,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         customRoleId,
       });
     }
+
     const unknownPermissions = Array.isArray(customRole.permissions)
       ? customRole.permissions
           .filter((value) => typeof value !== "string" || !isRegistryPermission(value))
@@ -436,66 +481,9 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         return { apiKeyId: who.id };
       default: {
         const unreachable: never = who;
+
         throw new Error(`unhandled grant principal: ${JSON.stringify(unreachable)}`);
       }
-    }
-  }
-
-  private async offboardUserFromOrganization({
-    repository,
-    actor,
-    userId,
-    organizationId,
-  }: {
-    repository: AuthzGrantRepository;
-    actor: LedgerActor;
-    userId: string;
-    organizationId: string;
-  }): Promise<{
-    removed: OffboardCounts;
-    needsHumanDecision: {
-      ownedApiKeys: Array<{ id: string; name: string }>;
-      personalTeams: Array<{ id: string; name: string }>;
-    };
-  }> {
-    const removed = await repository.offboardUser({
-      userId,
-      organizationId,
-      actor,
-      prove: (reader) => this.proveNothingResolves({ reader, userId, organizationId }),
-    });
-    const [ownedApiKeys, personalTeams] = await Promise.all([
-      repository.findOwnedApiKeys({ userId, organizationId }),
-      repository.findPersonalTeams({ userId, organizationId }),
-    ]);
-    return { removed, needsHumanDecision: { ownedApiKeys, personalTeams } };
-  }
-
-  private async proveNothingResolves({
-    reader,
-    userId,
-    organizationId,
-  }: {
-    reader: AuthzReadRepository;
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const grants = await AuthzCollectorService.create({ reader }).collectGrants({
-      principal: { type: "user", id: userId },
-      organizationId,
-    });
-    if (
-      grants.isOrgMember ||
-      grants.bindings.length > 0 ||
-      grants.legacyTeamMemberships.length > 0
-    ) {
-      throw new OffboardIncompleteError({
-        userId,
-        organizationId,
-        remainingBindings: grants.bindings.length,
-        remainingLegacyRows: grants.legacyTeamMemberships.length,
-        stillOrgMember: grants.isOrgMember,
-      });
     }
   }
 }

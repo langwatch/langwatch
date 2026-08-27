@@ -776,18 +776,6 @@
       "672be47344bdd3fd"
     ],
     [
-      "platform/app/src/server/app-layer/role-bindings/repositories/role-binding.prisma.repository.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/app-layer/role-bindings/repositories/role-binding.prisma.repository.ts",
-      "getApp",
-      "reference",
-      "ddccfd4022f64164"
-    ],
-    [
       "platform/app/src/server/app-layer/system-migrations/runtime.ts",
       "tryGetApp",
       "import",
@@ -1344,24 +1332,6 @@
       "getApp",
       "reference",
       "f396e4f852ac4e21"
-    ],
-    [
-      "platform/app/src/server/role-bindings/role-binding.service.ts",
-      "getApp",
-      "import",
-      "76f1251c03b899a6"
-    ],
-    [
-      "platform/app/src/server/role-bindings/role-binding.service.ts",
-      "getApp",
-      "reference",
-      "ddccfd4022f64164"
-    ],
-    [
-      "platform/app/src/server/role-bindings/role-binding.service.ts",
-      "getApp",
-      "reference",
-      "f7d135d877740e60"
     ],
     [
       "platform/app/src/server/routes/auth-cli.ts",

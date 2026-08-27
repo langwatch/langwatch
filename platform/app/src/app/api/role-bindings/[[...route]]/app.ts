@@ -19,19 +19,14 @@
  * would record the same mutation twice.
  */
 import type { EndpointVariables, ServiceContext } from "@langwatch/api";
+import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { Context } from "hono";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
-import {
-  type Organization,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { appFromContext } from "~/app/api/middleware/app-context";
+import { type Organization, RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
-import { prisma } from "~/server/db";
-import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { optimisticBindingWire } from "./read-back";
 
 const { service, guard } = createManagementService({
@@ -42,7 +37,7 @@ const { service, guard } = createManagementService({
 
 /** The handler context: the framework's variables plus the family's provider. */
 type RoleBindingsContext = ServiceContext<
-  EndpointVariables & { roleBindings: RoleBindingService }
+  EndpointVariables & { authz: AuthzService; grants: AuthzGrantsService }
 >;
 
 // ── wire schemas ─────────────────────────────────────────────────────────────
@@ -102,7 +97,9 @@ const updateBindingSchema = z.object({
 
 const idParamsSchema = z.object({ id: z.string().min(1) });
 
-type OrgBindingRow = Awaited<ReturnType<RoleBindingService["listForOrg"]>>[number];
+type OrgBindingRow = Awaited<
+  ReturnType<AuthzService["listManagedBindingsForOrganization"]>
+>[number];
 
 const principalOf = (row: OrgBindingRow): z.infer<typeof principalSchema> => {
   if (row.userId) {
@@ -130,18 +127,14 @@ const bindingWire = (row: OrgBindingRow): z.infer<typeof bindingSchema> => ({
   createdAt: row.createdAt,
 });
 
-const rowMatchesFilters = (
-  row: OrgBindingRow,
-  query: z.infer<typeof listQuerySchema>,
-): boolean =>
+const rowMatchesFilters = (row: OrgBindingRow, query: z.infer<typeof listQuerySchema>): boolean =>
   (query.userId === undefined || row.userId === query.userId) &&
   (query.groupId === undefined || row.groupId === query.groupId) &&
   (query.apiKeyId === undefined || row.apiKeyId === query.apiKeyId) &&
   (query.scopeType === undefined || row.scopeType === query.scopeType) &&
   (query.scopeId === undefined || row.scopeId === query.scopeId);
 
-const organizationOf = (c: Context): Organization =>
-  c.get("organization") as Organization;
+const organizationOf = (c: Context): Organization => c.get("organization") as Organization;
 
 /**
  * The just-written binding as the list reports it, so a write's response is
@@ -154,15 +147,15 @@ const organizationOf = (c: Context): Organization =>
  * at the call site.
  */
 const readBackBinding = async ({
-  roleBindings,
+  authz,
   organizationId,
   bindingId,
 }: {
-  roleBindings: RoleBindingService;
+  authz: AuthzService;
   organizationId: string;
   bindingId: string;
 }): Promise<z.infer<typeof bindingSchema> | null> => {
-  const rows = await roleBindings.listForOrg({ organizationId });
+  const rows = await authz.listManagedBindingsForOrganization({ organizationId });
   const row = rows.find((candidate) => candidate.id === bindingId);
   return row ? bindingWire(row) : null;
 };
@@ -173,7 +166,7 @@ const listBindingsHandler = async (
   c: RoleBindingsContext,
   input: z.infer<typeof listQuerySchema>,
 ) => {
-  const rows = await c.get("roleBindings").listForOrg({
+  const rows = await c.get("authz").listManagedBindingsForOrganization({
     organizationId: organizationOf(c).id,
   });
   const filtered = rows.filter((row) => rowMatchesFilters(row, input));
@@ -190,15 +183,16 @@ const createBindingHandler = async (
   input: z.infer<typeof createBindingSchema>,
 ) => {
   const organization = organizationOf(c);
-  const roleBindings = c.get("roleBindings");
+  const authz = c.get("authz");
+  const grants = c.get("grants");
   const hasLegacyAccessNotice = input.userId
-    ? await roleBindings.wouldFirstBindingDisableLegacyAccess({
+    ? await authz.wouldFirstBindingDisableLegacyAccess({
         organizationId: organization.id,
         userId: input.userId,
       })
     : false;
 
-  const created = await roleBindings.create({
+  const created = await grants.createBinding({
     organizationId: organization.id,
     ...input,
     actor: orgRequestLedgerActor(c),
@@ -211,7 +205,7 @@ const createBindingHandler = async (
   // role_binding_already_exists once the first row is projected).
   const binding =
     (await readBackBinding({
-      roleBindings,
+      authz,
       organizationId: organization.id,
       bindingId: created.id,
     })) ??
@@ -238,8 +232,8 @@ const updateBindingHandler = async (
   input: z.infer<typeof idParamsSchema> & z.infer<typeof updateBindingSchema>,
 ) => {
   const organization = organizationOf(c);
-  const roleBindings = c.get("roleBindings");
-  const updated = await roleBindings.update({
+  const authz = c.get("authz");
+  const updated = await c.get("grants").updateBinding({
     organizationId: organization.id,
     bindingId: input.id,
     role: input.role,
@@ -247,7 +241,7 @@ const updateBindingHandler = async (
     actor: orgRequestLedgerActor(c),
   });
   const binding = await readBackBinding({
-    roleBindings,
+    authz,
     organizationId: organization.id,
     bindingId: updated.id,
   });
@@ -268,7 +262,7 @@ const deleteBindingHandler = async (
   input: z.infer<typeof idParamsSchema>,
 ) => {
   const organization = organizationOf(c);
-  await c.get("roleBindings").delete({
+  await c.get("grants").deleteBinding({
     organizationId: organization.id,
     bindingId: input.id,
     actor: orgRequestLedgerActor(c),
@@ -280,12 +274,8 @@ const deleteBindingHandler = async (
 
 export const app = service
   .provide({
-    roleBindings: (_base, context) =>
-      new RoleBindingService({
-        prisma,
-        repo: new PrismaRoleBindingRepository(prisma),
-        roleService: context.get("langwatchApp").roles,
-      }),
+    authz: (_base, context) => appFromContext(context).permissions,
+    grants: (_base, context) => appFromContext(context).authzGrants,
   })
   .registerRoute("get", "/", MANAGEMENT_API_VERSION, listBindingsHandler, (b) =>
     guard("organization:manage")(b)

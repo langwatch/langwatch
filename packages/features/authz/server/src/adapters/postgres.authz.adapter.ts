@@ -23,6 +23,10 @@ import { PrismaAuthzMigrationRepository } from "../repositories/prisma/prisma.au
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository";
 import { PrismaAuthzProjectionRepository } from "../repositories/prisma/prisma.authz-projection.repository";
+import {
+  type AuthzBindingDatabase,
+  PrismaAuthzBindingRepository,
+} from "../repositories/prisma/prisma.authz-binding.repository";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository";
 import { RoutedAuthzListingRepository } from "../repositories/routed/routed.authz-listing.repository";
 import { RoutedAuthzReadRepository } from "../repositories/routed/routed.authz-read.repository";
@@ -49,7 +53,8 @@ type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzGrantWriteDatabase &
   AuthzMigrationDatabase &
   AuthzCutoverDatabase &
-  AuthzAuditDatabase;
+  AuthzAuditDatabase &
+  AuthzBindingDatabase;
 
 export type PostgresAuthzAdapterOptions = {
   database: PostgresAuthzDatabase;
@@ -89,9 +94,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     return (await this.dispatcher.commands()).commands;
   }
 
-  async attachGrant(
-    args: Parameters<AuthzEngineLedger["attachGrant"]>[0],
-  ): Promise<void> {
+  async attachGrant(args: Parameters<AuthzEngineLedger["attachGrant"]>[0]): Promise<void> {
     const { organizationId, commandId, grant } = args;
     await (
       await this.commands()
@@ -116,9 +119,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async changeGrantRole(
-    args: Parameters<AuthzEngineLedger["changeGrantRole"]>[0],
-  ): Promise<void> {
+  async changeGrantRole(args: Parameters<AuthzEngineLedger["changeGrantRole"]>[0]): Promise<void> {
     await (
       await this.commands()
     ).changeGrantRole.send({
@@ -127,9 +128,7 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
     });
   }
 
-  async revokeGrant(
-    args: Parameters<AuthzEngineLedger["revokeGrant"]>[0],
-  ): Promise<void> {
+  async revokeGrant(args: Parameters<AuthzEngineLedger["revokeGrant"]>[0]): Promise<void> {
     await (
       await this.commands()
     ).revokeGrant.send({
@@ -191,6 +190,7 @@ export class PostgresAuthzAdapter {
       writer: ledger,
       selectHead,
     });
+    const bindingRepository = PrismaAuthzBindingRepository.create(database);
 
     const authzOptions: AuthzServiceOptions = {
       repository: RoutedAuthzReadRepository.create({
@@ -201,10 +201,10 @@ export class PostgresAuthzAdapter {
         database,
         selectHead,
       }),
+      bindings: bindingRepository,
       epoch,
       isOnEngine: selectHead,
-      tryGetEngineCutoverAt: (organizationId) =>
-        cutover.tryGetFinalizedAt({ organizationId }),
+      tryGetEngineCutoverAt: (organizationId) => cutover.tryGetFinalizedAt({ organizationId }),
     };
     if (this.options.cacheEnabled) {
       authzOptions.cacheEnabled = this.options.cacheEnabled;
@@ -221,6 +221,7 @@ export class PostgresAuthzAdapter {
       epoch,
       newBindingId: this.options.newBindingId,
       ledger,
+      bindings: bindingRepository,
     });
 
     const pipeline = EventingAuthzAdapter.build({

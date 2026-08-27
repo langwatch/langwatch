@@ -25,6 +25,14 @@ import type {
   AuthzRevokeResourceGrantsOutput,
   AuthzUpdateGrantInput,
 } from "./authz.commands";
+import type {
+  AuthzApplyMemberBindingsInput,
+  AuthzBindingMutationSuccess,
+  AuthzCreateBindingInput,
+  AuthzCreateBindingOutput,
+  AuthzDeleteBindingInput,
+  AuthzUpdateBindingInput,
+} from "./authz.binding-management";
 
 /** The one portable mutation and offboarding capability for authorization. */
 export abstract class AuthzGrantsService {
@@ -40,9 +48,7 @@ export abstract class AuthzGrantsService {
 
   /** Lossless compatibility operations for existing application writers.
    * They live on this capability so no public ledger-writer surface escapes. */
-  abstract attachBindings(
-    args: AuthzAttachBindingsInput,
-  ): Promise<AuthzAttachBindingsOutput>;
+  abstract attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;
 
   abstract attachResourceGrant(
     args: AuthzAttachResourceGrantInput,
@@ -56,19 +62,25 @@ export abstract class AuthzGrantsService {
     args: AuthzChangeBindingRoleInput,
   ): Promise<AuthzChangeBindingRoleOutput>;
 
-  abstract revokeBindings(
-    args: AuthzRevokeBindingsInput,
-  ): Promise<AuthzRevokeBindingsOutput>;
+  abstract revokeBindings(args: AuthzRevokeBindingsInput): Promise<AuthzRevokeBindingsOutput>;
 
   abstract revokeBindingsWhere(
     args: AuthzRevokeBindingsWhereInput,
   ): Promise<AuthzRevokeBindingsWhereOutput>;
 
-  abstract offboardMember(
-    args: AuthzOffboardMemberInput,
-  ): Promise<AuthzOffboardMemberOutput>;
+  abstract offboardMember(args: AuthzOffboardMemberInput): Promise<AuthzOffboardMemberOutput>;
 
   abstract defineRole(args: AuthzDefineRoleInput): Promise<AuthzDefineRoleOutput>;
 
   abstract deleteRole(args: AuthzDeleteRoleInput): Promise<AuthzDeleteRoleOutput>;
+
+  abstract createBinding(args: AuthzCreateBindingInput): Promise<AuthzCreateBindingOutput>;
+
+  abstract updateBinding(args: AuthzUpdateBindingInput): Promise<AuthzCreateBindingOutput>;
+
+  abstract deleteBinding(args: AuthzDeleteBindingInput): Promise<AuthzBindingMutationSuccess>;
+
+  abstract applyMemberBindings(
+    args: AuthzApplyMemberBindingsInput,
+  ): Promise<AuthzBindingMutationSuccess>;
 }

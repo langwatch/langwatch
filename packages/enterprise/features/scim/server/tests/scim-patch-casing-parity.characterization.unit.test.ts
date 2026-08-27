@@ -30,6 +30,10 @@ class GrantsFake extends AuthzGrantsService {
   offboardMember = vi.fn();
   defineRole = vi.fn();
   deleteRole = vi.fn();
+  createBinding = vi.fn();
+  updateBinding = vi.fn();
+  deleteBinding = vi.fn();
+  applyMemberBindings = vi.fn();
 }
 
 class EnterpriseEntitlements extends EntitlementService {
@@ -168,9 +172,7 @@ describe("SCIM PATCH operation casing parity", () => {
   });
 
   it("continues to accept the RFC lowercase spelling", () => {
-    expect(parse([{ op: "replace", value: { active: false } }]).Operations[0]?.op).toBe(
-      "replace",
-    );
+    expect(parse([{ op: "replace", value: { active: false } }]).Operations[0]?.op).toBe("replace");
   });
 
   it("rejects a value that is not a SCIM operation", () => {

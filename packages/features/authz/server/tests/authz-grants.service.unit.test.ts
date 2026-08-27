@@ -10,6 +10,7 @@ import {
 import { AuthzGrantsService } from "../src/services/authz-grants.service";
 import { AuthzService } from "../src/services/authz.service";
 import { StubAuthzEpoch } from "./support/authz-epoch.stub";
+import { StubAuthzBindingRepository } from "./support/authz-binding.stub";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub";
 import { makeReader } from "./support/authz-read.stub";
 
@@ -96,6 +97,7 @@ function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger
     ledger: ledger as unknown as EventingAuthzLedgerAdapter,
     epoch,
     newBindingId: () => "rb_test_ksuid",
+    bindings: new StubAuthzBindingRepository(),
   });
   const bumpEpoch = epoch.bump;
   return { service, bumpEpoch, ledger };
@@ -184,9 +186,7 @@ describe("AuthzGrantsService.attach", () => {
   describe("when the custom role's payload is not a list at all", () => {
     it("attaches, because a malformed payload grants nothing to validate", async () => {
       const repository = makeRepository({
-        tryFindCustomRole: vi
-          .fn()
-          .mockResolvedValue({ organizationId: ORG, permissions: null }),
+        tryFindCustomRole: vi.fn().mockResolvedValue({ organizationId: ORG, permissions: null }),
       });
       const { service } = makeService(repository);
 
@@ -284,9 +284,7 @@ describe("AuthzGrantsService.revoke", () => {
   describe("when the binding belongs to another organization", () => {
     it("answers not-found rather than confirming it exists", async () => {
       const repository = makeRepository({
-        tryFindBinding: vi
-          .fn()
-          .mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
+        tryFindBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
       });
       const { service } = makeService(repository);
 
@@ -388,9 +386,7 @@ describe("AuthzGrantsService.update", () => {
   describe("when the binding belongs to another organization", () => {
     it("answers not-found rather than confirming it exists", async () => {
       const repository = makeRepository({
-        tryFindBinding: vi
-          .fn()
-          .mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
+        tryFindBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
       });
       const { service } = makeService(repository);
 
@@ -452,9 +448,7 @@ describe("AuthzGrantsService.offboard", () => {
     it("returns the removal counts, the manifest, and bumps the epoch", async () => {
       const repository = makeRepository({
         findOwnedApiKeys: vi.fn().mockResolvedValue([{ id: "key-1", name: "ci key" }]),
-        findPersonalTeams: vi
-          .fn()
-          .mockResolvedValue([{ id: "team-p", name: "Dave's workspace" }]),
+        findPersonalTeams: vi.fn().mockResolvedValue([{ id: "team-p", name: "Dave's workspace" }]),
       });
       const { service, bumpEpoch } = makeService(repository);
 
@@ -465,9 +459,7 @@ describe("AuthzGrantsService.offboard", () => {
       });
 
       expect(result.removed).toEqual(OFFBOARD_COUNTS);
-      expect(result.needsHumanDecision.ownedApiKeys).toEqual([
-        { id: "key-1", name: "ci key" },
-      ]);
+      expect(result.needsHumanDecision.ownedApiKeys).toEqual([{ id: "key-1", name: "ci key" }]);
       expect(result.needsHumanDecision.personalTeams).toEqual([
         { id: "team-p", name: "Dave's workspace" },
       ]);
@@ -533,6 +525,7 @@ describe("AuthzGrantsService.offboard", () => {
             },
           ]),
         }),
+        bindings: new StubAuthzBindingRepository(),
       });
 
       const decision = await authz.check({

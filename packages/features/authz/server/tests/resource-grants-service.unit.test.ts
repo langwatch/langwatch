@@ -4,6 +4,7 @@ import type { EventingAuthzLedgerAdapter } from "../src/adapters/eventing.authz-
 import type { AuthzGrantRepository } from "../src/repositories/authz-grant.repository";
 import { AuthzGrantsService } from "../src/services/authz-grants.service";
 import { AuthzService } from "../src/services/authz.service";
+import { StubAuthzBindingRepository } from "./support/authz-binding.stub";
 import { StubAuthzEpoch } from "./support/authz-epoch.stub";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub";
 import { makeReader } from "./support/authz-read.stub";
@@ -14,6 +15,7 @@ describe("AuthzService on a resource scope", () => {
     const authzWithLink = () =>
       AuthzService.create({
         listing: new StubAuthzListingRepository(),
+        bindings: new StubAuthzBindingRepository(),
         repository: makeReader({
           findShareLinks: vi.fn().mockResolvedValue([liveShareLinkRow]),
         }),
@@ -47,6 +49,7 @@ describe("AuthzGrantsService and resource scopes", () => {
       ledger: {} as EventingAuthzLedgerAdapter,
       epoch: new StubAuthzEpoch(),
       newBindingId: () => "rb_test",
+      bindings: new StubAuthzBindingRepository(),
     });
 
   describe("when a role binding is attached at a resource scope", () => {
@@ -88,9 +91,7 @@ describe("AuthzGrantsService and resource scopes", () => {
       });
       // The migration note lives in the source comment, never in the
       // sentence an admin reads.
-      const rejection = (await attaching.catch(
-        (error: unknown) => error,
-      )) as GrantValidationError;
+      const rejection = (await attaching.catch((error: unknown) => error)) as GrantValidationError;
       expect(rejection.message).not.toContain("C5");
       expect(rejection.message).not.toContain("stage");
     });
