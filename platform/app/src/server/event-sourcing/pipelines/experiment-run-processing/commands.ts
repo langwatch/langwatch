@@ -50,6 +50,14 @@ export const RecordTargetResultCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
 });
 
+/**
+ * A verdict is identified by its target as well as its evaluator and its row.
+ *
+ * Every evaluator runs against every target, so two columns produce a verdict
+ * for the same evaluator on the same row. `event_log` is a ReplacingMergeTree
+ * ordered by the idempotency key, so a key without the target makes those two
+ * verdicts one row and one column loses its score.
+ */
 export const RecordEvaluatorResultCommand = defineCommand({
   commandType: "lw.experiment_run.record_evaluator_result",
   eventType: "lw.experiment_run.evaluator_result",
@@ -59,15 +67,16 @@ export const RecordEvaluatorResultCommand = defineCommand({
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
   groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
   idempotencyKey: (d) =>
-    `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
+    `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
     "payload.experiment.id": d.experimentId,
+    "payload.target.id": d.targetId,
     "payload.evaluator.id": d.evaluatorId,
     "payload.index": d.index,
   }),
   makeJobId: (d) =>
-    `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
+    `${d.tenantId}:${d.runId}:evaluator:${d.targetId}:${d.evaluatorId}:${d.index}`,
 });
 
 export const ComputeExperimentRunMetricsCommand = defineCommand({
