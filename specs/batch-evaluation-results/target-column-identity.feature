@@ -33,6 +33,13 @@ Feature: Target column identity on the results page
     When the results table renders
     Then the target column headers read "classifier" and "summarizer"
 
+  @unit
+  Scenario: The CSV export keeps a column block per same-named target
+    Given a run with two targets both stored under the name "classifier"
+    When I export the results to CSV
+    Then the headers of the first target start with "classifier_(1)"
+    And the headers of the second target start with "classifier_(2)"
+
   # ============================================================================
   # Chart axis labels
   # ============================================================================
