@@ -201,9 +201,7 @@ export function builtinRoleGrants({
  * permission list is authoritative and handled by the engine before this
  * mapping is consulted).
  */
-export function roleKeyForTeamRole(
-  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM",
-): BuiltinRoleKey {
+export function roleKeyForTeamRole(role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM"): BuiltinRoleKey {
   switch (role) {
     case "ADMIN":
       return "admin";

@@ -6,7 +6,7 @@
  * two concurrent appends would both read `chunkCount=N`, both write `chunk-N`,
  * and one would be silently lost with the offset index left drifting.
  *
- * Mirrors the prior art in `modelDefaults.repository.ts#lockScope`: a
+ * Mirrors the Model Provider default-model locking scheme: a
  * transaction-scoped `pg_advisory_xact_lock` keyed by `hashtextextended` of a
  * namespaced string id (the lock is bigint; the hash fits the key into it). The
  * lock is held for the duration of the `$transaction`, so the chunk I/O AND the

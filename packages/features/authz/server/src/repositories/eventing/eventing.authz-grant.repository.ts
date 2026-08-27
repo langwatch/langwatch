@@ -85,7 +85,7 @@ class AuthzGrantPortFailureMapper {
  * holding whatever row locks the deletes took, so it needs the same explicit
  * budget every other multi-statement `$transaction` in this codebase sets
  * rather than Prisma's 5s default (see `dataset-lock.ts`,
- * `modelDefaults.service.ts`, `prismaProcessStore.ts`): `timeout` bounds the
+ * the default-model repository and `prismaProcessStore.ts`): `timeout` bounds the
  * callback itself, `maxWait` bounds acquiring a connection from the pool
  * before it even starts.
  */

@@ -107,15 +107,7 @@ export const AUTHZ_RESOURCES = {
     scopes: ["project", "team", "organization"],
   },
   virtualKeys: {
-    actions: [
-      "view",
-      "create",
-      "update",
-      "delete",
-      "rotate",
-      "manage",
-      "viewOtherPersonal",
-    ],
+    actions: ["view", "create", "update", "delete", "rotate", "manage", "viewOtherPersonal"],
     scopes: ["project", "team", "organization"],
   },
   gatewayBudgets: {
@@ -212,12 +204,7 @@ export type AuthzResource = z.infer<typeof authzResourceSchema>;
 /** The tiers a permission may be granted at. Every scope tier except
  *  `resource`, which is reached by a grant on the resource itself rather
  *  than by a permission declaration. */
-export const authzScopeTypeSchema = z.enum([
-  "project",
-  "team",
-  "organization",
-  "platform",
-]);
+export const authzScopeTypeSchema = z.enum(["project", "team", "organization", "platform"]);
 export type AuthzScopeType = z.infer<typeof authzScopeTypeSchema>;
 
 /** Only VALID resource:action pairs — `traces:rotate` is a type error. */
