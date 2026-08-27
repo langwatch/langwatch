@@ -10,14 +10,14 @@
  * this deployment's honest answer is `lwql_unavailable`, which proves the
  * refusal was about the bucket arithmetic and not about the door.
  *
- * The family publishes the canonical error envelope wrapped in a JSON-RPC
- * `error`, so the refusal is read at `body.error.data.error.code` with its
- * structured detail at `body.error.data.error.meta` — by code, never by
- * message prose.
+ * The family publishes this API's canonical error envelope at the top level,
+ * like every other REST family, so the refusal is read at `body.error.code`
+ * with its structured detail at `body.error.meta` — by code, never by message
+ * prose.
  *
  * @see specs/analytics/lwql-workbench.feature
  * @see ~/server/analytics/lwql/resolveTimeWindow.ts — the budget contract
- * @see ./queryRpcApi.integration.test.ts — the door's envelope and isolation proofs
+ * @see ./queryRestApi.integration.test.ts — the door's request and isolation proofs
  */
 
 import { nanoid } from "nanoid";
@@ -46,33 +46,28 @@ const GRANULARITY_SQL =
 /** Seven days, in seconds — the window every request below reports over. */
 const WEEK_SECONDS = 7 * 24 * 3600;
 
-describe("given the /api/v1/query JSON-RPC endpoint and the granularity budget", () => {
+describe("given the /api/v1/query REST endpoint and the granularity budget", () => {
   const ns = nanoid(8);
 
   let organization: Organization;
   let team: Team;
   let project: Project;
 
-  const rpcPath = "/api/v1/query";
+  const runPath = "/api/v1/query";
 
   const call = async (
-    params: Record<string, unknown>,
+    body: Record<string, unknown>,
   ): Promise<{
     status: number;
     body: Body;
   }> => {
-    const response = await app.request(rpcPath, {
+    const response = await app.request(runPath, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Auth-Token": project.apiKey,
       },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "query.run",
-        params,
-      }),
+      body: JSON.stringify(body),
     });
     return { status: response.status, body: (await response.json()) as Body };
   };
@@ -128,7 +123,7 @@ describe("given the /api/v1/query JSON-RPC endpoint and the granularity budget",
 
   describe("when a statement declaring the parameter is run at one-second steps over a week", () => {
     /** @scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST" */
-    it("is refused with the named code and the bucket arithmetic in the envelope's meta", async () => {
+    it("is refused with the named code and the bucket arithmetic in the error meta", async () => {
       const { status, body } = await call({
         sql: GRANULARITY_SQL,
         timeWindow: {
@@ -139,8 +134,8 @@ describe("given the /api/v1/query JSON-RPC endpoint and the granularity budget",
       });
 
       expect(status).toBe(400);
-      expect(body.error.data.error.code).toBe("lwql_granularity_too_fine");
-      expect(body.error.data.error.meta).toMatchObject({
+      expect(body.error.code).toBe("lwql_granularity_too_fine");
+      expect(body.error.meta).toMatchObject({
         requestedGranularitySeconds: 1,
         windowSeconds: WEEK_SECONDS,
         maxBuckets: 10_000,
@@ -166,9 +161,7 @@ describe("given the /api/v1/query JSON-RPC endpoint and the granularity budget",
       // a provisioned ClickHouse -> the query path itself), so assert only
       // that the budget refusal is gone, not which honest answer follows.
       expect(status).not.toBe(400);
-      expect(body.error?.data?.error?.code).not.toBe(
-        "lwql_granularity_too_fine",
-      );
+      expect(body.error?.code).not.toBe("lwql_granularity_too_fine");
     });
   });
 });

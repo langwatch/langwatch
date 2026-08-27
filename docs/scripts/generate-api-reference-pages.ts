@@ -286,11 +286,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     dirName: "query",
     pathPrefixes: ["/api/v1/query"],
     overviewDescription:
-      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query. One JSON-RPC 2.0 endpoint serves both methods: read the envelope guide before you call it, especially for how auth failures answer differently from a refused query.",
-    // One path, two JSON-RPC methods: the generator makes one endpoint page for
-    // it, and the envelope page carries the real explanatory weight the
-    // generated page cannot (the two methods, the two error shapes).
-    extraPages: ["api-reference/query/json-rpc-envelope"],
+      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.",
   },
   {
     name: "Secrets",

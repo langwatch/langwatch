@@ -66751,6 +66751,15 @@ openapi: "PATCH /api/api-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/automations/create-slack-automation.mdx
+
+---
+title: 'Create Slack automation'
+openapi: 'POST /api/trigger/slack'
+---
+
+---
+
 # FILE: ./api-reference/coding-agents/get-pull-request-coding-agent-usage.mdx
 
 ---
@@ -68961,6 +68970,15 @@ openapi: "POST /api/prompts/{id}/sync"
 
 ---
 
+# FILE: ./api-reference/prompts/create-prompt-version.mdx
+
+---
+title: "Create prompt version"
+openapi: "POST /api/prompts/{id}/versions"
+---
+
+---
+
 # FILE: ./api-reference/prompts/create-prompt.mdx
 
 ---
@@ -69094,312 +69112,12 @@ openapi: "PUT /api/prompts/{id}/tags/{tag}"
 
 ---
 
-# FILE: ./api-reference/query/call-a-langwatchql-method-json-rpc-2-0.mdx
+# FILE: ./api-reference/query/discover-the-queryable-langwatchql-schem.mdx
 
 ---
-title: "Call a LangWatchQL method (JSON-RPC 2.0)"
-openapi: "POST /api/v1/query"
+title: "Discover the queryable LangWatchQL schema"
+openapi: "GET /api/v1/query/schema"
 ---
-
----
-
-# FILE: ./api-reference/query/json-rpc-envelope.mdx
-
----
-title: 'JSON-RPC envelope'
-description: 'How POST /api/v1/query dispatches query.run and query.schema over one endpoint, and the one gotcha to code for: auth failures do not carry the JSON-RPC wrapper.'
----
-
-## Why one endpoint, two methods
-
-`POST /api/v1/query` is the LangWatchQL door: one path, dispatching on a JSON-RPC
-2.0 `method` field rather than the URL. That is unusual for this API: every
-other family is one path per operation. So this page exists to carry the
-explanation the generated endpoint page cannot: the envelope shape, the two
-methods it dispatches to, and the one error-shape gotcha a client must code for
-before it can trust a failure response.
-
-## The envelope
-
-Every request body is a JSON-RPC 2.0 envelope:
-
-```jsonc
-{
-  "jsonrpc": "2.0",
-  "id": 1,                  // string, number, or null: echoed back on the response
-  "method": "query.run",    // or "query.schema"
-  "params": { /* method-specific, see below */ }
-}
-```
-
-This door is **pragmatic JSON-RPC, not strict**. Two departures from the spec,
-both deliberate:
-
-- **Real HTTP status per outcome.** A refused query answers `422`, not `200`
-  with an `error` field: the transport status always tells you whether the
-  call was refused, so you never have to parse the body first to find out.
-- **No batch support.** Send one envelope per request. An array body is not a
-  batch call.
-
-## The two methods
-
-### `query.run`
-
-Executes one read-only LangWatchQL `SELECT` over the analytics datasets your
-project can see.
-
-**`params`:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `sql` | `string` | The LangWatchQL statement to run. |
-| `parameters` | `Record<string, string \| number \| boolean \| null>` | Optional. Bound values for named parameters in `sql`. |
-| `timeWindow` | `{ start: string; end: string }` | Optional. Fills the statement's reserved `period_start` / `period_end` parameters. |
-| `granularitySeconds` | `number` | Optional. The datapoint step, for a statement that declares `{period_granularity_seconds:UInt32}`. |
-
-**`result`:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `columns` | `{ name: string; type: string }[]` | The result's column names and types. |
-| `rows` | `Record<string, unknown>[]` | The result rows. |
-| `statistics` | `{ elapsedMs, rowsRead, bytesRead, rowsReturned }` | Execution statistics for this run. |
-| `truncated` | `boolean` | Whether a response ceiling cut the result short. |
-| `followsTimeWindow` | `boolean` | Whether the statement declared the reserved time-window parameters. |
-| `followsGranularity` | `boolean` | Whether the statement declared the reserved granularity parameter. |
-| `granularitySeconds` | `number` | Optional. The step this run was bucketed at, when one applied. |
-| `diagnostics` | `Diagnostic[]` | Advisory notes about the result. See below. |
-
-```bash
-curl -X POST https://app.langwatch.ai/api/v1/query \
-  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "query.run",
-    "params": {
-      "sql": "SELECT trace_id, total_cost FROM traces WHERE started_at BETWEEN {period_start:DateTime64} AND {period_end:DateTime64} LIMIT 100",
-      "timeWindow": { "start": "2026-08-01T00:00:00Z", "end": "2026-08-25T00:00:00Z" }
-    }
-  }'
-```
-
-```jsonc
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "columns": [
-      { "name": "trace_id", "type": "String" },
-      { "name": "total_cost", "type": "Float64" }
-    ],
-    "rows": [
-      { "trace_id": "abc123…", "total_cost": 0.0031 }
-    ],
-    "statistics": { "elapsedMs": 42, "rowsRead": 8192, "bytesRead": 524288, "rowsReturned": 100 },
-    "truncated": false,
-    "followsTimeWindow": true,
-    "followsGranularity": false,
-    "diagnostics": []
-  }
-}
-```
-
-<Info>
-**Diagnostics are advisory and never reject a query.** An empty `diagnostics`
-list means no known issue was detected. It is **not** proof that the answer is
-the one you meant. A statement can declare the reserved time-window parameters
-and never actually compare against them; `followsTimeWindow: true` only tells
-you the parameters were declared and filled, not that they bounded the rows
-returned. Read the statement, don't just read the flag.
-</Info>
-
-### `query.schema`
-
-Lists the datasets your key can query: names, descriptions, grain, join keys,
-the time column each one prunes on, freshness, and every column's type,
-description, unit, and the permission gates it requires, plus a runnable
-example statement per dataset.
-
-**`params`:** none. Sending `params` is not an error; it is ignored.
-
-**`result`:**
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `database` | `string` | The database name these datasets live in. |
-| `datasets` | `Dataset[]` | The datasets this key may query. |
-
-Each `Dataset`:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | `string` | Dataset name, as used in `FROM`. |
-| `description` | `string` | What the dataset contains. |
-| `grain` | `string` | What one row represents. |
-| `joinKeys` | `string[]` | Columns other datasets join to this one on. |
-| `timeColumn` | `string` | The column that prunes this dataset by time. |
-| `freshness` | `string` | How current the data is. |
-| `columns` | `Column[]` | Every column, with `name`, `type`, `description`, `unit` (`ms` \| `USD` \| `tokens` \| `tokens/s` \| `null`), `gates` (`input` \| `output` \| `costs`), and `available` (whether *this* caller currently holds the gates it needs). |
-| `exampleSql` | `string` | A runnable statement against this dataset. |
-
-```bash
-curl -X POST https://app.langwatch.ai/api/v1/query \
-  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc": "2.0", "id": 1, "method": "query.schema"}'
-```
-
-```jsonc
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "database": "langwatch_analytics",
-    "datasets": [
-      {
-        "name": "traces",
-        "description": "One row per trace.",
-        "grain": "trace",
-        "joinKeys": ["trace_id"],
-        "timeColumn": "started_at",
-        "freshness": "near real-time",
-        "columns": [
-          {
-            "name": "total_cost",
-            "type": "Float64",
-            "description": "Total cost of the trace, in USD.",
-            "unit": "USD",
-            "gates": ["costs"],
-            "available": true
-          }
-        ],
-        "exampleSql": "SELECT trace_id, total_cost FROM traces WHERE started_at BETWEEN {period_start:DateTime64} AND {period_end:DateTime64} LIMIT 100"
-      }
-    ]
-  }
-}
-```
-
-## The critical gotcha: not every failure carries the JSON-RPC wrapper
-
-**Only authentication and authorization failures (401, 403) answer with the
-canonical error envelope alone, never wrapped in a JSON-RPC `error`.**
-Everything else this endpoint answers with, including a refused query (400,
-422) or even an unexpected server failure (500), is wrapped, because those are
-all raised from inside the endpoint's own handler, which installs a JSON-RPC
-error handler around itself. 401/403 are the one exception: they are raised by
-auth middleware *before* the request reaches that handler, so there is no
-JSON-RPC layer around them yet.
-
-**Branch on the HTTP status first, then read `error.code`.** A client that
-assumes every failure carries a JSON-RPC envelope will misread a refused
-credential: it will look for `error.data.code`, which is absent, because on a
-401/403 the code is at `error.code` directly.
-
-<Warning>
-This is the one thing to get right before you write a query client against
-this endpoint. Get the branch order backwards and a refused API key silently
-falls through to a generic error path instead of surfacing `invalid_api_key`.
-</Warning>
-
-Compare the two shapes side by side. A **refused query** (400/422): the
-request reached this endpoint's handler, which wraps its refusal in JSON-RPC:
-
-```jsonc
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32000,
-    "message": "Query refused.",
-    "data": {
-      "type": "unprocessable_entity",
-      "code": "query_scan_limit_exceeded",
-      "message": "This query would scan more data than this key allows.",
-      "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
-    }
-  }
-}
-```
-
-The canonical envelope (`type`, `code`, `message`, `trace_id`) rides as
-`error.data`. `error.code` at the outer level (`-32000`) is the JSON-RPC
-protocol code, not the application code; the code your logic should branch on
-is one level deeper, at `error.data.code`.
-
-A **refused credential** (401/403), raised before this endpoint's handler and
-never wrapped:
-
-```jsonc
-{
-  "error": {
-    "type": "unauthorized",
-    "code": "invalid_api_key",
-    "message": "The API key provided is invalid or has been revoked.",
-    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
-  }
-}
-```
-
-No `jsonrpc` key at all. The canonical envelope is the whole body, at the top
-level: the same shape every other LangWatch API family answers with.
-
-| HTTP status | Body shape | Where the canonical `code` lives |
-|-------------|------------|-----------------------------------|
-| 200 | JSON-RPC success | (no error) |
-| 400, 422, 500 | JSON-RPC error | `error.data.code` |
-| 401, 403 | Canonical envelope, unwrapped | `error.code` |
-
-## Using the SDK instead
-
-The `langwatch` TypeScript SDK handles the envelope and this exact branching
-for you: call it and read a result or a typed error, never a raw JSON-RPC
-body:
-
-```typescript
-import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-
-// query.run
-const result = await langwatch.query.query({
-  sql: "SELECT trace_id, total_cost FROM traces WHERE started_at BETWEEN {period_start:DateTime64} AND {period_end:DateTime64} LIMIT 100",
-  timeWindow: { start: "2026-08-01T00:00:00Z", end: "2026-08-25T00:00:00Z" },
-});
-console.log(result.rows, result.diagnostics);
-
-// query.schema
-const schema = await langwatch.query.schema();
-console.log(schema.datasets.map((d) => d.name));
-```
-
-On failure the SDK throws `LangWatchHandledError` (or `QueryApiError` when the
-platform did not name the cause). Unwrapping applies whether the failure was
-JSON-RPC-wrapped (400/422) or bare (401/403), so `error.code` reads the same
-canonical code either way and you never branch on transport shape yourself:
-
-```typescript
-import { isLangWatchHandledError } from "langwatch";
-
-try {
-  await langwatch.query.query({ sql: "SELECT * FROM traces" });
-} catch (err) {
-  if (isLangWatchHandledError(err)) {
-    console.error(err.code, err.message); // e.g. "query_scan_limit_exceeded"
-  }
-  throw err;
-}
-```
-
-## See also
-
-- [Query overview](/api-reference/query/overview): the generated endpoint
-  reference for `POST /api/v1/query`.
-- [Projection DSL & field catalog](/api-reference/traces/projection-dsl): the
-  other place LangWatch lets you shape a response server-side, for
-  `POST /api/traces/search`.
 
 ---
 
@@ -69407,12 +69125,43 @@ try {
 
 ---
 title: "Overview"
-description: "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query. One JSON-RPC 2.0 endpoint serves both methods: read the envelope guide before you call it, especially for how auth failures answer differently from a refused query."
+description: "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query."
 ---
 
 ## Intro
 
-Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query. One JSON-RPC 2.0 endpoint serves both methods: read the envelope guide before you call it, especially for how auth failures answer differently from a refused query.
+The Query API runs read-only LangWatchQL `SELECT` statements over your project's analytics datasets. `POST /api/v1/query` runs one statement. `GET /api/v1/query/schema` lists the datasets and columns your key can query.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/query` | Run one LangWatchQL statement. |
+| `GET` | `/api/v1/query/schema` | List queryable datasets, columns, and permission gates. |
+
+## Authentication
+
+Pass your LangWatch API key in the `X-Auth-Token` header.
+
+## Errors
+
+Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors).
+
+| Status | `type` | When |
+|--------|--------|------|
+| `400` | `bad_request` | The request body failed validation. |
+| `401` | `unauthenticated` | The API key is missing, invalid, or revoked. |
+| `403` | `permission_denied` | The key lacks the `analytics:view` permission. |
+| `422` | `unprocessable_entity` | The statement is valid but would scan more data than the key allows. |
+
+---
+
+# FILE: ./api-reference/query/run-a-langwatchql-query.mdx
+
+---
+title: "Run a LangWatchQL query"
+openapi: "POST /api/v1/query"
+---
 
 ---
 
@@ -69699,6 +69448,58 @@ A role that a role binding or a team assignment still points at cannot be delete
 title: "Update role"
 openapi: "PATCH /api/roles/{id}"
 ---
+
+---
+
+# FILE: ./api-reference/saved-evaluators/create-evaluator.mdx
+
+---
+title: "Create evaluator"
+openapi: "POST /api/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/saved-evaluators/get-evaluator.mdx
+
+---
+title: "Get evaluator"
+openapi: "GET /api/evaluators/{idOrSlug}"
+---
+
+---
+
+# FILE: ./api-reference/saved-evaluators/get-evaluators.mdx
+
+---
+title: "List evaluators"
+openapi: "GET /api/evaluators"
+---
+
+---
+
+# FILE: ./api-reference/saved-evaluators/overview.mdx
+
+---
+title: "Overview"
+description: "Manage saved evaluator configurations for your project"
+---
+
+## Intro
+
+The Saved Evaluators API lets you manage reusable evaluator configurations for your project. You can list, retrieve, and create saved evaluators that can then be used for online evaluations, guardrails, and experiments.
+
+Each saved evaluator stores a name, an evaluator type (e.g. `langevals/exact_match`), and its settings configuration.
+
+## Authentication
+
+To make a call to the Saved Evaluators API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
+
+#### Allowed Methods
+
+- `GET /api/evaluators` - List all saved evaluators for a project
+- `GET /api/evaluators/:idOrSlug` - Get a specific evaluator by ID or slug
+- `POST /api/evaluators` - Create a new saved evaluator
 
 ---
 
@@ -70527,6 +70328,15 @@ openapi: 'POST /api/trace/{id}/unshare'
 
 ---
 
+# FILE: ./api-reference/traces/get-thread-details.mdx
+
+---
+title: 'Get thread details'
+openapi: 'GET /api/thread/{id}'
+---
+
+---
+
 # FILE: ./api-reference/traces/get-trace.mdx
 
 ---
@@ -70831,6 +70641,150 @@ and **no** `schema` field. Existing integrations are unaffected.
 title: 'Search traces'
 openapi: 'POST /api/traces/search'
 ---
+
+---
+
+# FILE: ./api-reference/traces/update-metadata.mdx
+
+---
+title: 'Update trace metadata'
+description: 'Update metadata on an existing trace by trace ID. Injects a synthetic span through the standard ingestion pipeline carrying the new attributes.'
+---
+
+## `PATCH /api/traces/{traceId}/metadata`
+
+Update metadata on a trace after it has been created. Under the hood, this injects a synthetic span through the standard ingestion pipeline — traces remain immutable per the OpenTelemetry spec, and "updating" a trace means adding a span that carries the new attributes. This is useful for attaching labels, user identity, or custom metadata from backend processes that resolve after trace ingestion.
+
+### Authentication
+
+Pass your LangWatch API key in the `X-Auth-Token` header.
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `traceId` | string | Yes | The trace ID to update |
+
+### Request Body
+
+```json
+{
+  "metadata": {
+    "user_id": "user-123",
+    "customer_id": "cust-456",
+    "thread_id": "thread-789",
+    "labels": ["production", "reviewed"],
+    "custom_key": "custom_value",
+    "config": { "retries": 3, "timeout": 30 }
+  }
+}
+```
+
+### Metadata Fields
+
+#### Reserved Fields
+
+| Field | Type | Stored As | Description |
+|-------|------|-----------|-------------|
+| `user_id` | string | `langwatch.user_id` | User identity for analytics |
+| `customer_id` | string | `langwatch.customer_id` | Customer identity for analytics |
+| `thread_id` | string | `gen_ai.conversation.id` | Thread/conversation grouping |
+| `labels` | string[] | `langwatch.labels` | Trace labels for filtering |
+
+#### Custom Fields
+
+Any key not in the reserved list is stored as `metadata.{key}` in trace attributes. Custom fields support strings, numbers, booleans, string arrays, and JSON objects.
+
+### Merge Semantics
+
+- **Attribute accumulation**: the synthetic span's resource attributes are processed through the standard attribute accumulation pipeline — new keys are added, existing keys are updated by the last-write-wins rule
+- **Labels**: the labels array is set as-is on the span resource. If a later span also carries labels, last write wins
+- **Custom fields**: stored as `langwatch.metadata.*` resource attributes on the synthetic span
+
+### Size Limits
+
+| Limit | Value |
+|-------|-------|
+| Individual metadata value | 4 KB |
+| Total metadata payload | 32 KB |
+
+### Permissions
+
+Requires `traces:update` permission on the project.
+
+### Response
+
+```json
+{
+  "traceId": "trace-abc-123"
+}
+```
+
+### Error Responses
+
+| Status | Description |
+|--------|-------------|
+| 400 | Empty metadata object, oversized payload, or invalid field values |
+| 403 | Missing `traces:update` permission |
+
+### Example
+
+<CodeGroup>
+
+```bash cURL
+curl -X PATCH https://app.langwatch.ai/api/traces/trace-abc-123/metadata \
+  -H "X-Auth-Token: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "user_id": "user-456",
+      "labels": ["reviewed", "production"],
+      "environment": "staging"
+    }
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.patch(
+    "https://app.langwatch.ai/api/traces/trace-abc-123/metadata",
+    headers={"X-Auth-Token": "your-api-key"},
+    json={
+        "metadata": {
+            "user_id": "user-456",
+            "labels": ["reviewed", "production"],
+            "environment": "staging",
+        }
+    },
+)
+```
+
+```typescript TypeScript
+const response = await fetch(
+  "https://app.langwatch.ai/api/traces/trace-abc-123/metadata",
+  {
+    method: "PATCH",
+    headers: {
+      "X-Auth-Token": "your-api-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      metadata: {
+        user_id: "user-456",
+        labels: ["reviewed", "production"],
+        environment: "staging",
+      },
+    }),
+  }
+);
+```
+
+</CodeGroup>
+
+<Note>
+Custom metadata keys share the same namespace as metadata set via the SDK during trace ingestion. If both the SDK and this API set the same key, the last write wins.
+</Note>
 
 ---
 

@@ -10,75 +10,23 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
-/** The JSON-RPC 2.0 envelope every `/api/v1/query` request body carries. */
-type QueryRpcRequestBody = NonNullable<
-  paths["/api/v1/query"]["post"]["requestBody"]
->["content"]["application/json"];
-
-/** The JSON-RPC 2.0 envelope a `200` answers with — `result` is a union of the two methods' payloads. */
-type QueryRpcResponseBody =
+/** The typed columns/rows/statistics payload `POST /api/v1/query` answers with. */
+export type QueryRunResult =
   paths["/api/v1/query"]["post"]["responses"]["200"]["content"]["application/json"];
 
-/**
- * `result` on a `200` is a two-member union — one path serves both
- * `query.run` and `query.schema`, so the generated type cannot tell them
- * apart by method. Narrow by `Extract`ing on a property that exists on only
- * one member (`rows` for a run result, `datasets` for a schema result) rather
- * than hand-writing either shape: a contract change to either member's
- * required fields breaks this narrowing at compile time instead of drifting
- * silently, the same reason `ChartRunResult` derives from the generated
- * response rather than a copy.
- */
-type QueryRpcResult = QueryRpcResponseBody["result"];
-
-/** The typed columns/rows/statistics payload `query.run` answers with. */
-export type QueryRunResult = Extract<QueryRpcResult, { rows: unknown[] }>;
-
-/** The queryable dataset/column catalog `query.schema` answers with. */
-export type QuerySchemaResult = Extract<QueryRpcResult, { datasets: unknown[] }>;
+/** The queryable dataset/column catalog `GET /api/v1/query/schema` answers with. */
+export type QuerySchemaResult =
+  paths["/api/v1/query/schema"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /**
- * The parameters a `query.run` call sends. The generated request body types
- * `params` as `unknown` (LangWatchQL's per-method params aren't modelled in
- * the OpenAPI schema), so this is the SDK's own contract for what it sends —
- * not derived, because there is nothing typed to derive it from.
- */
-export interface QueryRunParams {
-  sql: string;
-  parameters?: Record<string, string | number | boolean | null>;
-  timeWindow?: { start: string; end: string };
-  granularitySeconds?: number;
-}
-
-/**
- * The canonical error envelope this API publishes, as the shared error reader
- * expects to find it: at the top level of the body.
+ * The body a query request sends.
  *
- * A refusal this endpoint's own handler raised is wrapped in JSON-RPC, so the
- * canonical envelope rides one level deeper as `error.data`. Lift it back out
- * so the reader sees the shape every other family answers with.
- *
- * Anything else is returned untouched: a bare canonical envelope (how auth
- * refusals arrive, raised before this endpoint's handler), a JSON-RPC error
- * with no canonical `data`, a proxy's HTML, a truncated body. Unwrapping is
- * strictly additive — it never discards a body it does not recognise.
+ * Derived from the generated request body so a contract change to what the
+ * endpoint accepts breaks this at compile time rather than drifting silently.
  */
-const canonicalBody = (error: unknown): unknown => {
-  if (typeof error !== "object" || error === null) return error;
-  const rpcError = (error as { error?: unknown }).error;
-  if (typeof rpcError !== "object" || rpcError === null) return error;
-  const data = (rpcError as { data?: unknown }).data;
-  // Only a canonical envelope has a string `code`; a JSON-RPC error's own
-  // `code` is a number, and `data` may be absent or carry something else.
-  if (
-    typeof data !== "object" ||
-    data === null ||
-    typeof (data as { code?: unknown }).code !== "string"
-  ) {
-    return error;
-  }
-  return { error: data };
-};
+export type QueryRunParams = NonNullable<
+  paths["/api/v1/query"]["post"]["requestBody"]
+>["content"]["application/json"];
 
 export class QueryApiError extends Error {
   constructor(
@@ -98,12 +46,13 @@ export class QueryApiError extends Error {
 }
 
 /**
- * Typed client for the LangWatchQL JSON-RPC door (`POST /api/v1/query`) —
- * the same governed query surface the workbench and saved charts run
- * through, exposed directly rather than only via a saved chart's statement.
+ * Typed client for the LangWatchQL query doors (`POST /api/v1/query` and
+ * `GET /api/v1/query/schema`) — the same governed query surface the workbench
+ * and saved charts run through, exposed directly rather than only via a saved
+ * chart's statement.
  *
- * Unlike the chart family, this route carries no `projectId` in its path or
- * body — the generated operation declares `path?: never`. Project scope is
+ * Unlike the chart family, these routes carry no `projectId` in their path or
+ * body — the generated operations declare `path?: never`. Project scope is
  * resolved once, when the underlying `LangwatchApiClient` is built
  * (`createLangWatchApiClient` bakes `scopedProjectId() ?? LANGWATCH_PROJECT_ID`
  * into that client's `Authorization`/`Basic` header at construction time —
@@ -130,44 +79,19 @@ export class QueryApiService {
     response?: Response,
   ): never {
     const status = response?.status ?? extractStatusFromResponse(error);
-    // The shared reader (`throwIfHandledError`) decides "did the platform NAME
-    // this failure?" by looking for the canonical envelope `{error:{code,...}}`
-    // at the TOP level of the body — the shape every REST family answers with.
-    // This endpoint is the one that speaks JSON-RPC, so a refusal its own
-    // handler raised arrives one level deeper, as `error.data`. Handed the raw
-    // body, the reader finds `error.code = -32000` (a JSON-RPC number, not a
-    // canonical code), decides the failure is unnamed, and the caller loses the
-    // code, the trace id and the platform's sentence — every 400/422 degrading
-    // to a generic error.
-    //
-    // So unwrap the transport here, in the one service that speaks it, rather
-    // than teaching the shared reader about JSON-RPC — it is used by every
-    // other family and must keep reading exactly one shape.
-    //
-    // Auth refusals (401/403) are raised BEFORE this endpoint's handler and so
-    // arrive already unwrapped, as the bare canonical envelope. `canonicalBody`
-    // passes those through untouched.
-    const canonical = canonicalBody(error);
     const message = formatApiErrorForOperation({
       operation: operation,
-      error: canonical,
+      error,
       options: { status },
     });
     // A failure the platform NAMED (a code, a status, a meta bag) is raised as
     // the typed `LangWatchHandledError`, so the CLI's error output carries the
-    // real code instead of degrading everything to `network_error`.
-    throwIfHandledError({ operation, error: canonical, response, message });
+    // real code instead of degrading everything to `network_error`. The
+    // canonical envelope arrives at the top level of the body here, exactly
+    // where the shared reader looks — this family publishes the same error
+    // shape as every other one.
+    throwIfHandledError({ operation, error, response, message });
     throw new QueryApiError(message, operation, error, status);
-  }
-
-  /**
-   * A JSON-RPC id for one call. Only needs to correlate a request with its
-   * own response — not global uniqueness — so a per-call counter is enough
-   * and stays deterministic for tests.
-   */
-  #nextId = 0;
-  private requestId(): number {
-    return ++this.#nextId;
   }
 
   /**
@@ -176,22 +100,12 @@ export class QueryApiService {
    * diagnostics, scoped to the caller's project.
    */
   async query(params: QueryRunParams): Promise<QueryRunResult> {
-    const body: QueryRpcRequestBody = {
-      jsonrpc: "2.0",
-      id: this.requestId(),
-      method: "query.run",
-      params,
-    };
     const { data, error, response } = await this.apiClient.POST(
       "/api/v1/query",
-      { body },
+      { body: params },
     );
     if (error) this.handleApiError("run query", error, response);
-    // `result` is typed as the two-method union statically; which member it
-    // actually is depends on the `method` we just sent, a runtime fact the
-    // type system cannot see through the string literal. Narrow with the
-    // `Extract` alias above rather than a hand-written shape.
-    return data.result as QueryRunResult;
+    return data;
   }
 
   /**
@@ -201,16 +115,11 @@ export class QueryApiService {
    * partition-pruning time column, freshness and a runnable example query.
    */
   async schema(): Promise<QuerySchemaResult> {
-    const body: QueryRpcRequestBody = {
-      jsonrpc: "2.0",
-      id: this.requestId(),
-      method: "query.schema",
-    };
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/query",
-      { body },
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/query/schema",
+      {},
     );
     if (error) this.handleApiError("discover query schema", error, response);
-    return data.result as QuerySchemaResult;
+    return data;
   }
 }

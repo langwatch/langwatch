@@ -5,24 +5,22 @@
  * This is the suite `analytics-sql/__tests__/lwqlRestApi.integration.test.ts`
  * used to carry, ported here because the door it drove no longer exists:
  * issue #7565 removed the old per-protocol REST endpoints in favor of this
- * single JSON-RPC one. The proofs themselves are unchanged — every request
+ * one. The proofs themselves are unchanged — every request
  * still goes through the shipped Hono app against a real ClickHouse 25.10
  * container carrying the shipped migrations, provisioning and views, and
  * nothing between the request and the database is stubbed except the
  * executor's connection details, which is the only thing a deployment would
  * supply. Two things changed with the transport:
  *
- *  - **The envelope.** A request is JSON-RPC (`{jsonrpc, id, method, params}`)
- *    and a success reply's payload sits under `result`. Refusals split by
- *    status class: 401/403 carry this app's canonical error body unwrapped at
- *    the top level (`body.error.code`); 400/422/500 wrap it one level deeper,
- *    at `body.error.data.error.code`, because the family's own error handler
- *    puts the canonical body inside the JSON-RPC failure rather than
- *    replacing it. See `./queryRpcApi.integration.test.ts` for where that
- *    contract is proved directly.
+ *  - **The body.** A request body IS the query (`{sql, parameters?, ...}`) and
+ *    a success reply IS the result — nothing is wrapped. Every refusal, at
+ *    every status, carries this app's canonical error body at the top level
+ *    (`body.error.code`), the same shape every other REST family answers with.
+ *    See `./queryRestApi.integration.test.ts` for where that contract is
+ *    proved directly.
  *  - **No project id anywhere.** The old routes carried `:projectId` in the
  *    path but the tenant always came from the credential; this family has no
- *    project id in its one path at all, so the "another project named in the
+ *    project id in its paths at all, so the "another project named in the
  *    path" cases from the old suite have nothing left to prove and are
  *    dropped rather than reinterpreted.
  *
@@ -44,7 +42,7 @@
  *    something to fail on.
  *
  * @see specs/analytics/lwql-api.feature
- * @see ./queryRpcApi.integration.test.ts — the envelope contract this suite relies on but does not re-prove
+ * @see ./queryRestApi.integration.test.ts — the request/error contract this suite relies on but does not re-prove
  * @see ~/server/analytics/lwql — the service under test
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
@@ -411,7 +409,7 @@ async function seedTenant({
   });
 }
 
-describe("given the /api/v1/query JSON-RPC family's service, isolation and policy proofs", () => {
+describe("given the /api/v1/query REST family's service, isolation and policy proofs", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
   let organization: Organization;
@@ -423,92 +421,67 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
   let database: string;
   let facts: string;
 
-  /** One path for every method — that is the transport's whole shape. */
-  const rpcPath = "/api/v1/query";
+  /** The two paths this family serves. */
+  const runPath = "/api/v1/query";
+  const schemaPath = "/api/v1/query/schema";
+
+  const authHeaders = (token?: string | null) => ({
+    "Content-Type": "application/json",
+    ...(token === null ? {} : { "X-Auth-Token": token ?? "" }),
+  });
 
   const post = (body: unknown, options: { token?: string | null } = {}) =>
-    app.request(rpcPath, {
+    app.request(runPath, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.token === null
-          ? {}
-          : { "X-Auth-Token": options.token ?? "" }),
-      },
+      headers: authHeaders(options.token),
       body: typeof body === "string" ? body : JSON.stringify(body),
     });
 
-  const call = (
-    method: string,
-    params?: unknown,
-    options: { token?: string | null; id?: unknown } = {},
-  ) =>
-    post(
-      {
-        jsonrpc: "2.0",
-        id: options.id ?? 1,
-        method,
-        ...(params === undefined ? {} : { params }),
-      },
-      options,
-    );
-
-  /** Calls a method as one project, asserting the reply was a success. */
-  const succeed = async (
-    project: Project,
-    method: string,
-    params?: unknown,
-  ) => {
-    const response = await call(method, params, { token: project.apiKey });
+  /** Reads a response as a success, asserting the status before returning it. */
+  const succeed = async (response: Response, what: string) => {
     const body = (await response.json()) as Record<string, any>;
     if (response.status !== 200) {
-      throw new Error(`${method} failed: ${JSON.stringify(body)}`);
+      throw new Error(`${what} failed: ${JSON.stringify(body)}`);
     }
     if (body.error !== undefined) {
-      throw new Error(`${method} answered an error`);
+      throw new Error(`${what} answered an error`);
     }
-    return body.result as Record<string, any>;
+    return body as Record<string, any>;
   };
 
   /**
-   * Runs SQL through `query.run` and asserts it succeeded before returning
-   * the result. Extended past the pattern file's two-argument helper because
-   * this suite's parameterized-query and time-window cases need to bind
+   * Runs SQL and asserts it succeeded before returning the result. Extended
+   * past the pattern file's two-argument helper because this suite's
+   * parameterized-query and time-window cases need to bind
    * `parameters`/`timeWindow`/`granularitySeconds` — the old suite's `run`
    * took a positional `parameters` argument for the same reason.
    */
+  /** Runs a whole request body as one project, asserting it answered. */
+  const runBody = async (project: Project, body: Record<string, unknown>) =>
+    succeed(await post(body, { token: project.apiKey }), "POST /api/v1/query");
+
   const run = (
     project: Project,
     sql: string,
     parameters?: Record<string, unknown>,
-  ) =>
-    succeed(project, "query.run", {
-      sql,
-      ...(parameters ? { parameters } : {}),
-    });
+  ) => runBody(project, { sql, ...(parameters ? { parameters } : {}) });
 
   /**
-   * Runs SQL expected to be refused, and returns the *canonical* error body —
-   * unwrapped for a 401/403, unwrapped from `error.data` for a 400/422/500 —
-   * so every call site below reads `code`/`meta` the same way regardless of
-   * which status answered it.
+   * Runs SQL expected to be refused, and returns the canonical error body.
+   *
+   * One read for every status: this family answers the canonical envelope at
+   * the top level whichever layer refused, so a 401 and a 422 are read
+   * identically.
    */
   const refuse = async (project: Project, sql: string) => {
-    const response = await call(
-      "query.run",
-      { sql },
-      { token: project.apiKey },
-    );
+    const response = await post({ sql }, { token: project.apiKey });
     const body = (await response.json()) as Record<string, any>;
     if (response.status < 400) {
       throw new Error(
         `expected a refusal, got ${response.status}: ${JSON.stringify(body)}`,
       );
     }
-    const canonical =
-      response.status === 401 || response.status === 403
-        ? body.error
-        : body.error?.data?.error;
+    const canonical = body.error;
     if (canonical === undefined) {
       throw new Error(
         `no canonical error body found in: ${JSON.stringify(body)}`,
@@ -517,8 +490,15 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
     return canonical as Record<string, any>;
   };
 
-  /** Reads `query.schema` as one project, asserting it answered. */
-  const readSchema = (project: Project) => succeed(project, "query.schema");
+  /** Reads the queryable schema as one project, asserting it answered. */
+  const readSchema = async (project: Project) =>
+    succeed(
+      await app.request(schemaPath, {
+        method: "GET",
+        headers: authHeaders(project.apiKey),
+      }),
+      "GET /api/v1/query/schema",
+    );
 
   /**
    * Puts the process-wide service back to what a deployment would build.
@@ -849,7 +829,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
 
     /** Rows a period-aware statement returns for one window. */
     const countFor = async (timeWindow: { start: Date; end: Date }) => {
-      const result = await succeed(openProject, "query.run", {
+      const result = await runBody(openProject, {
         sql: PERIOD_SQL(),
         timeWindow,
       });
@@ -910,8 +890,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
 
     /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
     it("refuses a request that pins the window under its own parameters", async () => {
-      const response = await call(
-        "query.run",
+      const response = await post(
         {
           sql: PERIOD_SQL(),
           parameters: { period_start: "2020-01-01 00:00:00" },
@@ -922,9 +901,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       const body = (await response.json()) as Record<string, any>;
 
       expect(response.status).toBe(400);
-      expect(body.error.data?.error?.code).toBe(
-        "lwql_reserved_parameter_supplied",
-      );
+      expect(body.error?.code).toBe("lwql_reserved_parameter_supplied");
     });
 
     /** @scenario "A statement with no period parameters runs, and says so" */
@@ -1005,8 +982,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
 
     /** @scenario "Tenant scope derives exclusively from authenticated server context" */
     it("ignores a tenant named in the request body", async () => {
-      const response = await call(
-        "query.run",
+      const response = await post(
         {
           sql: `SELECT DISTINCT TenantId FROM ${database}.traces`,
           projectId: gatedProject.id,
@@ -1016,7 +992,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       );
       const body = (await response.json()) as any;
       expect(response.status, JSON.stringify(body)).toBe(200);
-      expect(body.result.rows.map((row: any) => row.TenantId)).toEqual([
+      expect(body.rows.map((row: any) => row.TenantId)).toEqual([
         openProject.id,
       ]);
     });
@@ -1121,11 +1097,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       // The same queries for a caller who holds the permission, so the
       // refusals are about the gate rather than about the SQL.
       for (const sql of positions(database)) {
-        const response = await call(
-          "query.run",
-          { sql },
-          { token: openProject.apiKey },
-        );
+        const response = await post({ sql }, { token: openProject.apiKey });
         expect(response.status, sql).toBe(200);
       }
     });
@@ -1137,10 +1109,9 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
         refused.meta.violations.map((violation: any) => violation.code),
       ).toContain("WILDCARD_NOT_ALLOWED");
 
-      expect(
-        (await call("query.run", { sql }, { token: openProject.apiKey }))
-          .status,
-      ).toBe(200);
+      expect((await post({ sql }, { token: openProject.apiKey })).status).toBe(
+        200,
+      );
     });
 
     it("still answers ungated questions for the gated caller", async () => {
@@ -1152,7 +1123,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
     });
   });
 
-  describe("when query.schema is called", () => {
+  describe("when the schema door is called", () => {
     /** @scenario "The schema endpoint names which permission unlocks each gated column" */
     it("names the permission that unlocks each withheld column, per caller", async () => {
       const permitted = await readSchema(openProject);
@@ -1195,8 +1166,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       const schema = await readSchema(gatedProject);
 
       for (const dataset of schema.datasets) {
-        const response = await call(
-          "query.run",
+        const response = await post(
           { sql: dataset.exampleSql },
           { token: gatedProject.apiKey },
         );
@@ -1498,8 +1468,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
 
     /** @scenario "A parameterized query missing a bound value is refused before execution" */
     it("refuses before execution when a declared parameter has no value", async () => {
-      const response = await call(
-        "query.run",
+      const response = await post(
         {
           sql: parameterized,
           parameters: { name: "checkout" },
@@ -1508,8 +1477,8 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
       );
       const body = (await response.json()) as any;
       expect(response.status).toBe(400);
-      expect(body.error.data?.error?.code).toBe("lwql_parameter_missing");
-      expect(body.error.data?.error?.meta?.parameters).toEqual(["floor"]);
+      expect(body.error?.code).toBe("lwql_parameter_missing");
+      expect(body.error?.meta?.parameters).toEqual(["floor"]);
     });
   });
 
@@ -1747,8 +1716,7 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
 
       const bodies = await Promise.all(
         probes.map(async (probe) => {
-          const response = await call(
-            "query.run",
+          const response = await post(
             {
               sql: probe.sql,
               ...(probe.parameters ? { parameters: probe.parameters } : {}),
@@ -1820,15 +1788,13 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
     /**
      * The old suite proved this by requesting two per-protocol REST paths
      * (`.../analytics/query/postgres`, `.../analytics/query/postgresql`) and
-     * finding neither routed anywhere. This door has no per-protocol paths at
-     * all — one URL serves both `query.run` and `query.schema` — so there is
-     * no sibling path left to probe for absence. What still carries the
-     * scenario's claim: the old paths really are gone rather than moved
-     * (proven against this app, which no longer mounts the routes that used
-     * to answer them), and the one door this API does publish has no method
-     * that executes SQL against PostgreSQL natively — `query.run` always
-     * executes through the LangWatchQL/ClickHouse surface, never a raw
-     * PostgreSQL connection, whatever name a caller gives the method.
+     * finding neither routed anywhere. This family publishes no per-protocol
+     * path at all, so what still carries the scenario's claim is that the old
+     * paths really are gone rather than moved (proven against this app, which
+     * no longer mounts the routes that used to answer them), and that no
+     * postgres-flavored sibling was minted alongside the two doors it does
+     * publish — a query always executes through the LangWatchQL/ClickHouse
+     * surface, never a raw PostgreSQL connection.
      */
     /** @scenario "No PostgreSQL native-SQL execution endpoint exists" */
     it("finds none", async () => {
@@ -1837,6 +1803,10 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
         `/api/v1/projects/${openProject.id}/analytics/query/postgresql`,
         `/api/v1/analytics/query/postgres`,
         `/api/v1/analytics/query/postgresql`,
+        // The sibling a postgres door would most plausibly be minted as, had
+        // one been added beside this family's own two paths.
+        `/api/v1/query/postgres`,
+        `/api/v1/query/postgresql`,
       ]) {
         const response = await app.request(path, {
           method: "POST",
@@ -1847,23 +1817,6 @@ describe("given the /api/v1/query JSON-RPC family's service, isolation and polic
           body: JSON.stringify({ sql: "SELECT 1" }),
         });
         expect(response.status, path).toBe(404);
-      }
-
-      // The one door's method vocabulary is enumerated
-      // ({@link QUERY_RPC_METHODS}), so a postgres-flavored method name is
-      // refused as unknown rather than dispatched to anything — there is no
-      // `query.run.postgres` or `query.runPostgres` to find.
-      for (const method of ["query.run.postgres", "query.runPostgres"]) {
-        const response = await call(
-          method,
-          { sql: "SELECT 1" },
-          {
-            token: openProject.apiKey,
-          },
-        );
-        const body = (await response.json()) as any;
-        expect(response.status, method).toBe(400);
-        expect(body.error.code, method).toBe(-32600);
       }
     });
   });

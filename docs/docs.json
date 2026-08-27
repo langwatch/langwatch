@@ -1356,8 +1356,8 @@
             "group": "Query",
             "pages": [
               "api-reference/query/overview",
-              "api-reference/query/call-a-langwatchql-method-json-rpc-2-0",
-              "api-reference/query/json-rpc-envelope"
+              "api-reference/query/discover-the-queryable-langwatchql-schem",
+              "api-reference/query/run-a-langwatchql-query"
             ]
           },
           {

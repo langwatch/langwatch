@@ -176,8 +176,14 @@ describe("given the saved workbench chart REST endpoints", () => {
     method?: string;
     body?: unknown;
     auth: Record<string, string>;
-    /** The Hono instance to route through. Defaults to this family's own app. */
-    app?: typeof app;
+    /**
+     * The Hono instance to route through. Defaults to this family's own app.
+     *
+     * Structural rather than `typeof app`: a call site also passes
+     * `queryApp`, whose route generic differs, and `.request()` is the only
+     * member used below regardless of which app is routed through.
+     */
+    app?: Pick<typeof app, "request">;
   }) =>
     (options.app ?? app).request(options.path, {
       method: options.method ?? "GET",
@@ -491,16 +497,11 @@ describe("given the saved workbench chart REST endpoints", () => {
         path: "/api/v1/query",
         method: "POST",
         auth: asProject(gatedProject),
-        body: {
-          jsonrpc: "2.0",
-          id: 1,
-          method: "query.run",
-          params: { sql: GATED_SQL },
-        },
+        body: { sql: GATED_SQL },
       });
 
       expect(saving.error.code).toBe("lwql_not_permitted");
-      expect(running.error.data.error.code).toBe(saving.error.code);
+      expect(running.error.code).toBe(saving.error.code);
       expect(await listedIds(gatedProject)).toEqual([]);
 
       // The control: the same statement, a key whose protections do not
@@ -1167,12 +1168,7 @@ describe("given the saved workbench chart REST endpoints", () => {
           path: "/api/v1/query",
           method: "POST",
           auth: asProject(gatedProject),
-          body: {
-            jsonrpc: "2.0",
-            id: 1,
-            method: "query.run",
-            params: { sql: GATED_SQL },
-          },
+          body: { sql: GATED_SQL },
         });
 
         // The application's own save path.
@@ -1193,7 +1189,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         }
 
         expect(viaCli.error.code).toBe("lwql_not_permitted");
-        expect(viaRest.error.data.error.code).toBe(viaCli.error.code);
+        expect(viaRest.error.code).toBe(viaCli.error.code);
         expect(viaApplication).toBe(viaCli.error.code);
       });
     });
