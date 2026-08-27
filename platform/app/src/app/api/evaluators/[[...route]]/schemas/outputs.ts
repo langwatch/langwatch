@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 
 const evaluatorFieldSchema = z.object({

@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  API_KEYS_AND_SECRETS_DETECTION,
+  AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
+  codeEvaluatorIdFromCheckType,
   defaultCodeEvaluatorConfig,
   evaluatorDisplayName,
   evaluatorSchema,
   evaluatorTypeSchema,
   getEvaluatorDefaultSettings,
+  getEvaluatorDefinitions,
+  isNativeEvaluatorType,
+  isCodeEvaluatorCheckType,
 } from "../src";
 
 describe("evaluator contract", () => {
@@ -62,5 +68,20 @@ describe("evaluator contract", () => {
       defaultCodeEvaluatorConfig,
     );
     expect(evaluatorDisplayName("OpenAI Moderation")).toBe("Moderation");
+    expect(isCodeEvaluatorCheckType("code/evaluator_abc")).toBe(true);
+    expect(codeEvaluatorIdFromCheckType("code/evaluator_abc")).toBe("evaluator_abc");
+    expect(codeEvaluatorIdFromCheckType("workflow")).toBeUndefined();
+  });
+
+  it("merges native and generated evaluators into one catalogue", () => {
+    const native = AVAILABLE_EVALUATORS[API_KEYS_AND_SECRETS_DETECTION];
+
+    expect(native.category).toBe("safety");
+    expect(native.isGuardrail).toBe(true);
+    expect(AVAILABLE_EVALUATORS["presidio/pii_detection"]).toBeDefined();
+    expect(AVAILABLE_EVALUATORS["langevals/exact_match"]).toBeDefined();
+    expect(isNativeEvaluatorType(API_KEYS_AND_SECRETS_DETECTION)).toBe(true);
+    expect(isNativeEvaluatorType("presidio/pii_detection")).toBe(false);
+    expect(getEvaluatorDefinitions(API_KEYS_AND_SECRETS_DETECTION)).toBe(native);
   });
 });

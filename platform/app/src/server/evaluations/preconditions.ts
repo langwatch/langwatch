@@ -14,7 +14,7 @@ import type {
   RAGSpan,
   Span,
 } from "../tracer/types";
-import { getEvaluatorDefinitions } from "./getEvaluator";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { CheckPreconditionRule, CheckPreconditions } from "./types";
 
 export type { PreconditionTraceData } from "../filters/precondition-matchers";

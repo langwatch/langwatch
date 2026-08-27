@@ -83,7 +83,7 @@ export const monitorSummarySchema = z
   .strict();
 export type MonitorSummary = z.infer<typeof monitorSummarySchema>;
 
-const monitorSettingsSchema = z.record(z.string(), z.json());
+export const monitorSettingsSchema = z.record(z.string(), z.json());
 
 export const monitorCreateInputSchema = z
   .object({

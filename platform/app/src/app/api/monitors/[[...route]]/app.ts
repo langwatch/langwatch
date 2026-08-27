@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
+import { monitorSettingsSchema } from "@langwatch/monitor-contract";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
@@ -303,6 +304,8 @@ secured.access(requires("evaluations:update")).patch(
       return c.json({ error: "Monitor not found" }, 404);
     }
 
+    const existingParameters = monitorSettingsSchema.safeParse(existing.parameters);
+
     const monitor = await c.app.monitors.update({
       id,
       projectId: project.id,
@@ -310,7 +313,7 @@ secured.access(requires("evaluations:update")).patch(
       checkType: body.checkType ?? existing.checkType,
       executionMode: body.executionMode ?? existing.executionMode,
       preconditions: body.preconditions ?? existing.preconditions,
-      parameters: body.parameters ?? existing.parameters,
+      parameters: body.parameters ?? (existingParameters.success ? existingParameters.data : {}),
       mappings: body.mappings !== undefined ? body.mappings : existing.mappings,
       sample: body.sample ?? existing.sample,
       enabled: body.enabled,

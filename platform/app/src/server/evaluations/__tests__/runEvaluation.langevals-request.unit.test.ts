@@ -24,17 +24,19 @@ vi.mock("~/server/langevals/stagedFetch", () => ({
   stagedLangevalsFetch: stagedLangevalsFetchMock,
 }));
 
-vi.mock("~/server/evaluations/native/registry", async (importOriginal) => {
+vi.mock("~/runtime/app/features/evaluator-native-observability.adapter", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("~/server/evaluations/native/registry")>();
+    await importOriginal<
+      typeof import("~/runtime/app/features/evaluator-native-observability.adapter")
+    >();
   return {
     ...actual,
     augmentEvaluationResult: augmentEvaluationResultMock,
   };
 });
 
-vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/evaluations/evaluators")>();
+vi.mock("@langwatch/evaluator-contract", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/evaluator-contract")>();
   return {
     ...actual,
     AVAILABLE_EVALUATORS: {
@@ -48,7 +50,7 @@ vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
   };
 });
 
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { Trace } from "~/server/tracer/types";
 import { runEvaluation } from "../runEvaluation";
 

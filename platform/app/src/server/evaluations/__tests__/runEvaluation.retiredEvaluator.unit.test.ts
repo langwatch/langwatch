@@ -17,7 +17,7 @@ vi.mock("~/server/langevals/stagedFetch", () => ({
 }));
 
 import { HandledError } from "@langwatch/handled-error";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { runEvaluation } from "../runEvaluation";
 
 // A slug removed from the catalog. Cast past the union, which by construction

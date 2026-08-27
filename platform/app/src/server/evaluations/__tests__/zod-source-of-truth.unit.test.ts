@@ -5,7 +5,7 @@ import {
   AVAILABLE_EVALUATORS,
   evaluatorsSchema,
   evaluatorTypesSchema,
-} from "~/server/evaluations/evaluators.generated";
+} from "@langwatch/evaluator-contract";
 import {
   chatRichContentSchema,
   collectorRESTParamsSchema,

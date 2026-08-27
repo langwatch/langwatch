@@ -19,7 +19,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { describe, expect, it } from "vitest";
-import { AVAILABLE_EVALUATORS } from "../evaluators";
+import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 
 const repoRoot = path.resolve(__dirname, "../../../../../..");
 

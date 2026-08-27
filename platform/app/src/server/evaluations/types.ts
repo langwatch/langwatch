@@ -4,7 +4,7 @@ import type {
   EvaluationResult,
   EvaluationResultError,
   EvaluationResultSkipped,
-} from "./evaluators.generated";
+} from "@langwatch/evaluator-contract";
 
 // ---------------------------------------------------------------------------
 // Precondition schemas (Zod-first, types inferred)

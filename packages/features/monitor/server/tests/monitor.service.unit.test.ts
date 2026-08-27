@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import { EvaluatorService } from "@langwatch/evaluator-contract";
 import {
   MonitorEvaluatorRequiredError,
   MonitorNotFoundError,
@@ -79,10 +79,68 @@ class FakeRepository extends MonitorRepository {
   }
 }
 
-const evaluator = { getById: vi.fn(async () => ({})) } as unknown as Pick<
-  EvaluatorService,
-  "getById"
->;
+class FakeEvaluatorService extends EvaluatorService {
+  async executeCode(): Promise<never> {
+    throw new Error("unused");
+  }
+  getById = vi.fn<EvaluatorService["getById"]>();
+  async tryGetById(): Promise<never> {
+    throw new Error("unused");
+  }
+  async tryGetByIdWithFields(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getByIdWithFields(): Promise<never> {
+    throw new Error("unused");
+  }
+  async tryGetBySlug(): Promise<never> {
+    throw new Error("unused");
+  }
+  async tryGetByWorkflow(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getBySlug(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getAll(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getAllWithFields(): Promise<never> {
+    throw new Error("unused");
+  }
+  async create(): Promise<never> {
+    throw new Error("unused");
+  }
+  async createWithDefaults(): Promise<never> {
+    throw new Error("unused");
+  }
+  async update(): Promise<never> {
+    throw new Error("unused");
+  }
+  async archive(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getWorkflowFields(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getCopies(): Promise<never> {
+    throw new Error("unused");
+  }
+  async pushToCopies(): Promise<never> {
+    throw new Error("unused");
+  }
+  async syncFromSource(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getCopySource(): Promise<never> {
+    throw new Error("unused");
+  }
+  async getHistory(): Promise<never> {
+    throw new Error("unused");
+  }
+}
+
+const evaluator = new FakeEvaluatorService();
 
 describe("MonitorService", () => {
   it("requires an evaluator on create", async () => {

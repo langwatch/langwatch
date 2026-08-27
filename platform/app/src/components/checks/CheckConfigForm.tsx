@@ -27,6 +27,10 @@ import { slugify } from "~/utils/slugify";
 import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
+  DEFAULT_EMBEDDINGS_MODEL,
+  DEFAULT_MODEL,
+} from "../../utils/constants";
+import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
@@ -237,10 +241,17 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(evaluatorDefinition, {
-        defaultModel: resolvedDefaultModel.data?.model ?? null,
-        embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
-      }),
+      getEvaluatorDefaultSettings(
+        evaluatorDefinition,
+        {
+          defaultModel: resolvedDefaultModel.data?.model ?? null,
+          embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+        },
+        {
+          defaultModel: DEFAULT_MODEL,
+          embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
+        },
+      ),
       "settings",
     );
   }, [

@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -13,10 +13,6 @@ import {
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
 } from "../../middleware";
-import {
-  type EvaluatorServiceMiddlewareVariables,
-  evaluatorServiceMiddleware,
-} from "../../middleware/evaluator-service";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import {
@@ -33,22 +29,19 @@ const logger = createLogger("langwatch:api:evaluators");
 
 patchZodOpenapi();
 
-export type EvaluatorAppVariables = EvaluatorServiceMiddlewareVariables &
-  AuthMiddlewareVariables &
+export type EvaluatorAppVariables = AuthMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
 export function registerEvaluatorRoutes(
   secured: SecuredApp<{ Variables: EvaluatorAppVariables }>,
 ): void {
-  // organizationMiddleware + evaluatorServiceMiddleware run AFTER the access
-  // chain (which authenticates and sets `project`), so they are applied
-  // per-route rather than app-wide.
+  // organizationMiddleware runs after the access chain authenticates and sets
+  // `project`, so it is applied per route rather than app-wide.
 
   // Get all evaluators
   secured.access(requires("evaluations:view")).get(
     "/",
     organizationMiddleware,
-    evaluatorServiceMiddleware,
     describeRoute({
       description: "Get all evaluators for a project",
       responses: {
@@ -64,7 +57,7 @@ export function registerEvaluatorRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("evaluatorService");
+      const service = c.app.evaluators;
       const project = c.get("project");
 
       logger.info({ projectId: project.id }, "Getting all evaluators for project");
@@ -92,7 +85,6 @@ export function registerEvaluatorRoutes(
   secured.access(requires("evaluations:view")).get(
     "/:idOrSlug{.+}",
     organizationMiddleware,
-    evaluatorServiceMiddleware,
     describeRoute({
       description: "Get a specific evaluator by ID or slug",
       responses: {
@@ -114,7 +106,7 @@ export function registerEvaluatorRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("evaluatorService");
+      const service = c.app.evaluators;
       const project = c.get("project");
       const { idOrSlug } = c.req.param();
 
@@ -162,7 +154,6 @@ export function registerEvaluatorRoutes(
   secured.access(requires("evaluations:create")).post(
     "/",
     organizationMiddleware,
-    evaluatorServiceMiddleware,
     describeRoute({
       description: "Create a new evaluator",
       responses: {
@@ -179,7 +170,7 @@ export function registerEvaluatorRoutes(
     }),
     zValidator("json", createEvaluatorInputSchema),
     async (c) => {
-      const service = c.get("evaluatorService");
+      const service = c.app.evaluators;
       const project = c.get("project");
       const data = c.req.valid("json");
 
@@ -242,7 +233,6 @@ export function registerEvaluatorRoutes(
   secured.access(requires("evaluations:update")).put(
     "/:id",
     organizationMiddleware,
-    evaluatorServiceMiddleware,
     describeRoute({
       description: "Update an existing evaluator",
       responses: {
@@ -271,7 +261,7 @@ export function registerEvaluatorRoutes(
     }),
     zValidator("json", updateEvaluatorInputSchema),
     async (c) => {
-      const service = c.get("evaluatorService");
+      const service = c.app.evaluators;
       const project = c.get("project");
       const { id } = c.req.param();
       const data = c.req.valid("json");
@@ -349,7 +339,6 @@ export function registerEvaluatorRoutes(
   secured.access(requires("evaluations:manage")).delete(
     "/:id",
     organizationMiddleware,
-    evaluatorServiceMiddleware,
     describeRoute({
       description: "Archive (soft-delete) an evaluator",
       responses: {
@@ -371,7 +360,7 @@ export function registerEvaluatorRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("evaluatorService");
+      const service = c.app.evaluators;
       const project = c.get("project");
       const { id } = c.req.param();
 

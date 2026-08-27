@@ -1,6 +1,7 @@
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
+  type CodeEvaluatorExecutionInput,
   evaluatorConfigSchema,
   evaluatorTypeSchema,
   fieldType,
@@ -10,6 +11,7 @@ import {
   type EvaluatorCreateInput,
   type EvaluatorField,
   type EvaluatorHistoryEntry,
+  type EvaluatorResultAugmentationInput,
   EvaluatorService as EvaluatorServiceContract,
   type EvaluatorUpdateInput,
   type EvaluatorWithFields,
@@ -20,25 +22,135 @@ import {
   EvaluatorSourceNotFoundError,
   EvaluatorWorkflowAlreadyAssignedError,
   type EvaluatorCopy,
+  type SingleEvaluationResult,
+  type NativeEvaluatorExecutionInput,
 } from "@langwatch/evaluator-contract";
-import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { EvaluatorAuditLogPort } from "../ports/evaluator.port";
+import type { StudioClientEvent, WorkflowService } from "@langwatch/workflow-contract";
+import type { EvaluatorAuditLogPort, EvaluatorCodeExecutionPort } from "../ports/evaluator.port";
 import type { EvaluatorRepository } from "../repositories/evaluator.repository";
+import { EvaluatorCodeService } from "./evaluator-code.service";
+import { EvaluatorNativeService } from "./evaluator-native.service";
 
 export type EvaluatorServiceOptions = {
   repository: EvaluatorRepository;
   workflows: WorkflowService;
   auditLog?: EvaluatorAuditLogPort;
   fallbackModels?: { defaultModel: string; embeddingsModel: string };
+  codeExecution: EvaluatorCodeExecutionPort;
+  generateId: () => string;
 };
 
 export class EvaluatorService extends EvaluatorServiceContract {
+  private readonly code = EvaluatorCodeService.create();
+  private readonly native = EvaluatorNativeService.create();
+
   static create(options: EvaluatorServiceOptions): EvaluatorService {
     return new EvaluatorService(options);
   }
 
   private constructor(private readonly options: EvaluatorServiceOptions) {
     super();
+  }
+
+  executeNative(input: NativeEvaluatorExecutionInput): Promise<SingleEvaluationResult> {
+    return this.native.execute(input);
+  }
+
+  augmentResult(input: EvaluatorResultAugmentationInput): SingleEvaluationResult {
+    return this.native.augment(input);
+  }
+
+  async executeCode(input: CodeEvaluatorExecutionInput): Promise<SingleEvaluationResult> {
+    try {
+      const evaluator = await this.getById({
+        id: input.evaluatorId,
+        projectId: input.projectId,
+      });
+      if (evaluator.type !== "code") {
+        throw new Error(`Code evaluator not found: ${input.evaluatorId}`);
+      }
+      const config = codeEvaluatorConfigSchema.parse(evaluator.config);
+      const inputs = Object.fromEntries(
+        config.inputs.map(({ identifier }) => {
+          const value = input.data[identifier];
+          return [
+            identifier,
+            value === null || value === void 0
+              ? ""
+              : typeof value === "string"
+                ? value
+                : JSON.stringify(value),
+          ];
+        }),
+      );
+      const event: StudioClientEvent = {
+        type: "execute_flow",
+        payload: {
+          trace_id: input.traceId ?? `trace_${this.options.generateId()}`,
+          workflow: this.code.buildDsl({
+            name: evaluator.name,
+            config,
+            workflowId: `code_evaluator_${this.options.generateId()}`,
+          }),
+          inputs: [inputs],
+          manual_execution_mode: false,
+          do_not_trace: false,
+          run_evaluations: false,
+          origin: "evaluation",
+        },
+      };
+      const enriched = await this.options.workflows.enrichStudioEvent({
+        event,
+        projectId: input.projectId,
+      });
+      const response = await this.options.codeExecution.execute({
+        projectId: input.projectId,
+        event: enriched,
+        causalityDepth: input.parentCausalityDepth ?? 0,
+        ...(input.parentTrace ? { parentTrace: input.parentTrace } : {}),
+      });
+      if (!response.ok) {
+        throw new Error(`Error running code evaluator: ${response.statusText}`);
+      }
+      if (response.body.status !== "success") {
+        return {
+          status: "error",
+          details: response.body.error?.message ?? "Code evaluator execution failed",
+          error_type: "CODE_EVALUATOR_ERROR",
+          traceback: response.body.error?.traceback ? [response.body.error.traceback] : [],
+        };
+      }
+
+      return {
+        ...this.coerceCodeResult(response.body.result ?? {}),
+        status: "processed",
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        details: error instanceof Error ? error.message : String(error),
+        error_type: "CODE_EVALUATOR_ERROR",
+        traceback: [error instanceof Error ? (error.stack ?? "") : ""],
+      };
+    }
+  }
+
+  private coerceCodeResult(result: Record<string, unknown>): Record<string, unknown> {
+    const coerced = { ...result };
+    if (
+      "score" in coerced &&
+      (typeof coerced.score === "number" || typeof coerced.score === "string")
+    ) {
+      const score = Number.parseFloat(`${coerced.score}`);
+      coerced.score = Number.isNaN(score) ? 0 : score;
+    }
+    if (
+      "passed" in coerced &&
+      (typeof coerced.passed === "boolean" || typeof coerced.passed === "string")
+    ) {
+      coerced.passed = coerced.passed === true || `${coerced.passed}` === "true";
+    }
+    return coerced;
   }
 
   async tryGetById(input: { id: string; projectId: string }): Promise<Evaluator | null> {
@@ -56,10 +168,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
     const evaluator = await this.tryGetById(input);
     return evaluator ? this.enrichWithFields(evaluator) : null;
   }
-  async getByIdWithFields(input: {
-    id: string;
-    projectId: string;
-  }): Promise<EvaluatorWithFields> {
+  async getByIdWithFields(input: { id: string; projectId: string }): Promise<EvaluatorWithFields> {
     return this.enrichWithFields(await this.getById(input));
   }
   tryGetBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | null> {
@@ -70,10 +179,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
     if (!evaluator) throw new EvaluatorNotFoundError(input.slug);
     return evaluator;
   }
-  tryGetByWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<Evaluator | null> {
+  tryGetByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator | null> {
     return this.options.repository.tryFindByWorkflow(input);
   }
   getAll(input: { projectId: string }): Promise<Evaluator[]> {
@@ -117,14 +223,8 @@ export class EvaluatorService extends EvaluatorServiceContract {
       : undefined;
     if (definition && input.type === "evaluator") {
       config.settings = {
-        ...getEvaluatorDefaultSettings(
-          definition,
-          input.resolved,
-          this.options.fallbackModels,
-        ),
-        ...(config.settings && typeof config.settings === "object"
-          ? config.settings
-          : {}),
+        ...getEvaluatorDefaultSettings(definition, input.resolved, this.options.fallbackModels),
+        ...(config.settings && typeof config.settings === "object" ? config.settings : {}),
       };
     }
     return this.create({ ...input, config });
@@ -176,9 +276,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
       return {
         ...evaluator,
         fields: config.success ? config.data.inputs : [],
-        outputFields: config.success
-          ? config.data.outputs
-          : [...standardEvaluatorOutputFields],
+        outputFields: config.success ? config.data.outputs : [...standardEvaluatorOutputFields],
       };
     }
     const evaluatorConfig = evaluatorConfigSchema.safeParse(evaluator.config);
@@ -205,17 +303,14 @@ export class EvaluatorService extends EvaluatorServiceContract {
     const outputFields = definition
       ? Object.entries(definition.result).map(([identifier, result]) => ({
           identifier,
-          type:
-            identifier === "score" ? "float" : identifier === "passed" ? "bool" : "str",
+          type: identifier === "score" ? "float" : identifier === "passed" ? "bool" : "str",
           ...(result ? {} : {}),
         }))
       : [...standardEvaluatorOutputFields];
     return {
       ...evaluator,
       fields,
-      outputFields: outputFields.length
-        ? outputFields
-        : [...standardEvaluatorOutputFields],
+      outputFields: outputFields.length ? outputFields : [...standardEvaluatorOutputFields],
     };
   }
 
@@ -254,10 +349,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
     };
   }
 
-  async getCopies(input: {
-    evaluatorId: string;
-    projectId: string;
-  }): Promise<EvaluatorCopy[]> {
+  async getCopies(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorCopy[]> {
     await this.getById({ id: input.evaluatorId, projectId: input.projectId });
     return this.options.repository.findCopies({ evaluatorId: input.evaluatorId });
   }
@@ -279,12 +371,8 @@ export class EvaluatorService extends EvaluatorServiceContract {
       ? copies.filter((copy) => input.copyIds?.includes(copy.id))
       : copies;
     if (!selected.length) throw new EvaluatorCopySelectionError(input.evaluatorId);
-    const allowed = input.allowedProjectIds
-      ? new Set(input.allowedProjectIds)
-      : undefined;
-    const writable = allowed
-      ? selected.filter((copy) => allowed.has(copy.projectId))
-      : selected;
+    const allowed = input.allowedProjectIds ? new Set(input.allowedProjectIds) : undefined;
+    const writable = allowed ? selected.filter((copy) => allowed.has(copy.projectId)) : selected;
     const config = evaluatorConfigSchema.safeParse(source.config);
     await Promise.all(
       writable.map((copy) =>
@@ -299,10 +387,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
     return { pushedTo: writable.length, selectedCopies: selected.length };
   }
 
-  async syncFromSource(input: {
-    projectId: string;
-    evaluatorId: string;
-  }): Promise<{ ok: true }> {
+  async syncFromSource(input: { projectId: string; evaluatorId: string }): Promise<{ ok: true }> {
     const copy = await this.getById({
       id: input.evaluatorId,
       projectId: input.projectId,
@@ -330,9 +415,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
       projectId: input.projectId,
     });
     if (!copy.copiedFromEvaluatorId) throw new EvaluatorIsNotCopyError(copy.id);
-    const source = await this.options.repository.tryFindByIdOnly(
-      copy.copiedFromEvaluatorId,
-    );
+    const source = await this.options.repository.tryFindByIdOnly(copy.copiedFromEvaluatorId);
     if (!source) throw new EvaluatorSourceNotFoundError(copy.copiedFromEvaluatorId);
     return { copy, source };
   }
@@ -345,9 +428,7 @@ export class EvaluatorService extends EvaluatorServiceContract {
     const logs = await this.options.auditLog.history({ ...input, limit: 100 });
     const users = await this.options.auditLog.users({
       userIds: [
-        ...new Set(
-          logs.map((log) => log.userId).filter((id): id is string => Boolean(id)),
-        ),
+        ...new Set(logs.map((log) => log.userId).filter((id): id is string => Boolean(id))),
       ],
     });
     const usersById = new Map(users.map((user) => [user.id, user]));

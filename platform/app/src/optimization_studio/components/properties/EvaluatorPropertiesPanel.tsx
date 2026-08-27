@@ -17,6 +17,10 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "../../../utils/api";
+import {
+  DEFAULT_EMBEDDINGS_MODEL,
+  DEFAULT_MODEL,
+} from "../../../utils/constants";
 import { useRegisterDrawerFooter, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import {
@@ -395,10 +399,17 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(evaluatorDefinition, {
-        defaultModel: resolvedDefaultModel.data?.model ?? null,
-        embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
-      }),
+      getEvaluatorDefaultSettings(
+        evaluatorDefinition,
+        {
+          defaultModel: resolvedDefaultModel.data?.model ?? null,
+          embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+        },
+        {
+          defaultModel: DEFAULT_MODEL,
+          embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
+        },
+      ),
       "settings",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps

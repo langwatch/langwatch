@@ -1,10 +1,11 @@
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
 export interface LangEvalsEvaluateParams {
   evaluatorType: string;
   data: Record<string, unknown>;
   settings: Record<string, unknown>;
   env: Record<string, string>;
+  idempotencyKey?: string;
 }
 
 export interface LangEvalsClient {

@@ -31,15 +31,11 @@ vi.mock("~/server/traces/trace.service", () => ({
 
 // Force the native short-circuit so the evaluator runs in-process and we can
 // capture the mapped data it receives without a langevals HTTP call.
-vi.mock("~/server/evaluations/evaluators.native", async (importOriginal) => {
+vi.mock("~/runtime/app/features/evaluator-native-observability.adapter", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("~/server/evaluations/evaluators.native")>();
-  return { ...actual, isNativeEvaluatorType: () => true };
-});
-
-vi.mock("~/server/evaluations/native/registry", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/server/evaluations/native/registry")>();
+    await importOriginal<
+      typeof import("~/runtime/app/features/evaluator-native-observability.adapter")
+    >();
   return {
     ...actual,
     executeNativeEvaluation: executeNativeEvaluationMock,
@@ -47,10 +43,11 @@ vi.mock("~/server/evaluations/native/registry", async (importOriginal) => {
   };
 });
 
-vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/evaluations/evaluators")>();
+vi.mock("@langwatch/evaluator-contract", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/evaluator-contract")>();
   return {
     ...actual,
+    isNativeEvaluatorType: () => true,
     AVAILABLE_EVALUATORS: {
       "test/evaluator": {
         name: "Test Evaluator",
@@ -61,7 +58,7 @@ vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
   };
 });
 
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { runEvaluationForTrace } from "../runEvaluation";
 
 // Registered above in the mocked AVAILABLE_EVALUATORS; cast past the real

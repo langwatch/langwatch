@@ -7,6 +7,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { EvaluatorRepository } from "../src/repositories/evaluator.repository";
+import { EvaluatorCodeExecutionPort } from "../src/ports/evaluator.port";
 import { EvaluatorService } from "../src/services/evaluator.service";
 
 const baseEvaluator: Evaluator = {
@@ -60,15 +61,104 @@ function service(
   options: {
     repository?: EvaluatorRepository;
     workflows?: WorkflowService;
+    codeExecution?: EvaluatorCodeExecutionPort;
   } = {},
 ): EvaluatorService {
   return EvaluatorService.create({
     repository: options.repository ?? repository(),
     workflows: options.workflows ?? workflows(),
+    codeExecution: options.codeExecution ?? new (class extends EvaluatorCodeExecutionPort {
+      async execute() {
+        return {
+          ok: true,
+          statusText: "OK",
+          body: { status: "success", result: {} },
+        };
+      }
+    })(),
+    generateId: () => "test",
   });
 }
 
 describe("EvaluatorService", () => {
+  it("converts a successful code execution into processed scalar results", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      ok: true,
+      statusText: "OK",
+      body: { status: "success", result: { passed: "true", score: "0.75" } },
+    });
+    const evaluators = service({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          evaluator({
+            type: "code",
+            config: {
+              code: "class Code: ...",
+              inputs: [{ identifier: "output", type: "str" }],
+              outputs: [{ identifier: "passed", type: "bool" }],
+            },
+          }),
+        ),
+      }),
+      workflows: workflows({ enrichStudioEvent: vi.fn(({ event }) => event) }),
+      codeExecution: new (class extends EvaluatorCodeExecutionPort {
+        execute = execute;
+      })(),
+    });
+
+    await expect(
+      evaluators.executeCode({
+        projectId: "p1",
+        evaluatorId: "e1",
+        data: { output: "hello" },
+      }),
+    ).resolves.toMatchObject({ status: "processed", passed: true, score: 0.75 });
+  });
+
+  it("surfaces code exceptions in the evaluator error envelope", async () => {
+    const evaluators = service({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          evaluator({
+            type: "code",
+            config: {
+              code: "raise ValueError()",
+              inputs: [{ identifier: "output", type: "str" }],
+              outputs: [{ identifier: "passed", type: "bool" }],
+            },
+          }),
+        ),
+      }),
+      workflows: workflows({ enrichStudioEvent: vi.fn(({ event }) => event) }),
+      codeExecution: new (class extends EvaluatorCodeExecutionPort {
+        async execute() {
+          return {
+            ok: true,
+            statusText: "OK",
+            body: {
+              status: "error",
+              error: {
+                message: "intentional kaboom",
+                traceback: "Traceback: ...",
+              },
+            },
+          };
+        }
+      })(),
+    });
+
+    await expect(
+      evaluators.executeCode({
+        projectId: "p1",
+        evaluatorId: "e1",
+        data: { output: "boom" },
+      }),
+    ).resolves.toMatchObject({
+      status: "error",
+      details: "intentional kaboom",
+      traceback: ["Traceback: ..."],
+    });
+  });
   it("keeps nullable lookup and throwing lookup distinct", async () => {
     const missing = repository({
       tryFindById: vi.fn().mockResolvedValue(null),

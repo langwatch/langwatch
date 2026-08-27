@@ -2,4 +2,7 @@ export {
   PostgresEvaluatorAdapter,
   type PostgresEvaluatorAdapterOptions,
 } from "./adapters/postgres.evaluator.adapter";
-export { EvaluatorAuditLogPort } from "./ports/evaluator.port";
+export {
+  EvaluatorAuditLogPort,
+  EvaluatorCodeExecutionPort,
+} from "./ports/evaluator.port";

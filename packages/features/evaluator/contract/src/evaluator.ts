@@ -60,7 +60,7 @@ export type EvaluatorCategory =
   | "custom"
   | "similarity";
 
-export type EvaluatorDefinition = {
+export type EvaluatorDefinition<_Type extends string = string> = {
   name: string;
   description: string;
   category: EvaluatorCategory;
@@ -75,6 +75,11 @@ export type EvaluatorDefinition = {
     passed?: { description: string };
     label?: { description: string };
   };
+};
+
+export type CustomEvaluatorDefinition = {
+  name: string;
+  requiredFields: string[];
 };
 
 /** The catalogue's short presentation names are product vocabulary, not UI state. */
@@ -98,14 +103,14 @@ export const fieldType = (fieldName: string): string =>
   })[fieldName] ?? "str";
 
 export function getEvaluatorDefaultSettings(
-  definition: EvaluatorDefinition | undefined,
+  definition: EvaluatorDefinition | CustomEvaluatorDefinition | undefined,
   resolved: { defaultModel?: string | null; embeddingsModel?: string | null } = {},
   fallback: { defaultModel: string; embeddingsModel: string } = {
     defaultModel: "openai/gpt-5",
     embeddingsModel: "openai/text-embedding-3-small",
   },
 ): Record<string, unknown> {
-  if (!definition) return {};
+  if (!definition || !("settings" in definition)) return {};
   return Object.fromEntries(
     Object.entries(definition.settings).map(([key, setting]) => [
       key,

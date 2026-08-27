@@ -35,7 +35,8 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -43,6 +44,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
+import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "~/utils/constants";
 
 import {
   type EvaluatorCategoryId,
@@ -309,10 +311,17 @@ export function useEvaluatorEditorController(
   const defaultSettings = useMemo(() => {
     if (!evaluatorDef || !project) return {};
     return (
-      getEvaluatorDefaultSettings(evaluatorDef, {
-        defaultModel: resolvedDefaultModel.data?.model ?? null,
-        embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
-      }) ?? {}
+      getEvaluatorDefaultSettings(
+        evaluatorDef,
+        {
+          defaultModel: resolvedDefaultModel.data?.model ?? null,
+          embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+        },
+        {
+          defaultModel: DEFAULT_MODEL,
+          embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
+        },
+      ) ?? {}
     );
   }, [
     evaluatorDef,
@@ -822,7 +831,7 @@ export function EvaluatorEditorBody({
               <WorkflowCardDisplay
                 name={workflowCard.workflowName ?? "Workflow"}
                 icon={workflowCard.workflowIcon}
-                updatedAt={workflowCard.updatedAt}
+                updatedAtLabel={formatTimeAgo(workflowCard.updatedAt.getTime())}
                 action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />

@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { z } from "zod/v4";
+import { z } from "zod";
 import {
   codeEvaluatorConfigSchema,
   evaluatorTypeSchema,

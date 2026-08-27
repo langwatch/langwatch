@@ -5,7 +5,8 @@ import { FormProvider, useWatch } from "react-hook-form";
 import type { ZodType } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
-import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
@@ -121,7 +122,7 @@ export function EvaluatorEditorContent({
               <WorkflowCardDisplay
                 name={workflow.name}
                 icon={workflow.icon}
-                updatedAt={workflow.updatedAt}
+                updatedAtLabel={formatTimeAgo(workflow.updatedAt.getTime())}
                 action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
                 width="300px"
               />

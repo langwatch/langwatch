@@ -4,6 +4,8 @@ import type {
   EvaluatorField,
   EvaluatorWithFields,
 } from "./evaluator";
+import type { CodeEvaluatorExecutionInput } from "./code-evaluator";
+import type { SingleEvaluationResult } from "./evaluators.generated";
 
 export type EvaluatorCreateInput = {
   id: string;
@@ -44,7 +46,27 @@ export type WorkflowEvaluatorFields = {
   outputFields: EvaluatorField[];
 };
 
+export type NativeEvaluatorExecutionInput = {
+  evaluatorType: string;
+  data: Record<string, unknown>;
+};
+
+export type EvaluatorResultAugmentationInput = {
+  evaluatorType: string;
+  mappedData: Record<string, unknown>;
+  settings: Record<string, unknown> | undefined;
+  droppedCategories: string[];
+  result: SingleEvaluationResult;
+};
+
 export abstract class EvaluatorService {
+  abstract executeCode(input: CodeEvaluatorExecutionInput): Promise<SingleEvaluationResult>;
+  abstract executeNative(
+    input: NativeEvaluatorExecutionInput,
+  ): Promise<SingleEvaluationResult>;
+  abstract augmentResult(
+    input: EvaluatorResultAugmentationInput,
+  ): SingleEvaluationResult;
   abstract tryGetById(input: {
     id: string;
     projectId: string;

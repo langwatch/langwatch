@@ -3,13 +3,13 @@ import {
   EvaluatorNotFoundError,
 } from "~/server/app-layer/evaluations/errors";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
-import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
-import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
+import { codeEvaluatorIdFromCheckType } from "@langwatch/evaluator-contract";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
@@ -21,12 +21,9 @@ import {
   type BatchEvaluationResult,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../server/evaluations/evaluators";
-import { isNativeEvaluatorType } from "../../server/evaluations/evaluators.native";
-import {
-  augmentEvaluationResult,
-  executeNativeEvaluation,
-} from "../../server/evaluations/native/registry";
+} from "@langwatch/evaluator-contract";
+import { isNativeEvaluatorType } from "@langwatch/evaluator-contract";
+import { executeNativeEvaluation } from "~/runtime/app/features/evaluator-native-observability.adapter";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   isAzureEvaluatorType,
@@ -254,6 +251,7 @@ export const runEvaluationForTrace = async ({
   modelProviders,
   managedProviders,
   workflows,
+  evaluators,
   traceCanonicalisation,
 }: {
   projectId: string;
@@ -268,6 +266,7 @@ export const runEvaluationForTrace = async ({
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
   workflows: WorkflowService;
+  evaluators: EvaluatorService;
   traceCanonicalisation: TraceCanonicalisationService;
 }): Promise<EvaluationResultWithThreadId> => {
   // #4991: the trace being evaluated is read content-first — resolve the
@@ -331,6 +330,7 @@ export const runEvaluationForTrace = async ({
     modelProviders,
     managedProviders,
     workflows,
+    evaluators,
     parentCausalityDepth: maxCausalityDepthOfSpans(
       trace.spans as unknown as Array<{
         attributes?: Record<string, unknown> | null;
@@ -357,6 +357,7 @@ export const runEvaluation = async ({
   modelProviders,
   managedProviders,
   workflows,
+  evaluators,
 }: {
   projectId: string;
   evaluatorType: EvaluatorTypes | "workflow";
@@ -369,6 +370,7 @@ export const runEvaluation = async ({
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
   workflows: WorkflowService;
+  evaluators: EvaluatorService;
 }): Promise<SingleEvaluationResult> => {
   if (data.type === "custom") {
     // Code evaluators arrive as `{type:"custom"}` with an evaluatorType of
@@ -377,14 +379,13 @@ export const runEvaluation = async ({
     // EvaluationExecutionService.runEvaluation.
     const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
     if (codeEvaluatorId) {
-      return runCodeEvaluator({
+      return evaluators.executeCode({
         projectId,
         evaluatorId: codeEvaluatorId,
         data: data.data,
         traceId: trace?.trace_id,
         parentCausalityDepth,
         parentTrace: extractParentTraceForNlpgo(trace),
-        workflows,
       });
     }
     return customEvaluation(
@@ -413,10 +414,11 @@ export const runEvaluation = async ({
   // already scrubbed, or content that was dropped, is reflected in the result.
   if (isNativeEvaluatorType(builtInEvaluatorType)) {
     const nativeResult = await executeNativeEvaluation({
+      evaluators: deps.evaluators,
       evaluatorType: builtInEvaluatorType,
       data: data.data,
     });
-    return augmentEvaluationResult({
+    return deps.evaluators.augmentResult({
       evaluatorType: builtInEvaluatorType,
       mappedData: data.data,
       settings,
@@ -583,6 +585,7 @@ export const runEvaluation = async ({
         modelProviders,
         managedProviders,
         workflows,
+        evaluators,
         retries: retries - 1,
       });
     }
@@ -614,7 +617,7 @@ export const runEvaluation = async ({
 
   getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
 
-  return augmentEvaluationResult({
+  return deps.evaluators.augmentResult({
     evaluatorType: builtInEvaluatorType,
     mappedData: data.data,
     settings,

@@ -24,7 +24,7 @@ import type { MonitorRepository } from "../repositories/monitor.repository";
 
 export type MonitorServiceOptions = {
   repository: MonitorRepository;
-  evaluators: Pick<EvaluatorService, "getById">;
+  evaluators: EvaluatorService;
   generateId?: () => string;
 };
 

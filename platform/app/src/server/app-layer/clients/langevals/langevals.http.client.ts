@@ -2,16 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import type {
   BatchEvaluationResult,
   SingleEvaluationResult,
-} from "~/server/evaluations/evaluators";
-import {
-  evaluationDurationHistogram,
-  getEvaluationStatusCounter,
-} from "~/server/metrics";
+} from "@langwatch/evaluator-contract";
+import { evaluationDurationHistogram, getEvaluationStatusCounter } from "~/server/metrics";
 import { tryAndConvertTo } from "~/server/tracer/tracesMapping";
-import {
-  EvaluatorExecutionError,
-  EvaluatorInputTooLargeError,
-} from "../../evaluations/errors";
+import { EvaluatorExecutionError, EvaluatorInputTooLargeError } from "../../evaluations/errors";
 import type { LangEvalsClient, LangEvalsEvaluateParams } from "./langevals.client";
 
 const logger = createLogger("langwatch:langevals-http-client");
@@ -33,7 +27,7 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     params: LangEvalsEvaluateParams,
     retriesLeft: number,
   ): Promise<SingleEvaluationResult> {
-    const { evaluatorType, data, settings, env } = params;
+    const { evaluatorType, data, settings, env, idempotencyKey } = params;
     const url = `${this.endpoint}/${evaluatorType}/evaluate`;
 
     const startTime = performance.now();
@@ -45,7 +39,10 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     try {
       response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+        },
         signal: controller.signal,
         body: JSON.stringify({
           data: [
@@ -65,10 +62,9 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         logger.warn({ url, timeoutMs: this.timeoutMs }, "Evaluator request timed out");
-        throw new EvaluatorExecutionError(
-          `Evaluator timed out after ${this.timeoutMs}ms`,
-          { meta: { evaluatorType, url, timeoutMs: this.timeoutMs } },
-        );
+        throw new EvaluatorExecutionError(`Evaluator timed out after ${this.timeoutMs}ms`, {
+          meta: { evaluatorType, url, timeoutMs: this.timeoutMs },
+        });
       }
       if (error instanceof Error && error.message.includes("fetch failed")) {
         logger.warn({ error, url }, "Evaluator cannot be reached");

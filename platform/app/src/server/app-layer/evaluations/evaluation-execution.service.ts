@@ -5,18 +5,16 @@ import {
 } from "~/server/evaluations/evaluationMappings";
 import {
   AVAILABLE_EVALUATORS,
+  type EvaluatorService,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "~/server/evaluations/evaluators";
-import { isNativeEvaluatorType } from "~/server/evaluations/evaluators.native";
+} from "@langwatch/evaluator-contract";
+import { isNativeEvaluatorType } from "@langwatch/evaluator-contract";
 import {
   evaluatorUnavailability,
   unavailableEvaluatorMessage,
 } from "~/server/evaluations/installedEvaluators";
-import {
-  augmentEvaluationResult,
-  executeNativeEvaluation,
-} from "~/server/evaluations/native/registry";
+import { executeNativeEvaluation } from "~/runtime/app/features/evaluator-native-observability.adapter";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
@@ -24,8 +22,7 @@ import {
 import {
   codeEvaluatorIdFromCheckType,
   isCodeEvaluatorCheckType,
-} from "~/server/evaluators/codeEvaluator";
-import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
+} from "@langwatch/evaluator-contract";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import {
   type MappingState,
@@ -63,6 +60,7 @@ export interface EvaluationExecutionDeps {
   modelEnvResolver: ModelEnvResolver;
   langevalsClient: LangEvalsClient;
   workflows: WorkflowService;
+  evaluators: EvaluatorService;
   workflowExecutor: WorkflowExecutor;
 }
 
@@ -535,14 +533,13 @@ export class EvaluationExecutionService {
     if (data.type === "custom") {
       const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
       if (codeEvaluatorId) {
-        return runCodeEvaluator({
+        return this.deps.evaluators.executeCode({
           projectId,
           evaluatorId: codeEvaluatorId,
           data: data.data,
           traceId: trace?.trace_id,
           parentCausalityDepth,
           parentTrace: extractParentTraceForNlpgo(trace),
-          workflows: this.deps.workflows,
         });
       }
       return this.runCustomEvaluation(
@@ -569,10 +566,11 @@ export class EvaluationExecutionService {
     // ingestion never hides a leak from the result.
     if (isNativeEvaluatorType(builtInType)) {
       const nativeResult = await executeNativeEvaluation({
+        evaluators: this.deps.evaluators,
         evaluatorType: builtInType,
         data: data.data,
       });
-      return augmentEvaluationResult({
+      return this.deps.evaluators.augmentResult({
         evaluatorType: builtInType,
         mappedData: data.data,
         settings,
@@ -596,7 +594,7 @@ export class EvaluationExecutionService {
       idempotencyKey,
     });
 
-    return augmentEvaluationResult({
+    return this.deps.evaluators.augmentResult({
       evaluatorType: builtInType,
       mappedData: data.data,
       settings,

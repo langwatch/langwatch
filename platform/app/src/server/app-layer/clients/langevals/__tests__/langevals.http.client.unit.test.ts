@@ -8,10 +8,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  EvaluatorExecutionError,
-  EvaluatorInputTooLargeError,
-} from "../../../evaluations/errors";
+import { EvaluatorExecutionError, EvaluatorInputTooLargeError } from "../../../evaluations/errors";
 import type { LangEvalsEvaluateParams } from "../langevals.client";
 import { LangEvalsHttpClient } from "../langevals.http.client";
 
@@ -39,9 +36,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function buildParams(
-  overrides?: Partial<LangEvalsEvaluateParams>,
-): LangEvalsEvaluateParams {
+function buildParams(overrides?: Partial<LangEvalsEvaluateParams>): LangEvalsEvaluateParams {
   return {
     evaluatorType: "test/evaluator",
     data: { input: "hello", output: "world" },
@@ -103,6 +98,25 @@ describe("LangEvalsHttpClient", () => {
           }),
         );
       });
+
+      it("forwards an evaluation operation key to the provider", async () => {
+        const fetchSpy = vi
+          .spyOn(globalThis, "fetch")
+          .mockResolvedValue(jsonResponse([{ status: "processed", score: 1 }]));
+
+        const client = new LangEvalsHttpClient(endpoint);
+        await client.evaluate(buildParams({ idempotencyKey: "evaluation:retry-safe" }));
+
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `${endpoint}/test/evaluator/evaluate`,
+          expect.objectContaining({
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "evaluation:retry-safe",
+            },
+          }),
+        );
+      });
     });
 
     describe("when fetch throws a network error", () => {
@@ -111,12 +125,8 @@ describe("LangEvalsHttpClient", () => {
 
         const client = new LangEvalsHttpClient(endpoint);
 
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          EvaluatorExecutionError,
-        );
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          "Evaluator cannot be reached",
-        );
+        await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
+        await expect(client.evaluate(buildParams())).rejects.toThrow("Evaluator cannot be reached");
       });
     });
 
@@ -148,9 +158,7 @@ describe("LangEvalsHttpClient", () => {
 
         const client = new LangEvalsHttpClient(endpoint, 0);
 
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          EvaluatorExecutionError,
-        );
+        await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
       });
     });
 
@@ -162,9 +170,7 @@ describe("LangEvalsHttpClient", () => {
 
         const client = new LangEvalsHttpClient(endpoint, 2);
 
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          EvaluatorExecutionError,
-        );
+        await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
         // Should NOT retry on 4xx
         expect(fetchSpy).toHaveBeenCalledTimes(1);
       });
@@ -178,9 +184,7 @@ describe("LangEvalsHttpClient", () => {
 
         const client = new LangEvalsHttpClient(endpoint, 2);
 
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          EvaluatorInputTooLargeError,
-        );
+        await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorInputTooLargeError);
         expect(fetchSpy).toHaveBeenCalledTimes(1);
       });
 
@@ -191,20 +195,12 @@ describe("LangEvalsHttpClient", () => {
 
         const client = new LangEvalsHttpClient(endpoint, 0);
 
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          EvaluatorInputTooLargeError,
-        );
+        await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorInputTooLargeError);
         // An oversized input is the customer's payload, not a platform fault:
         // the metric label has to match the "skipped" status the command
         // ultimately emits, or dashboards read it as an error-rate spike.
-        expect(getEvaluationStatusCounter).toHaveBeenCalledWith(
-          "test/evaluator",
-          "skipped",
-        );
-        expect(getEvaluationStatusCounter).not.toHaveBeenCalledWith(
-          "test/evaluator",
-          "error",
-        );
+        expect(getEvaluationStatusCounter).toHaveBeenCalledWith("test/evaluator", "skipped");
+        expect(getEvaluationStatusCounter).not.toHaveBeenCalledWith("test/evaluator", "error");
       });
     });
 
@@ -216,13 +212,8 @@ describe("LangEvalsHttpClient", () => {
 
         const client = new LangEvalsHttpClient(endpoint, 0);
 
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          EvaluatorExecutionError,
-        );
-        expect(getEvaluationStatusCounter).toHaveBeenCalledWith(
-          "test/evaluator",
-          "error",
-        );
+        await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
+        expect(getEvaluationStatusCounter).toHaveBeenCalledWith("test/evaluator", "error");
       });
     });
 
@@ -246,9 +237,7 @@ describe("LangEvalsHttpClient", () => {
 
         const client = new LangEvalsHttpClient(endpoint, 0);
 
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          EvaluatorExecutionError,
-        );
+        await expect(client.evaluate(buildParams())).rejects.toThrow(EvaluatorExecutionError);
         expect(fetchSpy).toHaveBeenCalledTimes(1);
       });
     });

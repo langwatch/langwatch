@@ -8,7 +8,7 @@ import {
 
 export type PostgresMonitorAdapterOptions = {
   database: MonitorDatabase;
-  evaluators: Pick<EvaluatorService, "getById">;
+  evaluators: EvaluatorService;
   generateId?: () => string;
 };
 

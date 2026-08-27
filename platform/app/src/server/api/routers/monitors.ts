@@ -8,8 +8,8 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   evaluatorsSchema,
-} from "../../evaluations/evaluators";
-import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
+} from "@langwatch/evaluator-contract";
+import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { currentVsPreviousDates } from "./analytics/common";
@@ -300,7 +300,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
 });
 
-const validateCheckSettings = (checkType: string, parameters: any) => {
+const validateCheckSettings = (checkType: string, parameters: unknown) => {
   // Allow workflow evaluators ("workflow") and code evaluators ("code/{id}")
   const isWorkflowEvaluator = checkType === "workflow";
   const isCodeEvaluator = checkType.startsWith("code/");
@@ -327,7 +327,7 @@ const validateCheckSettings = (checkType: string, parameters: any) => {
       if (error instanceof ZodError) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Invalid settings: ${error as any}`,
+          message: `Invalid settings: ${error}`,
         });
       } else {
         throw error;

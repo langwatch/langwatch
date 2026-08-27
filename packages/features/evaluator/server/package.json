@@ -23,6 +23,7 @@
   "dependencies": {
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*"
   },
   "devDependencies": {
