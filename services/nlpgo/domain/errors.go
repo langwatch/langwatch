@@ -40,7 +40,7 @@ const (
 	ErrIdleTimeout = herr.Code("idle_timeout")
 
 	// ErrCodeBlockTimeout signals the user code subprocess exceeded
-	// NLP_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
+	// NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
 	ErrCodeBlockTimeout = herr.Code("code_block_timeout")
 
 	// ErrSSRFBlocked signals an HTTP block tried to reach a destination

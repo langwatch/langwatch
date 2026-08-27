@@ -69,7 +69,7 @@ export const goErrorCodes = {
   circuit_open: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrCodeBlockTimeout — signals the user code subprocess exceeded
-   * NLP_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
+   * NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
    *
    * Also produced as a workflow NodeError type, so this one entry is the copy
    * for both the HTTP failure and the node error event. Its node sites are

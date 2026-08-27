@@ -208,6 +208,13 @@ const (
 
 func (e *Error) String() string { return fmt.Sprintf("%s: %s", e.Type, e.Message) }
 
+// DefaultTimeout reports the wall-clock timeout the executor applies to a
+// request that does not carry its own Request.Timeout. Exported so the
+// wiring that builds the executor from operator config can be asserted on.
+func (e *Executor) DefaultTimeout() time.Duration {
+	return e.opts.DefaultTimeout
+}
+
 // childEnv builds the environment handed to the user-code subprocess from
 // the configured allowlist. It always returns a non-nil slice — even when
 // no allowlisted variable is present — so the caller can assign it to

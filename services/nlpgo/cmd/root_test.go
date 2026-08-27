@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo"
 )
@@ -126,5 +127,90 @@ func TestResolveSandboxPython_HonorsTheUnprefixedImageSetting(t *testing.T) {
 					tc.explicit, tc.env, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout pins the operator
+// knob to the executor that enforces it. `CodeBlockTimeoutSeconds` was
+// declared, defaulted and documented but never read: `codeblock.New` was
+// called without `DefaultTimeout`, so the executor's own 60s fallback won
+// every time and a long-running code block could not be given more room
+// from configuration.
+func TestNewCodeExecutor_AppliesConfiguredCodeBlockTimeout(t *testing.T) {
+	getenv := func(string) string { return "" }
+
+	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+		SandboxPython:           nlpgo.DefaultSandboxPython,
+		CodeBlockTimeoutSeconds: 300,
+	}, getenv)
+	if err != nil {
+		t.Fatalf("newCodeExecutor: %v", err)
+	}
+	if got, want := exec.DefaultTimeout(), 5*time.Minute; got != want {
+		t.Errorf("DefaultTimeout() = %v; want %v (CODE_BLOCK_TIMEOUT_SECONDS=300)", got, want)
+	}
+}
+
+// TestNewCodeExecutor_UnsetTimeoutKeepsTheSixtySecondDefault guards the
+// wiring against turning an unset knob into a zero-length — that is,
+// already-expired — timeout.
+func TestNewCodeExecutor_UnsetTimeoutKeepsTheSixtySecondDefault(t *testing.T) {
+	getenv := func(string) string { return "" }
+
+	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+		SandboxPython: nlpgo.DefaultSandboxPython,
+	}, getenv)
+	if err != nil {
+		t.Fatalf("newCodeExecutor: %v", err)
+	}
+	if got, want := exec.DefaultTimeout(), 60*time.Second; got != want {
+		t.Errorf("DefaultTimeout() = %v; want %v", got, want)
+	}
+}
+
+// TestResolveCodeBlockTimeout covers the misconfiguration edge: a zero or
+// negative CODE_BLOCK_TIMEOUT_SECONDS must not become a negative duration.
+// codeblock.Execute feeds this straight into context.WithTimeout, so a
+// negative value would produce an already-expired context and kill every
+// code block instantly. Zero defers to codeblock.New's 60s fallback.
+func TestResolveCodeBlockTimeout(t *testing.T) {
+	cases := []struct {
+		name    string
+		seconds int
+		want    time.Duration
+	}{
+		{name: "a configured value is seconds", seconds: 300, want: 5 * time.Minute},
+		{name: "one second is honored", seconds: 1, want: time.Second},
+		{name: "unset defers to the executor default", seconds: 0, want: 0},
+		{name: "negative defers rather than expiring", seconds: -1, want: 0},
+		{name: "a large negative still defers", seconds: -3600, want: 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resolveCodeBlockTimeout(tc.seconds); got != tc.want {
+				t.Errorf("resolveCodeBlockTimeout(%d) = %v; want %v", tc.seconds, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately is the
+// end-to-end half of the edge above: the wiring, not just the helper, must
+// never hand codeblock.New a negative DefaultTimeout.
+func TestNewCodeExecutor_NegativeTimeoutDoesNotExpireImmediately(t *testing.T) {
+	getenv := func(string) string { return "" }
+
+	exec, err := newCodeExecutor(nlpgo.EngineConfig{
+		SandboxPython:           nlpgo.DefaultSandboxPython,
+		CodeBlockTimeoutSeconds: -30,
+	}, getenv)
+	if err != nil {
+		t.Fatalf("newCodeExecutor: %v", err)
+	}
+	if got := exec.DefaultTimeout(); got <= 0 {
+		t.Errorf("DefaultTimeout() = %v; want a positive duration", got)
+	}
+	if got, want := exec.DefaultTimeout(), 60*time.Second; got != want {
+		t.Errorf("DefaultTimeout() = %v; want %v", got, want)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -73,16 +74,7 @@ func Root(ctx context.Context, _ []string) error {
 	)
 
 	httpExec := httpblock.New(httpblock.Options{SSRF: ssrfOpts})
-	codeExec, err := codeblock.New(codeblock.Options{
-		Python: resolveSandboxPython(cfg.Engine.SandboxPython, os.Getenv),
-		// The instance a code node's LangWatch SDK calls. It is the same URL
-		// the evaluator blocks call back on, and it is injected only next to
-		// a run's own sandbox key.
-		SandboxEndpoint: resolveLangWatchBaseURL(
-			cfg.Engine.LangWatchBaseURL,
-			os.Getenv,
-		),
-	})
+	codeExec, err := newCodeExecutor(cfg.Engine, os.Getenv)
 	if err != nil {
 		return err
 	}
@@ -136,6 +128,41 @@ func Root(ctx context.Context, _ []string) error {
 	)
 
 	return nlpgo.Serve(ctx, application, deps, cfg, playground)
+}
+
+// newCodeExecutor builds the code-block executor from the operator-facing
+// engine config. Extracted from Root so the wiring itself — which operator
+// knob reaches which executor option — is reachable from a test without
+// standing up the whole service.
+//
+// `getenv` is injected so tests don't need to mutate process env.
+func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (*codeblock.Executor, error) {
+	return codeblock.New(codeblock.Options{
+		Python: resolveSandboxPython(engineCfg.SandboxPython, getenv),
+		// The instance a code node's LangWatch SDK calls. It is the same URL
+		// the evaluator blocks call back on, and it is injected only next to
+		// a run's own sandbox key.
+		SandboxEndpoint: resolveLangWatchBaseURL(
+			engineCfg.LangWatchBaseURL,
+			getenv,
+		),
+		DefaultTimeout: resolveCodeBlockTimeout(engineCfg.CodeBlockTimeoutSeconds),
+	})
+}
+
+// resolveCodeBlockTimeout converts the operator's CODE_BLOCK_TIMEOUT_SECONDS
+// into the wall-clock timeout the code-block executor enforces.
+//
+// A zero or negative value returns zero, which hands the decision back to
+// codeblock.New and its 60s fallback — one default, in one place. Returning a
+// negative duration instead would build an already-expired context and kill
+// every code block on its first instruction, turning a typo in a config file
+// into a total outage of the feature.
+func resolveCodeBlockTimeout(seconds int) time.Duration {
+	if seconds <= 0 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // resolveLangWatchBaseURL returns the base URL the evaluator and
