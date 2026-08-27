@@ -125,12 +125,26 @@ describe("<HandledErrorAlert />", () => {
       ],
     };
 
-    /** @scenario "A provider-setup failure tells the customer how to fix it" */
-    it("names the provider from meta instead of saying 'this provider'", () => {
+    /**
+     * The sentence stays provider-neutral on purpose (see the note on
+     * `provider_credential_invalid` in presentation.ts). The provider is named
+     * by the gateway's own tips, which is the line that also says what to do
+     * about it — so this asserts the customer still learns it was Vertex.
+     *
+     * @scenario "A provider-setup failure tells the customer how to fix it"
+     */
+    it("sends the customer to the credentials, and the tips name the provider", () => {
       renderAlert({ error: gatewayError(vertexCredentialEnvelope) });
 
       expect(
-        screen.getByText(/Google Vertex AI credentials saved for this project/),
+        screen.getByText(
+          /The credentials saved for this provider could not be used to authenticate/,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Vertex AI authenticates with a Google Cloud service-account JSON document/,
+        ),
       ).toBeInTheDocument();
     });
 
@@ -208,7 +222,7 @@ describe("<HandledErrorAlert />", () => {
 
       expect(
         screen.getByText(
-          "Google Vertex AI is configured on this project, but not for gemini-3.1-pro-preview. Add it to that provider in Settings → Model Providers.",
+          "No provider on this project is configured for gemini-3.1-pro-preview. Add it to one in Settings → Model Providers.",
         ),
       ).toBeInTheDocument();
     });

@@ -275,50 +275,6 @@ const label = (
   return typeof value === "string" ? value : undefined;
 };
 
-/**
- * The provider's display name, read from `meta.provider`.
- *
- * The gateway sends the dispatch engine's own name ("vertex", "azure"), which
- * is not what a customer calls it. Entries are bare noun phrases with no
- * leading article, so a caller can put one in front without having to know
- * which entries already carry one.
- */
-const PROVIDER_LABELS: Record<string, string> = {
-  vertex: "Google Vertex AI",
-  vertex_ai: "Google Vertex AI",
-  bedrock: "Amazon Bedrock",
-  azure: "Azure OpenAI",
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  gemini: "Google Gemini",
-  vllm: "custom OpenAI-compatible provider",
-};
-
-/**
- * An unmapped provider yields "", and every caller has a branch for that which
- * names no provider at all. Falling through to the raw value instead would put
- * an internal identifier in front of a customer: the gateway mints synthetic
- * provider keys of the form `anthropic-url-<16 hex>` and `gemini-url-<16 hex>`
- * for credentials carrying a base URL (adapters/providers/bifrost.go), so a
- * self-hosted Anthropic failure would read "Anthropic-url-3f9a2b8c1d0e4f57
- * received the credentials and refused them".
- *
- * Read through `label`, not by indexing: `meta.provider` is untrusted wire
- * data, and a bare index answers `"constructor"` with a function and
- * `"__proto__"` with an object — the second of which makes `capitalise` throw
- * while rendering an error, replacing the failure the customer came to read
- * with a blank region.
- */
-const providerLabel = (error: HandledErrorShape): string => {
-  const provider = str(error, "provider", "");
-  if (!provider) return "";
-  return label(PROVIDER_LABELS, provider.toLowerCase()) ?? "";
-};
-
-/** Sentence-cases a label that may already be a proper noun. */
-const capitalise = (text: string): string =>
-  text.charAt(0).toUpperCase() + text.slice(1);
-
 const presentations = {
   // ---- traces & spans ----
   trace_not_found: {
@@ -2692,41 +2648,48 @@ const presentations = {
     title: "The model provider timed out",
     describe: () => "Try again in a moment.",
   },
-  // The three below used to reach customers as provider_timeout — "try again
-  // in a moment" for a settings mistake that would repeat forever. Each one
-  // names the setting to change instead, and each names WHICH provider and
-  // model from `meta`, because "check your credentials" is unactionable to
-  // anyone whose key holds more than one provider.
+  /*
+   * The three below used to reach customers as provider_timeout — "try again
+   * in a moment" for a settings mistake that would repeat forever. Each one
+   * names the setting to change instead, and the model from `meta` where it
+   * narrows the answer.
+   *
+   * They deliberately do NOT name the provider. `meta.provider` carries the
+   * dispatch engine's own id ("vertex", "vllm"), which is not a name to show
+   * anyone, and turning it into one needs a table. The app already has two and
+   * they disagree: `server/modelProviders/registry` calls Bedrock "Bedrock" and
+   * is what Settings → Model Providers renders, while
+   * `features/onboarding/regions/model-providers/registry` calls it "AWS
+   * Bedrock". A third table here would have disagreed with both, and a name the
+   * customer cannot find on the page this copy sends them to is worse than no
+   * name at all. Importing the one Settings renders is not open either: it
+   * statically pulls the model catalog (`loadModelCatalog` → `llmModels.json`,
+   * ~570 KB) into every bundle that renders an error message.
+   *
+   * Little is lost. The gateway's remediation tips already name the provider
+   * and its credential artefact ("Vertex AI authenticates with a Google Cloud
+   * service-account JSON document, not an API key…"), so the customer still
+   * learns which provider failed — from the line that also tells them what to
+   * do about it. Name it here once one client-safe provider-name module exists.
+   */
   provider_credential_invalid: {
     // "Can't be used" rather than "not accepted": nothing reached the provider,
     // so nobody accepted or refused anything. The sibling code below is the one
     // the provider actually judged, and the two titles have to say which is
     // which or the split buys nothing.
     title: "Those provider credentials can't be used",
-    describe: (error) => {
-      const provider = providerLabel(error);
-      return provider
-        ? `The ${provider} credentials saved for this project could not be used to authenticate. Check them in Settings → Model Providers.`
-        : "The credentials saved for this provider could not be used to authenticate. Check them in Settings → Model Providers.";
-    },
+    describe: () =>
+      "The credentials saved for this provider could not be used to authenticate. Check them in Settings → Model Providers.",
   },
   provider_credential_rejected: {
     title: "The model provider rejected its credentials",
-    describe: (error) => {
-      const provider = providerLabel(error);
-      return provider
-        ? `${capitalise(provider)} received the credentials and refused them, so the account behind them is what to check — not their format.`
-        : "The provider received the credentials and refused them, so the account behind them is what to check — not their format.";
-    },
+    describe: () =>
+      "The provider received the credentials and refused them, so the account behind them is what to check — not their format.",
   },
   provider_config_invalid: {
     title: "This provider is not set up to serve that model",
     describe: (error) => {
       const model = str(error, "model", "");
-      const provider = providerLabel(error);
-      if (model && provider) {
-        return `${capitalise(provider)} is configured on this project, but not for ${model}. Add it to that provider in Settings → Model Providers.`;
-      }
       if (model) {
         return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
       }
