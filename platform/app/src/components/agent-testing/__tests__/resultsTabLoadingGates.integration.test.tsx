@@ -24,6 +24,9 @@ const mockSuiteSummaries = vi.hoisted(() => vi.fn());
 const mockExternalSets = vi.hoisted(() => vi.fn());
 const mockBatchHistory = vi.hoisted(() => vi.fn());
 
+const mockResultsOverview = vi.hoisted(() => vi.fn());
+const mockResultAtoms = vi.hoisted(() => vi.fn());
+
 vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
@@ -38,7 +41,16 @@ vi.mock("~/utils/api", () => ({
       getSummaries: { useQuery: mockSuiteSummaries },
       getById: { useQuery: () => ({ data: undefined }) },
     },
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    prompts: {
+      getAllPromptsForProject: { useQuery: () => ({ data: [] }) },
+    },
     scenarios: {
+      // The results list names the scenario and the labels of every run it
+      // lists, so the tab reads the scenarios of the project too.
+      getAll: { useQuery: () => ({ data: [] }) },
+      getResultsOverview: { useQuery: mockResultsOverview },
+      getResultAtoms: { useQuery: mockResultAtoms },
       getExternalSetSummaries: { useQuery: mockExternalSets },
       getScenarioSetBatchHistory: { useQuery: mockBatchHistory },
       getSuiteRunData: {
@@ -106,6 +118,24 @@ describe("the Results tab loading gate", () => {
       isLoading: false,
     });
     mockSuiteSummaries.mockReturnValue({ data: {}, isLoading: false });
+    mockResultsOverview.mockReturnValue({
+      data: {
+        totals: {
+          executions: 0,
+          runCount: 0,
+          passRate: null,
+          failingScenarios: 0,
+          cost: { totalUsd: 0, knownAtoms: 0, unknownAtoms: 0 },
+          series: [],
+        },
+        groups: [],
+      },
+      isLoading: false,
+    });
+    mockResultAtoms.mockReturnValue({
+      data: { atoms: [], hasMore: false },
+      isLoading: false,
+    });
   });
 
   afterEach(() => {

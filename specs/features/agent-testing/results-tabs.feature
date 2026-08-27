@@ -45,7 +45,72 @@ Feature: The Results tab
   Scenario: A run plan row shows its last result
     Given a run plan whose last run passed three of three
     When the Test Runs list is read
-    Then its row carries the pass summary of that last run
+    Then its row carries the pass rate of that last run
+
+  # --- The columns of the plan table ---
+
+  @integration
+  Scenario: The plan table holds seven columns in one order
+    Given the Results tab is open on the list of run plans
+    When the header of the table is read
+    Then the columns read "Run plan", "Last run", "Scope", "Targets", "Pass" and "Trend"
+    And the last column carries the row menu and no heading
+
+  @integration
+  Scenario: The Run plan column holds only the name
+    Given a run plan named "Checkout"
+    When its row is read
+    Then the Run plan cell reads "Checkout"
+    And no second line sits under the name
+
+  @integration
+  Scenario: The Last run column reads the age, the scenarios and the runs
+    Given a run plan that ran today, holds three scenarios and ran twice in the period
+    When its row is read
+    Then the Last run cell reads "today · 3 scenarios · 2 runs"
+    And it reads in muted text
+
+  @integration
+  Scenario: A run plan with no run in the period says so in the Last run column
+    Given a run plan with no run inside the selected period
+    When its row is read
+    Then the Last run cell says there is nothing in the period
+
+  @integration
+  Scenario: The Scope column says what the plan covers
+    Given a run plan whose scope names two test suites
+    When its row is read
+    Then the Scope cell names the two suites
+    And a plan that covers every scenario reads "All scenarios"
+
+  @integration
+  Scenario: The Targets column names the agents the plan runs against
+    Given a run plan that runs against "dev-agent" and "prod-agent"
+    When its row is read
+    Then the Targets cell names both agents
+
+  @integration
+  Scenario: The Pass column is a plain coloured percentage
+    Given a run plan whose runs passed nine of ten
+    When its row is read
+    Then the Pass cell reads "90%"
+    And it carries no box and no border
+    And it carries no cost and no duration
+
+  @integration
+  Scenario: The Trend column draws one bar per run, oldest first
+    Given a run plan with three runs that passed 100, 50 and 0 percent, oldest first
+    When its row is read
+    Then the Trend cell draws three bars
+    And the first bar reads the oldest run
+    And each bar takes its height and its colour from that run's pass rate
+
+  @integration
+  Scenario: The trend bars are softer than the text beside them
+    Given a run plan with runs to draw
+    When the Trend cell is read
+    Then every bar is drawn at the same reduced opacity
+    And that opacity is stated in one place for the whole page
 
   @integration
   Scenario: Choosing a run plan opens its runs
@@ -54,7 +119,135 @@ Feature: The Results tab
     Then the runs sidebar lists the three runs, newest first
     And the newest run is selected
 
+  # --- The toolbar ---
+
+  @integration
+  Scenario: The toolbar puts the filters above the numbers they drive
+    Given the Results tab is open on the list of run plans
+    When the top of the tab is read
+    Then the filter row reads first
+    And the charts block reads under it
+    And the table reads last
+
+  @integration
+  Scenario: The filter row holds four filters, the period and the Charts toggle
+    Given the Results tab is open on the list of run plans
+    When the filter row is read
+    Then it offers a scenario filter, a label filter, a target filter and a status filter on the left
+    And the period picker sits on the right
+    And a "Charts" toggle sits beside the period picker
+    And the toggle carries no caret
+
+  @integration
+  Scenario: The charts block is hidden until the Charts toggle is used
+    Given the Results tab is open on the list of run plans
+    When the tab is first read
+    Then no stat strip is shown
+    And no pass rate over time chart is shown
+    When "Charts" is chosen
+    Then the stat strip and the pass rate over time chart are shown
+
+  @integration
+  Scenario: There is no Simple and Explorer switch
+    Given the Results tab is open on the list of run plans
+    When the toolbar is read
+    Then no switch between a simple view and an explorer view is offered
+
+  @integration
+  Scenario: A filter cuts the list and every number with it
+    Given the Results tab is open with the charts block shown
+    When a scenario filter is chosen
+    Then only the rows holding that scenario are listed
+    And the stat strip reads the filtered rows
+    And the pass rate over time chart reads the filtered rows
+
+  # --- Group by ---
+
+  @integration
+  Scenario: Group by is an enclosed segmented control of four tabs
+    Given the Results tab is open on the list of run plans
+    When the Group by control is read
+    Then it draws four connected tabs inside one enclosure
+    And they read "Run plan", "Scenario", "Target" and "None"
+    And it is not a dropdown
+    And "Run plan" is chosen
+
+  @integration
+  Scenario: Grouping by scenario opens a row for every run of that scenario
+    Given two run plans that both hold the scenario "Refund a paid order"
+    When "Scenario" is chosen in Group by
+    Then one row reads "Refund a paid order"
+    And opening it lists every run of that scenario across both plans
+    And its Trend draws one bar per run
+
+  @integration
+  Scenario: Grouping by target compares one agent against another
+    Given runs against "dev-agent" and against "prod-agent"
+    When "Target" is chosen in Group by
+    Then one row reads "dev-agent" and one row reads "prod-agent"
+    And each row reads the pass rate of that agent alone
+
+  @integration
+  Scenario: Grouping by none reads the flat list
+    Given a filter has already narrowed the question
+    When "None" is chosen in Group by
+    Then one row is listed for every scenario, target and run
+
+  # --- Colour ---
+
+  @unit
+  Scenario: One helper maps a pass rate to a colour for text and for bars
+    Given a pass rate
+    When its colour is read for the text and for the bar of the same row
+    Then both read the same colour
+
+  @unit
+  Scenario: Green reads at one hundred percent only
+    Given a run plan that passed 99 of 100
+    When its pass rate colour is read
+    Then it is not green
+    And a run plan that passed every scenario is green
+
+  @unit
+  Scenario: Amber reads from forty percent and red reads under it
+    Given a pass rate of 40 percent
+    When its colour is read
+    Then it is amber
+    And a pass rate of 39 percent is red
+
+  @unit
+  Scenario: A pass rate that is not known reads grey
+    Given a run plan whose runs reached no verdict
+    When its pass rate colour is read
+    Then it is grey
+
   # --- The runs sidebar ---
+
+  @integration
+  Scenario: The runs sidebar holds only the back link and the run list
+    Given a run plan is open
+    When the runs sidebar is read
+    Then it offers a "Results" back link
+    And it lists the runs of the plan
+    And the name of the plan is not repeated in the sidebar
+
+  @integration
+  Scenario: The run header reads the run, the pass block, the evaluators and the note
+    Given a run of a plan that carries evaluators and a note
+    When the run header is read
+    Then it reads "Run #2" first
+    And the pass block reads after it
+    And the evaluator pills read after the pass block, at the size of the pass block
+    And the note reads last
+
+  @integration
+  Scenario: A score evaluator carries no threshold and no colour
+    Given a run whose evaluators are one pass or fail check and one score
+    When the evaluator pills are read
+    Then the pass or fail pill is coloured by its verdict
+    And the score pill reads its number with no colour
+    And no threshold is shown for the score
+
 
   @integration
   Scenario: A sidebar entry shows the number, the note, the age and the pass rate

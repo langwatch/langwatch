@@ -27,6 +27,7 @@ import type {
   ScenarioRunData,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
+import { parseSuiteScope } from "~/server/suites/scope";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import {
   ONE_OFF_RUNS_PLAN_SLUG,
@@ -65,6 +66,13 @@ export type RunPlan = {
   /** How many scenarios the plan holds, or null when only the code that ran knows. */
   caseCount: number | null;
   lastRun: RunPlanLastRun | null;
+  /**
+   * What the plan covers, in words, for the Scope column.
+   *
+   * Resolved when the plans are built, because a scope naming other suites can
+   * only be read as names while the whole suite list is in hand.
+   */
+  scopeLabel: string;
 };
 
 /**
@@ -87,7 +95,54 @@ export type RunPlanSuite = {
   slug: string;
   scenarioIds: string[];
   labels: string[];
+  /** "folder" for a suite that groups scenarios, "custom" for a written plan. */
+  kind?: string;
+  /** The stored scope rule, as it crosses the wire: unparsed JSON. */
+  scope?: unknown;
 };
+
+/**
+ * What a run plan covers, in words.
+ *
+ * A folder is its own scope: it runs the scenarios filed in it, so naming the
+ * suite again here would only repeat the Run plan column. Everything else
+ * reads its stored rule, with the suites of a `folders` scope named rather
+ * than counted, because "Checkout, Refunds" answers the question and
+ * "2 suites" does not.
+ *
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
+export function suiteScopeLabel({
+  suite,
+  suiteNames,
+}: {
+  suite: RunPlanSuite;
+  /** Every suite of the project, keyed by id, for a scope naming others. */
+  suiteNames: Map<string, string>;
+}): string {
+  if (suite.kind === "folder") return "Scenarios in this suite";
+
+  const scope = parseSuiteScope(suite.scope);
+  switch (scope.mode) {
+    case "all":
+      return "All scenarios";
+    case "folders": {
+      const named = scope.folderIds
+        .map((id) => suiteNames.get(id))
+        .filter((name): name is string => !!name);
+      if (named.length === 0) return "No suite";
+      return named.join(", ");
+    }
+    case "labels": {
+      if (scope.labels.length === 0) return "No label";
+      return `Labelled ${scope.labels.join(", ")}`;
+    }
+    case "cases": {
+      const count = suite.scenarioIds.length;
+      return count === 1 ? "1 scenario" : `${count} scenarios`;
+    }
+  }
+}
 
 /** The address segment an external set is opened by. */
 export function toExternalPlanSlug(scenarioSetId: string): string {
@@ -165,6 +220,8 @@ export function buildRunPlans({
   externalSets: ExternalSetSummary[];
   oneOffLastRun: RunPlanLastRun | null;
 }): RunPlan[] {
+  const suiteNames = new Map(suites.map((suite) => [suite.id, suite.name]));
+
   const suitePlans: RunPlan[] = suites
     .filter((suite) => !suite.labels.includes(CLI_EPHEMERAL_LABEL))
     .map((suite) => {
@@ -177,6 +234,7 @@ export function buildRunPlans({
         suiteId: suite.id,
         caseCount: suite.scenarioIds.length,
         lastRun: summary ? toLastRun(summary) : null,
+        scopeLabel: suiteScopeLabel({ suite, suiteNames }),
       };
     });
 
@@ -188,6 +246,7 @@ export function buildRunPlans({
     suiteId: null,
     caseCount: null,
     lastRun: toLastRun(set),
+    scopeLabel: "Whatever the code ran",
   }));
 
   const oneOffPlan: RunPlan = {
@@ -198,6 +257,7 @@ export function buildRunPlans({
     suiteId: null,
     caseCount: null,
     lastRun: oneOffLastRun,
+    scopeLabel: "One scenario at a time",
   };
 
   return [...suitePlans, ...externalPlans]
@@ -230,6 +290,7 @@ export function resolveRunPlan({
       suiteId: null,
       caseCount: null,
       lastRun: null,
+      scopeLabel: "One scenario at a time",
     };
   }
 
@@ -243,6 +304,7 @@ export function resolveRunPlan({
       suiteId: null,
       caseCount: null,
       lastRun: null,
+      scopeLabel: "Whatever the code ran",
     };
   }
 

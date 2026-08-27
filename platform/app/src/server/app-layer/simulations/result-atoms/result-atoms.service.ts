@@ -131,7 +131,12 @@ export class ResultAtomsService {
     });
 
     const groups = groupRows.map((row) =>
-      toGroup({ row, groupBy, trend: trendByGroup.get(row.GroupKey) ?? [], titles }),
+      toGroup({
+        row,
+        groupBy,
+        trend: trendByGroup.get(row.GroupKey) ?? [],
+        titles,
+      }),
     );
 
     return {
@@ -155,10 +160,7 @@ export class ResultAtomsService {
           bucketSeconds,
         }),
       },
-      groups:
-        groupBy === "plan"
-          ? withQuietPlans({ groups, plans })
-          : groups,
+      groups: groupBy === "plan" ? withQuietPlans({ groups, plans }) : groups,
     };
   }
 
@@ -197,7 +199,12 @@ export class ResultAtomsService {
       const asked = new Set(filter.scenarioIds);
       ids = ids.filter((id) => asked.has(id));
     }
-    return { ...filter, scenarioIds: ids, labels: undefined, folderIds: undefined };
+    return {
+      ...filter,
+      scenarioIds: ids,
+      labels: undefined,
+      folderIds: undefined,
+    };
   }
 
   /**
@@ -270,9 +277,16 @@ interface PlanIndex {
   all: { id: string; name: string; slug: string }[];
 }
 
+/**
+ * Where a group row takes its title from.
+ *
+ * The two arms are told apart by `kind`, so the scenario arm must be excluded
+ * from the other one: a `kind` that still holds "scenario" on both arms
+ * narrows to neither and the map is then unreachable.
+ */
 type GroupTitles =
   | { kind: "scenario"; byId: Map<string, { title: string; subtitle: string }> }
-  | { kind: ResultsGroupBy; plans: PlanIndex };
+  | { kind: Exclude<ResultsGroupBy, "scenario">; plans: PlanIndex };
 
 const runKey = (setId: string, batchRunId: string): string =>
   `${setId} ${batchRunId}`;
@@ -284,10 +298,7 @@ const runKey = (setId: string, batchRunId: string): string =>
  * who pushed it will recognise. The on-platform ad-hoc set has a friendly name
  * of its own, because its raw id is an internal namespace nobody chose.
  */
-function planFor(
-  setId: string,
-  plans: Map<string, PlanRecord>,
-): PlanRecord {
+function planFor(setId: string, plans: Map<string, PlanRecord>): PlanRecord {
   const known = plans.get(setId);
   if (known) return known;
   if (isOnPlatformSet(setId)) {
@@ -431,7 +442,9 @@ function foldTrend(rows: RawTrendRow[]): Map<string, TrendPoint[]> {
   const folded = new Map<string, TrendPoint[]>();
   for (const [groupKey, list] of byGroup) {
     const sorted = [...list].sort(
-      (a, b) => Number(a.RunAt) - Number(b.RunAt) || a.TrendKey.localeCompare(b.TrendKey),
+      (a, b) =>
+        Number(a.RunAt) - Number(b.RunAt) ||
+        a.TrendKey.localeCompare(b.TrendKey),
     );
     const kept = sorted.slice(-MAX_TREND_POINTS);
     folded.set(

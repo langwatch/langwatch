@@ -37,6 +37,21 @@ const emptyResults = vi.hoisted(() => ({
   freshness: { data: undefined },
   batchCount: { data: { count: 0 } },
   list: { data: [] as unknown[] },
+  overview: {
+    data: {
+      totals: {
+        executions: 0,
+        runCount: 0,
+        passRate: null,
+        failingScenarios: 0,
+        cost: { totalUsd: 0, knownAtoms: 0, unknownAtoms: 0 },
+        series: [] as unknown[],
+      },
+      groups: [] as unknown[],
+    },
+    isLoading: false,
+  },
+  atoms: { data: { atoms: [] as unknown[], hasMore: false }, isLoading: false },
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -53,7 +68,16 @@ vi.mock("~/utils/api", () => ({
       getSummaries: { useQuery: mockSuiteSummaries },
       getById: { useQuery: () => ({ data: undefined }) },
     },
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    prompts: {
+      getAllPromptsForProject: { useQuery: () => ({ data: [] }) },
+    },
     scenarios: {
+      // The results list names the scenario and the labels of every run it
+      // lists, so the tab reads the scenarios of the project too.
+      getAll: { useQuery: () => ({ data: [] }) },
+      getResultsOverview: { useQuery: () => emptyResults.overview },
+      getResultAtoms: { useQuery: () => emptyResults.atoms },
       getExternalSetSummaries: {
         useQuery: () => emptyResults.externalSets,
       },

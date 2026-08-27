@@ -47,8 +47,6 @@ import {
   closeClickHouseClient,
 } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
-import { ResultAtomsClickHouseRepository } from "./simulations/result-atoms/result-atoms.clickhouse.repository";
-import { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
 import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
@@ -323,6 +321,8 @@ import { PrismaShareRepository } from "./share/repositories/share.prisma.reposit
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
 import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
+import { ResultAtomsClickHouseRepository } from "./simulations/result-atoms/result-atoms.clickhouse.repository";
+import { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
@@ -2134,6 +2134,15 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     })(),
     simulations: {
       runs: testSimulationReads,
+      // The results read has no null repository. It fails on use rather than
+      // answering an empty page, so a test that reaches it says so instead of
+      // reading as a project with no runs.
+      results: new ResultAtomsService(
+        new ResultAtomsClickHouseRepository(() => {
+          throw new Error("ClickHouse not available in test app");
+        }),
+        testPrisma,
+      ),
       export: ScenarioRunExportService.create(testSimulationReads.repository),
     },
     suiteRuns: {

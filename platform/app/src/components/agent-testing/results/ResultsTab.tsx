@@ -12,15 +12,14 @@
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect } from "react";
 import { usePeriodSelector } from "~/components/PeriodSelector";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { PLAN_EDITOR_DRAWER } from "../plan/usePlanEditor";
+import { useOpenRunPlan } from "../run/RunPlanDialogHost";
 import { AgentTestingTabLayout } from "../shared/TabLayout";
 import { useNewRunPlanFlow } from "../useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
 import { useAgentTestingStore } from "../useAgentTestingStore";
+import { ResultsList } from "./ResultsList";
 import { RunPlanDetail } from "./RunPlanDetail";
-import { RunPlansTable } from "./RunPlansTable";
 import { planScopeNote, type RunPlan, resolveRunPlan } from "./run-plans";
 import { useRunPlans } from "./useRunPlans";
 import { useWidenWindowForPlan } from "./useWidenWindowForPlan";
@@ -80,12 +79,12 @@ function TabSkeleton({
 
 export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer } = useDrawer();
-  const { planSlug, batchRunId, isReady, selectPlan, selectRun } =
-    useAgentTestingRouting();
+  const routing = useAgentTestingRouting();
+  const { planSlug, batchRunId, isReady, selectPlan, selectRun } = routing;
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
   const { plans, isLoading, hasAnyPlans } = useRunPlans({ period });
-  const handleNewRunPlan = useNewRunPlanFlow(selectPlan);
+  const handleNewRunPlan = useNewRunPlanFlow();
+  const openRunPlan = useOpenRunPlan();
 
   const selectedPlan = planSlug
     ? resolveRunPlan({ plans, planSlug, projectId: project?.id ?? "" })
@@ -100,12 +99,9 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
     setPeriod,
   });
 
-  const handleEditPlan = useCallback(
-    (suiteId: string) => {
-      openDrawer(PLAN_EDITOR_DRAWER, { urlParams: { suiteId } });
-    },
-    [openDrawer],
-  );
+  // A run plan is configured in the run dialog, which is the only place a run
+  // is configured at all.
+  const handleEditPlan = openRunPlan;
 
   const handleBack = useCallback(() => selectPlan(null), [selectPlan]);
 
@@ -142,6 +138,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
 
   return (
     <ResultsListView
+      routingState={routing}
       planSlug={planSlug}
       selectedPlan={selectedPlan}
       plans={plans}
@@ -154,46 +151,40 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
       onSelectPlan={selectPlan}
       onEditPlan={handleEditPlan}
       onNewRunPlan={handleNewRunPlan}
+      isSseConnected={isSseConnected}
     />
   );
 }
 
-type ResultsListViewProps = {
+type ResultsListViewProps = Omit<
+  React.ComponentProps<typeof ResultsList>,
+  "isPlansLoading" | "onSelectRun"
+> & {
   planSlug: string | null;
   selectedPlan: RunPlan | null;
-  plans: RunPlan[];
   isLoading: boolean;
-  hasAnyPlans: boolean;
-  period: React.ComponentProps<typeof RunPlansTable>["period"];
-  periodMode: React.ComponentProps<typeof RunPlansTable>["periodMode"];
-  setPeriod: React.ComponentProps<typeof RunPlansTable>["setPeriod"];
-  setRelativePeriod: React.ComponentProps<
-    typeof RunPlansTable
-  >["setRelativePeriod"];
-  onSelectPlan: React.ComponentProps<typeof RunPlansTable>["onSelectPlan"];
-  onEditPlan: (suiteId: string) => void;
-  onNewRunPlan: () => void;
 };
 
 function ResultsListView({
   planSlug,
   selectedPlan,
-  plans,
   isLoading,
-  hasAnyPlans,
-  period,
-  periodMode,
-  setPeriod,
-  setRelativePeriod,
   onSelectPlan,
-  onEditPlan,
-  onNewRunPlan,
+  ...listProps
 }: ResultsListViewProps) {
   // When the URL names a plan, we must not fall through to the plans list —
   // even for a frame. A false render on `!selectedPlan` while the queries are
   // still on their way reads as "plan not found" for a split second before the
   // real detail arrives. The empty branch is reserved for `!isLoading && !data`.
   const isResolvingPlan = !!planSlug && !selectedPlan && isLoading;
+
+  // Opening one run from the list lands on its plan, which opens on that
+  // plan's newest run. Landing on the run itself needs one address change
+  // rather than two, which the routing hook does not offer yet.
+  const handleSelectRun = useCallback(
+    (runPlanSlug: string) => onSelectPlan(runPlanSlug),
+    [onSelectPlan],
+  );
 
   return (
     <AgentTestingTabLayout data-testid="agent-testing-results-tab">
@@ -204,17 +195,11 @@ function ResultsListView({
           testId="agent-testing-run-plan-loading"
         />
       ) : (
-        <RunPlansTable
-          plans={plans}
-          isLoading={isLoading}
-          hasAnyPlans={hasAnyPlans}
-          period={period}
-          periodMode={periodMode}
-          setPeriod={setPeriod}
-          setRelativePeriod={setRelativePeriod}
+        <ResultsList
+          {...listProps}
+          isPlansLoading={isLoading}
           onSelectPlan={onSelectPlan}
-          onEditPlan={onEditPlan}
-          onNewRunPlan={onNewRunPlan}
+          onSelectRun={handleSelectRun}
         />
       )}
     </AgentTestingTabLayout>

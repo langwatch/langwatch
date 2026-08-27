@@ -1,6 +1,6 @@
 /**
  * The results of one run as a table: one row per scenario and target pair,
- * with the verdict, the evaluators, the duration and the cost.
+ * with the verdict, the duration and the cost.
  *
  * The table is a grid inside one bordered card, the way the Scenarios table
  * is drawn, so both tabs read as one surface.
