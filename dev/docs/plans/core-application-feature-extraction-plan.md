@@ -41,6 +41,8 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Trace projection-persistence cut                          |     8 fewer | Committed                                 |
 | Topic clustering application cut                          |    39 fewer | Committed                                 |
 | Simulation and Suite eventing cut                         |    44 fewer | Partial checkpoint committed              |
+| Scenario/Suite folder and run-plan cut at `4c7bbddd73`    |    19 fewer | Suite app implementation deleted          |
+| Scenario version and displaced Suite stack at `4ae157efda` |    16 fewer | Committed and pushed                       |
 | Evaluation-wave and caller checkpoints since `fa00f3d7ec` |    46 fewer | 41 commits; incomplete slices named below |
 
 The Automation contract, server and web packages have 559 passing tests, and
@@ -67,13 +69,13 @@ cutovers remain explicit ledger work.
 | API framework          | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                                                                                                | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first.      |
 | Feature Flag           | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                                                                          | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services.                                                                                |
 | Evaluation wave        | Evaluator application implementations and its displaced API middleware are deleted. Experiment, Simulation and Suite old eventing roots are deleted. Their package and caller work is checkpointed, but strict-layout findings, subscriber guarantees, nullable repository naming, execution adapters and some behavioural proof remain red. | Repair the named package findings, prove each singular feature, then drain the remaining transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature.                        |
-| Scenario and Suite     | The current checkpoint moves folder ownership, run-plan scope, `runAll`, folder-compatible Suite reads/runs, and Scenario folder locking into the canonical packages. Suite ClickHouse writes remain event-driven projections; the service receives only a read-model port. Suite server has 33 passing tests and focused contract/server/web typechecks pass. | Commit the reviewed checkpoint, then migrate the remaining Suite integration coverage and delete the now-uncalled app Suite service/repository/scope stack. Scenario versioning, restore, move and duplicate remain the named blockers to deleting the old Scenario stack. |
+| Scenario and Suite     | Committed at `4ae157efda`: Scenario versioning, restore, move and duplicate now belong to `@langwatch/scenario-server`; both transports use the canonical service. The displaced Scenario stack, folder helper and dead Suite run stack are deleted, removing 16 application files. Contract/server typechecks pass; 228 contract and 438 server tests pass, with only the two Redis integration suites unavailable locally. | Keep the remaining Scenario/Simulation/Suite files only for their named process, transport or UI responsibilities; do not restore app-owned domain services. |
 | Trace boundary         | The old request-collection service, its app-owned types and its unit suite are deleted. Server and transport callers now use the Trace contract/server surfaces. The app-owned query/facet compiler and 18 trace-processing subscribers/utilities remain deliberate residue.                                                                 | Prove trace response and ingestion parity, then move the query/facet compiler, protection/edit and usage-reader cohorts without changing `trace_analytics`, `trace_summaries`, rollups or public response fields.        |
 | Integration checkpoint | The one merge of `origin/main` at `5a9cd02001` is committed at `5770224e31` with no unmerged paths, conflict markers, stale `@ee` imports, old Prisma migration root or `platform/app/ee`. Upstream added 600 net application files to the 5,804-file pre-merge checkpoint, leaving a 6,404-file integrated baseline.                        | Push the resolved merge, then resume deletion from the named residuals below. Do not count upstream integration as extraction progress.                                                                                  |
 
 Physical movement in the shared worktree is not progress until its exact paths
-are reviewed and committed. There is no time estimate in this ledger: the next
-status changes when a named proof or commit changes.
+are reviewed and committed. Forecasts below are ranges, not substitutes for a
+named proof or commit.
 
 Pre-merge focused proof is green for all 15 Evaluation-wave package
 typechecks, Trace server typecheck and 633 tests, Suite's 28 tests, and 118
@@ -89,45 +91,41 @@ are green. The application typecheck remains an explicit red integration
 baseline at 1,232 diagnostics across 378 files; it is not being described as a
 successful merge check.
 
-Main introduced four temporary application-owned behaviour cohorts for which a
-canonical package implementation does not yet exist: Experiment workbench
-persistence/versioning, Scenario version history, Suite folder/scope/run-plan
-semantics, and legacy Simulation ClickHouse read/export. SCIM lifecycle/config
-and Governance trace-ingestion composition also remain explicit process
-residuals. They were preserved for parity rather than silently dropped or
-pretended to be complete.
+Main introduced four temporary application-owned behaviour cohorts. Scenario
+version history and Suite folder/scope/run-plan semantics are now canonical
+package behaviour; Experiment workbench persistence/versioning and legacy
+Simulation ClickHouse read/export remain application-owned residuals. SCIM
+lifecycle/config and Governance trace-ingestion composition also remain
+explicit process residuals. They were preserved for parity rather than
+silently dropped or pretended to be complete.
 
 ## Deletion queue
 
 The next committed batches after the `origin/main` merge are:
 
-1. **Suite folder cut:** commit the canonical folder/scope/run-plan checkpoint,
-   move the remaining integration coverage, then delete the uncalled app Suite
-   service, repository, scope, constants, types and set-ID residue. Keep only
-   the named Scenario versioning/restore residual until the next cut.
-2. **Experiment and Scenario version cut:** move the restored workbench and
-   Scenario history implementations into their existing singular owners.
-3. **SCIM and Governance composition:** inject the SCIM lifecycle/config and
+1. **Experiment version cut:** move the restored workbench persistence and
+   versioning implementation into the existing singular Experiment owner.
+2. **SCIM and Governance composition:** inject the SCIM lifecycle/config and
    Governance trace-ingestion ports from API composition without restoring
    Enterprise application code.
-4. **Evaluation-wave repair:** clear the recorded strict-layout, repository,
+3. **Evaluation-wave repair:** clear the recorded strict-layout, repository,
    subscriber and test-quality findings without restoring app implementations.
-5. **Evaluation-wave completion:** drain the remaining execution adapters,
+4. **Evaluation-wave completion:** drain the remaining execution adapters,
    transports, workers and reusable UI while keeping Evaluation, Evaluator,
    Monitor, Experiment, Scenario, Simulation and Suite as separate services.
-6. **Prompt web cut:** use the redesign in
+5. **Prompt web cut:** use the redesign in
    [PR 7371](https://github.com/langwatch/langwatch/pull/7371) as the starting
    implementation for the Prompt web package and `apps/ui` composition. Do not
    migrate the displaced Prompt UI first and rewrite it again. Review the PR
    against the current Prompt contract and preserve every live transport and
    browser behaviour it does not replace.
-7. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
+6. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
    one dependency-closed read-side collaborator.
-8. **Trace edit overlay and protection:** move the 18-file edit/protection core
+7. **Trace edit overlay and protection:** move the 18-file edit/protection core
    and its behavioural coverage.
-9. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
+8. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
    not into the Trace service merely because they currently live under Trace.
-10. **API composition:** adopt the parked REST surface when `apps/api` is
+9. **API composition:** adopt the parked REST surface when `apps/api` is
     created; do not churn current routes before that physical cut.
 
 The remainder of Evaluation and the other feature slices remain open. They are
@@ -140,10 +138,47 @@ not completion fallout from the batches above:
 | Product features                                                           | Drain Model Provider, Prompt, Dataset, Agent, Workflow, Analytics, Dashboard, Topic, Gateway, Langy, Annotation and Share as independent verticals.        |
 | Data and operations                                                        | Drain Data Privacy, Data Retention, Secret, Stored Object, Ops and licensed Enterprise seams into their declared owners and process composition.           |
 | Browser and process composition                                            | Move reusable UI to feature web packages or the Design System; move route, API, worker and browser composition to `apps/api`, `apps/worker` and `apps/ui`. |
-| Infrastructure and repository support                                      | Move boot/config, Prisma, Redis, ClickHouse, queues, mail, storage, observability, scripts, tests, specs and assets to named owners.                       |
+| Infrastructure and repository support                                      | Move boot/config, Prisma, Redis, ClickHouse, queues, mail, storage, observability, scripts, tests and assets to named owners. Leave the existing root specs in place for this migration. |
 
 A later slice receives an exact file count only when it is inventoried against
 the then-current committed tree. Stale macro counts and low import counts are
+not evidence of completion.
+
+## Working forecast
+
+The committed `4ae157efda` baseline contains 6,369 application files. Of those,
+3,504 are production TypeScript, 2,395 are TypeScript tests, and 486 are other
+tests, scripts, assets, Prisma files, configuration and documentation. The
+architecture fragment baseline identifies 255 displaced implementations, 98
+transports, 26 composition files, two infrastructure adapters and 575 page
+shells. Those classified files are the main semantic cut; the remaining count
+is mostly reusable browser code, tests and physical process/support movement.
+
+All 50 catalogue features already have a package owner. There are 49 contract,
+48 server and 25 web package surfaces, and `apps/api`, `apps/ui` and
+`apps/worker` already have runtime shells. The remaining work is therefore not
+6,369 greenfield implementations, but neither is it a bulk rename: ownership,
+parity and process boot still have to be proved.
+
+The forecast assumes three continuously active migration lanes plus one review
+lane, no new upstream merge, and focused slice proof where the full application
+baseline is independently red.
+
+| Wave | Dependency-closed result | Likely elapsed range |
+| --- | --- | ---: |
+| Scenario gate | Committed and pushed at `4ae157efda`; 16 application files removed | Complete |
+| Experiment and Evaluation family | Workbench versioning, SCIM/Governance composition, then Evaluation/Evaluator/Monitor/Experiment/Simulation completion | 1–3 weeks |
+| Remaining server owners | Drain the 255 classified legacy implementations and their 98 transports into existing feature packages | 2–4 weeks |
+| Feature web and UI | Move reusable browser behaviour into feature web packages, use Prompt PR 7371, and leave only route/page composition for `apps/ui` | 3–6 weeks |
+| Physical processes and support | Cut API, worker and UI boot into their app shells; move tests, E2E, scripts, assets, Prisma/config and docs; leave root specs alone; remove external references | 2–4 weeks |
+| Final integration | Integrate fresh `origin/main`, resolve into canonical owners, and run parity/deletion proof | 1–2 weeks |
+
+Several waves overlap. The current whole-program range is **8–12 elapsed weeks
+if the mechanical web/process movement stays mechanical, and 12–18 weeks as
+the working likely range**. Re-estimate after the Experiment/Evaluation gate:
+that is the first point where the remaining rate is based on two complete
+post-merge verticals rather than one.
+
 ## Batch proof
 
 Every deletion batch records:
@@ -164,7 +199,8 @@ Every deletion batch records:
 
 No batch is complete merely because files moved out of the physical tree.
 Transports, pages, workers, tests and documentation move with their owner or are
-named as deliberate process composition in that same batch.
+named as deliberate process composition in that same batch. Existing root specs
+stay where they are and are not rewritten as part of extraction.
 
 ## Final deletion
 
