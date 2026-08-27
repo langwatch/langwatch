@@ -256,104 +256,110 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     });
   });
 
-  it("returns only internally consistent email delivery statuses", async () => {
-    const timestamp = "2026-08-24T07:22:00.000Z";
-    const statuses = [
-      {
-        status: "accepted",
-        acceptedCount: 2,
-        failedCount: 0,
-        totalCount: 2,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "partial_failure",
-        acceptedCount: 1,
-        failedCount: 1,
-        totalCount: 2,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "failed",
-        acceptedCount: 0,
-        failedCount: 2,
-        totalCount: 2,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "partial_failure",
-        acceptedCount: 2,
-        failedCount: 0,
-        totalCount: 2,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "accepted",
-        acceptedCount: 1,
-        failedCount: 0,
-        totalCount: 2,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "failed",
-        acceptedCount: -1,
-        failedCount: 2,
-        totalCount: 1,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "accepted",
-        acceptedCount: 1.5,
-        failedCount: 0,
-        totalCount: 1.5,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "accepted",
-        acceptedCount: Number.POSITIVE_INFINITY,
-        failedCount: 0,
-        totalCount: Number.POSITIVE_INFINITY,
-        updatedAtIso: timestamp,
-      },
-      {
-        status: "accepted",
-        acceptedCount: 1,
-        failedCount: 0,
-        totalCount: 1,
-        updatedAtIso: "not-a-date",
-      },
-    ];
-    const date = new Date(timestamp);
-    const prisma = {
-      anomalyAlert: {
-        findMany: vi.fn(async () =>
-          statuses.map((email, index) => ({
-            id: `alert-${index}`,
-            ruleId: "rule",
-            ruleName: "Rule",
-            ruleType: "spend_spike",
-            severity: "warning",
-            triggerWindowStart: date,
-            triggerWindowEnd: date,
-            triggerSpendUsd: null,
-            triggerEventCount: null,
-            detectedAt: date,
-            state: "open",
-            detail: {},
-            destinationStatus: { email },
-          })),
-        ),
-      },
-    };
-    const service = ActivityMonitorService.create(prisma as never);
+  describe("given persisted email delivery statuses", () => {
+    describe("when recent anomalies are requested", () => {
+      it("returns only internally consistent email delivery statuses", async () => {
+        const timestamp = "2026-08-24T07:22:00.000Z";
+        const statuses = [
+          {
+            status: "accepted",
+            acceptedCount: 2,
+            failedCount: 0,
+            totalCount: 2,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "partial_failure",
+            acceptedCount: 1,
+            failedCount: 1,
+            totalCount: 2,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "failed",
+            acceptedCount: 0,
+            failedCount: 2,
+            totalCount: 2,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "partial_failure",
+            acceptedCount: 2,
+            failedCount: 0,
+            totalCount: 2,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "accepted",
+            acceptedCount: 1,
+            failedCount: 0,
+            totalCount: 2,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "failed",
+            acceptedCount: -1,
+            failedCount: 2,
+            totalCount: 1,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "accepted",
+            acceptedCount: 1.5,
+            failedCount: 0,
+            totalCount: 1.5,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "accepted",
+            acceptedCount: Number.POSITIVE_INFINITY,
+            failedCount: 0,
+            totalCount: Number.POSITIVE_INFINITY,
+            updatedAtIso: timestamp,
+          },
+          {
+            status: "accepted",
+            acceptedCount: 1,
+            failedCount: 0,
+            totalCount: 1,
+            updatedAtIso: "not-a-date",
+          },
+        ];
+        const date = new Date(timestamp);
+        const prisma = {
+          anomalyAlert: {
+            findMany: vi.fn(async () =>
+              statuses.map((email, index) => ({
+                id: `alert-${index}`,
+                ruleId: "rule",
+                ruleName: "Rule",
+                ruleType: "spend_spike",
+                severity: "warning",
+                triggerWindowStart: date,
+                triggerWindowEnd: date,
+                triggerSpendUsd: null,
+                triggerEventCount: null,
+                detectedAt: date,
+                state: "open",
+                detail: {},
+                destinationStatus: { email },
+              })),
+            ),
+          },
+        };
+        const service = ActivityMonitorService.create({
+          prisma: prisma as never,
+        });
 
-    const rows = await service.recentAnomalies({ organizationId: "org" });
+        const rows = await service.recentAnomalies({ organizationId: "org" });
 
-    expect(rows.slice(0, 3).map((row) => row.emailDeliveryStatus)).toEqual(
-      statuses.slice(0, 3),
-    );
-    expect(rows.slice(3).every((row) => row.emailDeliveryStatus === null)).toBe(
-      true,
-    );
+        expect(rows.slice(0, 3).map((row) => row.emailDeliveryStatus)).toEqual(
+          statuses.slice(0, 3),
+        );
+        expect(
+          rows.slice(3).every((row) => row.emailDeliveryStatus === null),
+        ).toBe(true);
+      });
+    });
   });
 });
