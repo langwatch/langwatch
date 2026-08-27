@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed baseline:** `fa00f3d7ec`
+**Committed application baseline:** `10bc9ebff2`
 
 **Goal:** delete `platform/app`.
 
@@ -24,8 +24,8 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Ledger item                                          |       Count | Status                                |
 | ---------------------------------------------------- | ----------: | ------------------------------------- |
 | Original application baseline                       | 6,398 files | Reference                             |
-| Committed `platform/app` at `fa00f3d7ec`             | 5,850 files | Authoritative current progress        |
-| Current physical tree from `rg --files platform/app` | 5,828 files | Unreviewed work; not counted          |
+| Committed `platform/app` at `10bc9ebff2`             | 5,804 files | Authoritative current progress        |
+| Current physical tracked tree                        | 5,804 files | Clean; matches the committed tree     |
 | Automation cut                                       |    73 fewer | Committed                             |
 | Coding Agent/GitHub cut                              |    36 fewer | Committed                             |
 | Trace processing cut                                 |    45 fewer | Committed                             |
@@ -39,6 +39,7 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Trace projection-persistence cut                      |     8 fewer | Committed                             |
 | Topic clustering application cut                     |    39 fewer | Committed                             |
 | Simulation and Suite eventing cut                    |    44 fewer | Partial checkpoint committed          |
+| Evaluation-wave and caller checkpoints since `fa00f3d7ec` | 46 fewer | 41 commits; incomplete slices named below |
 
 The Automation contract, server and web packages have 559 passing tests, and
 their displaced application roots are empty. Coding Agent/GitHub has 266
@@ -63,7 +64,9 @@ cutovers remain explicit ledger work.
 | Topic         | Package ownership is committed at `ee3c64f882`; the 56-file app cut is committed at `1f0ee01ec9`, deleting both old roots and 39 net application files. Topic typechecks and 157 tests pass. Docker integration was unavailable.                                              | Clear the strict-layout and relocated task/test import findings without restoring app business logic; rerun Testcontainers integration where Docker exists. |
 | API framework | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                          | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first. |
 | Feature Flag  | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services. |
-| Evaluation wave | Evaluator duplicate vocabulary, native implementations and code-evaluator ownership are being removed; Experiment, Simulation and Suite old eventing roots are physically empty. Simulation and Suite have a 44-file committed partial checkpoint at `fa00f3d7ec`. | Finish the seven distinct feature cuts through transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature. |
+| Evaluation wave | Evaluator application implementations and its displaced API middleware are deleted. Experiment, Simulation and Suite old eventing roots are deleted. Their package and caller work is checkpointed, but strict-layout findings, subscriber guarantees, nullable repository naming, execution adapters and some behavioural proof remain red. | Repair the named package findings, prove each singular feature, then drain the remaining transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature. |
+| Trace boundary | The old request-collection service, its app-owned types and its unit suite are deleted. Server and transport callers now use the Trace contract/server surfaces. The app-owned query/facet compiler and 18 trace-processing subscribers/utilities remain deliberate residue. | Prove trace response and ingestion parity, then move the query/facet compiler, protection/edit and usage-reader cohorts without changing `trace_analytics`, `trace_summaries`, rollups or public response fields. |
+| Integration checkpoint | The worktree is clean after 41 commits since `fa00f3d7ec` (`558 files`, `+10,122/-12,155`). `origin/main` at `5a9cd02001` is 100 commits ahead; a merge-tree preview reported 516 conflict entries. | Push a safety ref and the clean branch, merge `origin/main` once, resolve conflicts into canonical owners, and rerun the focused package and compatibility proof before extraction resumes. |
 
 Physical movement in the shared worktree is not progress until its exact paths
 are reviewed and committed. There is no time estimate in this ledger: the next
@@ -71,21 +74,20 @@ status changes when a named proof or commit changes.
 
 ## Deletion queue
 
-The next committed batches are:
+The next committed batches after the `origin/main` merge are:
 
-1. **Evaluator and Monitor:** finish the active application cutover while
-   keeping Evaluation, Evaluator and Monitor as separate services.
-2. **Experiment:** move run processing, its process manager/projections and
-   compatibility transports with the Experiment feature.
-3. **Scenario, Simulation and Suite:** move each singular service and its own
-   eventing/runtime slice; do not merge the three because their callers overlap.
-4. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
+1. **Evaluation-wave repair:** clear the recorded strict-layout, repository,
+   subscriber and test-quality findings without restoring app implementations.
+2. **Evaluation-wave completion:** drain the remaining execution adapters,
+   transports, workers and reusable UI while keeping Evaluation, Evaluator,
+   Monitor, Experiment, Scenario, Simulation and Suite as separate services.
+3. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
    one dependency-closed read-side collaborator.
-5. **Trace edit overlay and protection:** move the 18-file edit/protection core
+4. **Trace edit overlay and protection:** move the 18-file edit/protection core
    and its behavioural coverage.
-6. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
+5. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
    not into the Trace service merely because they currently live under Trace.
-7. **API composition:** adopt the parked REST surface when `apps/api` is
+6. **API composition:** adopt the parked REST surface when `apps/api` is
    created; do not churn current routes before that physical cut.
 
 The remainder of Evaluation and the other feature slices remain open. They are
@@ -130,6 +132,6 @@ are empty:
    CI, containers, deployment, scripts, generated outputs and architecture
    baselines;
 2. delete `platform/app` and prove `test ! -e platform/app`;
-3. fetch and perform the final rebase onto fresh `origin/main`, resolving
-   conflicts into the new owners rather than restoring application code; and
-4. rerun the full workspace, parity and deletion proof on the rebased commit.
+3. fetch and integrate fresh `origin/main`, resolving conflicts into the new
+   owners rather than restoring application code; and
+4. rerun the full workspace, parity and deletion proof on the integrated commit.
