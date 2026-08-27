@@ -362,10 +362,14 @@ func TestClassifyBifrostError_ClampsTheModelTheCallerSupplied(t *testing.T) {
 // the customer sees to identify their own request would be corrupted by the
 // truncation meant to bound it.
 func TestClassifyBifrostError_ClampedModelStaysValidUTF8(t *testing.T) {
+	// The ASCII prefix is what makes this a test. bfMaxMetaValue is 120, which
+	// divides by both 3 (CJK) and 4 (emoji), so a string of only those runes
+	// happens to land the cut on a boundary and a byte-slicing clamp passes.
+	// Each prefix is sized to put byte 120 one byte inside the rune that
+	// follows it.
 	for name, long := range map[string]string{
-		// 3 bytes per rune: the 120-byte limit falls inside the 41st.
-		"CJK":   strings.Repeat("模", 200),
-		"emoji": strings.Repeat("🚀", 200),
+		"CJK":   strings.Repeat("x", bfMaxMetaValue-1) + strings.Repeat("模", 200),
+		"emoji": strings.Repeat("x", bfMaxMetaValue-2) + strings.Repeat("🚀", 200),
 	} {
 		t.Run(name, func(t *testing.T) {
 			berr := &bfschemas.BifrostError{
