@@ -63,6 +63,8 @@ export type MintStorageUri = (args: {
   sha256: string;
 }) => Promise<string>;
 
+type RegistryResolver = StorageRegistry | ((projectId: string) => StorageRegistry);
+
 /**
  * Returns the storage URI for a new object, delegating destination
  * resolution to the shared `resolveProjectStorageDestination` so that
@@ -98,11 +100,23 @@ export async function defaultMintStorageUri({
  * default so callers that omit the third arg are unaffected.
  */
 export class StoredObjectsService {
-  constructor(
+  static create(
+    repository: StoredObjectsRepository,
+    registry: RegistryResolver,
+    mintStorageUri: MintStorageUri = defaultMintStorageUri,
+  ): StoredObjectsService {
+    return new StoredObjectsService(repository, registry, mintStorageUri);
+  }
+
+  private constructor(
     private readonly repository: StoredObjectsRepository,
-    private readonly registry: StorageRegistry,
+    private readonly registry: RegistryResolver,
     private readonly mintStorageUri: MintStorageUri = defaultMintStorageUri,
   ) {}
+
+  private registryFor(projectId: string): StorageRegistry {
+    return typeof this.registry === "function" ? this.registry(projectId) : this.registry;
+  }
 
   /**
    * Stores byte content for a project, deduplicating by content hash.
@@ -175,10 +189,11 @@ export class StoredObjectsService {
         }
 
         const storageUri = await this.mintStorageUri({ projectId, sha256 });
+        const registry = this.registryFor(projectId);
 
         // PUT first: if storage rejects, never write the CH row
         try {
-          await this.registry.put(storageUri, bytes, mediaType);
+          await registry.put(storageUri, bytes, mediaType);
         } catch (error) {
           getStoredObjectWriteFailureCounter(purpose).inc();
           logger.error(
@@ -221,7 +236,7 @@ export class StoredObjectsService {
         } catch (insertError) {
           getStoredObjectWriteFailureCounter(purpose).inc();
           try {
-            await this.registry.delete(storageUri);
+            await registry.delete(storageUri);
           } catch (deleteError) {
             logger.error(
               {
@@ -268,7 +283,7 @@ export class StoredObjectsService {
   > {
     const row = await this.repository.findById({ projectId, id });
     if (!row) return { status: "not_found" };
-    const bytesPresent = await this.registry.exists(row.storage_uri);
+    const bytesPresent = await this.registryFor(projectId).exists(row.storage_uri);
     return bytesPresent
       ? { status: "available", mediaType: row.media_type }
       : { status: "missing", mediaType: row.media_type };
@@ -317,7 +332,7 @@ export class StoredObjectsService {
         }
 
         try {
-          const stream = await this.registry.get(row.storage_uri);
+          const stream = await this.registryFor(projectId).get(row.storage_uri);
           return { row, stream };
         } catch (error) {
           if (error instanceof ObjectNotFoundError) {
@@ -400,9 +415,10 @@ export class StoredObjectsService {
         const succeededIds: string[] = [];
         let bytesDeleted = 0;
         let byteDeleteFailures = 0;
+        const registry = this.registryFor(projectId);
         for (const row of rows) {
           try {
-            await this.registry.delete(row.storage_uri);
+            await registry.delete(row.storage_uri);
             bytesDeleted++;
             succeededIds.push(row.id);
           } catch (error) {

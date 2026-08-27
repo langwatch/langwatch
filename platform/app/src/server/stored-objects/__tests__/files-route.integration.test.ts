@@ -14,12 +14,8 @@
  *    lookup); a URL scoped to project A cannot serve project B's object
  *    (404 under own scope, 403 for a foreign claim with no existence oracle)
  *
- * Strategy:
- *  - The files route calls `createStoredObjectsService` which calls
- *    `StoredObjectsRepository` → `getClickHouseClientForTenant`.
- *  - We mock `createStoredObjectsService` so individual service methods can
- *    be stubbed per case without needing a live ClickHouse.
- *  - Real Prisma projects are created so the authMiddleware resolves API keys.
+ * The process-composed storage and owner-lookup services are mocked; real
+ * Prisma projects keep authentication and tenant checks in the test.
  */
 
 import { Readable } from "node:stream";
@@ -33,27 +29,20 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-// Control resolveStoredObjectOwner (cross-tenant lookup) and the service's
-// project-scoped getById per test. The lookup helper lives in its own
-// module to keep the unsafe shared-client surface separated from
-// project-scoped repository CRUD; mock it independently.
-//
-// vi.mock factories are hoisted above all top-level `const`s, so referring
-// to a plain `const fn = vi.fn()` from inside the factory throws
-// `Cannot access ... before initialization` at module-load time. vi.hoisted
-// runs in the same hoisted phase, so the mocks below can capture the same
-// fn reference that the test body uses to drive behavior.
 const { mockResolveOwnerProject, mockGetById } = vi.hoisted(() => ({
   mockResolveOwnerProject: vi.fn(),
   mockGetById: vi.fn(),
 }));
 
-vi.mock("~/server/stored-objects/stored-objects-cross-tenant-lookup", () => ({
-  resolveStoredObjectOwner: mockResolveOwnerProject,
+vi.mock("~/server/stored-objects/stored-object-owner-lookup.service", () => ({
+  StoredObjectOwnerLookupUnavailableError: class extends Error {},
+  StoredObjectOwnerLookupService: {
+    create: () => ({ resolve: mockResolveOwnerProject }),
+  },
 }));
 
 vi.mock("~/server/stored-objects/stored-objects-factory", () => ({
-  createStoredObjectsService: vi.fn(() => ({
+  createProcessStoredObjectsService: vi.fn(() => ({
     getById: mockGetById,
     storeFromBytes: vi.fn(),
     deleteOwnedBy: vi.fn(),

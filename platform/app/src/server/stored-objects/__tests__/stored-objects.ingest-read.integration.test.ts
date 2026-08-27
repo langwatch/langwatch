@@ -223,7 +223,7 @@ function buildService(projectId: string): StoredObjectsService {
   // at call time (set in beforeEach / withTmpStorage).
   const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
     mintFileStoredObjectUri({ root: tmpDir, projectId: pid, sha256 });
-  return new StoredObjectsService(repository, registry, mintUri);
+  return StoredObjectsService.create(repository, registry, mintUri);
 }
 
 /**

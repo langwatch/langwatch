@@ -8,7 +8,6 @@
  */
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 
 /**
  * Probes whether a stored object's row AND bytes exist.
@@ -42,9 +41,8 @@ export const storedObjectsRouter = createTRPCRouter({
       }),
     )
     .permissionAny("traces:view", "scenarios:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const { projectId, id } = input;
-      const service = createStoredObjectsService({ projectId });
-      return service.headById({ projectId, id });
+      return ctx.app.storedObjects.headById({ projectId, id });
     }),
 });

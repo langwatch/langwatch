@@ -1,41 +1,11 @@
-/**
- * Cross-tenant stored-object owner lookup — unit tests.
- *
- * Verifies the fan-out across all configured ClickHouse instances so the
- * `/api/files/:id` route resolves objects owned by tenants routed to a
- * private CH instance. Pre-fix the lookup only queried the shared client,
- * which 404'd for any object owned by a private-CH tenant (Sergio review).
- *
- * Also verifies the failure-isolation contract added in the follow-up
- * Sergio review (2026-05-20): a single failed instance must not block a
- * healthy hit on another instance, but a no-hit-with-failures result must
- * surface as a transient error rather than a false null.
- */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import {
-  resolveStoredObjectOwner,
+  StoredObjectOwnerLookupService,
   StoredObjectOwnerLookupUnavailableError,
-} from "../stored-objects-cross-tenant-lookup";
+} from "../stored-object-owner-lookup.service";
 
 const mockGetAllInstances = vi.fn();
-
-// The service takes its repository from `getApp()`; standing in for the
-// store means standing in for `getApp()`. The repository itself is real —
-// only the instance fan-out it reads from is mocked — so this still
-// exercises the fan-out, failure-isolation, and "no instances" contracts
-// through the actual repository code, not a hand-rolled substitute.
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({
-    storedObjects: {
-      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(() =>
-        mockGetAllInstances(),
-      ),
-    },
-  }),
-}));
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -61,6 +31,12 @@ function makeFailingClient(error: Error) {
   };
 }
 
+function service(): StoredObjectOwnerLookupService {
+  return StoredObjectOwnerLookupService.create(
+    new StoredObjectOwnerClickHouseRepository(() => mockGetAllInstances()),
+  );
+}
+
 describe("resolveStoredObjectOwner", () => {
   beforeEach(() => {
     mockGetAllInstances.mockReset();
@@ -75,7 +51,7 @@ describe("resolveStoredObjectOwner", () => {
         },
       ]);
 
-      const owner = await resolveStoredObjectOwner({ id: "obj-1" });
+      const owner = await service().resolve({ id: "obj-1" });
 
       expect(owner).toEqual({ projectId: "proj_a" });
     });
@@ -85,7 +61,7 @@ describe("resolveStoredObjectOwner", () => {
         { target: "shared", client: makeMockClient([]) },
       ]);
 
-      const owner = await resolveStoredObjectOwner({ id: "missing" });
+      const owner = await service().resolve({ id: "missing" });
 
       expect(owner).toBeNull();
     });
@@ -102,7 +78,7 @@ describe("resolveStoredObjectOwner", () => {
         },
       ]);
 
-      const owner = await resolveStoredObjectOwner({ id: "obj-byoc" });
+      const owner = await service().resolve({ id: "obj-byoc" });
 
       expect(owner).toEqual({ projectId: "proj_byoc" });
     });
@@ -117,7 +93,7 @@ describe("resolveStoredObjectOwner", () => {
         { target: "org_byoc", client: privateClient },
       ]);
 
-      const owner = await resolveStoredObjectOwner({ id: "unknown" });
+      const owner = await service().resolve({ id: "unknown" });
 
       expect(owner).toBeNull();
       expect(sharedClient.query).toHaveBeenCalledTimes(1);
@@ -139,7 +115,7 @@ describe("resolveStoredObjectOwner", () => {
         },
       ]);
 
-      const owner = await resolveStoredObjectOwner({ id: "obj-x" });
+      const owner = await service().resolve({ id: "obj-x" });
 
       expect(owner).toEqual({ projectId: "proj_shared" });
     });
@@ -157,7 +133,7 @@ describe("resolveStoredObjectOwner", () => {
         },
       ]);
 
-      await expect(resolveStoredObjectOwner({ id: "obj-x" })).rejects.toBeInstanceOf(
+      await expect(service().resolve({ id: "obj-x" })).rejects.toBeInstanceOf(
         StoredObjectOwnerLookupUnavailableError,
       );
     });
@@ -174,15 +150,9 @@ describe("resolveStoredObjectOwner", () => {
         },
       ]);
 
-      try {
-        await resolveStoredObjectOwner({ id: "obj-x" });
-        throw new Error("expected throw");
-      } catch (err) {
-        expect(err).toBeInstanceOf(StoredObjectOwnerLookupUnavailableError);
-        expect((err as StoredObjectOwnerLookupUnavailableError).failedTargets).toEqual([
-          "org_byoc_down",
-        ]);
-      }
+      await expect(service().resolve({ id: "obj-x" })).rejects.toMatchObject({
+        failedTargets: ["org_byoc_down"],
+      });
     });
   });
 
@@ -190,7 +160,7 @@ describe("resolveStoredObjectOwner", () => {
     it("throws a descriptive error", async () => {
       mockGetAllInstances.mockResolvedValue([]);
 
-      await expect(resolveStoredObjectOwner({ id: "obj-1" })).rejects.toThrow(
+      await expect(service().resolve({ id: "obj-1" })).rejects.toThrow(
         /ClickHouse is not configured/,
       );
     });

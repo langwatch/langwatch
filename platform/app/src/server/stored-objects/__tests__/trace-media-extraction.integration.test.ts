@@ -19,16 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import { collectMediaRefs, mediaRefBelongsToSide } from "~/shared/traces/media-refs";
 import type { BlobStore } from "../../app-layer/traces/blob-store.service";
@@ -42,8 +33,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
-import type { RecordSpanCommandData } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "@langwatch/trace-contract";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
 import { extractInlineMediaFromEvent } from "../content-extractor";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
@@ -136,19 +127,13 @@ const PNG_BYTES = Buffer.from(
   "base64",
 );
 
-const PDF_BYTES = Buffer.from(
-  "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n",
-  "utf8",
-);
+const PDF_BYTES = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n", "utf8");
 
 function sha256Of(bytes: Buffer): string {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-function makeSpan(
-  attributes: OtlpSpan["attributes"],
-  events: OtlpSpan["events"] = [],
-): OtlpSpan {
+function makeSpan(attributes: OtlpSpan["attributes"], events: OtlpSpan["events"] = []): OtlpSpan {
   return {
     traceId: `trace-${nanoid(8)}`,
     spanId: `span-${nanoid(8)}`,
@@ -228,13 +213,17 @@ function buildService(projectId: string): StoredObjectsService {
   const repository = new StoredObjectsRepository();
   const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
     mintFileStoredObjectUri({ root: tmpDir, projectId: pid, sha256 });
-  return new StoredObjectsService(repository, registry, mintUri);
+  return StoredObjectsService.create(repository, registry, mintUri);
 }
 
 /** Default deps: flag on, no privacy rules, real service on tmp storage. */
 function enabledDeps(service?: StoredObjectsService) {
+  const featureFlags = MemoryFeatureFlagService.create();
+  featureFlags.setFlag("release_trace_media_extraction", true);
+  vi.spyOn(featureFlags, "isEnabled");
+
   return {
-    isEnabled: vi.fn().mockResolvedValue(true),
+    featureFlags,
     hasContentDropRules: vi.fn().mockResolvedValue(false),
     createService: vi.fn(() => service ?? buildService(PROJECT)),
   };
@@ -415,12 +404,8 @@ describe("trace media extraction at the ingestion edge", () => {
 
       // Which is what keeps the caller's recording off the OUTPUT strip and
       // the agent's reply off the INPUT one.
-      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "input"))).toEqual([
-        refs[0],
-      ]);
-      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "output"))).toEqual([
-        refs[1],
-      ]);
+      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "input"))).toEqual([refs[0]]);
+      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "output"))).toEqual([refs[1]]);
     });
   });
 
@@ -808,7 +793,7 @@ describe("trace media extraction at the ingestion edge", () => {
       await fs.writeFile(blockerFile, "x");
       const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
         mintFileStoredObjectUri({ root: blockerFile, projectId: pid, sha256 });
-      const brokenService = new StoredObjectsService(repository, registry, mintUri);
+      const brokenService = StoredObjectsService.create(repository, registry, mintUri);
 
       const audio = makeAudioBytes(4444);
       const span = makeSpan([
@@ -844,9 +829,7 @@ describe("trace media extraction at the ingestion edge", () => {
         {
           key: "langwatch.input",
           value: {
-            stringValue: JSON.stringify([
-              { role: "user", content: "plain text question" },
-            ]),
+            stringValue: JSON.stringify([{ role: "user", content: "plain text question" }]),
           },
         },
         {
@@ -863,7 +846,7 @@ describe("trace media extraction at the ingestion edge", () => {
       });
 
       expect(result).toBe(data);
-      expect(deps.isEnabled).not.toHaveBeenCalled();
+      expect(deps.featureFlags.isEnabled).not.toHaveBeenCalled();
       expect(deps.createService).not.toHaveBeenCalled();
     });
   });
@@ -906,8 +889,8 @@ describe("trace media extraction at the ingestion edge", () => {
     it("returns the command data unchanged and stores nothing", async () => {
       const deps = {
         ...enabledDeps(),
-        isEnabled: vi.fn().mockResolvedValue(false),
       };
+      deps.featureFlags.setFlag("release_trace_media_extraction", false);
       const audio = makeAudioBytes();
       const span = makeSpan([
         {

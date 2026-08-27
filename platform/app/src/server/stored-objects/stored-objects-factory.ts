@@ -5,8 +5,6 @@
  * containing S3, local-filesystem, and (optionally) Azure Blob drivers.
  * Kept in a separate module so the service itself stays free of
  * concrete driver imports (DI).
- *
- * Call once per request — construction is lightweight; drivers are stateless.
  */
 import { env } from "~/env.mjs";
 import { AzureBlobDriver } from "./azure-blob-driver";
@@ -75,9 +73,7 @@ export function maybeAzureDriver(): AzureBlobDriver | undefined {
  * drivers wired. The `S3Driver` is projectId-scoped so per-tenant BYOC creds
  * resolve at call time. Azure construction is deferred until an azure-blob://
  * URI is dispatched: a globally selected but incomplete Azure configuration
- * must not block a BYOC project whose active destination is S3. Shared by
- * `createStoredObjectsService` and any other byte path that needs the object
- * store (e.g. the GroupQueue s3 blob tier).
+ * must not block a BYOC project whose active destination is S3.
  */
 export function createStorageRegistry({
   projectId,
@@ -91,17 +87,9 @@ export function createStorageRegistry({
   });
 }
 
-/**
- * Creates a `StoredObjectsService` wired to real storage and ClickHouse.
- *
- * The `S3Driver` is scoped to `projectId` so per-tenant BYOC S3 credentials
- * are resolved at call time.
- */
-export function createStoredObjectsService({
-  projectId,
-}: {
-  projectId: string;
-}): StoredObjectsService {
-  const repository = new StoredObjectsRepository();
-  return new StoredObjectsService(repository, createStorageRegistry({ projectId }));
+/** Composes the process-owned service with project-scoped storage drivers. */
+export function createProcessStoredObjectsService(): StoredObjectsService {
+  return StoredObjectsService.create(new StoredObjectsRepository(), (projectId) =>
+    createStorageRegistry({ projectId }),
+  );
 }

@@ -143,7 +143,7 @@ describe("storeFromBytes", () => {
       async ({ projectId, sha256 }: { projectId: string; sha256: string }) =>
         `file:///tmp/${projectId}/${sha256}`,
     ) as ReturnType<typeof vi.fn> & MintStorageUri;
-    service = new StoredObjectsService(repo, registry, mockMintStorageUri);
+    service = StoredObjectsService.create(repo, registry, mockMintStorageUri);
   });
 
   describe("when the content is new for the project", () => {
@@ -358,7 +358,7 @@ describe("getById", () => {
     registry = makeRegistry();
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
-    service = new StoredObjectsService(repo, registry, mintStub);
+    service = StoredObjectsService.create(repo, registry, mintStub);
   });
 
   describe("when the row exists and storage has the bytes", () => {
@@ -435,7 +435,7 @@ describe("deleteOwnedBy", () => {
     registry = makeRegistry();
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
-    service = new StoredObjectsService(repo, registry, mintStub);
+    service = StoredObjectsService.create(repo, registry, mintStub);
   });
 
   describe("when every byte-delete succeeds", () => {
@@ -519,7 +519,7 @@ describe("headById", () => {
     registry = makeRegistry();
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
-    service = new StoredObjectsService(repo, registry, mintStub);
+    service = StoredObjectsService.create(repo, registry, mintStub);
   });
 
   describe("when the row exists and storage has the bytes", () => {
@@ -576,7 +576,7 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
   beforeEach(() => {
     repo = makeRepository();
     registry = makeRegistry();
-    service = new StoredObjectsService(repo, registry);
+    service = StoredObjectsService.create(repo, registry);
   });
 
   describe("when the project has a private dataplane bucket configured", () => {
@@ -679,7 +679,7 @@ describe("StoredObjectsService surface", () => {
   it("exposes storeFromBytes, getById, deleteOwnedBy", () => {
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
-    const service = new StoredObjectsService(makeRepository(), makeRegistry(), mintStub);
+    const service = StoredObjectsService.create(makeRepository(), makeRegistry(), mintStub);
 
     expect(typeof service.storeFromBytes).toBe("function");
     expect(typeof service.getById).toBe("function");

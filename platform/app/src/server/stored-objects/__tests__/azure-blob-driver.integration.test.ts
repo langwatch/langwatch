@@ -269,7 +269,7 @@ describe("StoredObjectsService against a real Azurite emulator", () => {
           projectId,
           sha256,
         });
-      const service = new StoredObjectsService(repository, registry, mintUri);
+      const service = StoredObjectsService.create(repository, registry, mintUri);
 
       const bytes = Buffer.from("azure media payload", "utf8");
       const stored = await service.storeFromBytes({

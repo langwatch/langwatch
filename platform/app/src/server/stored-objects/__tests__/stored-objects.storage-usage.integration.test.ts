@@ -63,7 +63,7 @@ function buildService(): StoredObjectsService {
   const repository = new StoredObjectsRepository();
   const mintUri: MintStorageUri = async ({ projectId: pid, sha256 }) =>
     mintFileStoredObjectUri({ root: tmpDir, projectId: pid, sha256 });
-  return new StoredObjectsService(repository, registry, mintUri);
+  return StoredObjectsService.create(repository, registry, mintUri);
 }
 
 async function waitForRow(id: string, timeoutMs = 10_000): Promise<void> {
