@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed application baseline:** `5770224e31`
+**Committed application baseline:** `7558bc2a97`
 
 **Goal:** delete `platform/app`.
 
@@ -43,6 +43,13 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Simulation and Suite eventing cut                         |    44 fewer | Partial checkpoint committed              |
 | Scenario/Suite folder and run-plan cut at `4c7bbddd73`    |    19 fewer | Suite app implementation deleted          |
 | Scenario version and displaced Suite stack at `4ae157efda` |    16 fewer | Committed and pushed                       |
+| Dataset storage migration at `3442ff8509`                  |     0 fewer | 573 lines removed; app task reduced to composition |
+| Model Provider resolution at `8b2c6b33f1`                 |     8 fewer | Legacy resolver and duplicate tests deleted |
+| Experiment workbench at `549db70b20`                      |    11 fewer | Legacy workbench service/repository stack deleted |
+| SCIM direct composition at `3f58620f22`                   |     0 fewer | Forwarding runtime adapter deleted; route restored |
+| Monitor guardrail read at `7ceb8544e2`                    |     0 fewer | Two direct Prisma reads removed            |
+| Trace query/facet compiler at `3f559ed641`                |    32 fewer | Compiler and 11 unit suites moved intact   |
+| Suite execution fan-out at `7558bc2a97`                  |     1 fewer | Execution policy and five tests canonical  |
 | Evaluation-wave and caller checkpoints since `fa00f3d7ec` |    46 fewer | 41 commits; incomplete slices named below |
 
 The Automation contract, server and web packages have 559 passing tests, and
@@ -60,17 +67,18 @@ cutovers remain explicit ledger work.
 | Area                   | Current fact                                                                                                                                                                                                                                                                                                                                 | Exit condition                                                                                                                                                                                                           |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Trace process          | The 154-file cut is committed at `ef6c41f1f7`: `+2,208/-12,378`, for a net 45-file application reduction. The required Eventing preparation seam is committed at `cb5feeb6aa`. Old schema imports are zero; Coding tests pass 266/266 and Trace server typechecks.                                                                           | Keep the remaining 18 files only while their named composition/effect responsibilities exist; delete each as its owning feature or worker composition moves.                                                             |
-| Trace reads            | The 11-file projection-persistence move is committed at `64e18e11a6`; Trace server typecheck and 633 tests pass. `trace_analytics`, `trace_summaries` and timeseries rollups remain separate repositories and tables.                                                                                                                        | Move the query/facet compiler, then edit/protection and usage cohorts while preserving every response field and query semantic.                                                                                          |
-| Evaluation             | Evaluation processing is committed at `d4f11f4da7`: 67 files, `+1,304/-8,875`, for a net 42-file application reduction. Package implementation is checkpointed separately at `48585548d6`.                                                                                                                                                   | Prove the focused package/app checks, then drain remaining execution, evaluator, monitor and transport callers without collapsing the distinct Evaluation/Evaluator/Monitor/Experiment/Scenario/Simulation/Suite owners. |
+| Trace reads            | The projection-persistence move is committed at `64e18e11a6`. The query/facet compiler and 11 unit suites moved at `3f559ed641`, deleting 32 application files. Trace contract has 210 passing tests and Trace server has 1,095. `trace_analytics`, `trace_summaries` and timeseries rollups remain separate repositories and tables. | Add only the narrow full-trace read/mapping boundary needed by Evaluation, then move edit/protection and usage cohorts while preserving every response field and query semantic. |
+| Evaluation             | Evaluation processing is committed at `d4f11f4da7`. Its package already owns events, process management and execution intents. The remaining app execution engine depends on full Trace reads and trace mapping/digest types that the Trace contract does not yet expose. Monitor guardrail eligibility is canonical at `7ceb8544e2`. | First move the portable full-trace evaluation read/mapping boundary, then move the execution engine, factories and cost recorder without a callback-shaped compatibility layer. Keep Evaluation/Evaluator/Monitor/Experiment/Scenario/Simulation/Suite distinct. |
 | Langy                  | Langy package work is committed at `086250abca`; its 120-file application cut is committed at `b1599b2080`: `+1,001/-10,163`, for a net 37-file application reduction.                                                                                                                                                                       | Prove the focused feature/app checks, then move the remaining eventing pipeline and UI composition without restoring app-layer services.                                                                                 |
-| Model Provider         | Model Provider package work is committed at `435d8711d0`; its 130-file application cut is committed at `14fc0f4282`: `+1,315/-30,905`, for a net 45-file application reduction.                                                                                                                                                              | Prove the focused feature/app checks, then move the remaining UI and process composition without restoring the deleted repositories, catalogue or service.                                                               |
+| Model Provider         | Model Provider package work is committed at `435d8711d0`; its 130-file application cut is committed at `14fc0f4282`. The legacy resolution stack and duplicate coverage were removed at `8b2c6b33f1`; contract 169 tests and server 67 tests pass. | Move the remaining UI and process composition without restoring the deleted repositories, catalogue, resolver or service. |
 | Gateway                | Package ownership starts at `9b03f579ee`; the 137-file app cut is committed at `e1ff7b9f3f`, deleting 47 net application files. Gateway package typecheck, 128 server tests and 12 contract tests pass. Twenty app service modules remain.                                                                                                   | Move the remaining virtual-key, config/materialisation, guardrail, cache and realtime collaborators behind the same canonical Gateway service; remove the final `getApp` route.                                          |
 | Topic                  | Package ownership is committed at `ee3c64f882`; the 56-file app cut is committed at `1f0ee01ec9`, deleting both old roots and 39 net application files. Topic typechecks and 157 tests pass. Docker integration was unavailable.                                                                                                             | Clear the strict-layout and relocated task/test import findings without restoring app business logic; rerun Testcontainers integration where Docker exists.                                                              |
 | API framework          | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                                                                                                | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first.      |
 | Feature Flag           | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                                                                          | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services.                                                                                |
-| Evaluation wave        | Evaluator application implementations and its displaced API middleware are deleted. Experiment, Simulation and Suite old eventing roots are deleted. Their package and caller work is checkpointed, but strict-layout findings, subscriber guarantees, nullable repository naming, execution adapters and some behavioural proof remain red. | Repair the named package findings, prove each singular feature, then drain the remaining transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature.                        |
-| Scenario and Suite     | Committed at `4ae157efda`: Scenario versioning, restore, move and duplicate now belong to `@langwatch/scenario-server`; both transports use the canonical service. The displaced Scenario stack, folder helper and dead Suite run stack are deleted, removing 16 application files. Contract/server typechecks pass; 228 contract and 438 server tests pass, with only the two Redis integration suites unavailable locally. | Keep the remaining Scenario/Simulation/Suite files only for their named process, transport or UI responsibilities; do not restore app-owned domain services. |
-| Trace boundary         | The old request-collection service, its app-owned types and its unit suite are deleted. Server and transport callers now use the Trace contract/server surfaces. The app-owned query/facet compiler and 18 trace-processing subscribers/utilities remain deliberate residue.                                                                 | Prove trace response and ingestion parity, then move the query/facet compiler, protection/edit and usage-reader cohorts without changing `trace_analytics`, `trace_summaries`, rollups or public response fields.        |
+| UI and feature web     | Active inventory: `apps/ui` is already the `@langwatch/ui` runtime shell and `platform/app/src/main.tsx` delegates mounting to it, but the Vite build, HTML entry, router, providers, route/page composition and compatibility adapter remain in `platform/app`. The repository has 25 core and Enterprise feature web surfaces; they are reusable browser packages, not a second web application. | Map the browser-safe dependency closure and portable tRPC contract blockers, then take the Prompt redesign as the first feature-web cut. Move the physical browser bootstrap into `apps/ui` only with a runnable static build and without importing application or server implementation source. |
+| Evaluation wave        | Experiment workbench persistence/versioning is canonical at `549db70b20`: 49 files changed and 5,148 lines removed, with 5,114 package tests green. Monitor now owns the guardrail eligibility query. Evaluator, Simulation and Suite cuts are active. Strict-layout findings and some app proof remain red. | Drain the remaining execution adapters, transports, runtime, workers and reusable UI. A moved process manager alone does not complete a feature. |
+| Scenario and Suite     | Scenario versioning is committed at `4ae157efda`. Suite execution fan-out, parameter/secrets mapping and failure isolation moved at `7558bc2a97`; the app now retains only durable Eventing-command and KSUID adapters. Suite server typecheck and 44 tests pass. | Keep the remaining Scenario/Simulation/Suite files only for their named process, transport or UI responsibilities; do not restore app-owned domain services. |
+| Trace boundary         | The old request-collection service, its app-owned types and its unit suite are deleted. Query/facet compilation is canonical at `3f559ed641`; old-path residue is zero. Public outputs, query pagination, tables and ingestion were untouched. | Add the narrow required full-trace Evaluation read and mapping/digest ownership. Continue with protection/edit and usage readers without changing `trace_analytics`, `trace_summaries`, rollups or public response fields. |
 | Integration checkpoint | The one merge of `origin/main` at `5a9cd02001` is committed at `5770224e31` with no unmerged paths, conflict markers, stale `@ee` imports, old Prisma migration root or `platform/app/ee`. Upstream added 600 net application files to the 5,804-file pre-merge checkpoint, leaving a 6,404-file integrated baseline.                        | Push the resolved merge, then resume deletion from the named residuals below. Do not count upstream integration as extraction progress.                                                                                  |
 
 Physical movement in the shared worktree is not progress until its exact paths
@@ -103,24 +111,27 @@ silently dropped or pretended to be complete.
 
 The next committed batches after the `origin/main` merge are:
 
-1. **Experiment version cut:** move the restored workbench persistence and
-   versioning implementation into the existing singular Experiment owner.
-2. **SCIM and Governance composition:** inject the SCIM lifecycle/config and
-   Governance trace-ingestion ports from API composition without restoring
-   Enterprise application code.
-3. **Evaluation-wave repair:** clear the recorded strict-layout, repository,
+1. **Evaluator and Simulation verticals:** land the active dependency-closed cuts,
+   then take Simulation as the next Evaluation-family owner.
+2. **Evaluation full-trace prerequisite:** expose the narrow portable Trace
+   read/mapping capability required by Evaluation execution; do not pass a
+   callback bag or legacy Trace service.
+3. **Evaluation execution:** move the app execution service, factories and
+   cost recorder after the Trace prerequisite, preserving event and API parity.
+4. **Evaluation-wave repair:** clear the recorded strict-layout, repository,
    subscriber and test-quality findings without restoring app implementations.
-4. **Evaluation-wave completion:** drain the remaining execution adapters,
+5. **Evaluation-wave completion:** drain the remaining execution adapters,
    transports, workers and reusable UI while keeping Evaluation, Evaluator,
    Monitor, Experiment, Scenario, Simulation and Suite as separate services.
-5. **Prompt web cut:** use the redesign in
+6. **UI/web lane (active):** finish the browser ownership and dependency
+   inventory, then use the redesign in
    [PR 7371](https://github.com/langwatch/langwatch/pull/7371) as the starting
    implementation for the Prompt web package and `apps/ui` composition. Do not
    migrate the displaced Prompt UI first and rewrite it again. Review the PR
    against the current Prompt contract and preserve every live transport and
-   browser behaviour it does not replace.
-6. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
-   one dependency-closed read-side collaborator.
+   browser behaviour it does not replace. Keep `apps/ui` limited to browser
+   bootstrap, routing and page composition; reusable Prompt behaviour belongs
+   in `@langwatch/prompt-web`.
 7. **Trace edit overlay and protection:** move the 18-file edit/protection core
    and its behavioural coverage.
 8. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
@@ -146,7 +157,8 @@ not evidence of completion.
 
 ## Working forecast
 
-The committed `4ae157efda` baseline contains 6,369 application files. Of those,
+The committed `7558bc2a97` baseline contains 6,317 application files. Of the
+`4ae157efda` baseline's 6,369 files,
 3,504 are production TypeScript, 2,395 are TypeScript tests, and 486 are other
 tests, scripts, assets, Prisma files, configuration and documentation. The
 architecture fragment baseline identifies 255 displaced implementations, 98
