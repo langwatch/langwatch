@@ -10,7 +10,13 @@ vi.mock("~/server/db", () => ({
 }));
 
 const createPasskeyUser = vi.fn();
-vi.mock("~/server/users/credential-user", () => ({
+vi.mock("~/server/users/credential-user", async (importOriginal) => ({
+  // The predicate and the error class are REAL: they are the contract the
+  // guard and the write share, and mocking them would leave the two halves of
+  // it unasserted against each other.
+  ...(await importOriginal<
+    typeof import("~/server/users/credential-user")
+  >()),
   createPasskeyUser: (...args: unknown[]) => createPasskeyUser(...args),
 }));
 
@@ -21,6 +27,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
 }));
 
+import { PasskeySignUpAddressTakenError } from "~/server/users/credential-user";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
@@ -56,6 +63,7 @@ const signable = (id: string) => ({
   accounts: [{ provider: "credential", password: "argon2id$..." }],
   accountCredentials: [],
   passkeys: [],
+  orgMemberships: [],
 });
 
 /**
@@ -68,6 +76,7 @@ const stranded = (id: string) => ({
   accounts: [{ provider: "credential", password: null }],
   accountCredentials: [],
   passkeys: [],
+  orgMemberships: [],
 });
 
 describe("given passkey sign-up, which creates an account with no session", () => {
@@ -169,6 +178,65 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
       await expect(
         resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
+    });
+
+    /**
+     * An empty password opens nothing, so it is not a credential — the same
+     * reading `last-way-in.ts` takes when it decides whether removing a
+     * passkey would strand somebody. If the two disagreed, a row one of them
+     * called a way in the other would call residue, and the address would
+     * stay burned for precisely the account with no way into it.
+     */
+    it("treats an empty password as no credential at all", async () => {
+      findFirst.mockResolvedValue({
+        ...stranded("empty_password"),
+        accounts: [{ provider: "credential", password: "" }],
+      });
+
+      const resolved = await resolveUser({
+        ctx: fakeContext().ctx,
+        context: "someone@example.com",
+      });
+
+      expect(resolved.name).toBe("someone@example.com");
+    });
+
+    /**
+     * Belt and braces on the security boundary. Nothing today makes a
+     * credential-less user who belongs to an organization — joining takes a
+     * sign-in, and this account has never had a way to attempt one — so this
+     * refuses no real recovery. It stops the predicate's safety resting on an
+     * argument about code elsewhere, which is the part that decays.
+     */
+    it("refuses an account that belongs to an organization regardless", async () => {
+      findFirst.mockResolvedValue({
+        ...stranded("member"),
+        orgMemberships: [{ organizationId: "org_1" }],
+      });
+
+      await expect(
+        resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
+      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
+    });
+
+    /**
+     * The guard runs before the transaction opens, so between them the
+     * address can stop being residue. The write re-decides it where the read
+     * and the write cannot be pulled apart, and the refusal has to reach the
+     * screen in the same vocabulary the earlier one would have — otherwise
+     * losing that race looks like a broken ceremony rather than a taken
+     * address.
+     */
+    it("answers a claim that lands mid-write as a taken address", async () => {
+      const { ctx } = fakeContext();
+      findFirst.mockResolvedValue(stranded("half_made"));
+      createPasskeyUser.mockRejectedValue(
+        new PasskeySignUpAddressTakenError("claimed mid-write"),
+      );
+
+      await expect(
+        afterVerification({ ctx, context: "someone@example.com" }),
       ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN } });
     });
 

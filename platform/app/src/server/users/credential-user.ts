@@ -3,6 +3,71 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { trackServerEvent } from "~/server/posthog";
 
 /**
+ * A passkey sign-up that arrived for an address somebody already holds.
+ *
+ * Its own class because the caller has to tell it apart from every other way
+ * this can fail: it is the one that means "refuse in the taken-address
+ * vocabulary", and a message match would be the alternative.
+ */
+export class PasskeySignUpAddressTakenError extends Error {
+  readonly name = "PasskeySignUpAddressTakenError";
+}
+
+/**
+ * A credential row somebody could actually present.
+ *
+ * `provider` decides it rather than `password`: a row for an identity
+ * provider carries no password by design and is still a way in, while a
+ * `credential` row with no password is the one shape that is not — it is what
+ * `createPasskeyUser` writes before the passkey lands beside it, and on its
+ * own it authenticates nobody (sign-in hashes a dummy and refuses it exactly
+ * as it refuses a missing row).
+ *
+ * Empty counts as absent, in the same words `last-way-in.ts` uses. The two
+ * guards answer one question from opposite sides — that one refuses removing
+ * the last way in, this one refuses adopting an account that still has one —
+ * so a row either calls a credential the other must too.
+ */
+export function isUsableCredential(row: {
+  provider: string;
+  password: string | null;
+}): boolean {
+  if (row.provider !== "credential") return true;
+  return typeof row.password === "string" && row.password.length > 0;
+}
+
+/**
+ * Whether this account is somebody's, rather than the residue of a ceremony
+ * that never finished.
+ *
+ * ONE definition, exported, because two collaborators decide the same thing
+ * about the same row at two moments: the sign-up guard refuses before the
+ * browser prompt opens, and the adoption re-decides it inside the transaction
+ * that writes. Two copies of this would be two chances to disagree, and the
+ * disagreement would be a takeover on one side or a burnt address on the
+ * other.
+ *
+ * Both credential tables are read: a user whose identifier backfill has
+ * finalized keeps theirs in `AccountCredential` rather than `Account`, and a
+ * check seeing only one would call every finalized user unregistered.
+ * Membership counts on its own — an account that belongs to an organization
+ * is somebody's whatever its credential rows say.
+ */
+export function belongsToSomebody(row: {
+  accounts: { provider: string; password: string | null }[];
+  accountCredentials: { provider: string; password: string | null }[];
+  passkeys: unknown[];
+  orgMemberships: unknown[];
+}): boolean {
+  return (
+    row.passkeys.length > 0 ||
+    row.orgMemberships.length > 0 ||
+    row.accounts.some(isUsableCredential) ||
+    row.accountCredentials.some(isUsableCredential)
+  );
+}
+
+/**
  * Creating an account that authenticates with a password.
  *
  * One writer for both doors into it: the sign-up form, and a verified sign-up
@@ -96,21 +161,39 @@ export async function createPasskeyUser({
   const outcome = await prisma.$transaction(async (tx) => {
     // Inside the transaction on purpose: the read and the write that depends
     // on it are one decision, and two concurrent ceremonies for the same
-    // address must not both conclude the row is theirs to make. The unique
-    // index on the address is still the backstop — the loser of that race
-    // fails here rather than writing a twin.
+    // address must not both conclude the row is theirs to make. For the
+    // CREATE branch the unique index on the address settles that race anyway
+    // — the loser fails rather than writing a twin. For the ADOPT branch it
+    // cannot, because adopting touches no unique column, which is why the
+    // decision is re-taken below rather than inherited from the caller.
     const existing = await tx.user.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
       select: {
         id: true,
-        accounts: { select: { id: true, provider: true } },
+        accounts: { select: { id: true, provider: true, password: true } },
+        accountCredentials: { select: { provider: true, password: true } },
+        passkeys: { select: { id: true }, take: 1 },
+        orgMemberships: { select: { organizationId: true }, take: 1 },
       },
     });
 
     if (existing) {
-      // The caller has already established this account holds no credential
-      // anybody could present; all that can be missing is the placeholder
-      // itself, if the earlier attempt died between the two writes.
+      // Asked AGAIN, here, rather than trusted from the caller. The caller's
+      // refusal ran before this transaction opened, and between the two an
+      // account that was residue can become somebody's — a password set, a
+      // passkey landed, an invitation redeemed. Deciding it inside the
+      // transaction that adopts is what makes the read and the write one
+      // decision instead of two; before, the unique index on the address was
+      // the backstop for that race, and adopting rather than creating is
+      // exactly what takes the index out of the path.
+      if (belongsToSomebody(existing)) {
+        throw new PasskeySignUpAddressTakenError(
+          "the address gained a credential between the guard and the adoption",
+        );
+      }
+
+      // All that can be missing is the placeholder itself, if the earlier
+      // attempt died between its two writes.
       const hasPlaceholder = existing.accounts.some(
         (account) => account.provider === "credential",
       );

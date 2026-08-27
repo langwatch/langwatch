@@ -6,7 +6,11 @@ import { APIError } from "better-auth/api";
 import { env } from "~/env.mjs";
 import { signUpVerification } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
-import { createPasskeyUser } from "~/server/users/credential-user";
+import {
+  belongsToSomebody,
+  createPasskeyUser,
+  PasskeySignUpAddressTakenError,
+} from "~/server/users/credential-user";
 
 const logger = createLogger("langwatch:better-auth:passkey-signup");
 
@@ -90,23 +94,6 @@ function requireEmail(context: string | null | undefined): string {
 }
 
 /**
- * A credential row somebody could actually present, from either branch.
- *
- * `provider` decides it rather than `password`: a row for an identity
- * provider carries no password by design and is still a way in, while a
- * `credential` row with a null password is the one shape that is not — it is
- * what `createPasskeyUser` writes before the passkey lands beside it, and on
- * its own it authenticates nobody (sign-in hashes a dummy and refuses it
- * exactly as it refuses a missing row).
- */
-function isUsableCredential(row: {
-  provider: string;
-  password: string | null;
-}): boolean {
-  return row.provider !== "credential" || row.password !== null;
-}
-
-/**
  * Whether this address already has an account somebody can sign into.
  *
  * NOT "is there a User row", and the difference is the dead end this closes.
@@ -140,10 +127,20 @@ function isUsableCredential(row: {
  * makes a credential-less user: `createCredentialUser` always writes a
  * password, a social sign-up always writes its provider's account, an
  * invitation creates no User row at all (`OrganizationInvite` is keyed by
- * address and redeemed after sign-in), and SCIM provisioning has models but
- * no write path. If that ever stops being true — a provisioning route that
- * pre-creates members, say — this predicate is where it has to be reckoned
- * with, because such a row WOULD be adoptable by a stranger.
+ * address and redeemed after sign-in), and removing somebody's last way in is
+ * refused before it happens — by the detach guard on `account.delete.before`,
+ * and by `last-way-in.ts` for the passkey and second-factor doors those hooks
+ * never saw (ADR-119).
+ *
+ * MEMBERSHIP IS CHECKED ANYWAY, and the reason is worth stating: everything
+ * in the paragraph above is an argument about OTHER code, and this predicate
+ * is the security boundary. An account that belongs to an organization is
+ * somebody's whatever its credential rows say, so it is refused on that
+ * ground alone — which keeps the boundary true even if some later
+ * provisioning path starts pre-creating members. It costs no genuine
+ * recovery: residue from a ceremony that never finished has no membership,
+ * because joining one takes a sign-in and this account has never had a way
+ * to sign in.
  */
 async function refuseIfRegistered(email: string): Promise<void> {
   // Case-insensitive for the same reason `user.register` is: rows written
@@ -155,18 +152,14 @@ async function refuseIfRegistered(email: string): Promise<void> {
       id: true,
       accounts: { select: { provider: true, password: true } },
       accountCredentials: { select: { provider: true, password: true } },
-      // One is enough: the question is only whether any exists.
+      // One of each is enough: the question is only whether any exists.
       passkeys: { select: { id: true }, take: 1 },
+      orgMemberships: { select: { organizationId: true }, take: 1 },
     },
   });
   if (!existing) return;
 
-  const signable =
-    existing.passkeys.length > 0 ||
-    existing.accounts.some(isUsableCredential) ||
-    existing.accountCredentials.some(isUsableCredential);
-
-  if (!signable) {
+  if (!belongsToSomebody(existing)) {
     // The recovery, and the one line that says it happened. Without it a
     // resumed sign-up is indistinguishable from a first one in the logs,
     // which is the difference between knowing this path is exercised and
@@ -234,11 +227,28 @@ async function afterVerification({
 }): Promise<{ userId: string; name: string }> {
   const email = requireEmail(context);
   // Again, because the check in `resolveUser` was one network round trip ago
-  // and an account can be created in that window. The unique index on the
-  // address is the real backstop; this is the one that answers in words.
+  // and an account can be created in that window. This is the one that
+  // answers in WORDS; the decision that actually holds is taken inside the
+  // write's own transaction, which is the only place a read of the account
+  // and the write that depends on it cannot be separated.
   await refuseIfRegistered(email);
 
-  const user = await createPasskeyUser({ prisma, email });
+  const user = await createPasskeyUser({ prisma, email }).catch((error) => {
+    // The transaction found what the guard above could not: the address
+    // became somebody's in between. Same refusal, same code, so the screen
+    // cannot tell the two moments apart and does not have to.
+    if (error instanceof PasskeySignUpAddressTakenError) {
+      logger.warn(
+        { path: "/passkey/verify-registration" },
+        "an address was claimed between the sign-up guard and the write; the ceremony is refused",
+      );
+      throw new APIError("BAD_REQUEST", {
+        code: PASSKEY_SIGNUP_EMAIL_TAKEN,
+        message: "That email already has an account. Log in with it instead.",
+      });
+    }
+    throw error;
+  });
 
   // The address confirmation follows them in, exactly as it does on the
   // password path (ADR-117 §6, revised). Sent from HERE rather than from the
