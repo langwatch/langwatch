@@ -158,6 +158,7 @@ export class IdempotencyConflictError extends HandledError {
       meta: { reason },
       httpStatus: 409,
       fault: "customer",
+      retryable: reason === "in_progress",
     });
     this.name = "IdempotencyConflictError";
   }
@@ -241,8 +242,42 @@ export interface IdempotentReplayed {
 
 export type IdempotentOutcome<T> = IdempotentExecuted<T> | IdempotentReplayed;
 
+export type IdempotencyReceiptCreateInput = {
+  scopeId: string;
+  key: string;
+  claimId: string;
+  requestFingerprint: string;
+  heartbeatAt: Date;
+  expiresAt: Date;
+};
+
+export type IdempotencyReceiptUpdateInput = Partial<
+  Pick<
+    IdempotencyReceipt,
+    "claimId" | "heartbeatAt" | "expiresAt" | "responseStatus" | "responseBody"
+  >
+>;
+
+/** Minimal durable receipt store used by the idempotency protocol. */
+export interface IdempotencyReceiptPersistence {
+  readonly idempotencyReceipt: {
+    create(input: {
+      data: IdempotencyReceiptCreateInput;
+      select: { id: true };
+    }): Promise<{ id: string }>;
+    findUnique(input: {
+      where: { scopeId_key: { scopeId: string; key: string } };
+    }): Promise<IdempotencyReceipt | null>;
+    updateMany(input: {
+      where: { id: string; claimId?: string; responseStatus?: null };
+      data: IdempotencyReceiptUpdateInput;
+    }): Promise<{ count: number }>;
+    deleteMany(input: { where: { id: string; claimId?: string } }): Promise<{ count: number }>;
+  };
+}
+
 export interface WithIdempotencyParams<T> {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   /**
    * Which create this is, e.g. `gateway.v1.virtual-keys.create`. Folded into
    * the fingerprint so one key cannot answer for two different creates that
@@ -349,7 +384,7 @@ function startClaimHeartbeat({
   receiptId,
   claimId,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   receiptId: string;
   claimId: string;
 }): ClaimHeartbeat {
@@ -397,7 +432,7 @@ async function finalizeClaim({
   status,
   serializedBody,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   receiptId: string;
   claimId: string;
   status: number;
@@ -456,7 +491,7 @@ async function claimReceipt({
   key,
   requestFingerprint,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   scopeId: string;
   key: string;
   requestFingerprint: string;
@@ -503,7 +538,7 @@ async function insertPendingReceipt({
   requestFingerprint,
   now,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   scopeId: string;
   key: string;
   requestFingerprint: string;
@@ -539,13 +574,7 @@ async function insertPendingReceipt({
  * what it turns on is a matter of record: the last time the holder said it was
  * running, never how long ago the claim was made.
  */
-export function isClaimAbandoned({
-  heartbeatAt,
-  now,
-}: {
-  heartbeatAt: Date;
-  now: Date;
-}): boolean {
+export function isClaimAbandoned({ heartbeatAt, now }: { heartbeatAt: Date; now: Date }): boolean {
   return now.getTime() - heartbeatAt.getTime() > TAKEOVER_AFTER_MS;
 }
 
@@ -563,7 +592,7 @@ async function takeOverClaim({
   existing,
   now,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   existing: IdempotencyReceipt;
   now: Date;
 }): Promise<ExistingVerdict> {
@@ -603,7 +632,7 @@ async function readExistingReceipt({
   requestFingerprint,
   now,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   existing: IdempotencyReceipt;
   requestFingerprint: string;
   now: Date;
@@ -689,7 +718,7 @@ async function releaseClaim({
   receiptId,
   claimId,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   receiptId: string;
   claimId: string;
 }): Promise<void> {
@@ -722,7 +751,7 @@ async function discardReceipt({
   prisma,
   receiptId,
 }: {
-  prisma: PrismaClient;
+  prisma: IdempotencyReceiptPersistence;
   receiptId: string;
 }): Promise<void> {
   try {

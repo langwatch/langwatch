@@ -22,6 +22,7 @@ import { encrypt } from "~/utils/encryption";
 import {
   fingerprintRequestBody,
   HEARTBEAT_INTERVAL_MS,
+  IdempotencyConflictError,
   isClaimAbandoned,
   MAX_KEY_LENGTH,
   MIN_KEY_LENGTH,
@@ -48,6 +49,16 @@ vi.mock("@langwatch/observability", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("IdempotencyConflictError", () => {
+  it("marks a live claim as retryable", () => {
+    expect(new IdempotencyConflictError("in_progress").retryable).toBe(true);
+  });
+
+  it("keeps a body mismatch terminal", () => {
+    expect(new IdempotencyConflictError("body_mismatch").retryable).toBe(false);
+  });
 });
 
 /** A prisma that fails loudly if anything reaches for it. */
@@ -111,8 +122,7 @@ describe("readIdempotencyKey", () => {
 
 describe("fingerprintRequestBody", () => {
   const OPERATION = "gateway.v1.budgets.create";
-  const fingerprint = (body: unknown) =>
-    fingerprintRequestBody({ operation: OPERATION, body });
+  const fingerprint = (body: unknown) => fingerprintRequestBody({ operation: OPERATION, body });
 
   it("ignores the order the caller's serialiser emitted keys in", () => {
     const one = fingerprint({
@@ -149,15 +159,11 @@ describe("fingerprintRequestBody", () => {
   it("treats array order as meaningful", () => {
     // Order carries meaning in the wire schemas that take lists (scopes,
     // enabled_events), so two orderings are two different requests.
-    expect(fingerprint({ events: ["a", "b"] })).not.toBe(
-      fingerprint({ events: ["b", "a"] }),
-    );
+    expect(fingerprint({ events: ["a", "b"] })).not.toBe(fingerprint({ events: ["b", "a"] }));
   });
 
   it("distinguishes a missing key from an explicit null", () => {
-    expect(fingerprint({ name: "x" })).not.toBe(
-      fingerprint({ name: "x", description: null }),
-    );
+    expect(fingerprint({ name: "x" })).not.toBe(fingerprint({ name: "x", description: null }));
   });
 
   it("is a sha256 hex digest", () => {
@@ -280,23 +286,17 @@ describe("isClaimAbandoned", () => {
     /** @scenario "A retry sent while the original is still running is refused" */
     it("holds the claim while the beats keep arriving", () => {
       expect(isClaimAbandoned({ heartbeatAt: lastBeat(0), now })).toBe(false);
-      expect(
-        isClaimAbandoned({ heartbeatAt: lastBeat(HEARTBEAT_INTERVAL_MS), now }),
-      ).toBe(false);
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(HEARTBEAT_INTERVAL_MS), now })).toBe(false);
       // Silent for the whole tolerance and not a millisecond more: the beat
       // that would have cleared it may simply be in flight.
-      expect(isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS), now })).toBe(
-        false,
-      );
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS), now })).toBe(false);
     });
   });
 
   describe("given a claim that stopped beating", () => {
     /** @scenario "A claim that stopped reporting itself alive is taken over" */
     it("releases the claim once the tolerance is past", () => {
-      expect(
-        isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS + 1), now }),
-      ).toBe(true);
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS + 1), now })).toBe(true);
       expect(isClaimAbandoned({ heartbeatAt: lastBeat(10 * 60_000), now })).toBe(true);
     });
   });
@@ -376,8 +376,7 @@ describe("the writes a claim holder makes", () => {
       handler: handler as never,
     });
 
-  const succeeds = () =>
-    Promise.resolve({ status: 201, body: { budget: { id: "bg-1" } } });
+  const succeeds = () => Promise.resolve({ status: 201, body: { budget: { id: "bg-1" } } });
 
   describe("when the claim is still the one this request took", () => {
     it("stores the response against the claim it holds", async () => {
@@ -410,9 +409,7 @@ describe("the writes a claim holder makes", () => {
       expect(updated).toHaveLength(1);
       expect(deleted).toHaveLength(0);
       expect(logSpy.error).toHaveBeenCalledTimes(1);
-      expect(logSpy.error.mock.calls[0]?.[1]).toContain(
-        "may now stand for a second resource",
-      );
+      expect(logSpy.error.mock.calls[0]?.[1]).toContain("may now stand for a second resource");
     });
 
     it("releases nothing when its handler failed", async () => {
