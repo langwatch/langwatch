@@ -37,10 +37,173 @@ import { FlatRowsTable, GroupedRowsTable } from "./GroupedRowsTable";
 import { PlanRowsTable } from "./PlanRowsTable";
 import { ResultsChartsBlock } from "./ResultsChartsBlock";
 import { ResultsFilterRow } from "./ResultsFilterRow";
-import type { ResultRow } from "./result-atoms";
+import type { ResultGrouping, ResultRow } from "./result-atoms";
 import type { RunPlan } from "./run-plans";
-import { useResultGroups } from "./useResultGroups";
+import { type UseResultGroupsResult, useResultGroups } from "./useResultGroups";
 import { useResultsView } from "./useResultsView";
+
+/** The title line: what the window holds, and the way to add a run plan. */
+function ResultsHeader({
+  executionCount,
+  onNewRunPlan,
+}: {
+  executionCount: number;
+  onNewRunPlan: () => void;
+}) {
+  return (
+    <HStack gap={2} height="32px">
+      <Text fontSize="14px" fontWeight="semibold" color="fg">
+        Test Runs
+      </Text>
+      <Text fontSize="11.5px" color={FG_MUTED}>
+        {executionCount === 1 ? "1 execution" : `${executionCount} executions`}
+      </Text>
+      <Box flex={1} />
+      <SmallButton onClick={onNewRunPlan}>
+        <Plus size={13} />
+        New run plan
+      </SmallButton>
+    </HStack>
+  );
+}
+
+/** What stands in for the table while the reads are still out. */
+function LoadingRows() {
+  return (
+    <VStack align="stretch" gap={2}>
+      <Skeleton height="44px" />
+      <Skeleton height="44px" />
+      <Skeleton height="44px" />
+    </VStack>
+  );
+}
+
+/** What the tab says to a project that has never run anything. */
+function NoRunsYet() {
+  return (
+    <EmptyState.Root paddingY={12}>
+      <EmptyState.Content>
+        <EmptyState.Indicator>
+          <FlaskConical size={28} />
+        </EmptyState.Indicator>
+        <EmptyState.Title>No runs yet</EmptyState.Title>
+        <EmptyState.Description>
+          Run a test suite or a single scenario and the results land here.
+        </EmptyState.Description>
+      </EmptyState.Content>
+    </EmptyState.Root>
+  );
+}
+
+/** The table the chosen grouping draws. */
+function ResultsTable({
+  grouping,
+  results,
+  days,
+  openedKeys,
+  onToggleOpen,
+  onSelectPlan,
+  onEditPlan,
+  onOpenRun,
+}: {
+  grouping: ResultGrouping;
+  results: UseResultGroupsResult;
+  days: number;
+  openedKeys: string[];
+  onToggleOpen: (key: string) => void;
+  onSelectPlan: (planSlug: string) => void;
+  onEditPlan: (suiteId: string) => void;
+  onOpenRun: (row: ResultRow) => void;
+}) {
+  if (grouping === "plan") {
+    return (
+      <PlanRowsTable
+        rows={results.planRows}
+        days={days}
+        resolveTargetName={results.resolveTargetName}
+        onSelectPlan={onSelectPlan}
+        onEditPlan={onEditPlan}
+      />
+    );
+  }
+
+  if (grouping === "scenario" || grouping === "target") {
+    return (
+      <GroupedRowsTable
+        kind={grouping}
+        groups={results.groups}
+        openedKeys={openedKeys}
+        onToggleOpen={onToggleOpen}
+        rowsByGroupKey={results.rowsByGroupKey}
+        resolveTargetName={results.resolveTargetName}
+        onOpenRun={onOpenRun}
+      />
+    );
+  }
+
+  return (
+    <FlatRowsTable
+      rows={results.rows}
+      resolveTargetName={results.resolveTargetName}
+      onOpenRun={onOpenRun}
+      hasMore={results.hasMore}
+    />
+  );
+}
+
+/** The filters, the charts they drive, and the table, in that order. */
+function ResultsBody({
+  view,
+  results,
+  period,
+  setRelativePeriod,
+  days,
+  onSelectPlan,
+  onEditPlan,
+  onOpenRun,
+}: {
+  view: ReturnType<typeof useResultsView>;
+  results: UseResultGroupsResult;
+  period: Period;
+  setRelativePeriod: (key: RelativePresetKey) => void;
+  days: number;
+  onSelectPlan: (planSlug: string) => void;
+  onEditPlan: (suiteId: string) => void;
+  onOpenRun: (row: ResultRow) => void;
+}) {
+  return (
+    <>
+      <ResultsFilterRow
+        grouping={view.grouping}
+        onGroupingChange={view.onGroupingChange}
+        filters={view.filters}
+        onFiltersChange={view.onFiltersChange}
+        scenarioOptions={results.scenarioOptions}
+        labelOptions={results.labelOptions}
+        targetOptions={results.targetOptions}
+        isChartsShown={view.isChartsShown}
+        onChartsToggle={view.onChartsToggle}
+        period={period}
+        setRelativePeriod={setRelativePeriod}
+      />
+
+      {view.isChartsShown ? (
+        <ResultsChartsBlock totals={results.totals} buckets={results.buckets} />
+      ) : null}
+
+      <ResultsTable
+        grouping={view.grouping}
+        results={results}
+        days={days}
+        openedKeys={view.openedKeys}
+        onToggleOpen={view.onToggleOpen}
+        onSelectPlan={onSelectPlan}
+        onEditPlan={onEditPlan}
+        onOpenRun={onOpenRun}
+      />
+    </>
+  );
+}
 
 export type ResultsListProps = {
   /** Where the address stands, so the view can write its own params into it. */
@@ -87,7 +250,6 @@ export function ResultsList({
     isSseConnected,
   });
 
-  const days = periodDays(period);
   const isLoading = isPlansLoading || results.isLoading;
 
   const openRun = (row: ResultRow) => onSelectRun(row.planSlug, row.runId);
@@ -97,94 +259,26 @@ export function ResultsList({
       railWidth={AGENT_TESTING_RAIL_WIDTH + CONTENT_COLUMN_GUTTER}
       data-testid="agent-testing-run-plans"
     >
-      <HStack gap={2} height="32px">
-        <Text fontSize="14px" fontWeight="semibold" color="fg">
-          Test Runs
-        </Text>
-        <Text fontSize="11.5px" color={FG_MUTED}>
-          {results.totals.executions === 1
-            ? "1 execution"
-            : `${results.totals.executions} executions`}
-        </Text>
-        <Box flex={1} />
-        <SmallButton onClick={onNewRunPlan}>
-          <Plus size={13} />
-          New run plan
-        </SmallButton>
-      </HStack>
+      <ResultsHeader
+        executionCount={results.totals.executions}
+        onNewRunPlan={onNewRunPlan}
+      />
 
       {isLoading ? (
-        <VStack align="stretch" gap={2}>
-          <Skeleton height="44px" />
-          <Skeleton height="44px" />
-          <Skeleton height="44px" />
-        </VStack>
+        <LoadingRows />
       ) : !hasAnyPlans ? (
-        <EmptyState.Root paddingY={12}>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <FlaskConical size={28} />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No runs yet</EmptyState.Title>
-            <EmptyState.Description>
-              Run a test suite or a single scenario and the results land here.
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <NoRunsYet />
       ) : (
-        <>
-          <ResultsFilterRow
-            grouping={view.grouping}
-            onGroupingChange={view.onGroupingChange}
-            filters={view.filters}
-            onFiltersChange={view.onFiltersChange}
-            scenarioOptions={results.scenarioOptions}
-            labelOptions={results.labelOptions}
-            targetOptions={results.targetOptions}
-            isChartsShown={view.isChartsShown}
-            onChartsToggle={view.onChartsToggle}
-            period={period}
-            setRelativePeriod={setRelativePeriod}
-          />
-
-          {view.isChartsShown ? (
-            <ResultsChartsBlock
-              totals={results.totals}
-              buckets={results.buckets}
-            />
-          ) : null}
-
-          {view.grouping === "plan" ? (
-            <PlanRowsTable
-              rows={results.planRows}
-              days={days}
-              resolveTargetName={results.resolveTargetName}
-              onSelectPlan={onSelectPlan}
-              onEditPlan={onEditPlan}
-            />
-          ) : null}
-
-          {view.grouping === "scenario" || view.grouping === "target" ? (
-            <GroupedRowsTable
-              kind={view.grouping}
-              groups={results.groups}
-              openedKeys={view.openedKeys}
-              onToggleOpen={view.onToggleOpen}
-              rowsByGroupKey={results.rowsByGroupKey}
-              resolveTargetName={results.resolveTargetName}
-              onOpenRun={openRun}
-            />
-          ) : null}
-
-          {view.grouping === "none" ? (
-            <FlatRowsTable
-              rows={results.rows}
-              resolveTargetName={results.resolveTargetName}
-              onOpenRun={openRun}
-              hasMore={results.hasMore}
-            />
-          ) : null}
-        </>
+        <ResultsBody
+          view={view}
+          results={results}
+          period={period}
+          setRelativePeriod={setRelativePeriod}
+          days={periodDays(period)}
+          onSelectPlan={onSelectPlan}
+          onEditPlan={onEditPlan}
+          onOpenRun={openRun}
+        />
       )}
     </ContentColumn>
   );

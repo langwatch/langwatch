@@ -23,6 +23,7 @@ import type { Period, PeriodMode } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import type {
+  ResultAtom,
   ResultGroup,
   ResultTotals,
   SeriesBucket,
@@ -104,15 +105,13 @@ function narrowTo({
   return opened.filter((key) => wanted.has(key));
 }
 
-export function useResultGroups({
-  plans,
-  period,
-  periodMode,
-  grouping,
-  filters,
-  openedKeys,
-  isSseConnected,
-}: {
+/** What the rows and the option lists need from one of the project's scenarios. */
+type ScenarioSource = { id: string; name: string; labels: string[] };
+
+/** The filter both reads take, so neither can be in scope of what the other is not. */
+type ResultsScope = ReturnType<typeof useResultsScope>;
+
+export type UseResultGroupsArgs = {
   plans: RunPlan[];
   period: Period;
   periodMode: PeriodMode;
@@ -121,16 +120,29 @@ export function useResultGroups({
   /** The keys of the groups a person has opened. */
   openedKeys: string[];
   isSseConnected: boolean;
-}): UseResultGroupsResult {
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
+};
 
-  // A relative window sends no end. Its end is pinned at mount, so sending it
-  // would filter on "started before the page loaded" and a run beginning while
-  // someone watches would never appear, on the page whose job is watching runs
-  // happen. A window a person picked by hand does send one: they asked for
-  // that window, and it must not drift.
-  const scope = useMemo(
+/**
+ * The window and the filters, as the shape both reads take.
+ *
+ * A relative window sends no end. Its end is pinned at mount, so sending it
+ * would filter on "started before the page loaded" and a run beginning while
+ * someone watches would never appear, on the page whose job is watching runs
+ * happen. A window a person picked by hand does send one: they asked for that
+ * window, and it must not drift.
+ */
+function useResultsScope({
+  projectId,
+  period,
+  periodMode,
+  filters,
+}: {
+  projectId: string;
+  period: Period;
+  periodMode: PeriodMode;
+  filters: ResultFilters;
+}) {
+  return useMemo(
     () => ({
       projectId,
       startDate: period.startDate.getTime(),
@@ -142,113 +154,200 @@ export function useResultGroups({
     }),
     [projectId, period, periodMode, filters],
   );
+}
 
+/**
+ * The drill-down's own scope: the shared filter, narrowed to the opened rows.
+ *
+ * It narrows rather than widens. An open row asks for its own runs, and a
+ * filter already cutting those ids must keep cutting them.
+ */
+function narrowDrillScope({
+  scope,
+  grouping,
+  openedKeys,
+  filters,
+}: {
+  scope: ResultsScope;
+  grouping: ResultGrouping;
+  openedKeys: string[];
+  filters: ResultFilters;
+}): ResultsScope {
+  if (grouping === "scenario") {
+    return {
+      ...scope,
+      scenarioIds: narrowTo({ opened: openedKeys, asked: filters.scenarioIds }),
+    };
+  }
+  if (grouping === "target") {
+    return {
+      ...scope,
+      targetKeys: narrowTo({ opened: openedKeys, asked: filters.targetKeys }),
+    };
+  }
+  return scope;
+}
+
+/**
+ * The two reads, both taking the same filter.
+ *
+ * The drill-down is asked for only when something is drilling into: the flat
+ * list, or the runs behind an opened row. The plan grouping never opens a row
+ * in place, so it asks for no atoms at all.
+ */
+function useResultsReads({
+  scope,
+  grouping,
+  filters,
+  openedKeys,
+  isEnabled,
+  isSseConnected,
+}: {
+  scope: ResultsScope;
+  grouping: ResultGrouping;
+  filters: ResultFilters;
+  openedKeys: string[];
+  isEnabled: boolean;
+  isSseConnected: boolean;
+}) {
   const refetchInterval = isSseConnected ? false : RESULTS_POLL_MS;
 
   const overview = api.scenarios.getResultsOverview.useQuery(
     { ...scope, groupBy: grouping },
-    { enabled: !!project, refetchInterval },
+    { enabled: isEnabled, refetchInterval },
   );
 
-  // The drill-down. It is asked for only when something is drilling into:
-  // the flat list, or the runs behind an opened row. The plan grouping never
-  // opens a row in place, so it asks for no atoms at all.
-  const isFlat = grouping === "none";
   const isDrilling =
     grouping === "scenario" || grouping === "target"
       ? openedKeys.length > 0
-      : isFlat;
+      : grouping === "none";
 
-  const drillScope = useMemo(() => {
-    if (grouping === "scenario") {
-      return {
-        ...scope,
-        scenarioIds: narrowTo({
-          opened: openedKeys,
-          asked: filters.scenarioIds,
-        }),
-      };
-    }
-    if (grouping === "target") {
-      return {
-        ...scope,
-        targetKeys: narrowTo({ opened: openedKeys, asked: filters.targetKeys }),
-      };
-    }
-    return scope;
-  }, [scope, grouping, openedKeys, filters]);
+  const drillScope = useMemo(
+    () => narrowDrillScope({ scope, grouping, openedKeys, filters }),
+    [scope, grouping, openedKeys, filters],
+  );
 
   const atomPage = api.scenarios.getResultAtoms.useQuery(
     { ...drillScope, limit: ATOM_PAGE },
-    { enabled: !!project && isDrilling, refetchInterval },
+    { enabled: isEnabled && isDrilling, refetchInterval },
   );
 
-  const { data: scenarios } = api.scenarios.getAll.useQuery(
-    { projectId },
-    { enabled: !!project },
+  return { overview, atomPage };
+}
+
+/** The names and labels the rows read, keyed by scenario id. */
+function toScenarioFacts(
+  scenarios: ScenarioSource[],
+): Map<string, ScenarioFacts> {
+  const facts = new Map<string, ScenarioFacts>();
+  for (const scenario of scenarios) {
+    facts.set(scenario.id, { name: scenario.name, labels: scenario.labels });
+  }
+  return facts;
+}
+
+/** The atoms of the drill-down page, named with what the project knows. */
+function useNamedRows({
+  atoms,
+  plans,
+  scenarios,
+  targetNames,
+}: {
+  atoms: ResultAtom[] | undefined;
+  plans: RunPlan[];
+  scenarios: ScenarioSource[] | undefined;
+  targetNames: Map<string, string>;
+}): ResultRow[] {
+  const scenarioFacts = useMemo(
+    () => toScenarioFacts(scenarios ?? []),
+    [scenarios],
   );
 
-  const targetNames = useTargetNameMap();
+  const planBySlug = useMemo(
+    () => new Map(plans.map((plan) => [plan.slug, plan])),
+    [plans],
+  );
 
-  const scenarioFacts = useMemo(() => {
-    const facts = new Map<string, ScenarioFacts>();
-    for (const scenario of scenarios ?? []) {
-      facts.set(scenario.id, { name: scenario.name, labels: scenario.labels });
-    }
-    return facts;
-  }, [scenarios]);
-
-  const planBySlug = useMemo(() => {
-    const bySlug = new Map<string, RunPlan>();
-    for (const plan of plans) bySlug.set(plan.slug, plan);
-    return bySlug;
-  }, [plans]);
-
-  const rows = useMemo(
+  return useMemo(
     () =>
       toResultRows({
-        atoms: atomPage.data?.atoms ?? [],
+        atoms: atoms ?? [],
         plans: planBySlug,
         scenarioFacts,
         targetNames,
       }),
-    [atomPage.data, planBySlug, scenarioFacts, targetNames],
+    [atoms, planBySlug, scenarioFacts, targetNames],
   );
+}
 
-  const rowsByGroupKey = useMemo(() => {
-    const byKey = new Map<string, ResultRow[]>();
-    if (grouping !== "scenario" && grouping !== "target") return byKey;
-    for (const row of rows) {
-      const key = grouping === "scenario" ? row.scenarioId : row.targetKey;
-      const held = byKey.get(key);
-      if (held) held.push(row);
-      else byKey.set(key, [row]);
-    }
-    return byKey;
-  }, [rows, grouping]);
+/**
+ * The runs behind each opened group, keyed by that group's key.
+ *
+ * Only the two groupings that open a row in place hold any: the others ask for
+ * no atoms, so there is nothing to key.
+ */
+function groupRowsByKey({
+  rows,
+  grouping,
+}: {
+  rows: ResultRow[];
+  grouping: ResultGrouping;
+}): Map<string, ResultRow[]> {
+  const byKey = new Map<string, ResultRow[]>();
+  if (grouping !== "scenario" && grouping !== "target") return byKey;
 
-  const groups = overview.data?.groups ?? [];
+  for (const row of rows) {
+    const key = grouping === "scenario" ? row.scenarioId : row.targetKey;
+    const held = byKey.get(key);
+    if (held) held.push(row);
+    else byKey.set(key, [row]);
+  }
+  return byKey;
+}
 
-  const planRows = useMemo<PlanRowModel[]>(() => {
-    if (grouping !== "plan") return [];
+/**
+ * The rows of the Run plan grouping, quiet plans included.
+ *
+ * A quiet plan still has a row, so a plan someone is worried about does not
+ * vanish the moment it stops running. It stands down only while a filter is
+ * narrowing the question, where a row matching nothing is noise rather than
+ * reassurance.
+ */
+function buildPlanRows({
+  plans,
+  groups,
+  grouping,
+  filters,
+}: {
+  plans: RunPlan[];
+  groups: ResultGroup[];
+  grouping: ResultGrouping;
+  filters: ResultFilters;
+}): PlanRowModel[] {
+  if (grouping !== "plan") return [];
 
-    const byPlanSlug = new Map(groups.map((group) => [group.key, group]));
-    const narrowed = isNarrowed(filters);
+  const byPlanSlug = new Map(groups.map((group) => [group.key, group]));
+  const narrowed = isNarrowed(filters);
 
-    return (
-      plans
-        .map((plan) => ({ plan, group: byPlanSlug.get(plan.slug) ?? null }))
-        // A quiet plan still has a row, so a plan someone is worried about does
-        // not vanish the moment it stops running. It stands down only while a
-        // filter is narrowing the question, where a row matching nothing is
-        // noise rather than reassurance.
-        .filter(({ group }) => !narrowed || group !== null)
-    );
-  }, [plans, groups, grouping, filters]);
+  return plans
+    .map((plan) => ({ plan, group: byPlanSlug.get(plan.slug) ?? null }))
+    .filter(({ group }) => !narrowed || group !== null);
+}
 
-  // Every option list is built from the project rather than from the window,
-  // so a filter never hides its own way back: an option built from what the
-  // page already cut away cannot be chosen to undo the cut.
+/**
+ * The option lists of the filter row.
+ *
+ * Every list is built from the project rather than from the window, so a
+ * filter never hides its own way back: an option built from what the page
+ * already cut away cannot be chosen to undo the cut.
+ */
+function useResultFilterOptions({
+  scenarios,
+  targetNames,
+}: {
+  scenarios: ScenarioSource[] | undefined;
+  targetNames: Map<string, string>;
+}) {
   const scenarioOptions = useMemo(
     () =>
       (scenarios ?? [])
@@ -280,6 +379,59 @@ export function useResultGroups({
     [targetNames],
   );
 
+  return { scenarioOptions, labelOptions, targetOptions, resolveTargetName };
+}
+
+export function useResultGroups({
+  plans,
+  period,
+  periodMode,
+  grouping,
+  filters,
+  openedKeys,
+  isSseConnected,
+}: UseResultGroupsArgs): UseResultGroupsResult {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+
+  const scope = useResultsScope({ projectId, period, periodMode, filters });
+
+  const { overview, atomPage } = useResultsReads({
+    scope,
+    grouping,
+    filters,
+    openedKeys,
+    isEnabled: !!project,
+    isSseConnected,
+  });
+
+  const { data: scenarios } = api.scenarios.getAll.useQuery(
+    { projectId },
+    { enabled: !!project },
+  );
+
+  const targetNames = useTargetNameMap();
+  const options = useResultFilterOptions({ scenarios, targetNames });
+
+  const rows = useNamedRows({
+    atoms: atomPage.data?.atoms,
+    plans,
+    scenarios,
+    targetNames,
+  });
+
+  const rowsByGroupKey = useMemo(
+    () => groupRowsByKey({ rows, grouping }),
+    [rows, grouping],
+  );
+
+  const groups = overview.data?.groups ?? [];
+
+  const planRows = useMemo(
+    () => buildPlanRows({ plans, groups, grouping, filters }),
+    [plans, groups, grouping, filters],
+  );
+
   return {
     planRows,
     groups,
@@ -287,10 +439,7 @@ export function useResultGroups({
     rows,
     totals: overview.data?.totals ?? EMPTY_TOTALS,
     buckets: overview.data?.totals.series ?? [],
-    scenarioOptions,
-    labelOptions,
-    targetOptions,
-    resolveTargetName,
+    ...options,
     isLoading: overview.isLoading,
     hasMore: atomPage.data?.hasMore ?? false,
   };

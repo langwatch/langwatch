@@ -125,6 +125,126 @@ function RunLine({
   );
 }
 
+/** The middle column: a scenario's labels, or how many scenarios a target covers. */
+function middleColumnText({
+  group,
+  isScenario,
+}: {
+  group: ResultGroup;
+  isScenario: boolean;
+}): string {
+  if (isScenario) return group.subtitle ?? "";
+  return group.scenarioCount === 1
+    ? "1 scenario"
+    : `${group.scenarioCount} scenarios`;
+}
+
+/** The line a group always draws, open or folded. */
+function GroupSummaryRow({
+  group,
+  isScenario,
+  isOpen,
+  onToggleOpen,
+}: {
+  group: ResultGroup;
+  isScenario: boolean;
+  isOpen: boolean;
+  onToggleOpen: (key: string) => void;
+}) {
+  return (
+    <ResultsTableRow
+      columns={GROUP_COLUMNS}
+      onClick={() => onToggleOpen(group.key)}
+      testId={`results-group-row-${group.key}`}
+    >
+      <Box color={FG_MUTED} display="flex" alignItems="center">
+        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </Box>
+
+      <HStack gap={1.5} minWidth={0}>
+        {!isScenario ? (
+          <Box color={FG_MUTED} flexShrink={0} display="flex">
+            <Target size={13} />
+          </Box>
+        ) : null}
+        <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+          {group.title}
+        </Text>
+      </HStack>
+
+      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+        {middleColumnText({ group, isScenario })}
+      </Text>
+
+      <Text
+        fontSize="12px"
+        color={FG_MUTED}
+        textAlign="right"
+        fontVariantNumeric="tabular-nums"
+      >
+        {group.runCount}
+      </Text>
+
+      <PassRateText passRate={group.passRate} />
+
+      <TrendSparkline bars={group.trend} per="execution" />
+    </ResultsTableRow>
+  );
+}
+
+/** The runs behind an opened group, newest first and capped. */
+function GroupRunList({
+  group,
+  rows,
+  show,
+  resolveTargetName,
+  onOpenRun,
+  now,
+}: {
+  group: ResultGroup;
+  rows: ResultRow[];
+  show: "plan" | "scenario";
+  resolveTargetName: (targetKey: string) => string;
+  onOpenRun: (row: ResultRow) => void;
+  now: number;
+}) {
+  const ordered = [...rows].sort((a, b) => b.runAt - a.runAt);
+
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      paddingY={1}
+      borderTopWidth="1px"
+      borderTopColor="border.muted"
+      background={GROUP_HEADER_BG}
+      data-testid={`results-group-expanded-${group.key}`}
+    >
+      {ordered.slice(0, EXPANDED_RUN_LIMIT).map((row) => (
+        <RunLine
+          key={row.executionId}
+          row={row}
+          show={show}
+          resolveTargetName={resolveTargetName}
+          onOpenRun={onOpenRun}
+          now={now}
+        />
+      ))}
+      {ordered.length > EXPANDED_RUN_LIMIT ? (
+        <Text fontSize="11px" color={FG_MUTED} paddingX={4} paddingY={1.5}>
+          {ordered.length - EXPANDED_RUN_LIMIT} older runs are not listed.
+          Narrow the period to see them.
+        </Text>
+      ) : null}
+      {ordered.length === 0 ? (
+        <Text fontSize="11px" color={FG_MUTED} paddingX={4} paddingY={1.5}>
+          The runs behind this row are still loading.
+        </Text>
+      ) : null}
+    </VStack>
+  );
+}
+
 export type GroupedRowsTableProps = {
   kind: "scenario" | "target";
   groups: ResultGroup[];
@@ -171,112 +291,27 @@ export function GroupedRowsTable({
       />
 
       <ResultsTableBody>
-        {groups.map((group) => {
-          const isOpen = openedKeys.includes(group.key);
-          const middle = isScenario
-            ? (group.subtitle ?? "")
-            : group.scenarioCount === 1
-              ? "1 scenario"
-              : `${group.scenarioCount} scenarios`;
-          const ordered = [...(rowsByGroupKey.get(group.key) ?? [])].sort(
-            (a, b) => b.runAt - a.runAt,
-          );
+        {groups.map((group) => (
+          <Box key={group.key}>
+            <GroupSummaryRow
+              group={group}
+              isScenario={isScenario}
+              isOpen={openedKeys.includes(group.key)}
+              onToggleOpen={onToggleOpen}
+            />
 
-          return (
-            <Box key={group.key}>
-              <ResultsTableRow
-                columns={GROUP_COLUMNS}
-                onClick={() => onToggleOpen(group.key)}
-                testId={`results-group-row-${group.key}`}
-              >
-                <Box color={FG_MUTED} display="flex" alignItems="center">
-                  {isOpen ? (
-                    <ChevronDown size={14} />
-                  ) : (
-                    <ChevronRight size={14} />
-                  )}
-                </Box>
-
-                <HStack gap={1.5} minWidth={0}>
-                  {!isScenario ? (
-                    <Box color={FG_MUTED} flexShrink={0} display="flex">
-                      <Target size={13} />
-                    </Box>
-                  ) : null}
-                  <Text
-                    fontSize="12.5px"
-                    fontWeight="medium"
-                    color="fg"
-                    truncate
-                  >
-                    {group.title}
-                  </Text>
-                </HStack>
-
-                <Text fontSize="11.5px" color={FG_MUTED} truncate>
-                  {middle}
-                </Text>
-
-                <Text
-                  fontSize="12px"
-                  color={FG_MUTED}
-                  textAlign="right"
-                  fontVariantNumeric="tabular-nums"
-                >
-                  {group.runCount}
-                </Text>
-
-                <PassRateText passRate={group.passRate} />
-
-                <TrendSparkline bars={group.trend} per="execution" />
-              </ResultsTableRow>
-
-              {isOpen ? (
-                <VStack
-                  align="stretch"
-                  gap={0}
-                  paddingY={1}
-                  borderTopWidth="1px"
-                  borderTopColor="border.muted"
-                  background={GROUP_HEADER_BG}
-                  data-testid={`results-group-expanded-${group.key}`}
-                >
-                  {ordered.slice(0, EXPANDED_RUN_LIMIT).map((row) => (
-                    <RunLine
-                      key={row.executionId}
-                      row={row}
-                      show={isScenario ? "plan" : "scenario"}
-                      resolveTargetName={resolveTargetName}
-                      onOpenRun={onOpenRun}
-                      now={now}
-                    />
-                  ))}
-                  {ordered.length > EXPANDED_RUN_LIMIT ? (
-                    <Text
-                      fontSize="11px"
-                      color={FG_MUTED}
-                      paddingX={4}
-                      paddingY={1.5}
-                    >
-                      {ordered.length - EXPANDED_RUN_LIMIT} older runs are not
-                      listed. Narrow the period to see them.
-                    </Text>
-                  ) : null}
-                  {ordered.length === 0 ? (
-                    <Text
-                      fontSize="11px"
-                      color={FG_MUTED}
-                      paddingX={4}
-                      paddingY={1.5}
-                    >
-                      The runs behind this row are still loading.
-                    </Text>
-                  ) : null}
-                </VStack>
-              ) : null}
-            </Box>
-          );
-        })}
+            {openedKeys.includes(group.key) ? (
+              <GroupRunList
+                group={group}
+                rows={rowsByGroupKey.get(group.key) ?? []}
+                show={isScenario ? "plan" : "scenario"}
+                resolveTargetName={resolveTargetName}
+                onOpenRun={onOpenRun}
+                now={now}
+              />
+            ) : null}
+          </Box>
+        ))}
 
         {groups.length === 0 ? (
           <ResultsTableEmptyLine text="No runs match these filters." />

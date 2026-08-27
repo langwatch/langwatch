@@ -188,6 +188,99 @@ export interface AtomFilterSql {
   params: Record<string, string | string[]>;
 }
 
+/** A set of WHERE predicates and the query parameters they read. */
+interface FilterParts {
+  parts: string[];
+  params: Record<string, string | string[]>;
+}
+
+/** The predicates that may run inside the dedup subquery. */
+function stableFilterParts(filter: ResultsFilter): FilterParts {
+  const parts: string[] = [];
+  const params: Record<string, string | string[]> = {};
+
+  if (filter.scenarioSetIds && filter.scenarioSetIds.length > 0) {
+    parts.push("ScenarioSetId IN ({atomSetIds:Array(String)})");
+    params.atomSetIds = filter.scenarioSetIds.flatMap((setId) =>
+      expandSetIdFilter(setId),
+    );
+  }
+
+  if (filter.scenarioIds && filter.scenarioIds.length > 0) {
+    parts.push("ScenarioId IN ({atomScenarioIds:Array(String)})");
+    params.atomScenarioIds = filter.scenarioIds;
+  }
+
+  return { parts, params };
+}
+
+/** The `Status` predicate a verdict filter asks for, if it asks for one. */
+function outcomePart(outcome: ResultsFilter["outcome"]): string | null {
+  if (outcome === "passed") {
+    return `Status IN (${quoted(PASSED_STATUS_VALUES)})`;
+  }
+  if (outcome === "failed") {
+    return `Status IN (${quoted(FAILED_STATUS_VALUES)})`;
+  }
+  if (outcome === "pending") {
+    return `Status NOT IN (${quoted([...PASSED_STATUS_VALUES, ...FAILED_STATUS_VALUES])})`;
+  }
+  return null;
+}
+
+/** The predicates that may only run after dedup. */
+function volatileFilterParts(filter: ResultsFilter): FilterParts {
+  const params: Record<string, string | string[]> = {
+    atomStartMs: String(filter.startDate),
+  };
+  // The lower bound always applies and is what prunes partitions. The upper
+  // bound is deliberately optional: a live view sends none, so a run that
+  // starts while the page is open still lands in the window.
+  const parts = [
+    "StartedAt >= fromUnixTimestamp64Milli(toUInt64({atomStartMs:String}))",
+  ];
+  if (filter.endDate !== undefined) {
+    params.atomEndMs = String(filter.endDate);
+    parts.push(
+      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({atomEndMs:String}))",
+    );
+  }
+
+  const outcome = outcomePart(filter.outcome);
+  if (outcome !== null) parts.push(outcome);
+
+  if (filter.targetKeys && filter.targetKeys.length > 0) {
+    parts.push(`${TARGET_KEY_EXPR} IN ({atomTargetKeys:Array(String)})`);
+    params.atomTargetKeys = filter.targetKeys;
+  }
+
+  return { parts, params };
+}
+
+/** The widened window the dedup subquery prunes partitions with. */
+function dedupWindowParts(filter: ResultsFilter): FilterParts {
+  const params: Record<string, string | string[]> = {
+    atomDedupStartMs: String(
+      Math.max(0, filter.startDate - DEDUP_WINDOW_SLACK_MS),
+    ),
+  };
+  const parts = [
+    "StartedAt >= fromUnixTimestamp64Milli(toUInt64({atomDedupStartMs:String}))",
+  ];
+  if (filter.endDate !== undefined) {
+    params.atomDedupEndMs = String(filter.endDate + DEDUP_WINDOW_SLACK_MS);
+    parts.push(
+      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({atomDedupEndMs:String}))",
+    );
+  }
+  return { parts, params };
+}
+
+/** The predicates as one appendable fragment, or nothing when there are none. */
+function andClause(parts: string[]): string {
+  return parts.length > 0 ? `AND ${parts.join(" AND ")}` : "";
+}
+
 /**
  * Builds the WHERE fragments both reads share, split by where each may go.
  *
@@ -195,73 +288,19 @@ export interface AtomFilterSql {
  * about what is in scope, and two copies of this logic is how they would.
  */
 export function buildAtomFilters(filter: ResultsFilter): AtomFilterSql {
-  const stableParts: string[] = [];
-  const volatileParts: string[] = [];
-  const params: Record<string, string | string[]> = {};
-
-  if (filter.scenarioSetIds && filter.scenarioSetIds.length > 0) {
-    stableParts.push("ScenarioSetId IN ({atomSetIds:Array(String)})");
-    params.atomSetIds = filter.scenarioSetIds.flatMap((setId) =>
-      expandSetIdFilter(setId),
-    );
-  }
-
-  if (filter.scenarioIds && filter.scenarioIds.length > 0) {
-    stableParts.push("ScenarioId IN ({atomScenarioIds:Array(String)})");
-    params.atomScenarioIds = filter.scenarioIds;
-  }
-
-  // The lower bound always applies and is what prunes partitions. The upper
-  // bound is deliberately optional: a live view sends none, so a run that
-  // starts while the page is open still lands in the window.
-  volatileParts.push(
-    "StartedAt >= fromUnixTimestamp64Milli(toUInt64({atomStartMs:String}))",
-  );
-  params.atomStartMs = String(filter.startDate);
-  if (filter.endDate !== undefined) {
-    volatileParts.push(
-      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({atomEndMs:String}))",
-    );
-    params.atomEndMs = String(filter.endDate);
-  }
-
-  if (filter.outcome === "passed") {
-    volatileParts.push(`Status IN (${quoted(PASSED_STATUS_VALUES)})`);
-  } else if (filter.outcome === "failed") {
-    volatileParts.push(`Status IN (${quoted(FAILED_STATUS_VALUES)})`);
-  } else if (filter.outcome === "pending") {
-    volatileParts.push(
-      `Status NOT IN (${quoted([...PASSED_STATUS_VALUES, ...FAILED_STATUS_VALUES])})`,
-    );
-  }
-
-  if (filter.targetKeys && filter.targetKeys.length > 0) {
-    volatileParts.push(
-      `${TARGET_KEY_EXPR} IN ({atomTargetKeys:Array(String)})`,
-    );
-    params.atomTargetKeys = filter.targetKeys;
-  }
-
-  params.atomDedupStartMs = String(
-    Math.max(0, filter.startDate - DEDUP_WINDOW_SLACK_MS),
-  );
-  const dedupParts = [
-    "StartedAt >= fromUnixTimestamp64Milli(toUInt64({atomDedupStartMs:String}))",
-  ];
-  if (filter.endDate !== undefined) {
-    params.atomDedupEndMs = String(filter.endDate + DEDUP_WINDOW_SLACK_MS);
-    dedupParts.push(
-      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({atomDedupEndMs:String}))",
-    );
-  }
+  const stable = stableFilterParts(filter);
+  const volatilePredicates = volatileFilterParts(filter);
+  const dedupWindow = dedupWindowParts(filter);
 
   return {
-    stableClause:
-      stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
-    volatileClause:
-      volatileParts.length > 0 ? `AND ${volatileParts.join(" AND ")}` : "",
-    dedupWindowClause: `AND ${dedupParts.join(" AND ")}`,
-    params,
+    stableClause: andClause(stable.parts),
+    volatileClause: andClause(volatilePredicates.parts),
+    dedupWindowClause: andClause(dedupWindow.parts),
+    params: {
+      ...stable.params,
+      ...volatilePredicates.params,
+      ...dedupWindow.params,
+    },
   };
 }
 
