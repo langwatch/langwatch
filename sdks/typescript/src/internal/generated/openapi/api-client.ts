@@ -3396,7 +3396,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name. */
+        /**
+         * Run a plan again
+         * @description Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.
+         */
         post: operations["rerunRunPlan"];
         delete?: never;
         options?: never;
@@ -3429,7 +3432,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found. */
+        /**
+         * Read one test suite
+         * @description Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.
+         */
         get: operations["getTestSuite"];
         put?: never;
         post?: never;
@@ -3450,7 +3456,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required. */
+        /**
+         * Run a test suite
+         * @description Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.
+         */
         post: operations["runTestSuite"];
         delete?: never;
         options?: never;

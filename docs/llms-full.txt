@@ -69513,6 +69513,64 @@ openapi: "PATCH /api/roles/{id}"
 
 ---
 
+# FILE: ./api-reference/run-plans/create-run.mdx
+
+---
+title: "Run a configuration under a name"
+openapi: "POST /api/v1/run-plans/run"
+---
+
+---
+
+# FILE: ./api-reference/run-plans/delete-run-plans.mdx
+
+---
+title: "Archive a run plan"
+openapi: "DELETE /api/v1/run-plans/{id}"
+---
+
+---
+
+# FILE: ./api-reference/run-plans/get-run-plans.mdx
+
+---
+title: "Read one run plan"
+openapi: "GET /api/v1/run-plans/{id}"
+---
+
+---
+
+# FILE: ./api-reference/run-plans/list-run-plans.mdx
+
+---
+title: "List the project's run plans"
+openapi: "GET /api/v1/run-plans"
+---
+
+---
+
+# FILE: ./api-reference/run-plans/overview.mdx
+
+---
+title: "Overview"
+description: "Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when nothing answers. List, read, run and archive run plans."
+---
+
+## Intro
+
+Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when nothing answers. List, read, run and archive run plans.
+
+---
+
+# FILE: ./api-reference/run-plans/run-a-plan-again.mdx
+
+---
+title: "Run a plan again"
+openapi: "POST /api/v1/run-plans/{id}/run"
+---
+
+---
+
 # FILE: ./api-reference/scenario-events/create-browser-tab.mdx
 
 ---
@@ -70316,6 +70374,73 @@ openapi: "DELETE /api/teams/{id}/members/{userId}"
 ---
 title: "Update team"
 openapi: "PATCH /api/teams/{id}"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/create-test-suites.mdx
+
+---
+title: "Create a test suite"
+openapi: "POST /api/v1/test-suites"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/delete-test-suites.mdx
+
+---
+title: "Archive a test suite"
+openapi: "DELETE /api/v1/test-suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/list-test-suites.mdx
+
+---
+title: "List the project's test suites"
+openapi: "GET /api/v1/test-suites"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/overview.mdx
+
+---
+title: "Overview"
+description: "Organise agent tests. A test suite is a folder of scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites."
+---
+
+## Intro
+
+Organise agent tests. A test suite is a folder of scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.
+
+---
+
+# FILE: ./api-reference/test-suites/read-one-test-suite.mdx
+
+---
+title: "Read one test suite"
+openapi: "GET /api/v1/test-suites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/run-a-test-suite.mdx
+
+---
+title: "Run a test suite"
+openapi: "POST /api/v1/test-suites/{id}/run"
+---
+
+---
+
+# FILE: ./api-reference/test-suites/update-test-suites.mdx
+
+---
+title: "Rename a test suite"
+openapi: "PATCH /api/v1/test-suites/{id}"
 ---
 
 ---

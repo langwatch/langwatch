@@ -207,7 +207,11 @@ const registerItemEndpoints = (v: TestSuitesVersion): void => {
       output: testSuiteDetailSchema,
       description:
         "Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.",
-      docs: { operationId: "getTestSuite", tags: ["Test Suites"] },
+      docs: {
+        summary: "Read one test suite",
+        operationId: "getTestSuite",
+        tags: ["Test Suites"],
+      },
     },
     async (
       _c,
@@ -291,7 +295,11 @@ const registerRunEndpoint = (v: TestSuitesVersion): void => {
       output: runPlanRunResultSchema,
       description:
         "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
-      docs: { operationId: "runTestSuite", tags: ["Test Suites"] },
+      docs: {
+        summary: "Run a test suite",
+        operationId: "runTestSuite",
+        tags: ["Test Suites"],
+      },
     },
     async (
       c,

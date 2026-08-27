@@ -66,7 +66,9 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: RunTestSuiteBody,
 ) -> Response[RunTestSuiteResponse200]:
-    """Run every scenario filed in the test suite against the targets sent with the request. The run is
+    """Run a test suite
+
+     Run every scenario filed in the test suite against the targets sent with the request. The run is
     filed under a run plan named after the suite and its targets unless a name is sent. A request that
     names no target answers 422 suite_targets_required.
 
@@ -100,7 +102,9 @@ def sync(
     client: AuthenticatedClient,
     body: RunTestSuiteBody,
 ) -> RunTestSuiteResponse200 | None:
-    """Run every scenario filed in the test suite against the targets sent with the request. The run is
+    """Run a test suite
+
+     Run every scenario filed in the test suite against the targets sent with the request. The run is
     filed under a run plan named after the suite and its targets unless a name is sent. A request that
     names no target answers 422 suite_targets_required.
 
@@ -129,7 +133,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: RunTestSuiteBody,
 ) -> Response[RunTestSuiteResponse200]:
-    """Run every scenario filed in the test suite against the targets sent with the request. The run is
+    """Run a test suite
+
+     Run every scenario filed in the test suite against the targets sent with the request. The run is
     filed under a run plan named after the suite and its targets unless a name is sent. A request that
     names no target answers 422 suite_targets_required.
 
@@ -161,7 +167,9 @@ async def asyncio(
     client: AuthenticatedClient,
     body: RunTestSuiteBody,
 ) -> RunTestSuiteResponse200 | None:
-    """Run every scenario filed in the test suite against the targets sent with the request. The run is
+    """Run a test suite
+
+     Run every scenario filed in the test suite against the targets sent with the request. The run is
     filed under a run plan named after the suite and its targets unless a name is sent. A request that
     names no target answers 422 suite_targets_required.
 

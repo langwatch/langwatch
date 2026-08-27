@@ -66,7 +66,9 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: RerunRunPlanBody,
 ) -> Response[RerunRunPlanResponse200]:
-    """Run a run plan again, with the configuration it already holds. To run a different configuration,
+    """Run a plan again
+
+     Run a run plan again, with the configuration it already holds. To run a different configuration,
     post it to /run under the plan's name.
 
     Args:
@@ -99,7 +101,9 @@ def sync(
     client: AuthenticatedClient,
     body: RerunRunPlanBody,
 ) -> RerunRunPlanResponse200 | None:
-    """Run a run plan again, with the configuration it already holds. To run a different configuration,
+    """Run a plan again
+
+     Run a run plan again, with the configuration it already holds. To run a different configuration,
     post it to /run under the plan's name.
 
     Args:
@@ -127,7 +131,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: RerunRunPlanBody,
 ) -> Response[RerunRunPlanResponse200]:
-    """Run a run plan again, with the configuration it already holds. To run a different configuration,
+    """Run a plan again
+
+     Run a run plan again, with the configuration it already holds. To run a different configuration,
     post it to /run under the plan's name.
 
     Args:
@@ -158,7 +164,9 @@ async def asyncio(
     client: AuthenticatedClient,
     body: RerunRunPlanBody,
 ) -> RerunRunPlanResponse200 | None:
-    """Run a run plan again, with the configuration it already holds. To run a different configuration,
+    """Run a plan again
+
+     Run a run plan again, with the configuration it already holds. To run a different configuration,
     post it to /run under the plan's name.
 
     Args:

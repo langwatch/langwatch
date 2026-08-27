@@ -56,7 +56,9 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetTestSuiteResponse200]:
-    """Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
+    """Read one test suite
+
+     Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
     run plan id, both answer 404 suite_not_found.
 
     Args:
@@ -86,7 +88,9 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> GetTestSuiteResponse200 | None:
-    """Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
+    """Read one test suite
+
+     Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
     run plan id, both answer 404 suite_not_found.
 
     Args:
@@ -111,7 +115,9 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[GetTestSuiteResponse200]:
-    """Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
+    """Read one test suite
+
+     Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
     run plan id, both answer 404 suite_not_found.
 
     Args:
@@ -139,7 +145,9 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> GetTestSuiteResponse200 | None:
-    """Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
+    """Read one test suite
+
+     Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a
     run plan id, both answer 404 suite_not_found.
 
     Args:

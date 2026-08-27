@@ -55807,6 +55807,7 @@
           }
         },
         "description": "Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.",
+        "summary": "Run a plan again",
         "tags": [
           "Run Plans"
         ],
@@ -56159,6 +56160,7 @@
           }
         },
         "description": "Read one test suite with the scenarios filed in it, named. An id the project does not hold, and a run plan id, both answer 404 suite_not_found.",
+        "summary": "Read one test suite",
         "tags": [
           "Test Suites"
         ],
@@ -56486,6 +56488,7 @@
           }
         },
         "description": "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
+        "summary": "Run a test suite",
         "tags": [
           "Test Suites"
         ],

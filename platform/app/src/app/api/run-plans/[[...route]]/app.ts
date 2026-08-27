@@ -217,7 +217,11 @@ const registerRerunEndpoint = (v: RunPlansVersion): void => {
       output: runPlanRunResultSchema,
       description:
         "Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.",
-      docs: { operationId: "rerunRunPlan", tags: ["Run Plans"] },
+      docs: {
+        summary: "Run a plan again",
+        operationId: "rerunRunPlan",
+        tags: ["Run Plans"],
+      },
     },
     async (
       c,
