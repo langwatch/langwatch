@@ -149,6 +149,25 @@ function assertFolderUpdate(data: UpdateSuiteInput): void {
   }
 }
 
+/**
+ * The config a run plan is started with, as the caller sends it.
+ *
+ * The stored form fills the optional fields in and sorts the targets; see
+ * `PlanConfig` in ./plan-config.ts.
+ */
+export type RunPlanConfigInput = {
+  scope: SuiteScope;
+  targets: SuiteTarget[];
+  repeatCount?: number;
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+  /**
+   * The scenarios a hand-picked scope covers. A `cases` scope names no
+   * scenario in the rule itself, so the plan runs what it stores here.
+   */
+  scenarioIds?: string[];
+};
+
 export class SuiteService {
   constructor(
     private readonly repository: SuiteRepository,
@@ -780,10 +799,10 @@ export class SuiteService {
    * Two things this deliberately does, both of which were bugs in the
    * prototype:
    *
-   * - The name is written back explicitly on the match, and the plan's slug is
-   *   left alone. A plan whose name was only ever suggested must not rename
-   *   itself when its config is replaced, or it stops answering to the name the
-   *   caller just resolved it by, and its run history moves address.
+   * - On a match only the config is replaced. The plan's own name and its own
+   *   slug are left alone. A plan whose name was only ever suggested must not
+   *   rename itself when its config is replaced, or it stops answering to the
+   *   name the caller just resolved it by, and its run history moves address.
    * - Neither the plan id nor the plan slug is derived from the config. Two
    *   plans may hold one config and differ only by name, so a config-derived
    *   key collides. The slug comes from the NAME, through the same
@@ -795,18 +814,14 @@ export class SuiteService {
     projectId: string;
     organizationId: string;
     name: string;
-    config: {
-      scope: SuiteScope;
-      targets: SuiteTarget[];
-      repeatCount?: number;
-      simulatorModel?: string | null;
-      judgeModel?: string | null;
-    };
+    config: RunPlanConfigInput;
     idempotencyKey: string;
     batchRunId?: string;
     parameters?: RunParameterValues;
     note?: string;
-  }): Promise<SuiteRunResult & { suiteId: string; planName: string; created: boolean }> {
+  }): Promise<
+    SuiteRunResult & { suiteId: string; planName: string; created: boolean }
+  > {
     return tracer.withActiveSpan(
       "SuiteService.runPlan",
       {
@@ -823,62 +838,13 @@ export class SuiteService {
           });
         }
 
-        // Normalised before the plan is matched and before anything is stored,
-        // so hand-picking every suite and pressing Run all reach one plan.
-        const scope = await normalizePlanScope({
-          projectId: params.projectId,
-          scope: params.config.scope,
-          prisma: this.prisma,
-        });
-        const storedConfig = {
-          scope: scope as unknown as Prisma.InputJsonValue,
-          targets: sortSuiteTargets(params.config.targets),
-          repeatCount: params.config.repeatCount ?? 1,
-          simulatorModel: params.config.simulatorModel ?? null,
-          judgeModel: params.config.judgeModel ?? null,
-        };
-
-        const existing = await this.repository.findPlanByName({
+        const { suite, created } = await this.resolvePlanByName({
           projectId: params.projectId,
           name,
+          config: params.config,
         });
-
-        let suite: SimulationSuite;
-        if (existing) {
-          // The name is written back with the config. The slug is NOT, so the
-          // plan keeps the address its run history is read under.
-          suite = await this.repository.update({
-            id: existing.id,
-            projectId: params.projectId,
-            data: { name, ...storedConfig },
-          });
-        } else {
-          const baseSlug = slugify(name) || "run-plan";
-          const initialSlug = await this.generateUniqueSlug({
-            baseSlug,
-            projectId: params.projectId,
-          });
-          suite = await this.saveWithSlugRetry({
-            initialSlug,
-            execute: (slug) =>
-              this.repository.create({
-                projectId: params.projectId,
-                name,
-                slug,
-                kind: "custom",
-                scenarioIds: [],
-                labels: [],
-                ...storedConfig,
-              }),
-            regenerateSlug: () =>
-              this.generateUniqueSlug({
-                baseSlug,
-                projectId: params.projectId,
-              }),
-          });
-        }
         span.setAttribute("suite.id", suite.id);
-        span.setAttribute("suite.plan_created", existing === null);
+        span.setAttribute("suite.plan_created", created);
 
         const result = await this.run({
           suite,
@@ -893,10 +859,88 @@ export class SuiteService {
           ...result,
           suiteId: suite.id,
           planName: suite.name,
-          created: existing === null,
+          created,
         };
       },
     );
+  }
+
+  /**
+   * The plan a name resolves to, matched or created, holding the given config.
+   *
+   * On a match ONLY the config is replaced. The plan keeps its own name and
+   * its own slug.
+   *
+   * Its name, because a name is what a plan is: the match is made trimmed and
+   * without case, so writing the caller's spelling back would rename "Nightly"
+   * to "nightly" the first time somebody typed it that way, and a plan whose
+   * name was only ever suggested would rename itself on every run.
+   *
+   * Its slug, because run history is read under it.
+   *
+   * On a create the slug comes from the NAME. Neither the id nor the slug is
+   * ever derived from the config: two plans may hold one config and differ
+   * only by name, so a config-derived key collides.
+   */
+  private async resolvePlanByName(params: {
+    projectId: string;
+    name: string;
+    config: RunPlanConfigInput;
+  }): Promise<{ suite: SimulationSuite; created: boolean }> {
+    // Normalised before the plan is matched and before anything is stored, so
+    // hand-picking every suite and pressing Run all reach one plan.
+    const scope = await normalizePlanScope({
+      projectId: params.projectId,
+      scope: params.config.scope,
+      prisma: this.prisma,
+    });
+    // A hand-picked scope carries its list on the plan, because the rule
+    // itself names no scenario. Every other scope resolves at run time and
+    // stores nothing.
+    const scenarioIds =
+      scope.mode === "cases" ? (params.config.scenarioIds ?? []) : [];
+    const storedConfig = {
+      scope: scope as unknown as Prisma.InputJsonValue,
+      targets: sortSuiteTargets(params.config.targets),
+      repeatCount: params.config.repeatCount ?? 1,
+      simulatorModel: params.config.simulatorModel ?? null,
+      judgeModel: params.config.judgeModel ?? null,
+      scenarioIds,
+    };
+
+    const existing = await this.repository.findPlanByName({
+      projectId: params.projectId,
+      name: params.name,
+    });
+    if (existing) {
+      const suite = await this.repository.update({
+        id: existing.id,
+        projectId: params.projectId,
+        data: storedConfig,
+      });
+      return { suite, created: false };
+    }
+
+    const baseSlug = slugify(params.name) || "run-plan";
+    const initialSlug = await this.generateUniqueSlug({
+      baseSlug,
+      projectId: params.projectId,
+    });
+    const suite = await this.saveWithSlugRetry({
+      initialSlug,
+      execute: (slug) =>
+        this.repository.create({
+          projectId: params.projectId,
+          name: params.name,
+          slug,
+          kind: "custom",
+          labels: [],
+          ...storedConfig,
+        }),
+      regenerateSlug: () =>
+        this.generateUniqueSlug({ baseSlug, projectId: params.projectId }),
+    });
+    return { suite, created: true };
   }
 
   /**

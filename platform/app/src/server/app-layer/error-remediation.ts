@@ -333,6 +333,15 @@ const registry = {
     ],
   },
 
+  // ---- scenario runs ----
+  scenario_reserved_set_id: {
+    tips: [
+      "Send the run without a setId; it is then recorded in the project's own one-off bucket",
+      "To group runs of your own, send a setId of your own choosing; any name outside the `__internal__` namespace is free",
+      "A `__internal__<suiteId>__suite` address belongs to a run plan; start a run on that plan instead of writing into its address",
+    ],
+  },
+
   // ---- evaluations ----
   evaluation_not_found: {
     tips: [

@@ -386,6 +386,7 @@ describe("simulationRunnerRouter.run", () => {
 
     describe("when run is called without explicit setId", () => {
       /** @scenario "A single scenario run goes to the project internal run set" */
+      /** @scenario "A run naming no set goes to this project's one-off bucket" */
       it("dispatches queueRun command before scheduling", async () => {
         await caller.run(defaultInput);
 
@@ -435,6 +436,7 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called with explicit setId", () => {
+      /** @scenario "A run naming an external set is allowed" */
       it("preserves the user-provided set ID in queueRun", async () => {
         const inputWithSetId = {
           ...defaultInput,
@@ -476,6 +478,48 @@ describe("simulationRunnerRouter.run", () => {
           batchRunId: "batch_test_123",
           scenarioRunId: "scenariorun_test_456",
         });
+      });
+    });
+
+    describe("when run is called naming a set the platform reserves", () => {
+      // The internal namespace holds the one-off bucket and every run plan's
+      // address. A run written into a plan's address is read as that plan's
+      // own history, so it would move its pass rate, its cost and its trend.
+      /** @scenario "A run naming a run plan's set address is refused" */
+      it("refuses a run plan's set address with scenario_reserved_set_id", async () => {
+        await expect(
+          caller.run({
+            ...defaultInput,
+            setId: "__internal__suite_abc123__suite",
+          }),
+        ).rejects.toMatchObject({
+          cause: { code: "scenario_reserved_set_id" },
+        });
+
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A run naming another project's one-off set is refused" */
+      it("refuses another project's one-off set", async () => {
+        await expect(
+          caller.run({
+            ...defaultInput,
+            setId: getOnPlatformSetId("proj_someone_else"),
+          }),
+        ).rejects.toMatchObject({
+          cause: { code: "scenario_reserved_set_id" },
+        });
+
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A run naming this project's own one-off set is allowed" */
+      it("allows this project's own one-off set", async () => {
+        const setId = getOnPlatformSetId(defaultInput.projectId);
+
+        const result = await caller.run({ ...defaultInput, setId });
+
+        expect(result).toMatchObject({ scheduled: true, setId });
       });
     });
 

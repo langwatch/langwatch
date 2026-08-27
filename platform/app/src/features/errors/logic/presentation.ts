@@ -1674,6 +1674,11 @@ const presentations = {
     describe: (error) =>
       `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
   },
+  scenario_reserved_set_id: {
+    title: "This run can't be saved to that set",
+    describe: () =>
+      "That set belongs to LangWatch and holds a run plan's results. Leave the set empty for a one-off run, or give the run a set name of your own.",
+  },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
     describe: () =>

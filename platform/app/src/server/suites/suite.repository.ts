@@ -14,7 +14,7 @@ import type {
   PrismaClient,
   SimulationSuite,
 } from "~/generated/prisma/client";
-import { ARCHIVED_SLUG_SUFFIX } from "./constants";
+import { ARCHIVED_SLUG_SUFFIX, CLI_EPHEMERAL_LABEL } from "./constants";
 import type { SuiteKind } from "./types";
 
 /**
@@ -198,6 +198,37 @@ export class SuiteRepository {
       select: { slug: true },
     });
     return rows.map((row) => row.slug);
+  }
+
+  /**
+   * The run plan this name resolves to, or null.
+   *
+   * A run plan is identified by its NAME, compared trimmed and without case.
+   * `name` carries no unique constraint and never has, so a project may already
+   * hold two plans of one name: the most recently used one wins, and the
+   * ordering is total so the answer does not move between reads. Every run
+   * through this path replaces the matched plan's config, which moves
+   * `updatedAt`, so "most recently used" is what a person means by the name.
+   *
+   * Skipped on purpose: archived plans, folders, and the command line's
+   * throwaway suites, which it archives as soon as the run is queued.
+   *
+   * @see specs/suites/run-plan-identity-by-name.feature
+   */
+  async findPlanByName(params: {
+    projectId: string;
+    name: string;
+  }): Promise<SimulationSuite | null> {
+    return this.prisma.simulationSuite.findFirst({
+      where: {
+        projectId: params.projectId,
+        kind: "custom",
+        archivedAt: null,
+        name: { equals: params.name.trim(), mode: "insensitive" },
+        NOT: { labels: { has: CLI_EPHEMERAL_LABEL } },
+      },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    });
   }
 
   /**

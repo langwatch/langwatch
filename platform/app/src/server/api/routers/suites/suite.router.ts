@@ -13,6 +13,8 @@ import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
+import { suiteScopeSchema } from "~/server/suites/scope";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import { SUITE_KINDS } from "~/server/suites/types";
@@ -23,6 +25,12 @@ import {
   suiteTargetSchema,
   updateSuiteSchema,
 } from "./schemas";
+
+/**
+ * How long a run plan name may be. Long enough for a derived
+ * `<scope> <target> vs <target>` name, short enough to stay a name.
+ */
+const MAX_PLAN_NAME_LENGTH = 200;
 
 function createSuiteService(prisma: PrismaClient) {
   return SuiteService.create({
@@ -198,6 +206,61 @@ export const suiteRouter = createTRPCRouter({
         scheduled: true,
         ...result,
       };
+    }),
+
+  /**
+   * Starts a run under a name, which is what identifies a run plan: the name
+   * either joins an existing plan and replaces its config, or creates one.
+   *
+   * Separate from `run` on purpose. `run` takes a plan id and is what the CLI,
+   * the REST surface and v1 reach; this one is the v2 run dialog's single
+   * entry point for all four of its cases.
+   *
+   * @see specs/suites/run-plan-identity-by-name.feature
+   */
+  runPlan: protectedProcedure
+    .input(
+      projectSchema.extend({
+        name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH),
+        config: z.object({
+          scope: suiteScopeSchema,
+          targets: z.array(suiteTargetSchema),
+          repeatCount: z.number().int().min(1).max(MAX_REPEAT_COUNT).optional(),
+          simulatorModel: z.string().nullish(),
+          judgeModel: z.string().nullish(),
+          /** The scenarios a hand-picked scope covers; ignored by every other. */
+          scenarioIds: z.array(z.string()).optional(),
+        }),
+        idempotencyKey: z.string(),
+        batchRunId: z.string().optional(),
+        parameters: runParameterValuesSchema.optional(),
+        note: runNoteSchema,
+      }),
+    )
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      const projectRepository = new ProjectRepository(ctx.prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: input.projectId,
+      });
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found for project",
+        });
+      }
+      const service = createSuiteService(ctx.prisma);
+      const result = await service.runPlan({
+        projectId: input.projectId,
+        organizationId,
+        name: input.name,
+        config: input.config,
+        idempotencyKey: input.idempotencyKey,
+        batchRunId: input.batchRunId,
+        parameters: input.parameters,
+        note: input.note,
+      });
+      return { scheduled: true, ...result };
     }),
 
   /**

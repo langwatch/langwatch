@@ -256,6 +256,28 @@ describe("folder membership", () => {
       expect(await invariantBreaks()).toEqual([]);
     });
 
+    /** @scenario "Filing a scenario out of Default updates both suites" */
+    it("moves a case out of Default and updates both suites", async () => {
+      const stays = await createCase({ name: "Stays" });
+      const moves = await createCase({ name: "Moves" });
+      const defaultSuite = await findDefaultSuite({ projectId, prisma });
+      expect(await folderScenarioIds(defaultSuite!.id)).toEqual([
+        stays.id,
+        moves.id,
+      ]);
+      const refunds = await createFolder("Refunds");
+
+      await scenarioService.moveToFolder({
+        scenarioId: moves.id,
+        projectId,
+        folderId: refunds.id,
+      });
+
+      expect(await folderScenarioIds(defaultSuite!.id)).toEqual([stays.id]);
+      expect(await folderScenarioIds(refunds.id)).toEqual([moves.id]);
+      expect(await invariantBreaks()).toEqual([]);
+    });
+
     /** @scenario "Taking a case out of its folder files it into Default" */
     /** @scenario "Removing a scenario from its suite files it into Default instead of leaving it loose" */
     it("files a case into Default when it is taken out of its folder", async () => {

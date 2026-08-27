@@ -310,6 +310,7 @@ export const APP_ERROR_CODES = [
   "scenario_parameter_missing",
   "scenario_parameter_template_invalid",
   "scenario_parameter_unknown",
+  "scenario_reserved_set_id",
   "scenario_run_export_forbidden",
   "scenario_run_export_unauthenticated",
   "scenario_secret_parameter_conflict",

@@ -13,6 +13,12 @@ Feature: A run plan is identified by its name
         is replaced with what the caller sent;
       - nothing matches: a plan is created with that name and that config.
 
+    Two kinds of row are skipped when the name is matched. An archived plan,
+    because a person archived it. And the throwaway suite `langwatch scenario
+    run` creates, which carries the label `cli-ephemeral` and is archived as
+    soon as the run is queued: joining one attaches a person's run to a plan
+    that is about to disappear from every list.
+
     Two rules follow, and both were bugs in the prototype:
 
       - replacing the config must never rename the plan, or a plan whose name
@@ -49,6 +55,7 @@ Feature: A run plan is identified by its name
     When a run is started under the name "  nightly  "
     Then the run joins the existing "Nightly" plan
     And no second plan is created
+    And the plan is still spelled "Nightly"
 
   @integration
   Scenario: An archived plan does not answer to its name
@@ -56,6 +63,13 @@ Feature: A run plan is identified by its name
     When a run is started under the name "Nightly"
     Then a new run plan named "Nightly" is created
     And the archived plan is left archived
+
+  @integration
+  Scenario: The command line's throwaway suite does not answer to its name
+    Given a suite labelled "cli-ephemeral" named "CLI run"
+    When a run is started under the name "CLI run"
+    Then a new run plan named "CLI run" is created
+    And the throwaway suite is left alone
 
   @integration
   Scenario: A folder-kind suite does not answer to a run plan name
