@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { Evaluation } from "~/server/tracer/types";
 import { applyDerivedTraceEventProtections } from "~/server/traces/mappers/redaction";
 import type { Protections } from "~/server/traces/protections";

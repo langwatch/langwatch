@@ -1,9 +1,7 @@
+import { shareResourceTypeSchema, shareVisibilitySchema } from "@langwatch/share-contract";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-
-const resourceType = z.enum(["TRACE", "THREAD"]);
-const visibility = z.enum(["PUBLIC", "ORGANIZATION", "PROJECT"]);
 
 /**
  * Share-link management. Anonymous reads DO NOT live here — they go through the
@@ -22,7 +20,7 @@ export const shareRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        resourceType,
+        resourceType: shareResourceTypeSchema,
         resourceId: z.string(),
       }),
     )
@@ -43,7 +41,7 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
         resourceType: z.literal("TRACE"),
         resourceId: z.string(),
-        visibility: visibility.default("PUBLIC"),
+        visibility: shareVisibilitySchema.default("PUBLIC"),
         expiresAt: z.date().nullish(),
         maxViews: z.number().int().positive().nullish(),
       }),

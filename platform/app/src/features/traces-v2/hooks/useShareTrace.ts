@@ -1,27 +1,8 @@
+import type { ShareLink } from "@langwatch/share-contract";
+import { expiryToDate, type CreateShareLinkDraft } from "@langwatch/share-web";
 import { useCallback } from "react";
 import { showErrorToast } from "~/features/errors";
-import type { ShareLink } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
-
-export type ShareVisibilityOption = "PUBLIC" | "ORGANIZATION" | "PROJECT";
-export type ShareExpiryOption = "never" | "1h" | "24h" | "7d" | "30d";
-
-const EXPIRY_MS: Record<Exclude<ShareExpiryOption, "never">, number> = {
-  "1h": 60 * 60 * 1000,
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-};
-
-function expiryToDate(option: ShareExpiryOption): Date | null {
-  if (option === "never") return null;
-  return new Date(Date.now() + EXPIRY_MS[option]);
-}
-
-export function shareUrlForToken(token: string): string {
-  if (typeof window === "undefined") return `/share/${token}`;
-  return `${window.location.origin}/share/${token}`;
-}
 
 /**
  * The share-links list query, scoped to a resource. Split out of
@@ -44,8 +25,10 @@ function useShareLinksQuery({
     { enabled },
   );
 
+  const links: ShareLink[] = linksQuery.data ?? [];
+
   return {
-    links: (linksQuery.data ?? []) as ShareLink[],
+    links,
     isLoading: enabled && linksQuery.isLoading,
     // Surfaced so the dialog can tell a fetch failure apart from "no links yet".
     isError: enabled && linksQuery.isError,
@@ -90,15 +73,7 @@ function useShareLinkMutations({
   });
 
   const createLink = useCallback(
-    ({
-      visibility,
-      expiry,
-      isSingleView,
-    }: {
-      visibility: ShareVisibilityOption;
-      expiry: ShareExpiryOption;
-      isSingleView: boolean;
-    }) => {
+    ({ visibility, expiry, isSingleView }: CreateShareLinkDraft) => {
       if (!projectId) return;
       // TRACE only — thread sharing is parked until the share viewer can
       // render the surrounding conversation. See ADR-057's follow-ups.
@@ -107,7 +82,7 @@ function useShareLinkMutations({
         resourceType: "TRACE",
         resourceId: traceId,
         visibility,
-        expiresAt: expiryToDate(expiry),
+        expiresAt: expiryToDate({ option: expiry }),
         maxViews: isSingleView ? 1 : null,
       });
     },
@@ -132,9 +107,9 @@ function useShareLinkMutations({
 }
 
 /**
- * State + callbacks for the trace share drawer/dialog. Returns no JSX (see
- * dev/docs/best_practices/react.md) — the consumer renders the UI. Backs the
- * new-Trace-Explorer share experience; the legacy drawer no longer shares.
+ * Transport for the trace share dialog: the tRPC reads and writes, and nothing
+ * else. Returns no JSX (see dev/docs/best_practices/react.md) — the consumer
+ * renders `ShareTraceDialogBody` from `@langwatch/share-web` with this state.
  */
 export function useShareTrace({
   projectId,
