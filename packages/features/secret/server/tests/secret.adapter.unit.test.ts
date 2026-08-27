@@ -6,6 +6,10 @@ class StubSecretEncryption extends SecretEncryptionPort {
   encrypt(value: string): string {
     return value;
   }
+
+  decrypt(value: string): string {
+    return value;
+  }
 }
 
 describe("PostgresSecretAdapter", () => {

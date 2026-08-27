@@ -35,6 +35,15 @@ export class PrismaSecretRepository extends SecretRepository {
     return rows.map((row) => secretSchema.parse(row));
   }
 
+  listEncryptedValues(
+    projectId: string,
+  ): Promise<Array<{ name: string; encryptedValue: string }>> {
+    return this.database.projectSecret.findMany({
+      where: { projectId },
+      select: { name: true, encryptedValue: true },
+    });
+  }
+
   async get(projectId: string, id: string): Promise<Secret> {
     const row = await this.database.projectSecret.findFirst({
       where: { id, projectId },

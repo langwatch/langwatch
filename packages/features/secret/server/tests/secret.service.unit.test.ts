@@ -27,6 +27,7 @@ function row(input: Partial<Secret> = {}): Secret {
 
 class StubSecretRepository extends SecretRepository {
   readonly rows: Secret[] = [];
+  readonly encryptedValues: Array<{ name: string; encryptedValue: string }> = [];
   readonly createCall = vi.fn();
   readonly updateCall = vi.fn();
   readonly deleteCall = vi.fn();
@@ -34,6 +35,10 @@ class StubSecretRepository extends SecretRepository {
 
   list(): Promise<Secret[]> {
     return Promise.resolve(this.rows);
+  }
+
+  listEncryptedValues(): Promise<Array<{ name: string; encryptedValue: string }>> {
+    return Promise.resolve(this.encryptedValues);
   }
 
   async get(_projectId: string, id: string): Promise<Secret> {
@@ -76,6 +81,10 @@ class StubSecretEncryption extends SecretEncryptionPort {
   encrypt(value: string): string {
     return `encrypted(${value})`;
   }
+
+  decrypt(value: string): string {
+    return value.replace(/^encrypted\((.*)\)$/, "$1");
+  }
 }
 
 function createService(options?: {
@@ -98,6 +107,19 @@ describe("SecretService", () => {
     repository.rows.push(row(), row({ id: "reserved", name: "LANGY_KEY" }));
 
     await expect(service.list({ projectId: "project-1" })).resolves.toEqual([row()]);
+  });
+
+  it("decrypts every project secret for trusted server execution", async () => {
+    const { repository, service } = createService();
+    repository.encryptedValues.push(
+      { name: "OPENAI_API_KEY", encryptedValue: "encrypted(openai)" },
+      { name: "LANGY_KEY", encryptedValue: "encrypted(internal)" },
+    );
+
+    await expect(service.getValues({ projectId: "project-1" })).resolves.toEqual({
+      OPENAI_API_KEY: "openai",
+      LANGY_KEY: "internal",
+    });
   });
 
   it("reports reserved and missing rows as not found", async () => {

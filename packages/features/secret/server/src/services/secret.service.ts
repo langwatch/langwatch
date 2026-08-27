@@ -46,6 +46,23 @@ export class SecretService extends SecretServiceContract {
     return rows.filter((secret) => !this.reservedNames.has(secret.name));
   }
 
+  async getValues(input: ListSecretsInput): Promise<Record<string, string>> {
+    const parsed = listSecretsInputSchema.parse(input);
+    const rows = await this.options.repository.listEncryptedValues(parsed.projectId);
+    const values: Record<string, string> = {};
+
+    for (const row of rows) {
+      try {
+        values[row.name] = this.options.encryption.decrypt(row.encryptedValue);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to decrypt project secret "${row.name}": ${message}`);
+      }
+    }
+
+    return values;
+  }
+
   async get(input: GetSecretInput): Promise<Secret> {
     const parsed = getSecretInputSchema.parse(input);
     return this.getMutableSecret(parsed);

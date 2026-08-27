@@ -17,6 +17,9 @@ class StubSecretService extends SecretService {
   list(): Promise<Secret[]> {
     return Promise.resolve([secret]);
   }
+  getValues(): Promise<Record<string, string>> {
+    return Promise.resolve({});
+  }
   get(): Promise<Secret> {
     return Promise.resolve(secret);
   }

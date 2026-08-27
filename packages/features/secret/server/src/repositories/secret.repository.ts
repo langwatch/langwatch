@@ -2,6 +2,9 @@ import type { Secret } from "@langwatch/secret-contract";
 
 export abstract class SecretRepository {
   abstract list(projectId: string): Promise<Secret[]>;
+  abstract listEncryptedValues(
+    projectId: string,
+  ): Promise<Array<{ name: string; encryptedValue: string }>>;
   abstract get(projectId: string, id: string): Promise<Secret>;
   abstract count(projectId: string): Promise<number>;
   abstract create(input: {
