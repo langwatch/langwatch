@@ -436,13 +436,15 @@ describe("given my profile page", () => {
     });
 
     /** @scenario A deployment that does not offer a thing does not list it */
-    it("lists neither passkeys nor two-step where the deployment offers neither", () => {
-      harness.publicEnv = { PASSKEYS_ENABLED: false };
+    it("lists no two-step row where the deployment does not offer it", () => {
       harness.twoStep = { offered: false, enabled: false };
       renderPage();
 
-      expect(screen.queryByTestId("method-row-passkeys")).toBeNull();
       expect(screen.queryByTestId("method-row-two-step")).toBeNull();
+      // Passkeys are not among the things a deployment can decline to offer
+      // any more: the plugin is mounted everywhere, so the row is always here
+      // and the only question is how many are registered.
+      expect(screen.getByTestId("method-row-passkeys")).toBeTruthy();
     });
 
     /** @scenario A read that fails says so without taking the band down */
