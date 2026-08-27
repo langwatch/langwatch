@@ -346,7 +346,13 @@ describe("a pull run that reported errors", () => {
         Promise.resolve({ events: [], cursor: "cursor-B", errorCount: 1 }),
     };
 
-    async function runWith(adapter: { id: string }, sourceId: string) {
+    async function runWith({
+      adapter,
+      sourceId,
+    }: {
+      adapter: { id: string };
+      sourceId: string;
+    }) {
       sourceFindUnique.mockResolvedValueOnce({
         id: sourceId,
         organizationId: "org-1",
@@ -363,15 +369,18 @@ describe("a pull run that reported errors", () => {
 
     describe("when the worker runs it", () => {
       it("fails the run rather than rewinding the source to the beginning", async () => {
-        await expect(runWith(nullCursorAdapter, "src-null-1")).rejects.toThrow(
-          /reported 1 error/,
-        );
+        await expect(
+          runWith({ adapter: nullCursorAdapter, sourceId: "src-null-1" }),
+        ).rejects.toThrow(/reported 1 error/);
       });
     });
 
     describe("when the same adapter hands back a real cursor instead", () => {
       it("accepts it as progress, so the rule is about null and not about errors", async () => {
-        const outcome = await runWith(advancingAdapter, "src-advance-1");
+        const outcome = await runWith({
+          adapter: advancingAdapter,
+          sourceId: "src-advance-1",
+        });
         expect(outcome.nextCursor).toBe("cursor-B");
         expect(outcome.errorCount).toBe(1);
       });
