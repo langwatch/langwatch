@@ -81,17 +81,18 @@ describe("given no failure at all", () => {
  * part-way through signing in back to a signed-out page with an apology.
  */
 describe("given an intermediary answering while the app is still coming up", () => {
-  it.each([[502], [503], [504]])(
-    "treats a bodiless %i as nothing having answered",
-    (status) => {
-      expect(
-        isServerUnreachable({
-          message: "Unexpected end of JSON input",
-          meta: { response: { status } },
-        }),
-      ).toBe(true);
-    },
-  );
+  it.each([
+    [502],
+    [503],
+    [504],
+  ])("treats a bodiless %i as nothing having answered", (status) => {
+    expect(
+      isServerUnreachable({
+        message: "Unexpected end of JSON input",
+        meta: { response: { status } },
+      }),
+    ).toBe(true);
+  });
 
   describe("when the same status carries one of our own codes", () => {
     it.each([

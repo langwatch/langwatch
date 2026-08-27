@@ -332,9 +332,7 @@ describe("<HandledErrorAlert />", () => {
           </ChakraProvider>,
         );
 
-        expect(
-          screen.getByRole("alert"),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("alert")).toBeInTheDocument();
       });
     });
 

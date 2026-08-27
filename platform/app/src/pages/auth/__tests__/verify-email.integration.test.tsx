@@ -16,10 +16,7 @@ const { searchParamsRef, publicEnvRef } = vi.hoisted(() => ({
     current: new URLSearchParams("") as URLSearchParams | null,
   },
   publicEnvRef: {
-    current: { IS_SAAS: false } as Record<
-      string,
-      unknown
-    >,
+    current: { IS_SAAS: false } as Record<string, unknown>,
   },
 }));
 

@@ -61,7 +61,6 @@ describe("userRouter.secureAccountNudge", () => {
 
   describe("given somebody who signs in with a password alone", () => {
     it("offers a passkey to somebody holding none who was never asked", async () => {
-
       await expect(call()).resolves.toEqual({
         offer: true,
         passkey: true,
@@ -77,7 +76,6 @@ describe("userRouter.secureAccountNudge", () => {
         passkey: false,
       });
     });
-
   });
 
   describe("given two-step verification is offered on this deployment", () => {
@@ -90,7 +88,6 @@ describe("userRouter.secureAccountNudge", () => {
 
     /** @scenario "Only what the deployment offers is offered" */
     it("offers it to somebody who has not set one up", async () => {
-
       await expect(call()).resolves.toEqual({
         offer: true,
         passkey: false,

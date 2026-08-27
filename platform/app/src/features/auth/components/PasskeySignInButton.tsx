@@ -8,6 +8,7 @@ import {
   endPasskeyCeremony,
   startPasskeyCeremony,
 } from "../logic/passkeyCeremony";
+import { passkeyFailure, passkeyFailureFrom } from "../logic/passkeyFailure";
 import { MethodButton } from "./MethodButton";
 import { SignInMethodIcon } from "./SignInMethodIcon";
 
@@ -18,31 +19,6 @@ const PASSKEY: SignInMethod = {
   kind: "passkey",
   connectionId: null,
 };
-
-/**
- * What went wrong, in a code the registry has words for.
- *
- * The ceremony's own failures arrive from the WebAuthn client, which knows
- * nothing about our error vocabulary — so handed on as they are, every one of
- * them resolved to the generic unknown line ("Something went wrong. We've been
- * notified."). That line is for failures we could not anticipate, and this is
- * not one of them: a passkey attempt fails in two ways worth telling apart,
- * and both have been registered copy all along.
- *
- * The shape is the flat one a REST boundary sends (`{ error: "<code>" }`),
- * which `readHandledError` reads, so the alert resolves it exactly as it would
- * a refusal from the server.
- */
-function passkeyFailure(status: number | undefined): { error: string } {
-  // The server looked at the credential and said no. Same answer whether it
-  // belongs to somebody else or to nobody — the endpoint does not say which.
-  const refused = status === 400 || status === 401 || status === 403;
-  return {
-    error: refused
-      ? "identity_passkey_not_recognized"
-      : "identity_passkey_ceremony_failed",
-  };
-}
 
 /**
  * Signing in with a passkey: the whole ceremony is the browser's, so this is
@@ -169,7 +145,7 @@ export function PasskeySignInButton({
   const announceRefusal = (error: { code?: string; status?: number }) => {
     const cancelled = error.code === "ERROR_CEREMONY_ABORTED";
     if (!cancelled) {
-      onError(passkeyFailure(error.status === 0 ? void 0 : error.status));
+      onError(passkeyFailureFrom(error));
     }
     // Told either way, quiet refusal included: the screen's job now is to
     // offer the next-best method, and that is as true of a prompt somebody

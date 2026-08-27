@@ -155,20 +155,20 @@ const plugins = [
       ]
     : []),
   ...[
-        passkey({
-          rpName: "LangWatch",
-          // The relying party is the app's own origin. Left to the plugin's
-          // default derivation from `baseURL` so a self-hosted install on
-          // its own hostname works without a second place to configure it.
+    passkey({
+      rpName: "LangWatch",
+      // The relying party is the app's own origin. Left to the plugin's
+      // default derivation from `baseURL` so a self-hosted install on
+      // its own hostname works without a second place to configure it.
 
-          // Signing UP with a passkey, not only adding one to an account that
-          // already exists. This is what drops the session requirement from
-          // the two registration endpoints — see `passkey-signup.ts` for what
-          // stands in its place, and why an address that already has an
-          // account must be refused there.
-          registration: passkeySignUpRegistration,
-        }),
-      ],
+      // Signing UP with a passkey, not only adding one to an account that
+      // already exists. This is what drops the session requirement from
+      // the two registration endpoints — see `passkey-signup.ts` for what
+      // stands in its place, and why an address that already has an
+      // account must be refused there.
+      registration: passkeySignUpRegistration,
+    }),
+  ],
   /**
    * Per-organization single sign-on (D09 — see
    * specs/identity/sso-idp-termination.feature).

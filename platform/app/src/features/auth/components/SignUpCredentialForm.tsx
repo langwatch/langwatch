@@ -168,8 +168,7 @@ export function SignUpCredentialForm({
   // not go through it — the ceremony creates the account itself, which would
   // leave the proof unspent and the address asked for a second time. A passkey
   // is an offer once there is an account to enrol it against (D07).
-  const offersPasskeys =
-    !addressIsConfirmed;
+  const offersPasskeys = !addressIsConfirmed;
 
   const onSubmit = async (values: SignUpValues) => {
     setSubmitError(null);
