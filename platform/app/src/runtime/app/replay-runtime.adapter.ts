@@ -9,15 +9,19 @@ import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "~/server/app-layer/app";
 import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
 import { EvaluationEventingAdapter } from "@langwatch/evaluation-server";
-import { createExperimentRunStateFoldStore } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunState.store";
-import { ExperimentRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
-import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
-import { SIMULATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/constants";
+import {
+  createExperimentRunStateFoldStore,
+  ExperimentRunStateRepositoryClickHouse,
+} from "@langwatch/experiment-server";
+import {
+  SimulationRunStateRepositoryClickHouse,
+  SIMULATION_PROJECTION_VERSIONS,
+} from "@langwatch/simulation-server";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { createAppTraceSummaryStore } from "~/runtime/app/trace-summary-fold.adapter";
 import { AppTraceWindowedReadMetricsAdapter } from "~/runtime/app/trace-windowed-read-metrics.adapter";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { SUITE_RUN_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/constants";
+import { SUITE_RUN_PROJECTION_VERSIONS } from "@langwatch/suite-server";
 import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/replayEventLoader";
 
 export interface ReplayRuntime {
@@ -102,12 +106,17 @@ export function createReplayRuntime(config: {
     ],
     [
       "experiment_run_processing",
-      createExperimentRunStateFoldStore(new ExperimentRunStateRepositoryClickHouse(clientResolver)),
+      createExperimentRunStateFoldStore(
+        new ExperimentRunStateRepositoryClickHouse(clientResolver, PLATFORM_DEFAULT_RETENTION_DAYS),
+      ),
     ],
     [
       "simulation_processing",
       new RepositoryFoldStore(
-        new SimulationRunStateRepositoryClickHouse(clientResolver),
+        new SimulationRunStateRepositoryClickHouse({
+          resolveClient: clientResolver,
+          defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        }),
         SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
       ),
     ],

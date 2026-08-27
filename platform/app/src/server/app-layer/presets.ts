@@ -257,24 +257,18 @@ import {
   createAutomationTestFirePort,
   createAutomationTestRuntime,
 } from "@langwatch/automation-server/testing";
-import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
-import {
-  ExperimentIdLookupClickHouseRepository,
-  ExperimentRunStateRepositoryClickHouse,
-  ExperimentRunStateRepositoryMemory,
-  NullExperimentIdLookupRepository,
-} from "../event-sourcing/pipelines/experiment-run-processing/repositories";
+import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
   LangyAnalyticsEventStorageAdapter,
   NullLangyAnalyticsEventSinkAdapter,
 } from "@langwatch/langy-server";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { SimulationRunMetricsAppendStore } from "../event-sourcing/pipelines/simulation-processing/projections";
 import {
+  SimulationRunMetricsAppendStore,
   SimulationRunMetricsRepositoryClickHouse,
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/simulation-processing/repositories";
+} from "@langwatch/simulation-server";
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { ExportService } from "../export/export.service";
 import { InviteService } from "../invites/invite.service";
@@ -827,12 +821,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     }).build(),
     "AnnotationService",
   );
+  const workflowNlpRuntime = AppWorkflowNlpRuntimePort.create(nlpLambda);
   const workflows = traced(
     AppWorkflowRuntime.create({
       database: prisma,
       datasets: dataset,
       modelProviders,
-      nlpRuntime: AppWorkflowNlpRuntimePort.create(nlpLambda),
+      nlpRuntime: workflowNlpRuntime,
       projectEnvironment: AppWorkflowProjectEnvironmentPort.create({
         database: prisma,
         encryption: AppWorkflowEnvironmentEncryption.create(),
@@ -848,7 +843,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     session: null,
     workflows,
   });
-  const evaluators = traced(EvaluatorFeature.create({ prisma, workflows }), "EvaluatorService");
+  const evaluators = traced(
+    EvaluatorFeature.create({ prisma, workflows, nlpRuntime: workflowNlpRuntime }),
+    "EvaluatorService",
+  );
   const traceService = TraceService.create({
     prisma,
     blobResolutionDeps: {
@@ -871,6 +869,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         ? new LangEvalsHttpClient(config.langevalsEndpoint)
         : new NullLangevalsClient(),
       workflows,
+      evaluators,
       workflowExecutor: AppWorkflowEvaluationAdapter.create(workflows),
     }),
     "EvaluationExecutionService",
@@ -1158,7 +1157,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     simulationRunState: clickhouseEnabled
-      ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
+      ? new SimulationRunStateRepositoryClickHouse({
+          resolveClient: resolveClickHouseClient,
+          defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        })
       : new SimulationRunStateRepositoryMemory(),
     simulationRunMetricsStore: clickhouseEnabled
       ? new SimulationRunMetricsAppendStore(
@@ -1173,12 +1175,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
             /* noop */
           },
         },
-    experimentRunState: clickhouseEnabled
-      ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
-      : new ExperimentRunStateRepositoryMemory(),
-    experimentIdLookup: clickhouseEnabled
-      ? new ExperimentIdLookupClickHouseRepository(resolveClickHouseClient)
-      : new NullExperimentIdLookupRepository(),
+    experimentRunState: ExperimentEventingAdapter.createStateRepository({
+      resolveClient: resolveClickHouseClient,
+      clickhouseEnabled,
+      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    }),
+    experimentIdLookup: ExperimentEventingAdapter.createIdLookup({
+      resolveClient: resolveClickHouseClient,
+      clickhouseEnabled,
+    }),
     traceSummaryFold: clickhouseEnabled
       ? TraceSummaryClickHouseRepository.create({
           resolveClient: resolveClickHouseClient,
@@ -1200,8 +1205,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
           windowedReadMetrics: AppTraceWindowedReadMetricsAdapter.create(),
         })
       : new NullTraceAnalyticsRepository(),
-    experimentRunItemStorage: createExperimentRunItemAppendStore(
-      clickhouseEnabled ? resolveClickHouseClient : null,
+    experimentRunItemStorage: ExperimentEventingAdapter.createItemStore(
+      resolveClickHouseClient,
+      PLATFORM_DEFAULT_RETENTION_DAYS,
     ),
     langyConversationState: langyPersistence.langyConversationState,
     langyConversationTurnState: langyPersistence.langyConversationTurnState,
@@ -2470,6 +2476,7 @@ export function createTestApp(
   const testDataset = AppDatasetRuntime.create({
     database: testPrisma,
   }).build();
+  const testWorkflowNlpRuntime = AppWorkflowNlpRuntimePort.create(nlpLambda);
   const testWorkflows = AppWorkflowRuntime.create({
     database: testPrisma,
     datasets: testDataset,
@@ -2481,7 +2488,7 @@ export function createTestApp(
       modelProviders,
     }),
     modelProviders,
-    nlpRuntime: AppWorkflowNlpRuntimePort.create(nlpLambda),
+    nlpRuntime: testWorkflowNlpRuntime,
   }).build();
   const agents = AgentsFeature.create({
     prisma: testPrisma,
@@ -2491,6 +2498,7 @@ export function createTestApp(
   const testEvaluators = EvaluatorFeature.create({
     prisma: testPrisma,
     workflows: testWorkflows,
+    nlpRuntime: testWorkflowNlpRuntime,
   });
   const testEvaluationService = AppEvaluationRuntime.create({
     resolveClickHouse: async () => ({

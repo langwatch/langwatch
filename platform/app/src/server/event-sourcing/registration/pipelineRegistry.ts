@@ -157,13 +157,15 @@ import {
 import { AppAutomationEvaluationSubscriberRuntime } from "~/runtime/app/features/evaluation-automation-subscribers.adapter";
 import { AppEvaluationExecutionReceiptPort } from "~/runtime/app/features/evaluation-execution-receipt.adapter";
 import { TraceAnalyticsAttributePolicy } from "~/runtime/app/features/evaluation-analytics-attribute-policy.adapter";
-import { createExperimentRunProcessingPipeline } from "../pipelines/experiment-run-processing/pipeline";
-import type { ClickHouseExperimentRunResultRecord } from "../pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
-import type { ExperimentRunStateData } from "../pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
-import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
-import type { ExperimentIdLookup } from "../pipelines/experiment-run-processing/repositories/experimentIdLookup.clickhouse.repository";
-import type { ExperimentRunStateRepository } from "../pipelines/experiment-run-processing/repositories/experimentRunState.repository";
-import type { ComputeExperimentRunMetricsCommandData } from "../pipelines/experiment-run-processing/schemas/commands";
+import {
+  createExperimentRunProcessingPipeline,
+  createExperimentRunStateFoldStore,
+  type ClickHouseExperimentRunResultRecord,
+  type ComputeExperimentRunMetricsCommandData,
+  type ExperimentIdLookup,
+  type ExperimentRunStateData,
+  type ExperimentRunStateRepository,
+} from "@langwatch/experiment-server";
 import { createGatewaySpendProcessingPipeline } from "../pipelines/gateway-spend-processing/pipeline";
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
 import type { GatewaySpendState } from "@langwatch/gateway-server";
@@ -183,20 +185,21 @@ import { createProcessManagerMaintenancePipeline } from "../pipelines/process-ma
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
-} from "../pipelines/simulation-processing/commands/computeRunMetrics.command";
-import { FinishRunCommand } from "../pipelines/simulation-processing/commands/finishRun.command";
-import { createSimulationProcessingPipeline } from "../pipelines/simulation-processing/pipeline";
-import {
+  createSimulationProcessingPipeline,
+  FinishRunCommand,
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+  SIMULATION_PROJECTION_VERSIONS,
+  type ComputeRunMetricsCommandData,
+  type SimulationProcessingEvent,
+  type SimulationRunMetricsProjectionRecord,
+  type SimulationRunStateData,
+  type SimulationRunStateRepository,
   simulationRunExecutionPM,
 } from "@langwatch/simulation-server";
-import type { SimulationRunMetricsProjectionRecord } from "../pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
-import type { SimulationRunStateData } from "../pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import type { SimulationRunStateRepository } from "../pipelines/simulation-processing/repositories/simulationRunState.repository";
-import type { ComputeRunMetricsCommandData } from "../pipelines/simulation-processing/schemas/commands";
-import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
-import type { SimulationProcessingEvent } from "../pipelines/simulation-processing/schemas/events";
-import { createSuiteRunProcessingPipeline } from "../pipelines/suite-run-processing/pipeline";
+import {
+  createSuiteRunProcessingPipeline,
+  SUITE_RUN_PROJECTION_VERSIONS,
+} from "@langwatch/suite-server";
 import {
   classifyClusteringError,
   createTopicClusteringProcessingPipeline,
@@ -1439,12 +1442,21 @@ export class PipelineRegistry {
         },
         simulations: this.deps.simulations,
         snapshotUpdateBroadcast: {
-          broadcast: this.deps.broadcast,
-          hasRedis: true,
+          broadcastUpdate: async ({ tenantId, payload }) =>
+            this.deps.broadcast.broadcastToTenant(tenantId, payload, "simulation_updated"),
         },
         suiteRunSync: {
-          recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
-          completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+          recordSuiteRunItemStarted: async (data) => {
+            const command = suiteRunCommands.recordSuiteRunItemStarted;
+            if (!command)
+              throw new Error("Suite run pipeline is missing recordSuiteRunItemStarted");
+            await command(data);
+          },
+          completeSuiteRunItem: async (data) => {
+            const command = suiteRunCommands.completeSuiteRunItem;
+            if (!command) throw new Error("Suite run pipeline is missing completeSuiteRunItem");
+            await command(data);
+          },
         },
         traceMetricsSync: {
           computeRunMetrics: selfComputeRunMetrics.fn,

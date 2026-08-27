@@ -35,7 +35,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
+import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import { DRAWER_WIDTH } from "../constants";
@@ -44,10 +44,7 @@ import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenEvaluatorEditor } from "../hooks/useOpenEvaluatorEditor";
-import {
-  scrollToTargetColumn,
-  useOpenTargetEditor,
-} from "../hooks/useOpenTargetEditor";
+import { scrollToTargetColumn, useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useSyncWorkflowTargetFields } from "../hooks/useSyncWorkflowTargetFields";
 import type {
@@ -82,7 +79,6 @@ import {
   type PromptOutputField,
   toTargetOutputFields,
 } from "../utils/targetOutputFields";
-import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { ComparisonCell } from "./ComparisonCell";
 import { ComparisonColumnHeader } from "./ComparisonColumnHeader";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
@@ -170,16 +166,14 @@ export const buildTargetEvaluatorsForRow = (
       (evaluator) =>
         [
           evaluator.id,
-          results.evaluatorResults[target.id]?.[evaluator.id]?.[rowIndex] ??
-            null,
+          results.evaluatorResults[target.id]?.[evaluator.id]?.[rowIndex] ?? null,
         ] as [string, unknown],
     ),
     ...(toComparisonConfig(target)
       ? [
           [
             target.id,
-            results.evaluatorResults[target.id]?.[target.id]?.[rowIndex] ??
-              null,
+            results.evaluatorResults[target.id]?.[target.id]?.[rowIndex] ?? null,
           ] as [string, unknown],
         ]
       : []),
@@ -295,14 +289,8 @@ export function EvaluationsV3Table({
   });
 
   // Execution hook for running evaluations
-  const {
-    execute,
-    abort,
-    status,
-    isAborting,
-    rerunEvaluator,
-    runEvaluatorOnAllRows,
-  } = useExecuteEvaluation();
+  const { execute, abort, status, isAborting, rerunEvaluator, runEvaluatorOnAllRows } =
+    useExecuteEvaluation();
 
   // Execution handlers for partial execution
   const handleRunTarget = useCallback(
@@ -358,8 +346,7 @@ export function EvaluationsV3Table({
   }, [abort]);
 
   // Check if execution is running
-  const isExecutionRunning =
-    status === "running" || results.status === "running";
+  const isExecutionRunning = status === "running" || results.status === "running";
 
   // Get the active dataset
   const activeDataset = useMemo(
@@ -436,9 +423,7 @@ export function EvaluationsV3Table({
       if (isHttpAgent) {
         // HTTP agent: extract inputs from body template
         const httpComponentConfig = config as HttpComponentConfig;
-        targetInputs = buildInputsFromBodyTemplate(
-          httpComponentConfig.bodyTemplate,
-        );
+        targetInputs = buildInputsFromBodyTemplate(httpComponentConfig.bodyTemplate);
         httpConfig = convertHttpComponentConfig(httpComponentConfig);
 
         // Fall back to default input if bodyTemplate has no variables
@@ -460,20 +445,14 @@ export function EvaluationsV3Table({
       // Every other kind keeps its fields on its own config, so an empty list
       // there means nothing was saved and the fallbacks still apply.
       const { inputFields, outputFields, fieldsResolved } = savedAgent;
-      const derivationIsFinal =
-        savedAgent.type === "workflow" && fieldsResolved;
+      const derivationIsFinal = savedAgent.type === "workflow" && fieldsResolved;
 
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
         type: "agent", // This is a target of type "agent" (code/workflow/http)
-        agentType: isHttpAgent
-          ? "http"
-          : (savedAgent.type as TargetConfig["agentType"]),
+        agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs:
-          derivationIsFinal || inputFields.length > 0
-            ? inputFields
-            : targetInputs,
+        inputs: derivationIsFinal || inputFields.length > 0 ? inputFields : targetInputs,
         outputs:
           derivationIsFinal || outputFields.length > 0
             ? outputFields
@@ -590,12 +569,10 @@ export function EvaluationsV3Table({
         promptId: prompt.id,
         promptVersionId: prompt.versionId,
         promptVersionNumber: prompt.version,
-        inputs: (prompt.inputs ?? [{ identifier: "input", type: "str" }]).map(
-          (i) => ({
-            identifier: i.identifier,
-            type: i.type as Field["type"],
-          }),
-        ),
+        inputs: (prompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
+          identifier: i.identifier,
+          type: i.type as Field["type"],
+        })),
         outputs: toTargetOutputFields(
           prompt.outputs ?? [{ identifier: "output", type: "str" }],
         ),
@@ -613,8 +590,7 @@ export function EvaluationsV3Table({
           updateTarget,
           setTargetMapping,
           removeTargetMapping,
-          getActiveDatasetId: () =>
-            useEvaluationsV3Store.getState().activeDatasetId,
+          getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
           getDatasets: () => useEvaluationsV3Store.getState().datasets,
         }),
       );
@@ -636,13 +612,7 @@ export function EvaluationsV3Table({
         scrollToTargetColumn(targetId);
       });
     },
-    [
-      addOrReplaceTarget,
-      openDrawer,
-      updateTarget,
-      setTargetMapping,
-      removeTargetMapping,
-    ],
+    [addOrReplaceTarget, openDrawer, updateTarget, setTargetMapping, removeTargetMapping],
   );
 
   /**
@@ -659,9 +629,7 @@ export function EvaluationsV3Table({
       const config = evaluator.config as EvaluatorDbConfig | null;
 
       // Check if this evaluator is already added globally
-      const existingEvaluator = evaluators.find(
-        (e) => e.dbEvaluatorId === evaluator.id,
-      );
+      const existingEvaluator = evaluators.find((e) => e.dbEvaluatorId === evaluator.id);
 
       // If already exists, reuse it instead of silently no-op'ing. The
       // pre-existing behavior (return null) made the drawer close with no
@@ -722,11 +690,7 @@ export function EvaluationsV3Table({
 
       if (
         firstTarget &&
-        evaluatorHasMissingMappings(
-          added,
-          state.activeDatasetId,
-          firstTarget.id,
-        )
+        evaluatorHasMissingMappings(added, state.activeDatasetId, firstTarget.id)
       ) {
         openEvaluatorEditor({
           evaluator: added,
@@ -842,12 +806,9 @@ export function EvaluationsV3Table({
       handleSelectEvaluatorAsTarget,
     ],
   );
-  const handlePendingComparisonChange = useCallback(
-    (next: ComparisonEvaluatorConfig) => {
-      pendingComparisonRef.current = next;
-    },
-    [],
-  );
+  const handlePendingComparisonChange = useCallback((next: ComparisonEvaluatorConfig) => {
+    pendingComparisonRef.current = next;
+  }, []);
 
   // Handler for opening the add target flow (prompts/agents)
   // Memoized to prevent TargetSuperHeader re-renders
@@ -904,15 +865,12 @@ export function EvaluationsV3Table({
       onSave: (savedPrompt) => {
         // Apply pending mappings when creating the target
         const storeMappings: Record<string, FieldMapping> = {};
-        for (const [key, uiMapping] of Object.entries(
-          pendingMappingsRef.current,
-        )) {
+        for (const [key, uiMapping] of Object.entries(pendingMappingsRef.current)) {
           storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
         }
 
         // Get current state for active dataset
-        const currentActiveDatasetId =
-          useEvaluationsV3Store.getState().activeDatasetId;
+        const currentActiveDatasetId = useEvaluationsV3Store.getState().activeDatasetId;
 
         // Create target with pending mappings
         const targetId = `target_${Date.now()}`;
@@ -922,12 +880,12 @@ export function EvaluationsV3Table({
           promptId: savedPrompt.id,
           promptVersionId: savedPrompt.versionId,
           promptVersionNumber: savedPrompt.version,
-          inputs: (
-            savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]
-          ).map((i) => ({
-            identifier: i.identifier,
-            type: i.type as Field["type"],
-          })),
+          inputs: (savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]).map(
+            (i) => ({
+              identifier: i.identifier,
+              type: i.type as Field["type"],
+            }),
+          ),
           outputs: toTargetOutputFields(
             savedPrompt.outputs ?? [{ identifier: "output", type: "str" }],
           ),
@@ -1029,9 +987,7 @@ export function EvaluationsV3Table({
     // Flow context already present → a live Add/edit flow (or an earlier run of
     // this effect) wired it up. Also the loop guard.
     const alreadyWired = (
-      getFlowCallbacks("evaluatorEditor") as
-        | { onComparisonChange?: unknown }
-        | undefined
+      getFlowCallbacks("evaluatorEditor") as { onComparisonChange?: unknown } | undefined
     )?.onComparisonChange;
     if (alreadyWired) return;
 
@@ -1178,10 +1134,7 @@ export function EvaluationsV3Table({
 
         // Convert inline dataset to row-based format, filtering empty rows
         const columns = dataset.inline.columns;
-        const datasetRecords = convertInlineToRowRecords(
-          columns,
-          dataset.inline.records,
-        );
+        const datasetRecords = convertInlineToRowRecords(columns, dataset.inline.records);
 
         // Find next available name to avoid conflicts
         // E.g., if "Test Data" exists, suggest "Test Data (2)"
@@ -1217,9 +1170,7 @@ export function EvaluationsV3Table({
   );
 
   const tableRef = useRef<HTMLTableElement>(null);
-  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(
-    null,
-  );
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
 
   // Find the scroll container (parent with overflow: auto)
   useEffect(() => {
@@ -1338,17 +1289,11 @@ export function EvaluationsV3Table({
             {
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
-              evaluators: buildTargetEvaluatorsForRow(
-                target,
-                evaluators,
-                results,
-                index,
-              ),
+              evaluators: buildTargetEvaluatorsForRow(target, evaluators, results, index),
               // Error for this target/row: the engine's raw string, plus the
               // code the cell reads its customer-facing copy from.
               error: results.errors[target.id]?.[index] ?? null,
-              domainError:
-                results.targetMetadata?.[target.id]?.[index]?.domainError,
+              domainError: results.targetMetadata?.[target.id]?.[index]?.domainError,
               // Loading if this specific cell is in the executing set AND has no output/error yet
               // Once target output or error arrives, show it instead of skeleton
               isLoading:
@@ -1357,11 +1302,9 @@ export function EvaluationsV3Table({
                 results.targetOutputs[target.id]?.[index] === undefined &&
                 results.errors[target.id]?.[index] === undefined,
               // Trace ID for viewing the execution trace
-              traceId:
-                results.targetMetadata?.[target.id]?.[index]?.traceId ?? null,
+              traceId: results.targetMetadata?.[target.id]?.[index]?.traceId ?? null,
               // Duration/latency for this cell execution
-              duration:
-                results.targetMetadata?.[target.id]?.[index]?.duration ?? null,
+              duration: results.targetMetadata?.[target.id]?.[index]?.duration ?? null,
             },
           ]),
         ),
@@ -1421,13 +1364,8 @@ export function EvaluationsV3Table({
   );
 
   // Similarly stabilize dataset columns - include type in key so icon updates when type changes
-  const datasetColumnsKey = datasetColumns
-    .map((c) => `${c.id}:${c.type}`)
-    .join(",");
-  const stableDatasetColumns = useMemo(
-    () => datasetColumns,
-    [datasetColumnsKey],
-  );
+  const datasetColumnsKey = datasetColumns.map((c) => `${c.id}:${c.type}`).join(",");
+  const stableDatasetColumns = useMemo(() => datasetColumns, [datasetColumnsKey]);
 
   // Stabilize comparison evaluators — only those considered configured (see
   // isComparisonConfigured above). Key on the ordered variants list so the
@@ -1444,10 +1382,7 @@ export function EvaluationsV3Table({
 
   // Build table meta for passing dynamic data to headers/cells
   // This allows column definitions to stay stable while data changes
-  const targetsMap = useMemo(
-    () => new Map(targets.map((r) => [r.id, r])),
-    [targets],
-  );
+  const targetsMap = useMemo(() => new Map(targets.map((r) => [r.id, r])), [targets]);
 
   // Helper to check if a specific target has cells being executed
   const isTargetExecuting = useCallback(
@@ -1477,9 +1412,7 @@ export function EvaluationsV3Table({
   const isEvaluatorRunning = useCallback(
     (rowIndex: number, targetId: string, evaluatorId: string): boolean => {
       if (!results.runningEvaluators) return false;
-      return results.runningEvaluators.has(
-        `${rowIndex}:${targetId}:${evaluatorId}`,
-      );
+      return results.runningEvaluators.has(`${rowIndex}:${targetId}:${evaluatorId}`);
     },
     [results.runningEvaluators],
   );
@@ -1625,9 +1558,7 @@ export function EvaluationsV3Table({
           size: comparisonTargetIds.has(targetId)
             ? COMPARISON_COL_DEFAULT_PCT
             : TARGET_COL_DEFAULT_PCT,
-          minSize: comparisonTargetIds.has(targetId)
-            ? COMPARISON_COL_MIN_PCT
-            : 10,
+          minSize: comparisonTargetIds.has(targetId) ? COMPARISON_COL_MIN_PCT : 10,
           meta: {
             columnType: "target" as ColumnType,
             columnId: `target.${targetId}`,
@@ -1661,9 +1592,7 @@ export function EvaluationsV3Table({
             cell: (info) => {
               if (info.row.original.isEmpty) return null;
               const meta = info.table.options.meta as TableMeta | undefined;
-              const variantTargets = variantIds.map((id) =>
-                meta?.targetsMap.get(id),
-              );
+              const variantTargets = variantIds.map((id) => meta?.targetsMap.get(id));
               const rowData = info.row.original.targets[anchorVariantId];
               return (
                 <ComparisonCell
@@ -1769,13 +1698,11 @@ export function EvaluationsV3Table({
       return (event: React.MouseEvent | React.TouchEvent) => {
         event.preventDefault();
 
-        const startX =
-          "touches" in event ? event.touches[0]!.clientX : event.clientX;
+        const startX = "touches" in event ? event.touches[0]!.clientX : event.clientX;
 
         // Get current width percentage
         const currentPct =
-          columnSizing[columnId] ??
-          getDefaultPctForColumn(columnId, columnType);
+          columnSizing[columnId] ?? getDefaultPctForColumn(columnId, columnType);
 
         resizingColumnRef.current = columnId;
         resizeStartXRef.current = startX;
@@ -1783,9 +1710,7 @@ export function EvaluationsV3Table({
 
         const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
           const currentX =
-            "touches" in moveEvent
-              ? moveEvent.touches[0]!.clientX
-              : moveEvent.clientX;
+            "touches" in moveEvent ? moveEvent.touches[0]!.clientX : moveEvent.clientX;
 
           const deltaX = currentX - resizeStartXRef.current;
 
@@ -1939,8 +1864,7 @@ export function EvaluationsV3Table({
     // character per line.
     for (const compEval of stableComparisonEvaluators) {
       const colId = `comparison.${compEval.id}`;
-      total +=
-        columnSizing[colId] ?? getDefaultPctForColumn(colId, "comparison");
+      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "comparison");
     }
 
     return total;
@@ -2121,11 +2045,7 @@ export function EvaluationsV3Table({
                   <th
                     key={header.id}
                     style={{
-                      width: getColumnWidth(
-                        header.id,
-                        columnType,
-                        isFixedWidth,
-                      ),
+                      width: getColumnWidth(header.id, columnType, isFixedWidth),
                       // The highlight is a brief auto-clearing flash (see
                       // CLICK_HIGHLIGHT_DURATION_MS in ComparisonCell), so it
                       // needs to fade smoothly rather than snapping off.
@@ -2136,8 +2056,7 @@ export function EvaluationsV3Table({
                       // this inline style would otherwise override the
                       // header's own opaque background (needed so scrolled
                       // rows don't show through the sticky header).
-                      transition:
-                        "box-shadow 300ms ease, background-color 300ms ease",
+                      transition: "box-shadow 300ms ease, background-color 300ms ease",
                       boxShadow: isHighlightedColumn
                         ? `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`
                         : "inset 0 0 0 0 transparent",
@@ -2150,19 +2069,13 @@ export function EvaluationsV3Table({
                   >
                     {header.isPlaceholder
                       ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                      : flexRender(header.column.columnDef.header, header.getContext())}
                     {/* Resize handle - custom handler for percentage-based resizing */}
                     {/* Double-click resets to default width */}
                     {!isFixedWidth && header.id !== "select" && (
                       <div
                         onMouseDown={createResizeHandler(header.id, columnType)}
-                        onTouchStart={createResizeHandler(
-                          header.id,
-                          columnType,
-                        )}
+                        onTouchStart={createResizeHandler(header.id, columnType)}
                         onDoubleClick={() =>
                           handleResizeDoubleClick(header.id, columnType)
                         }
@@ -2194,10 +2107,7 @@ export function EvaluationsV3Table({
               ) : (
                 <>
                   {/* Filler column - absorbs remaining space */}
-                  <th
-                    colSpan={2}
-                    style={{ width: "auto", minWidth: DRAWER_WIDTH }}
-                  ></th>
+                  <th colSpan={2} style={{ width: "auto", minWidth: DRAWER_WIDTH }}></th>
                 </>
               )}
             </tr>
@@ -2273,9 +2183,7 @@ export function EvaluationsV3Table({
           activeDataset
             ? {
                 datasetId:
-                  activeDataset.type === "saved"
-                    ? activeDataset.datasetId
-                    : undefined,
+                  activeDataset.type === "saved" ? activeDataset.datasetId : undefined,
                 name: activeDataset.name,
                 columnTypes: activeDataset.columns.map((col) => ({
                   name: col.name,
@@ -2320,9 +2228,7 @@ export function EvaluationsV3Table({
             // Map old records to new columns (by name matching)
             const currentRowCount = getRowCount(activeDataset.id);
             for (const newCol of newColumns) {
-              const oldCol = activeDataset.columns.find(
-                (c) => c.name === newCol.name,
-              );
+              const oldCol = activeDataset.columns.find((c) => c.name === newCol.name);
               const oldValues = oldCol ? oldRecords[oldCol.id] : undefined;
               if (oldValues) {
                 newRecords[newCol.id] = oldValues;

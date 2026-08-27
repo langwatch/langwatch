@@ -1,8 +1,8 @@
 import type { Event, MapProjectionDefinition } from "@langwatch/eventing";
-import { EVALUATION_EVENT_TYPES } from "../../pipelines/evaluation-processing/schemas/constants";
-import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
-import { SIMULATION_RUN_EVENT_TYPES } from "../../pipelines/simulation-processing";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
+import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "@langwatch/experiment-server";
+import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/simulation-contract";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import {
   type BillableEventRecord,
   orgBillableEventsMeterStore,
@@ -24,44 +24,42 @@ export function extractDeduplicationKey(event: Event): string {
  * Reacts to billable event types and extracts a dedup key from the event
  * envelope; the store handles org resolution and ClickHouse insert.
  */
-export const orgBillableEventsMeterProjection: MapProjectionDefinition<
-  BillableEventRecord,
-  Event
-> = {
-  name: "orgBillableEventsMeter",
-  eventTypes: [
-    SPAN_RECEIVED_EVENT_TYPE,
+export const orgBillableEventsMeterProjection: MapProjectionDefinition<BillableEventRecord, Event> =
+  {
+    name: "orgBillableEventsMeter",
+    eventTypes: [
+      SPAN_RECEIVED_EVENT_TYPE,
 
-    // `reported` is the only evaluation event production ever emits (via
-    // reportEvaluation / ReportEvaluationCommand / ExecuteEvaluationCommand).
-    // Its idempotencyKey is `${tenantId}:${evaluationId}:reported`, so retries and
-    // replays collapse to exactly one billable unit per evaluation. The previously
-    // listed `scheduled`/`started` types are never produced outside test presets
-    // (see issue #5124) and are intentionally not subscribed.
-    EVALUATION_EVENT_TYPES.REPORTED,
+      // `reported` is the only evaluation event production ever emits (via
+      // reportEvaluation / ReportEvaluationCommand / ExecuteEvaluationCommand).
+      // Its idempotencyKey is `${tenantId}:${evaluationId}:reported`, so retries and
+      // replays collapse to exactly one billable unit per evaluation. The previously
+      // listed `scheduled`/`started` types are never produced outside test presets
+      // (see issue #5124) and are intentionally not subscribed.
+      EVALUATION_EVENT_TYPES.REPORTED,
 
-    EXPERIMENT_RUN_EVENT_TYPES.STARTED,
-    EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
-    EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
+      EXPERIMENT_RUN_EVENT_TYPES.STARTED,
+      EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
+      EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
 
-    SIMULATION_RUN_EVENT_TYPES.STARTED,
-    SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
-  ],
+      SIMULATION_RUN_EVENT_TYPES.STARTED,
+      SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
+    ],
 
-  options: {
-    groupKeyFn: (event: Event) => `billing:${event.id}`,
-  },
+    options: {
+      groupKeyFn: (event: Event) => `billing:${event.id}`,
+    },
 
-  map(event: Event): BillableEventRecord {
-    return {
-      organizationId: "", // resolved by store
-      tenantId: String(event.tenantId),
-      eventId: event.id,
-      eventType: event.type,
-      deduplicationKey: extractDeduplicationKey(event),
-      eventTimestamp: event.createdAt,
-    };
-  },
+    map(event: Event): BillableEventRecord {
+      return {
+        organizationId: "", // resolved by store
+        tenantId: String(event.tenantId),
+        eventId: event.id,
+        eventType: event.type,
+        deduplicationKey: extractDeduplicationKey(event),
+        eventTimestamp: event.createdAt,
+      };
+    },
 
-  store: orgBillableEventsMeterStore,
-};
+    store: orgBillableEventsMeterStore,
+  };

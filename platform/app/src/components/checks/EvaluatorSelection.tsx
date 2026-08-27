@@ -16,6 +16,7 @@ import type { UseFormReturn } from "react-hook-form";
 import NextLink from "~/utils/compat/next-link";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   AVAILABLE_EVALUATORS,
@@ -23,13 +24,12 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { api } from "../../utils/api";
-import { isFeatureEnabled } from "../../utils/featureFlags";
 import { titleCase } from "../../utils/stringCasing";
 import { Link } from "../ui/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 
-type Category = EvaluatorDefinition<any>["category"];
+type Category = EvaluatorDefinition["category"];
 
 const sortingOrder = [
   // rag,
@@ -59,6 +59,14 @@ export function EvaluatorSelection({
 }) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const betaAnnotationsTrained = useFeatureFlag("release_ui_beta_annotations_trained_enabled", {
+    projectId: project?.id,
+    enabled: !!project,
+  });
+  const betaAnnotationsQueryValue = router.query.NEXT_PUBLIC_FEATURE_BETA_ANNOTATIONS_TRAINED;
+  const betaAnnotationsQueryEnabled = Array.isArray(betaAnnotationsQueryValue)
+    ? betaAnnotationsQueryValue[0] === "1"
+    : betaAnnotationsQueryValue === "1";
 
   const tab = (router.query.tab as Category | undefined) ?? "safety";
 
@@ -100,7 +108,7 @@ export function EvaluatorSelection({
     Array<
       [
         string,
-        EvaluatorDefinition<any> & {
+        EvaluatorDefinition & {
           beta?: boolean;
           missingEnvVars?: string[];
           unavailable?: { reason: string; howToEnable: string };
@@ -111,7 +119,7 @@ export function EvaluatorSelection({
 
   for (const category of categories) {
     availableEvaluatorsPerCategory[category] = availableEvaluators.filter(
-      (entry): entry is [string, EvaluatorDefinition<any>] =>
+      (entry): entry is [string, EvaluatorDefinition] =>
         Array.isArray(entry) &&
         typeof entry[1] === "object" &&
         "category" in entry[1] &&
@@ -119,7 +127,7 @@ export function EvaluatorSelection({
     );
   }
 
-  if (isFeatureEnabled("NEXT_PUBLIC_FEATURE_BETA_ANNOTATIONS_TRAINED")) {
+  if (betaAnnotationsTrained.enabled || betaAnnotationsQueryEnabled) {
     availableEvaluatorsPerCategory.custom!.push([
       "custom",
       {
@@ -295,10 +303,7 @@ export function EvaluatorSelection({
                           </Tooltip>
                         )}
                       <Text>
-                        {evaluator.description.replace(
-                          "Google DLP PII detects",
-                          "Detects",
-                        )}
+                        {evaluator.description.replace("Google DLP PII detects", "Detects")}
                       </Text>
                       <HStack wrap="wrap">
                         {evaluator.requiredFields.includes("contexts") && (

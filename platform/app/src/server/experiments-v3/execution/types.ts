@@ -8,7 +8,7 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
 // ============================================================================
 // Execution Request Types

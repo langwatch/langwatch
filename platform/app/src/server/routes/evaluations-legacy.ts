@@ -45,7 +45,7 @@ import {
 import { appFromContext } from "~/app/api/middleware/app-context";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
-import { evaluatorDisplayName } from "~/server/evaluations/evaluatorDisplayNames";
+import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluationResult,
@@ -53,11 +53,11 @@ import {
   type EvaluatorTypes,
   evaluatorsSchema,
   type SingleEvaluationResult,
-} from "~/server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import {
   type CustomEvaluatorDefinition,
   getEvaluatorDefaultSettings,
-} from "~/server/evaluations/getEvaluator";
+} from "@langwatch/evaluator-contract";
 import {
   type DataForEvaluation,
   runEvaluation,
@@ -70,7 +70,7 @@ import {
 import {
   CODE_EVALUATOR_CHECK_PREFIX,
   codeEvaluatorConfigSchema,
-} from "~/server/evaluators/codeEvaluator";
+} from "@langwatch/evaluator-contract";
 import {
   type ESBatchEvaluation,
   type ESBatchEvaluationRESTParams,
@@ -79,8 +79,8 @@ import {
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
   eSBatchEvaluationTargetTypeSchema,
-} from "~/server/experiments/types";
-import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
+  mapLegacyExperimentTargets,
+} from "@langwatch/experiment-contract";
 import { getPayloadSizeHistogram } from "~/server/metrics";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
@@ -91,7 +91,11 @@ import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationName
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import {
+  DEFAULT_EMBEDDINGS_MODEL,
+  DEFAULT_MODEL,
+  KSUID_RESOURCES,
+} from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
@@ -717,6 +721,7 @@ secured.access(legacyEvaluationAuth).post(
         modelProviders: c.app.modelProviders,
         managedProviders: c.app.managedProviders,
         workflows: c.app.workflows,
+        evaluators: c.app.evaluators,
       });
     } catch (error) {
       result = {
@@ -1273,6 +1278,10 @@ async function handleEvaluatorCall(
         ? getEvaluatorDefaultSettings(
             evaluatorDefinition,
             await resolveEvaluatorSettingsDefaults(project.id, c.app.modelProviders),
+            {
+              defaultModel: DEFAULT_MODEL,
+              embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
+            },
           )
         : {}),
       ...(settings as Record<string, unknown>),
@@ -1407,6 +1416,7 @@ async function handleEvaluatorCall(
       modelProviders: c.app.modelProviders,
       managedProviders: c.app.managedProviders,
       workflows: c.app.workflows,
+      evaluators: c.app.evaluators,
     });
 
   try {
@@ -1602,7 +1612,7 @@ const dispatchToClickHouse = async (
   batchEvaluation: ESBatchEvaluation,
 ): Promise<void> => {
   const { run_id: runId } = batchEvaluation;
-  const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
+  const targets = mapLegacyExperimentTargets(batchEvaluation.targets ?? []);
 
   try {
     await app.experiments.startExperimentRun({

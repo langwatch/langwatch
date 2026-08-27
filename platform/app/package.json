@@ -57,7 +57,7 @@
     "seed:langy-prompts": "tsx --env-file-if-exists=../../.env --env-file-if-exists=../../.env.portless scripts/seed-langy-prompts.ts",
     "clickhouse:migrate": "sh -c 'if [ \"$SKIP_CLICKHOUSE_MIGRATE\" != \"true\" ]; then pnpm run task clickhouseMigrate; else echo \"Skipping ClickHouse migrations\"; fi'",
     "lwql:provision": "sh -c 'if [ \"$SKIP_LWQL_PROVISION\" != \"true\" ]; then pnpm run task provisionLwql; else echo \"Skipping LangWatchQL provisioning\"; fi'",
-    "copy:langevals-types": "cp ../../services/langevals/ts-integration/evaluators.generated.ts src/server/evaluations/evaluators.generated.ts",
+    "copy:langevals-types": "cp ../../services/langevals/ts-integration/evaluators.generated.ts ../../packages/features/evaluator/contract/src/evaluators.generated.ts",
     "tsc-watch": "tsc --noEmit --watch",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",

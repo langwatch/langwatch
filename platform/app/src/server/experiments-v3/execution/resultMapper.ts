@@ -17,7 +17,7 @@ import {
   type StudioServerEvent,
 } from "@langwatch/workflow-contract";
 import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   type EvaluationV3EvaluatorResult,
   type EvaluationV3Event,

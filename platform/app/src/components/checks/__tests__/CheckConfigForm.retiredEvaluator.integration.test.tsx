@@ -41,9 +41,8 @@ vi.mock("~/utils/compat/next-link", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-// Reads server-only env, which is not reachable from a jsdom render.
-vi.mock("~/utils/featureFlags", () => ({
-  isFeatureEnabled: () => false,
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
 // tRPC is the boundary. The form's subtree reaches dozens of procedures that
@@ -135,9 +134,7 @@ describe("<CheckConfigForm/>", () => {
       it("names the retired evaluator and asks for a replacement", () => {
         renderForm(RETIRED_CHECK_TYPE);
 
-        expect(
-          screen.getByText("This evaluator is no longer available"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("This evaluator is no longer available")).toBeInTheDocument();
         expect(screen.getByText(new RegExp(RETIRED_CHECK_TYPE))).toBeInTheDocument();
       });
 
@@ -157,9 +154,7 @@ describe("<CheckConfigForm/>", () => {
         renderForm("ragas/faithfulness");
 
         expect(screen.getByText("Ragas Faithfulness")).toBeInTheDocument();
-        expect(
-          screen.queryByText("This evaluator is no longer available"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("This evaluator is no longer available")).not.toBeInTheDocument();
       });
     });
   });

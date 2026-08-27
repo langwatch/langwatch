@@ -730,6 +730,7 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
       modelProviders: c.app.modelProviders,
       managedProviders: c.app.managedProviders,
       workflows: c.app.workflows,
+      evaluators: c.app.evaluators,
     }),
   ).check({
     projectId: parsed.data.project_id,

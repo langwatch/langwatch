@@ -20,7 +20,7 @@ import type {
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
-} from "../evaluations/evaluators.generated";
+} from "@langwatch/evaluator-contract";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
 

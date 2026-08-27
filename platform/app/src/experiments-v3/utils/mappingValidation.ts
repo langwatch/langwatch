@@ -8,7 +8,7 @@
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "~/server/evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import type { EvaluatorConfig, TargetConfig } from "../types";
 import { isGoldenFieldSatisfied } from "../types";
 import { extractVariablesFromBodyTemplate } from "./httpAgentUtils";

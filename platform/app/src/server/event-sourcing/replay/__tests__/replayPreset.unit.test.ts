@@ -26,21 +26,14 @@ vi.mock("@langwatch/evaluation-server", () => ({
   },
 }));
 
-vi.mock("../../pipelines/experiment-run-processing/projections/experimentRunState.store", () => ({
+vi.mock("@langwatch/experiment-server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/experiment-server")>()),
   createExperimentRunStateFoldStore: vi.fn(() => ({})),
+  ExperimentRunStateRepositoryClickHouse: class {},
 }));
 
-vi.mock(
-  "../../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository",
-  () => ({ ExperimentRunStateRepositoryClickHouse: class {} }),
-);
-
-vi.mock(
-  "../../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository",
-  () => ({ SimulationRunStateRepositoryClickHouse: class {} }),
-);
-
-vi.mock("../../pipelines/simulation-processing/schemas/constants", () => ({
+vi.mock("@langwatch/simulation-server", () => ({
+  SimulationRunStateRepositoryClickHouse: class {},
   SIMULATION_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
 }));
 
@@ -50,7 +43,7 @@ vi.mock("~/runtime/app/features/suite", () => ({
   },
 }));
 
-vi.mock("../../pipelines/suite-run-processing/schemas/constants", () => ({
+vi.mock("@langwatch/suite-server", () => ({
   SUITE_RUN_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
 }));
 

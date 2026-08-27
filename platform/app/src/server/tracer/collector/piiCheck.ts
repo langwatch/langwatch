@@ -8,9 +8,9 @@ import {
   type ProtectedRange,
   subtractProtectedRanges,
 } from "~/server/data-privacy/redaction/essentialPii";
-import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 import { env } from "../../../env.mjs";
-import type { BatchEvaluationResult } from "../../evaluations/evaluators";
+import type { BatchEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,

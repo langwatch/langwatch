@@ -41,12 +41,12 @@ import {
 } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { getApp } from "~/server/app-layer/app";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type {
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
-} from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
-import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
+  ESBatchEvaluationTarget,
+} from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { estimateCost, getMatchingLLMModelCost } from "~/server/tracer/collector/cost";
 import { KSUID_RESOURCES } from "~/utils/constants";

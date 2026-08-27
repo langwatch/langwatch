@@ -30,12 +30,18 @@ type HttpNodeData = {
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { buildHttpNodeParameters } from "@langwatch/agent-contract";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
 import { buildWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ChatMessage } from "~/server/tracer/types";
-import type { ExecutionCell, WorkflowBuilderInput, WorkflowBuilderOutput } from "./types";
+import type {
+  ExecutionCell,
+  WorkflowBuilderInput,
+  WorkflowBuilderOutput,
+} from "./types";
 
 // ============================================================================
 // Main Workflow Builder

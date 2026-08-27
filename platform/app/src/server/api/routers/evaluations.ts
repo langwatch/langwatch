@@ -14,7 +14,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   evaluatorsSchema,
-} from "../../evaluations/evaluators";
+} from "@langwatch/evaluator-contract";
 import { evaluatorUnavailability } from "../../evaluations/installedEvaluators";
 import { runEvaluationForTrace } from "../../evaluations/runEvaluation";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
@@ -93,6 +93,7 @@ export const evaluationsRouter = createTRPCRouter({
         modelProviders: ctx.app.modelProviders,
         managedProviders: ctx.app.managedProviders,
         workflows: ctx.app.workflows,
+        evaluators: ctx.app.evaluators,
         traceCanonicalisation: ctx.app.traces.canonicalisation,
       });
 
