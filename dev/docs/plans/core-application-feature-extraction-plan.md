@@ -23,6 +23,11 @@ lane concurrently owns API, Secret, Agent server/composition, and backend
 transport lint changes. Each lane must commit before integration; reconcile the
 shared `pnpm-lock.yaml` and this ledger after both checkpoints exist.
 
+Frontend checkpoint: `1d3e93022f` owns the Prompt boundary and lint,
+`897622d6b0` owns the exact shell and Storybook, and `cad35bcd19` contains only
+Oxfmt changes to touched legacy callers. Integration is waiting for the backend
+lane's clean commit.
+
 Integration note for the concurrent Agent UI work: browser RPC ports and
 adapters belong under `apps/ui/src/platform/agent`, not directly under
 `apps/ui/src`. Update their exports and tests during reconciliation; the new
