@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed baseline:** `b1599b2080`
+**Committed baseline:** `a2bdd16fd1`
 
 **Goal:** delete `platform/app`.
 
@@ -24,13 +24,16 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Ledger item                                          |       Count | Status                                |
 | ---------------------------------------------------- | ----------: | ------------------------------------- |
 | Original application baseline                       | 6,398 files | Reference                             |
-| Committed `platform/app` at `b1599b2080`             | 6,065 files | Authoritative current progress        |
-| Current physical tree from `rg --files platform/app` | 5,909 files | Working-tree queue only; not progress |
+| Committed `platform/app` at `a2bdd16fd1`             | 6,012 files | Authoritative current progress        |
+| Current physical tree from `rg --files platform/app` | 5,898 files | Working-tree queue only; not progress |
 | Automation cut                                       |    73 fewer | Committed                             |
 | Coding Agent/GitHub cut                              |    36 fewer | Committed                             |
 | Trace processing cut                                 |    45 fewer | Committed                             |
 | Evaluation processing cut                            |    42 fewer | Committed                             |
 | Langy application cut                                |    37 fewer | Committed                             |
+| Model Provider application cut                       |    45 fewer | Committed                             |
+| Workflow application cut                             |     3 fewer | Committed                             |
+| Feature-web and Ops composition cuts                 |     5 fewer | Committed                             |
 
 The Automation contract, server and web packages have 559 passing tests, and
 their displaced application roots are empty. Coding Agent/GitHub has 266
@@ -50,6 +53,7 @@ cutovers remain explicit ledger work.
 | Trace reads   | At committed `HEAD`, `server/app-layer/traces` and `server/traces` remain large and are not one safe move. The 11-file projection-persistence cut is active.                                                                                                            | Cut dependency-closed read cohorts while preserving every response field and keeping `trace_analytics`, `trace_summaries` and timeseries rollups distinct. |
 | Evaluation    | Evaluation processing is committed at `d4f11f4da7`: 67 files, `+1,304/-8,875`, for a net 42-file application reduction. Package implementation is checkpointed separately at `48585548d6`.                                                                            | Prove the focused package/app checks, then drain remaining execution, evaluator, monitor and transport callers without collapsing the distinct Evaluation/Evaluator/Monitor/Experiment/Scenario/Simulation/Suite owners. |
 | Langy         | Langy package work is committed at `086250abca`; its 120-file application cut is committed at `b1599b2080`: `+1,001/-10,163`, for a net 37-file application reduction.                                                                                               | Prove the focused feature/app checks, then move the remaining eventing pipeline and UI composition without restoring app-layer services. |
+| Model Provider | Model Provider package work is committed at `435d8711d0`; its 130-file application cut is committed at `14fc0f4282`: `+1,315/-30,905`, for a net 45-file application reduction.                                                                                      | Prove the focused feature/app checks, then move the remaining UI and process composition without restoring the deleted repositories, catalogue or service. |
 | Gateway       | Gateway package implementation is checkpointed at `9b03f579ee`; the application cutover is active.                                                                                                                                                                   | Rewire the composed service graph, preserve money/auth/query behavior and delete the displaced Gateway, virtual-key, spend and realtime implementation. |
 | API framework | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                          | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first. |
 
