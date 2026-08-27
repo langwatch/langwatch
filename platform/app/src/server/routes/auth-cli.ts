@@ -39,8 +39,7 @@ import {
   PersonalVirtualKeyAlreadyExistsError,
   PersonalWorkspaceMissingError,
   RoutingPolicyHasNoProvidersError,
-  type GovernanceIngestionKeyService,
-  type GovernancePersonalVirtualKeyService,
+  type GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { createLogger } from "@langwatch/observability";
@@ -59,7 +58,6 @@ import {
 
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { featureFlagService } from "~/server/featureFlag";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 
 type CliContext = Context<{ Variables: AppContextVariables }>;
@@ -113,10 +111,7 @@ function positiveIntFromEnv(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
   const parsed = Number(raw);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    logger.warn(
-      { raw, fallback },
-      "ignoring invalid CLI token TTL override; using the default",
-    );
+    logger.warn({ raw, fallback }, "ignoring invalid CLI token TTL override; using the default");
     return fallback;
   }
   return parsed;
@@ -405,8 +400,7 @@ async function refuseProjectKeyHandout(
     return c.json(
       {
         error: "forbidden",
-        error_description:
-          "You need write access to this project to retrieve its API key.",
+        error_description: "You need write access to this project to retrieve its API key.",
       },
       403,
     );
@@ -551,9 +545,7 @@ const deviceCodeRequestSchema = z.object({
    * `device_session` so older CLIs that pre-date the no-paste convergence
    * keep working unchanged (their /exchange response shape is also unchanged).
    */
-  credential_type: z
-    .enum(["device_session", "project_api_key"])
-    .default("device_session"),
+  credential_type: z.enum(["device_session", "project_api_key"]).default("device_session"),
 });
 
 secured.access(CLI_POLICY).post("/device-code", async (c: CliContext) => {
@@ -684,10 +676,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
     // when keys differ in hash slot.
     await redis.del(deviceCodeKey(device_code));
     await redis.del(userCodeKey(record.user_code));
-    return c.json(
-      { error: "expired_token", error_description: "Device code expired" },
-      408,
-    );
+    return c.json({ error: "expired_token", error_description: "Device code expired" }, 408);
   }
 
   if (record.status === "denied") {
@@ -814,9 +803,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
     // CLI never has to ask the user for one. Best-effort: a workspace
     // failure must not fail the login itself, and older CLIs ignore the
     // extra field.
-    let personalProject:
-      | { id: string; slug: string; name: string; api_key: string }
-      | undefined;
+    let personalProject: { id: string; slug: string; name: string; api_key: string } | undefined;
     try {
       const workspace = await c.var.langwatchApp.organizations.ensurePersonalWorkspace({
         userId: user.id,
@@ -846,9 +833,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
     // credentials.
     let cliApiKey: string | undefined;
     let cliApiKeyId: string | undefined;
-    let cliApiKeyScope:
-      | { kind: "organization" | "projects"; project_ids: string[] }
-      | undefined;
+    let cliApiKeyScope: { kind: "organization" | "projects"; project_ids: string[] } | undefined;
     if (record.key_selection) {
       // Same normalization the other label paths use, and the user-chosen
       // label wins over the machine hostname. The value names the key AND
@@ -999,17 +984,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
   }
 
   if (record.status === "expired") {
-    return c.json(
-      { error: "expired_token", error_description: "Device code expired" },
-      408,
-    );
+    return c.json({ error: "expired_token", error_description: "Device code expired" }, 408);
   }
 
   // Defensive: unrecognised status.
-  return c.json(
-    { error: "server_error", error_description: "Unknown device code state" },
-    500,
-  );
+  return c.json({ error: "server_error", error_description: "Unknown device code state" }, 500);
 });
 
 // ---------------------------------------------------------------------------
@@ -1227,7 +1206,7 @@ secured.access(CLI_POLICY).get("/budget/status", async (c: CliContext) => {
 
   // Resolve the user's personal VK. Same graceful-fallback rationale —
   // no VK means no traffic flowing, nothing to block on.
-  const vks = await c.var.langwatchApp.governance.personalVirtualKeys.list({
+  const vks = await c.var.langwatchApp.governance.personalVirtualKeyList({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1295,7 +1274,7 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: CliContext) => {
       401,
     );
   }
-  const result = await c.var.langwatchApp.governance.cliBootstrap.resolve({
+  const result = await c.var.langwatchApp.governance.cliBootstrapResolve({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1323,7 +1302,7 @@ secured.access(CLI_POLICY).get("/budget-overview", async (c: CliContext) => {
       401,
     );
   }
-  const result = await c.var.langwatchApp.gateway.budgetOverview.overviewForUser({
+  const result = await c.var.langwatchApp.governance.personalBudgetOverviewForUser({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -1465,7 +1444,7 @@ secured.access(CLI_POLICY).post("/virtual-key", async (c: CliContext) => {
     where: { id: tokenRecord.user_id },
     select: { name: true, email: true },
   });
-  const service = c.var.langwatchApp.governance.personalVirtualKeys;
+  const service = c.var.langwatchApp.governance;
 
   try {
     const issued = await issuePersonalVirtualKey({
@@ -1502,10 +1481,7 @@ function virtualKeyFailureResponse(
   err: unknown,
   tokenRecord: AccessTokenRecord,
 ): Response {
-  if (
-    err instanceof NoEligibleProvidersError ||
-    err instanceof RoutingPolicyHasNoProvidersError
-  ) {
+  if (err instanceof NoEligibleProvidersError || err instanceof RoutingPolicyHasNoProvidersError) {
     logger.info(
       {
         userId: tokenRecord.user_id,
@@ -1554,7 +1530,7 @@ async function issuePersonalVirtualKey({
   displayEmail,
   deviceLabel,
 }: {
-  service: GovernancePersonalVirtualKeyService;
+  service: GovernanceService;
   organizations: OrganizationService;
   userId: string;
   organizationId: string;
@@ -1563,7 +1539,7 @@ async function issuePersonalVirtualKey({
   deviceLabel: string | null;
 }) {
   try {
-    return await service.ensureDefault({
+    return await service.personalVirtualKeyEnsureDefault({
       userId,
       organizationId,
       displayName,
@@ -1580,7 +1556,7 @@ async function issuePersonalVirtualKey({
     displayEmail,
   });
   const suffix = deviceLabel ?? randomBytes(3).toString("hex");
-  return await service.issue({
+  return await service.personalVirtualKeyIssue({
     userId,
     organizationId,
     personalProjectId: workspace.project.id,
@@ -1625,10 +1601,7 @@ secured.access(CLI_POLICY).post("/project-key", async (c: CliContext) => {
   const body = await c.req.json().catch(() => ({}));
   const parsed = projectKeyRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json(
-      { error: "invalid_request", error_description: "slug is required" },
-      400,
-    );
+    return c.json({ error: "invalid_request", error_description: "slug is required" }, 400);
   }
   const project = await prisma.project.findFirst({
     where: {
@@ -1753,15 +1726,12 @@ secured.access(cliIngestionSourcesAuth).get("/governance/ingest/sources", async 
     ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   );
   if (gate) return gate;
-  const denied = await ensureGovernancePermissionOr403(
-    c,
-    tokenRecord,
-    "ingestionSources:view",
-  );
+  const denied = await ensureGovernancePermissionOr403(c, tokenRecord, "ingestionSources:view");
   if (denied) return denied;
   const includeArchived = c.req.query("include_archived") === "1";
-  const service = c.var.langwatchApp.governance.ingestionSources;
-  const sources = await service.list(tokenRecord.organization_id);
+  const sources = await c.var.langwatchApp.governance.ingestionSourceList(
+    tokenRecord.organization_id,
+  );
   const filtered = includeArchived
     ? sources
     : sources.filter((s: { archivedAt: Date | null }) => s.archivedAt === null);
@@ -1779,108 +1749,98 @@ secured.access(cliIngestionSourcesAuth).get("/governance/ingest/sources", async 
   });
 });
 
-secured
-  .access(cliActivityMonitorAuth)
-  .get("/governance/ingest/sources/:id/events", async (c) => {
-    const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
-    if (!tokenRecord) {
-      return c.json(
-        {
-          error: "unauthorized",
-          error_description: "Bearer access token is missing, malformed, or expired",
-        },
-        401,
-      );
-    }
-    const gate = await ensureEnterpriseOr402(
-      c,
-      tokenRecord.organization_id,
-      ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
+secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/events", async (c) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description: "Bearer access token is missing, malformed, or expired",
+      },
+      401,
     );
-    if (gate) return gate;
-    const denied = await ensureGovernancePermissionOr403(
-      c,
-      tokenRecord,
-      "activityMonitor:view",
+  }
+  const gate = await ensureEnterpriseOr402(
+    c,
+    tokenRecord.organization_id,
+    ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
+  );
+  if (gate) return gate;
+  const denied = await ensureGovernancePermissionOr403(c, tokenRecord, "activityMonitor:view");
+  if (denied) return denied;
+  const sourceId = c.req.param("id");
+  if (!sourceId) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "source id is required",
+      },
+      400,
     );
-    if (denied) return denied;
-    const sourceId = c.req.param("id");
-    if (!sourceId) {
-      return c.json(
-        {
-          error: "invalid_request",
-          error_description: "source id is required",
-        },
-        400,
-      );
-    }
-    const limitRaw = c.req.query("limit");
-    const beforeIso = c.req.query("before_iso") ?? undefined;
-    const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
+  }
+  const limitRaw = c.req.query("limit");
+  const beforeIso = c.req.query("before_iso") ?? undefined;
+  const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
 
-    // Defensive ownership check before hitting CH — prevents the
-    // "querying any source-id with a valid bearer" footgun even
-    // though ActivityMonitorService also filters by OrganizationId.
-    const sourceService = c.var.langwatchApp.governance.ingestionSources;
-    const source = await sourceService.getById(sourceId, tokenRecord.organization_id);
+  // Defensive ownership check before hitting CH — prevents the
+  // "querying any source-id with a valid bearer" footgun even
+  // though ActivityMonitorService also filters by OrganizationId.
+  const source = await c.var.langwatchApp.governance.ingestionSourceGetById(
+    sourceId,
+    tokenRecord.organization_id,
+  );
 
-    const monitor = c.var.langwatchApp.governance.activity;
-    const events = await monitor.eventsForSource({
-      organizationId: tokenRecord.organization_id,
-      sourceId,
-      limit,
-      beforeIso,
-    });
-    return c.json({ events });
+  const events = await c.var.langwatchApp.governance.activityEventsForSource({
+    organizationId: tokenRecord.organization_id,
+    sourceId,
+    limit,
+    beforeIso,
   });
+  return c.json({ events });
+});
 
-secured
-  .access(cliActivityMonitorAuth)
-  .get("/governance/ingest/sources/:id/health", async (c) => {
-    const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
-    if (!tokenRecord) {
-      return c.json(
-        {
-          error: "unauthorized",
-          error_description: "Bearer access token is missing, malformed, or expired",
-        },
-        401,
-      );
-    }
-    const gate = await ensureEnterpriseOr402(
-      c,
-      tokenRecord.organization_id,
-      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/health", async (c) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description: "Bearer access token is missing, malformed, or expired",
+      },
+      401,
     );
-    if (gate) return gate;
-    const denied = await ensureGovernancePermissionOr403(
-      c,
-      tokenRecord,
-      "activityMonitor:view",
+  }
+  const gate = await ensureEnterpriseOr402(
+    c,
+    tokenRecord.organization_id,
+    ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+  );
+  if (gate) return gate;
+  const denied = await ensureGovernancePermissionOr403(c, tokenRecord, "activityMonitor:view");
+  if (denied) return denied;
+  const sourceId = c.req.param("id");
+  if (!sourceId) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "source id is required",
+      },
+      400,
     );
-    if (denied) return denied;
-    const sourceId = c.req.param("id");
-    if (!sourceId) {
-      return c.json(
-        {
-          error: "invalid_request",
-          error_description: "source id is required",
-        },
-        400,
-      );
-    }
-    const sourceService = c.var.langwatchApp.governance.ingestionSources;
-    const source = await sourceService.getById(sourceId, tokenRecord.organization_id);
-    const monitor = c.var.langwatchApp.governance.activity;
-    const health = await monitor.sourceHealthMetrics({
-      organizationId: tokenRecord.organization_id,
-      sourceId,
-    });
-    return c.json({
-      source: { id: source.id, name: source.name, status: source.status },
-      health,
-    });
+  }
+  const source = await c.var.langwatchApp.governance.ingestionSourceGetById(
+    sourceId,
+    tokenRecord.organization_id,
+  );
+  const health = await c.var.langwatchApp.governance.activitySourceHealthMetrics({
+    organizationId: tokenRecord.organization_id,
+    sourceId,
   });
+  return c.json({
+    source: { id: source.id, name: source.name, status: source.status },
+    health,
+  });
+});
 
 secured.access(CLI_POLICY).get("/governance/status", async (c: CliContext) => {
   const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
@@ -1899,9 +1859,7 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: CliContext) => {
     ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   );
   if (gate) return gate;
-  const setup = await c.var.langwatchApp.governance.setupState.resolve(
-    tokenRecord.organization_id,
-  );
+  const setup = await c.var.langwatchApp.governance.resolveSetupState(tokenRecord.organization_id);
   return c.json({ setup });
 });
 
@@ -1929,8 +1887,7 @@ secured.access(CLI_POLICY).get("/governance/ingestion-templates", async (c) => {
       401,
     );
   }
-  const service = c.var.langwatchApp.governance.ingestionTemplates;
-  const rows = await service.listForUser({
+  const rows = await c.var.langwatchApp.governance.templateListForUser({
     organizationId: tokenRecord.organization_id,
   });
   return c.json({
@@ -1953,36 +1910,16 @@ secured.access(CLI_POLICY).get("/governance/ingestion-templates", async (c) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/cli/governance/ingestion-key
 // ---------------------------------------------------------------------------
-// Mints an ingestion key for the device-session caller. The unified
-// `langwatch <tool>` CLI Path B calls this to obtain a write-only `ik-lw-`
-// token + the OTLP endpoint, then points the tool's OTLP exporter at it.
-// `source_type` carries the tool slug stamped as `langwatch.source`
-// provenance.
+// Mints a write-only `ik-lw-` key and OTLP endpoint for the device-session
+// caller. `source_type` is stored as `langwatch.source` provenance.
 //
-// Body: { source_type, project?, device_label? }.
+// Without `project`, rotate the key for the caller's personal project. With
+// an authorised project id/slug, create a key for that project instead so
+// separate machines can retain their own key. Both return `/api/otel`.
 //
-//   - Without `project`: the caller's personal project, rotating in place, so
-//     one user never accumulates keys for a tool. Returns
-//     { token, prefix, endpoint }.
-//   - With `project` (a project id or slug inside the caller's organization):
-//     that project, create-only, so two machines instrumenting the same
-//     repository each keep a working token. The caller needs `traces:create`
-//     on the project. Returns { token, prefix, endpoint, project }.
-//
-// `endpoint` is `${baseUrl}/api/otel` on both branches.
-//
-// Both branches refuse with 403 `direct_otel_not_allowed` when the caller's
-// organization turned the direct-OTLP path off for the tool `source_type`
-// declares. The declaration is what the policy reads, and it is caller-
-// controlled, so the check is a backstop for compliant clients (an old CLI,
-// a stale cached policy, a hand-run of the documented flow), not an
-// isolation boundary: a caller who declares another source type still
-// mints, because types outside the wrapped-tool set are a supported input
-// here (`copilot_app`, ingestion templates, SDK sources) and a minted key
-// carries only the `traces:create` the caller already holds. The receiver
-// stamps `langwatch.source` provenance from the key's stored source type,
-// so an export sent through a key minted under another tool's name stays
-// attributable to that key and the device that minted it.
+// A disabled direct-OTLP policy returns `direct_otel_not_allowed`. Source type
+// is caller input and therefore a policy backstop, not a tenant boundary; the
+// issued key still carries only the caller's existing `traces:create` grant.
 // ---------------------------------------------------------------------------
 const mintIngestionKeySchema = z.object({
   source_type: z.string().min(1),
@@ -2051,7 +1988,7 @@ async function mintProjectIngestionKey(
     deviceLabel,
   }: {
     tokenRecord: AccessTokenRecord;
-    service: GovernanceIngestionKeyService;
+    service: GovernanceService;
     projectRef: string;
     sourceType: string;
     deviceLabel: string | null;
@@ -2103,7 +2040,7 @@ async function mintProjectIngestionKey(
   }
 
   try {
-    const result = await service.issueForProject({
+    const result = await service.ingestionKeyIssueForProject({
       callerUserId: tokenRecord.user_id,
       // A shared project's key is an org service key, owned by nobody, so it
       // stays visible to the whole team. The caller's own personal workspace
@@ -2183,14 +2120,11 @@ secured.access(CLI_POLICY).post("/governance/ingestion-key", async (c: CliContex
   // `Object.hasOwn` and not a plain lookup: the key is request-controlled,
   // so `"toString"` would otherwise resolve an inherited function, pass a
   // truthy check, and index the policy map with nothing.
-  const policedSlug = Object.hasOwn(
-    PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
-    parsed.data.source_type,
-  )
+  const policedSlug = Object.hasOwn(PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE, parsed.data.source_type)
     ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
     : undefined;
   if (policedSlug) {
-    const policy = await c.var.langwatchApp.governance.aiTools.resolveToolPolicy({
+    const policy = await c.var.langwatchApp.governance.aiToolResolvePolicy({
       organizationId: tokenRecord.organization_id,
       userId: tokenRecord.user_id,
       slug: policedSlug,
@@ -2206,7 +2140,7 @@ secured.access(CLI_POLICY).post("/governance/ingestion-key", async (c: CliContex
     }
   }
 
-  const service = c.var.langwatchApp.governance.ingestionKeys;
+  const service = c.var.langwatchApp.governance;
 
   if (parsed.data.project) {
     return await mintProjectIngestionKey(c, {
@@ -2237,12 +2171,12 @@ async function mintPersonalIngestionKey(
     sourceType,
   }: {
     tokenRecord: AccessTokenRecord;
-    service: GovernanceIngestionKeyService;
+    service: GovernanceService;
     sourceType: string;
   },
 ): Promise<Response> {
   try {
-    const result = await service.ensureForPersonalProject({
+    const result = await service.ingestionKeyEnsureForPersonalProject({
       userId: tokenRecord.user_id,
       organizationId: tokenRecord.organization_id,
       sourceType,
@@ -2250,9 +2184,7 @@ async function mintPersonalIngestionKey(
       // can attribute it. Falls back to the hostname when the CLI sent no
       // explicit label; null for CLIs that predate device metadata.
       createdByDeviceLabel:
-        tokenRecord.client_info?.device_label ??
-        tokenRecord.client_info?.hostname ??
-        null,
+        tokenRecord.client_info?.device_label ?? tokenRecord.client_info?.hostname ?? null,
     });
     return c.json(
       {
@@ -2272,8 +2204,7 @@ async function mintPersonalIngestionKey(
       return c.json(
         {
           error: "precondition_failed",
-          error_description:
-            "Sign in to a personal workspace before issuing an ingestion key.",
+          error_description: "Sign in to a personal workspace before issuing an ingestion key.",
         },
         412,
       );
@@ -2319,7 +2250,7 @@ secured.access(CLI_POLICY).get("/governance/ingestion-keys", async (c: CliContex
       401,
     );
   }
-  const keys = await c.var.langwatchApp.governance.ingestionKeys.listForPersonalProject({
+  const keys = await c.var.langwatchApp.governance.ingestionKeyListForPersonalProject({
     userId: tokenRecord.user_id,
     organizationId: tokenRecord.organization_id,
   });
@@ -2346,17 +2277,11 @@ secured.access(CLI_POLICY).get("/governance/ingestion-keys", async (c: CliContex
 secured.access(CLI_POLICY).get("/lookup", async (c: CliContext) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
-    return c.json(
-      { error: "unauthorized", error_description: "Sign in to continue" },
-      401,
-    );
+    return c.json({ error: "unauthorized", error_description: "Sign in to continue" }, 401);
   }
   const userCode = c.req.query("user_code");
   if (!userCode) {
-    return c.json(
-      { error: "invalid_request", error_description: "user_code is required" },
-      400,
-    );
+    return c.json({ error: "invalid_request", error_description: "user_code is required" }, 400);
   }
   const record = await findDeviceCodeByUserCode(userCode);
   if (!record) {
@@ -2440,10 +2365,7 @@ const approveRequestSchema = z.object({
 secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
-    return c.json(
-      { error: "unauthorized", error_description: "Sign in to continue" },
-      401,
-    );
+    return c.json({ error: "unauthorized", error_description: "Sign in to continue" }, 401);
   }
 
   const body = await c.req.json().catch(() => ({}));
@@ -2504,8 +2426,7 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
       return c.json(
         {
           error: "invalid_request",
-          error_description:
-            "project_id is required when credential_type is project_api_key",
+          error_description: "project_id is required when credential_type is project_api_key",
         },
         400,
       );
@@ -2588,11 +2509,11 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
   // login, which writes a real project's API key to `.env`; the
   // device-session flow silently capturing evaluations into a personal
   // project (customer report) stays impossible for gated orgs.
-  const governanceEnabled = await featureFlagService
+  const governanceEnabled = await c.app.featureFlags
     .isEnabled("release_ui_ai_governance_enabled", {
-      distinctId: session.user.id,
+      kind: "organization",
+      userId: session.user.id,
       organizationId: organization_id,
-      defaultValue: true,
     })
     .catch(() => true);
   if (!governanceEnabled) {
@@ -2679,18 +2600,12 @@ const denyRequestSchema = z.object({ user_code: z.string().min(1) });
 secured.access(CLI_POLICY).post("/deny", async (c: CliContext) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
-    return c.json(
-      { error: "unauthorized", error_description: "Sign in to continue" },
-      401,
-    );
+    return c.json({ error: "unauthorized", error_description: "Sign in to continue" }, 401);
   }
   const body = await c.req.json().catch(() => ({}));
   const parsed = denyRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json(
-      { error: "invalid_request", error_description: "user_code is required" },
-      400,
-    );
+    return c.json({ error: "invalid_request", error_description: "user_code is required" }, 400);
   }
   const record = await findDeviceCodeByUserCode(parsed.data.user_code);
   if (!record) {
@@ -2732,9 +2647,7 @@ secured.access(CLI_POLICY).post("/logout", async (c: CliContext) => {
   // /exchange minted for this session, which logout revokes alongside the
   // tokens so the wiped config leaves no live credential behind.
   const [refreshRaw, accessRaw] = await Promise.all([
-    parsed.data.refresh_token
-      ? redis.get(refreshTokenKey(parsed.data.refresh_token))
-      : null,
+    parsed.data.refresh_token ? redis.get(refreshTokenKey(parsed.data.refresh_token)) : null,
     parsed.data.access_token ? redis.get(accessTokenKey(parsed.data.access_token)) : null,
   ]);
 
@@ -2747,10 +2660,7 @@ secured.access(CLI_POLICY).post("/logout", async (c: CliContext) => {
   }
   await ops.exec();
 
-  await revokeCliKeysFromTokenRecords(c.var.langwatchApp.apiKeys, [
-    refreshRaw,
-    accessRaw,
-  ]);
+  await revokeCliKeysFromTokenRecords(c.var.langwatchApp.apiKeys, [refreshRaw, accessRaw]);
 
   return c.json({ ok: true });
 });
@@ -2803,9 +2713,7 @@ export const app = secured.hono;
  * Look up a device-code record by its short user_code (the 8-char form
  * the user types in the browser). Returns null if unknown / expired.
  */
-export async function findDeviceCodeByUserCode(
-  userCode: string,
-): Promise<DeviceCodeRecord | null> {
+export async function findDeviceCodeByUserCode(userCode: string): Promise<DeviceCodeRecord | null> {
   const redis = getRedis();
   const deviceCode = await redis.get(userCodeKey(userCode.toUpperCase()));
   if (!deviceCode) return null;
@@ -2864,12 +2772,7 @@ export async function approveDeviceCode({
   // Preserve original TTL by computing remaining seconds.
   const remainingMs = Math.max(1000, record.expires_at - Date.now());
   const remainingSeconds = Math.ceil(remainingMs / 1000);
-  await redis.set(
-    deviceCodeKey(deviceCode),
-    JSON.stringify(updated),
-    "EX",
-    remainingSeconds,
-  );
+  await redis.set(deviceCodeKey(deviceCode), JSON.stringify(updated), "EX", remainingSeconds);
   return { approved: true };
 }
 

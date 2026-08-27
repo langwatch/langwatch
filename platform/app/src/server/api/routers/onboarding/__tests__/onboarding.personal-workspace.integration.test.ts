@@ -19,7 +19,7 @@
  * Spec: specs/features/onboarding/intent-fork.feature
  *       specs/ai-governance/personal-portal/default-catalog.feature
  */
-import { STARTER_PACK_TILES } from "@ee/governance/services/aiToolEntry.service";
+import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
@@ -175,7 +175,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
         orderBy: { order: "asc" },
       });
 
-      expect(tiles.map((t) => t.slug)).toEqual(STARTER_PACK_TILES.map((t) => t.slug));
+      expect(tiles.map((t) => t.slug)).toEqual(AI_TOOL_STARTER_TILES.map((t) => t.slug));
       expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
 
@@ -240,7 +240,7 @@ describe("onboarding.initializeOrganization personal workspace", () => {
         orderBy: { order: "asc" },
       });
 
-      expect(tiles.map((t) => t.slug)).toEqual(STARTER_PACK_TILES.map((t) => t.slug));
+      expect(tiles.map((t) => t.slug)).toEqual(AI_TOOL_STARTER_TILES.map((t) => t.slug));
       expect(tiles.every((t) => t.enabled && t.archivedAt === null)).toBe(true);
     });
   });

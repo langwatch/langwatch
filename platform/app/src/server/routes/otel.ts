@@ -33,7 +33,7 @@ import {
 import type { App } from "~/server/app-layer/app";
 import { PlanLimitExceededError } from "~/server/app-layer/usage/errors";
 import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
-import type { GovernancePolicyService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import {
   OTLP_CORRECTED_PATH_HEADER,
@@ -336,7 +336,7 @@ async function applyReceiverProvenanceToTraces({
 }: {
   request: IExportTraceServiceRequest;
   resolved: ResolvedApiKeyToken | null;
-  policy: GovernancePolicyService;
+  policy: GovernanceService;
 }): Promise<void> {
   const typedRequest = request as unknown as Parameters<
     typeof enforceApiKeyIdOnTraceRequest
@@ -391,7 +391,7 @@ async function applyReceiverProvenanceToLogs({
 }: {
   request: unknown;
   resolved: ResolvedApiKeyToken | null;
-  policy: GovernancePolicyService;
+  policy: GovernanceService;
 }): Promise<void> {
   enforceApiKeyIdOnLogRequest(
     request as Parameters<typeof enforceApiKeyIdOnLogRequest>[0],
@@ -597,7 +597,7 @@ secured
         await applyReceiverProvenanceToTraces({
           request: traceRequest,
           resolved,
-          policy: c.app.governance.policy,
+          policy: c.app.governance,
         });
 
         const collectionResult = await c.app.traces.collection.handleOtlpTraceRequest(
@@ -681,7 +681,7 @@ secured
         await applyReceiverProvenanceToLogs({
           request: logRequest,
           resolved,
-          policy: c.app.governance.policy,
+          policy: c.app.governance,
         });
 
         const result = await c.app.traces.logCollection.handleOtlpLogRequest({

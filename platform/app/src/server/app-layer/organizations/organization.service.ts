@@ -18,6 +18,7 @@ import {
   type GetOrganizationTeamBySlugForMemberInput,
   type GetOrganizationTeamWithMembersInput,
   type GetOrganizationBillingProfileInput,
+  type GetOrganizationMembersInput,
   type ListMemberOrganizationGroupsInput,
   type ListOrganizationGroupsInput,
   type ListOrganizationTeamsInput,
@@ -308,6 +309,10 @@ export class OrganizationService extends OrganizationServiceContract {
           membership !== null &&
           (input.includeDeactivated === true || membership.disabledAt == null),
       );
+  }
+
+  getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]> {
+    return this.getCanonicalService().getOrganizationMembers(input);
   }
 
   getOldestTeamId(input: GetOldestTeamInput): Promise<string> {

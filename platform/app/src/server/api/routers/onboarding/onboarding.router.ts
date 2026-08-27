@@ -69,7 +69,7 @@ export const onboardingRouter = createTRPCRouter({
         // organization they just created, and the aiTools.list read path
         // lazily provisions the same set on first portal load anyway.
         try {
-          await ctx.app.governance.aiTools.ensureDefaultCatalog({
+          await ctx.app.governance.aiToolEnsureDefaultCatalog({
             organizationId: orgResult.organization.id,
           });
         } catch (error) {

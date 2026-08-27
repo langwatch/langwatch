@@ -27,7 +27,6 @@
  *     side renders the wire shape returned here)
  */
 
-import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -48,6 +47,7 @@ import {
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { getApp } from "../../../app-layer/app";
 
 wireDefaultTestApp();
 
@@ -166,9 +166,9 @@ describe("user.cliBootstrap integration", () => {
 
   describe("when the org has published catalog tiles", () => {
     it("sources tools + providers from the catalog, not env-fed project providers", async () => {
-      const service = AiToolEntryService.create(prisma);
+      const service = getApp().governance;
       // A coding-assistant tile → an `langwatch <slug>` AI tool.
-      await service.create({
+      await service.aiToolCreate({
         organizationId: ORG_ID,
         departmentIds: [],
         type: "coding_assistant",
@@ -180,7 +180,7 @@ describe("user.cliBootstrap integration", () => {
       // Deliberately NOT openai: even if the test instance has OPENAI_API_KEY
       // in env (which the old project-sourced path surfaced), the catalog
       // never published it, so it must not appear.
-      await service.create({
+      await service.aiToolCreate({
         organizationId: ORG_ID,
         departmentIds: [],
         type: "model_provider",

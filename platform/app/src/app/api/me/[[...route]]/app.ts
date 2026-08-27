@@ -104,7 +104,7 @@ function registerUsageRoute(
           })
         : null;
 
-      const usage = c.var.langwatchApp.governance.personalUsage;
+      const usage = c.var.langwatchApp.governance;
       const input = {
         personalProjectId: project.id,
         userId: ownerUserId,
@@ -114,9 +114,9 @@ function registerUsageRoute(
 
       // Independent rollups — CH multiplexes them happily.
       const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.summary(input),
-        usage.dailyBuckets(input),
-        usage.breakdownByModel(input),
+        usage.personalUsageSummary(input),
+        usage.personalUsageDailyBuckets(input),
+        usage.personalUsageBreakdownByModel(input),
       ]);
 
       return c.json({ summary, dailyBuckets, breakdownByModel });

@@ -23,13 +23,9 @@ import {
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
-import {
-  ENTERPRISE_FEATURE_ERRORS,
-  requireEnterprisePlan,
-} from "~/server/api/enterprise";
+import { ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "~/server/api/enterprise";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
-import { featureFlagService } from "~/server/featureFlag";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
 export const governanceRouter = createTRPCRouter({
@@ -113,10 +109,10 @@ export const governanceRouter = createTRPCRouter({
         // `/me` and `/governance` are gated behind this flag; without it both
         // 404. Gate the auto-detected destination on it so a non-governance
         // org (e.g. a customer being impersonated) never lands on /me.
-        featureFlagService
+        ctx.app.featureFlags
           .isEnabled("release_ui_ai_governance_enabled", {
-            distinctId: userId,
-            defaultValue: false,
+            kind: "organization",
+            userId,
             organizationId: input.organizationId,
           })
           .catch(() => false),
