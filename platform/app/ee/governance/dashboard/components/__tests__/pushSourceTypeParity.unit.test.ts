@@ -15,9 +15,9 @@ import {
 } from "../ingestionSourceCatalog";
 
 describe("given the catalog and service both classify source types", () => {
-  /** @scenario "Each source row shows its delivery protocol" */
-  /** @scenario "Each source row shows the vendor icon next to the name" */
   describe("when checking secret-bearing parity", () => {
+    /** @scenario "Each source row shows its delivery protocol" */
+    /** @scenario "Each source row shows the vendor icon next to the name" */
     it("every catalog secret-bearing type is recognized by the service", () => {
       const catalogSecret = SOURCE_TYPE_OPTIONS.filter((o) =>
         needsIngestSecret({ sourceType: o.value }),

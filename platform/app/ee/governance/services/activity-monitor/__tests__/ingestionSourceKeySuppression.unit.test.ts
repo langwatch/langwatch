@@ -73,9 +73,9 @@ function createServiceForRotate(existing: Record<string, unknown>) {
 }
 
 describe("pull-source key suppression (#7616)", () => {
-  /** @scenario "The rotate-secret button is hidden for non-push sources on the list" */
-  /** @scenario "The rotate-secret button is hidden for non-push sources on the detail page" */
   describe("when createSource is called", () => {
+    /** @scenario "The rotate-secret button is hidden for non-push sources on the list" */
+    /** @scenario "The rotate-secret button is hidden for non-push sources on the detail page" */
     it("pull type → empty sentinel hash, null secret", async () => {
       const { service, captured } = createServiceForCreate();
 
