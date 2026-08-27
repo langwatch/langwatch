@@ -188,7 +188,7 @@ in-flight `_retention_days` mutation matches the tenant + target tables.
 stores the command string and closes a CodeQL incomplete-encoding flag for
 project ids containing `'` or `\`.
 
-### Storage metering (`storageMeter.service.ts`)
+### Storage metering (`packages/features/data-retention/server`)
 
 Per-tenant total is computed as per-table `sum(_size_bytes)` scalars
 union-summed:

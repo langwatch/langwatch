@@ -326,7 +326,7 @@ and deterministically keyed intents. It does not perform external I/O.
 Use `intents/<subject>.intent.ts` for the retry-safe executor of those intents.
 The executor may perform network or persistence work. If that work must create
 a durable domain event, it calls the owning feature command so validation,
-telemetry, event registration, and append semantics stay on the canonical
+instrumentation, event registration, and append semantics stay on the canonical
 pipeline.
 
 ### Migration

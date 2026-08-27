@@ -244,10 +244,8 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
       `health-checks.ts` (resolve `X-Auth-Token` → owning user + project via the
       TokenResolver), then mirror `langyTurnProcedure`: `hasLangyAccess` +
       `checkLangyMessageRateLimit`, and
-      `getApp().langy.turns.startConversationTurn({ projectId, requestId, session:
-{ user: { id } }, messages, ... })` — the app layer already anticipates this
-      caller (`server/app-layer/langy/langyApiKey.ts`: "if/when Langy is exposed to
-      programmatic (API-key) callers…"). Reply delivery, simplest first: poll the
+      the process-composed `LangyService` with the API-key principal and authorised
+      project. Reply delivery, simplest first: poll the
       durable `messages` read model until the fold leaves active/running and return
       the final assistant text (optionally SSE from the Redis token buffer exactly
       as `onTurnStream` does). The CLI side is then small: `lw ask "<question>"

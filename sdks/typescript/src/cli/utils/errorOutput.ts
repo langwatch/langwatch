@@ -87,7 +87,7 @@ export const disableOutputColor = (): void => {
  * `meta`, `kind` and `reasons` are the opposite: they are a CURATED payload the
  * platform composes for a user, an agent or the UI to act on, and the handled-error
  * contract is that nothing internal or secret goes in them (see the content rule
- * on `server/app-layer/langy/errors.ts`). Scrubbing them would not add safety —
+ * on the package-owned Langy error adapter). Scrubbing them would not add safety —
  * it would destroy the actionable data this whole feature exists to surface,
  * because the credential patterns match legitimate identifiers too: a `vk-…`
  * virtual-key id or an `lw-…` handle in `meta` would come out as `[redacted]`
