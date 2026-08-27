@@ -499,6 +499,25 @@ describe("given a run against an environment holding one conversation", () => {
     expect(result.events[0]!.actor).toBe("");
   });
 
+  it("hands a row on as an unattributed person rather than as a machine", async () => {
+    const adapter = await newAdapter();
+    queueSignInAndBots();
+    responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+    const result = await adapter.runOnce(
+      { cursor: null, credentials: CREDENTIALS },
+      adapter.validateConfig(CONFIG),
+    );
+
+    // No author means no provider id either. `person` is the deliberate
+    // choice, not a default that happened to fall out: the report reads an
+    // empty-id person row as `unattributed` — counted, visible and fixable by
+    // an admin linking it — where a `bot` would be `unattributable` and could
+    // never resolve (ADR-094 Decision 5).
+    expect(result.events[0]!.actor_id).toBe("");
+    expect(result.events[0]!.actor_kind).toBe("person");
+  });
+
   it("asks for the agent as a lookup id rather than asking Dataverse to join", async () => {
     const adapter = await newAdapter();
     queueSignInAndBots();
