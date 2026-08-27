@@ -972,4 +972,79 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(sentParams(1).traceparent).toBe(secondTraceparent);
     });
   });
+  describe("when the agent config carries a per-agent code timeout", () => {
+    /** The code node's parameters, as sent on the synthesized workflow DSL. */
+    const codeNodeParameters = (): {
+      identifier: string;
+      type: string;
+      value: unknown;
+    }[] => {
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const codeNode = callBody.payload.workflow.nodes.find(
+        (n: { id: string }) => n.id === "code_agent",
+      );
+      return codeNode.data.parameters;
+    };
+
+    it("sends it as the code node's timeout_ms parameter", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 5000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(codeNodeParameters()).toContainEqual({
+        identifier: "timeout_ms",
+        type: "int",
+        value: 5000,
+      });
+    });
+
+    it("still sends the code parameter", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 5000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(codeNodeParameters()).toContainEqual({
+        identifier: "code",
+        type: "code",
+        value: defaultConfig.code,
+      });
+    });
+
+    it("keeps its own fetch deadline above the requested code budget", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: { ...defaultConfig, timeoutMs: 300_000 },
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      const spanAttributes = withActiveSpanCalls[0]!.options.attributes;
+      expect(spanAttributes["nlp.timeout_ms"] as number).toBeGreaterThan(
+        300_000,
+      );
+    });
+
+    it("omits timeout_ms when the config carries no timeout", async () => {
+      const adapter = new SerializedCodeAgentAdapter({
+        config: defaultConfig,
+        nlpServiceUrl: nlpServiceUrl,
+        projectApiKey: apiKey,
+      });
+
+      await adapter.call(defaultInput);
+
+      expect(
+        codeNodeParameters().some((p) => p.identifier === "timeout_ms"),
+      ).toBe(false);
+    });
+  });
 });

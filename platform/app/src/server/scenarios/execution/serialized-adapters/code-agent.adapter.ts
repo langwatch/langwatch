@@ -23,6 +23,14 @@ import type { CodeAgentData } from "../types";
 /** Timeout for NLP service requests (2 minutes) */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
 
+/**
+ * Slack added to the fetch deadline when the agent asks for a code budget
+ * longer than {@link NLP_FETCH_TIMEOUT_MS}, so this adapter never becomes a
+ * second, lower ceiling that aborts the request while the engine is still
+ * inside the budget it was given.
+ */
+const NLP_FETCH_HEADROOM_MS = 30_000;
+
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
 type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
 
@@ -233,11 +241,22 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     };
   }
 
-  /** Build the code node that executes the agent's Python code. */
+  /**
+   * Build the code node that executes the agent's Python code.
+   *
+   * A configured `timeoutMs` travels as the node's `timeout_ms` parameter —
+   * the identifier and units the engine reads (`nodeTimeout` in
+   * services/nlpgo/app/engine/engine.go). It is a request for a SHORTER
+   * budget only: the code executor clamps it to the operator's ceiling
+   * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, 60s when unset), so a larger
+   * value buys the agent nothing. Omitted when unset, which leaves the engine
+   * on that operator default.
+   */
   private buildCodeNode(
     inputs: { identifier: string; type: string; value: string }[],
     outputs: { identifier: string; type: string }[],
   ) {
+    const { timeoutMs } = this.config;
     return {
       id: SerializedCodeAgentAdapter.CODE_NODE_ID,
       type: "code",
@@ -252,10 +271,32 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             type: "code",
             value: this.config.code,
           },
+          ...(timeoutMs === undefined
+            ? []
+            : [
+                {
+                  identifier: "timeout_ms",
+                  type: "int",
+                  value: timeoutMs,
+                },
+              ]),
         ],
         cls: "Code",
       },
     };
+  }
+
+  /**
+   * How long to wait on the NLP service for one turn.
+   *
+   * Always at least {@link NLP_FETCH_TIMEOUT_MS}, and above the agent's own
+   * code budget when that budget is longer, so the engine gets to enforce (and
+   * report) the timeout rather than the request being aborted from here.
+   */
+  private fetchTimeoutMs(): number {
+    const { timeoutMs } = this.config;
+    if (timeoutMs === undefined) return NLP_FETCH_TIMEOUT_MS;
+    return Math.max(NLP_FETCH_TIMEOUT_MS, timeoutMs + NLP_FETCH_HEADROOM_MS);
   }
 
   /** Build the end node that captures code node outputs for the response. */
@@ -303,6 +344,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     };
 
     const url = `${this.nlpServiceUrl}/go/studio/execute_sync`;
+    const fetchTimeoutMs = this.fetchTimeoutMs();
 
     return tracer.withActiveSpan(
       "SerializedCodeAgentAdapter.execute_nlp_request",
@@ -312,7 +354,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
           "scenario.agent.id": this.config.agentId,
           "http.url": url,
           "http.method": "POST",
-          "nlp.timeout_ms": NLP_FETCH_TIMEOUT_MS,
+          "nlp.timeout_ms": fetchTimeoutMs,
         },
       },
       async (span) => {
@@ -321,7 +363,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         const timeout = setTimeout(() => {
           timedOut = true;
           controller.abort();
-        }, NLP_FETCH_TIMEOUT_MS);
+        }, fetchTimeoutMs);
 
         try {
           let response: Response;
@@ -339,7 +381,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
                 "timeout" satisfies AdapterErrorKind,
               );
               throw new SerializedCodeAgentAdapterError(
-                `Code execution failed: NLP service ${url} did not respond within ${NLP_FETCH_TIMEOUT_MS}ms (request aborted).`,
+                `Code execution failed: NLP service ${url} did not respond within ${fetchTimeoutMs}ms (request aborted).`,
                 { kind: "timeout", cause: fetchError },
               );
             }
