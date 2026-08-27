@@ -71,6 +71,7 @@ import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
 import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
+import type { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
@@ -155,6 +156,12 @@ export interface AppDependencies {
   };
   simulations: {
     runs: SimulationRunService;
+    /**
+     * The atom reads behind the Results tab: one scenario, one target, one
+     * run. A sibling of `runs` because it answers a different question, and
+     * because nothing it does may change what `runs` serves to v1.
+     */
+    results: ResultAtomsService;
     /**
      * CSV export of run history. A sibling of `runs` rather than a method on
      * it: the export sweeps with its own keyset pagination and serializers,

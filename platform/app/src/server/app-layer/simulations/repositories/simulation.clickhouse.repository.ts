@@ -28,7 +28,7 @@ import type {
   SimulationRepository,
 } from "./simulation.repository";
 
-const TABLE_NAME = "simulation_runs" as const;
+export const TABLE_NAME = "simulation_runs" as const;
 
 export const RUN_ID_CAP = 10000;
 
@@ -142,7 +142,7 @@ function mapBatchAggregateRow(
  *
  * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
  */
-function simulationRunDedupPredicate(whereFilters: string): string {
+export function simulationRunDedupPredicate(whereFilters: string): string {
   return `AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
     SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
     FROM ${TABLE_NAME}
@@ -192,7 +192,7 @@ function unqualify(clause: string): string {
  * The WHERE on StartedAt enables partition pruning (~12x faster), the HAVING
  * on max(CreatedAt) ensures exact filtering for edge cases where they differ.
  */
-function buildDateFilter({
+export function buildDateFilter({
   startDate,
   endDate,
 }: {
@@ -356,7 +356,8 @@ const LIST_COLUMNS = `
  *
  * @see specs/suites/run-note-metadata-convention.feature
  */
-const RUN_NOTE_EXPR = "JSONExtractString(ifNull(Metadata, '{}'), 'note')";
+export const RUN_NOTE_EXPR =
+  "JSONExtractString(ifNull(Metadata, '{}'), 'note')";
 
 /** Columns for a slim batch-history preview — no full message arrays. */
 const PREVIEW_COLUMNS = `

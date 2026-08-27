@@ -47,6 +47,8 @@ import {
   closeClickHouseClient,
 } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
+import { ResultAtomsClickHouseRepository } from "./simulations/result-atoms/result-atoms.clickhouse.repository";
+import { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
 import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
@@ -620,6 +622,10 @@ export function initializeDefaultApp(options?: {
   // the run history does, rather than opening a second one.
   const scenarioRunExport = ScenarioRunExportService.create(
     simulationReads.repository,
+  );
+  const resultAtoms = new ResultAtomsService(
+    new ResultAtomsClickHouseRepository(resolveClickHouseClient),
+    globalPrisma,
   );
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
@@ -1795,7 +1801,11 @@ export function initializeDefaultApp(options?: {
     emailSuppressions,
     dspySteps: { steps: dspySteps },
     analytics: { service: analyticsService },
-    simulations: { runs: simulationReads, export: scenarioRunExport },
+    simulations: {
+      runs: simulationReads,
+      results: resultAtoms,
+      export: scenarioRunExport,
+    },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
       status: new TopicClusteringStatusService(
