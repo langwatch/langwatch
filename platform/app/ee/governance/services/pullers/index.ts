@@ -42,7 +42,6 @@ export {
   anthropicAdminPullConfigSchema,
 } from "./anthropicAdmin.puller";
 export { CLAUDE_COMPLIANCE_PULL_CONFIG } from "./claudeCompliance.puller";
-export { COPILOT_STUDIO_PULL_CONFIG } from "./copilotStudio.puller";
 export {
   type CopilotStudioDataverseConfig,
   copilotStudioDataversePullConfigSchema,
