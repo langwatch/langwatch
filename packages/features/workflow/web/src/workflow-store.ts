@@ -91,9 +91,7 @@ export type WorkflowStore = State & {
   setCurrentVersionId: (id: string | undefined) => void;
   /** Returns true if the current workflow differs from the last committed version. Synchronous — no DB query needed. */
   checkCanCommitNewVersion: () => boolean;
-  setSocketStatus: (
-    status: SocketStatus | ((status: SocketStatus) => SocketStatus),
-  ) => void;
+  setSocketStatus: (status: SocketStatus | ((status: SocketStatus) => SocketStatus)) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
@@ -104,11 +102,7 @@ export type WorkflowStore = State & {
   onConnectEnd: () => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
-  edgeConnectToNewHandle: (
-    source: string,
-    sourceHandle: string,
-    target: string,
-  ) => string;
+  edgeConnectToNewHandle: (source: string, sourceHandle: string, target: string) => string;
   /**
    * Update a node in the workflow.
    * This will find the node by id and update it.
@@ -122,7 +116,7 @@ export type WorkflowStore = State & {
     parameter: Partial<Omit<Field, "value">> & {
       identifier: string;
       type: Field["type"];
-      value?: any;
+      value?: unknown;
     },
   ) => void;
   deleteNode: (id: string) => void;
@@ -134,9 +128,7 @@ export type WorkflowStore = State & {
   setWorkflowExecutionState: (
     executionState: Partial<NonNullable<StudioWorkflow["state"]["execution"]>>,
   ) => void;
-  setEvaluationState: (
-    evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>,
-  ) => void;
+  setEvaluationState: (evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>) => void;
   setOptimizationState: (
     optimizationState: Partial<StudioWorkflow["state"]["optimization"]>,
   ) => void;
@@ -149,11 +141,7 @@ export type WorkflowStore = State & {
    * remove dataset-derived fields they don't care about - the dataset
    * stays attached either way.
    */
-  attachEntryDataset: (
-    nodeId: string,
-    dataset: Entry["dataset"],
-    columns: Field[],
-  ) => void;
+  attachEntryDataset: (nodeId: string, dataset: Entry["dataset"], columns: Field[]) => void;
   setSelectedNode: (nodeId: string) => void;
   deselectAllNodes: () => void;
   setPropertiesExpanded: (expanded: boolean) => void;
@@ -224,9 +212,7 @@ export const getWorkflow = (state: State) => {
  * workflow before serialization (autosave, execution payloads). This prevents
  * UI-only state from being persisted to the database.
  */
-export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
-  workflow: T,
-): T => {
+export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(workflow: T): T => {
   return {
     ...workflow,
     nodes: workflow.nodes.map((node) => {
@@ -244,25 +230,21 @@ export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
   };
 };
 
-export const removeInvalidEdges = ({
-  nodes,
-  edges,
-}: {
-  nodes: Node[];
-  edges: Edge[];
-}) => {
+export const removeInvalidEdges = ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => {
   return {
     nodes,
     edges: edges.filter((edge) => {
       const source = nodes.find((node) => node.id === edge.source);
-      const [sourceHandleGroup, sourceHandleIdentifier] = edge.sourceHandle?.split(
-        ".",
-      ) ?? [null, null];
+      const [sourceHandleGroup, sourceHandleIdentifier] = edge.sourceHandle?.split(".") ?? [
+        null,
+        null,
+      ];
 
       const target = nodes.find((node) => node.id === edge.target);
-      const [targetHandleGroup, targetHandleIdentifier] = edge.targetHandle?.split(
-        ".",
-      ) ?? [null, null];
+      const [targetHandleGroup, targetHandleIdentifier] = edge.targetHandle?.split(".") ?? [
+        null,
+        null,
+      ];
 
       if (!source || !target) {
         logger.warn(
@@ -327,8 +309,7 @@ export const removeInvalidDecorations = (nodes: Node[]) => {
         data: {
           ...node.data,
           parameters: (node.data.parameters as Field[]).map((p) =>
-            (p.value as { ref: string })?.ref &&
-            !nodeIds.has((p.value as { ref: string }).ref)
+            (p.value as { ref: string })?.ref && !nodeIds.has((p.value as { ref: string }).ref)
               ? { ...p, value: undefined }
               : p,
           ),
@@ -368,9 +349,7 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
   }
 
   return parameters.map((p) =>
-    p.identifier === "code"
-      ? { ...p, value: rewriteCodeSignature(p.value as string, inputs) }
-      : p,
+    p.identifier === "code" ? { ...p, value: rewriteCodeSignature(p.value as string, inputs) } : p,
   );
 };
 
@@ -435,12 +414,9 @@ export const store = (
     return hasDSLChanged(autosavedWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
-    workflow:
-      | Partial<StudioWorkflow>
-      | ((current: StudioWorkflow) => Partial<StudioWorkflow>),
+    workflow: Partial<StudioWorkflow> | ((current: StudioWorkflow) => Partial<StudioWorkflow>),
   ) => {
-    const resolved =
-      typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
+    const resolved = typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
     // The entry node was historically named "Entry" and styled as a
     // dataset grid, which made dataset columns read as the workflow's
     // inputs. It now presents as "Entry point" everywhere - normalize
@@ -580,17 +556,12 @@ export const store = (
       }
     }
     const existingConnection = currentEdges.find(
-      (edge) =>
-        edge.target === connection.target &&
-        edge.targetHandle === connection.targetHandle,
+      (edge) => edge.target === connection.target && edge.targetHandle === connection.targetHandle,
     );
     // An input takes one source, except across mutually exclusive If/Else
     // branches: only one of them ever runs, so they may converge on the
     // same input. Sources that can run together stay blocked.
-    if (
-      existingConnection &&
-      !canConvergeOnInput({ nodes, edges: currentEdges, connection })
-    ) {
+    if (existingConnection && !canConvergeOnInput({ nodes, edges: currentEdges, connection })) {
       return {
         error:
           "These two values can run at the same time, so they can't feed the same input. Only mutually exclusive If/Else branches can converge on one input.",
@@ -794,9 +765,7 @@ export const store = (
             data: {
               ...n.data,
               parameters: (n.data.parameters as Field[]).map((p) =>
-                (p.value as { ref: string })?.ref === oldId
-                  ? { ...p, value: { ref: newId } }
-                  : p,
+                (p.value as { ref: string })?.ref === oldId ? { ...p, value: { ref: newId } } : p,
               ),
             },
           };
@@ -815,7 +784,7 @@ export const store = (
     parameter: Partial<Omit<Field, "value">> & {
       identifier: string;
       type: Field["type"];
-      value?: any;
+      value?: unknown;
     },
   ) => {
     set({
@@ -891,10 +860,7 @@ export const store = (
       nodes: [...get().nodes, newNode],
     });
   },
-  setComponentExecutionState: (
-    id: string,
-    executionState: BaseComponent["execution_state"],
-  ) => {
+  setComponentExecutionState: (id: string, executionState: BaseComponent["execution_state"]) => {
     logger.debug(
       { componentId: id, status: executionState?.status },
       "setComponentExecutionState: execution state changed",
@@ -911,9 +877,7 @@ export const store = (
               execution_state: {
                 ...(current_execution_state ?? {}),
                 ...executionState,
-                ...(executionState?.error
-                  ? { error: executionState.error.slice(0, 2048) }
-                  : {}),
+                ...(executionState?.error ? { error: executionState.error.slice(0, 2048) } : {}),
                 timestamps: {
                   ...(timestamps ?? {}),
                   ...(executionState?.timestamps ?? {}),
@@ -943,34 +907,26 @@ export const store = (
       },
     });
   },
-  setEvaluationState: (
-    evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>,
-  ) => {
+  setEvaluationState: (evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>) => {
     set({
       state: {
         ...get().state,
         evaluation: {
           ...(get().state.evaluation ?? {}),
           ...evaluationState,
-          ...(evaluationState?.error
-            ? { error: evaluationState.error.slice(0, 140) }
-            : {}),
+          ...(evaluationState?.error ? { error: evaluationState.error.slice(0, 140) } : {}),
         },
       },
     });
   },
-  setOptimizationState: (
-    optimizationState: Partial<StudioWorkflow["state"]["optimization"]>,
-  ) => {
+  setOptimizationState: (optimizationState: Partial<StudioWorkflow["state"]["optimization"]>) => {
     set({
       state: {
         ...get().state,
         optimization: {
           ...(get().state.optimization ?? {}),
           ...optimizationState,
-          ...(optimizationState?.error
-            ? { error: optimizationState.error.slice(0, 140) }
-            : {}),
+          ...(optimizationState?.error ? { error: optimizationState.error.slice(0, 140) } : {}),
           ...(optimizationState?.stdout
             ? {
                 stdout: (() => {
@@ -1004,10 +960,7 @@ export const store = (
         if (node.id !== nodeId) return node;
         const existing = node.data.outputs ?? [];
         const existingIds = new Set(existing.map((f) => f.identifier));
-        const merged = [
-          ...existing,
-          ...columns.filter((c) => !existingIds.has(c.identifier)),
-        ];
+        const merged = [...existing, ...columns.filter((c) => !existingIds.has(c.identifier))];
         return {
           ...node,
           data: { ...node.data, outputs: merged, dataset } as Component,

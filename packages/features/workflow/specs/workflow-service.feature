@@ -41,6 +41,24 @@ Feature: Workflow service boundary
     Then declared entry defaults fill only missing values
     And the browser template does not pin a resolved project model
 
+  Scenario: Workflow creation import is portable browser behaviour
+    Given a user opens the workflow creation dialog
+    When they select a template or import a valid workflow file
+    Then Workflow Web owns the selection and file validation
+    And application composition supplies the create mutation and routing
+
+  Scenario: Workflow management cards keep transport in application composition
+    Given the workflow list displays a saved workflow
+    When the user opens its sync, push, copy or delete actions
+    Then Workflow Web renders the card and action menu
+    And application composition performs project queries, mutations and dialogs
+
+  Scenario: Studio result presentation keeps transport in application composition
+    Given Studio displays workflow evaluation results
+    When the panel is loading, waiting, failed, or showing a selected run
+    Then Workflow Web owns the panel state and layout
+    And application composition supplies project queries and Experiment renderers
+
   Scenario: Studio dataset transforms are portable browser behaviour
     Given Studio, Prompts, or execution needs to reshape a dataset
     When it converts records, fields, or train/test partitions
@@ -98,3 +116,9 @@ Feature: Workflow service boundary
     When the API handles the request
     Then it composes Workflow version selection with Evaluation execution
     And Workflow does not own the evaluation run lifecycle
+
+  Scenario: Execution dispatch is a Workflow server concern
+    Given Workflow resolves a version to run
+    When the server executor dispatches it through injected nlpgo infrastructure
+    Then it validates required entry inputs and model credentials
+    And application composition supplies nlpgo and model-provider adapters

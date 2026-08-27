@@ -1,14 +1,16 @@
 declare module "lodash-es/debounce" {
+  type Callable = (...args: never[]) => unknown;
+
   type DebounceOptions = {
     leading?: boolean;
     trailing?: boolean;
   };
 
-  const debounce: <T extends (...args: any[]) => unknown>(
-    callback: T,
+  const debounce: <Callback extends Callable>(
+    callback: Callback,
     wait?: number,
     options?: DebounceOptions,
-  ) => T;
+  ) => Callback;
 
   export default debounce;
 }

@@ -15,7 +15,9 @@ import {
 } from "@langwatch/workflow-contract";
 import { useWorkflowNodeHost } from "./workflow-node.host";
 
-type NodeDragItem = { node: Node<Component> };
+export type WorkflowNodeDragItem = {
+  node: Node<Component> & { type: ComponentType };
+};
 type CanvasDropResult = { x: number; y: number };
 
 /**
@@ -40,7 +42,7 @@ export const NodeDraggable = (props: {
       nodes.map((node) => node.id),
       props.component.name ?? "Component",
     );
-    const newNode: Node<Component> = {
+    const newNode: WorkflowNodeDragItem["node"] = {
       id: newId,
       type: props.type,
       position: { x: 0, y: 0 },
@@ -78,7 +80,7 @@ export const NodeDraggable = (props: {
   };
 
   const [collected, drag, preview] = useDrag<
-    NodeDragItem,
+    WorkflowNodeDragItem,
     CanvasDropResult,
     { isDragging: boolean; clientOffset: { x: number; y: number } | null }
   >({

@@ -3,18 +3,21 @@ import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
-import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import { Switch } from "@langwatch/design-system/switch";
-import type { FieldMapping } from "~/components/variables";
-import { type Variable, VariablesSection } from "~/components/variables";
-import { LiquidConditionEditor, useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../hooks/use-workflow-store";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "@langwatch/workflow-web";
-import { BasePropertiesPanel, PropertySectionTitle } from "./BasePropertiesPanel";
+} from "../utils/edge-mapping";
+import type {
+  WorkflowPanelFieldMapping,
+  WorkflowBasePropertiesPanelProps,
+  WorkflowCodeEditorProps,
+  WorkflowVariablesProps,
+  WorkflowVariable,
+} from "./workflow-properties.ports";
 
 const LIQUID_OPERATORS_DOCS = "https://shopify.github.io/liquid/basics/operators/";
 
@@ -52,21 +55,41 @@ function pythonConditionTemplate(inputs: Field[]): string {
  * handle and skips the not-taken side; the branch outputs are the
  * gating contract, so they render read-only.
  */
-export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
-  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        nodes: state.getWorkflow().nodes,
-        edges: state.getWorkflow().edges,
-        setNode: state.setNode,
-        setNodeParameter: state.setNodeParameter,
-        setEdges: state.setEdges,
-        getWorkflow: state.getWorkflow,
-      })),
-    );
+export function IfElsePropertiesPanel({
+  node,
+  renderBase: BasePropertiesPanel,
+  renderCodeEditor: CodeBlockEditor,
+  renderVariables: VariablesSection,
+  renderPropertySectionTitle: PropertySectionTitle,
+  renderLiquidConditionEditor: LiquidEditor,
+}: {
+  node: Node<Component>;
+  renderBase: (props: WorkflowBasePropertiesPanelProps) => React.ReactNode;
+  renderCodeEditor: (props: WorkflowCodeEditorProps) => React.ReactNode;
+  renderVariables: (props: WorkflowVariablesProps) => React.ReactNode;
+  renderPropertySectionTitle: React.ComponentType<{
+    children: React.ReactNode;
+  }>;
+  renderLiquidConditionEditor: React.ComponentType<{
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    availableVariables?: string[];
+  }>;
+}) {
+  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } = useWorkflowStore(
+    useShallow((state) => ({
+      nodes: state.getWorkflow().nodes,
+      edges: state.getWorkflow().edges,
+      setNode: state.setNode,
+      setNodeParameter: state.setNodeParameter,
+      setEdges: state.setEdges,
+      getWorkflow: state.getWorkflow,
+    })),
+  );
   const updateNodeInternals = useUpdateNodeInternals();
 
-  const inputs: Variable[] = (node.data.inputs ?? []).map((input) => ({
+  const inputs: WorkflowVariable[] = (node.data.inputs ?? []).map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
@@ -87,10 +110,9 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   const handleMappingChange = useCallback(
-    (identifier: string, mapping: FieldMapping | undefined) => {
+    (identifier: string, mapping: WorkflowPanelFieldMapping | undefined) => {
       const workflow = getWorkflow();
-      const currentInputs =
-        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
       const result = applyMappingChange({
         nodeId: node.id,
         identifier,
@@ -106,7 +128,7 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   const handleInputsChange = useCallback(
-    (newVariables: Variable[]) => {
+    (newVariables: WorkflowVariable[]) => {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: Field[] = newVariables.map((variable) => {
         const existing = existingInputs.find((i) => i.identifier === variable.identifier);
@@ -202,13 +224,12 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
               viewStateKey={`if-else-condition:${node.id}`}
             />
             <Text fontSize="12px" color="fg.muted">
-              Python over the inputs, must return True or False. The not-taken branch is
-              skipped.
+              Python over the inputs, must return True or False. The not-taken branch is skipped.
             </Text>
           </>
         ) : (
           <>
-            <LiquidConditionEditor
+            <LiquidEditor
               value={condition}
               onChange={handleConditionChange}
               placeholder={'e.g. context != ""'}
@@ -223,10 +244,7 @@ export function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
                 textDecoration="underline"
               >
                 Liquid condition
-                <ExternalLink
-                  size={11}
-                  style={{ display: "inline", marginLeft: "2px" }}
-                />
+                <ExternalLink size={11} style={{ display: "inline", marginLeft: "2px" }} />
               </Link>{" "}
               over the inputs. The not-taken branch is skipped.
             </Text>

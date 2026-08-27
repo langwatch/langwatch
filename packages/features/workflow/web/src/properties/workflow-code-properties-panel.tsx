@@ -3,58 +3,67 @@ import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
-import {
-  CODE_OUTPUT_TYPES,
-  type Output,
-  OutputsSection,
-  type OutputType,
-} from "~/components/outputs/OutputsSection";
-import type { FieldMapping } from "~/components/variables";
-import { type Variable, VariablesSection } from "~/components/variables";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../hooks/use-workflow-store";
 import type { Component, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "@langwatch/workflow-web";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
+} from "../utils/edge-mapping";
+import type {
+  WorkflowBasePropertiesPanelProps,
+  WorkflowCodeEditorProps,
+  WorkflowOutputsProps,
+  WorkflowVariablesProps,
+  WorkflowVariable,
+  WorkflowPanelFieldMapping,
+} from "./workflow-properties.ports";
+
+const CODE_OUTPUT_TYPES: Field["type"][] = ["str", "float", "bool", "dict", "list", "image"];
 
 /**
  * Properties panel for Code nodes in the optimization studio.
  * Uses VariablesSection for inputs and OutputsSection for outputs.
  */
-export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
-  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        nodes: state.getWorkflow().nodes,
-        edges: state.getWorkflow().edges,
-        setNode: state.setNode,
-        setNodeParameter: state.setNodeParameter,
-        setEdges: state.setEdges,
-        getWorkflow: state.getWorkflow,
-      })),
-    );
+export function CodePropertiesPanel({
+  node,
+  renderBase: BasePropertiesPanel,
+  renderCodeEditor: CodeBlockEditor,
+  renderVariables: VariablesSection,
+  renderOutputs: OutputsSection,
+}: {
+  node: Node<Component>;
+  renderBase: (props: WorkflowBasePropertiesPanelProps) => React.ReactNode;
+  renderCodeEditor: (props: WorkflowCodeEditorProps) => React.ReactNode;
+  renderVariables: (props: WorkflowVariablesProps) => React.ReactNode;
+  renderOutputs: (props: WorkflowOutputsProps) => React.ReactNode;
+}) {
+  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } = useWorkflowStore(
+    useShallow((state) => ({
+      nodes: state.getWorkflow().nodes,
+      edges: state.getWorkflow().edges,
+      setNode: state.setNode,
+      setNodeParameter: state.setNodeParameter,
+      setEdges: state.setEdges,
+      getWorkflow: state.getWorkflow,
+    })),
+  );
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Get code from parameters
-  const codeParam = node.data.parameters?.find(
-    (p) => p.identifier === "code" && p.type === "code",
-  );
+  const codeParam = node.data.parameters?.find((p) => p.identifier === "code" && p.type === "code");
   const code = (codeParam?.value as string) ?? "";
 
   // Convert node inputs to Variable[] format
-  const inputs: Variable[] = (node.data.inputs ?? []).map((input) => ({
+  const inputs: WorkflowVariable[] = (node.data.inputs ?? []).map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
 
   // Convert node outputs to Output[] format
-  const outputs: Output[] = (node.data.outputs ?? []).map((output) => ({
+  const outputs: WorkflowOutputsProps["outputs"] = (node.data.outputs ?? []).map((output) => ({
     identifier: output.identifier,
-    type: output.type as OutputType,
+    type: output.type,
   }));
 
   // Build mapping data from workflow graph
@@ -74,10 +83,9 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   const handleMappingChange = useCallback(
-    (identifier: string, mapping: FieldMapping | undefined) => {
+    (identifier: string, mapping: WorkflowPanelFieldMapping | undefined) => {
       const workflow = getWorkflow();
-      const currentInputs =
-        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
       const result = applyMappingChange({
         nodeId: node.id,
         identifier,
@@ -106,7 +114,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
 
   // Handle inputs change (preserves field.value for existing inputs)
   const handleInputsChange = useCallback(
-    (newVariables: Variable[]) => {
+    (newVariables: WorkflowVariable[]) => {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: Field[] = newVariables.map((v) => {
         // Preserve field.value from existing input with same identifier
@@ -129,7 +137,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
 
   // Handle outputs change
   const handleOutputsChange = useCallback(
-    (newOutputs: Output[]) => {
+    (newOutputs: WorkflowOutputsProps["outputs"]) => {
       const outputs: Field[] = newOutputs.map((o) => ({
         identifier: o.identifier,
         type: o.type as Field["type"],

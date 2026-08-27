@@ -3,13 +3,14 @@ import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useState } from "react";
 import { ArrowRight, Database, Flag, Folder, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
-import { type Variable, VariablesSection } from "~/components/variables";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useGetDatasetData } from "../../hooks/useGetDatasetData";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../hooks/use-workflow-store";
 import type { Entry, Field } from "@langwatch/workflow-contract";
-import { DatasetModal } from "../DatasetModal";
-import { BasePropertiesPanel, PropertySectionTitle } from "./BasePropertiesPanel";
+import type {
+  WorkflowBasePropertiesPanelProps,
+  WorkflowVariablesProps,
+  WorkflowVariable,
+} from "./workflow-properties.ports";
 
 /**
  * Drawer for the workflow's entry point.
@@ -20,13 +21,30 @@ import { BasePropertiesPanel, PropertySectionTitle } from "./BasePropertiesPanel
  * for evaluations; it is rendered as a compact card, not a data grid,
  * so it never reads as "the inputs".
  */
-export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
+export function EntryPointPropertiesPanel({
+  node,
+  renderBase: BasePropertiesPanel,
+  renderVariables: VariablesSection,
+  renderDatasetModal: DatasetModal,
+  datasetTotal,
+  renderPropertySectionTitle: PropertySectionTitle,
+}: {
+  node: Node<Entry>;
+  renderBase: (props: WorkflowBasePropertiesPanelProps) => React.ReactNode;
+  renderVariables: (props: WorkflowVariablesProps) => React.ReactNode;
+  renderDatasetModal: React.ComponentType<{
+    open: boolean;
+    onClose: () => void;
+    node: Node<Entry>;
+    editingDataset?: Entry["dataset"];
+  }>;
+  datasetTotal: number | undefined;
+  renderPropertySectionTitle: React.ComponentType<{
+    children: React.ReactNode;
+  }>;
+}) {
   const { open, onOpen, onClose } = useDisclosure();
   const [editingDataset, setEditingDataset] = useState<Entry["dataset"] | undefined>();
-  const { total } = useGetDatasetData({
-    dataset: "dataset" in node.data ? node.data.dataset : undefined,
-    preview: true,
-  });
   const { setNode, setSelectedNode, endNodeId } = useWorkflowStore(
     useShallow((state) => ({
       setNode: state.setNode,
@@ -42,7 +60,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   // The entry fields are the workflow inputs. DSL-wise they live on the node's
   // `outputs` (they are emitted to downstream nodes); the user-facing language
   // is "Inputs". They are the source of the run, so there is nothing to map.
-  const inputVariables: Variable[] = (node.data.outputs ?? []).map((field) => ({
+  const inputVariables: WorkflowVariable[] = (node.data.outputs ?? []).map((field) => ({
     identifier: field.identifier,
     type: field.type,
   }));
@@ -56,7 +74,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   );
 
   const handleInputsChange = useCallback(
-    (newVariables: Variable[]) => {
+    (newVariables: WorkflowVariable[]) => {
       const existing = node.data.outputs ?? [];
       const outputs: Field[] = newVariables.map((variable) => {
         const prev = existing.find((f) => f.identifier === variable.identifier);
@@ -146,9 +164,9 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
             <Text fontSize="13px" truncate>
               {dataset.name ?? "Dataset"}
             </Text>
-            {total !== undefined && total !== null && (
+            {datasetTotal !== undefined && datasetTotal !== null && (
               <Text fontSize="13px" color="fg.subtle" flexShrink={0}>
-                ({total} {total === 1 ? "row" : "rows"})
+                ({datasetTotal} {datasetTotal === 1 ? "row" : "rows"})
               </Text>
             )}
             <Spacer />
@@ -185,26 +203,16 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
           </HStack>
         ) : (
           <Text fontSize="13px" color="fg.muted">
-            Optional. Attaching a dataset adds its columns to the inputs and provides the
-            rows for evaluations.
+            Optional. Attaching a dataset adds its columns to the inputs and provides the rows for
+            evaluations.
           </Text>
         )}
       </VStack>
-      <DatasetModal
-        open={open}
-        onClose={onClose}
-        node={node}
-        editingDataset={editingDataset}
-      />
+      <DatasetModal open={open} onClose={onClose} node={node} editingDataset={editingDataset} />
       {endNodeId && (
         <VStack align="start" gap={2} width="full">
           <PropertySectionTitle>Workflow Outputs</PropertySectionTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            data-testid="go-to-end-node"
-            onClick={goToEndNode}
-          >
+          <Button size="sm" variant="outline" data-testid="go-to-end-node" onClick={goToEndNode}>
             <Flag size={14} />
             <Text>Go to end node</Text>
             <ArrowRight size={14} />

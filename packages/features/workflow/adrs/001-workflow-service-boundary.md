@@ -43,11 +43,12 @@ Studio execution materializes referenced datasets through an explicit
 
 ## Dependencies
 
-NLP execution, persisted-DSL migration, project environment and LiteLLM
-parameters are explicit ports supplied by application composition. The adapter
-requires Dataset, environment and LLM parameter dependencies to construct the
-private Studio-event preparer given to `WorkflowService`; neither it nor the
-service receives Prisma or a Model Provider service directly.
+The Workflow server package owns the version-to-nlpgo execution bridge and
+persisted-DSL migration. Application composition supplies its explicit nlpgo,
+model-provider, project-environment and LiteLLM-parameter infrastructure. The
+adapter requires Dataset, environment and LLM parameter dependencies to
+construct the private Studio-event preparer given to `WorkflowService`; neither
+it nor the service receives Prisma or a Model Provider service directly.
 
 ## Public surfaces and transports
 
@@ -67,13 +68,27 @@ shells, query/event transport composition, secret controls, and Lambda/worker
 infrastructure remain application responsibilities. The browser package owns
 the code-node Python provider behaviour used by its editor.
 
+Workflow Web also owns the creation dialog's template selection, file import
+validation and browser state. Application composition supplies the existing
+create form, mutation, routing and error presentation through controlled render
+ports.
+
+Workflow Web owns workflow-card presentation and its copy, sync, push and
+delete action menu. Application composition supplies project queries,
+mutations, toasts and replication dialogs.
+
+The Studio results panel shell, empty/error states and selected-run browser
+state are Workflow Web presentation. The application composes Experiment Web's
+run sidebar, table and footer with its project-scoped result queries.
+
 ## Runtime and registration
 
 The process creates one `PostgresWorkflowAdapter` during App composition and
-passes its resulting `WorkflowService` through request context. Its required
-dependencies are the private database adapter, canonical `DatasetService`,
-project-environment and LiteLLM-parameter ports, plus DSL migration; execution
-is an explicit optional dispatch port.
+passes its resulting `WorkflowService` through request context. The same
+composition connects the Workflow server executor to nlpgo and model-provider
+infrastructure. Its required dependencies are the private database adapter,
+canonical `DatasetService`, project-environment and LiteLLM-parameter ports,
+plus the required execution port.
 
 ## Environment and configuration
 

@@ -1,18 +1,5 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Center,
-  EmptyState,
-  HStack,
-  type StackProps,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { HStack, type StackProps } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { X } from "react-feather";
-import { LuSquareCheckBig } from "react-icons/lu";
 import {
   BatchEvaluationResultsTable,
   type BatchRunSummary,
@@ -30,8 +17,13 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { slugify } from "../../utils/slugify";
 import { useRunEvalution } from "../hooks/useRunEvalution";
-import { useWorkflowStore } from "@langwatch/workflow-web";
-import { isExperimentQueryEnabled } from "@langwatch/workflow-web";
+import {
+  isExperimentQueryEnabled,
+  useWorkflowSelectedEvaluationRun,
+  useWorkflowStore,
+  WorkflowEvaluationResultsLayout,
+  WorkflowResultsPanel,
+} from "@langwatch/workflow-web";
 import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { OpenFullResultsButton } from "./OpenFullResultsButton";
@@ -53,51 +45,13 @@ export function ResultsPanel({
   );
 
   return (
-    <HStack
-      display={isCollapsed ? "none" : undefined}
-      background="bg"
-      borderTop="2px solid"
-      borderColor="border"
-      width="full"
-      fontSize="14px"
-      height="full"
-      align="start"
-      position="relative"
-    >
-      <Button
-        variant="ghost"
-        onClick={() => collapsePanel(true)}
-        position="absolute"
-        top={1}
-        right={1}
-        size="xs"
-        zIndex={1}
-      >
-        <X size={16} />
-      </Button>
-      <Tabs.Root
-        value="evaluations"
-        width="full"
-        height="full"
-        display="flex"
-        flexDirection="column"
-        size="sm"
-        colorPalette="blue"
-      >
-        <Tabs.List borderBottomWidth="2px">
-          <Tabs.Trigger value="evaluations">Evaluations</Tabs.Trigger>
-        </Tabs.List>
-        <Tabs.Content value="evaluations" padding={0} height="calc(100% - 32px)">
-          {!isCollapsed && (
-            <EvaluationResults
-              workflowId={workflowId}
-              experimentId={experimentId}
-              evaluationState={evaluationState}
-            />
-          )}
-        </Tabs.Content>
-      </Tabs.Root>
-    </HStack>
+    <WorkflowResultsPanel isCollapsed={isCollapsed} onCollapse={() => collapsePanel(true)}>
+      <EvaluationResults
+        workflowId={workflowId}
+        experimentId={experimentId}
+        evaluationState={evaluationState}
+      />
+    </WorkflowResultsPanel>
   );
 }
 
@@ -114,7 +68,6 @@ export function EvaluationResults({
 }) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-
   const [keepFetching, setKeepFetching] = useState(false);
 
   const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
@@ -147,13 +100,9 @@ export function EvaluationResults({
     }
   }, [evaluationState?.status, experiment.data]);
 
-  const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
+  const { selectedRunId, setSelectedRunId } = useWorkflowSelectedEvaluationRun(
     evaluationState?.run_id,
   );
-
-  useEffect(() => {
-    setSelectedRunId(evaluationState?.run_id);
-  }, [evaluationState?.run_id]);
 
   const { stopEvaluation } = useRunEvalution();
 
@@ -192,29 +141,27 @@ export function EvaluationResults({
     : null;
 
   // Transform runs for new sidebar
-  const sidebarRuns: BatchRunSummary[] = (batchEvaluationRuns.data?.runs ?? []).map(
-    (run) => ({
-      runId: run.runId,
-      workflowVersion: run.workflowVersion,
-      timestamps: run.timestamps,
-      progress: run.progress,
-      total: run.total,
-      summary: {
-        datasetCost: run.summary.datasetCost,
-        evaluationsCost: run.summary.evaluationsCost,
-        evaluations: Object.fromEntries(
-          Object.entries(run.summary.evaluations).map(([id, ev]) => [
-            id,
-            {
-              name: ev.name,
-              averageScore: ev.averageScore,
-              averagePassed: ev.averagePassed,
-            },
-          ]),
-        ),
-      },
-    }),
-  );
+  const sidebarRuns: BatchRunSummary[] = (batchEvaluationRuns.data?.runs ?? []).map((run) => ({
+    runId: run.runId,
+    workflowVersion: run.workflowVersion,
+    timestamps: run.timestamps,
+    progress: run.progress,
+    total: run.total,
+    summary: {
+      datasetCost: run.summary.datasetCost,
+      evaluationsCost: run.summary.evaluationsCost,
+      evaluations: Object.fromEntries(
+        Object.entries(run.summary.evaluations).map(([id, ev]) => [
+          id,
+          {
+            name: ev.name,
+            averageScore: ev.averageScore,
+            averagePassed: ev.averagePassed,
+          },
+        ]),
+      ),
+    },
+  }));
 
   const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId_);
 
@@ -225,32 +172,13 @@ export function EvaluationResults({
     !project
   ) {
     if (keepFetching) {
-      return <Text padding={4}>Loading...</Text>;
+      return <WorkflowEvaluationResultsLayout status="loading" />;
     }
-    return (
-      <Center width="full" height="full">
-        <EmptyState.Root marginTop="-60px">
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <LuSquareCheckBig />
-            </EmptyState.Indicator>
-            <EmptyState.Title>Waiting for evaluation results</EmptyState.Title>
-            <EmptyState.Description>
-              Run your first evaluation to see the results here
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      </Center>
-    );
+    return <WorkflowEvaluationResultsLayout status="waiting" />;
   }
 
   if (experiment.isError) {
-    return (
-      <Alert.Root status="error">
-        <Alert.Indicator />
-        Error loading evaluation results
-      </Alert.Root>
-    );
+    return <WorkflowEvaluationResultsLayout status="error" />;
   }
 
   const evaluationStateRunId = evaluationState?.run_id;
@@ -260,54 +188,55 @@ export function EvaluationResults({
   const entryDataset = (
     workflow.nodes.find((node) => node.type === "entry")?.data as Entry | undefined
   )?.dataset;
-  const datasetColumns =
-    entryDataset?.inline?.columnTypes.map((column) => column.name) ?? [];
+  const datasetColumns = entryDataset?.inline?.columnTypes.map((column) => column.name) ?? [];
 
   return (
-    <HStack align="stretch" width="full" height="full" gap={0}>
-      <BatchRunsSidebar
-        runs={sidebarRuns}
-        selectedRunId={selectedRunId_}
-        onSelectRun={setSelectedRunId}
-        isLoading={batchEvaluationRuns.isLoading}
-        size="sm"
-        {...sidebarProps}
-      />
-      <VStack gap={0} width="full" height="full" minWidth="0" minHeight="0">
-        {/* Table container with constrained height for virtualization */}
-        <Box flex={1} width="full" minHeight="0" overflow="hidden">
-          <BatchEvaluationResultsTable
-            data={transformedData}
-            isLoading={runDataQuery.isLoading}
-            describeFailure={describeCellFailure}
-            renderEvaluatorResult={({ result }) => (
-              <EvaluatorResultChip
-                name={result.evaluatorName}
-                result={{
-                  status: result.status,
-                  score: result.score,
-                  passed: result.passed,
-                  label: result.label,
-                  details: result.details,
-                }}
-                inputs={result.inputs}
-              />
-            )}
-            renderTracePeek={({ traceId }) => <TraceIdPeek traceId={traceId} />}
-            onOpenTrace={(traceId) => openDrawer("traceV2Details", { traceId })}
-            renderDatasetImage={({ src }) => (
-              <ExternalImage
-                src={src}
-                minWidth="24px"
-                minHeight="24px"
-                maxHeight="80px"
-                maxWidth="100%"
-                expandable
-              />
-            )}
-          />
-        </Box>
-        {sidebarSelectedRun && (
+    <WorkflowEvaluationResultsLayout
+      status="ready"
+      sidebar={
+        <BatchRunsSidebar
+          runs={sidebarRuns}
+          selectedRunId={selectedRunId_}
+          onSelectRun={setSelectedRunId}
+          isLoading={batchEvaluationRuns.isLoading}
+          size="sm"
+          {...sidebarProps}
+        />
+      }
+      table={
+        <BatchEvaluationResultsTable
+          data={transformedData}
+          isLoading={runDataQuery.isLoading}
+          describeFailure={describeCellFailure}
+          renderEvaluatorResult={({ result }) => (
+            <EvaluatorResultChip
+              name={result.evaluatorName}
+              result={{
+                status: result.status,
+                score: result.score,
+                passed: result.passed,
+                label: result.label,
+                details: result.details,
+              }}
+              inputs={result.inputs}
+            />
+          )}
+          renderTracePeek={({ traceId }) => <TraceIdPeek traceId={traceId} />}
+          onOpenTrace={(traceId) => openDrawer("traceV2Details", { traceId })}
+          renderDatasetImage={({ src }) => (
+            <ExternalImage
+              src={src}
+              minWidth="24px"
+              minHeight="24px"
+              maxHeight="80px"
+              maxWidth="100%"
+              expandable
+            />
+          )}
+        />
+      }
+      footer={
+        sidebarSelectedRun ? (
           <BatchSummaryFooter
             run={sidebarSelectedRun}
             showProgress={
@@ -341,8 +270,8 @@ export function EvaluationResults({
               </HStack>
             }
           />
-        )}
-      </VStack>
-    </HStack>
+        ) : null
+      }
+    />
   );
 }

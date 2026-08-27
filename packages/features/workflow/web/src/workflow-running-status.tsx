@@ -1,14 +1,18 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
-import { useWorkflowStore } from "@langwatch/workflow-web";
 
-export function RunningStatus({ isLoading }: { isLoading?: boolean }) {
+import { useWorkflowStore } from "./hooks/use-workflow-store";
+
+/** Workflow execution status with the process-owned stop action supplied by the app. */
+export function WorkflowRunningStatus({
+  isLoading,
+  onStop,
+}: {
+  isLoading?: boolean;
+  onStop: (input: { traceId: string }) => void;
+}) {
   const { executionState } = useWorkflowStore(({ state }) => ({
     executionState: state.execution,
   }));
-
-  const { stopWorkflowExecution } = useWorkflowExecution();
-
   const isRunning = executionState?.status === "running";
   const isWaiting = executionState?.status === "waiting";
 
@@ -22,14 +26,7 @@ export function RunningStatus({ isLoading }: { isLoading?: boolean }) {
         <HStack>
           <Spinner size="xs" />
           <Text fontSize="13px">Running...</Text>
-          <Button
-            size="xs"
-            onClick={() =>
-              stopWorkflowExecution({
-                trace_id: executionState?.trace_id ?? "",
-              })
-            }
-          >
+          <Button size="xs" onClick={() => onStop({ traceId: executionState?.trace_id ?? "" })}>
             Stop
           </Button>
         </HStack>

@@ -1,25 +1,127 @@
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
+import { HttpConfigEditor, useHttpTest } from "~/components/agents/http";
+import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
+import { OutputsSection } from "~/components/outputs/OutputsSection";
+import { VariablesSection } from "~/components/variables";
 import { useDrawer } from "~/hooks/useDrawer";
-import { InsideDrawerProvider, useWorkflowStore } from "@langwatch/workflow-web";
 import type {
   AgentComponent,
   Component,
   ComponentType,
+  End,
+  Entry,
   Evaluator,
+  PromptingTechnique,
+  Retriever,
 } from "@langwatch/workflow-contract";
+import {
+  CodePropertiesPanel as WorkflowCodePropertiesPanel,
+  EndPropertiesPanel as WorkflowEndPropertiesPanel,
+  EntryPointPropertiesPanel as WorkflowEntryPointPropertiesPanel,
+  HttpPropertiesPanel as WorkflowHttpPropertiesPanel,
+  IfElsePropertiesPanel as WorkflowIfElsePropertiesPanel,
+  InsideDrawerProvider,
+  LiquidConditionEditor,
+  PromptingTechniquePropertiesPanel as WorkflowPromptingTechniquePropertiesPanel,
+  RetrievePropertiesPanel as WorkflowRetrievePropertiesPanel,
+  type WorkflowBasePropertiesPanelProps,
+  type WorkflowCodeEditorProps,
+  type WorkflowHttpConfigProps,
+  type WorkflowHttpTestConfig,
+  type WorkflowOutputsProps,
+  type WorkflowVariablesProps,
+  useWorkflowStore,
+} from "@langwatch/workflow-web";
+import { DatasetModal } from "../DatasetModal";
 import { AgentPropertiesPanel } from "../properties/AgentPropertiesPanel";
-import { CodePropertiesPanel } from "../properties/CodePropertiesPanel";
+import { BasePropertiesPanel, PropertySectionTitle } from "../properties/BasePropertiesPanel";
 import { CustomPropertiesPanel } from "../properties/CustomPropertiesPanel";
-import { EndPropertiesPanel } from "../properties/EndPropertiesPanel";
-import { EntryPointPropertiesPanel } from "../properties/EntryPointPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "../properties/EvaluatorPropertiesPanel";
-import { HttpPropertiesPanel } from "../properties/HttpPropertiesPanel";
-import { IfElsePropertiesPanel } from "../properties/IfElsePropertiesPanel";
-import { PromptingTechniquePropertiesPanel } from "../properties/PromptingTechniquePropertiesPanel";
-import { RetrievePropertiesPanel } from "../properties/RetrievePropertiesPanel";
+import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { SignaturePromptEditorBridge } from "./SignaturePromptEditorBridge";
 import { StudioDrawerWrapper } from "./StudioDrawerWrapper";
+
+function CodePropertiesPanel({ node }: { node: Node<Component> }) {
+  return (
+    <WorkflowCodePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
+    />
+  );
+}
+
+function EndPropertiesPanel({ node }: { node: Node<End> }) {
+  return (
+    <WorkflowEndPropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+    />
+  );
+}
+
+function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
+  const { total } = useGetDatasetData({ dataset: node.data.dataset, preview: true });
+
+  return (
+    <WorkflowEntryPointPropertiesPanel
+      node={node}
+      datasetTotal={total}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderDatasetModal={DatasetModal}
+      renderPropertySectionTitle={PropertySectionTitle}
+    />
+  );
+}
+
+function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
+  return (
+    <WorkflowHttpPropertiesPanel
+      node={node}
+      useHttpTest={(config: WorkflowHttpTestConfig) => useHttpTest(config)}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderHttpConfig={(props: WorkflowHttpConfigProps) => <HttpConfigEditor {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
+    />
+  );
+}
+
+function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
+  return (
+    <WorkflowIfElsePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderPropertySectionTitle={PropertySectionTitle}
+      renderLiquidConditionEditor={LiquidConditionEditor}
+    />
+  );
+}
+
+function PromptingTechniquePropertiesPanel({ node }: { node: Node<PromptingTechnique> }) {
+  return (
+    <WorkflowPromptingTechniquePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+    />
+  );
+}
+
+function RetrievePropertiesPanel({ node }: { node: Node<Retriever> }) {
+  return (
+    <WorkflowRetrievePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+    />
+  );
+}
 
 /**
  * Panel map for all node types. Every node type goes through
@@ -49,15 +151,14 @@ const ComponentPropertiesPanelMap: Partial<
  * for unified play/expand/close controls.
  */
 export function StudioNodeDrawer() {
-  const { selectedNode, deselectAllNodes, isDraggingNode, clickedNodeId } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        selectedNode: state.nodes.find((n) => n.selected),
-        deselectAllNodes: state.deselectAllNodes,
-        isDraggingNode: state.isDraggingNode,
-        clickedNodeId: state.clickedNodeId,
-      })),
-    );
+  const { selectedNode, deselectAllNodes, isDraggingNode, clickedNodeId } = useWorkflowStore(
+    useShallow((state) => ({
+      selectedNode: state.nodes.find((n) => n.selected),
+      deselectAllNodes: state.deselectAllNodes,
+      isDraggingNode: state.isDraggingNode,
+      clickedNodeId: state.clickedNodeId,
+    })),
+  );
 
   const { currentDrawer } = useDrawer();
 
@@ -81,11 +182,7 @@ export function StudioNodeDrawer() {
   const hasClickConfirmation = selectedNode && clickedNodeId === selectedNode.id;
 
   const effectiveNode =
-    !hasUrlDrawer &&
-    !isEmptyEvaluator &&
-    !isEmptyAgent &&
-    !isDraggingNode &&
-    hasClickConfirmation
+    !hasUrlDrawer && !isEmptyEvaluator && !isEmptyAgent && !isDraggingNode && hasClickConfirmation
       ? selectedNode
       : undefined;
 

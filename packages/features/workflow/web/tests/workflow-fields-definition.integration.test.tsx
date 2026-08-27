@@ -8,29 +8,18 @@
  * native select. Picking a type writes it back through the node.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Component } from "@langwatch/workflow-contract";
-
-const mockSetNode = vi.fn();
-
-vi.mock("@langwatch/workflow-web", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@langwatch/workflow-web")>();
-  return {
-    ...actual,
-    useWorkflowStore: (selector: (state: unknown) => unknown) =>
-      selector({ setNode: mockSetNode }),
-  };
-});
+import { FieldsDefinition } from "@langwatch/workflow-web";
+import { _useWorkflowStore } from "../src/hooks/use-workflow-store";
 
 vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => vi.fn(),
 }));
-
-import { FieldsDefinition } from "../BasePropertiesPanel";
 
 const node = (inputs: Component["inputs"]): Node<Component> => ({
   id: "node1",
@@ -39,28 +28,38 @@ const node = (inputs: Component["inputs"]): Node<Component> => ({
   data: { name: "Node", inputs },
 });
 
+class TestResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 const renderFields = ({
   inputs,
   readOnly = false,
 }: {
   inputs: Component["inputs"];
   readOnly?: boolean;
-}) =>
-  render(
+}) => {
+  const workflowNode = node(inputs);
+  _useWorkflowStore.getState().setNodes([workflowNode]);
+
+  return render(
     <ChakraProvider value={defaultSystem}>
-      <FieldsDefinition
-        node={node(inputs)}
-        field="inputs"
-        title="Results"
-        readOnly={readOnly}
-      />
+      <FieldsDefinition node={workflowNode} field="inputs" title="Results" readOnly={readOnly} />
     </ChakraProvider>,
   );
+};
 
 describe("FieldsDefinition type selector", () => {
+  beforeEach(() => {
+    _useWorkflowStore.getState().reset();
+    vi.stubGlobal("ResizeObserver", TestResizeObserver);
+  });
+
   afterEach(() => {
     cleanup();
-    vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   describe("when the fields are editable", () => {
@@ -69,23 +68,24 @@ describe("FieldsDefinition type selector", () => {
       renderFields({ inputs: [{ identifier: "result", type: "str" }] });
 
       const select = screen.getByTestId("field-type-select-inputs-0");
-      expect(select).toBeInTheDocument();
-      expect(within(select).getByText("Text")).toBeInTheDocument();
+      expect(select).not.toBeNull();
+      expect(within(select).getByText("Text")).not.toBeNull();
       // The old hidden <option>/<select> picker is gone.
-      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("combobox")).toBeNull();
     });
 
     /** @scenario Picking a type from the menu writes it back to the node */
     it("updates the field type through the node when a menu option is picked", async () => {
-      const user = userEvent.setup();
       renderFields({ inputs: [{ identifier: "result", type: "str" }] });
 
+      const user = userEvent.setup();
       await user.click(screen.getByTestId("field-type-select-inputs-0"));
       await user.click(screen.getByTestId("field-type-option-float"));
 
-      expect(mockSetNode).toHaveBeenCalledWith({
-        id: "node1",
-        data: { inputs: [{ identifier: "result", type: "float" }] },
+      await waitFor(() => {
+        expect(_useWorkflowStore.getState().nodes[0]?.data.inputs).toEqual([
+          { identifier: "result", type: "float" },
+        ]);
       });
     });
   });
@@ -99,8 +99,8 @@ describe("FieldsDefinition type selector", () => {
       });
 
       const select = screen.getByTestId("field-type-select-inputs-0");
-      expect(within(select).getByText("Number")).toBeInTheDocument();
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(within(select).getByText("Number")).not.toBeNull();
+      expect(screen.queryByRole("button")).toBeNull();
     });
   });
 });

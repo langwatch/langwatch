@@ -1,31 +1,72 @@
 import { Button, Field, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import type { Node } from "@xyflow/react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { DatasetPreviewTable } from "../../components/datasets/editor/DatasetPreviewTable";
-import { Dialog } from "../../components/ui/dialog";
-import { useGetDatasetData } from "../hooks/useGetDatasetData";
-import { useRunUntilHereDialogStore } from "@langwatch/workflow-web";
-import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
-import { useWorkflowStore } from "@langwatch/workflow-web";
-import type { Entry } from "@langwatch/workflow-contract";
-import { getNodeDisplayName } from "@langwatch/workflow-web";
+import { Dialog } from "@langwatch/design-system/dialog";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type { Component, Entry } from "@langwatch/workflow-contract";
+
+import { useRunUntilHereDialogStore } from "./hooks/use-run-until-here-dialog-store";
+import { useWorkflowStore } from "./hooks/use-workflow-store";
+import { getNodeDisplayName } from "./workflow-nodes";
+
+export type WorkflowPartialExecutionInput = {
+  untilNodeId: string;
+  inputs?: Record<string, string>[];
+};
+
+export type WorkflowDatasetPreviewRow = {
+  id?: string;
+  isSelected?: boolean;
+} & Record<string, unknown>;
+
+export type WorkflowDatasetPreviewProps = {
+  rows: WorkflowDatasetPreviewRow[];
+  columns: DatasetColumns;
+  onRowClick: (rowIndex: number) => void;
+};
+
+export type WorkflowRunUntilHereDialogProps = {
+  datasetRows: DatasetRecordEntry[];
+  datasetColumns: DatasetColumns;
+  onStartWorkflowExecution: (input: WorkflowPartialExecutionInput) => void;
+  renderDatasetPreview: (props: WorkflowDatasetPreviewProps) => ReactNode;
+};
+
+type EntryWorkflowNode = Node<Entry> & { type: "entry" };
+
+const isEntryWorkflowNode = (node: Node<Component>): node is EntryWorkflowNode =>
+  node.type === "entry";
+
+export const getWorkflowEntryNode = (nodes: Node<Component>[]): EntryWorkflowNode | undefined =>
+  nodes.find(isEntryWorkflowNode);
 
 const stringifyValue = (value: unknown): string => {
-  if (value === null || value === undefined) return "";
+  if (value === null || value === void 0) return "";
   if (typeof value === "string") return value;
   return JSON.stringify(value);
 };
 
-/**
- * Asks which values a partial run should execute with, instead of the
- * old hidden "Manual Test Entry" first/last/random picker on the entry
- * drawer. Fields prefill from the last submitted values (persisted on
- * the entry node as `manual_run_values`) or the first dataset row, and
- * an attached dataset can be browsed to run with one of its rows.
- * UX contract: specs/workflows/run-until-here-dialog.feature.
- */
-export function RunUntilHereDialog() {
+const hasSameValues = (
+  currentValues: Record<string, string>,
+  nextValues: Record<string, string>,
+) => {
+  const currentKeys = Object.keys(currentValues);
+  const nextKeys = Object.keys(nextValues);
+
+  return (
+    currentKeys.length === nextKeys.length &&
+    currentKeys.every((key) => currentValues[key] === nextValues[key])
+  );
+};
+
+export function WorkflowRunUntilHereDialog({
+  datasetRows,
+  datasetColumns,
+  onStartWorkflowExecution,
+  renderDatasetPreview,
+}: WorkflowRunUntilHereDialogProps) {
   const { untilNodeId, close } = useRunUntilHereDialogStore(
     useShallow(({ untilNodeId, close }) => ({ untilNodeId, close })),
   );
@@ -37,61 +78,44 @@ export function RunUntilHereDialog() {
       setPropertiesExpanded,
     })),
   );
-  const { startWorkflowExecution } = useWorkflowExecution();
 
-  const entryNode = nodes.find((node) => node.type === "entry");
-  const entryData = entryNode?.data as Entry | undefined;
+  const entryNode = getWorkflowEntryNode(nodes);
   const targetNode = nodes.find((node) => node.id === untilNodeId);
-  const fields = entryData?.outputs ?? [];
-  const dataset = entryData?.dataset;
-
-  const { rows, columns } = useGetDatasetData({ dataset });
+  const fields = entryNode?.data.outputs ?? [];
+  const dataset = entryNode?.data.dataset;
 
   const [view, setView] = useState<"fields" | "table">("fields");
   const [values, setValues] = useState<Record<string, string>>({});
-  const [selectedRowIndex, setSelectedRowIndex] = useState<number | undefined>(undefined);
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | undefined>(void 0);
   const userEditedValues = useRef(false);
-
-  // useGetDatasetData returns a fresh `rows` array reference on every render
-  // for saved datasets, so depending on `rows` directly re-fires this effect
-  // each render and the setValues below (always a new object) never settles -
-  // an infinite render loop. Key the prefill on the first row's CONTENT
-  // instead, which is stable across renders once the data has loaded.
-  const firstRowSignature = JSON.stringify(rows[0] ?? null);
-
-  // Prefill on open: last submitted values win, then the first dataset
-  // row (which may arrive async for saved datasets), then the input's
-  // default value, then empty.
   useEffect(() => {
     if (!untilNodeId) {
       setView("fields");
-      setSelectedRowIndex(undefined);
+      setSelectedRowIndex(void 0);
       userEditedValues.current = false;
       return;
     }
     if (userEditedValues.current) return;
-    const manualValues = (entryNode?.data as Entry | undefined)?.manual_run_values;
-    const firstRow = rows[0];
-    setValues(
-      Object.fromEntries(
-        (entryData?.outputs ?? []).map((field) => {
-          const fromRow = firstRow?.[field.identifier];
-          const value =
-            manualValues?.[field.identifier] ??
-            (fromRow !== undefined && fromRow !== null
-              ? stringifyValue(fromRow)
-              : stringifyValue(field.value));
-          return [field.identifier, value];
-        }),
-      ),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [untilNodeId, firstRowSignature]);
 
-  // Opening the dialog from a node's run menu selects that node, which
-  // surfaces its properties drawer docked behind the dialog. Deselect so the
-  // dialog stays clean; the drawer reopens on its own when the run completes
-  // (usePostEvent's execution_state_change handler re-selects the target).
+    const manualValues = entryNode?.data.manual_run_values;
+    const firstRow = datasetRows[0];
+    const nextValues = Object.fromEntries(
+      fields.map((field) => {
+        const fromRow = firstRow?.[field.identifier];
+        const value =
+          manualValues?.[field.identifier] ??
+          (fromRow !== void 0 && fromRow !== null
+            ? stringifyValue(fromRow)
+            : stringifyValue(field.value));
+        return [field.identifier, value];
+      }),
+    );
+
+    setValues((currentValues) =>
+      hasSameValues(currentValues, nextValues) ? currentValues : nextValues,
+    );
+  }, [datasetRows, entryNode?.data.manual_run_values, fields, untilNodeId]);
+
   useEffect(() => {
     if (untilNodeId) {
       deselectAllNodes();
@@ -101,29 +125,39 @@ export function RunUntilHereDialog() {
 
   const runWithValues = (runValues: Record<string, string>) => {
     if (!untilNodeId) return;
+
     if (entryNode && fields.length > 0) {
       setNode({
         id: entryNode.id,
-        data: { ...entryNode.data, manual_run_values: runValues } as Entry,
+        data: { ...entryNode.data, manual_run_values: runValues },
       });
     }
+
     close();
-    startWorkflowExecution({
+    onStartWorkflowExecution({
       untilNodeId,
-      inputs: fields.length > 0 ? [runValues] : undefined,
+      inputs: fields.length > 0 ? [runValues] : void 0,
     });
   };
 
   const runWithSelectedRow = () => {
-    if (selectedRowIndex === undefined) return;
-    const row = rows[selectedRowIndex];
+    if (selectedRowIndex === void 0) return;
+
+    const row = datasetRows[selectedRowIndex];
     if (!row) return;
+
     runWithValues(
       Object.fromEntries(
         fields.map((field) => [field.identifier, stringifyValue(row[field.identifier])]),
       ),
     );
   };
+
+  const previewRows = datasetRows.map((row, index) => ({
+    ...row,
+    id: stringifyValue(row.id),
+    isSelected: index === selectedRowIndex,
+  }));
 
   return (
     <Dialog.Root
@@ -149,16 +183,11 @@ export function RunUntilHereDialog() {
         </Dialog.Header>
         <Dialog.Body>
           {view === "table" ? (
-            <DatasetPreviewTable
-              rows={rows.map((row, index) => ({
-                ...row,
-                id: stringifyValue(row.id),
-                isSelected: index === selectedRowIndex,
-              }))}
-              columns={columns}
-              background="bg.panel"
-              onRowClick={(rowIndex) => setSelectedRowIndex(rowIndex)}
-            />
+            renderDatasetPreview({
+              rows: previewRows,
+              columns: datasetColumns,
+              onRowClick: setSelectedRowIndex,
+            })
           ) : fields.length > 0 ? (
             <VStack width="full" align="start" gap={3}>
               {fields.map((field) => (
@@ -170,16 +199,16 @@ export function RunUntilHereDialog() {
                     size="sm"
                     data-testid={`run-until-here-input-${field.identifier}`}
                     value={values[field.identifier] ?? ""}
-                    onChange={(e) => {
+                    onChange={(event) => {
                       userEditedValues.current = true;
                       setValues((current) => ({
                         ...current,
-                        [field.identifier]: e.target.value,
+                        [field.identifier]: event.target.value,
                       }));
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
                         runWithValues(values);
                       }
                     }}
@@ -202,12 +231,12 @@ export function RunUntilHereDialog() {
                 size="sm"
                 onClick={() => {
                   setView("fields");
-                  setSelectedRowIndex(undefined);
+                  setSelectedRowIndex(void 0);
                 }}
               >
                 Cancel
               </Button>
-              {selectedRowIndex !== undefined && (
+              {selectedRowIndex !== void 0 && (
                 <Button
                   colorPalette="orange"
                   size="sm"
@@ -220,7 +249,7 @@ export function RunUntilHereDialog() {
             </HStack>
           ) : (
             <HStack width="full">
-              {dataset && rows.length > 0 && (
+              {dataset && datasetRows.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"

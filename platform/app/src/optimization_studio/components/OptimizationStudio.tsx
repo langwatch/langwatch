@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Center,
-  Flex,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Center, Flex, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
   Background,
   BackgroundVariant,
@@ -21,7 +12,7 @@ import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart2 } from "react-feather";
 import {
   type ImperativePanelHandle,
@@ -32,6 +23,8 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import Head from "~/utils/compat/next-head";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
+import { DatasetPreviewTable } from "../../components/datasets/editor/DatasetPreviewTable";
+import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { GlobalUpgradeModal } from "../../components/UpgradeModal";
 import {
@@ -49,37 +42,54 @@ import { assertCrispChatHidden } from "../../utils/crispBubblePolicy";
 import { titleCase } from "../../utils/stringCasing";
 import {
   useAskBeforeLeaving,
+  type WorkflowEmojiPickerRenderProps,
+  WorkflowAutosave,
   WorkflowEdge,
+  WorkflowDragPreview,
+  WorkflowNamePopover,
+  WorkflowNodeSelectionPanel,
+  WorkflowNodeSelectionPanelButton,
+  WorkflowProgressToast,
+  WorkflowRunUntilHereDialog,
+  WorkflowRunningStatus,
+  WorkflowUndoRedo,
+  getWorkflowEntryNode,
   workflowNodeComponents,
 } from "@langwatch/workflow-web";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import { isConnectionAllowed } from "@langwatch/workflow-web";
 import { WorkflowNodeHostProvider } from "@langwatch/workflow-web";
-import type { Entry } from "@langwatch/workflow-contract";
+import {
+  fieldSchema,
+  getInputsOutputs,
+  studioWorkflowWireSchema,
+  studioWorkflowSchema,
+  type Entry,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import { LLMModelDisplay } from "../../components/llmPromptConfigs/LLMModelDisplay";
 import { HoverableBigText } from "../../components/HoverableBigText";
-import { AutoSave } from "./AutoSave";
 import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import { Evaluate } from "./Evaluate";
-import { RunningStatus } from "./ExecutionState";
 import { History } from "./History";
-import {
-  CustomDragLayer,
-  NodeSelectionPanel,
-  NodeSelectionPanelButton,
-} from "./node-selection-panel/NodeSelectionPanel";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { useComponentExecution } from "../hooks/useComponentExecution";
 import { useComponentVersion } from "../hooks/useComponentVersion";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
+import { useAgentPickerFlow } from "../hooks/useAgentPickerFlow";
+import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
+import { useEvaluatorPickerFlow } from "../hooks/useEvaluatorPickerFlow";
+import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
+import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { usePromptPickerFlow } from "../hooks/usePromptPickerFlow";
+import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { Optimize } from "./Optimize";
-import { ProgressToast } from "./ProgressToast";
+import { EmojiPickerModal } from "./properties/modals/EmojiPickerModal";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
-import { RunUntilHereDialog } from "./RunUntilHereDialog";
-import { UndoRedo } from "./UndoRedo";
-import { WorkflowNamePopover } from "./WorkflowNamePopover";
+import { DEFAULT_MODEL } from "../../utils/constants";
+import { api } from "../../utils/api";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -226,7 +236,7 @@ export default function OptimizationStudio() {
       <ReactFlowProvider>
         <DndProvider backend={HTML5Backend}>
           <PostEventProvider>
-            <CustomDragLayer />
+            <WorkflowDragPreview />
             <VStack width="full" height="full" gap={0}>
               <HStack
                 width="full"
@@ -239,13 +249,13 @@ export default function OptimizationStudio() {
                   <Link href={`/${project?.slug}/workflows`}>
                     <LogoIcon width={24} height={24} />
                   </Link>
-                  <RunningStatus />
+                  <StudioWorkflowRunningStatus />
                   {!["waiting", "running"].includes(executionStatus ?? "") && (
-                    <AutoSave />
+                    <StudioWorkflowAutosave />
                   )}
                 </HStack>
                 <HStack width="full" justify="center">
-                  <WorkflowNamePopover />
+                  <StudioWorkflowNamePopover />
                   <StatusCircle
                     status={socketStatus}
                     tooltip={
@@ -254,9 +264,7 @@ export default function OptimizationStudio() {
                           <HStack>
                             <StatusCircle
                               status={
-                                socketStatus === "connecting-python"
-                                  ? "connected"
-                                  : "connecting"
+                                socketStatus === "connecting-python" ? "connected" : "connecting"
                               }
                             />
                             <Text>Socket Connection</Text>
@@ -273,7 +281,7 @@ export default function OptimizationStudio() {
                   />
                 </HStack>
                 <HStack width="full" justify="end">
-                  <UndoRedo />
+                  <StudioWorkflowUndoRedo />
                   <History />
                   <Box />
                   <Evaluate />
@@ -284,14 +292,14 @@ export default function OptimizationStudio() {
               </HStack>
               <Box width="full" height="full" position="relative">
                 <Flex width="full" height="full">
-                  <NodeSelectionPanel
+                  <StudioWorkflowNodeSelectionPanel
                     isOpen={nodeSelectionPanelIsOpen}
                     setIsOpen={setNodeSelectionPanelIsOpen}
                   />
                   <PanelGroup direction="vertical">
                     <Panel style={{ position: "relative" }}>
                       <HStack position="absolute" bottom={3} left={3} zIndex={100}>
-                        <NodeSelectionPanelButton
+                        <StudioWorkflowNodeSelectionPanelButton
                           isOpen={nodeSelectionPanelIsOpen}
                           setIsOpen={setNodeSelectionPanelIsOpen}
                         />
@@ -312,7 +320,7 @@ export default function OptimizationStudio() {
                           </HStack>
                         </Button>
                       </HStack>
-                      {isResultsPanelCollapsed && <ProgressToast />}
+                      {isResultsPanelCollapsed && <StudioWorkflowProgressToast />}
                       <DragDropArea>
                         <OptimizationStudioCanvas
                           nodes={nodes}
@@ -377,9 +385,7 @@ export default function OptimizationStudio() {
                         </OptimizationStudioCanvas>
                       </DragDropArea>
                     </Panel>
-                    <PanelResizeHandle
-                      style={{ position: "relative", marginTop: "-20px" }}
-                    >
+                    <PanelResizeHandle style={{ position: "relative", marginTop: "-20px" }}>
                       <Center paddingY={2}>
                         <Box
                           width="30px"
@@ -412,7 +418,7 @@ export default function OptimizationStudio() {
       </ReactFlowProvider>
 
       <CurrentDrawer marginTop={56} />
-      <RunUntilHereDialog />
+      <StudioWorkflowRunUntilHereDialog />
       {/* The studio route doesn't use DashboardLayout, so the v2 trace
           explorer needs its own mount here - without it, view-trace from
           the evaluations panel routes to traceV2Details (per the device
@@ -429,10 +435,7 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const bgColor = useColorModeValue(
-    useColorRawValue("gray.100"),
-    useColorRawValue("gray.900"),
-  );
+  const bgColor = useColorModeValue(useColorRawValue("gray.100"), useColorRawValue("gray.900"));
   // Hardcoded to the pre-redesign grays (old gray.300 in light, a subtle dark
   // in dark). The theme gray scale shifted to darker Chakra v3 defaults, which
   // turned the canvas dots into a heavy grid; pin them so the texture stays the
@@ -450,13 +453,7 @@ function ReactFlowBackground() {
   );
 }
 
-function StatusCircle({
-  status,
-  tooltip,
-}: {
-  status: string;
-  tooltip?: string | React.ReactNode;
-}) {
+function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | React.ReactNode }) {
   return (
     <Tooltip content={tooltip}>
       <HStack>
@@ -523,8 +520,7 @@ export function OptimizationStudioCanvas({
           zoom: defaultZoom,
           x: 100,
           y: Math.round(
-            ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) /
-              2,
+            ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) / 2,
           ),
         }}
         proOptions={{ hideAttribution: true }}
@@ -535,4 +531,179 @@ export function OptimizationStudioCanvas({
       </ReactFlow>
     </WorkflowNodeHostProvider>
   );
+}
+
+function StudioWorkflowNodeSelectionPanel({
+  isOpen,
+  setIsOpen,
+}: {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const workflowId = useWorkflowStore((state) => state.workflow_id);
+  const { handlePromptDragEnd } = usePromptPickerFlow();
+  const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
+  const { handleAgentDragEnd } = useAgentPickerFlow();
+  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "workflows.create_default" },
+    { enabled: !!project?.id },
+  );
+  const components = api.optimization.getComponents.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project?.id && !!workflowId,
+      refetchOnWindowFocus: true,
+    },
+  );
+
+  const customComponents = useMemo(() => {
+    return (components.data ?? []).flatMap((component) => {
+      if (!component.isComponent || !component.publishedId) {
+        return [];
+      }
+
+      const publishedVersion = component.versions.find(
+        (version) => version.id === component.publishedId,
+      );
+      if (!publishedVersion) {
+        return [];
+      }
+
+      const workflow = studioWorkflowSchema.safeParse(publishedVersion.dsl);
+      if (!workflow.success) {
+        return [];
+      }
+
+      const fields = getInputsOutputs(workflow.data.edges, workflow.data.nodes);
+      return [
+        {
+          id: component.id,
+          name: component.name,
+          publishedId: component.publishedId,
+          inputs: normalizePaletteFields(fields.inputs),
+          outputs: normalizePaletteFields(fields.outputs),
+        },
+      ];
+    });
+  }, [components.data]);
+
+  return (
+    <WorkflowNodeSelectionPanel
+      isOpen={isOpen}
+      setIsOpen={setIsOpen}
+      defaultModel={resolvedDefault.data?.model ?? DEFAULT_MODEL}
+      customComponents={customComponents}
+      onPromptDragEnd={handlePromptDragEnd}
+      onEvaluatorDragEnd={handleEvaluatorDragEnd}
+      onAgentDragEnd={handleAgentDragEnd}
+    />
+  );
+}
+
+function StudioWorkflowAutosave() {
+  const { project } = useOrganizationTeamProject();
+  const { workflow } = useLoadWorkflow();
+  const autosave = api.workflow.autosave.useMutation();
+  const trpc = api.useUtils();
+  const onSave = useCallback(
+    ({ dsl, setAsLatestVersion }: { dsl: StudioWorkflow; setAsLatestVersion: boolean }) => {
+      if (!project || !workflow.data) {
+        return Promise.reject(new Error("Workflow is not ready to autosave"));
+      }
+      return autosave.mutateAsync({
+        projectId: project.id,
+        workflowId: workflow.data.id,
+        dsl: studioWorkflowWireSchema.parse(dsl),
+        setAsLatestVersion,
+      });
+    },
+    [autosave, project, workflow.data],
+  );
+  const onRefreshVersions = useCallback(async () => {
+    if (!project || !workflow.data) {
+      return;
+    }
+    await trpc.workflow.getVersions.refetch({
+      workflowId: workflow.data.id,
+      projectId: project.id,
+      returnDSL: "previousVersion",
+    });
+  }, [project, trpc.workflow.getVersions, workflow.data]);
+
+  return (
+    <WorkflowAutosave
+      isWorkflowReady={!!project && !!workflow.data}
+      onSave={onSave}
+      onRefreshVersions={onRefreshVersions}
+    />
+  );
+}
+
+function StudioWorkflowRunningStatus({ isLoading }: { isLoading?: boolean }) {
+  const { stopWorkflowExecution } = useWorkflowExecution();
+
+  return (
+    <WorkflowRunningStatus
+      isLoading={isLoading}
+      onStop={({ traceId }) => stopWorkflowExecution({ trace_id: traceId })}
+    />
+  );
+}
+
+function StudioWorkflowRunUntilHereDialog() {
+  const dataset = useWorkflowStore((state) => getWorkflowEntryNode(state.nodes)?.data.dataset);
+  const { rows, columns } = useGetDatasetData({ dataset });
+  const { startWorkflowExecution } = useWorkflowExecution();
+
+  return (
+    <WorkflowRunUntilHereDialog
+      datasetRows={rows}
+      datasetColumns={columns}
+      onStartWorkflowExecution={startWorkflowExecution}
+      renderDatasetPreview={({ rows: previewRows, columns: previewColumns, onRowClick }) => (
+        <DatasetPreviewTable
+          rows={previewRows}
+          columns={previewColumns}
+          background="bg.panel"
+          onRowClick={onRowClick}
+        />
+      )}
+    />
+  );
+}
+
+function StudioWorkflowUndoRedo() {
+  const { workflow } = useLoadWorkflow();
+  return <WorkflowUndoRedo isWorkflowLoaded={workflow.isFetched} />;
+}
+
+function StudioWorkflowNamePopover() {
+  return <WorkflowNamePopover renderEmojiPicker={renderWorkflowEmojiPicker} />;
+}
+
+function StudioWorkflowProgressToast() {
+  const { stopEvaluationExecution } = useEvaluationExecution();
+  const { stopOptimizationExecution } = useOptimizationExecution();
+
+  return (
+    <WorkflowProgressToast
+      renderEvaluationProgress={(state) => <EvaluationProgressBar evaluationState={state} />}
+      onStopEvaluation={({ runId }) => stopEvaluationExecution({ run_id: runId })}
+      onStopOptimization={({ runId }) => stopOptimizationExecution({ run_id: runId })}
+    />
+  );
+}
+
+const StudioWorkflowNodeSelectionPanelButton = WorkflowNodeSelectionPanelButton;
+
+function renderWorkflowEmojiPicker(props: WorkflowEmojiPickerRenderProps) {
+  return <EmojiPickerModal {...props} />;
+}
+
+function normalizePaletteFields(fields: unknown[] | undefined) {
+  return (fields ?? []).flatMap((field) => {
+    const parsed = fieldSchema.safeParse(field);
+    return parsed.success ? [parsed.data] : [];
+  });
 }

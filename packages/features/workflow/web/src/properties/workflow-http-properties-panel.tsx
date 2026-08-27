@@ -3,25 +3,26 @@ import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-
-import { HttpConfigEditor, useHttpTest } from "~/components/agents/http";
-import {
-  CODE_OUTPUT_TYPES,
-  type Output,
-  OutputsSection,
-  type OutputType,
-} from "~/components/outputs/OutputsSection";
-import type { FieldMapping } from "~/components/variables";
-import { type Variable, VariablesSection } from "~/components/variables";
+import type { WorkflowPanelFieldMapping } from "./workflow-properties.ports";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/workflow-contract";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../hooks/use-workflow-store";
 import type { Component, Field as DslField } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "@langwatch/workflow-web";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
+} from "../utils/edge-mapping";
+import type {
+  WorkflowBasePropertiesPanelProps,
+  WorkflowHttpConfigProps,
+  WorkflowHttpTestConfig,
+  WorkflowHttpTestResult,
+  WorkflowOutputsProps,
+  WorkflowVariablesProps,
+  WorkflowVariable,
+} from "./workflow-properties.ports";
+
+const CODE_OUTPUT_TYPES: DslField["type"][] = ["str", "float", "bool", "dict", "list", "image"];
 
 /**
  * Get a parameter value from the node's parameters array.
@@ -80,18 +81,35 @@ function parseHeadersFromParams(parameters: DslField[] | undefined): HttpHeader[
  * Uses the shared HttpConfigEditor for the endpoint + tabs UI,
  * plus studio-specific input mappings and outputs.
  */
-export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
-  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        nodes: state.getWorkflow().nodes,
-        edges: state.getWorkflow().edges,
-        setNode: state.setNode,
-        setNodeParameter: state.setNodeParameter,
-        setEdges: state.setEdges,
-        getWorkflow: state.getWorkflow,
-      })),
-    );
+export function HttpPropertiesPanel({
+  node,
+  renderBase: BasePropertiesPanel,
+  renderHttpConfig: HttpConfigEditor,
+  renderVariables: VariablesSection,
+  renderOutputs: OutputsSection,
+  onTest,
+  useHttpTest,
+}: {
+  node: Node<Component>;
+  renderBase: (props: WorkflowBasePropertiesPanelProps) => React.ReactNode;
+  renderHttpConfig: (props: WorkflowHttpConfigProps) => React.ReactNode;
+  renderVariables: (props: WorkflowVariablesProps) => React.ReactNode;
+  renderOutputs: (props: WorkflowOutputsProps) => React.ReactNode;
+  onTest?: (templateVariables: Record<string, unknown>) => Promise<WorkflowHttpTestResult>;
+  useHttpTest: (config: WorkflowHttpTestConfig) => {
+    handleTest: (templateVariables: Record<string, unknown>) => Promise<WorkflowHttpTestResult>;
+  };
+}) {
+  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } = useWorkflowStore(
+    useShallow((state) => ({
+      nodes: state.getWorkflow().nodes,
+      edges: state.getWorkflow().edges,
+      setNode: state.setNode,
+      setNodeParameter: state.setNodeParameter,
+      setEdges: state.setEdges,
+      getWorkflow: state.getWorkflow,
+    })),
+  );
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Read HTTP config from parameters
@@ -101,16 +119,17 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
   const outputPath = (getParam(node.data.parameters, "output_path") as string) ?? "";
   const auth = parseAuthFromParams(node.data.parameters);
   const headers = parseHeadersFromParams(node.data.parameters);
+  const test = useHttpTest({ url, method, headers, auth, outputPath, bodyTemplate });
 
   // Convert node inputs/outputs
-  const inputs: Variable[] = (node.data.inputs ?? []).map((input) => ({
+  const inputs: WorkflowVariable[] = (node.data.inputs ?? []).map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
 
-  const outputs: Output[] = (node.data.outputs ?? []).map((output) => ({
+  const outputs: WorkflowOutputsProps["outputs"] = (node.data.outputs ?? []).map((output) => ({
     identifier: output.identifier,
-    type: output.type as OutputType,
+    type: output.type,
   }));
 
   // Build mapping data from workflow graph
@@ -130,10 +149,9 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   const handleMappingChange = useCallback(
-    (identifier: string, mapping: FieldMapping | undefined) => {
+    (identifier: string, mapping: WorkflowPanelFieldMapping | undefined) => {
       const workflow = getWorkflow();
-      const currentInputs =
-        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
       const result = applyMappingChange({
         nodeId: node.id,
         identifier,
@@ -156,10 +174,7 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
     [node.id, setNodeParameter],
   );
 
-  const handleUrlChange = useCallback(
-    (newUrl: string) => setParam("url", newUrl),
-    [setParam],
-  );
+  const handleUrlChange = useCallback((newUrl: string) => setParam("url", newUrl), [setParam]);
 
   const handleMethodChange = useCallback(
     (newMethod: HttpMethod) => setParam("method", newMethod),
@@ -201,7 +216,7 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
 
   // Handle inputs change
   const handleInputsChange = useCallback(
-    (newVariables: Variable[]) => {
+    (newVariables: WorkflowVariable[]) => {
       const existingInputs = node.data.inputs ?? [];
       const newInputs: DslField[] = newVariables.map((v) => {
         const existing = existingInputs.find((i) => i.identifier === v.identifier);
@@ -219,7 +234,7 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
 
   // Handle outputs change
   const handleOutputsChange = useCallback(
-    (newOutputs: Output[]) => {
+    (newOutputs: WorkflowOutputsProps["outputs"]) => {
       const outputs: DslField[] = newOutputs.map((o) => ({
         identifier: o.identifier,
         type: o.type as DslField["type"],
@@ -229,16 +244,6 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
     },
     [node.id, setNode, updateNodeInternals],
   );
-
-  // HTTP test via shared hook
-  const { handleTest } = useHttpTest({
-    url,
-    method,
-    headers,
-    auth,
-    outputPath,
-    bodyTemplate,
-  });
 
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={0}>
@@ -255,7 +260,7 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
         onAuthChange={handleAuthChange}
         headers={headers}
         onHeadersChange={handleHeadersChange}
-        onTest={handleTest}
+        onTest={onTest ?? test.handleTest}
       />
 
       {/* Inputs with mappings */}

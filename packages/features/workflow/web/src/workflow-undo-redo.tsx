@@ -1,42 +1,39 @@
 import { Button } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { RotateCcw, RotateCw } from "react-feather";
-import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
-import { _useWorkflowStore } from "@langwatch/workflow-web";
 
-export function UndoRedo() {
+import { _useWorkflowStore } from "./hooks/use-workflow-store";
+
+/** Browser-only workflow history controls. The app owns when the workflow query is loaded. */
+export function WorkflowUndoRedo({ isWorkflowLoaded }: { isWorkflowLoaded: boolean }) {
   const { undo, redo, pastStates, futureStates, clear, pause, resume } =
     _useWorkflowStore.temporal.getState();
-
-  const { workflow } = useLoadWorkflow();
 
   useEffect(() => {
     const handleUndoRedoKeyDown = (event: KeyboardEvent) => {
       const isMac = navigator.userAgent.includes("Mac");
-
-      if (
+      const shouldRedo =
         (event.metaKey && event.shiftKey && event.key === "z") ||
-        (event.ctrlKey && event.key === "y")
-      ) {
-        redo();
-      } else if (
+        (event.ctrlKey && event.key === "y");
+      const shouldUndo =
         (isMac && event.metaKey && !event.shiftKey && event.key === "z") ||
-        (!isMac && event.ctrlKey && event.key === "z")
-      ) {
+        (!isMac && event.ctrlKey && event.key === "z");
+
+      if (shouldRedo) {
+        redo();
+      } else if (shouldUndo) {
         undo();
       }
     };
 
     window.addEventListener("keydown", handleUndoRedoKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleUndoRedoKeyDown);
-    };
+    return () => window.removeEventListener("keydown", handleUndoRedoKeyDown);
   }, [undo, redo]);
 
-  // Fix for initial state
   useEffect(() => {
     let resumeTimeout: ReturnType<typeof setTimeout> | undefined;
-    if (workflow.isFetched) {
+
+    if (isWorkflowLoaded) {
       resumeTimeout = setTimeout(() => {
         resume();
         clear();
@@ -44,11 +41,13 @@ export function UndoRedo() {
     } else {
       pause();
     }
+
     return () => {
-      if (resumeTimeout) clearTimeout(resumeTimeout);
+      if (resumeTimeout) {
+        clearTimeout(resumeTimeout);
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflow.isFetched]);
+  }, [clear, isWorkflowLoaded, pause, resume]);
 
   return (
     <>

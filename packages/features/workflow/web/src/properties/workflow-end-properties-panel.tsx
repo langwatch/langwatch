@@ -2,10 +2,13 @@ import { Alert, Box, HStack, Text } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { type Variable, VariablesSection } from "~/components/variables";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "../hooks/use-workflow-store";
 import type { End, Field } from "@langwatch/workflow-contract";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
+import type {
+  WorkflowBasePropertiesPanelProps,
+  WorkflowVariablesProps,
+  WorkflowVariable,
+} from "./workflow-properties.ports";
 
 /**
  * The full vocabulary an evaluator can return. When the workflow
@@ -39,7 +42,15 @@ const EVALUATOR_RESULT_DESCRIPTIONS: Record<string, string> = {
   details: "The reasoning behind the result, usually the LLM as judge explanation.",
 };
 
-export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
+export function EndPropertiesPanel({
+  node: initialNode,
+  renderBase: BasePropertiesPanel,
+  renderVariables: VariablesSection,
+}: {
+  node: Node<End>;
+  renderBase: (props: WorkflowBasePropertiesPanelProps) => React.ReactNode;
+  renderVariables: (props: WorkflowVariablesProps) => React.ReactNode;
+}) {
   const { node, edges, setNode, workflowType } = useWorkflowStore(
     useShallow((state) => ({
       node: state.nodes.find((n) => n.id === initialNode.id) as Node<End>,
@@ -73,10 +84,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
       EVALUATOR_RESULT_FIELDS.every((f, i) => {
         const c = current[i];
         return (
-          c &&
-          c.identifier === f.identifier &&
-          c.type === f.type &&
-          !!c.optional === !!f.optional
+          c && c.identifier === f.identifier && c.type === f.type && !!c.optional === !!f.optional
         );
       });
     if (!matchesContract) {
@@ -100,13 +108,13 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
 
   // Non-evaluator end nodes keep free-form results, rendered through the
   // shared VariablesSection so the rows match every other node panel.
-  const variables: Variable[] = (node.data.inputs ?? []).map((f) => ({
+  const variables = (node.data.inputs ?? []).map((f) => ({
     identifier: f.identifier,
-    type: f.type as Variable["type"],
+    type: f.type as WorkflowVariable["type"],
   }));
 
   const handleResultsChange = useCallback(
-    (newVariables: Variable[]) => {
+    (newVariables: WorkflowVariable[]) => {
       const existing = node.data.inputs ?? [];
       const newInputs: Field[] = newVariables.map((variable) => {
         const prev = existing.find((i) => i.identifier === variable.identifier);
@@ -131,8 +139,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
             Results
           </Text>
           <Text fontSize="13px" color="fg.muted">
-            Evaluators return up to these four results. Connect the ones your workflow
-            produces; unconnected results are simply omitted.
+            Evaluators return up to these four results. Connect the ones your workflow produces;
+            unconnected results are simply omitted.
           </Text>
           <Box display="flex" flexDirection="column" gap={3}>
             {EVALUATOR_RESULT_FIELDS.map((field) => (
@@ -170,8 +178,8 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
           <Alert.Indicator />
           <Alert.Content>
             <Text>
-              Connect at least one result, usually a <b>passed</b> or a <b>score</b>, for
-              this evaluator to be useful.
+              Connect at least one result, usually a <b>passed</b> or a <b>score</b>, for this
+              evaluator to be useful.
             </Text>
           </Alert.Content>
         </Alert.Root>
