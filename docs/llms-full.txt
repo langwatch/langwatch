@@ -16822,7 +16822,7 @@ The puller queries two Dataverse tables per run:
 | Table | What it provides |
 |---|---|
 | `conversationtranscripts` | Every conversation, stored as Bot Framework activity blobs |
-| `bots` | Agent names, so conversations show which agent answered |
+| `bot` | Agent names, so conversations show which agent answered |
 
 Each conversation produces one trace, with:
 - Each user question paired with the agent's answer as a turn
@@ -16833,10 +16833,10 @@ Each conversation produces one trace, with:
 
 ## What the admin sets up
 
-### In the Azure portal
+### In Azure and Power Platform
 
-1. **App registrations**: register one application (e.g. `langwatch-copilot-reader`).
-2. **Certificates & secrets**: create a client secret and copy the value.
+1. **App registrations** (Azure portal): register one application (e.g. `langwatch-copilot-reader`).
+2. **Certificates & secrets** (Azure portal): create a client secret and copy the value.
 3. **Power Platform admin centre**: in the target environment, create an application user for the app registration and grant it a security role that can read the `conversationtranscripts` and `bot` tables.
 
 No directory permission is needed. The puller never calls Microsoft Graph.
