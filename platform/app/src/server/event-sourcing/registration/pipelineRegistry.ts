@@ -48,9 +48,13 @@ import {
   RepositoryFoldStore,
   throttledWindow,
 } from "@langwatch/eventing";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type {
+  TraceCanonicalisationService,
+  TraceService,
+  TraceSummaryData,
+} from "@langwatch/trace-contract";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { GithubService } from "@langwatch/github-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { BlobSweeper } from "@langwatch/group-queue/operational";
 import type {
   LangyConversationStateData,
@@ -63,18 +67,28 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automation-contract";
 import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
-import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { DatasetNormalizePayload } from "@langwatch/dataset-server";
-import { featureFlagService } from "~/server/featureFlag";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
-import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
-import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
+import type { GatewaySpendEventsPort } from "@langwatch/gateway-server";
 import { incrementAutomationMatchRecordsTotal } from "~/server/metrics";
+import {
+  incrementTopicClusteringPageTotal,
+  observeTopicClusteringPageDuration,
+} from "~/server/metrics";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { UsageReportingService } from "~/runtime/app/features/billing";
-import type { AutomationService } from "@langwatch/automation-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import { AppTraceRecordSpanAdapter } from "~/runtime/app/trace-record-span.adapter";
+import type { AppTraceProjectionStorage } from "~/runtime/app/trace-projection-storage.adapter";
+import type {
+  AutomationEvaluationSubscriberService,
+  AutomationService,
+} from "@langwatch/automation-contract";
+import type {
+  EvaluationService,
+  ExecuteEvaluationCommandData,
+  ReportEvaluationCommandData,
+} from "@langwatch/evaluation-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import type { BillingCheckpointService } from "../../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../../app-layer/broadcast/broadcast.service";
@@ -87,18 +101,10 @@ import {
   createCodingAgentMetricFactsDispatchSubscriber,
   createCodingAgentSpanFactsDispatchSubscriber,
 } from "@langwatch/coding-agent-server";
-import { AppCodingAgentTraceProcessingAdapter } from "~/runtime/app/features/coding-agent-trace-processing.adapter";
-import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
-import type { EvaluationCostRecorder } from "../../app-layer/evaluations/evaluation-cost.recorder";
-import { offloadInputsIfOversized } from "../../app-layer/evaluations/evaluation-inputs-offload";
-import type { EvaluationAnalyticsRepository } from "../../app-layer/evaluations/repositories/evaluation-analytics.repository";
-import type { EvaluationAnalyticsRollupRepository } from "../../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
-import type { LangyTitleGenerator } from "../../app-layer/langy/langy-title-generation.service";
-import {
-  mintLangySessionApiKeyForUser,
-  revokeLangySessionApiKey,
-} from "../../app-layer/langy/langyApiKey";
-import type { LangyWorkerPort } from "@langwatch/langy-server";
+import type { EvaluationCostRecorderPort } from "@langwatch/evaluation-server";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { LangyTitleGenerator } from "~/runtime/app/features/langy-title-generation.adapter";
+import type { LangySessionKeyService, LangyWorkerPort } from "@langwatch/langy-server";
 import type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 import type { LangyTokenBuffer } from "@langwatch/langy-server";
 import type { LangyTurnHandoffStore } from "@langwatch/langy-server";
@@ -110,41 +116,47 @@ import {
 import type { LogRuntimeAdapter } from "@langwatch/log-server";
 import type { MetricRuntimeAdapter } from "@langwatch/metric-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import type { OrganizationService } from "../../app-layer/organizations/organization.service";
 import type { ProjectService } from "@langwatch/project-contract";
-import { createRateLimitedBootstrap } from "../../app-layer/topic-clustering/topicClusteringBootstrapGate";
-import type { TraceAnalyticsRepository } from "../../app-layer/traces/repositories/trace-analytics.repository";
-import type { TraceAnalyticsRollupRepository } from "../../app-layer/traces/repositories/trace-analytics-rollup.repository";
-import type { TraceSummaryRepository } from "../../app-layer/traces/repositories/trace-summary.repository";
+import type {
+  TraceAnalyticsRepository,
+  TraceAnalyticsRollupRepository,
+  TraceSummaryRepository,
+} from "@langwatch/trace-server";
 import type { SpanStorageService } from "../../app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "../../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../../app-layer/traces/trace-summary.service";
-import type { TraceSummaryData } from "../../app-layer/traces/types";
-import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
+import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { publishCancellation } from "../../scenarios/cancellation-channel";
-import type { ScenarioExecutionPool } from "../../scenarios/execution/execution-pool";
+import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import type { SimulationService } from "@langwatch/simulation-contract";
 import {
   createAutomationsPipeline,
   createGraphTriggerActivityHandler,
 } from "@langwatch/automation-server";
 import type { AutomationDispatchPorts } from "~/runtime/app/features/automation-dispatch.wiring";
-import { AppAutomationEvaluationSubscriberRuntime } from "~/runtime/app/features/evaluation-automation-subscribers.adapter";
 import { ReportUsageForMonthCommand } from "../pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "../pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "../pipelines/blob-maintenance/pipeline";
-import { ExecuteEvaluationCommand } from "../pipelines/evaluation-processing/commands/executeEvaluation.command";
 import {
+  EvaluationExecutionIntentService,
+  ExecuteEvaluationCommand,
+  EvaluationEventingAdapter,
+  type EvaluationInputOffloadConfig,
   createEvaluationProcessingPipeline,
-  type EvaluationProcessingPipelineDeps,
-} from "../pipelines/evaluation-processing/pipeline";
-import type { EvaluationAnalyticsData } from "../pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
-import { EvaluationAnalyticsStore } from "../pipelines/evaluation-processing/projections/evaluationAnalytics.store";
-import { EvaluationAnalyticsRollupAppendStore } from "../pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
-import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
+} from "@langwatch/evaluation-server";
+import {
+  AppEvaluationAzureSafetyCredentialsPort,
+  type AppEvaluationExecutionControls,
+} from "~/runtime/app/features/evaluation";
+import { AppAutomationEvaluationSubscriberRuntime } from "~/runtime/app/features/evaluation-automation-subscribers.adapter";
+import { AppEvaluationExecutionReceiptPort } from "~/runtime/app/features/evaluation-execution-receipt.adapter";
+import { TraceAnalyticsAttributePolicy } from "~/runtime/app/features/evaluation-analytics-attribute-policy.adapter";
 import { createExperimentRunProcessingPipeline } from "../pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "../pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "../pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
@@ -154,11 +166,11 @@ import type { ExperimentRunStateRepository } from "../pipelines/experiment-run-p
 import type { ComputeExperimentRunMetricsCommandData } from "../pipelines/experiment-run-processing/schemas/commands";
 import { createGatewaySpendProcessingPipeline } from "../pipelines/gateway-spend-processing/pipeline";
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../pipelines/gateway-spend-processing/process-manager/spendSettlement.process";
-import type { GatewaySpendState } from "../pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
+import type { GatewaySpendState } from "@langwatch/gateway-server";
 import { GatewaySpendStore } from "../pipelines/gateway-spend-processing/projections/gatewaySpend.store";
 import type { OpenAdmission } from "../pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
 import { getOpenAdmissionFindersByInstance } from "../pipelines/gateway-spend-processing/repositories/openAdmissions.clickhouse.repository";
-import { GATEWAY_SPEND_PIPELINE_NAME } from "../pipelines/gateway-spend-processing/schemas/constants";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "@langwatch/gateway-server";
 import { EventingGithubMaintenanceAdapter } from "@langwatch/github-server";
 import { createLangyConversationProcessingPipeline } from "@langwatch/langy-server";
 import { createLangyEffectPorts } from "../pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
@@ -174,7 +186,10 @@ import {
 } from "../pipelines/simulation-processing/commands/computeRunMetrics.command";
 import { FinishRunCommand } from "../pipelines/simulation-processing/commands/finishRun.command";
 import { createSimulationProcessingPipeline } from "../pipelines/simulation-processing/pipeline";
-import type { SimulationRunExecutionCommands } from "../pipelines/simulation-processing/process-manager";
+import {
+  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+  simulationRunExecutionPM,
+} from "@langwatch/simulation-server";
 import type { SimulationRunMetricsProjectionRecord } from "../pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
 import type { SimulationRunStateData } from "../pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import type { SimulationRunStateRepository } from "../pipelines/simulation-processing/repositories/simulationRunState.repository";
@@ -182,29 +197,31 @@ import type { ComputeRunMetricsCommandData } from "../pipelines/simulation-proce
 import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "../pipelines/simulation-processing/schemas/events";
 import { createSuiteRunProcessingPipeline } from "../pipelines/suite-run-processing/pipeline";
-import { SUITE_RUN_PROJECTION_VERSIONS } from "../pipelines/suite-run-processing/schemas/constants";
-import { createTopicClusteringProcessingPipeline } from "../pipelines/topic-clustering-processing/pipeline";
-import type {
-  TopicClusteringOutcomeCommands,
-  TopicClusteringRunPort,
-} from "../pipelines/topic-clustering-processing/process-manager";
-import type { TopicClusteringRunHistoryData } from "../pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
-import type { TopicClusteringRunStatusData } from "../pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
-import type { TopicModelData } from "../pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
-import { resolveSpanCommandShardCount } from "../pipelines/trace-processing/commands/spanCommandGroupKey";
+import {
+  classifyClusteringError,
+  createTopicClusteringProcessingPipeline,
+  RedisTopicClusteringBootstrapAdapter,
+  type TopicClusteringOutcomeCommands,
+  type TopicClusteringRunHistoryData,
+  type TopicClusteringRunPort,
+  type TopicClusteringRunStatusData,
+  type TopicModelData,
+} from "@langwatch/topic-server";
+import { resolveSpanCommandShardCount } from "@langwatch/trace-server";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
-} from "../pipelines/trace-processing/pipeline";
-import { SpanAppendStore } from "../pipelines/trace-processing/projections/spanStorage.store";
-import type { TraceAnalyticsData } from "../pipelines/trace-processing/projections/traceAnalytics.foldProjection";
-import { TraceAnalyticsStore } from "../pipelines/trace-processing/projections/traceAnalytics.store";
-import { TraceAnalyticsRollupAppendStore } from "../pipelines/trace-processing/projections/traceAnalyticsRollup.store";
-import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
-import type { ResolveOriginCommandData } from "../pipelines/trace-processing/schemas/commands";
-import type { TraceProcessingEvent } from "../pipelines/trace-processing/schemas/events";
+} from "~/runtime/app/trace-processing.adapter";
+import { AppTraceProjectionStorageAdapter } from "~/runtime/app/trace-projection-storage.adapter";
+import { SpanStorageStore } from "@langwatch/trace-server";
+import type { TraceAnalyticsData } from "@langwatch/trace-server";
+import { TraceAnalyticsStore } from "@langwatch/trace-server";
+import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
+import type { ResolveOriginCommandData } from "@langwatch/trace-contract";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import { AppCodingAgentTraceProcessingAdapter } from "~/runtime/app/features/coding-agent-trace-processing.adapter";
 import { createCustomEvaluationSyncHandler } from "../pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
-import { createEvaluationTriggerSubscriber } from "../pipelines/trace-processing/subscribers/evaluationTrigger.subscriber";
+import { createEvaluationTriggerSubscriber } from "~/runtime/app/trace-evaluation-trigger.adapter";
 import { createExperimentMetricsSyncHandler } from "../pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
 import {
   createDeferredOriginHandler,
@@ -220,6 +237,11 @@ import { createTraceUpdateBroadcastHandler } from "../pipelines/trace-processing
 import { createTrackedEventSyncHandler } from "../pipelines/trace-processing/subscribers/trackedEventSync.subscriber";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
+
+type EvaluationPipelineCommands = {
+  executeEvaluation: CommandDispatcher<ExecuteEvaluationCommandData>;
+  reportEvaluation: CommandDispatcher<ReportEvaluationCommandData>;
+};
 
 class AppGovernanceSubscriberRuntime extends GovernanceSubscriberRuntime {
   capture(error: unknown): void {
@@ -318,28 +340,6 @@ function createInMemoryDeferredFallback<P>({
 }
 
 /**
- * Late-bound holder for this pod's scenario execution pool. Owned by the
- * registry; the simulationRunExecution process manager's execute intent reads
- * it via `getPool`, and worker startup (startWorkers.bootScenarioProcessor)
- * sets the pool once the ScenarioExecutionPool exists — after the pipeline
- * registry has been built.
- */
-export interface ScenarioExecutionPoolHolder {
-  get(): ScenarioExecutionPool | null;
-  set(pool: ScenarioExecutionPool): void;
-}
-
-function createScenarioExecutionPoolHolder(): ScenarioExecutionPoolHolder {
-  let pool: ScenarioExecutionPool | null = null;
-  return {
-    get: () => pool,
-    set: (p) => {
-      pool = p;
-    },
-  };
-}
-
-/**
  * Pre-constructed repositories, resolved at the composition root (presets.ts).
  * The registry consumes these directly — no ClickHouse client resolution here.
  */
@@ -352,16 +352,12 @@ export interface PipelineRepositories {
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
-  /** Coding Agent owns the persistence behind its durable projections. */
+  /** Coding Agent owns the four persistence models behind this named projection adapter. */
   codingAgentProjections: CodingAgentProjectionPersistence;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
   traceAnalytics: TraceAnalyticsRepository;
-  /** ADR-034 Phase 6: per-evaluation rollup repository. */
-  evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
-  /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
-  evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
   /** experimentMetricsSync's late-bound runId -> experimentId lookup. */
   experimentIdLookup: ExperimentIdLookup;
@@ -400,15 +396,20 @@ export interface PipelineRegistryDeps {
     connect(commands: unknown): void;
   };
   repositories: PipelineRepositories;
+  /** One write-through fold store shared by projection writes and immediate readers. */
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** The Suite package's single run-state store, shared by Eventing and reads. */
   suiteRunState: ProjectionStore<Projection<SuiteRunStateData>>;
   redis: Redis | Cluster;
   broadcast: BroadcastService;
+  simulations: SimulationService;
+  scenarioExecutions: ScenarioExecutionService;
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
     handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;
     worker: LangyWorkerPort;
     titleGenerator: LangyTitleGenerator;
+    sessionKeys: LangySessionKeyService;
   };
   topicClustering: {
     /** Runs one clustering page (the ADR-051 effect's domain function). */
@@ -418,6 +419,8 @@ export interface PipelineRegistryDeps {
   projects: ProjectService;
   monitors: MonitorService;
   modelProviders: ModelProviderService;
+  featureFlags: FeatureFlagService;
+  evaluationControls: AppEvaluationExecutionControls;
   automation: AutomationService;
   automations: { ports: AutomationDispatchPorts };
   prisma: PrismaClient;
@@ -428,13 +431,18 @@ export interface PipelineRegistryDeps {
   traces: {
     summary: TraceSummaryService;
     spans: SpanStorageService;
+    tree: TraceService;
   };
+  traceProjectionStorage: AppTraceProjectionStorage;
   evaluations: EvaluationService;
+  analytics: AnalyticsService;
+  storedObjects: StoredObjectsService;
+  evaluationInputsOffloadConfig: EvaluationInputOffloadConfig;
   organizations: OrganizationService;
-  costRecorder: EvaluationCostRecorder;
+  costRecorder: EvaluationCostRecorderPort;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
-  gatewaySpend?: { repository: GatewaySpendEventsRepository };
+  gatewaySpend?: { port: GatewaySpendEventsPort };
   webhookDelivery?: WebhookDeliveryProcessDeps;
   gatewayDebits?: GatewayGovernancePort;
   /**
@@ -446,7 +454,7 @@ export interface PipelineRegistryDeps {
   blobStore?: BlobStore;
   governanceKpisSync?: AppGovernanceKpisSubscriberDependencies;
   governanceOcsfEventsSync?: AppGovernanceOcsfSubscriberDependencies;
-  retentionPolicyResolver?: RetentionPolicyResolver;
+  retentionPolicyResolver?: DataRetentionService;
   codingAgent?: {
     github: GithubService;
   };
@@ -535,10 +543,7 @@ export class PipelineRegistry {
   }
 
   registerAll() {
-    const traceSummaryStore = this.cached<TraceSummaryData>(
-      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
-      "trace_summaries",
-    );
+    const traceSummaryStore = this.deps.traceSummaryStore;
 
     const automationPorts = this.deps.automations.ports;
     const graphActivityHandler = createGraphTriggerActivityHandler(this.deps.automation);
@@ -586,7 +591,7 @@ export class PipelineRegistry {
     this.deps.eventSourcing.register(
       createLangyMaintenancePipeline({
         sessionKeyReap: {
-          reap: () => reapExpiredLangySessionApiKeys({ prisma: this.deps.prisma }),
+          reap: () => this.deps.langy.sessionKeys.reapExpired(),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
@@ -618,17 +623,18 @@ export class PipelineRegistry {
       recordTriggerMatch: automationPipeline.commands.recordTriggerMatch,
     });
     const evalPipeline = this.registerEvaluationPipeline({
-      automations: {
-        triggerMatchHandler: (event, context) =>
-          evaluationAutomationSubscribers.handleEvaluationTriggerMatch(event, context),
-        graphActivityHandler: (event, context) =>
-          evaluationAutomationSubscribers.handleEvaluationGraphTriggerActivity(event, context),
-      },
+      automations: evaluationAutomationSubscribers,
     });
+    const evaluationCommands: EvaluationPipelineCommands = mapCommands(evalPipeline.commands);
     // Registered BEFORE the metric, log and trace pipelines: their
     // coding-agent dispatch subscribers close over this pipeline's
     // contribution commands.
-    const codingAgentPipeline = this.registerCodingAgentPipeline();
+    const codingAgentCostMetrics = PrometheusCodingAgentCostMetricsAdapter.create();
+    const codingAgentTraces = AppCodingAgentTraceProcessingAdapter.create({
+      traceCanonicalisation: this.deps.traceCanonicalisation,
+      spans: this.deps.traces.spans,
+    });
+    const codingAgentPipeline = this.registerCodingAgentPipeline(codingAgentCostMetrics);
     if (this.deps.gatewaySpend) {
       const governanceEvents = this.registerGovernanceEventsPipeline();
       const governanceDelivery = AppPipelineGovernanceSignalDeliveryPort.create(
@@ -657,7 +663,7 @@ export class PipelineRegistry {
       simComputeRunMetrics,
       wireExperimentDeps,
     } = this.registerTracePipeline({
-      evalPipeline,
+      evaluationCommands,
       traceSummaryStore,
       automations: {
         triggerMatchHandler: AppGovernanceSubscriberAdapter.create(
@@ -668,21 +674,16 @@ export class PipelineRegistry {
       codingAgentSubscribers: [
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
-          traces: AppCodingAgentTraceProcessingAdapter.create({
-            traceCanonicalisation: this.deps.traceCanonicalisation,
-            spans: this.deps.traces.spans,
-          }),
+          traces: codingAgentTraces,
         }),
       ],
     });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const { pipeline: simulationPipeline, scenarioExecutionPool } = this.registerSimulationPipeline(
-      {
-        suiteRunPipeline,
-        traceSummaryStore,
-        simComputeRunMetrics,
-      },
-    );
+    const simulationPipeline = this.registerSimulationPipeline({
+      suiteRunPipeline,
+      traceSummaryStore,
+      simComputeRunMetrics,
+    });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
@@ -722,8 +723,6 @@ export class PipelineRegistry {
       pulledUsage: enterprisePipelines.pulledUsage,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
-      /** Late-bind the execution pool for the simulationRunExecution process manager. */
-      scenarioExecutionPool,
     };
   }
 
@@ -763,6 +762,13 @@ export class PipelineRegistry {
             }
             return outcomeCommands;
           },
+          // The failure taxonomy lives with the clustering execution; the
+          // intent executor only consumes its verdict.
+          classifyError: classifyClusteringError,
+          metrics: {
+            incrementPageTotal: incrementTopicClusteringPageTotal,
+            observePageDuration: observeTopicClusteringPageDuration,
+          },
         },
       }),
     );
@@ -775,17 +781,18 @@ export class PipelineRegistry {
     };
     // Level-triggered bootstrap: the projectMetadata subscriber asks on every
     // real ingest, and this claim keeps that to one commit per project per
-    // window. See createRateLimitedBootstrap for why re-asking is safe.
-    this.bootstrapTopicClustering.resolve(
-      createRateLimitedBootstrap({
-        redis: this.deps.redis,
-        bootstrap: (projectId) =>
-          commands.requestClustering({
-            tenantId: projectId,
-            occurredAt: Date.now(),
-            trigger: "bootstrap",
-          }),
-      }),
+    // window. See RedisTopicClusteringBootstrapAdapter for why re-asking is safe.
+    const topicClusteringBootstrap = RedisTopicClusteringBootstrapAdapter.create({
+      redis: this.deps.redis,
+      bootstrap: (projectId) =>
+        commands.requestClustering({
+          tenantId: projectId,
+          occurredAt: Date.now(),
+          trigger: "bootstrap",
+        }),
+    });
+    this.bootstrapTopicClustering.resolve((projectId) =>
+      topicClusteringBootstrap.claimAndBootstrap(projectId),
     );
 
     return { pipeline };
@@ -816,18 +823,9 @@ export class PipelineRegistry {
       handoffStore: this.deps.langy.handoffStore,
       worker: this.deps.langy.worker,
       mintSessionKey: ({ userId, projectId, organizationId }) =>
-        mintLangySessionApiKeyForUser({
-          prisma: this.deps.prisma,
-          userId,
-          projectId,
-          organizationId,
-        }),
+        this.deps.langy.sessionKeys.mintForUser({ userId, projectId, organizationId }),
       revokeSessionKey: ({ apiKeyId, projectId }) =>
-        revokeLangySessionApiKey({
-          prisma: this.deps.prisma,
-          apiKeyId,
-          projectId,
-        }).then(() => undefined),
+        this.deps.langy.sessionKeys.revoke({ apiKeyId, projectId }),
       titleGenerator: this.deps.langy.titleGenerator,
       saveTitle: (args) => saveTitle.fn(args),
       failTurn: { failTurn: (args) => failTurn.fn(args) },
@@ -945,13 +943,13 @@ export class PipelineRegistry {
   }
 
   private registerGatewaySpendPipeline(
-    deps: { repository: GatewaySpendEventsRepository },
+    deps: { port: GatewaySpendEventsPort },
     governanceDelivery: GovernanceSignalDeliveryPort,
   ) {
     return this.deps.eventSourcing.register(
       createGatewaySpendProcessingPipeline({
         gatewaySpendStore: this.cached<GatewaySpendState>(
-          new GatewaySpendStore(deps.repository),
+          new GatewaySpendStore(deps.port),
           "gateway_spend",
         ),
         // The ADR-073 delivery process manager consumes this pipeline's
@@ -1026,18 +1024,22 @@ export class PipelineRegistry {
     return AppGatewayDebitAdapter.create(gateway, governanceDelivery).build();
   }
 
-  private registerCodingAgentPipeline() {
+  private registerCodingAgentPipeline(costMetrics: PrometheusCodingAgentCostMetricsAdapter) {
     return this.deps.eventSourcing.register(
       EventingCodingAgentProcessingAdapter.create({
         traceCanonicalisation: this.deps.traceCanonicalisation,
         modelProviders: this.deps.modelProviders,
-        costMetrics: PrometheusCodingAgentCostMetricsAdapter.create(),
+        costMetrics,
         projections: this.deps.repositories.codingAgentProjections,
         projects: this.deps.projects,
         clock: SystemCodingAgentClock.create(),
         redis: this.deps.redis,
         defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        ...(this.deps.codingAgent ? { github: this.deps.codingAgent.github } : {}),
+        ...(this.deps.codingAgent
+          ? {
+              github: this.deps.codingAgent.github,
+            }
+          : {}),
       }).build(),
     );
   }
@@ -1057,85 +1059,45 @@ export class PipelineRegistry {
   private registerEvaluationPipeline({
     automations,
   }: {
-    automations: EvaluationProcessingPipelineDeps["automations"];
+    automations: AutomationEvaluationSubscriberService;
   }) {
-    const executeEvaluationCommand = new ExecuteEvaluationCommand({
+    const evaluationExecutionIntent = EvaluationExecutionIntentService.create({
       monitors: this.deps.monitors,
-      spanStorage: this.deps.traces.spans,
-      traceEvents: this.deps.traces.spans,
-      evaluations: this.deps.evaluations,
-      costRecorder: this.deps.costRecorder,
-      azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+      traces: this.deps.traces.tree,
+      executionReceipt: AppEvaluationExecutionReceiptPort.create({
+        prisma: this.deps.prisma,
+        evaluations: this.deps.evaluations,
+        costs: this.deps.costRecorder,
+      }),
+      azureSafetyCredentials: AppEvaluationAzureSafetyCredentialsPort.create(
+        this.deps.modelProviders,
+      ),
       // Emergency operator rollback for the langwatch#6397 settings recovery.
       // Without this line the flag is inert: the command defaults an absent
       // resolver to "not disabled", so /ops/feature-flags would report the
       // switch as available while flipping it changed nothing. The command
       // catches a rejection here and stays on the shipped default (recovery
       // ACTIVE) — an unreadable kill switch must not fail evaluations.
-      isSettingsRecoveryDisabled: () =>
-        featureFlagService.isEnabled("ops_evaluator_settings_recovery_disabled", {
-          distinctId: "evaluator-settings-recovery",
-          defaultValue: false,
-        }),
-      // ADR-040: offload oversized evaluator inputs to durable object storage
-      // before the event is built. ON by default (this bounds the fat-payload
-      // class behind the 2026-07-10 outage); the SYSTEM flag
-      // ops_evaluation_payload_offload_disabled is the operator kill switch.
-      // A flag-store error keeps the DEFAULT (offload runs): the kill switch
-      // failing to read must not silently drop the protection. Storage errors
-      // are handled INSIDE offloadInputsIfOversized, which degrades to a
-      // bounded preview-only marker so the event stays lean even when S3 is
-      // down. The catch below is the wiring-level fail-open for unexpected
-      // errors only (service construction, serialization); there the inputs
-      // stay inline and the unconditional repository belt-and-braces cap
-      // keeps the ClickHouse row merge-safe.
-      offloadInputs: async ({ projectId, evaluationId, inputs }) => {
-        try {
-          let disabled = false;
-          try {
-            disabled = await featureFlagService.isEnabled(
-              "ops_evaluation_payload_offload_disabled",
-              { distinctId: "evaluation-inputs-offload", defaultValue: false },
-            );
-          } catch {
-            // Unreadable kill switch: stay on the default (offload enabled).
-          }
-          if (disabled) return inputs;
-          const { inputs: maybeOffloaded } = await offloadInputsIfOversized({
-            inputs,
-            projectId,
-            evaluationId,
-            storedObjects: createStoredObjectsService({ projectId }),
-          });
-          return maybeOffloaded;
-        } catch (error) {
-          createLogger("langwatch:evaluations:inputs-offload-fail-open").warn(
-            {
-              projectId,
-              evaluationId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Evaluation inputs offload gate failed; keeping inputs inline (fail-open)",
-          );
-          return inputs;
-        }
-      },
+      settingsRecovery: this.deps.evaluationControls.settingsRecovery,
+      inputsOffload: this.deps.evaluationControls.inputsOffload,
     });
+    const executeEvaluationCommand = ExecuteEvaluationCommand.create(evaluationExecutionIntent);
+
+    const evaluationStores = EvaluationEventingAdapter.create({
+      evaluation: this.deps.evaluations,
+      analytics: this.deps.analytics,
+      attributePolicy: new TraceAnalyticsAttributePolicy(),
+      retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    }).buildStores();
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore(this.deps.evaluations),
-        // Redis cache is the eval slim fold's warm read path; a miss now falls
-        // through to the store's own ClickHouse read-back (ADR-066, migration
-        // 00056) rather than re-folding the event log. Same wiring as
-        // trace_analytics.
-        evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
-          new EvaluationAnalyticsStore(this.deps.repositories.evaluationAnalytics),
+        evalRunStore: evaluationStores.evalRunStore,
+        evaluationAnalyticsStore: this.cached(
+          evaluationStores.evaluationAnalyticsStore,
           "evaluation_analytics",
         ),
-        evaluationAnalyticsRollupAppendStore: new EvaluationAnalyticsRollupAppendStore(
-          this.deps.repositories.evaluationAnalyticsRollup,
-        ),
+        evaluationAnalyticsRollupAppendStore: evaluationStores.evaluationAnalyticsRollupAppendStore,
         executeEvaluationCommand,
         automations,
       }),
@@ -1143,17 +1105,17 @@ export class PipelineRegistry {
   }
 
   private registerTracePipeline({
-    evalPipeline,
+    evaluationCommands,
     traceSummaryStore,
     automations,
     codingAgentSubscribers,
   }: {
-    evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
+    evaluationCommands: EvaluationPipelineCommands;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     automations: TraceProcessingPipelineDeps["automations"];
     codingAgentSubscribers: TraceProcessingPipelineDeps["subscribers"];
   }) {
-    const evalCommands = mapCommands(evalPipeline.commands);
+    const evalCommands = evaluationCommands;
 
     // Deferred dispatchers — resolved after pipeline registration.
     const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>(
@@ -1171,6 +1133,7 @@ export class PipelineRegistry {
     });
 
     const evaluationTrigger = createEvaluationTriggerSubscriber({
+      featureFlags: this.deps.featureFlags,
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
     });
@@ -1276,17 +1239,29 @@ export class PipelineRegistry {
 
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
+        recordSpanCommand: AppTraceRecordSpanAdapter.create({
+          modelProviders: this.deps.modelProviders,
+          featureFlags: this.deps.featureFlags,
+          blobStore: this.deps.blobStore,
+        }),
         traceCanonicalisation: this.deps.traceCanonicalisation,
-        spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
-        traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
-          this.deps.repositories.traceAnalyticsRollup,
-        ),
+        spanAppendStore: SpanStorageStore.create({
+          storage: this.deps.traceProjectionStorage.spans,
+          defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        }),
+        traceAnalyticsRollupAppendStore: TraceAnalyticsRollupStore.create({
+          storage: this.deps.traceProjectionStorage.analyticsRollup,
+          defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        }),
         // Redis cache is the slim fold's warm read path; a miss now falls
         // through to the store's own ClickHouse read-back (ADR-066, migration
         // 00056) rather than re-folding the event log. The wrapper still earns
         // its keep — it keeps the steady state off ClickHouse entirely.
         traceAnalyticsStore: this.cached<TraceAnalyticsData>(
-          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          TraceAnalyticsStore.create({
+            storage: this.deps.traceProjectionStorage.analytics,
+            defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+          }),
           "trace_analytics",
         ),
         traceSummaryStore,
@@ -1301,9 +1276,6 @@ export class PipelineRegistry {
         experimentMetricsSyncHandler,
         spanStorageBroadcastHandler,
         broadcastDisabled,
-        // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
-        // oversized commands and best-effort delete the transient S3 spool.
-        blobStore: this.deps.blobStore,
         // Span-command sharding fan-out (env TRACE_SPAN_PROCESSING_SHARDS,
         // default 1 = disabled). Lets a hot trace's recordSpan commands drain in
         // parallel across `traceId:<shard>` GroupQueue groups; fold stays per-trace.
@@ -1425,10 +1397,6 @@ export class PipelineRegistry {
       "simulation_runs",
     );
 
-    // Late-bound pool holder — worker startup sets the pool after the
-    // pipeline is built; the process manager's execute intent reads it.
-    const scenarioExecutionPool = createScenarioExecutionPoolHolder();
-
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
 
     // Deferred dispatchers — resolved after pipeline registration.
@@ -1438,12 +1406,6 @@ export class PipelineRegistry {
     const scheduleRetry = new Deferred<(payload: ComputeRunMetricsCommandData) => Promise<void>>(
       "scheduleRetry",
     );
-    // The process manager's finish intent reports through this same
-    // pipeline's commands, which exist only after `.build()`.
-    const selfExecutionCommands = new Deferred<() => SimulationRunExecutionCommands>(
-      "selfExecutionCommands",
-    );
-
     const traceReadDerivation = new TraceReadDerivationService(this.deps.traces.spans);
     const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
@@ -1471,16 +1433,11 @@ export class PipelineRegistry {
         simulationRunMetricsStore: this.deps.repositories.simulationRunMetricsStore,
         finishRunCommand,
         computeRunMetricsCommand,
-        simulationRunExecution: {
-          getPool: () => scenarioExecutionPool.get(),
-          publishCancellation: async ({ projectId, scenarioRunId }) => {
-            await publishCancellation({
-              publisher: this.deps.redis,
-              message: { projectId, scenarioRunId },
-            });
-          },
-          commands: selfExecutionCommands.fn,
+        scenarioRunExecution: {
+          name: SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+          process: simulationRunExecutionPM(this.deps.scenarioExecutions, this.deps.simulations),
         },
+        simulations: this.deps.simulations,
         snapshotUpdateBroadcast: {
           broadcast: this.deps.broadcast,
           hasRedis: true,
@@ -1498,7 +1455,6 @@ export class PipelineRegistry {
     // Resolve self-referencing command
     const simCommands = mapCommands(simulationPipeline.commands);
     selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
-    selfExecutionCommands.resolve(() => simCommands);
 
     // Resolve cross-pipeline deferred (trace → simulation)
     simComputeRunMetrics.resolve(simCommands.computeRunMetrics);
@@ -1544,7 +1500,7 @@ export class PipelineRegistry {
       );
     }
 
-    return { pipeline: simulationPipeline, scenarioExecutionPool };
+    return simulationPipeline;
   }
 
   private registerBillingReportingPipeline() {

@@ -1,15 +1,12 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
-import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository";
+import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port";
+import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection";
+import type { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
 
-const logger = createLogger(
-  "langwatch:app-layer:traces:trace-analytics-rollup-repository",
-);
+const logger = createLogger("langwatch:trace:trace-analytics-rollup-repository");
 
 /**
  * ClickHouse columns are `SimpleAggregateFunction(sum, ...)`. Inserts carry
@@ -70,11 +67,23 @@ function toClickHouseRecord(
 }
 
 export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsRollupRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private constructor(
+    private readonly options: {
+      resolveClient: TraceClickHouseWriteResolver;
+      defaultRetentionDays: number;
+    },
+  ) {}
+
+  static create(options: {
+    resolveClient: TraceClickHouseWriteResolver;
+    defaultRetentionDays: number;
+  }): TraceAnalyticsRollupClickHouseRepository {
+    return new TraceAnalyticsRollupClickHouseRepository(options);
+  }
 
   async insertRow(
     row: TraceAnalyticsRollupRow,
-    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+    retentionDays = this.options.defaultRetentionDays,
   ): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: row.tenantId },
@@ -82,7 +91,7 @@ export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsR
     );
 
     try {
-      const client = await this.resolveClient(row.tenantId);
+      const client = await this.options.resolveClient(row.tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: [toClickHouseRecord(row, retentionDays)],
@@ -103,7 +112,7 @@ export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsR
 
   async insertRows(
     rows: TraceAnalyticsRollupRow[],
-    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+    retentionDays = this.options.defaultRetentionDays,
   ): Promise<void> {
     if (rows.length === 0) return;
 
@@ -130,7 +139,7 @@ export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsR
     }
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.options.resolveClient(tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: rows.map((row) => toClickHouseRecord(row, retentionDays)),

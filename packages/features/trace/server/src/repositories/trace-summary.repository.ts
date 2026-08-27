@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { TraceSummaryData } from "../types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 export interface FindByTraceIdOptions {
   /**

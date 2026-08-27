@@ -21,12 +21,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run --exclude '**/*.integration.test.ts'",
+    "test:unit": "vitest run --exclude '**/*.integration.test.ts'"
   },
   "dependencies": {
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
@@ -37,6 +38,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "nanoid": "^5.1.5",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

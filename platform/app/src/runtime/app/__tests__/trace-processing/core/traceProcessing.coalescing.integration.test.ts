@@ -3,7 +3,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { FoldProjectionExecutor } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { createAppTraceSummaryStore } from "~/runtime/app/trace-summary-fold.adapter";
@@ -71,7 +71,10 @@ describe.skipIf(!hasTestcontainers)("Trace summary fold coalescing -> ClickHouse
     tenantIdString = getTenantIdString(tenantId);
     traceSummaryStore = createAppTraceSummaryStore({
       repository: new TraceSummaryService(
-        new TraceSummaryClickHouseRepository(async () => clickHouseClient),
+        TraceSummaryClickHouseRepository.create({
+          resolveClient: async () => clickHouseClient,
+          defaultRetentionDays: 30,
+        }),
       ).repository,
       redis: null,
       defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,

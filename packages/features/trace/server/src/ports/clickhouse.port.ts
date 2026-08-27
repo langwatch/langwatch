@@ -8,7 +8,19 @@ export interface TraceClickHouseClient {
   }): Promise<{ json<T = Row>(): Promise<T[]> }>;
 }
 
+export interface TraceClickHouseWriteClient extends TraceClickHouseClient {
+  insert(input: {
+    table: string;
+    values: unknown[];
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<string, number>;
+  }): Promise<unknown>;
+}
+
 export type TraceClickHouseResolver = (tenantId: string) => Promise<TraceClickHouseClient>;
+export type TraceClickHouseWriteResolver = (
+  tenantId: string,
+) => Promise<TraceClickHouseWriteClient>;
 
 export abstract class TraceClickHousePort {
   abstract resolve(tenantId: string): Promise<TraceClickHouseClient>;

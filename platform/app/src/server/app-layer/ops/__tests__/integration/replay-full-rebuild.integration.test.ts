@@ -21,10 +21,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import type {
-  RegisteredMapProjection,
-  RetentionPolicyResolver,
-} from "@langwatch/eventing";
+import type { RegisteredMapProjection, RetentionPolicyResolver } from "@langwatch/eventing";
 import {
   aggregateKey,
   cleanupAll,
@@ -34,7 +31,7 @@ import {
 } from "@langwatch/eventing";
 import type { Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
+import { TraceAnalyticsRollupClickHouseRepository } from "@langwatch/trace-server";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -45,10 +42,12 @@ import {
   generateTestAggregateId,
   generateTestTenantId,
 } from "~/server/event-sourcing/__tests__/integration/testHelpers";
-import { createSpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
-import { TraceAnalyticsRollupMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
-import { TraceAnalyticsRollupAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.store";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { createSpanReceivedEvent } from "~/runtime/app/__tests__/trace-processing/projections/tests/fixtures/trace-summary-test.fixtures";
+import { TraceAnalyticsRollupMapProjection } from "@langwatch/trace-server";
+import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
+import { AppTraceProjectionStorageAdapter } from "~/runtime/app/trace-projection-storage.adapter";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/replayEventLoader";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
 import { ReplayService } from "../../replay.service";
@@ -221,10 +220,7 @@ async function readRollupTotals(
 }
 
 /** Start a run through the ops entry point and wait for it to leave "running". */
-async function startAndAwaitReplay(params: {
-  tenantIds: string[];
-  fullRebuild?: boolean;
-}) {
+async function startAndAwaitReplay(params: { tenantIds: string[]; fullRebuild?: boolean }) {
   const { runId } = await opsReplay.startReplay({
     projectionNames: [PROJECTION_NAME],
     since: SINCE,
@@ -270,11 +266,17 @@ describe("given identical span history for tenants whose rollup is empty", () =>
     await seedEventLog(skippedTenantId, skippedTraceId);
     await seedEventLog(rebuiltTenantId, rebuiltTraceId);
 
-    const projection = new TraceAnalyticsRollupMapProjection({
+    const projection = TraceAnalyticsRollupMapProjection.create({
       traceCanonicalisation: TraceCanonicalisationService.create(),
-      store: new TraceAnalyticsRollupAppendStore(
-        new TraceAnalyticsRollupClickHouseRepository(async () => client),
-      ),
+      store: TraceAnalyticsRollupStore.create({
+        storage: AppTraceProjectionStorageAdapter.createAnalyticsRollup(
+          TraceAnalyticsRollupClickHouseRepository.create({
+            resolveClient: async () => client,
+            defaultRetentionDays: 30,
+          }),
+        ),
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      }),
     });
     const registered: RegisteredMapProjection = {
       projectionName: PROJECTION_NAME,
@@ -299,10 +301,7 @@ describe("given identical span history for tenants whose rollup is empty", () =>
       close: async () => {},
     });
 
-    opsReplay = new ReplayService(
-      new ReplayRedisRepository(redis),
-      retentionPolicyResolver,
-    );
+    opsReplay = new ReplayService(new ReplayRedisRepository(redis), retentionPolicyResolver);
   });
 
   beforeEach(async () => {
@@ -380,9 +379,7 @@ describe("given identical span history for tenants whose rollup is empty", () =>
 
       // The run owns the markers end to end: cleared before discovery, and
       // cleared again by the replay path once every batch completed.
-      expect(await getCompletedSet({ redis, projectionName: PROJECTION_NAME })).toEqual(
-        new Set(),
-      );
+      expect(await getCompletedSet({ redis, projectionName: PROJECTION_NAME })).toEqual(new Set());
     });
   });
 });

@@ -1,34 +1,51 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type { WithDateWrites } from "~/server/clickhouse/types";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { firstUsableAnchor } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/storage-anchor";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   isStorageAnchoredVersion,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
-import { validateBatchTenants } from "../../_shared/clickhouse-batch";
-import {
-  DEFAULT_PARTITION_WINDOW_MS,
-  queryWindowed,
-} from "../../clients/clickhouse/windowed-read";
-import type { TraceSummaryData } from "../types";
-import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
-import type {
-  FindByTraceIdOptions,
-  TraceSummaryRepository,
-} from "./trace-summary.repository";
+} from "@langwatch/trace-contract";
+import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port";
+import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port";
+import { firstUsableAnchor } from "../../services/trace-storage-anchor.rules";
+import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository";
+import type { TraceSummaryFieldsBase } from "./trace-summary-fields.types";
+import { createTraceSummaryProjectionId } from "./trace-summary-id";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read";
 
 const TABLE_NAME = "trace_summaries" as const;
 
-const logger = createLogger("langwatch:app-layer:traces:trace-summary-repository");
+const logger = createLogger("langwatch:trace:trace-summary-repository");
 
-type ClickHouseSummaryWriteRecord = WithDateWrites<
+function validateBatchTenants<T extends { tenantId: string }>(
+  entries: readonly T[],
+  context: string,
+): string {
+  const tenantId = entries[0]?.tenantId;
+  if (!tenantId) {
+    throw new Error(`${context}: cannot validate tenants on an empty batch`);
+  }
+
+  EventUtils.validateTenantId({ tenantId }, context);
+  const mismatchedTenant = entries.find((entry) => entry.tenantId !== tenantId);
+  if (mismatchedTenant) {
+    throw new Error(
+      `Mixed tenants in ${context}: expected ${tenantId}, got ${mismatchedTenant.tenantId}`,
+    );
+  }
+
+  return tenantId;
+}
+
+type ClickHouseSummaryWriteRecord = Omit<
   ClickHouseSummaryRecord,
   "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
->;
+> & {
+  OccurredAt: Date;
+  CreatedAt: Date;
+  UpdatedAt: Date;
+  LastEventOccurredAt: Date;
+};
 
 /**
  * The value that lands in the `OccurredAt` partition / TTL column (ADR-087).
@@ -78,23 +95,37 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private constructor(
+    private readonly options: {
+      resolveClient: TraceClickHouseWriteResolver;
+      defaultRetentionDays: number;
+      windowedReadMetrics?: TraceWindowedReadMetricsPort;
+    },
+  ) {}
+
+  static create(options: {
+    resolveClient: TraceClickHouseWriteResolver;
+    defaultRetentionDays: number;
+    windowedReadMetrics?: TraceWindowedReadMetricsPort;
+  }): TraceSummaryClickHouseRepository {
+    return new TraceSummaryClickHouseRepository(options);
+  }
 
   async upsert(
     data: TraceSummaryData,
     tenantId: string,
-    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+    retentionDays = this.options.defaultRetentionDays,
   ): Promise<void> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
-    const projectionId = IdUtils.generateDeterministicTraceSummaryIdFromData(
+    const projectionId = createTraceSummaryProjectionId({
       tenantId,
-      data.traceId,
-      data.occurredAt,
-    );
+      traceId: data.traceId,
+      occurredAtMs: data.occurredAt,
+    });
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.options.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -128,19 +159,16 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   ): Promise<void> {
     if (entries.length === 0) return;
 
-    const tenantId = validateBatchTenants(
-      entries,
-      "TraceSummaryClickHouseRepository.upsertBatch",
-    );
+    const tenantId = validateBatchTenants(entries, "TraceSummaryClickHouseRepository.upsertBatch");
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.options.resolveClient(tenantId);
       const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
-        const projectionId = IdUtils.generateDeterministicTraceSummaryIdFromData(
-          tid,
-          data.traceId,
-          data.occurredAt,
-        );
+        const projectionId = createTraceSummaryProjectionId({
+          tenantId: tid,
+          traceId: data.traceId,
+          occurredAtMs: data.occurredAt,
+        });
         return this.toClickHouseRecord(
           data,
           tid,
@@ -171,10 +199,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     traceId: string,
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceSummaryClickHouseRepository.findByTraceId",
-    );
+    EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.findByTraceId");
 
     // Fold read-back path (ADR-066): an explicit window is applied verbatim
     // with NO internal fallback — the caller (the fold executor) owns the miss
@@ -189,6 +214,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       try {
         return await queryWindowed<TraceSummaryData | null>({
           table: TABLE_NAME,
+          metrics: this.options.windowedReadMetrics,
           hintMs: (fromMs + toMs) / 2,
           windowMs: (toMs - fromMs) / 2,
           fallback: "none",
@@ -239,6 +265,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     try {
       return await queryWindowed<TraceSummaryData | null>({
         table: TABLE_NAME,
+        metrics: this.options.windowedReadMetrics,
         hintMs: options?.occurredAtMs ?? null,
         fallback: "unbounded",
         isEmpty: (result) => result === null,
@@ -318,7 +345,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     tenantId: string;
     traceId: string;
   }): Promise<{ found: boolean; occurredAtMs?: number }> {
-    const client = await this.resolveClient(tenantId);
+    const client = await this.options.resolveClient(tenantId);
     const result = await client.query({
       query: `
         SELECT
@@ -337,8 +364,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     }>;
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
-    const rowCount =
-      typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
+    const rowCount = typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
     if (!Number.isFinite(rowCount) || rowCount <= 0) {
       return { found: false };
     }
@@ -347,9 +373,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     // epoch sentinel (0) must fall back to the legacy unbounded lookup because
     // they do exist but have no usable partition key.
     const ms = typeof raw === "string" ? Number(raw) : raw;
-    return Number.isFinite(ms) && ms > 0
-      ? { found: true, occurredAtMs: ms }
-      : { found: true };
+    return Number.isFinite(ms) && ms > 0 ? { found: true, occurredAtMs: ms } : { found: true };
   }
 
   private async queryByTraceId(
@@ -366,7 +390,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         "AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
       : "";
 
-    const client = await this.resolveClient(tenantId);
+    const client = await this.options.resolveClient(tenantId);
     // IN-tuple dedup over the ReplacingMergeTree: the inner SELECT scans
     // only (TenantId, TraceId, UpdatedAt) — small, sparse — to find the
     // latest version, then the outer SELECT pulls the heavy columns
@@ -514,7 +538,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     tenantId: string,
     projectionId: string,
     version: string,
-    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+    retentionDays = this.options.defaultRetentionDays,
   ): ClickHouseSummaryWriteRecord {
     return {
       ProjectionId: projectionId,
@@ -537,11 +561,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ComputedOutput: data.computedOutput,
       TimeToFirstTokenMs:
         data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
-      TimeToLastTokenMs:
-        data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
+      TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
       TotalDurationMs: Math.round(data.totalDurationMs),
-      TokensPerSecond:
-        data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
+      TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
       SpanCount: data.spanCount,
       ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
       ContainsOKStatus: data.containsOKStatus ? 1 : 0,

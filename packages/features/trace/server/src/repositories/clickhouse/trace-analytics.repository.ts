@@ -1,26 +1,59 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
-import { READ_BACK_FOLD_INSERT_SETTINGS } from "~/server/clickhouse/queryDefaults";
-import {
-  asNullableNumber,
-  asNullableString,
-  asNumber,
-  asStringArray,
-  asStringMap,
-} from "~/server/clickhouse/recordDecode";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port";
+import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
-} from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
-import { queryWindowed } from "../../clients/clickhouse/windowed-read";
-import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
+} from "../../projections/trace-derived.projection";
+import type { TraceAnalyticsRepository } from "../trace-analytics.repository";
+import { queryWindowed } from "./windowed-read";
 
 const TABLE_NAME = "trace_analytics" as const;
 
-const logger = createLogger("langwatch:app-layer:traces:trace-analytics-repository");
+const logger = createLogger("langwatch:trace:trace-analytics-repository");
+
+const READ_BACK_FOLD_INSERT_SETTINGS = {
+  async_insert: 1,
+  wait_for_async_insert: 1,
+  input_format_skip_unknown_fields: 0,
+} as const;
+
+function parseClickHouseDateTimeMs(value: string): number {
+  const milliseconds = new Date(value.replace(" ", "T") + "Z").getTime();
+  return Number.isNaN(milliseconds) ? 0 : milliseconds;
+}
+
+function asNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function asNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function asNullableString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function asStringMap(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
 
 /**
  * ClickHouse write shape for the slim `trace_analytics` table (ADR-034 Phase 2,
@@ -115,10 +148,8 @@ function toClickHouseRecord(
     TotalCost: row.totalCost,
     NonBilledCost: row.nonBilledCost,
     TotalDurationMs: String(Math.round(row.totalDurationMs)),
-    TimeToFirstTokenMs:
-      row.timeToFirstTokenMs !== null ? Math.round(row.timeToFirstTokenMs) : null,
-    TokensPerSecond:
-      row.tokensPerSecond !== null ? Math.round(row.tokensPerSecond) : null,
+    TimeToFirstTokenMs: row.timeToFirstTokenMs !== null ? Math.round(row.timeToFirstTokenMs) : null,
+    TokensPerSecond: row.tokensPerSecond !== null ? Math.round(row.tokensPerSecond) : null,
     PromptTokens: row.promptTokens,
     CompletionTokens: row.completionTokens,
     CacheReadTokens: row.cacheReadTokens,
@@ -149,11 +180,25 @@ function toClickHouseRecord(
 }
 
 export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  private constructor(
+    private readonly options: {
+      resolveClient: TraceClickHouseWriteResolver;
+      defaultRetentionDays: number;
+      windowedReadMetrics?: TraceWindowedReadMetricsPort;
+    },
+  ) {}
+
+  static create(options: {
+    resolveClient: TraceClickHouseWriteResolver;
+    defaultRetentionDays: number;
+    windowedReadMetrics?: TraceWindowedReadMetricsPort;
+  }): TraceAnalyticsClickHouseRepository {
+    return new TraceAnalyticsClickHouseRepository(options);
+  }
 
   async upsert(
     row: TraceAnalyticsRow,
-    retentionDays: number = PLATFORM_DEFAULT_RETENTION_DAYS,
+    retentionDays: number = this.options.defaultRetentionDays,
     appliedEventIds?: readonly string[],
   ): Promise<void> {
     EventUtils.validateTenantId(
@@ -162,7 +207,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     );
 
     try {
-      const client = await this.resolveClient(row.tenantId);
+      const client = await this.options.resolveClient(row.tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: [toClickHouseRecord(row, retentionDays, appliedEventIds)],
@@ -192,10 +237,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     if (entries.length === 0) return;
 
     const tenantId = entries[0]!.row.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceAnalyticsClickHouseRepository.upsertBatch",
-    );
+    EventUtils.validateTenantId({ tenantId }, "TraceAnalyticsClickHouseRepository.upsertBatch");
     for (const { row } of entries) {
       if (row.tenantId !== tenantId) {
         throw new SecurityError(
@@ -208,13 +250,13 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     }
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.options.resolveClient(tenantId);
       await client.insert({
         table: TABLE_NAME,
         values: entries.map(({ row, retentionDays, appliedEventIds }) =>
           toClickHouseRecord(
             row,
-            retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+            retentionDays ?? this.options.defaultRetentionDays,
             appliedEventIds,
           ),
         ),
@@ -287,6 +329,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
         appliedEventIds: string[];
       } | null>({
         table: TABLE_NAME,
+        metrics: this.options.windowedReadMetrics,
         hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
         ...(window !== undefined ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
         fallback: "none",
@@ -295,9 +338,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
           await this.queryLatestVersion({
             tenantId,
             traceId,
-            window: fragment
-              ? { fromMs: fragment.fromMs, toMs: fragment.toMs }
-              : undefined,
+            window: fragment ? { fromMs: fragment.fromMs, toMs: fragment.toMs } : undefined,
           }),
       });
     } catch (error) {
@@ -306,10 +347,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
       // the row, so without this the deploy window ADR-066 documents — workers
       // rolling ahead of migration 00056, every read throwing
       // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
-      logger.warn(
-        { tenantId, traceId, error },
-        "Failed to read back trace analytics row",
-      );
+      logger.warn({ tenantId, traceId, error }, "Failed to read back trace analytics row");
       throw error;
     }
   }
@@ -396,7 +434,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
-    const client = await this.resolveClient(tenantId);
+    const client = await this.options.resolveClient(tenantId);
 
     const partitionFilter =
       window !== undefined

@@ -26,12 +26,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
+import { TraceAnalyticsRollupClickHouseRepository } from "@langwatch/trace-server";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import type { TraceAnalyticsRollupRow } from "@langwatch/trace-server";
 
 const tenantId = `test-rollup-${generate("tenant").toString()}`;
 // All spans below land in one minute bucket so the rollup collapses to a
@@ -175,14 +175,16 @@ async function waitForSpanCount(tenant: string, expected: number): Promise<void>
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new TraceAnalyticsRollupClickHouseRepository(async () => ch);
+  repo = TraceAnalyticsRollupClickHouseRepository.create({
+    resolveClient: async () => ch,
+    defaultRetentionDays: 30,
+  });
 }, 120_000);
 
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query:
-        "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId },
     });
   }
@@ -231,7 +233,10 @@ describe("trace_analytics_rollup root-span duration (integration)", () => {
   let durRepo: TraceAnalyticsRollupClickHouseRepository;
 
   beforeAll(async () => {
-    durRepo = new TraceAnalyticsRollupClickHouseRepository(async () => ch);
+    durRepo = TraceAnalyticsRollupClickHouseRepository.create({
+      resolveClient: async () => ch,
+      defaultRetentionDays: 30,
+    });
     // Only the root span carries the trace's wall-clock duration; the two
     // children carry 0 — same gate the projection applies via `parentSpanId === null`.
     await durRepo.insertRows([
@@ -244,8 +249,7 @@ describe("trace_analytics_rollup root-span duration (integration)", () => {
 
   afterAll(async () => {
     await ch.exec({
-      query:
-        "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId: rootTenantId },
     });
   });
@@ -268,7 +272,10 @@ describe("trace_analytics_rollup per-trace average via TraceCount (integration)"
   let avgRepo: TraceAnalyticsRollupClickHouseRepository;
 
   beforeAll(async () => {
-    avgRepo = new TraceAnalyticsRollupClickHouseRepository(async () => ch);
+    avgRepo = TraceAnalyticsRollupClickHouseRepository.create({
+      resolveClient: async () => ch,
+      defaultRetentionDays: 30,
+    });
     // Two traces in the bucket: roots carrying 900ms and 300ms, plus a child
     // span. TraceCount (1 per root) is the denominator that turns the
     // duration sum into a per-trace mean — the shape the rollup query builder
@@ -283,8 +290,7 @@ describe("trace_analytics_rollup per-trace average via TraceCount (integration)"
 
   afterAll(async () => {
     await ch.exec({
-      query:
-        "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId: avgTenantId },
     });
   });
@@ -311,7 +317,10 @@ describe("trace_analytics_rollup re-delivered span (integration)", () => {
   let dupRepo: TraceAnalyticsRollupClickHouseRepository;
 
   beforeAll(async () => {
-    dupRepo = new TraceAnalyticsRollupClickHouseRepository(async () => ch);
+    dupRepo = TraceAnalyticsRollupClickHouseRepository.create({
+      resolveClient: async () => ch,
+      defaultRetentionDays: 30,
+    });
     const row = makeRow(dupTenantId, { cost: 0.02 });
     // First delivery, then a transient-failure re-delivery of the same span.
     // Each `insertRows` writes a fresh AggregatingMergeTree row, so the
@@ -324,8 +333,7 @@ describe("trace_analytics_rollup re-delivered span (integration)", () => {
 
   afterAll(async () => {
     await ch.exec({
-      query:
-        "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId: dupTenantId },
     });
   });

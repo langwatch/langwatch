@@ -1,6 +1,4 @@
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
-import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
-import type { TraceAnalyticsRollupRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import {
   TraceAnalyticsProjectionPort,
@@ -10,6 +8,8 @@ import {
   TraceSpanStoragePort,
   type TraceAnalyticsRollupRow,
   type TraceAnalyticsRow,
+  type TraceAnalyticsRepository,
+  type TraceAnalyticsRollupRepository,
 } from "@langwatch/trace-server";
 
 export type AppTraceProjectionStorage = {

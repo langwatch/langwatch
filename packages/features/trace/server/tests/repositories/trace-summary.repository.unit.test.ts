@@ -13,12 +13,12 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
+} from "@langwatch/trace-contract";
+import { TraceSummaryClickHouseRepository } from "../../src/repositories/clickhouse/trace-summary.repository";
 
 const heavyRow = {
   ProjectionId: "p1",
@@ -42,7 +42,10 @@ function makeRepo(responder: (sql: string) => unknown[]) {
     }),
   } as unknown as ClickHouseClient;
   return {
-    repo: new TraceSummaryClickHouseRepository(async () => client),
+    repo: TraceSummaryClickHouseRepository.create({
+      resolveClient: async () => client,
+      defaultRetentionDays: 30,
+    }),
     queries,
   };
 }
@@ -201,7 +204,10 @@ describe("given the trace-summary row carries a storage anchor", () => {
       const insert = vi.fn().mockResolvedValue(undefined);
       const client = { insert } as unknown as ClickHouseClient;
       return {
-        repo: new TraceSummaryClickHouseRepository(async () => client),
+        repo: TraceSummaryClickHouseRepository.create({
+          resolveClient: async () => client,
+          defaultRetentionDays: 30,
+        }),
         insert,
       };
     }
@@ -237,10 +243,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
 
       // A state nothing could anchor: no frozen anchor, no span baseline, and a
       // createdAt that failed to parse (parseClickHouseDateTimeMs returns 0).
-      await repo.upsert(
-        stateWith({ storageAnchorMs: 0, occurredAt: 0, createdAt: 0 }),
-        "tenant-1",
-      );
+      await repo.upsert(stateWith({ storageAnchorMs: 0, occurredAt: 0, createdAt: 0 }), "tenant-1");
 
       const record = insert.mock.calls[0]?.[0]?.values[0];
       expect(record.OccurredAt.getTime()).toBeGreaterThanOrEqual(before);
@@ -250,10 +253,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
       const { repo, insert } = makeInsertRepo();
       const farFutureMs = Date.now() + 365 * 24 * 60 * 60 * 1000;
 
-      await repo.upsert(
-        stateWith({ storageAnchorMs: farFutureMs, occurredAt: 0 }),
-        "tenant-1",
-      );
+      await repo.upsert(stateWith({ storageAnchorMs: farFutureMs, occurredAt: 0 }), "tenant-1");
 
       // Deliberate: such a row was filed in a future partition with a TTL
       // deadline to match and would have outlived its tenant's retention. The

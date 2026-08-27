@@ -15,8 +15,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startTestContainers } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
+import { startTestContainers } from "../../../../../../platform/app/src/server/event-sourcing/__tests__/integration/testContainers";
+import { TraceSummaryClickHouseRepository } from "../../src/repositories/clickhouse/trace-summary.repository";
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;
 const presentTraceId = `trace-${nanoid()}`;
@@ -68,7 +68,10 @@ function makeRow(traceId: string, occurredAtMs: number) {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new TraceSummaryClickHouseRepository(async () => ch);
+  repo = TraceSummaryClickHouseRepository.create({
+    resolveClient: async () => ch,
+    defaultRetentionDays: 30,
+  });
 
   await ch.insert({
     table: "trace_summaries",
@@ -106,7 +109,10 @@ function recordingRepo(): {
     },
   }) as ClickHouseClient;
   return {
-    repo: new TraceSummaryClickHouseRepository(async () => recordingClient),
+    repo: TraceSummaryClickHouseRepository.create({
+      resolveClient: async () => recordingClient,
+      defaultRetentionDays: 30,
+    }),
     queries,
   };
 }

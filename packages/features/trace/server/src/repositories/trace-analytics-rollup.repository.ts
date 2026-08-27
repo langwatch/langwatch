@@ -1,4 +1,4 @@
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection";
 
 /**
  * Per-span insert into `trace_analytics_rollup` (ADR-034 Phase 1).
@@ -23,10 +23,7 @@ export class NullTraceAnalyticsRollupRepository implements TraceAnalyticsRollupR
     // no-op: the Null repository intentionally discards rollup writes
   }
 
-  async insertRows(
-    _rows: TraceAnalyticsRollupRow[],
-    _retentionDays?: number,
-  ): Promise<void> {
+  async insertRows(_rows: TraceAnalyticsRollupRow[], _retentionDays?: number): Promise<void> {
     // no-op: the Null repository intentionally discards rollup writes
   }
 }

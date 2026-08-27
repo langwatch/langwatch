@@ -16,12 +16,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import type { TraceAnalyticsRow } from "@langwatch/trace-server";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.clickhouse.repository";
+} from "../../../../../../platform/app/src/server/event-sourcing/__tests__/integration/testContainers";
+import { TraceAnalyticsClickHouseRepository } from "../../src/repositories/clickhouse/trace-analytics.repository";
 
 let ch: ClickHouseClient;
 let repo: TraceAnalyticsClickHouseRepository;
@@ -85,7 +85,10 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new TraceAnalyticsClickHouseRepository(async () => ch);
+  repo = TraceAnalyticsClickHouseRepository.create({
+    resolveClient: async () => ch,
+    defaultRetentionDays: 30,
+  });
 }, 60_000);
 
 afterAll(async () => {
@@ -171,9 +174,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => 
   describe("given a row written with an applied-event-id watermark", () => {
     it("reads the watermark back next to the row (ADR-066)", async () => {
       const row = traceRow({ traceId: `${tag}-applied` });
-      await repo.upsertBatch([
-        { row, retentionDays: 30, appliedEventIds: ["ev-1", "ev-2"] },
-      ]);
+      await repo.upsertBatch([{ row, retentionDays: 30, appliedEventIds: ["ev-1", "ev-2"] }]);
 
       const read = await repo.findByTraceIdWithApplied({
         tenantId,

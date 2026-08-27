@@ -16,15 +16,10 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
  * @see specs/features/suites/trace-role-cost-accumulation.feature
  */
 
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-  EventSourcing,
-} from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline, EventSourcing } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
@@ -35,38 +30,28 @@ import {
   createTestTenantId,
   getTenantIdString,
 } from "../../__tests__/integration/testHelpers";
-import { AssignTopicCommand } from "../trace-processing/commands/assignTopicCommand";
-import { RecordSpanCommand } from "../trace-processing/commands/recordSpanCommand";
-import { deriveScenarioRoleMetricsFromSpans } from "../trace-processing/projections/services/scenario-role-metrics.derivation";
-import { SpanCostService } from "../trace-processing/projections/services/span-cost.service";
-import { SpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
-import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
-import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
-import { TraceSummaryStore } from "../trace-processing/projections/traceSummary.store";
-import { TRACE_PROCESSING_EVENT_TYPES } from "../trace-processing/schemas/constants";
-import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
-import type { OtlpSpan } from "../trace-processing/schemas/otlp";
+import { AssignTopicCommand } from "@langwatch/trace-server";
+import { RecordSpanCommand } from "@langwatch/trace-server";
+import { SpanCostService } from "@langwatch/trace-server";
+import { SpanStorageMapProjection } from "@langwatch/trace-server";
+import { SpanStorageStore } from "@langwatch/trace-server";
+import { TraceSummaryFoldProjection } from "@langwatch/trace-server";
+import { TraceSummaryStore } from "@langwatch/trace-server";
+import { TRACE_PROCESSING_EVENT_TYPES } from "@langwatch/trace-contract";
+import type { TraceProcessingEvent } from "@langwatch/trace-server";
+import type { OtlpSpan } from "@langwatch/trace-contract";
 
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
+const hasTestcontainers = !!(process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL);
 
-class TestRecordSpanCommand extends RecordSpanCommand {
-  static override readonly schema = RecordSpanCommand.schema;
-  constructor() {
-    super({
-      piiRedactionService: { redactSpan: async () => {} },
-      costEnrichmentService: { enrichSpan: async () => {} },
-      tokenEstimationService: { estimateSpanTokens: async () => {} },
-      contentDropService: {
-        dropSpanContent: async () => ({
-          droppedCount: 0,
-          droppedCategories: [],
-          droppedAttributeKeys: [],
-        }),
-      },
-    });
-  }
+function createTestRecordSpanCommand(): RecordSpanCommand {
+  return RecordSpanCommand.create({
+    piiRedaction: { redact: async () => {} },
+    costEnrichment: { enrich: async () => {} },
+    tokenEstimation: { estimate: async () => {} },
+    contentDrop: {
+      drop: async () => ({ droppedCount: 0, droppedCategories: [] }),
+    },
+  });
 }
 
 function generateId(prefix: string): string {
@@ -137,13 +122,15 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       const spanAppendStore = new SpanAppendStore(
-        new SpanStorageService(
-          new SpanStorageClickHouseRepository(async () => clickHouseClient),
-        ).repository,
+        new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient))
+          .repository,
       );
       traceSummaryStore = new TraceSummaryStore(
         new TraceSummaryService(
-          new TraceSummaryClickHouseRepository(async () => clickHouseClient),
+          TraceSummaryClickHouseRepository.create({
+            resolveClient: async () => clickHouseClient,
+            defaultRetentionDays: 30,
+          }),
         ).repository,
       );
 
@@ -171,7 +158,7 @@ describe.skipIf(!hasTestcontainers)(
           }) as any,
         )
         .withClickHouseMapProjection(
-          new SpanStorageMapProjection({
+          SpanStorageMapProjection.create({
             store: spanAppendStore,
             traceCanonicalisation: TraceCanonicalisationService.create(),
           }) as any,
@@ -182,7 +169,7 @@ describe.skipIf(!hasTestcontainers)(
         .withProjectionSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
         .withProjectionSubscriber("projectMetadata", noopFoldSubscriber() as any)
         .withProjectionSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
-        .withCommand("recordSpan", TestRecordSpanCommand as any)
+        .withCommandInstance("recordSpan", RecordSpanCommand, createTestRecordSpanCommand())
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();
 
@@ -323,10 +310,7 @@ describe.skipIf(!hasTestcontainers)(
           clickhouse_settings: { select_sequential_consistency: "1" },
         });
         const eventRows = await eventResult.json();
-        console.log(
-          "[TEST] Events in event_log for this trace:",
-          (eventRows[0] as any)?.cnt,
-        );
+        console.log("[TEST] Events in event_log for this trace:", (eventRows[0] as any)?.cnt);
 
         console.log("[TEST] Polling trace_summaries...");
         const clickHouseClient = getTestClickHouseClient()!;
@@ -373,18 +357,15 @@ describe.skipIf(!hasTestcontainers)(
         // Read them back and verify the derivation produces the expected
         // per-role aggregates (both child LLM costs attributed to Agent; Agent
         // latency = its own span duration).
-        const spanRepo = new SpanStorageClickHouseRepository(
-          async () => clickHouseClient,
-        );
+        const spanRepo = new SpanStorageClickHouseRepository(async () => clickHouseClient);
         const spans = await spanRepo.getNormalizedSpansByTraceId({
           tenantId: tenantIdString,
           traceId,
         });
-        const { scenarioRoleCosts, scenarioRoleLatencies } =
-          deriveScenarioRoleMetricsFromSpans({
-            spans,
-            spanCostService: new SpanCostService(),
-          });
+        const { scenarioRoleCosts, scenarioRoleLatencies } = deriveScenarioRoleMetricsFromSpans({
+          spans,
+          spanCostService: new SpanCostService(),
+        });
 
         expect(scenarioRoleCosts.Agent).toBeGreaterThan(0);
         expect(scenarioRoleLatencies.Agent).toBe(4000);

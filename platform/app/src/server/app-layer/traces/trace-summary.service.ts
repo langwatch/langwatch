@@ -1,15 +1,12 @@
 import { createLogger } from "@langwatch/observability";
+import type { FindByTraceIdOptions, TraceSummaryRepository } from "@langwatch/trace-server";
 
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
 import type { BlobStore } from "./blob-store.service";
 import { TraceNotFoundError } from "./errors";
 import type { SpanStorageRepository } from "./repositories/span-storage.repository";
-import type {
-  FindByTraceIdOptions,
-  TraceSummaryRepository,
-} from "./repositories/trace-summary.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
-import type { TraceSummaryData } from "./types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { teaserOf } from "./visibility-window.service";
 
 /**
@@ -65,15 +62,11 @@ export class TraceSummaryService {
       // to redact it would be a wasted spans + event_log read.
       return {
         ...result,
-        computedInput: result.computedInput
-          ? teaserOf(result.computedInput)
-          : result.computedInput,
+        computedInput: result.computedInput ? teaserOf(result.computedInput) : result.computedInput,
         computedOutput: result.computedOutput
           ? teaserOf(result.computedOutput)
           : result.computedOutput,
-        errorMessage: result.errorMessage
-          ? teaserOf(result.errorMessage)
-          : result.errorMessage,
+        errorMessage: result.errorMessage ? teaserOf(result.errorMessage) : result.errorMessage,
         redactedByVisibilityWindow: true,
       };
     }
@@ -90,27 +83,22 @@ export class TraceSummaryService {
    * back to the stored preview: a degraded header read must never become a
    * failed one.
    */
-  private async withFullIO(
-    tenantId: string,
-    summary: TraceSummaryData,
-  ): Promise<TraceSummaryData> {
+  private async withFullIO(tenantId: string, summary: TraceSummaryData): Promise<TraceSummaryData> {
     const deps = this.fullResolutionDeps;
     if (!deps) return summary;
     try {
-      const normalizedSpans =
-        await deps.spanStorageRepository.getNormalizedSpansByTraceId({
-          tenantId,
-          traceId: summary.traceId,
-          occurredAtMs: summary.occurredAt,
-        });
-      const { recomputedInput, recomputedOutput, anyResolved } =
-        await resolveOffloadedTraces({
-          projectId: tenantId,
-          normalizedSpans,
-          blobStore: deps.blobStore,
-          ioExtractionService: deps.ioExtractionService,
-          logger: this.logger,
-        });
+      const normalizedSpans = await deps.spanStorageRepository.getNormalizedSpansByTraceId({
+        tenantId,
+        traceId: summary.traceId,
+        occurredAtMs: summary.occurredAt,
+      });
+      const { recomputedInput, recomputedOutput, anyResolved } = await resolveOffloadedTraces({
+        projectId: tenantId,
+        normalizedSpans,
+        blobStore: deps.blobStore,
+        ioExtractionService: deps.ioExtractionService,
+        logger: this.logger,
+      });
       if (!anyResolved) return summary;
       return {
         ...summary,

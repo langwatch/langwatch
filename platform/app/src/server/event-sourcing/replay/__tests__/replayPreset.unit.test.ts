@@ -15,8 +15,9 @@ vi.mock("../../../app-layer/app", () => ({
   getApp: vi.fn(),
 }));
 
-vi.mock("../../../app-layer/traces/repositories/trace-summary.clickhouse.repository", () => ({
-  TraceSummaryClickHouseRepository: class {},
+vi.mock("@langwatch/trace-server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/trace-server")>()),
+  TraceSummaryClickHouseRepository: { create: vi.fn() },
 }));
 
 vi.mock("@langwatch/evaluation-server", () => ({

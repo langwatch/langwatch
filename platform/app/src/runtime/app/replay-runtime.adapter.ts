@@ -7,7 +7,7 @@ import type {
 import { ReplayService, RepositoryFoldStore } from "@langwatch/eventing";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "~/server/app-layer/app";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
 import { EvaluationEventingAdapter } from "@langwatch/evaluation-server";
 import { createExperimentRunStateFoldStore } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunState.store";
 import { ExperimentRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
@@ -15,6 +15,7 @@ import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/
 import { SIMULATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/constants";
 import { AppSuiteRuntime } from "~/runtime/app/features/suite";
 import { createAppTraceSummaryStore } from "~/runtime/app/trace-summary-fold.adapter";
+import { AppTraceWindowedReadMetricsAdapter } from "~/runtime/app/trace-windowed-read-metrics.adapter";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/constants";
 import { ClickHouseReplayEventSource } from "~/server/event-sourcing/replay/replayEventLoader";
@@ -83,7 +84,11 @@ export function createReplayRuntime(config: {
     [
       "trace_processing",
       createAppTraceSummaryStore({
-        repository: new TraceSummaryClickHouseRepository(clientResolver),
+        repository: TraceSummaryClickHouseRepository.create({
+          resolveClient: clientResolver,
+          defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+          windowedReadMetrics: AppTraceWindowedReadMetricsAdapter.create(),
+        }),
         redis: null,
         defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
       }),

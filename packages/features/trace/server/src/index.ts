@@ -10,7 +10,33 @@ export {
 } from "./adapters/eventing.trace-pipeline.adapter";
 export { EventingTraceProcessingAdapter } from "./adapters/eventing.trace-processing.adapter";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository";
-export type { TraceClickHouseClient, TraceClickHouseResolver } from "./ports/clickhouse.port";
+export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository";
+export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-analytics.repository";
+export { TraceAnalyticsRollupClickHouseRepository } from "./repositories/clickhouse/trace-analytics-rollup.repository";
+export {
+  NullTraceSummaryRepository,
+  type FindByTraceIdOptions,
+  type TraceSummaryRepository,
+} from "./repositories/trace-summary.repository";
+export {
+  NullTraceAnalyticsRepository,
+  type TraceAnalyticsRepository,
+} from "./repositories/trace-analytics.repository";
+export {
+  NullTraceAnalyticsRollupRepository,
+  type TraceAnalyticsRollupRepository,
+} from "./repositories/trace-analytics-rollup.repository";
+export type {
+  TraceClickHouseClient,
+  TraceClickHouseResolver,
+  TraceClickHouseWriteClient,
+  TraceClickHouseWriteResolver,
+} from "./ports/clickhouse.port";
+export {
+  NullTraceWindowedReadMetricsPort,
+  TraceWindowedReadMetricsPort,
+  type TraceWindowedReadOutcome,
+} from "./ports/trace-windowed-read-metrics.port";
 export { TraceRecordPort } from "./ports/trace-record.port";
 export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
 export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port";

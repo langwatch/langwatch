@@ -23,7 +23,7 @@ import {
   runFoldMapReplay,
 } from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
+import { TraceAnalyticsRollupClickHouseRepository } from "@langwatch/trace-server";
 import { createSpanReceivedEvent } from "~/runtime/app/__tests__/trace-processing/projections/tests/fixtures/trace-summary-test.fixtures";
 import { TraceAnalyticsRollupStore } from "@langwatch/trace-server";
 import { AppTraceProjectionStorageAdapter } from "~/runtime/app/trace-projection-storage.adapter";
@@ -272,7 +272,10 @@ describe("given span events in event_log for a tenant whose rollup is empty", ()
         canonicalisation: TraceCanonicalisationService.create(),
         store: TraceAnalyticsRollupStore.create({
           storage: AppTraceProjectionStorageAdapter.createAnalyticsRollup(
-            new TraceAnalyticsRollupClickHouseRepository(async () => client),
+            TraceAnalyticsRollupClickHouseRepository.create({
+              resolveClient: async () => client,
+              defaultRetentionDays: 30,
+            }),
           ),
           defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
         }),

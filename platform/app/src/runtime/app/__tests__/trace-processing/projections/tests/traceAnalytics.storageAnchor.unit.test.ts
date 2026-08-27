@@ -3,7 +3,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
+import type { TraceAnalyticsRepository } from "@langwatch/trace-server";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,

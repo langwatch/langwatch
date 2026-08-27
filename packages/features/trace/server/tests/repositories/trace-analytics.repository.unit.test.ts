@@ -32,27 +32,36 @@ import { env as nodeProcessEnv } from "node:process";
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { describe, expect, it } from "vitest";
-import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import type { TraceAnalyticsRow } from "@langwatch/trace-server";
 import {
   capturingInsertClient,
   clientReturning,
   orderingClient,
-  windowedReadCount,
-} from "../../../analytics/__tests__/clickhouse-repository-test-helpers";
-import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.clickhouse.repository";
+  TestWindowedReadMetrics,
+} from "./clickhouse-test-helpers";
+import { TraceAnalyticsClickHouseRepository } from "../../src/repositories/clickhouse/trace-analytics.repository";
 
 const TENANT_ID = "project_analyticsreadbackunit";
 const TRACE_ID = "trace-tz";
 const TABLE = "trace_analytics";
+const windowedReadMetrics = new TestWindowedReadMetrics();
 
 function makeRepositoryReturning(record: Record<string, unknown>) {
-  return new TraceAnalyticsClickHouseRepository(async () => clientReturning(record));
+  return TraceAnalyticsClickHouseRepository.create({
+    resolveClient: async () => clientReturning(record),
+    defaultRetentionDays: 30,
+    windowedReadMetrics,
+  });
 }
 
 function makeOrderingRepository(rows: Array<Record<string, unknown>>) {
   const { client, seen } = orderingClient(rows);
   return {
-    repository: new TraceAnalyticsClickHouseRepository(async () => client),
+    repository: TraceAnalyticsClickHouseRepository.create({
+      resolveClient: async () => client,
+      defaultRetentionDays: 30,
+      windowedReadMetrics,
+    }),
     seen,
   };
 }
@@ -221,7 +230,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
   describe("given a caller-supplied window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as a window hit", async () => {
-        const before = await windowedReadCount({
+        const before = windowedReadMetrics.count({
           table: TABLE,
           outcome: "hit",
         });
@@ -243,9 +252,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(
-          before + 1,
-        );
+        expect(windowedReadMetrics.count({ table: TABLE, outcome: "hit" })).toBe(before + 1);
       });
 
       /**
@@ -255,11 +262,11 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
        */
       /** @scenario a bounded miss is recorded as a miss, not as an answer */
       it("counts an empty window as a miss, not as a hit", async () => {
-        const beforeEmpty = await windowedReadCount({
+        const beforeEmpty = windowedReadMetrics.count({
           table: TABLE,
           outcome: "windowed_empty",
         });
-        const beforeHit = await windowedReadCount({
+        const beforeHit = windowedReadMetrics.count({
           table: TABLE,
           outcome: "hit",
         });
@@ -271,10 +278,10 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
         });
 
-        expect(await windowedReadCount({ table: TABLE, outcome: "windowed_empty" })).toBe(
+        expect(windowedReadMetrics.count({ table: TABLE, outcome: "windowed_empty" })).toBe(
           beforeEmpty + 1,
         );
-        expect(await windowedReadCount({ table: TABLE, outcome: "hit" })).toBe(beforeHit);
+        expect(windowedReadMetrics.count({ table: TABLE, outcome: "hit" })).toBe(beforeHit);
       });
 
       it("passes the caller's bounds through to ClickHouse unchanged", async () => {
@@ -319,7 +326,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
   describe("given no window", () => {
     describe("when the read runs", () => {
       it("counts the read on the windowed-read metric as unwindowed", async () => {
-        const before = await windowedReadCount({
+        const before = windowedReadMetrics.count({
           table: TABLE,
           outcome: "unwindowed",
         });
@@ -330,9 +337,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           traceId: TRACE_ID,
         });
 
-        expect(await windowedReadCount({ table: TABLE, outcome: "unwindowed" })).toBe(
-          before + 1,
-        );
+        expect(windowedReadMetrics.count({ table: TABLE, outcome: "unwindowed" })).toBe(before + 1);
         expect(seen[0]?.query).not.toContain("fromUnixTimestamp64Milli");
       });
     });
@@ -396,7 +401,10 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     describe("when a single row is upserted", () => {
       it("refuses to let ClickHouse silently drop an unknown column", async () => {
         const { client, inserts } = capturingInsertClient();
-        const repository = new TraceAnalyticsClickHouseRepository(async () => client);
+        const repository = TraceAnalyticsClickHouseRepository.create({
+          resolveClient: async () => client,
+          defaultRetentionDays: 30,
+        });
 
         await repository.upsert(ROW);
 
@@ -409,7 +417,10 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     describe("when a batch is upserted", () => {
       it("refuses to let ClickHouse silently drop an unknown column", async () => {
         const { client, inserts } = capturingInsertClient();
-        const repository = new TraceAnalyticsClickHouseRepository(async () => client);
+        const repository = TraceAnalyticsClickHouseRepository.create({
+          resolveClient: async () => client,
+          defaultRetentionDays: 30,
+        });
 
         await repository.upsertBatch([{ row: ROW }]);
 

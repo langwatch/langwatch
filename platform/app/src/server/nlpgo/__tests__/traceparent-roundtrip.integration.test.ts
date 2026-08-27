@@ -1,4 +1,7 @@
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { AppTraceRuntime } from "~/runtime/app/features/trace";
+import { AppTraceProjectionStorageAdapter } from "~/runtime/app/trace-projection-storage.adapter";
+import { TestCodingAgentService } from "~/test-utils/test-coding-agent.service";
 /**
  * Full-loop end-to-end test for traceparent propagation:
  *
@@ -51,9 +54,8 @@ import type { EventSourcing } from "@langwatch/eventing";
 import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { TraceSummaryClickHouseRepository } from "@langwatch/trace-server";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { TraceRequestCollectionService } from "~/server/app-layer/traces/trace-request-collection.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import {
   getTestClickHouseClient,
@@ -67,15 +69,16 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testHelpers";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
 import { EventStoreClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventStoreClickHouse";
-import { AssignTopicCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/assignTopicCommand";
-import { RecordSpanCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/recordSpanCommand";
-import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection";
-import { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store";
-import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
-import { TRACE_PROCESSING_EVENT_TYPES } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { AssignTopicCommand } from "@langwatch/trace-server";
+import { RecordSpanCommand } from "@langwatch/trace-server";
+import { SpanStorageMapProjection } from "@langwatch/trace-server";
+import { SpanStorageStore } from "@langwatch/trace-server";
+import { TraceSummaryFoldProjection } from "@langwatch/trace-server";
+import { TraceSummaryStore } from "@langwatch/trace-server";
+import { TRACE_PROCESSING_EVENT_TYPES } from "@langwatch/trace-contract";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { makeQueueName } from "~/server/queues/makeQueueName";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const otlpRoot = require("@opentelemetry/otlp-transformer/build/src/generated/root");
@@ -91,9 +94,7 @@ const PARENT_SPAN_ID = "0011223344556677";
 // /langwatch/src/server/nlpgo/__tests__  → up 5 = repo root
 const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
+const hasTestcontainers = !!(process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL);
 function hasGo(): boolean {
   try {
     execSync("go version", { stdio: "ignore" });
@@ -253,14 +254,19 @@ describe.skipIf(!shouldRun)(
         redis: redisConnection,
       });
 
-      const spanAppendStore = new SpanAppendStore(
-        new SpanStorageService(
-          new SpanStorageClickHouseRepository(async () => clickHouseClient),
-        ).repository,
-      );
+      const spanStorage = new SpanStorageService(
+        new SpanStorageClickHouseRepository(async () => clickHouseClient),
+      ).repository;
+      const spanAppendStore = SpanStorageStore.create({
+        storage: AppTraceProjectionStorageAdapter.createSpanStorage(spanStorage),
+        defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      });
       const traceSummaryStore = new TraceSummaryStore(
         new TraceSummaryService(
-          new TraceSummaryClickHouseRepository(async () => clickHouseClient),
+          TraceSummaryClickHouseRepository.create({
+            resolveClient: async () => clickHouseClient,
+            defaultRetentionDays: 30,
+          }),
         ).repository,
       );
 
@@ -281,7 +287,7 @@ describe.skipIf(!shouldRun)(
           }) as any,
         )
         .withClickHouseMapProjection(
-          new SpanStorageMapProjection({
+          SpanStorageMapProjection.create({
             store: spanAppendStore,
             traceCanonicalisation: TraceCanonicalisationService.create(),
           }) as any,
@@ -292,28 +298,20 @@ describe.skipIf(!shouldRun)(
         .withProjectionSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
         .withProjectionSubscriber("projectMetadata", noopFoldSubscriber() as any)
         .withProjectionSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
-        // REAL RecordSpanCommand with no-op PII/cost/token deps —
-        // same pattern as the other event-sourcing integration tests.
-        .withCommand(
+        .withCommandInstance(
           "recordSpan",
-          class extends RecordSpanCommand {
-            static override readonly schema = RecordSpanCommand.schema;
-            constructor() {
-              super({
-                piiRedactionService: { redactSpan: async () => {} } as any,
-                costEnrichmentService: { enrichSpan: async () => {} } as any,
-                tokenEstimationService: {
-                  estimateSpanTokens: async () => {},
-                } as any,
-                contentDropService: {
-                  dropSpanContent: async () => ({
-                    droppedCount: 0,
-                    droppedCategories: [],
-                  }),
-                } as any,
-              });
-            }
-          } as any,
+          RecordSpanCommand,
+          RecordSpanCommand.create({
+            piiRedaction: { redact: async () => {} },
+            costEnrichment: { enrich: async () => {} },
+            tokenEstimation: { estimate: async () => {} },
+            contentDrop: {
+              drop: async () => ({
+                droppedCount: 0,
+                droppedCategories: [],
+              }),
+            },
+          }),
         )
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();
@@ -381,12 +379,14 @@ describe.skipIf(!shouldRun)(
       // Trace request collection service wired to the SAME recordSpan
       // command dispatcher the pipeline uses — so nlpgo's OTLP feeds
       // straight into the event-sourcing flow that lands in CH.
-      const traceCollection = new TraceRequestCollectionService({
+      const traceCollection = AppTraceRuntime.createIngestion({
+        codingAgents: TestCodingAgentService.create(),
+        codingAgentSpanFilterEnabled: false,
         dedup: {
           tryAcquireProcessingLock: async () => true,
           tryConfirmProcessed: async () => undefined,
           tryReleaseOnFailure: async () => undefined,
-        } as any,
+        },
         recordSpan: (data) => tracePipeline.commands.recordSpan.send(data),
       });
 
@@ -448,9 +448,7 @@ describe.skipIf(!shouldRun)(
                   delivery.collectionErrorMessage = collectionResult.errorMessage;
                 } catch (err) {
                   delivery.collectionThrew =
-                    err instanceof Error
-                      ? `${err.message}\n${err.stack ?? ""}`
-                      : String(err);
+                    err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err);
                   throw err;
                 }
                 res.statusCode = 200;
@@ -482,9 +480,7 @@ describe.skipIf(!shouldRun)(
           })();
         });
       });
-      await new Promise<void>((resolve) =>
-        langwatchSrv!.listen(0, "127.0.0.1", () => resolve()),
-      );
+      await new Promise<void>((resolve) => langwatchSrv!.listen(0, "127.0.0.1", () => resolve()));
       langwatchUrl = `http://127.0.0.1:${(langwatchSrv.address() as AddressInfo).port}`;
 
       // Build nlpgo (cached). The build itself can take a couple of
@@ -566,9 +562,7 @@ describe.skipIf(!shouldRun)(
           /* group already gone */
         }
         const exited = await Promise.race([
-          new Promise<boolean>((resolve) =>
-            nlpgoProcess!.once("exit", () => resolve(true)),
-          ),
+          new Promise<boolean>((resolve) => nlpgoProcess!.once("exit", () => resolve(true))),
           sleep(3000).then(() => false),
         ]);
         if (!exited) {
@@ -695,19 +689,16 @@ describe.skipIf(!shouldRun)(
         const traceparent = `00-${PARENT_TRACE_ID}-${PARENT_SPAN_ID}-01`;
         const body = makeWorkflowBody(PARENT_TRACE_ID);
 
-        const resp = await fetch(
-          `http://127.0.0.1:${NLPGO_PORT}/go/studio/execute_sync`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              traceparent,
-              "X-LangWatch-Origin": "evaluation",
-              "X-LangWatch-Causality-Depth": "0",
-            },
-            body: JSON.stringify(body),
+        const resp = await fetch(`http://127.0.0.1:${NLPGO_PORT}/go/studio/execute_sync`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            traceparent,
+            "X-LangWatch-Origin": "evaluation",
+            "X-LangWatch-Causality-Depth": "0",
           },
-        );
+          body: JSON.stringify(body),
+        });
         const respText = await resp.text();
         expect(resp.ok, `nlpgo response ${resp.status}: ${respText}`).toBe(true);
 
@@ -824,14 +815,9 @@ describe.skipIf(!shouldRun)(
             for (const t of d.traceIds) traceIdsSeen.add(t);
             totalSpans += d.spanCount;
           }
-          const otlpForInbound = otlpDeliveries.filter((d) =>
-            d.traceIds.includes(PARENT_TRACE_ID),
-          );
+          const otlpForInbound = otlpDeliveries.filter((d) => d.traceIds.includes(PARENT_TRACE_ID));
           const otherTraceIds = [...traceIdsSeen].filter((t) => t !== PARENT_TRACE_ID);
-          const totalRejected = otlpDeliveries.reduce(
-            (s, d) => s + (d.rejectedSpans ?? 0),
-            0,
-          );
+          const totalRejected = otlpDeliveries.reduce((s, d) => s + (d.rejectedSpans ?? 0), 0);
           const collectionErrors = otlpDeliveries
             .map((d) => d.collectionErrorMessage)
             .filter((m): m is string => !!m && m.length > 0);
@@ -908,10 +894,7 @@ describe.skipIf(!shouldRun)(
             `Spans seen in CH: ${
               rows
                 .map(
-                  (r) =>
-                    `${r.SpanName}(span_id=${r.SpanId}, parent=${
-                      r.ParentSpanId ?? "<root>"
-                    })`,
+                  (r) => `${r.SpanName}(span_id=${r.SpanId}, parent=${r.ParentSpanId ?? "<root>"})`,
                 )
                 .join(", ") || "(none)"
             }\n` +

@@ -28,9 +28,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  TraceAnalyticsClickHouseRepository,
+  TraceSummaryClickHouseRepository,
+} from "@langwatch/trace-server";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   startTestContainers,
   stopTestContainers,
@@ -40,7 +42,7 @@ import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+} from "@langwatch/trace-server";
 
 let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
@@ -109,8 +111,14 @@ async function flushAsyncInserts(): Promise<void> {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  analyticsRepo = new TraceAnalyticsClickHouseRepository(async () => ch);
-  summaryRepo = new TraceSummaryClickHouseRepository(async () => ch);
+  analyticsRepo = TraceAnalyticsClickHouseRepository.create({
+    resolveClient: async () => ch,
+    defaultRetentionDays: 30,
+  });
+  summaryRepo = TraceSummaryClickHouseRepository.create({
+    resolveClient: async () => ch,
+    defaultRetentionDays: 30,
+  });
 }, 120_000);
 
 afterAll(async () => {
