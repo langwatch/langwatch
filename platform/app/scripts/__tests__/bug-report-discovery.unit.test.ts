@@ -53,10 +53,9 @@ describe("agent report discovery notices", () => {
     /** @scenario "The attribution footer carries the report line on every page" */
     it("injects the agent report line above the Powered by note", () => {
       const script = read("docs/posthog.js");
-      expect(
-        script,
-        "posthog.js lost the footer injection",
-      ).toContain("lw-agent-report");
+      expect(script, "posthog.js lost the footer injection").toContain(
+        "lw-agent-report",
+      );
       expect(script).toContain("npx langwatch report");
       expect(script).toContain('href="/support"');
 

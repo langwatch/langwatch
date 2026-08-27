@@ -65,6 +65,17 @@ describe("Feature: the agent cache", () => {
       body: JSON.stringify(body),
     });
 
+  const claimEntry = (
+    name: string,
+    token: string,
+    body: Record<string, unknown>,
+  ) =>
+    app.request(`/api/agent-cache/${name}/claim`, {
+      method: "POST",
+      headers: { ...headersFor(token), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
   const removeEntry = (name: string, token: string) =>
     app.request(`/api/agent-cache/${name}`, {
       method: "DELETE",
@@ -275,6 +286,92 @@ describe("Feature: the agent cache", () => {
           ttl_seconds: 1,
         });
         expect(res.status).toBe(400);
+      });
+    });
+  });
+
+  describe("given a caller that takes a name with a claim", () => {
+    describe("when the project holds no entry under that name", () => {
+      /** @scenario "A claim on a free name is taken" */
+      it("takes the name and stores the value", async () => {
+        const res = await claimEntry("ACME_CLAIM_FREE", manageToken, {
+          value: "won-it",
+        });
+        expect(res.status).toBe(200);
+        expect((await res.json()) as unknown).toMatchObject({
+          name: "ACME_CLAIM_FREE",
+          claimed: true,
+        });
+
+        const read = await readEntry("ACME_CLAIM_FREE", manageToken);
+        expect(((await read.json()) as { value: string }).value).toBe("won-it");
+      });
+    });
+
+    describe("when the project already holds that name", () => {
+      /** @scenario "A claim on a held name leaves the held value alone" */
+      it("does not take the name and leaves the held value alone", async () => {
+        await writeEntry("ACME_CLAIM_HELD", manageToken, { value: "first" });
+
+        const res = await claimEntry("ACME_CLAIM_HELD", manageToken, {
+          value: "second",
+        });
+        expect(res.status).toBe(200);
+        expect(((await res.json()) as { claimed: boolean }).claimed).toBe(
+          false,
+        );
+
+        const read = await readEntry("ACME_CLAIM_HELD", manageToken);
+        expect(((await read.json()) as { value: string }).value).toBe("first");
+      });
+    });
+
+    describe("when the claimed entry's lifetime passes", () => {
+      /** @scenario "A name is free again once its lifetime passes" */
+      it("lets the next caller take the name", async () => {
+        const first = await claimEntry("ACME_CLAIM_BRIEF", manageToken, {
+          value: "gone-soon",
+          ttl_seconds: 5,
+        });
+        expect(((await first.json()) as { claimed: boolean }).claimed).toBe(
+          true,
+        );
+
+        // The route floor is 5 seconds, so waiting past it is the only way to
+        // observe the name coming free again.
+        await sleep(5_100);
+
+        const second = await claimEntry("ACME_CLAIM_BRIEF", manageToken, {
+          value: "the-next-one",
+        });
+        expect(((await second.json()) as { claimed: boolean }).claimed).toBe(
+          true,
+        );
+      }, 15_000);
+    });
+
+    describe("when several callers claim the same name at once", () => {
+      /** @scenario "Only one of several claims sent at once takes the name" */
+      it("takes the name exactly once", async () => {
+        const responses = await Promise.all(
+          Array.from({ length: 8 }, (_, index) =>
+            claimEntry("ACME_CLAIM_RACE", manageToken, {
+              value: `row-${index}`,
+            }),
+          ),
+        );
+
+        const outcomes = await Promise.all(
+          responses.map((res) => res.json() as Promise<{ claimed: boolean }>),
+        );
+        const winners = outcomes.filter((outcome) => outcome.claimed);
+        expect(winners).toHaveLength(1);
+
+        const winnerIndex = outcomes.findIndex((outcome) => outcome.claimed);
+        const read = await readEntry("ACME_CLAIM_RACE", manageToken);
+        expect(((await read.json()) as { value: string }).value).toBe(
+          `row-${winnerIndex}`,
+        );
       });
     });
   });

@@ -500,6 +500,110 @@ describe("given a conversation Microsoft stored across several rows", () => {
   });
 });
 
+/**
+ * Observed, not hand-built. One conversation with the agent, left idle past
+ * the session timeout and then picked up again, was stored as two rows: the
+ * same `name`, both numbered batch 0, and two different start times — 15
+ * messages under `2026-08-26T14:45:41Z` and 2 more under
+ * `2026-08-26T16:29:56Z`. Grouping on the start time as well as the name
+ * split it into two traces, and the trace list showed only the newer half.
+ *
+ * The rows below keep that shape — one name, one batch number, two start
+ * times — and carry a single exchange each. The message counts are not what
+ * splits the conversation; the second start time is, and one exchange per row
+ * is enough to show it.
+ */
+describe("given a conversation resumed after a break", () => {
+  const RESUMED_NAME = "98396e1f-0000-4000-8000-000000000002_14a3a0cf-bot";
+  const before = transcriptRow({
+    activities: [
+      userMessage({
+        id: "e1111111-1111-4111-8111-111111111111",
+        text: "what's the capital of berlin?",
+        ms: 1_787_755_541_000,
+      }),
+      agentMessage({
+        id: "e2222222-2222-4222-8222-222222222222",
+        text: "Berlin is a city, and it is the capital of Germany.",
+        ms: 1_787_755_545_000,
+      }),
+    ],
+    batchId: 0,
+    name: RESUMED_NAME,
+    start: "2026-08-26T14:45:41Z",
+    transcriptId: "row-before-break",
+  });
+  const after = transcriptRow({
+    activities: [
+      userMessage({
+        id: "e3333333-3333-4333-8333-333333333333",
+        text: "what about chile.",
+        ms: 1_787_761_796_000,
+      }),
+      agentMessage({
+        id: "e4444444-4444-4444-8444-444444444444",
+        text: "Santiago is the capital of Chile.",
+        ms: 1_787_761_800_000,
+      }),
+    ],
+    batchId: 0,
+    name: RESUMED_NAME,
+    start: "2026-08-26T16:29:56Z",
+    transcriptId: "row-after-break",
+  });
+
+  describe("when both halves reach the mapper in one pull", () => {
+    it("records one trace holding both halves", () => {
+      const spans = spansOf([copilotEvent(before), copilotEvent(after)]);
+      expect(new Set(spans.map((s) => s.traceId)).size).toBe(1);
+      const rendered = JSON.stringify(spans);
+      expect(rendered).toContain("what's the capital of berlin?");
+      expect(rendered).toContain("Santiago is the capital of Chile.");
+    });
+
+    it("hangs both halves' turns under a single conversation", () => {
+      const events = [copilotEvent(before), copilotEvent(after)];
+      const conversations = spansOf(events).filter(
+        (s: { name: string }) => s.name === COPILOT_CONVERSATION_SPAN_NAME,
+      );
+      expect(conversations.length).toBe(1);
+      const turns = turnSpansOf(events);
+      expect(turns.length).toBe(2);
+      expect(new Set(turns.map((s) => s.parentSpanId))).toEqual(
+        new Set([conversations[0]!.spanId]),
+      );
+    });
+
+    /**
+     * Both halves are numbered batch 0, which is two rows carrying the same
+     * number rather than a hole in the numbering. Nothing is missing here.
+     */
+    it("does not read the repeated batch number as a missing piece", () => {
+      const spans = spansOf([copilotEvent(before), copilotEvent(after)]);
+      expect(
+        attrsOf(spans[0]!)["copilot_studio.conversation_incomplete"],
+      ).toBeUndefined();
+    });
+  });
+
+  /**
+   * The two halves land in different pull runs in practice, so the trace they
+   * join is decided by the identifiers alone, not by being mapped together.
+   */
+  describe("when each half is pulled on its own", () => {
+    it("gives a half pulled on its own the same trace and thread as the other", () => {
+      const [firstRun, secondRun] = [
+        spansOf([copilotEvent(before)]),
+        spansOf([copilotEvent(after)]),
+      ];
+      expect(firstRun[0]!.traceId).toBe(secondRun[0]!.traceId);
+      expect(attrsOf(firstRun[0]!)["langwatch.thread.id"]).toBe(
+        attrsOf(secondRun[0]!)["langwatch.thread.id"],
+      );
+    });
+  });
+});
+
 describe("given a stored name that does not match the shape we observed", () => {
   /** @scenario "The conversation's stored label is used whole, never taken apart" */
   it("groups a name with no underscore and one with several", () => {

@@ -138,6 +138,12 @@ interface Activity {
 interface TranscriptRow {
   /** Opaque grouping key. Never parsed — see `conversationKeyOf`. */
   name?: string | null;
+  /**
+   * Declared to record that the field exists and is deliberately unread. It
+   * dates a session, not a conversation, so it is never an identity input —
+   * two rows of one conversation carry different values here and must still
+   * produce one trace. The puller reads it, as the event's timestamp.
+   */
   conversationstarttime?: string | null;
   /**
    * Declared to record that the field exists and is deliberately unread. It
@@ -222,8 +228,7 @@ function batchIdOf(row: TranscriptRow): number | null {
 }
 
 /**
- * What groups rows into one conversation: the stored name together with the
- * conversation's start time, both used whole.
+ * What groups rows into one conversation: the stored name, used whole.
  *
  * The name happens to look like a conversation id and a bot id joined by an
  * underscore. Microsoft documents that as a shape they observed, not one they
@@ -231,15 +236,18 @@ function batchIdOf(row: TranscriptRow): number | null {
  * on a format nobody committed to — and the failure would be silent, since a
  * name that stopped matching the shape would still produce *an* identifier,
  * just a different one, orphaning every conversation pulled before the change.
+ *
+ * The start time was part of this key and had to come out. Someone who leaves
+ * a conversation idle past the session timeout and then keeps talking gets a
+ * second row: same name, same batch number, a later start time. Keying on the
+ * start time made that one conversation into two traces on two thread ids,
+ * and the trace list showed only the newer half — which is exactly what the
+ * whole `name` is for, since it already carries the conversation's own id.
  */
 function conversationKeyOf(row: TranscriptRow): string | null {
   const name = typeof row.name === "string" ? row.name.trim() : "";
-  const start =
-    typeof row.conversationstarttime === "string"
-      ? row.conversationstarttime.trim()
-      : "";
-  if (!name || !start) return null;
-  return `${name}|${start}`;
+  if (!name) return null;
+  return name;
 }
 
 interface ConversationGroup {
