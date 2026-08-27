@@ -251,20 +251,39 @@ export class LangyUiActionService {
     definition,
     payload,
     experimentSlug,
+    remainingMs,
   }: {
     actionId: string;
     kind: string;
     definition: NonNullable<ReturnType<typeof findPageAction>>;
     payload: unknown;
     experimentSlug?: string;
+    /** What is left of the ceiling once the claim window is spent. */
+    remainingMs: number;
   }): Promise<UiActionOutcome> {
     if (!this.backendRunner) throw new LangyUiNoBrowserError(kind);
-    const result = await this.backendRunner({
-      kind,
-      definition,
-      payload,
-      experimentSlug,
+    // The backend answers under the same ceiling the page does. Without this
+    // the runner is awaited unbounded, so a slow action runs past the ceiling
+    // and the CLI's deadline reports the failure instead of this layer.
+    //
+    // The action is not cancelled, only stopped being waited on: it may still
+    // apply, which is exactly what the caller is told.
+    let timer: NodeJS.Timeout | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new LangyUiTimeoutError(kind)),
+        remainingMs,
+      );
     });
+    let result: unknown;
+    try {
+      result = await Promise.race([
+        this.backendRunner({ kind, definition, payload, experimentSlug }),
+        deadline,
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     return {
       status: "done",
       executedVia: "backend",
@@ -297,6 +316,14 @@ export class LangyUiActionService {
     experimentSlug?: string;
   }): Promise<UiActionOutcome> {
     const blocking = this.redis.duplicate();
+    // What is left of the ceiling once the claim window is spent. Both the
+    // page and the backend answer inside it, so the whole server wait stays
+    // under the CLI's own deadline whichever side runs the action.
+    const budgetMs = Math.min(
+      definition.executeBudgetMs ?? UI_ACTION_DEFAULT_BUDGET_MS,
+      UI_ACTION_MAX_BUDGET_MS,
+    );
+    const remainingMs = Math.max(1_000, budgetMs - UI_ACTION_CLAIM_WINDOW_MS);
     try {
       const claimWindowSeconds = Math.ceil(UI_ACTION_CLAIM_WINDOW_MS / 1000);
       const first = await blocking.blpop(
@@ -337,17 +364,11 @@ export class LangyUiActionService {
           definition,
           payload,
           experimentSlug,
+          remainingMs,
         });
       }
 
-      const budgetMs = Math.min(
-        definition.executeBudgetMs ?? UI_ACTION_DEFAULT_BUDGET_MS,
-        UI_ACTION_MAX_BUDGET_MS,
-      );
-      const remainingSeconds = Math.max(
-        1,
-        Math.ceil((budgetMs - UI_ACTION_CLAIM_WINDOW_MS) / 1000),
-      );
+      const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
       const second = await blocking.blpop(
         uiActionKeys.result(actionId),
         remainingSeconds,

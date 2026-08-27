@@ -5,7 +5,7 @@
  * deletion — because the at-most-once and away-detection guarantees live in
  * how those primitives are sequenced.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   LangyUiActionService,
   UI_ACTION_MAX_BUDGET_MS,
@@ -632,6 +632,38 @@ describe("LangyUiActionService", () => {
       expect(appended).toHaveLength(1);
       // A zombie tab claiming late must find nothing to claim.
       expect(pendingAtRunnerTime).toBe(false);
+    });
+  });
+
+  describe("when the backend takes the action and goes silent", () => {
+    /** @scenario A backend action that runs past the ceiling is reported by the server */
+    it("stops waiting at the ceiling rather than holding the caller's budget", async () => {
+      // The ceiling is the WHOLE server wait. Awaiting the runner unbounded
+      // hands the failure to the CLI's own deadline, which is the layer above,
+      // so the caller is told a timeout happened rather than which one.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const { redis } = makeRedis(["wait-empty"]);
+        const service = makeService({
+          redis,
+          backendRunner: () => new Promise(() => undefined),
+        });
+
+        const dispatch = service.dispatch({
+          ...DISPATCH,
+          kind: "workbench.duplicateTarget",
+          payload: { targetId: "t1" },
+          experimentSlug: "my-exp",
+        });
+        const settled = expect(dispatch).rejects.toMatchObject({
+          code: "langy_ui_timeout",
+        });
+
+        await vi.advanceTimersByTimeAsync(UI_ACTION_MAX_BUDGET_MS);
+        await settled;
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

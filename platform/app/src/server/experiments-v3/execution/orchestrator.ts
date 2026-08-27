@@ -2559,6 +2559,112 @@ export const buildEvaluatorResultDispatch = ({
  *
  * Exported for unit testing.
  */
+/**
+ * The optional halves of a carried cell, each present only when the board
+ * holds it. An absent cost is not a zero cost, and an absent trace is not a
+ * missing one.
+ */
+const carriedCellFields = (cell: CarriedOverCell) => ({
+  ...(cell.cost !== undefined ? { cost: cell.cost } : {}),
+  ...(cell.duration !== undefined ? { duration: cell.duration } : {}),
+  ...(cell.traceId !== undefined ? { traceId: cell.traceId } : {}),
+  ...(cell.error !== undefined ? { error: cell.error } : {}),
+  ...(cell.domainError !== undefined
+    ? { domainError: cell.domainError }
+    : {}),
+});
+
+/** The statuses the store knows. A verdict with any other is dropped. */
+const isStorableVerdict = (
+  result: SingleEvaluationResult | undefined,
+): result is SingleEvaluationResult =>
+  result?.status === "processed" ||
+  result?.status === "error" ||
+  result?.status === "skipped";
+
+/**
+ * The target row a carried cell contributes, or null when it holds none.
+ *
+ * A cell with neither an output nor a failure gets no row: writing one would
+ * say the column produced nothing, which reads as a result rather than as an
+ * empty cell.
+ */
+const carriedTargetResult = ({
+  tenantId,
+  runId,
+  experimentId,
+  cell,
+  datasetEntry,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  cell: CarriedOverCell;
+  datasetEntry: Record<string, unknown>;
+  occurredAt: number;
+}): RecordTargetResultCommandData | null => {
+  const hasOutput = cell.output !== undefined && cell.output !== null;
+  if (!hasOutput && !cell.error) return null;
+
+  const dispatch = buildTargetResultDispatch({
+    tenantId,
+    runId,
+    experimentId,
+    event: {
+      type: "target_result",
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+      output: cell.output,
+      ...carriedCellFields(cell),
+    },
+    datasetEntry,
+    occurredAt,
+  });
+
+  return dispatch ? { ...dispatch, carriedOver: true } : null;
+};
+
+/** The verdict rows a carried cell contributes, in board order. */
+const carriedEvaluatorResults = ({
+  tenantId,
+  runId,
+  experimentId,
+  cell,
+  evaluatorNameFor,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  cell: CarriedOverCell;
+  evaluatorNameFor: (evaluatorId: string) => string | null;
+  occurredAt: number;
+}): RecordEvaluatorResultCommandData[] =>
+  cell.evaluatorResults.flatMap((verdict) => {
+    const result = verdict.result as SingleEvaluationResult | undefined;
+    if (!isStorableVerdict(result)) return [];
+
+    return [
+      {
+        ...buildEvaluatorResultDispatch({
+          tenantId,
+          runId,
+          experimentId,
+          event: {
+            rowIndex: cell.rowIndex,
+            targetId: cell.targetId,
+            evaluatorId: verdict.evaluatorId,
+          },
+          result,
+          evaluatorName: evaluatorNameFor(verdict.evaluatorId),
+          occurredAt,
+        }),
+        carriedOver: true,
+      },
+    ];
+  });
+
 export const buildCarriedOverDispatches = ({
   tenantId,
   runId,
@@ -2586,58 +2692,26 @@ export const buildCarriedOverDispatches = ({
     const datasetEntry = datasetRows[cell.rowIndex];
     if (!datasetEntry) continue;
 
-    const hasOutput = cell.output !== undefined && cell.output !== null;
-    if (hasOutput || cell.error) {
-      const dispatch = buildTargetResultDispatch({
+    const target = carriedTargetResult({
+      tenantId,
+      runId,
+      experimentId,
+      cell,
+      datasetEntry,
+      occurredAt,
+    });
+    if (target) targetResults.push(target);
+
+    evaluatorResults.push(
+      ...carriedEvaluatorResults({
         tenantId,
         runId,
         experimentId,
-        event: {
-          type: "target_result",
-          rowIndex: cell.rowIndex,
-          targetId: cell.targetId,
-          output: cell.output,
-          ...(cell.cost !== undefined ? { cost: cell.cost } : {}),
-          ...(cell.duration !== undefined ? { duration: cell.duration } : {}),
-          ...(cell.traceId !== undefined ? { traceId: cell.traceId } : {}),
-          ...(cell.error !== undefined ? { error: cell.error } : {}),
-          ...(cell.domainError !== undefined
-            ? { domainError: cell.domainError }
-            : {}),
-        },
-        datasetEntry,
+        cell,
+        evaluatorNameFor,
         occurredAt,
-      });
-      if (dispatch) targetResults.push({ ...dispatch, carriedOver: true });
-    }
-
-    for (const verdict of cell.evaluatorResults) {
-      const result = verdict.result as SingleEvaluationResult | undefined;
-      if (
-        !result ||
-        (result.status !== "processed" &&
-          result.status !== "error" &&
-          result.status !== "skipped")
-      ) {
-        continue;
-      }
-      evaluatorResults.push({
-        ...buildEvaluatorResultDispatch({
-          tenantId,
-          runId,
-          experimentId,
-          event: {
-            rowIndex: cell.rowIndex,
-            targetId: cell.targetId,
-            evaluatorId: verdict.evaluatorId,
-          },
-          result,
-          evaluatorName: evaluatorNameFor(verdict.evaluatorId),
-          occurredAt,
-        }),
-        carriedOver: true,
-      });
-    }
+      }),
+    );
   }
 
   return { targetResults, evaluatorResults };

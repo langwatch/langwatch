@@ -308,6 +308,108 @@ const clearCoveredCell = ({
 };
 
 /**
+ * Opens the carried cell for one board position, or refuses it.
+ *
+ * Refuses a cell the run covers itself: that cell is about to be produced, and
+ * a carried copy of it would be the stale half of the same position.
+ */
+type OpenCarriedCell = (args: {
+  rowIndex: number;
+  targetId: string;
+}) => CarriedOverCell | null;
+
+const carryOutputs = ({
+  results,
+  openCell,
+}: {
+  results: PersistedResults;
+  openCell: OpenCarriedCell;
+}): void => {
+  for (const [targetId, outputs] of Object.entries(results.targetOutputs)) {
+    outputs.forEach((output, rowIndex) => {
+      if (output === undefined || output === null) return;
+      const cell = openCell({ rowIndex, targetId });
+      if (cell) cell.output = output;
+    });
+  }
+};
+
+const carryErrors = ({
+  results,
+  openCell,
+}: {
+  results: PersistedResults;
+  openCell: OpenCarriedCell;
+}): void => {
+  for (const [targetId, errors] of Object.entries(results.errors)) {
+    errors.forEach((error, rowIndex) => {
+      if (!error) return;
+      const cell = openCell({ rowIndex, targetId });
+      if (cell) cell.error = error;
+    });
+  }
+};
+
+const carryVerdicts = ({
+  results,
+  openCell,
+}: {
+  results: PersistedResults;
+  openCell: OpenCarriedCell;
+}): void => {
+  for (const [targetId, byEvaluator] of Object.entries(
+    results.evaluatorResults,
+  )) {
+    for (const [evaluatorId, verdicts] of Object.entries(byEvaluator)) {
+      verdicts.forEach((result, rowIndex) => {
+        if (result === undefined || result === null) return;
+        const cell = openCell({ rowIndex, targetId });
+        if (cell) cell.evaluatorResults.push({ evaluatorId, result });
+      });
+    }
+  }
+};
+
+/**
+ * Copies the metadata fields the board holds, leaving the rest of the cell
+ * alone. An absent field is not the same as a zero cost or a missing trace.
+ */
+const copyMetadataOnto = ({
+  cell,
+  entry,
+}: {
+  cell: CarriedOverCell;
+  entry: TargetRowMetadata;
+}): void => {
+  if (entry.cost !== undefined) cell.cost = entry.cost;
+  if (entry.duration !== undefined) cell.duration = entry.duration;
+  if (entry.traceId !== undefined) cell.traceId = entry.traceId;
+  if (entry.domainError !== undefined) cell.domainError = entry.domainError;
+};
+
+/**
+ * Metadata goes on last, and only onto cells something else already opened.
+ *
+ * A row holding cost but neither an output nor a failure is a leftover rather
+ * than a result, and carrying it would draw an empty cell with a price on it.
+ */
+const carryMetadata = ({
+  results,
+  cells,
+}: {
+  results: PersistedResults;
+  cells: Map<string, CarriedOverCell>;
+}): void => {
+  for (const [targetId, metadata] of Object.entries(results.targetMetadata)) {
+    metadata.forEach((entry, rowIndex) => {
+      if (!entry) return;
+      const cell = cells.get(cellKey({ rowIndex, targetId }));
+      if (cell) copyMetadataOnto({ cell, entry });
+    });
+  }
+};
+
+/**
  * The board's cells, minus the ones the run covers, as the run carries them.
  *
  * Reads the same four groups `mergeRunResults` writes, so there is one
@@ -330,13 +432,7 @@ export const carriedOverCells = ({
 
   const cells = new Map<string, CarriedOverCell>();
 
-  const cellAt = ({
-    rowIndex,
-    targetId,
-  }: {
-    rowIndex: number;
-    targetId: string;
-  }): CarriedOverCell | null => {
+  const openCell: OpenCarriedCell = ({ rowIndex, targetId }) => {
     const key = cellKey({ rowIndex, targetId });
     if (coveredCells.has(key)) return null;
     const existing = cells.get(key);
@@ -350,48 +446,10 @@ export const carriedOverCells = ({
     return created;
   };
 
-  for (const [targetId, outputs] of Object.entries(results.targetOutputs)) {
-    outputs.forEach((output, rowIndex) => {
-      if (output === undefined || output === null) return;
-      const cell = cellAt({ rowIndex, targetId });
-      if (cell) cell.output = output;
-    });
-  }
-
-  for (const [targetId, errors] of Object.entries(results.errors)) {
-    errors.forEach((error, rowIndex) => {
-      if (!error) return;
-      const cell = cellAt({ rowIndex, targetId });
-      if (cell) cell.error = error;
-    });
-  }
-
-  for (const [targetId, byEvaluator] of Object.entries(
-    results.evaluatorResults,
-  )) {
-    for (const [evaluatorId, verdicts] of Object.entries(byEvaluator)) {
-      verdicts.forEach((result, rowIndex) => {
-        if (result === undefined || result === null) return;
-        const cell = cellAt({ rowIndex, targetId });
-        if (cell) cell.evaluatorResults.push({ evaluatorId, result });
-      });
-    }
-  }
-
-  // Metadata last, and only onto cells something else already opened. A row
-  // holding cost but neither an output nor a failure is a leftover, not a
-  // result, and carrying it would draw an empty cell with a price on it.
-  for (const [targetId, metadata] of Object.entries(results.targetMetadata)) {
-    metadata.forEach((entry, rowIndex) => {
-      if (!entry) return;
-      const cell = cells.get(cellKey({ rowIndex, targetId }));
-      if (!cell) return;
-      if (entry.cost !== undefined) cell.cost = entry.cost;
-      if (entry.duration !== undefined) cell.duration = entry.duration;
-      if (entry.traceId !== undefined) cell.traceId = entry.traceId;
-      if (entry.domainError !== undefined) cell.domainError = entry.domainError;
-    });
-  }
+  carryOutputs({ results, openCell });
+  carryErrors({ results, openCell });
+  carryVerdicts({ results, openCell });
+  carryMetadata({ results, cells });
 
   return [...cells.values()];
 };

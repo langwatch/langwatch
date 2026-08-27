@@ -56,6 +56,18 @@ const resultEvents = [
 ] as const;
 
 /**
+ * The verdict as ClickHouse holds it: a nullable flag.
+ *
+ * An evaluator that errored or was skipped reports no verdict at all, and that
+ * is not the same fact as a failure. It stays null so a pass rate counts it in
+ * neither half.
+ */
+const toPassedFlag = (passed: boolean | null | undefined): number | null => {
+  if (passed === undefined || passed === null) return null;
+  return passed ? 1 : 0;
+};
+
+/**
  * Map projection that transforms TargetResultEvent and EvaluatorResultEvent
  * into ClickHouse records for storage in the experiment_run_items table.
  */
@@ -163,12 +175,7 @@ export class ExperimentRunResultStorageMapProjection
       EvaluationStatus: event.data.status,
       Score: event.data.score ?? null,
       Label: event.data.label ?? null,
-      Passed:
-        event.data.passed === undefined || event.data.passed === null
-          ? null
-          : event.data.passed
-            ? 1
-            : 0,
+      Passed: toPassedFlag(event.data.passed),
       EvaluationDetails: event.data.details ?? null,
       EvaluationCost: event.data.cost ?? null,
       EvaluationInputs: event.data.inputs

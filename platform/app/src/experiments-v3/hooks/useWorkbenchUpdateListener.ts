@@ -86,6 +86,78 @@ const rememberMissedVersion = ({
  * warning would keep sending the version it had, and the next save would be
  * refused for exactly the same reason one save later.
  */
+/**
+ * What the page does about a version somebody else announced.
+ *
+ * `ignore` covers two different reasons to do nothing: the version is not
+ * newer than the one held, or this tab is about to write a newer one itself.
+ */
+type VersionAction = "ignore" | "adopt" | "banner" | "remember" | "reload";
+
+/**
+ * The rule, in order. Reading it as one list is the point: the reasons overlap,
+ * and an earlier reason always wins.
+ */
+const decideVersionAction = ({
+  serverVersion,
+  known,
+  runId,
+  isDirty,
+  isReloading,
+}: {
+  serverVersion: number;
+  known: number | undefined;
+  runId?: string;
+  isDirty: boolean;
+  isReloading: boolean;
+}): VersionAction => {
+  if (known === undefined || serverVersion <= known) return "ignore";
+  // This page's own run, before every other rule.
+  if (isOwnRunVersion(runId)) return "adopt";
+  if (thisTabWillAnswerFirst(isDirty)) return "ignore";
+  if (isDirty) return "banner";
+  if (isReloading) return "remember";
+  return "reload";
+};
+
+/**
+ * Pulls, then runs the rule again over whatever was announced while it ran.
+ *
+ * Running the rule again rather than reloading outright: the pull that just
+ * finished may already carry the newer version, and the workbench may have
+ * gone dirty while it ran.
+ */
+const pullThenApplyMissed = async ({
+  serverVersion,
+  reload,
+  reloadingRef,
+  missedRef,
+  apply,
+}: {
+  serverVersion: number;
+  reload: () => Promise<void>;
+  reloadingRef: MutableRefObject<boolean>;
+  missedRef: MutableRefObject<MissedVersion | undefined>;
+  apply: ApplyServerVersion;
+}): Promise<void> => {
+  await pullQuietly({ reload, serverVersion });
+  reloadingRef.current = false;
+  const missed = missedRef.current;
+  missedRef.current = undefined;
+  if (missed) apply(missed);
+};
+
+/**
+ * True when this page started the run that wrote the version.
+ *
+ * That run's bump is the one write carrying nothing the page does not already
+ * have, so the page takes the version instead of reading it as a stranger's.
+ */
+const isOwnRunVersion = (runId: string | undefined): boolean =>
+  Boolean(
+    runId && useEvaluationsV3Store.getState().runsStartedHere?.includes(runId),
+  );
+
 const adoptOwnRunVersion = (serverVersion: number): void => {
   const store = useEvaluationsV3Store.getState();
   store.setWorkbenchVersion(serverVersion);
@@ -159,42 +231,42 @@ const useApplyServerVersion = ({
 
   const applyServerVersion = useCallback<ApplyServerVersion>(
     ({ serverVersion, actorLabel, runId }) => {
-      const known = versionRef.current;
-      if (known === undefined || serverVersion <= known) return;
-      // This page's own run, before every other rule. It is the one writer
-      // whose bump carries nothing the page does not already have.
-      if (
-        runId &&
-        useEvaluationsV3Store.getState().runsStartedHere?.includes(runId)
-      ) {
-        adoptOwnRunVersion(serverVersion);
-        return;
+      const action = decideVersionAction({
+        serverVersion,
+        known: versionRef.current,
+        runId,
+        isDirty: isDirtyRef.current,
+        isReloading: reloadingRef.current,
+      });
+
+      switch (action) {
+        case "ignore":
+          return;
+        case "adopt":
+          adoptOwnRunVersion(serverVersion);
+          return;
+        case "banner":
+          setStaleWorkbench({ serverVersion, actorLabel });
+          return;
+        case "remember":
+          rememberMissedVersion({
+            ref: missedRef,
+            serverVersion,
+            actorLabel,
+            runId,
+          });
+          return;
+        case "reload":
+          reloadingRef.current = true;
+          void pullThenApplyMissed({
+            serverVersion,
+            reload: reloadRef.current,
+            reloadingRef,
+            missedRef,
+            apply: applyServerVersion,
+          });
+          return;
       }
-      if (thisTabWillAnswerFirst(isDirtyRef.current)) return;
-      if (isDirtyRef.current) {
-        setStaleWorkbench({ serverVersion, actorLabel });
-        return;
-      }
-      if (reloadingRef.current) {
-        rememberMissedVersion({
-          ref: missedRef,
-          serverVersion,
-          actorLabel,
-          runId,
-        });
-        return;
-      }
-      reloadingRef.current = true;
-      void (async () => {
-        await pullQuietly({ reload: reloadRef.current, serverVersion });
-        reloadingRef.current = false;
-        const missed = missedRef.current;
-        missedRef.current = undefined;
-        // Re-run the same rule rather than reloading outright: the reload that
-        // just finished may already have carried this version, and the
-        // workbench may have gone dirty while it ran.
-        if (missed) applyServerVersion(missed);
-      })();
     },
     [setStaleWorkbench],
   );
@@ -204,6 +276,26 @@ const useApplyServerVersion = ({
   }, []);
 
   return { applyServerVersion, reload };
+};
+
+/**
+ * The broadcast payload, or undefined when the frame is not one to act on.
+ *
+ * The frame arrives as a string on some transports and as an object on others,
+ * and a frame this page does not understand is not a failure worth reporting:
+ * the next signal, or the next time the tab becomes visible, tries again.
+ */
+const parseUpdateSignal = (
+  event: unknown,
+): ExperimentUpdateSignal | undefined => {
+  if (!event) return undefined;
+  try {
+    const raw = typeof event === "string" ? JSON.parse(event) : event;
+    const result = experimentUpdateSignalSchema.safeParse(raw);
+    return result.success ? result.data : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 /** The `experiment_updated` broadcast: a save landed, whoever wrote it. */
@@ -228,20 +320,8 @@ const useExperimentUpdateSignal = ({
     {
       enabled: Boolean(enabled && projectId && experimentSlug),
       onData: (data) => {
-        if (!data.event) return;
-        let parsed: ExperimentUpdateSignal;
-        try {
-          const raw =
-            typeof data.event === "string"
-              ? JSON.parse(data.event)
-              : data.event;
-          const result = experimentUpdateSignalSchema.safeParse(raw);
-          if (!result.success) return;
-          parsed = result.data;
-        } catch {
-          return;
-        }
-        if (parsed.slug !== experimentSlug) return;
+        const parsed = parseUpdateSignal(data.event);
+        if (!parsed || parsed.slug !== experimentSlug) return;
         applyServerVersion({
           serverVersion: parsed.version,
           actorLabel: parsed.actorLabel,
