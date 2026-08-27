@@ -201,8 +201,14 @@ describe("a pull run that reported errors", () => {
   describe("given the adapter skipped a record and advanced past it", () => {
     beforeEach(() => {
       stubObjects = [
-        { key: `${PREFIX}a.ndjson`, body: [record("evt-1"), record("evt-2")].join("\n") },
-        { key: `${PREFIX}b.ndjson`, body: `${record("evt-3")}\nnot json at all` },
+        {
+          key: `${PREFIX}a.ndjson`,
+          body: [record("evt-1"), record("evt-2")].join("\n"),
+        },
+        {
+          key: `${PREFIX}b.ndjson`,
+          body: `${record("evt-3")}\nnot json at all`,
+        },
       ];
     });
 
@@ -357,9 +363,9 @@ describe("a pull run that reported errors", () => {
 
     describe("when the worker runs it", () => {
       it("fails the run rather than rewinding the source to the beginning", async () => {
-        await expect(
-          runWith(nullCursorAdapter, "src-null-1"),
-        ).rejects.toThrow(/reported 1 error/);
+        await expect(runWith(nullCursorAdapter, "src-null-1")).rejects.toThrow(
+          /reported 1 error/,
+        );
       });
     });
 
