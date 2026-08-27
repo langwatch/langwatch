@@ -91,15 +91,22 @@ describe("given a fetch of the verification file", () => {
     });
 
     /** @scenario "A token read off https proves nothing" */
-    it("refuses a journey that ended off https", async () => {
-      const { lookup } = lookupAnswering(async () =>
-        respond(200, "lw-token-123", "http://acme.com/verification.txt"),
+    it("refuses a journey the domain redirects onto plain http", async () => {
+      // Driven as the domain actually drives it: a real 302 whose Location
+      // is http. The refusal has to come from the GUARD judging that hop,
+      // before a socket is opened for it — not from inspecting where a
+      // followed response says it landed, which is a thing the runtime
+      // decides after the request we were trying to prevent already happened.
+      const { lookup, asked } = lookupAnswering(async () =>
+        redirectTo("http://acme.com/verification.txt"),
       );
 
       expect(await fetchFile(lookup)).toEqual({
         outcome: "unreachable",
-        reason: "insecure_redirect",
+        reason: "not_https",
       });
+      // The https hop was fetched; the http one never was.
+      expect(asked).toEqual([URL_UNDER_TEST]);
     });
 
     it("refuses a body too large to be the token", async () => {
@@ -115,7 +122,70 @@ describe("given a fetch of the verification file", () => {
   });
 });
 
-/** A Response whose final `url` can be pinned, the way a redirect pins it. */
+describe("given a name whose answer changes between the check and the socket", () => {
+  describe("when the resolver answers publicly and would answer privately next", () => {
+    it("dials the addresses it judged, not the name it judged them for", async () => {
+      // DNS REBINDING, which is the ordinary way a check-then-dial guard is
+      // defeated: a record with a one-second time-to-live answers publicly
+      // for the check and `127.0.0.1` for the connection a moment later.
+      // What makes this safe is not the check passing — it is that the
+      // addresses the check validated are the addresses the connection is
+      // pinned to, so a second answer never reaches a socket.
+      const answers = [["93.184.216.34"], ["127.0.0.1"]];
+      let call = 0;
+      const seen: (RequestInit & { dispatcher?: unknown })[] = [];
+      const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+        seen.push(init ?? {});
+        return respond(200, "lw-token-123");
+      }) as typeof fetch;
+
+      const lookup = new HttpsDomainProofFileLookup(fetchImpl, async () => {
+        const answer = answers[Math.min(call, answers.length - 1)];
+        call += 1;
+        return answer ?? [];
+      });
+
+      await lookup.fetchVerificationFile({
+        domain: "acme.com",
+        url: URL_UNDER_TEST,
+      });
+
+      // The request carries a dispatcher rather than trusting the name.
+      // Without one, the runtime resolves a second time and the rebind wins.
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.dispatcher).toBeDefined();
+    });
+  });
+
+  describe("when the resolver cannot answer at all", () => {
+    it("refuses rather than letting the fetch decide", async () => {
+      // FAILING CLOSED. Treating a throw as "not a private host" meant the
+      // guard could be skipped by making it fail, which is the cheapest
+      // thing an attacker can do to a check — and a transient EAI_AGAIN
+      // under resolver load did it by accident.
+      const asked: string[] = [];
+      const fetchImpl = (async (input: RequestInfo | URL) => {
+        asked.push(String(input));
+        return respond(200, "lw-token-123");
+      }) as typeof fetch;
+
+      const lookup = new HttpsDomainProofFileLookup(fetchImpl, async () => {
+        throw Object.assign(new Error("resolver is busy"), {
+          code: "EAI_AGAIN",
+        });
+      });
+
+      expect(
+        await lookup.fetchVerificationFile({
+          domain: "acme.com",
+          url: URL_UNDER_TEST,
+        }),
+      ).toEqual({ outcome: "unreachable", reason: "unresolvable" });
+      expect(asked).toEqual([]);
+    });
+  });
+});
+
 describe("given a fetch aimed somewhere on our own network", () => {
   describe("when the URL names a private address outright", () => {
     it("never connects, and says the host is not public", async () => {
@@ -333,5 +403,15 @@ describe("given a fetch aimed somewhere on our own network", () => {
 function respond(status: number, body: string, url = URL_UNDER_TEST): Response {
   const response = new Response(status === 204 ? null : body, { status });
   Object.defineProperty(response, "url", { value: url });
+  return response;
+}
+
+/** A real redirect, the way the customer's web server sends one. */
+function redirectTo(location: string): Response {
+  const response = new Response(null, {
+    status: 302,
+    headers: { location },
+  });
+  Object.defineProperty(response, "url", { value: URL_UNDER_TEST });
   return response;
 }

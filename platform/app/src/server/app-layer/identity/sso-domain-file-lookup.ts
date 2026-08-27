@@ -3,26 +3,32 @@ import type {
   SsoDomainFileLookup,
 } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { classify } from "@langwatch/ssrf";
-import { lookup } from "dns/promises";
+import {
+  fetchFollowingPublicHosts,
+  type HostResolver,
+  systemHostResolver,
+} from "./public-egress";
 
 /**
  * Reading a domain's proof out of a file the domain serves — the published
  * ceremony's second channel, for the customer whose DNS is a ticket away but
  * whose web server is not.
  *
- * IT LIVES IN ITS OWN MODULE BECAUSE OF WHAT IT IS. Most of what follows is
- * not "fetch a URL": it is the guard that stops us fetching one. A proof
- * ceremony takes a hostname a stranger typed and asks this process to make a
- * request to it, which is the shape of a server-side request forgery whether
- * or not anybody meant it that way. So the redirect chain is walked a hop at
- * a time, every hop is re-resolved, and every resolved address is judged
- * against the private ranges below before a socket is opened.
+ * WHAT MAKES THIS SAFE LIVES IN `public-egress.ts`. A proof ceremony takes a
+ * hostname a stranger typed and asks this process to make a request to it,
+ * which is the shape of a server-side request forgery whether or not anybody
+ * meant it that way — so the redirect chain is walked a hop at a time, every
+ * hop is resolved and judged, and the connection is PINNED to the addresses
+ * that were judged, so the name cannot answer differently for the socket
+ * than it did for the check.
  *
- * That is the most security-critical code in single sign-on setup, and it
- * spent its first life in the middle of a nine-hundred-line file named after
- * a pattern. Here it sits next to its own tests, where somebody changing it
- * can see what it is for.
+ * That guard used to live here, and the issuer-discovery ceremony next door
+ * made the same kind of fetch with no guard at all. Two ceremonies dialing
+ * strangers, one of them protected, is how the unprotected one stayed
+ * invisible; there is one guard now and both call it.
+ *
+ * What is left in this file is the part that is genuinely about a proof
+ * file: how long to wait, how much to read, and what an answer MEANS.
  */
 
 const logger = createLogger("langwatch:identity:sso-domain-file");
@@ -68,12 +74,7 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
    */
   constructor(
     private readonly fetchImpl: typeof fetch = fetch,
-    private readonly resolveHost: (host: string) => Promise<string[]> = (
-      host,
-    ) =>
-      lookup(host, { all: true, verbatim: true }).then((answers) =>
-        answers.map((answer) => answer.address),
-      ),
+    private readonly resolveHost: HostResolver = systemHostResolver,
   ) {}
 
   async fetchVerificationFile({
@@ -86,18 +87,29 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FILE_FETCH_TIMEOUT_MS);
     try {
-      const response = await this.followToPublicHost({
+      const outcome = await fetchFollowingPublicHosts({
         url,
+        fetchImpl: this.fetchImpl,
+        resolveHost: this.resolveHost,
         signal: controller.signal,
+        headers: { accept: "text/plain" },
+        maxRedirects: FILE_MAX_REDIRECTS,
       });
-      if (response === "private-host") {
+      if (!outcome.ok) {
         logger.warn(
-          { domain, url },
-          "the verification file fetch was aimed at a host that is not public",
+          { domain, url, refusal: outcome.refusal },
+          "the verification file fetch was refused before a socket was opened",
         );
-        return { outcome: "unreachable", reason: "host_not_public" };
+        // Each refusal is its own sentence. Telling somebody whose web server
+        // merely canonicalises to http that we could not reach their host
+        // sends them to argue with their DNS team about a redirect.
+        return { outcome: "unreachable", reason: outcome.refusal };
       }
-      return await classifyFileResponse({ domain, url, response });
+      return await classifyFileResponse({
+        domain,
+        url,
+        response: outcome.response,
+      });
     } catch (error) {
       const code = errorCodeOf(error);
       logger.warn(
@@ -115,125 +127,10 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
     }
   }
 
-  /**
-   * The fetch, following redirects OURSELVES so every hop's host is checked.
-   *
-   * `redirect: "follow"` hands the whole journey to the runtime, which will
-   * happily follow a customer-controlled 302 into `169.254.169.254` or a
-   * service on the cluster's own network — and the three outcomes this port
-   * reports back (`absent` / a status / `timeout`) are a reachability and
-   * port oracle for whatever it reached. The domain itself is now refused at
-   * claim time if it is not a public hostname, but a redirect is not the
-   * claimed domain: it is a string the customer's own web server chose, at
-   * request time, after the claim was approved.
-   *
-   * So: manual redirects, and the host is re-checked before each one. The
-   * body is only ever hash-compared, so nothing that comes back is rendered —
-   * this is about what we are made to CONNECT to.
-   */
-  private async followToPublicHost({
-    url,
-    signal,
-  }: {
-    url: string;
-    signal: AbortSignal;
-  }): Promise<Response | "private-host"> {
-    let next = url;
-    for (let hop = 0; hop <= FILE_MAX_REDIRECTS; hop++) {
-      if (!(await hostIsPublic(next, this.resolveHost))) return "private-host";
-
-      const response = await this.fetchImpl(next, {
-        signal,
-        redirect: "manual",
-        headers: { accept: "text/plain" },
-      });
-
-      const location = response.headers.get("location");
-      if (!isRedirectStatus(response.status) || !location) return response;
-
-      next = new URL(location, next).toString();
-    }
-    // Too many hops is the domain failing to answer, not the domain saying
-    // the file is absent.
-    return "private-host";
-  }
 }
 
 /** How many redirects a domain may spend before we stop following. */
 const FILE_MAX_REDIRECTS = 5;
-
-function isRedirectStatus(status: number): boolean {
-  return (
-    status === 301 ||
-    status === 302 ||
-    status === 303 ||
-    status === 307 ||
-    status === 308
-  );
-}
-
-/**
- * Whether a URL names a host on the public internet.
- *
- * Resolved rather than pattern-matched: a name is only private once it
- * ANSWERS with a private address, and a customer-controlled name resolving to
- * `127.0.0.1` is the ordinary shape of this attack. Every address the name
- * answers with has to be public — one private answer is enough to refuse,
- * because which one a later connect picks is not ours to decide.
- */
-async function hostIsPublic(
-  url: string,
-  resolveHost: (host: string) => Promise<string[]>,
-): Promise<boolean> {
-  let hostname: string;
-  let protocol: string;
-  try {
-    const parsed = new URL(url);
-    hostname = parsed.hostname;
-    protocol = parsed.protocol;
-  } catch {
-    return false;
-  }
-  if (protocol !== "https:") return false;
-
-  const literal = stripBrackets(hostname);
-  if (isIpLiteral(literal)) return isPublicAddress(literal);
-
-  try {
-    const answers = await resolveHost(literal);
-    return answers.length > 0 && answers.every(isPublicAddress);
-  } catch {
-    // A name that does not resolve is not a private host; let the fetch fail
-    // on its own and be reported as unreachable.
-    return true;
-  }
-}
-
-const stripBrackets = (host: string): string =>
-  host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
-
-const isIpLiteral = (host: string): boolean =>
-  /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":");
-
-/**
- * Whether an address is somewhere on the public internet.
- *
- * Delegated to `@langwatch/ssrf` rather than written out here. That table is
- * shared byte-for-byte with the Go AI gateway, the Go Langy egress proxy and
- * the NLP service, and it is tested by one corpus — so a fetch this app is
- * willing to make is one every other egress path would make too.
- *
- * Doing it by hand is what put a hole here: the WHATWG URL parser rewrites
- * `::ffff:127.0.0.1` as `::ffff:7f00:1`, so a strip of the literal `::ffff:`
- * prefix left `7f00:1` — still a colon, matching no private IPv6 prefix, and
- * judged public. Loopback and the cloud metadata endpoint both reached the
- * fetch that way. `classify` resolves `::` elision and the embedded IPv4 tail
- * before it decides, and covers the CGNAT, NAT64, 6to4, benchmarking,
- * documentation and reserved ranges a short hand-rolled list leaves out.
- */
-function isPublicAddress(address: string): boolean {
-  return classify(address) === "global";
-}
 
 /** What an answered fetch actually says, in the port's three outcomes. */
 async function classifyFileResponse({
@@ -245,13 +142,6 @@ async function classifyFileResponse({
   url: string;
   response: Response;
 }): Promise<SsoDomainFileFetch> {
-  if (!response.url.startsWith("https://")) {
-    logger.warn(
-      { domain, url, landedOn: response.url },
-      "the verification file fetch was redirected off https",
-    );
-    return { outcome: "unreachable", reason: "insecure_redirect" };
-  }
   // The two statuses that SAY the file is not there. Everything else
   // non-ok — a 403, a 500, a 503 — is the server refusing to answer the
   // question, which is not the same fact.
