@@ -41,13 +41,13 @@
  * them to call theirs. Identity history is platform-level, so it lands on the
  * shared instance.
  *
- * What `userMigrationPassCohort` still excludes, there and only there, is a
- * private-dataplane MEMBER. That exclusion is now PACING, not correctness:
- * the resolver routes every user tenant to the shared instance without
- * consulting membership at all, so such a person has a perfectly good answer
- * and would migrate like anybody else. Dropping the exclusion is a product
- * call about backfilling those people, not a routing question - until it is
- * made, they simply are not enrolled.
+ * `userMigrationPassCohort` used to except a private-dataplane MEMBER, and no
+ * longer does. That exception existed because a user tenant could not be
+ * placed at all; now it can - the resolver routes every user tenant to the
+ * shared instance without consulting membership - so the person has a
+ * perfectly good answer and migrates like anybody else. Keeping them out
+ * would have stranded exactly them on the legacy path, which is the reason
+ * this axis does not hold their organizations back either.
  *
  * SELF-HOSTED is paced per migration, at release time, by the migration's
  * own `runsAutomaticallyOnSelfHosted` declaration. There is no enrollment
