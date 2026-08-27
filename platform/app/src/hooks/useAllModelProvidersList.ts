@@ -1,4 +1,4 @@
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 

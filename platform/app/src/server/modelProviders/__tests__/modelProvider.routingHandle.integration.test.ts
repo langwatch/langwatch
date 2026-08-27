@@ -16,11 +16,11 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import { getApp } from "~/server/app-layer";
 
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { GatewayConfigMaterialiser } from "../../gateway/config.materialiser";
-import { VirtualKeyRepository } from "../../gateway/virtualKey.repository";
 import { ModelProviderService } from "../modelProvider.service";
 
 // The service authorizes every write through `getApp().permissions`, so the
@@ -120,20 +120,6 @@ describe.skipIf(!hasCredentialsSecret)(
       ]);
     });
 
-    function ctx() {
-      return {
-        prisma,
-        session: {
-          user: {
-            id: adminUserId,
-            email: `admin-${ns}@example.com`,
-            name: "Admin",
-          },
-          expires: "2099-01-01T00:00:00.000Z",
-        } as any,
-      };
-    }
-
     async function createProvider({
       project,
       handle,
@@ -143,31 +129,25 @@ describe.skipIf(!hasCredentialsSecret)(
       handle?: string | null;
       suffix: string;
     }) {
-      return await ModelProviderService.create(prisma).updateModelProvider(
-        {
-          projectId: project,
-          provider: "anthropic",
-          enabled: true,
-          name: `Anthropic ${suffix}`,
-          customKeys: { ANTHROPIC_API_KEY: `sk-${suffix}` },
-          scopes: [{ scopeType: "PROJECT", scopeId: project }],
-          ...(handle !== undefined && { routingHandle: handle }),
-        },
-        ctx(),
-      );
+      return await getApp().modelProviders.upsert({
+        projectId: project,
+        provider: "anthropic",
+        enabled: true,
+        name: `Anthropic ${suffix}`,
+        customKeys: { ANTHROPIC_API_KEY: `sk-${suffix}` },
+        scopes: [{ scopeType: "PROJECT", scopeId: project }],
+        ...(handle !== undefined && { routingHandle: handle }),
+      });
     }
 
     async function setHandle({ id, handle }: { id: string; handle: string | null }) {
-      return await ModelProviderService.create(prisma).updateModelProvider(
-        {
-          id,
-          projectId,
-          provider: "anthropic",
-          enabled: true,
-          routingHandle: handle,
-        },
-        ctx(),
-      );
+      return await getApp().modelProviders.upsert({
+        id,
+        projectId,
+        provider: "anthropic",
+        enabled: true,
+        routingHandle: handle,
+      });
     }
 
     describe("when an administrator sets a handle", () => {
@@ -281,7 +261,11 @@ describe.skipIf(!hasCredentialsSecret)(
           key.id,
           organizationId,
         );
-        const bundle = await new GatewayConfigMaterialiser(prisma, null).materialise(vk!);
+        const bundle = await new GatewayConfigMaterialiser(
+          prisma,
+          getApp().projects,
+          null,
+        ).materialise(vk!);
         return new Map(bundle.providers.map((slot) => [slot.id, slot.handle]));
       } finally {
         await prisma.virtualKey.delete({ where: { id: key.id } });

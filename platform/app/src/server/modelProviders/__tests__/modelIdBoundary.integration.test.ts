@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { translateModelIdForLitellm } from "../modelIdBoundary";
+import { translateModelIdForLitellm } from "@langwatch/model-provider-contract";
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 

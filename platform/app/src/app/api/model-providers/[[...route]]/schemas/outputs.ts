@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { customModelEntrySchema } from "~/server/modelProviders/customModel.schema";
+import { customModelEntrySchema } from "@langwatch/model-provider-contract";
 
 const extraHeaderSchema = z.object({
   key: z.string(),

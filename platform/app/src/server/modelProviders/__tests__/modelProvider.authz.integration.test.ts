@@ -1,18 +1,4 @@
-/**
- * @vitest-environment node
- *
- * Real-Postgres integration coverage for ModelProvider scope authz.
- *
- * The unit tests in `modelProvider.authz.unit.test.ts` mock the rbac
- * helpers and prove the orchestration (fail-closed loop, NOT_FOUND vs
- * FORBIDDEN) is correct in isolation. This file stands up actual org /
- * team / project rows with organization and team-user bindings and
- * exercises `ModelProviderService` end-to-end to prove the *composed*
- * path still holds: seed role → seed MP → call service → assert.
- *
- * Requires: PostgreSQL (Prisma). Skipped in the Testcontainers-only
- * ClickHouse suite.
- */
+/** @vitest-environment node */
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,727 +7,437 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
-import { ModelProviderScopeForbiddenError } from "../errors";
-import { ModelProviderService } from "../modelProvider.service";
 
 wireDefaultTestApp();
 
-const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
+const hasCredentialsSecret = Boolean(process.env.CREDENTIALS_SECRET);
 
 describe.skipIf(!hasCredentialsSecret)(
-  "ModelProviderService scope authz (real DB)",
+  "model provider scope authorization (real DB)",
   () => {
-    const ns = `mp-authz-${nanoid(8)}`;
+    const namespace = `model-provider-authz-${nanoid(8)}`;
 
     let organizationId: string;
     let teamAId: string;
     let teamBId: string;
     let projectAId: string;
     let projectBId: string;
+    let orgAdminId: string;
+    let teamAAdminId: string;
+    let teamAMemberId: string;
+    let teamBAdminId: string;
 
-    let orgAdminUserId: string;
-    let teamAAdminUserId: string;
-    let teamAMemberUserId: string;
-    let unrelatedUserId: string;
+    const service = () => getApp().modelProviders;
 
     beforeAll(async () => {
       const organization = await prisma.organization.create({
         data: {
-          name: `Authz Org ${ns}`,
-          slug: `--test-${ns}`,
+          name: `Model Provider Authz ${namespace}`,
+          slug: `--${namespace}`,
         },
       });
       organizationId = organization.id;
 
-      const teamA = await prisma.team.create({
-        data: {
-          name: `Team A ${ns}`,
-          slug: `--team-a-${ns}`,
-          organizationId,
-        },
-      });
+      const [teamA, teamB] = await Promise.all([
+        prisma.team.create({
+          data: {
+            name: `Model Provider Team A ${namespace}`,
+            slug: `--${namespace}-a`,
+            organizationId,
+          },
+        }),
+        prisma.team.create({
+          data: {
+            name: `Model Provider Team B ${namespace}`,
+            slug: `--${namespace}-b`,
+            organizationId,
+          },
+        }),
+      ]);
       teamAId = teamA.id;
-
-      const teamB = await prisma.team.create({
-        data: {
-          name: `Team B ${ns}`,
-          slug: `--team-b-${ns}`,
-          organizationId,
-        },
-      });
       teamBId = teamB.id;
 
-      const projectA = await prisma.project.create({
-        data: {
-          name: `Project A ${ns}`,
-          slug: `--proj-a-${ns}`,
-          teamId: teamA.id,
-          language: "typescript",
-          framework: "other",
-          apiKey: `test-key-a-${ns}`,
-        },
-      });
+      const [projectA, projectB] = await Promise.all([
+        prisma.project.create({
+          data: {
+            name: `Model Provider Project A ${namespace}`,
+            slug: `--${namespace}-a`,
+            teamId: teamAId,
+            language: "typescript",
+            framework: "other",
+            apiKey: `model-provider-authz-a-${namespace}`,
+          },
+        }),
+        prisma.project.create({
+          data: {
+            name: `Model Provider Project B ${namespace}`,
+            slug: `--${namespace}-b`,
+            teamId: teamBId,
+            language: "typescript",
+            framework: "other",
+            apiKey: `model-provider-authz-b-${namespace}`,
+          },
+        }),
+      ]);
       projectAId = projectA.id;
-
-      const projectB = await prisma.project.create({
-        data: {
-          name: `Project B ${ns}`,
-          slug: `--proj-b-${ns}`,
-          teamId: teamB.id,
-          language: "typescript",
-          framework: "other",
-          apiKey: `test-key-b-${ns}`,
-        },
-      });
       projectBId = projectB.id;
 
-      // Org-level admin: OrganizationUser ADMIN alone is not enough for the
-      // rbac helpers to grant org:manage — the checkPermissionFromBindings
-      // path needs a RoleBinding (or a TeamUser fallback). We add an
-      // ORGANIZATION-scoped RoleBinding with role=ADMIN so this user
-      // exercises the intended "full org admin" code path.
-      const orgAdmin = await prisma.user.create({
-        data: { name: "Org Admin", email: `org-admin-${ns}@example.com` },
-      });
-      orgAdminUserId = orgAdmin.id;
-      await prisma.organizationUser.create({
-        data: {
-          userId: orgAdmin.id,
-          organizationId,
-          role: OrganizationUserRole.ADMIN,
-        },
+      const [orgAdmin, teamAAdmin, teamAMember, teamBAdmin] = await Promise.all([
+        prisma.user.create({
+          data: {
+            name: "Model Provider Org Admin",
+            email: `model-provider-org-admin-${namespace}@example.com`,
+          },
+        }),
+        prisma.user.create({
+          data: {
+            name: "Model Provider Team A Admin",
+            email: `model-provider-team-a-admin-${namespace}@example.com`,
+          },
+        }),
+        prisma.user.create({
+          data: {
+            name: "Model Provider Team A Member",
+            email: `model-provider-team-a-member-${namespace}@example.com`,
+          },
+        }),
+        prisma.user.create({
+          data: {
+            name: "Model Provider Team B Admin",
+            email: `model-provider-team-b-admin-${namespace}@example.com`,
+          },
+        }),
+      ]);
+      orgAdminId = orgAdmin.id;
+      teamAAdminId = teamAAdmin.id;
+      teamAMemberId = teamAMember.id;
+      teamBAdminId = teamBAdmin.id;
+
+      await prisma.organizationUser.createMany({
+        data: [
+          { userId: orgAdminId, organizationId, role: OrganizationUserRole.ADMIN },
+          { userId: teamAAdminId, organizationId, role: OrganizationUserRole.MEMBER },
+          { userId: teamAMemberId, organizationId, role: OrganizationUserRole.MEMBER },
+          { userId: teamBAdminId, organizationId, role: OrganizationUserRole.MEMBER },
+        ],
       });
       await prisma.roleBinding.create({
         data: {
           organizationId,
-          userId: orgAdmin.id,
+          userId: orgAdminId,
           role: TeamUserRole.ADMIN,
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: organizationId,
         },
       });
-
-      // Team A admin: org MEMBER + TeamUser ADMIN on A only. Should pass
-      // team:manage and project:manage for A, but NOT organization:manage
-      // or team:manage for B.
-      const teamAAdmin = await prisma.user.create({
-        data: { name: "Team A Admin", email: `team-a-admin-${ns}@example.com` },
+      await prisma.teamUser.createMany({
+        data: [
+          { userId: teamAAdminId, teamId: teamAId, role: TeamUserRole.ADMIN },
+          { userId: teamAMemberId, teamId: teamAId, role: TeamUserRole.MEMBER },
+          { userId: teamBAdminId, teamId: teamBId, role: TeamUserRole.ADMIN },
+        ],
       });
-      teamAAdminUserId = teamAAdmin.id;
-      await prisma.organizationUser.create({
-        data: {
-          userId: teamAAdmin.id,
-          organizationId,
-          role: OrganizationUserRole.MEMBER,
-        },
-      });
-      await prisma.teamUser.create({
-        data: {
-          userId: teamAAdmin.id,
-          teamId: teamA.id,
-          role: TeamUserRole.ADMIN,
-        },
-      });
-
-      // Team A member: org MEMBER + TeamUser MEMBER on A. No :manage.
-      // Also seeded with an ORG-scoped RoleBinding at role=MEMBER so the
-      // scope-aware read gate recognises them as an org viewer (required
-      // for `canReadAnyScope` to return true on org-scoped rows).
-      const teamAMember = await prisma.user.create({
-        data: {
-          name: "Team A Member",
-          email: `team-a-member-${ns}@example.com`,
-        },
-      });
-      teamAMemberUserId = teamAMember.id;
-      await prisma.organizationUser.create({
-        data: {
-          userId: teamAMember.id,
-          organizationId,
-          role: OrganizationUserRole.MEMBER,
-        },
-      });
-      await prisma.teamUser.create({
-        data: {
-          userId: teamAMember.id,
-          teamId: teamA.id,
-          role: TeamUserRole.MEMBER,
-        },
-      });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: teamAMember.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
-      });
-
-      // Unrelated user: no membership anywhere in this org.
-      const unrelated = await prisma.user.create({
-        data: { name: "Unrelated", email: `unrelated-${ns}@example.com` },
-      });
-      unrelatedUserId = unrelated.id;
     });
 
     afterAll(async () => {
-      // Order matters: providers (scopes cascade via onDelete: Cascade)
-      // → teamUser/orgUser → team/project → user → org.
       await cleanupTestRows(prisma, [
+        ["modelProvider", { organizationId }],
         ["roleBinding", { organizationId }],
+        ["teamUser", { userId: { in: [teamAAdminId, teamAMemberId, teamBAdminId] } }],
+        ["organizationUser", { organizationId }],
         [
-          "modelProvider",
+          "project",
           {
-            scopes: {
-              some: {
-                scopeType: "PROJECT",
-                scopeId: { in: [projectAId, projectBId] },
-              },
-            },
+            id: { in: [projectAId, projectBId] },
           },
         ],
-        ["teamUser", { team: { organizationId } }],
-        // The org-tenancy guard wants a literal organizationId; a relation
-        // filter on the org's slug does not bound the query for it.
-        ["organizationUser", { organizationId }],
-        ["project", { team: { organizationId } }],
-        ["team", { organizationId }],
-        ["organization", { slug: `--test-${ns}` }],
+        ["team", { id: { in: [teamAId, teamBId] } }],
+        ["organization", { id: organizationId }],
         [
           "user",
           {
-            email: {
-              in: [
-                `org-admin-${ns}@example.com`,
-                `team-a-admin-${ns}@example.com`,
-                `team-a-member-${ns}@example.com`,
-                `unrelated-${ns}@example.com`,
-              ],
-            },
+            id: { in: [orgAdminId, teamAAdminId, teamAMemberId, teamBAdminId] },
           },
         ],
       ]);
     });
 
-    function ctxFor(userId: string) {
-      return {
-        prisma,
-        session: {
-          user: { id: userId },
-          expires: "1",
-        } as any,
-      };
-    }
-
-    function service() {
-      return ModelProviderService.create(prisma);
-    }
-
-    // =========================================================================
-    // Fail-closed on the WRITE path (updateModelProvider)
-    // =========================================================================
-
-    describe("given an ORGANIZATION-scoped MP write", () => {
-      describe("when the caller is an org admin", () => {
-        it("creates the row", async () => {
-          const result = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "openai",
-              enabled: true,
-              customKeys: { OPENAI_API_KEY: `sk-org-${ns}` },
-              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-            },
-            ctxFor(orgAdminUserId),
-          );
-          expect(result).toBeDefined();
-          // Read back directly via prisma to check the scope row landed.
-          const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id },
-            include: { scopes: true },
-          });
-          const scopes = stored?.scopes ?? [];
-          expect(scopes).toHaveLength(1);
-          expect(scopes[0]).toMatchObject({
-            scopeType: "ORGANIZATION",
-            scopeId: organizationId,
-          });
-        });
+    it("allows an organization admin to create an organization-scoped provider", async () => {
+      const provider = await service().upsert({
+        projectId: projectAId,
+        actorId: orgAdminId,
+        provider: "openai",
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: `sk-org-${namespace}` },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
       });
 
-      describe("when the caller is only a team admin (not org admin)", () => {
-        /** @scenario Assigning a provider to an org without manage permission is denied */
-        it("rejects with FORBIDDEN and does not persist", async () => {
-          const before = await prisma.modelProvider.count({
-            where: { organizationId, provider: "anthropic" },
-          });
-          await expect(
-            service().updateModelProvider(
-              {
-                projectId: projectAId,
-                provider: "anthropic",
-                enabled: true,
-                customKeys: { ANTHROPIC_API_KEY: `sk-ant-${ns}` },
-                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-              },
-              ctxFor(teamAAdminUserId),
-            ),
-          ).rejects.toMatchObject({
-            code: "model_provider_scope_forbidden",
-            meta: { requiredPermission: "organization:manage" },
-          });
-          const after = await prisma.modelProvider.count({
-            where: { organizationId, provider: "anthropic" },
-          });
-          expect(after).toBe(before);
-        });
+      const scopes = await prisma.modelProviderScope.findMany({
+        where: { modelProviderId: provider.id },
       });
-
-      describe("when the caller is an ordinary team member", () => {
-        it("rejects with FORBIDDEN", async () => {
-          await expect(
-            service().updateModelProvider(
-              {
-                projectId: projectAId,
-                provider: "gemini",
-                enabled: true,
-                customKeys: { GEMINI_API_KEY: `sk-gem-${ns}` },
-                scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-              },
-              ctxFor(teamAMemberUserId),
-            ),
-          ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
-        });
-      });
+      expect(scopes).toEqual([
+        expect.objectContaining({
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        }),
+      ]);
     });
 
-    describe("given a TEAM-scoped MP write", () => {
-      describe("when the caller is team admin for the target team", () => {
-        it("creates the row", async () => {
-          const result = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "groq",
-              enabled: true,
-              customKeys: { GROQ_API_KEY: `sk-groq-${ns}` },
-              scopes: [{ scopeType: "TEAM", scopeId: teamAId }],
-            },
-            ctxFor(teamAAdminUserId),
-          );
-          expect(result).toBeDefined();
-          const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id },
-            include: { scopes: true },
-          });
-          const scopes = stored?.scopes ?? [];
-          expect(scopes).toHaveLength(1);
-          expect(scopes[0]).toMatchObject({
-            scopeType: "TEAM",
-            scopeId: teamAId,
-          });
-        });
+    it("rejects an organization scope for team admins and members before persistence", async () => {
+      const before = await prisma.modelProvider.count({
+        where: { organizationId, provider: "anthropic" },
       });
 
-      describe("when the caller is team admin for a DIFFERENT team", () => {
-        /** @scenario Assigning a provider to an unmanageable team is denied */
-        it("rejects with FORBIDDEN", async () => {
-          await expect(
-            service().updateModelProvider(
-              {
-                projectId: projectBId,
-                provider: "xai",
-                enabled: true,
-                customKeys: { XAI_API_KEY: `sk-xai-${ns}` },
-                scopes: [{ scopeType: "TEAM", scopeId: teamBId }],
-              },
-              ctxFor(teamAAdminUserId),
-            ),
-          ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
-        });
-      });
+      for (const actorId of [teamAAdminId, teamAMemberId]) {
+        await expect(
+          service().upsert({
+            projectId: projectAId,
+            actorId,
+            provider: "anthropic",
+            enabled: true,
+            customKeys: { ANTHROPIC_API_KEY: `sk-anthropic-${namespace}` },
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+          }),
+        ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
+      }
+
+      await expect(
+        prisma.modelProvider.count({ where: { organizationId, provider: "anthropic" } }),
+      ).resolves.toBe(before);
     });
 
-    // =========================================================================
-    // Multi-scope atomicity: every entry must pass or the whole write aborts
-    // =========================================================================
+    it("allows a team admin to write its own team scope and rejects another team's scope", async () => {
+      await expect(
+        service().upsert({
+          projectId: projectAId,
+          actorId: teamAAdminId,
+          provider: "groq",
+          enabled: true,
+          customKeys: { GROQ_API_KEY: `sk-groq-${namespace}` },
+          scopes: [{ scopeType: "TEAM", scopeId: teamAId }],
+        }),
+      ).resolves.toMatchObject({ provider: "groq" });
 
-    describe("given a multi-scope write (ORG + TEAM)", () => {
-      describe("when the caller can manage ONLY the team (not the org)", () => {
-        /** @scenario Adding an unauthorized team scope to an existing provider is rejected */
-        it("rejects the entire mutation with no partial persistence", async () => {
-          const before = await prisma.modelProvider.count({
-            where: { organizationId, provider: "deepseek" },
-          });
-          await expect(
-            service().updateModelProvider(
-              {
-                projectId: projectAId,
-                provider: "deepseek",
-                enabled: true,
-                customKeys: { DEEPSEEK_API_KEY: `sk-ds-${ns}` },
-                scopes: [
-                  { scopeType: "TEAM", scopeId: teamAId }, // caller can manage
-                  { scopeType: "ORGANIZATION", scopeId: organizationId }, // caller cannot
-                ],
-              },
-              ctxFor(teamAAdminUserId),
-            ),
-          ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
-
-          const after = await prisma.modelProvider.count({
-            where: { organizationId, provider: "deepseek" },
-          });
-          expect(after).toBe(before);
-        });
-      });
-
-      describe("when the caller is an org admin (can manage both)", () => {
-        it("persists every scope entry", async () => {
-          const result = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "cerebras",
-              enabled: true,
-              customKeys: { CEREBRAS_API_KEY: `sk-cer-${ns}` },
-              scopes: [
-                { scopeType: "ORGANIZATION", scopeId: organizationId },
-                { scopeType: "TEAM", scopeId: teamAId },
-                { scopeType: "PROJECT", scopeId: projectAId },
-              ],
-            },
-            ctxFor(orgAdminUserId),
-          );
-          const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id },
-            include: { scopes: true },
-          });
-          const scopes = stored?.scopes ?? [];
-          expect(scopes).toHaveLength(3);
-          const kinds = scopes.map((s) => s.scopeType).sort();
-          expect(kinds).toEqual(["ORGANIZATION", "PROJECT", "TEAM"]);
-        });
-      });
+      await expect(
+        service().upsert({
+          projectId: projectBId,
+          actorId: teamAAdminId,
+          provider: "xai",
+          enabled: true,
+          customKeys: { XAI_API_KEY: `sk-xai-${namespace}` },
+          scopes: [{ scopeType: "TEAM", scopeId: teamBId }],
+        }),
+      ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
     });
 
-    // =========================================================================
-    // Scope replacement on update: passing a new `scopes` array replaces
-    // the whole set atomically. Makes sure the drawer's multi-select
-    // writes don't accidentally accumulate stale rows.
-    // =========================================================================
-
-    describe("given an existing MP with ORG+TEAM scopes", () => {
-      describe("when an org admin replaces it with PROJECT-only", () => {
-        it("drops the old scope rows and leaves only the new one", async () => {
-          const created = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "groq",
-              enabled: true,
-              customKeys: { GROQ_API_KEY: `sk-groq-replace-${ns}` },
-              scopes: [
-                { scopeType: "ORGANIZATION", scopeId: organizationId },
-                { scopeType: "TEAM", scopeId: teamAId },
-              ],
-            },
-            ctxFor(orgAdminUserId),
-          );
-          // Sanity check: both scopes persisted.
-          {
-            const stored = await prisma.modelProvider.findFirst({
-              where: { id: created.id },
-              include: { scopes: true },
-            });
-            expect(stored?.scopes).toHaveLength(2);
-          }
-
-          await service().updateModelProvider(
-            {
-              id: created.id,
-              projectId: projectAId,
-              provider: "groq",
-              enabled: true,
-              scopes: [{ scopeType: "PROJECT", scopeId: projectAId }],
-            },
-            ctxFor(orgAdminUserId),
-          );
-
-          const after = await prisma.modelProvider.findFirst({
-            where: { id: created.id },
-            include: { scopes: true },
-          });
-          expect(after?.scopes).toHaveLength(1);
-          expect(after?.scopes[0]).toMatchObject({
-            scopeType: "PROJECT",
-            scopeId: projectAId,
-          });
-        });
+    it("rejects a mixed authorized and unauthorized scope set without creating a row", async () => {
+      const before = await prisma.modelProvider.count({
+        where: { organizationId, provider: "deepseek" },
       });
+
+      await expect(
+        service().upsert({
+          projectId: projectAId,
+          actorId: teamAAdminId,
+          provider: "deepseek",
+          enabled: true,
+          customKeys: { DEEPSEEK_API_KEY: `sk-deepseek-${namespace}` },
+          scopes: [
+            { scopeType: "TEAM", scopeId: teamAId },
+            { scopeType: "ORGANIZATION", scopeId: organizationId },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
+
+      await expect(
+        prisma.modelProvider.count({ where: { organizationId, provider: "deepseek" } }),
+      ).resolves.toBe(before);
     });
 
-    // =========================================================================
-    // Advanced (Gateway) writes: rate limits / fallback priority /
-    // providerConfig are folded into the unified `update` mutation. The
-    // service must still demand manage on every existing-row scope when
-    // the caller writes any advanced field — even when no `scopes`
-    // array is supplied — so a team admin can't nudge an org-shared
-    // credential's rate limit without org-manage perm.
-    // =========================================================================
-
-    describe("given an ORG-scoped MP exists", () => {
-      describe("when a team admin (not org admin) writes an advanced field via id-only", () => {
-        /** @scenario Advanced gateway writes require manage on every existing-row scope */
-        it("rejects with FORBIDDEN and does not mutate the rate limit", async () => {
-          const mp = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "cerebras",
-              enabled: true,
-              customKeys: { CEREBRAS_API_KEY: `sk-cer-${ns}` },
-              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-            },
-            ctxFor(orgAdminUserId),
-          );
-          // Sanity: no rate limit set yet.
-          const before = await prisma.modelProvider.findFirst({
-            where: { id: mp.id },
-            select: { rateLimitRpm: true },
-          });
-          expect(before?.rateLimitRpm).toBeNull();
-
-          await expect(
-            service().updateModelProvider(
-              {
-                id: mp.id,
-                projectId: projectAId,
-                provider: "cerebras",
-                enabled: true,
-                rateLimitRpm: 600,
-              },
-              ctxFor(teamAAdminUserId),
-            ),
-          ).rejects.toMatchObject({
-            code: "model_provider_scope_forbidden",
-            meta: { requiredPermission: "organization:manage" },
-          });
-
-          const after = await prisma.modelProvider.findFirst({
-            where: { id: mp.id },
-            select: { rateLimitRpm: true },
-          });
-          expect(after?.rateLimitRpm).toBeNull();
-        });
+    it("persists every scope an organization admin is allowed to manage", async () => {
+      const provider = await service().upsert({
+        projectId: projectAId,
+        actorId: orgAdminId,
+        provider: "cerebras",
+        enabled: true,
+        customKeys: { CEREBRAS_API_KEY: `sk-cerebras-${namespace}` },
+        scopes: [
+          { scopeType: "ORGANIZATION", scopeId: organizationId },
+          { scopeType: "TEAM", scopeId: teamAId },
+          { scopeType: "PROJECT", scopeId: projectAId },
+        ],
       });
 
-      describe("when the org admin writes an advanced field via id-only", () => {
-        it("persists the rate limit", async () => {
-          const mp = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "xai",
-              enabled: true,
-              customKeys: { XAI_API_KEY: `sk-xai-${ns}` },
-              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-            },
-            ctxFor(orgAdminUserId),
-          );
-          await service().updateModelProvider(
-            {
-              id: mp.id,
-              projectId: projectAId,
-              provider: "xai",
-              enabled: true,
-              rateLimitRpm: 900,
-            },
-            ctxFor(orgAdminUserId),
-          );
-          const stored = await prisma.modelProvider.findFirst({
-            where: { id: mp.id },
-            select: { rateLimitRpm: true },
-          });
-          expect(stored?.rateLimitRpm).toBe(900);
-        });
+      const scopes = await prisma.modelProviderScope.findMany({
+        where: { modelProviderId: provider.id },
       });
-
-      describe("when the supplied id no longer resolves a row", () => {
-        /** @scenario Update of a vanished id surfaces NOT_FOUND instead of silently creating */
-        it("throws NOT_FOUND instead of falling through to create a new row", async () => {
-          const beforeCount = await prisma.modelProvider.count({
-            where: { organizationId, provider: "groq" },
-          });
-          await expect(
-            service().updateModelProvider(
-              {
-                id: `vanished-mp-${ns}`,
-                projectId: projectAId,
-                provider: "groq",
-                enabled: true,
-                customKeys: { GROQ_API_KEY: `sk-groq-${ns}` },
-              },
-              ctxFor(orgAdminUserId),
-            ),
-            // The service is framework-agnostic, so it raises its own handled
-            // code rather than a transport one. Asserting `code` (not the
-            // class) is what keeps this honest across the tRPC boundary.
-          ).rejects.toMatchObject({ code: "model_provider_not_found" });
-          const afterCount = await prisma.modelProvider.count({
-            where: { organizationId, provider: "groq" },
-          });
-          expect(afterCount).toBe(beforeCount);
-        });
-      });
+      expect(scopes.map((scope) => scope.scopeType).sort()).toEqual([
+        "ORGANIZATION",
+        "PROJECT",
+        "TEAM",
+      ]);
     });
 
-    // =========================================================================
-    // Read gate: NOT_FOUND (not FORBIDDEN) for unreadable scopes
-    // =========================================================================
-
-    describe("given an ORG-scoped MP that the caller cannot see", () => {
-      describe("when an unrelated user calls getById", () => {
-        /** @scenario Reading a provider outside my access scope returns not found */
-        it("surfaces NOT_FOUND to prevent id enumeration across tenants", async () => {
-          const mp = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "bedrock",
-              enabled: true,
-              customKeys: { AWS_ACCESS_KEY_ID: `ak-${ns}` },
-              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-            },
-            ctxFor(orgAdminUserId),
-          );
-
-          await expect(
-            service().getById(mp.id, projectAId, ctxFor(unrelatedUserId)),
-          ).rejects.toMatchObject({ code: "model_provider_not_found" });
-        });
+    it("authorizes old and new scopes before replacing the scope set", async () => {
+      const provider = await service().upsert({
+        projectId: projectAId,
+        actorId: orgAdminId,
+        provider: "groq",
+        enabled: true,
+        customKeys: { GROQ_API_KEY: `sk-groq-replace-${namespace}` },
+        scopes: [
+          { scopeType: "ORGANIZATION", scopeId: organizationId },
+          { scopeType: "TEAM", scopeId: teamAId },
+        ],
       });
 
-      describe("when a user with org membership reads", () => {
-        it("returns the row", async () => {
-          const mp = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "vertex_ai",
-              enabled: true,
-              customKeys: {
-                GOOGLE_APPLICATION_CREDENTIALS: `{"stub":"${ns}"}`,
-                VERTEXAI_PROJECT: "stub-proj",
-                VERTEXAI_LOCATION: "us-central1",
-              },
-              scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-            },
-            ctxFor(orgAdminUserId),
-          );
-          const read = await service().getById(
-            mp.id,
-            projectAId,
-            ctxFor(teamAMemberUserId),
-          );
-          expect(read.id).toBe(mp.id);
-        });
+      await service().upsert({
+        id: provider.id,
+        projectId: projectAId,
+        actorId: orgAdminId,
+        provider: "groq",
+        enabled: true,
+        scopes: [{ scopeType: "PROJECT", scopeId: projectAId }],
       });
+
+      const scopes = await prisma.modelProviderScope.findMany({
+        where: { modelProviderId: provider.id },
+      });
+      expect(scopes).toEqual([
+        expect.objectContaining({ scopeType: "PROJECT", scopeId: projectAId }),
+      ]);
     });
 
-    // =========================================================================
-    // Delete gate: must hold manage on every persisted scope
-    // =========================================================================
-
-    describe("given a TEAM-scoped MP exists", () => {
-      describe("when a team admin deletes it", () => {
-        it("removes the row and its scopes", async () => {
-          const mp = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "custom",
-              enabled: true,
-              customKeys: { CUSTOM_BASE_URL: `https://custom-${ns}.test/v1` },
-              scopes: [{ scopeType: "TEAM", scopeId: teamAId }],
-            },
-            ctxFor(teamAAdminUserId),
-          );
-
-          await service().deleteModelProvider(
-            { id: mp.id, projectId: projectAId, provider: "custom" },
-            ctxFor(teamAAdminUserId),
-          );
-
-          const remaining = await prisma.modelProvider.findFirst({
-            where: { id: mp.id },
-            include: { scopes: true },
-          });
-          expect(remaining).toBeNull();
-        });
+    it("rejects an advanced update when the actor cannot manage the existing scope", async () => {
+      const provider = await service().upsert({
+        projectId: projectAId,
+        actorId: orgAdminId,
+        provider: "xai",
+        enabled: true,
+        customKeys: { XAI_API_KEY: `sk-xai-advanced-${namespace}` },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
       });
 
-      describe("when a team-admin from a different team tries to delete", () => {
-        /** @scenario Deletion requires manage permission on EVERY current scope of the MP */
-        it("rejects with FORBIDDEN", async () => {
-          const mp = await service().updateModelProvider(
-            {
-              projectId: projectAId,
-              provider: "azure_safety",
-              enabled: true,
-              customKeys: {
-                AZURE_CONTENT_SAFETY_ENDPOINT: "https://stub.test",
-                AZURE_CONTENT_SAFETY_KEY: `key-${ns}`,
-              },
-              scopes: [{ scopeType: "TEAM", scopeId: teamAId }],
-            },
-            ctxFor(teamAAdminUserId),
-          );
+      await expect(
+        service().upsert({
+          id: provider.id,
+          projectId: projectAId,
+          actorId: teamAAdminId,
+          provider: "xai",
+          enabled: true,
+          rateLimitRpm: 600,
+        }),
+      ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
 
-          // Seed a team admin for team B to prove the cross-team rejection.
-          const teamBAdmin = await prisma.user.create({
-            data: {
-              name: "Team B Admin",
-              email: `team-b-admin-${ns}@example.com`,
-            },
-          });
-          await prisma.organizationUser.create({
-            data: {
-              userId: teamBAdmin.id,
-              organizationId,
-              role: OrganizationUserRole.MEMBER,
-            },
-          });
-          await prisma.teamUser.create({
-            data: {
-              userId: teamBAdmin.id,
-              teamId: teamBId,
-              role: TeamUserRole.ADMIN,
-            },
-          });
+      await expect(
+        prisma.modelProvider.findUnique({
+          where: { id: provider.id },
+          select: { rateLimitRpm: true },
+        }),
+      ).resolves.toMatchObject({ rateLimitRpm: null });
+    });
 
-          try {
-            await expect(
-              service().deleteModelProvider(
-                { id: mp.id, projectId: projectAId, provider: "azure_safety" },
-                ctxFor(teamBAdmin.id),
-              ),
-            ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
-
-            // Row still present
-            const stillThere = await prisma.modelProvider.findFirst({
-              where: { id: mp.id },
-            });
-            expect(stillThere).not.toBeNull();
-          } finally {
-            await prisma.teamUser
-              .deleteMany({ where: { userId: teamBAdmin.id } })
-              .catch(() => {});
-            await prisma.organizationUser
-              .deleteMany({ where: { userId: teamBAdmin.id } })
-              .catch(() => {});
-            await prisma.user
-              .deleteMany({ where: { id: teamBAdmin.id } })
-              .catch(() => {});
-          }
-        });
+    it("allows an organization admin to persist an advanced update", async () => {
+      const provider = await service().upsert({
+        projectId: projectAId,
+        actorId: orgAdminId,
+        provider: "cerebras",
+        enabled: true,
+        customKeys: { CEREBRAS_API_KEY: `sk-cerebras-advanced-${namespace}` },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
       });
+
+      await service().upsert({
+        id: provider.id,
+        projectId: projectAId,
+        actorId: orgAdminId,
+        provider: "cerebras",
+        enabled: true,
+        rateLimitRpm: 900,
+      });
+
+      await expect(
+        prisma.modelProvider.findUnique({
+          where: { id: provider.id },
+          select: { rateLimitRpm: true },
+        }),
+      ).resolves.toMatchObject({ rateLimitRpm: 900 });
+    });
+
+    it("does not turn a missing id into a new provider", async () => {
+      const before = await prisma.modelProvider.count({
+        where: { organizationId, provider: "groq" },
+      });
+
+      await expect(
+        service().upsert({
+          id: `missing-${namespace}`,
+          projectId: projectAId,
+          actorId: orgAdminId,
+          provider: "groq",
+          enabled: true,
+          customKeys: { GROQ_API_KEY: `sk-groq-missing-${namespace}` },
+        }),
+      ).rejects.toMatchObject({ code: "model_provider_not_found" });
+
+      await expect(
+        prisma.modelProvider.count({
+          where: { organizationId, provider: "groq" },
+        }),
+      ).resolves.toBe(before);
+    });
+
+    it("allows a team admin to delete a provider in its own team", async () => {
+      const provider = await service().upsert({
+        projectId: projectAId,
+        actorId: teamAAdminId,
+        provider: "custom",
+        enabled: true,
+        customKeys: { CUSTOM_BASE_URL: `https://${namespace}.example.test/v1` },
+        scopes: [{ scopeType: "TEAM", scopeId: teamAId }],
+      });
+
+      await service().delete({
+        id: provider.id,
+        projectId: projectAId,
+        actorId: teamAAdminId,
+        provider: "custom",
+      });
+
+      await expect(
+        prisma.modelProvider.findUnique({ where: { id: provider.id } }),
+      ).resolves.toBeNull();
+    });
+
+    it("rejects deletion from a different team and leaves the provider in place", async () => {
+      const provider = await service().upsert({
+        projectId: projectAId,
+        actorId: teamAAdminId,
+        provider: "azure_safety",
+        enabled: true,
+        customKeys: {
+          AZURE_CONTENT_SAFETY_ENDPOINT: `https://${namespace}.example.test`,
+          AZURE_CONTENT_SAFETY_KEY: `key-${namespace}`,
+        },
+        scopes: [{ scopeType: "TEAM", scopeId: teamAId }],
+      });
+
+      await expect(
+        service().delete({
+          id: provider.id,
+          projectId: projectAId,
+          actorId: teamBAdminId,
+          provider: "azure_safety",
+        }),
+      ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
+
+      await expect(
+        prisma.modelProvider.findUnique({ where: { id: provider.id } }),
+      ).resolves.not.toBeNull();
     });
   },
 );

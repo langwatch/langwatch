@@ -4,11 +4,11 @@ import type {
   CustomModelEntry,
   MultimodalInput,
   SupportedParameter,
-} from "../../server/modelProviders/customModel.schema";
+} from "@langwatch/model-provider-contract";
 import {
   customModelEntrySchema,
   multimodalInputValues,
-} from "../../server/modelProviders/customModel.schema";
+} from "@langwatch/model-provider-contract";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Checkbox } from "../ui/checkbox";
 import {

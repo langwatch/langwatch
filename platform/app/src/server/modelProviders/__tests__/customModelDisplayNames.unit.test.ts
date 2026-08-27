@@ -13,12 +13,14 @@
  * field-missing entries can reach the resolver from a hand-edited row.
  */
 import { describe, expect, it } from "vitest";
-import type { CustomModelEntry } from "../customModel.schema";
-import { toLegacyCompatibleCustomModels } from "../customModel.schema";
+import {
+  toLegacyCompatibleCustomModels,
+  type CustomModelEntry,
+} from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
-} from "../customModelDisplayNames";
+} from "@langwatch/model-provider-contract";
 import { makeProvider } from "./test-helpers";
 
 describe("buildCustomModelDisplayNames()", () => {

@@ -1,7 +1,11 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { env } from "../../env.mjs";
+import {
+  ModelNotConfiguredError,
+  ModelProviderDisabledError,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
+import { env } from "@langwatch/trace-server";
 import {
   getProjectModelProviders,
   type LegacyModelProviderExecution,
@@ -10,14 +14,7 @@ import {
 import { prisma } from "../db";
 import { nlpgoProxyBaseURL } from "../nlpgo/nlpgoFetch";
 import { getCodexVercelAIModel } from "./codexGatewayModel";
-import { isCodexModel } from "./codexRestrictions";
-import { featureByKey } from "./featureRegistry";
-import { ModelNotConfiguredError } from "./modelNotConfiguredError";
-import { ModelProviderDisabledError } from "./modelProviderDisabledError";
-import {
-  findAlternateBelowScope,
-  resolveModelForFeature,
-} from "./resolveModelForFeature";
+import { isCodexModel } from "@langwatch/model-provider-contract";
 
 /**
  * Returns a Vercel AI SDK model handle for the given project + feature.
@@ -39,7 +36,12 @@ type VercelModelInput = {
 };
 
 export const getVercelAIModel = async (input: VercelModelInput) => {
-  const { projectId, model, featureKey = "prompt.create_default", managedProviders } = input;
+  const {
+    projectId,
+    model,
+    featureKey = "prompt.create_default",
+    managedProviders,
+  } = input;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -55,6 +57,7 @@ export const getVercelAIModel = async (input: VercelModelInput) => {
     projectId,
     featureKey,
     modelProviders,
+    modelProviderService: input.modelProviders,
   });
 
   const providerKey = model_.split("/")[0] ?? "";
@@ -115,11 +118,13 @@ async function resolveModel({
   projectId,
   featureKey,
   modelProviders,
+  modelProviderService,
 }: {
   explicit: string | undefined;
   projectId: string;
   featureKey: string;
   modelProviders: Record<string, LegacyModelProviderExecution>;
+  modelProviderService: ModelProviderService;
 }): Promise<string> {
   // 1. Explicit model always wins.
   if (explicit) return explicit;
@@ -131,9 +136,9 @@ async function resolveModel({
   //    popup with the feature+role in context. Swallowing it here
   //    would silently substitute an unrelated model.
   try {
-    const resolved = await resolveModelForFeature(featureKey, {
-      prisma,
+    const resolved = await modelProviderService.resolveModelForFeature({
       projectId,
+      featureKey,
     });
     const providerKey = resolved.model.split("/")[0] ?? "";
     if (modelProviders[providerKey]?.enabled) return resolved.model;
@@ -150,16 +155,15 @@ async function resolveModel({
     if (resolved.scope === null) {
       throw new Error("resolveModelForFeature returned a null scope");
     }
-    const alternate = await findAlternateBelowScope(
+    const alternate = await modelProviderService.tryFindAlternateModel({
+      projectId,
       featureKey,
-      { prisma, projectId },
-      resolved.scope,
-    );
-    const feature = featureByKey(featureKey);
+      skipFromScope: resolved.scope,
+    });
     const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
     throw new ModelProviderDisabledError(
       featureKey,
-      feature?.displayName ?? featureKey,
+      resolved.feature.displayName,
       resolved.feature.role,
       projectId,
       resolved.scope,

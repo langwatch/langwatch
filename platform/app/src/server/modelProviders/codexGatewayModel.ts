@@ -2,10 +2,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import { env } from "../../env.mjs";
 import { ensureGatewayV1BaseUrl } from "@langwatch/langy-contract";
-import { provisionLangyVirtualKey } from "../app-layer/langy/langyVirtualKey";
+import { provisionLangyVirtualKey } from "~/runtime/app/features/langy-virtual-key.adapter";
 import { prisma } from "../db";
-import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
-import { isModelAllowedForFeature } from "./codexRestrictions";
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "@langwatch/model-provider-contract";
+import { isModelAllowedForFeature } from "@langwatch/model-provider-contract";
 
 /**
  * The Vercel AI SDK handle for a codex model.

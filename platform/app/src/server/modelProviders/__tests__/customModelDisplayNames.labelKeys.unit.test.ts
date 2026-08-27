@@ -20,11 +20,11 @@
  * contract can't regress them.
  */
 import { describe, expect, it } from "vitest";
-import { toLegacyCompatibleCustomModels } from "../customModel.schema";
+import { toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,
   modelDisplayLabel,
-} from "../customModelDisplayNames";
+} from "@langwatch/model-provider-contract";
 import { makeProvider } from "./test-helpers";
 
 describe("given a custom model row identified by its row id", () => {

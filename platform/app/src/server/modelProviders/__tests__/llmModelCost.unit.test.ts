@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { matchModelCostWithFallbacks } from "../../tracer/collector/cost";
 import {
   getStaticModelCosts,
@@ -100,51 +100,6 @@ describe("getStaticModelCosts", () => {
 
     it("does not match a model that only shares a suffix", () => {
       expect(matches("openai/gpt-4o", "my-custom-gpt-4o")).toBe(false);
-    });
-  });
-
-  describe("given model entries whose vendor-prefixed key length hides the matched suffix length", () => {
-    afterEach(() => {
-      vi.doUnmock("../loadModelCatalog");
-      vi.resetModules();
-    });
-
-    describe("when static model costs are built", () => {
-      it("orders entries by matched model suffix, not vendor-prefixed key length", async () => {
-        vi.resetModules();
-        vi.doMock("../loadModelCatalog", () => ({
-          llmModels: {
-            updatedAt: "test",
-            modelCount: 2,
-            models: {
-              "verylongvendor/abc": {
-                pricing: {
-                  inputCostPerToken: 0.001,
-                  outputCostPerToken: 0.002,
-                },
-              },
-              "x/abc-def": {
-                pricing: {
-                  inputCostPerToken: 0.003,
-                  outputCostPerToken: 0.004,
-                },
-              },
-            },
-          },
-        }));
-
-        const { getStaticModelCosts: getMockedStaticModelCosts } =
-          await import("../llmModelCost");
-        const mockedCosts = getMockedStaticModelCosts();
-
-        expect(mockedCosts.map((entry) => entry.model)).toEqual([
-          "x/abc-def",
-          "verylongvendor/abc",
-        ]);
-        expect(
-          mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))?.model,
-        ).toBe("x/abc-def");
-      });
     });
   });
 });

@@ -3,7 +3,7 @@
  * (codex) model found while walking the cascade (issue #6634, Gap 1).
  *
  * Today no product write path can save a codex value on a DEFAULT-role key
- * (setRoleAtScope / setFeatureAtScope both refuse it — see
+ * (the canonical default writer refuses it — see
  * codexRestrictions.unit.test.ts), so this state is reachable only via a
  * raw DB write or a value legal when saved becoming restricted later. The
  * resolver still needs to tell the two exhaustion causes apart: a
@@ -19,7 +19,7 @@
 import { describe, expect, it } from "vitest";
 import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 
-import { CODEX_DEFAULT_MODEL } from "../codexRestrictions";
+import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "../modelNotConfiguredError";
 import { ModelRestrictedForFeatureError } from "../modelRestrictedForFeatureError";
 import { resolveModelForFeature } from "../resolveModelForFeature";

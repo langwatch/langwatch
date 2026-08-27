@@ -19,8 +19,8 @@
  * must not key the map on an id no caller could ever hold.
  */
 import { describe, expect, it } from "vitest";
-import type { CustomModelEntry } from "../customModel.schema";
-import { buildCustomModelDisplayNames } from "../customModelDisplayNames";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { makeProvider } from "./test-helpers";
 
 describe("given a row whose custom entry has a non-string display name", () => {

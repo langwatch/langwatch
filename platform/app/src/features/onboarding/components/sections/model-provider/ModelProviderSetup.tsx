@@ -8,6 +8,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability";
+import {
+  getProviderModelOptions,
+  modelProviders as modelProvidersRegistry,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -21,11 +26,6 @@ import { useModelProviderFields } from "../../../../../hooks/useModelProviderFie
 import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import {
-  getProviderModelOptions,
-  type MaybeStoredModelProvider,
-  modelProviders as modelProvidersRegistry,
-} from "../../../../../server/modelProviders/registry";
 import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,

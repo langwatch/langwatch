@@ -3,7 +3,7 @@ import {
   customModelEntrySchema,
   isLegacyCustomModels,
   toLegacyCompatibleCustomModels,
-} from "../customModel.schema";
+} from "@langwatch/model-provider-contract";
 
 describe("customModelEntrySchema", () => {
   describe("when given a valid chat model entry", () => {

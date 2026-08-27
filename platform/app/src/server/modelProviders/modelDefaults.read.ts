@@ -1,4 +1,5 @@
 import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -12,13 +13,13 @@ import {
   featureByKey,
   MODEL_ROLES,
   type ModelRole,
-} from "./featureRegistry";
+} from "@langwatch/model-provider-contract";
 import {
   type ResolutionScope,
   type ResolutionSource,
   resolveModelForFeature,
 } from "./resolveModelForFeature";
-import { buildSeedPlanForProvider } from "./seedOnboardingDefaults";
+import { buildProviderOnboardingDefaultPlan } from "@langwatch/model-provider-contract";
 
 export type ReadCtx = {
   prisma: PrismaClient;
@@ -103,7 +104,12 @@ export type InheritedValuesResult = {
 export async function getResolvedDefaultForFeature(
   ctx: ReadCtx,
   params: { projectId: string; featureKey: string },
+  modelProviders?: ModelProviderService,
 ): Promise<DefaultModelEffective | null> {
+  if (modelProviders) {
+    return modelProviders.tryGetResolvedDefault(params);
+  }
+
   if (!featureByKey(params.featureKey)) return null;
   try {
     const resolved = await resolveModelForFeature(params.featureKey, {
@@ -646,7 +652,7 @@ export async function getInheritedValuesForScopes(
     : [];
   const inferenceProvider = providers[0]?.provider;
   const inferencePlan = inferenceProvider
-    ? buildSeedPlanForProvider(inferenceProvider)
+    ? buildProviderOnboardingDefaultPlan(inferenceProvider)
     : {};
 
   const features = allFeatures();

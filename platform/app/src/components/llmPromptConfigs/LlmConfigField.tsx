@@ -8,7 +8,7 @@ import {
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "@langwatch/workflow-contract";
-import type { ModelOption } from "~/server/app-layer/topic-clustering/clustering.types";
+import type { ModelOption } from "@langwatch/topic-contract";
 import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
 import { Popover } from "@langwatch/design-system/popover";
 import { LLMModelDisplay } from "./LLMModelDisplay";

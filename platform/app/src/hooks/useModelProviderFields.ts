@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { modelProviders as serverModelProviders } from "../server/modelProviders/registry";
+import { modelProviders as serverModelProviders } from "@langwatch/model-provider-contract";
 import {
   getDisplayKeysForProvider,
   getRequiredCredentialKeys,

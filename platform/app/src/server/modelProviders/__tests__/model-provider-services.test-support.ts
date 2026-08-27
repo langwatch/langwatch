@@ -45,6 +45,10 @@ export class TestModelProviderService extends ModelProviderService {
     return this.executionProviders;
   }
 
+  async prepareExecution() {
+    return unusedTestDoubleMethod();
+  }
+
   async upsert() {
     return unusedTestDoubleMethod();
   }
@@ -77,6 +81,14 @@ export class TestModelProviderService extends ModelProviderService {
 
   async tryGetResolvedDefault() {
     return null;
+  }
+
+  async resolveModelForFeature(): Promise<never> {
+    return unusedTestDoubleMethod();
+  }
+
+  async tryFindAlternateModel(): Promise<never> {
+    return unusedTestDoubleMethod();
   }
 
   async setDefault() {}

@@ -1,6 +1,6 @@
 // biome-ignore lint/style/useImportType: React is needed at runtime for JSX in non-jsdom test environments
 import React from "react";
-import type { modelProviders } from "~/server/modelProviders/registry";
+import type { modelProviders } from "@langwatch/model-provider-contract";
 import { Anthropic } from "../icons/Anthropic";
 import { AWS } from "../icons/AWS";
 import { Azure } from "../icons/Azure";

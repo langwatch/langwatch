@@ -7,7 +7,7 @@ import {
   useAllModelProvidersList,
 } from "../hooks/useAllModelProvidersList";
 import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
-import { modelProviders } from "../server/modelProviders/registry";
+import { modelProviders } from "@langwatch/model-provider-contract";
 import { EditModelProviderForm } from "./settings/ModelProviderForm";
 import { Drawer } from "./ui/drawer";
 

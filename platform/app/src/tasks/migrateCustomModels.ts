@@ -14,9 +14,11 @@
  */
 
 import { prisma } from "../server/db";
-import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
-import { isLegacyCustomModels } from "../server/modelProviders/customModel.schema";
-import { getProviderModelOptions } from "../server/modelProviders/registry";
+import {
+  isLegacyCustomModels,
+  type CustomModelEntry,
+} from "@langwatch/model-provider-contract";
+import { getProviderModelOptions } from "@langwatch/model-provider-contract";
 
 // ============================================================================
 // Types

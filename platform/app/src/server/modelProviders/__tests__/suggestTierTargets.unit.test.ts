@@ -8,14 +8,14 @@
 import { describe, expect, it } from "vitest";
 
 import { MODEL_TIERS } from "~/utils/modelTierPresets";
-import { resolveLatestAlias } from "../latestAliases";
-import type { LLMModelEntry } from "../llmModels.types";
+import { resolveLatestAlias } from "@langwatch/model-provider-contract";
+import type { LLMModelEntry } from "@langwatch/model-provider-contract";
 import {
   isKnownModelId,
   isRankableByPrice,
   partitionTierAliases,
   suggestTierTargets,
-} from "../suggestTierTargets";
+} from "@langwatch/model-provider-server";
 
 describe("given a tier and no provider filter", () => {
   it.each(MODEL_TIERS)("offers candidates for the %s tier", (tier) => {

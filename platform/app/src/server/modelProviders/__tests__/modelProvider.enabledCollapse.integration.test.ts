@@ -17,9 +17,10 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import { getApp } from "~/server/app-layer";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
+import { getProjectModelProvidersForFrontend } from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
-import { ModelProviderService } from "../modelProvider.service";
 
 wireDefaultTestApp();
 
@@ -108,21 +109,7 @@ describe.skipIf(!hasCredentialsSecret)(
     });
 
     function service() {
-      return ModelProviderService.create(prisma);
-    }
-
-    function ctx() {
-      return {
-        prisma,
-        session: {
-          user: {
-            id: orgAdminUserId,
-            email: `org-admin-${ns}@example.com`,
-            name: "Org Admin",
-          },
-          expires: "2099-01-01T00:00:00.000Z",
-        } as any,
-      };
+      return getApp().modelProviders;
     }
 
     /**
@@ -133,30 +120,29 @@ describe.skipIf(!hasCredentialsSecret)(
      */
     it("prefers an enabled wider-scope row over a disabled narrower-scope row", async () => {
       // Enabled at ORGANIZATION scope — the real, working credential.
-      await service().updateModelProvider(
-        {
-          projectId,
-          provider: "openai",
-          enabled: true,
-          customKeys: { OPENAI_API_KEY: `sk-org-${ns}` },
-          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-        },
-        ctx(),
-      );
+      await service().upsert({
+        projectId,
+        provider: "openai",
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: `sk-org-${ns}` },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        actorId: orgAdminUserId,
+      });
 
       // Disabled at PROJECT scope — a stale project-level override.
-      await service().updateModelProvider(
-        {
-          projectId,
-          provider: "openai",
-          enabled: false,
-          customKeys: { OPENAI_API_KEY: `sk-project-disabled-${ns}` },
-          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-        },
-        ctx(),
-      );
+      await service().upsert({
+        projectId,
+        provider: "openai",
+        enabled: false,
+        customKeys: { OPENAI_API_KEY: `sk-project-disabled-${ns}` },
+        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+        actorId: orgAdminUserId,
+      });
 
-      const result = await service().getProjectModelProvidersForFrontend(projectId);
+      const { providers: result } = await getProjectModelProvidersForFrontend(
+        service(),
+        projectId,
+      );
 
       expect(result.openai).toBeDefined();
       // `noUncheckedIndexedAccess` makes `result.openai` possibly
@@ -175,29 +161,28 @@ describe.skipIf(!hasCredentialsSecret)(
      */
     it("still picks the narrower scope when both rows are enabled", async () => {
       // Distinct provider so the prior test's openai rows don't interfere.
-      await service().updateModelProvider(
-        {
-          projectId,
-          provider: "anthropic",
-          enabled: true,
-          customKeys: { ANTHROPIC_API_KEY: `sk-ant-org-${ns}` },
-          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-        },
-        ctx(),
-      );
+      await service().upsert({
+        projectId,
+        provider: "anthropic",
+        enabled: true,
+        customKeys: { ANTHROPIC_API_KEY: `sk-ant-org-${ns}` },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        actorId: orgAdminUserId,
+      });
 
-      await service().updateModelProvider(
-        {
-          projectId,
-          provider: "anthropic",
-          enabled: true,
-          customKeys: { ANTHROPIC_API_KEY: `sk-ant-project-${ns}` },
-          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-        },
-        ctx(),
-      );
+      await service().upsert({
+        projectId,
+        provider: "anthropic",
+        enabled: true,
+        customKeys: { ANTHROPIC_API_KEY: `sk-ant-project-${ns}` },
+        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+        actorId: orgAdminUserId,
+      });
 
-      const result = await service().getProjectModelProvidersForFrontend(projectId);
+      const { providers: result } = await getProjectModelProvidersForFrontend(
+        service(),
+        projectId,
+      );
 
       expect(result.anthropic).toBeDefined();
       expect(result.anthropic!.enabled).toBe(true);

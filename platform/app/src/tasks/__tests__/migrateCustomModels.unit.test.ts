@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 
 vi.mock("../../server/db", () => ({
   prisma: {},

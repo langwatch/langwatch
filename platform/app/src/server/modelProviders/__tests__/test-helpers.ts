@@ -6,7 +6,7 @@
  * `customModelDisplayNames.unit.test.ts` — derives them from one
  * definition rather than copies that can drift apart.
  */
-import type { MaybeStoredModelProvider } from "../registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
 /**
  * Builds a `MaybeStoredModelProvider` fixture with every optional column

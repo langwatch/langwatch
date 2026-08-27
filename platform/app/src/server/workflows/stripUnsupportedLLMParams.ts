@@ -7,7 +7,7 @@ import { z } from "zod";
 import {
   filterUnsupportedSamplingParams,
   resolveSupportedParameters,
-} from "../modelProviders/resolveSupportedParameters";
+} from "@langwatch/model-provider-contract";
 
 const llmLikeSchema = z.object({ model: z.string().optional() }).catchall(z.unknown());
 type LLMLike = z.infer<typeof llmLikeSchema>;

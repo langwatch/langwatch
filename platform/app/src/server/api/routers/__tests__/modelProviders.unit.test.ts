@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { isSecretCredentialField } from "../../../../utils/modelProviderHelpers";
-import type { CustomModelEntry } from "../../../modelProviders/customModel.schema";
-import { customModelUpdateInputSchema } from "../../../modelProviders/customModel.schema";
-import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import { customModelUpdateInputSchema } from "@langwatch/model-provider-contract";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import {
   getModelMetadataForFrontend,
   type LegacyModelProviderExecution,

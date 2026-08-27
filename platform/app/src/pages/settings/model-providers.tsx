@@ -34,11 +34,11 @@ import { Menu } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
+import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import {
   modelProviders as modelProvidersRegistry,
   providerDeprecation,
-} from "../../server/modelProviders/registry";
+} from "@langwatch/model-provider-contract";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
 import { broadestScopeRank } from "../../utils/scopeBreadth";
 

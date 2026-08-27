@@ -2,8 +2,8 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer";
 import { prisma } from "~/server/db";
-import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
@@ -285,10 +285,10 @@ describe("Model Providers API", () => {
           customKeys: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },
         });
 
-        // Verify original key still in DB. Use the repository so the
-        // encrypted-at-rest payload is decrypted before assertion.
-        const repo = new ModelProviderRepository(prisma);
-        const saved = await repo.findByProvider("openai", testProjectId);
+        const providers = await getApp().modelProviders.getExecutionProviders({
+          projectId: testProjectId,
+        });
+        const saved = providers.openai;
         expect((saved?.customKeys as Record<string, string>)?.OPENAI_API_KEY).toBe(
           "sk-original-key",
         );
@@ -299,12 +299,12 @@ describe("Model Providers API", () => {
     // along with the Project.defaultModel scalar column. Defaults now
     // live in ModelDefaultConfig and are mutated through the tRPC
     // model-provider router (createConfig / updateConfig /
-    // setRoleAtScope / setFeatureAtScope).
+    // the canonical default-assignment API).
 
     describe("when the project has no defaults yet", () => {
       it("seeds a ModelDefaultConfig row on first-provider create", async () => {
         // No provider rows on this project yet — the next PUT below
-        // is the "first provider" event. ModelProviderService.createNew
+        // is the "first provider" event. The canonical creation path
         // runs seedOnboardingDefaultsForProvider, which should land a
         // ModelDefaultConfig row at PROJECT scope.
         const before = await prisma.modelDefaultConfig.count({

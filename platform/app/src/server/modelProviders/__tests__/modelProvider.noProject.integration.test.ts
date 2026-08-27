@@ -59,11 +59,11 @@ vi.mock("~/utils/ssrfProtection", async (importOriginal) => ({
 }));
 
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import { getApp } from "~/server/app-layer";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
-import { ModelProviderService } from "../modelProvider.service";
 
 wireDefaultTestApp();
 
@@ -78,14 +78,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
   let viewOnlyMemberUserId: string;
   let externalMemberUserId: string;
 
-  const service = () => ModelProviderService.create(prisma);
-
-  function ctxFor(userId: string) {
-    return {
-      prisma,
-      session: { user: { id: userId }, expires: "1" } as any,
-    };
-  }
+  const service = () => getApp().modelProviders;
 
   // The tRPC layer is where the project requirement actually lived: the
   // `update` input took `projectId` as required and the permission
@@ -245,17 +238,15 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
     describe("when they add a provider at organization scope", () => {
       /** @scenario "Saving the credential stores it against the organization" */
       it("stores it against the organization", async () => {
-        const created = await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "openai",
-            name: `Create OpenAI ${ns}`,
-            enabled: true,
-            customKeys: { OPENAI_API_KEY: "sk-noproject-create" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        );
+        const created = await service().upsert({
+          organizationId: orgId,
+          provider: "openai",
+          name: `Create OpenAI ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-noproject-create" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        });
 
         const stored = await prisma.modelProvider.findUnique({
           where: { id: created.id },
@@ -268,17 +259,15 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
 
       /** @scenario "Saving the credential stores it against the organization" */
       it("reaches organization scope", async () => {
-        const created = await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "anthropic",
-            name: `Scope Anthropic ${ns}`,
-            enabled: true,
-            customKeys: { ANTHROPIC_API_KEY: "sk-noproject-scope" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        );
+        const created = await service().upsert({
+          organizationId: orgId,
+          provider: "anthropic",
+          name: `Scope Anthropic ${ns}`,
+          enabled: true,
+          customKeys: { ANTHROPIC_API_KEY: "sk-noproject-scope" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        });
 
         const stored = await prisma.modelProvider.findUnique({
           where: { id: created.id },
@@ -295,17 +284,15 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
 
       /** @scenario "Saving the credential stores it against the organization" */
       it("creates no project along the way", async () => {
-        await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "openai",
-            name: `NoProject Sentinel ${ns}`,
-            enabled: true,
-            customKeys: { OPENAI_API_KEY: "sk-noproject-sentinel" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        );
+        await service().upsert({
+          organizationId: orgId,
+          provider: "openai",
+          name: `NoProject Sentinel ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-noproject-sentinel" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        });
 
         const projectCount = await prisma.project.count({
           where: { team: { organizationId: orgId } },
@@ -316,19 +303,17 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
 
       /** @scenario "The saved provider shows the organization it belongs to" */
       it("shows up in the organization's provider list", async () => {
-        const created = await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "deepseek",
-            name: `Listed DeepSeek ${ns}`,
-            enabled: true,
-            customKeys: { DEEPSEEK_API_KEY: "sk-noproject-list" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        );
+        const created = await service().upsert({
+          organizationId: orgId,
+          provider: "deepseek",
+          name: `Listed DeepSeek ${ns}`,
+          enabled: true,
+          customKeys: { DEEPSEEK_API_KEY: "sk-noproject-list" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        });
 
-        const listed = await service().listOrgModelProvidersForFrontend(orgId);
+        const listed = await service().listForOrganization({ organizationId: orgId });
 
         expect(listed.map((p) => p.id)).toContain(created.id);
       });
@@ -336,17 +321,15 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
 
     describe("when they add a provider at team scope", () => {
       it("stores it against the team's organization", async () => {
-        const created = await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "openai",
-            name: `Team OpenAI ${ns}`,
-            enabled: true,
-            customKeys: { OPENAI_API_KEY: "sk-noproject-team" },
-            scopes: [{ scopeType: "TEAM", scopeId: teamId }],
-          },
-          ctxFor(adminUserId),
-        );
+        const created = await service().upsert({
+          organizationId: orgId,
+          provider: "openai",
+          name: `Team OpenAI ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-noproject-team" },
+          scopes: [{ scopeType: "TEAM", scopeId: teamId }],
+          actorId: adminUserId,
+        });
 
         const stored = await prisma.modelProvider.findUnique({
           where: { id: created.id },
@@ -363,28 +346,24 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
     describe("when they edit a provider they already added", () => {
       /** @scenario "Changing the credential on it" */
       it("updates the same row instead of creating a second one", async () => {
-        const created = await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "openai",
-            name: `Editable OpenAI ${ns}`,
-            enabled: true,
-            customKeys: { OPENAI_API_KEY: "sk-noproject-edit" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        );
+        const created = await service().upsert({
+          organizationId: orgId,
+          provider: "openai",
+          name: `Editable OpenAI ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-noproject-edit" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        });
 
-        const updated = await service().updateModelProvider(
-          {
-            id: created.id,
-            organizationId: orgId,
-            provider: "openai",
-            name: `Renamed OpenAI ${ns}`,
-            enabled: true,
-          },
-          ctxFor(adminUserId),
-        );
+        const updated = await service().upsert({
+          id: created.id,
+          organizationId: orgId,
+          provider: "openai",
+          name: `Renamed OpenAI ${ns}`,
+          enabled: true,
+          actorId: adminUserId,
+        });
 
         const rows = await prisma.modelProvider.findMany({
           where: { organizationId: orgId, name: { contains: `OpenAI ${ns}` } },
@@ -396,30 +375,26 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
       });
 
       it("preserves the stored credential when no new key is sent", async () => {
-        const created = await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "openai",
-            name: `Keyed OpenAI ${ns}`,
-            enabled: true,
-            customKeys: { OPENAI_API_KEY: "sk-noproject-preserved" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        );
+        const created = await service().upsert({
+          organizationId: orgId,
+          provider: "openai",
+          name: `Keyed OpenAI ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-noproject-preserved" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        });
 
-        await service().updateModelProvider(
-          {
-            id: created.id,
-            organizationId: orgId,
-            provider: "openai",
-            name: `Keyed OpenAI Renamed ${ns}`,
-            enabled: true,
-          },
-          ctxFor(adminUserId),
-        );
+        await service().upsert({
+          id: created.id,
+          organizationId: orgId,
+          provider: "openai",
+          name: `Keyed OpenAI Renamed ${ns}`,
+          enabled: true,
+          actorId: adminUserId,
+        });
 
-        const listed = await service().listOrgModelProvidersForFrontend(orgId);
+        const listed = await service().listForOrganization({ organizationId: orgId });
         const row = listed.find((p) => p.id === created.id);
 
         // The list masks keys, so "still credentialed" is what it can
@@ -431,26 +406,22 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
     describe("when they delete a provider they already added", () => {
       /** @scenario "Deleting it" */
       it("removes the row", async () => {
-        const created = await service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "xai",
-            name: `Doomed xAI ${ns}`,
-            enabled: true,
-            customKeys: { XAI_API_KEY: "sk-noproject-delete" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        );
+        const created = await service().upsert({
+          organizationId: orgId,
+          provider: "xai",
+          name: `Doomed xAI ${ns}`,
+          enabled: true,
+          customKeys: { XAI_API_KEY: "sk-noproject-delete" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        });
 
-        await service().deleteModelProvider(
-          {
-            id: created.id,
-            organizationId: orgId,
-            provider: "xai",
-          },
-          ctxFor(adminUserId),
-        );
+        await service().delete({
+          id: created.id,
+          organizationId: orgId,
+          provider: "xai",
+          actorId: adminUserId,
+        });
 
         const stored = await prisma.modelProvider.findUnique({
           where: { id: created.id },
@@ -749,17 +720,15 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
       });
 
       await expect(
-        service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "openai",
-            name: `Intruder OpenAI ${ns}`,
-            enabled: true,
-            customKeys: { OPENAI_API_KEY: "sk-intruder" },
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(outsiderUserId),
-        ),
+        service().upsert({
+          organizationId: orgId,
+          provider: "openai",
+          name: `Intruder OpenAI ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-intruder" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: outsiderUserId,
+        }),
         // Straight at the service, so no tRPC wrapper: the handled error
         // itself is what arrives, and its `code` is the assertion.
       ).rejects.toMatchObject({
@@ -783,20 +752,18 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
       });
 
       await expect(
-        service().updateModelProvider(
-          {
-            organizationId: outsiderOrgId,
-            provider: "openai",
-            name: `Reaching OpenAI ${ns}`,
-            enabled: true,
-            customKeys: { OPENAI_API_KEY: "sk-reaching" },
-            scopes: [
-              { scopeType: "ORGANIZATION", scopeId: outsiderOrgId },
-              { scopeType: "TEAM", scopeId: teamId },
-            ],
-          },
-          ctxFor(outsiderUserId),
-        ),
+        service().upsert({
+          organizationId: outsiderOrgId,
+          provider: "openai",
+          name: `Reaching OpenAI ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-reaching" },
+          scopes: [
+            { scopeType: "ORGANIZATION", scopeId: outsiderOrgId },
+            { scopeType: "TEAM", scopeId: teamId },
+          ],
+          actorId: outsiderUserId,
+        }),
         // The TEAM entry is the one that fails, and it fails the whole write:
         // asserting `team:manage` is what proves the refusal came from that
         // second scope rather than from the org the caller does own.
@@ -815,14 +782,12 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
   describe("given a write that names no tenant at all", () => {
     it("is refused rather than guessing one", async () => {
       await expect(
-        service().updateModelProvider(
-          {
-            provider: "openai",
-            enabled: true,
-            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
-          },
-          ctxFor(adminUserId),
-        ),
+        service().upsert({
+          provider: "openai",
+          enabled: true,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          actorId: adminUserId,
+        }),
         // The code, not the prose: the message is copy and free to change,
         // while the code is the part a caller branches on.
       ).rejects.toMatchObject({ code: "model_provider_anchor_required" });
@@ -832,14 +797,12 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
   describe("given a create with an organization but no scopes", () => {
     it("is refused rather than defaulting to a project that does not exist", async () => {
       await expect(
-        service().updateModelProvider(
-          {
-            organizationId: orgId,
-            provider: "openai",
-            enabled: true,
-          },
-          ctxFor(adminUserId),
-        ),
+        service().upsert({
+          organizationId: orgId,
+          provider: "openai",
+          enabled: true,
+          actorId: adminUserId,
+        }),
       ).rejects.toMatchObject({ code: "model_provider_scopes_required" });
     });
   });

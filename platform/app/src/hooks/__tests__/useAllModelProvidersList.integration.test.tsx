@@ -52,7 +52,7 @@ vi.mock("../useOrganizationTeamProject", () => ({
   }),
 }));
 
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { useAllModelProvidersList } from "../useAllModelProvidersList";
 
 /**

@@ -15,7 +15,7 @@ import {
   formatCost,
   formatRelativeTimeAgo,
   formatTokens,
-} from "~/features/traces-v2/utils/formatters";
+} from "@langwatch/trace-web";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { isSafeRegex } from "../../utils/safeRegex";

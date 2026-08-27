@@ -138,7 +138,7 @@ vi.mock("../../ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { EditModelProviderForm } from "../ModelProviderForm";
 

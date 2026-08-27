@@ -18,8 +18,8 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../../hooks/useModelProviderForm";
-import type { CustomModelEntry } from "../../../server/modelProviders/customModel.schema";
-import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { CustomModelInputSection } from "../ModelProviderCustomModelInput";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { modelProviders } from "../../server/modelProviders/registry";
+import { modelProviders } from "@langwatch/model-provider-contract";
 import {
   getDisplayKeysForProvider,
   getEmptyRequiredCredentialKeys,

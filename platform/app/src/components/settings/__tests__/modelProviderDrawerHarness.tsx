@@ -11,7 +11,7 @@ import { screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
 
-import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 
 export const Wrapper = ({ children }: { children: ReactNode }) => (

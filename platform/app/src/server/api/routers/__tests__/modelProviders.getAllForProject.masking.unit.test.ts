@@ -44,15 +44,6 @@ vi.mock("~/server/db", () => ({
   prisma: { auditLog: { create: vi.fn() } },
 }));
 
-// The repository is where decryption happens: rows come back with
-// plaintext customKeys, exactly as in production. Masking is the
-// service boundary's job — which is what this suite pins down.
-vi.mock("~/server/modelProviders/modelProvider.repository", () => ({
-  ModelProviderRepository: class {
-    findAllAccessibleForProject = mockFindAllAccessibleForProject;
-  },
-}));
-
 const PLAINTEXT_OPENAI_KEY = "sk-plaintext-secret-123";
 const PLAINTEXT_AWS_SECRET = "aws-secret-access-key-456";
 const PLAINTEXT_AZURE_KEY = "azure-subscription-key-789";

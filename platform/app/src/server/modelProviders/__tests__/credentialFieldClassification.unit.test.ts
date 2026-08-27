@@ -7,7 +7,7 @@ import {
   getSchemaShape,
   isSecretCredentialField,
 } from "../../../utils/modelProviderHelpers";
-import { modelProviders } from "../registry";
+import { modelProviders } from "@langwatch/model-provider-contract";
 
 /**
  * The classifier decides what every read path masks and what a partial write

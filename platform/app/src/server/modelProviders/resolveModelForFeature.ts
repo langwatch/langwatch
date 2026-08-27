@@ -1,8 +1,11 @@
 import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/client";
 
-import { isModelAllowedForFeature, LANGY_CHAT_FEATURE_KEY } from "./codexRestrictions";
-import { type FeatureDescriptor, featureByKey } from "./featureRegistry";
-import { expandLatestAlias, isLatestAlias } from "./latestAliases";
+import {
+  isModelAllowedForFeature,
+  LANGY_CHAT_FEATURE_KEY,
+} from "@langwatch/model-provider-contract";
+import { type FeatureDescriptor, featureByKey } from "@langwatch/model-provider-contract";
+import { expandLatestAlias, isLatestAlias } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 import { ModelRestrictedForFeatureError } from "./modelRestrictedForFeatureError";
 

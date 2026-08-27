@@ -8,7 +8,7 @@ import type {
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { api } from "../../utils/api";
 import { isSecretCredentialField } from "../../utils/modelProviderHelpers";
 import { SmallLabel } from "../SmallLabel";

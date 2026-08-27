@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ModelProviderScopeForbiddenError } from "@langwatch/model-provider-contract";
 
 const hasOrganizationPermissionMock = vi.fn();
 const hasTeamPermissionMock = vi.fn();
@@ -11,7 +12,6 @@ vi.mock("~/server/app-layer/permissions/imperative", () => ({
   probeProjectPermission: (...args: unknown[]) => hasProjectPermissionMock(...args),
 }));
 
-import { ModelProviderScopeForbiddenError } from "../errors";
 import {
   assertCanManageAllScopes,
   assertCanManageScope,

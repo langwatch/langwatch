@@ -2,7 +2,7 @@ import { Box, Field, Input, Text } from "@chakra-ui/react";
 import {
   ROUTING_HANDLE_MAX_LENGTH,
   sanitizeRoutingHandleInput,
-} from "../../server/modelProviders/routingHandle";
+} from "@langwatch/model-provider-contract";
 import { SmallLabel } from "../SmallLabel";
 
 /**

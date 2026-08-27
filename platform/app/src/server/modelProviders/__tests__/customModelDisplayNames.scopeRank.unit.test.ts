@@ -22,7 +22,7 @@
  * these cases honest: they cannot pass by accident on the tier below.
  */
 import { describe, expect, it } from "vitest";
-import { buildCustomModelDisplayNames } from "../customModelDisplayNames";
+import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { makeProvider } from "./test-helpers";
 
 describe("given a project-scoped row and an organization-scoped row that both define the same model id", () => {
@@ -93,8 +93,7 @@ describe("given a project-scoped row and a row whose scope tier is not one `rank
     // row win: if the unknown tier fell through to the id tiebreak
     // instead of ranking last, this row would win on id alone and the
     // test would pass for the wrong reason. "WORKSPACE" stands in for a
-    // future tier, cast in unchecked the same way
-    // `modelProvider.service.ts` launders the Prisma enum with `as` —
+    // future tier, cast in unchecked at a legacy persistence boundary —
     // `registry.ts`'s `scopes[].scopeType` is typed as the known union,
     // so reaching an unrecognized value here requires the same kind of
     // cast a real caller would need to smuggle one past the type system.

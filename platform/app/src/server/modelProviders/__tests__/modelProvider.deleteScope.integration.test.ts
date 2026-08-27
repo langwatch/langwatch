@@ -23,10 +23,9 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import { getApp } from "~/server/app-layer";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
-import { ModelProviderRepository } from "../modelProvider.repository";
-import { ModelProviderService } from "../modelProvider.service";
 
 wireDefaultTestApp();
 
@@ -46,15 +45,7 @@ describe.skipIf(!hasCredentialsSecret)(
     let otherProjectId: string;
     let orgAdminUserId: string;
 
-    const repo = () => new ModelProviderRepository(prisma);
-    const service = () => ModelProviderService.create(prisma);
-
-    function ctxFor(userId: string) {
-      return {
-        prisma,
-        session: { user: { id: userId }, expires: "1" } as any,
-      };
-    }
+    const service = () => getApp().modelProviders;
 
     beforeAll(async () => {
       const org = await prisma.organization.create({
@@ -165,7 +156,8 @@ describe.skipIf(!hasCredentialsSecret)(
       describe("when an org admin deletes it by id", () => {
         /** @scenario Delete an organization-scoped provider from a project settings view */
         it("removes the row and its scope grants instead of 404ing", async () => {
-          const created = await repo().create({
+          const created = await service().upsert({
+            organizationId: orgId,
             name: `OpenAI Org ${ns}`,
             provider: "openai",
             enabled: true,
@@ -173,10 +165,12 @@ describe.skipIf(!hasCredentialsSecret)(
             scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
           });
 
-          await service().deleteModelProvider(
-            { id: created.id, projectId: projectAId, provider: "openai" },
-            ctxFor(orgAdminUserId),
-          );
+          await service().delete({
+            id: created.id,
+            projectId: projectAId,
+            provider: "openai",
+            actorId: orgAdminUserId,
+          });
 
           const row = await prisma.modelProvider.findUnique({
             where: { id: created.id },
@@ -194,7 +188,8 @@ describe.skipIf(!hasCredentialsSecret)(
       describe("when an org admin deletes it from a different project's view", () => {
         /** @scenario Delete a provider scoped only to a sibling project in the same org */
         it("removes the row", async () => {
-          const created = await repo().create({
+          const created = await service().upsert({
+            organizationId: orgId,
             name: `OpenAI Sibling ${ns}`,
             provider: "anthropic",
             enabled: true,
@@ -202,10 +197,12 @@ describe.skipIf(!hasCredentialsSecret)(
             scopes: [{ scopeType: "PROJECT", scopeId: siblingProjectId }],
           });
 
-          await service().deleteModelProvider(
-            { id: created.id, projectId: projectAId, provider: "anthropic" },
-            ctxFor(orgAdminUserId),
-          );
+          await service().delete({
+            id: created.id,
+            projectId: projectAId,
+            provider: "anthropic",
+            actorId: orgAdminUserId,
+          });
 
           const row = await prisma.modelProvider.findUnique({
             where: { id: created.id },
@@ -219,7 +216,8 @@ describe.skipIf(!hasCredentialsSecret)(
       describe("when deleting it by id from my project", () => {
         /** @scenario Deleting a provider from a different organization is not found */
         it("rejects as NOT_FOUND and leaves the row intact", async () => {
-          const created = await repo().create({
+          const created = await service().upsert({
+            organizationId: otherOrgId,
             name: `OpenAI Other ${ns}`,
             provider: "openai",
             enabled: true,
@@ -228,10 +226,12 @@ describe.skipIf(!hasCredentialsSecret)(
           });
 
           await expect(
-            service().deleteModelProvider(
-              { id: created.id, projectId: projectAId, provider: "openai" },
-              ctxFor(orgAdminUserId),
-            ),
+            service().delete({
+              id: created.id,
+              projectId: projectAId,
+              provider: "openai",
+              actorId: orgAdminUserId,
+            }),
             // `model_provider_not_found`, not the tRPC `NOT_FOUND` this once
             // asserted: the service throws a HandledError now. The property
             // under test is unchanged — a cross-tenant id is refused, and
@@ -251,7 +251,8 @@ describe.skipIf(!hasCredentialsSecret)(
       describe("when it is deleted", () => {
         /** @scenario Deleting a provider removes its stored credentials */
         it("leaves no row with that provider id", async () => {
-          const created = await repo().create({
+          const created = await service().upsert({
+            organizationId: orgId,
             name: `OpenAI Keyed ${ns}`,
             provider: "groq",
             enabled: true,
@@ -259,10 +260,12 @@ describe.skipIf(!hasCredentialsSecret)(
             scopes: [{ scopeType: "PROJECT", scopeId: projectAId }],
           });
 
-          await service().deleteModelProvider(
-            { id: created.id, projectId: projectAId, provider: "groq" },
-            ctxFor(orgAdminUserId),
-          );
+          await service().delete({
+            id: created.id,
+            projectId: projectAId,
+            provider: "groq",
+            actorId: orgAdminUserId,
+          });
 
           const row = await prisma.modelProvider.findUnique({
             where: { id: created.id },

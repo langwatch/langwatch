@@ -1,45 +1,20 @@
 import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 import type {
-  CustomModelEntry,
+  LLMModelEntry,
   Model,
   ModelProviderExecution,
   ModelProviderService,
   ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
-import { customModelEntrySchema } from "@langwatch/model-provider-contract";
+export { DEFAULT_AZURE_API_VERSION } from "@langwatch/model-provider-contract";
+import { customModelEntrySchema, getAllModels } from "@langwatch/model-provider-contract";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
-import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
-import { isCodexModel } from "../../modelProviders/codexRestrictions";
-import { geminiAgentPlatformPair } from "../../modelProviders/geminiDoor";
-import type {
-  LLMModelEntry,
-  ReasoningConfig,
-} from "../../modelProviders/llmModels.types";
-import { translateModelIdForLitellm } from "../../modelProviders/modelIdBoundary";
+import type { ReasoningConfig } from "@langwatch/model-provider-contract";
 import {
-  getAllModels,
   getParameterConstraints,
   modelProviders,
   type ParameterConstraints,
-} from "../../modelProviders/registry";
-import { parseWireValue } from "../../modelProviders/wireFormat";
-
-/**
- * Normalises either wire format ("mp_abc/gpt-5" or "openai/gpt-5") into
- * the legacy provider-prefixed form LiteLLM expects. We always use the
- * resolved ModelProvider's provider string rather than trusting the
- * prefix in the wire value — the two never disagree for resolved rows,
- * and this keeps LiteLLM routing stable when new mp-id values arrive.
- */
-function toLitellmModelId(wireValue: string, provider: string): string {
-  const parsed = parseWireValue(wireValue);
-  if (parsed.kind === "mp-id" || parsed.kind === "legacy") {
-    return `${provider}/${parsed.model}`;
-  }
-  // Unknown shapes — no slash — were treated as provider-less in the
-  // original code and just passed to LiteLLM verbatim.
-  return wireValue;
-}
+} from "@langwatch/model-provider-contract";
 
 /**
  * Simplified model metadata for frontend consumption
@@ -61,20 +36,54 @@ export type ModelMetadataForFrontend = {
   parameterConstraints?: ParameterConstraints;
 };
 
+type LegacyModelProviderScope = {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+};
+
+type LegacyCustomModel = {
+  modelId: string;
+  displayName: string;
+  mode: "chat" | "embedding";
+  maxTokens?: number | null;
+  supportedParameters?: string[];
+  multimodalInputs?: Array<"image" | "file" | "audio">;
+};
+
 /**
  * The legacy execution shape used by LiteLLM and the workflow DSL.  It is
  * deliberately assembled from the canonical server-only execution DTO at the
  * app boundary: contract callers never receive the app's registry type or
  * Prisma row shape.
  */
-export type LegacyModelProviderExecution = Omit<
-  ModelProviderExecution,
-  "customModels" | "customEmbeddingsModels"
-> & {
+export type LegacyModelProviderExecution = {
+  id: string;
+  organizationId: string;
+  provider: string;
+  name: string;
+  enabled: boolean;
+  defaultModel?: string;
+  routingHandle: string | null;
+  scopes: LegacyModelProviderScope[];
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
-  customModels: CustomModelEntry[];
-  customEmbeddingsModels: CustomModelEntry[];
+  customKeys: Record<string, unknown> | null;
+  customModels: LegacyCustomModel[];
+  customEmbeddingsModels: LegacyCustomModel[];
+  extraHeaders: Array<{ key: string; value: string }>;
+  rateLimitRpm: number | null;
+  rateLimitTpm: number | null;
+  rateLimitRpd: number | null;
+  fallbackPriorityGlobal: number | null;
+  providerConfig: Record<string, unknown> | null;
+  deploymentMapping?: Record<string, string> | null;
+  createdAt: Date;
+  updatedAt: Date;
+  models?: string[] | null;
+  embeddingsModels?: string[] | null;
+  disabledByDefault?: boolean;
+  isSystem: boolean;
+  embeddingsUnsupported: boolean;
 };
 
 function scopeRank(scopeType: LegacyModelProviderExecution["scopeType"]): number {
@@ -335,25 +344,6 @@ const getModelOrDefaultEnvKey = (
 const getProviderDefinition = (provider: string) =>
   Object.entries(modelProviders).find(([providerKey]) => providerKey === provider)?.[1];
 
-const getModelOrDefaultApiKey = (modelProvider: LegacyModelProviderExecution) => {
-  const providerDefinition = getProviderDefinition(modelProvider.provider);
-  if (!providerDefinition) {
-    return undefined;
-  }
-  return getModelOrDefaultEnvKey(modelProvider, providerDefinition.apiKey);
-};
-
-const getModelOrDefaultEndpointKey = (modelProvider: LegacyModelProviderExecution) => {
-  const providerDefinition = getProviderDefinition(modelProvider.provider);
-  if (!providerDefinition) {
-    return undefined;
-  }
-  return (
-    providerDefinition.endpointKey &&
-    getModelOrDefaultEnvKey(modelProvider, providerDefinition.endpointKey)
-  );
-};
-
 export const prepareEnvKeys = (modelProvider: LegacyModelProviderExecution) => {
   const providerDefinition = getProviderDefinition(modelProvider.provider);
   if (!providerDefinition) {
@@ -378,230 +368,15 @@ export const prepareEnvKeys = (modelProvider: LegacyModelProviderExecution) => {
   );
 };
 
-/**
- * Modern Azure OpenAI api-version used for direct (non-gateway) calls.
- * Without an explicit version the downstream gateway (Bifrost) falls back
- * to a stale GA default (2024-10-21) that returns "Resource not found" for
- * newer (gpt-5-class) Azure deployments — even when the deployment name is
- * correct. Overridable per provider via the AZURE_OPENAI_API_VERSION key.
- */
-export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
-
-/**
- * NOTE: the swapped-in row is loaded with real (decrypted) credentials,
- * so this function must only feed provider-execution paths. A caller
- * holding a key-stripped row (frontend-facing shape) must not route
- * through here — the swap would silently re-inject credentials.
- */
-async function resolveServingRow({
-  service,
-  model,
-  modelProvider,
-  projectId,
-}: {
-  service: ModelProviderService;
-  model: string;
-  modelProvider: LegacyModelProviderExecution;
-  projectId: string;
-}): Promise<LegacyModelProviderExecution> {
-  const parsedWire = parseWireValue(model);
-  if (
-    parsedWire.kind !== "legacy" ||
-    modelProvider.models?.includes(parsedWire.model) ||
-    modelProvider.embeddingsModels?.includes(parsedWire.model) ||
-    modelProvider.customModels.some((entry) => entry.modelId === parsedWire.model) ||
-    modelProvider.customEmbeddingsModels.some(
-      (entry) => entry.modelId === parsedWire.model,
-    )
-  ) {
-    return modelProvider;
-  }
-  const servingRow = await service.tryFindRowServingModel({
-    projectId,
-    provider: modelProvider.provider,
-    model: parsedWire.model,
-  });
-  return servingRow
-    ? toLegacyExecutionProvider({
-        ...servingRow,
-        models: modelProvider.models,
-        embeddingsModels: modelProvider.embeddingsModels,
-        disabledByDefault: modelProvider.disabledByDefault,
-        isSystem: false,
-        embeddingsUnsupported: modelProvider.embeddingsUnsupported,
-      })
-    : modelProvider;
-}
-
 export const prepareLitellmParams = async (
   service: ModelProviderService,
-  managedProviders: ManagedProviderService,
+  _managedProviders: ManagedProviderService,
   {
     model,
-    modelProvider: givenModelProvider,
     projectId,
   }: {
     model: string;
     modelProvider: LegacyModelProviderExecution;
     projectId: string;
   },
-) => {
-  // Execution backstop for the terms-restricted provider: every general
-  // inference path (workflows, evaluations, playground, optimization
-  // studio) funnels through here on its way to litellm/nlpgo, and codex
-  // must never ride it — its only road is the AI gateway's Responses
-  // endpoint (see codexGatewayModel.ts), reserved for the coding-assistant
-  // surfaces. Pickers already hide codex models on these surfaces; this
-  // guard is what makes the restriction hold against a handcrafted request.
-  if (isCodexModel(model) || givenModelProvider.provider === "openai_codex") {
-    throw new Error(
-      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
-    );
-  }
-
-  const params: Record<string, string> = {};
-
-  // Multi-instance correction: the caller hands us the scope-collapse
-  // winner for the provider key, but with several rows per provider that
-  // row may not serve this model at all (its catalog doesn't list it) —
-  // the model was picked from a wider-scope row's catalog. Executing it
-  // against the wrong row's credentials targets a deployment that doesn't
-  // exist there (Azure answers 404 "Resource not found"). Re-select the
-  // narrowest ENABLED row that lists the model. Only for legacy
-  // `{provider}/{model}` wire values — an `{mpId}/{model}` value is an
-  // explicit row pick — and only for stored rows (env-fed pseudo-rows
-  // have no id and no custom catalog).
-  const modelProvider = await resolveServingRow({
-    service,
-    model,
-    modelProvider: givenModelProvider,
-    projectId,
-  });
-
-  // Second half of the codex backstop. The wire check above only sees the
-  // legacy `openai_codex/...` prefix; the canonical `mp_<row-id>/<model>`
-  // format names the ROW, so a handcrafted request carrying a codex row's
-  // canonical value sails past it and would build litellm params around the
-  // stored OAuth token. The resolved row knows its provider — fail closed on
-  // it too.
-  if (modelProvider.provider === "openai_codex") {
-    throw new Error(
-      `"${model}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`,
-    );
-  }
-
-  // Normalise the incoming wire value for LiteLLM. After iter 109 two
-  // formats coexist: the canonical `{mpId}/{model}` and the legacy
-  // `{provider}/{model}`. LiteLLM only understands the latter; translate
-  // the model portion into a canonical provider-prefixed form using the
-  // resolved ModelProvider so downstream routing keeps working.
-  const litellmModelInput = toLitellmModelId(model, modelProvider.provider);
-  // Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
-  // Custom models use OpenAI-compatible API format, so we replace the prefix.
-  // LiteLLM routes "openai/" prefixed models through its OpenAI-compatible handler.
-  params.model = translateModelIdForLitellm(litellmModelInput).replace(
-    "custom/",
-    "openai/",
-  );
-
-  const apiKey = getModelOrDefaultApiKey(modelProvider);
-  if (apiKey && modelProvider.provider !== "vertex_ai") {
-    params.api_key = apiKey;
-  }
-  const endpoint = getModelOrDefaultEndpointKey(modelProvider);
-  if (endpoint) {
-    // Strip trailing /v1 for Anthropic - LiteLLM adds it internally
-    if (modelProvider.provider === "anthropic") {
-      params.api_base = endpoint.replace(/\/v1\/?$/, "");
-    } else {
-      params.api_base = endpoint;
-    }
-  }
-
-  if (modelProvider.provider === "vertex_ai") {
-    params.vertex_credentials = apiKey ?? "invalid";
-    params.vertex_project =
-      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_PROJECT") ?? "invalid";
-    params.vertex_location =
-      getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
-  }
-
-  // Gemini's second door: a credential carrying a project and location is
-  // an Agent Platform key, and the two fields ride with it so nlpgo and the
-  // Go gateway route to aiplatform.googleapis.com instead of the Gemini
-  // API. Emitted together or not at all — one without the other names no
-  // door. See specs/model-providers/google-agent-platform.feature.
-  if (modelProvider.provider === "gemini") {
-    const pair = geminiAgentPlatformPair(modelProvider.customKeys);
-    if (pair) {
-      params.project_id = pair.project;
-      params.region = pair.location;
-    }
-  }
-
-  if (modelProvider.provider === "bedrock") {
-    delete params.api_key;
-    params.aws_access_key_id =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
-    params.aws_secret_access_key =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_SECRET_ACCESS_KEY") ?? "invalid";
-    params.aws_region_name =
-      getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
-  }
-
-  // Azure: resolve api-version and deployment so the downstream gateway
-  // (Bifrost) targets the right Azure surface.
-  if (modelProvider.provider === "azure") {
-    const gatewayBaseUrl = getModelOrDefaultEnvKey(
-      modelProvider,
-      "AZURE_API_GATEWAY_BASE_URL",
-    );
-
-    if (gatewayBaseUrl) {
-      // API Gateway mode: route through the customer's gateway endpoint with
-      // its own pinned api-version (the gateway/APIM owns version policy).
-      params.api_base = gatewayBaseUrl;
-      params.use_azure_gateway = "true";
-      params.api_version =
-        getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
-        "2024-05-01-preview";
-    } else {
-      // Direct mode: pin a modern api-version (see DEFAULT_AZURE_API_VERSION).
-      params.api_version =
-        getModelOrDefaultEnvKey(modelProvider, "AZURE_OPENAI_API_VERSION") ??
-        DEFAULT_AZURE_API_VERSION;
-    }
-
-    // Map the model id to its Azure deployment name when the provider defines
-    // an explicit deploymentMapping (the deployment name need not equal the
-    // model id). The gateway/control-plane path already honors this field
-    // (config.materialiser); mirror it here so the in-process Studio /
-    // playground path agrees instead of assuming model id == deployment name.
-    const deploymentMap = modelProvider.deploymentMapping;
-    if (deploymentMap) {
-      // params.model is already normalized to `provider/model` (the incoming
-      // `model` may still be the canonical `mp_.../...` wire format), so key
-      // the lookups off it for both the bare and full-key forms.
-      const bareModel = params.model.split("/").slice(1).join("/");
-      const deployment = deploymentMap[bareModel] ?? deploymentMap[params.model];
-      if (deployment) {
-        params.deployment = deployment;
-      }
-    }
-
-    // Pass through all extra headers
-    if (modelProvider.extraHeaders.length > 0) {
-      const extraHeaders = modelProvider.extraHeaders;
-      params.extra_headers = JSON.stringify(
-        Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])),
-      );
-    }
-  }
-
-  return await managedProviders.buildLitellmParameters({
-    params,
-    projectId,
-    model,
-    modelProvider,
-  });
-};
+): Promise<Record<string, string>> => service.prepareExecution({ model, projectId });

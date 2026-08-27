@@ -1,13 +1,15 @@
 import { HandledError, type SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import {
+  tryGetModelProviderDefinition,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
 import {
   providerApiRoots,
   providerDefaultBaseUrls,
 } from "../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import { RedirectRefusedError, ssrfSafeFetch } from "../../utils/ssrfProtection";
-import { modelProviders } from "./registry";
 
 /**
  * The response shape the probe actually receives.
@@ -1011,7 +1013,7 @@ export async function validateKeyWithCustomUrl({
   customBaseUrl: string | undefined;
   modelProviders: ModelProviderService;
 }): Promise<ValidationResult> {
-  const providerDef = modelProviders[provider as keyof typeof modelProviders];
+  const providerDef = tryGetModelProviderDefinition(provider);
   if (!providerDef) {
     return unchecked("unknown_provider");
   }
@@ -1183,7 +1185,7 @@ export async function validateProviderApiKey(
   customKeys: Record<string, string>,
 ): Promise<ValidationResult> {
   // Get provider definition from registry
-  const providerDef = modelProviders[provider as keyof typeof modelProviders];
+  const providerDef = tryGetModelProviderDefinition(provider);
   if (!providerDef) {
     return unchecked("unknown_provider");
   }

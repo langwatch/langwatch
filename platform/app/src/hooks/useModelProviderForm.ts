@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
-  type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
-} from "../server/modelProviders/registry";
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import {
   hasUserModifiedAnyCredential,
   headerSignature,

@@ -16,9 +16,9 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
+import { getApp } from "~/server/app-layer";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
-import { ModelProviderService } from "../modelProvider.service";
 
 wireDefaultTestApp();
 
@@ -99,46 +99,26 @@ describe.skipIf(!hasCredentialsSecret)(
     });
 
     function service() {
-      return ModelProviderService.create(prisma);
-    }
-
-    function ctx() {
-      return {
-        prisma,
-        session: {
-          user: {
-            id: orgAdminUserId,
-            email: `org-admin-${ns}@example.com`,
-            name: "Org Admin",
-          },
-          expires: "2099-01-01T00:00:00.000Z",
-        } as any,
-      };
+      return getApp().modelProviders;
     }
 
     /** @scenario Create a second OpenAI row under a different scope */
     it("creates a second OpenAI row at a different scope instead of overwriting", async () => {
-      const first = await service().updateModelProvider(
-        {
-          projectId,
-          provider: "openai",
-          enabled: true,
-          customKeys: { OPENAI_API_KEY: `sk-project-${ns}` },
-          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-        },
-        ctx(),
-      );
+      const first = await service().upsert({
+        projectId,
+        provider: "openai",
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: `sk-project-${ns}` },
+        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+      });
 
-      const second = await service().updateModelProvider(
-        {
-          projectId,
-          provider: "openai",
-          enabled: true,
-          customKeys: { OPENAI_API_KEY: `sk-org-${ns}` },
-          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-        },
-        ctx(),
-      );
+      const second = await service().upsert({
+        projectId,
+        provider: "openai",
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: `sk-org-${ns}` },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+      });
 
       expect(second.id).not.toBe(first.id);
 
@@ -158,20 +138,17 @@ describe.skipIf(!hasCredentialsSecret)(
 
     /** @scenario Save a provider with multiple scopes */
     it("saves a single row with multiple ModelProviderScope entries", async () => {
-      const result = await service().updateModelProvider(
-        {
-          projectId,
-          provider: "anthropic",
-          name: "Anthropic Production",
-          enabled: true,
-          customKeys: { ANTHROPIC_API_KEY: `sk-ant-${ns}` },
-          scopes: [
-            { scopeType: "ORGANIZATION", scopeId: organizationId },
-            { scopeType: "TEAM", scopeId: teamId },
-          ],
-        },
-        ctx(),
-      );
+      const result = await service().upsert({
+        projectId,
+        provider: "anthropic",
+        name: "Anthropic Production",
+        enabled: true,
+        customKeys: { ANTHROPIC_API_KEY: `sk-ant-${ns}` },
+        scopes: [
+          { scopeType: "ORGANIZATION", scopeId: organizationId },
+          { scopeType: "TEAM", scopeId: teamId },
+        ],
+      });
 
       const stored = await prisma.modelProvider.findFirst({
         where: { id: result.id },
@@ -186,17 +163,14 @@ describe.skipIf(!hasCredentialsSecret)(
     });
 
     it("updates an org-scoped provider by id from a project context without 404ing", async () => {
-      const created = await service().updateModelProvider(
-        {
-          projectId,
-          provider: "openai",
-          name: `OpenAI Org Edit ${ns}`,
-          enabled: true,
-          customKeys: { OPENAI_API_KEY: `sk-org-edit-${ns}` },
-          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-        },
-        ctx(),
-      );
+      const created = await service().upsert({
+        projectId,
+        provider: "openai",
+        name: `OpenAI Org Edit ${ns}`,
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: `sk-org-edit-${ns}` },
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+      });
       const createdRow = await prisma.modelProvider.findFirst({
         where: { id: created.id },
       });
@@ -204,17 +178,14 @@ describe.skipIf(!hasCredentialsSecret)(
       // The drawer's masked-only save: id + scopes, no customKeys. The row is
       // ORG-scoped, so a PROJECT-only lookup would 404. The org-anchored lookup
       // must find it and update it in place, preserving the stored key.
-      const updated = await service().updateModelProvider(
-        {
-          id: created.id,
-          projectId,
-          provider: "openai",
-          name: `OpenAI Org Edit ${ns}`,
-          enabled: true,
-          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-        },
-        ctx(),
-      );
+      const updated = await service().upsert({
+        id: created.id,
+        projectId,
+        provider: "openai",
+        name: `OpenAI Org Edit ${ns}`,
+        enabled: true,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+      });
 
       expect(updated.id).toBe(created.id);
       const rows = await prisma.modelProvider.findMany({

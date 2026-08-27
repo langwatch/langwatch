@@ -21,12 +21,15 @@ import type { ModelDefaultScopeType, PrismaClient } from "~/generated/prisma/cli
 
 const UNRESOLVABLE_ALIAS = "openai/latest";
 
-vi.mock("../latestAliases", () => ({
-  isLatestAlias: (model: string) => model === UNRESOLVABLE_ALIAS,
-  // Mirrors the real contract: expandLatestAlias returns the input
-  // unchanged when there's nothing to resolve it to.
-  expandLatestAlias: (model: string) => model,
-}));
+vi.mock("@langwatch/model-provider-contract", async (importOriginal) => {
+  const contract =
+    await importOriginal<typeof import("@langwatch/model-provider-contract")>();
+  return {
+    ...contract,
+    isLatestAlias: (model: string) => model === UNRESOLVABLE_ALIAS,
+    expandLatestAlias: (model: string) => model,
+  };
+});
 
 import { ModelNotConfiguredError } from "../modelNotConfiguredError";
 import { resolveModelForFeature } from "../resolveModelForFeature";

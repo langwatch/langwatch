@@ -24,12 +24,6 @@ vi.mock("~/server/db", () => ({
   prisma: { auditLog: { create: vi.fn() } },
 }));
 
-vi.mock("~/server/modelProviders/modelProvider.repository", () => ({
-  ModelProviderRepository: class {
-    findAllAccessibleForProject = mockFindAllAccessibleForProject;
-  },
-}));
-
 // ---------------------------------------------------------------------------
 // Tenancy fixture: org_a owns project_a (team_a) and project_b (team_b);
 // org_b is a completely separate organization.

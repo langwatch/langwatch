@@ -1,4 +1,5 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
+import { modelProviderTestConnectionInputSchema as testConnectionInputSchema } from "@langwatch/model-provider-contract";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -9,11 +10,8 @@ import {
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
 import { CodexAccountService } from "../../modelProviders/codexAccount.service";
-import { CODEX_DEFAULT_MODEL } from "../../modelProviders/codexRestrictions";
-import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
-import { MODEL_ROLES } from "../../modelProviders/featureRegistry";
+import { customModelUpdateInputSchema } from "@langwatch/model-provider-contract";
 import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
-import { testConnectionInputSchema } from "../../modelProviders/modelProvider.service";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
@@ -21,9 +19,10 @@ import {
 import {
   ROUTING_HANDLE_MAX_LENGTH,
   ROUTING_HANDLE_RULE,
-} from "../../modelProviders/routingHandle";
+} from "@langwatch/model-provider-contract";
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { CODEX_DEFAULT_MODEL, MODEL_ROLES } from "@langwatch/model-provider-contract";
 export type { ModelMetadataForFrontend } from "./modelProviders.utils";
 export {
   getModelMetadataForFrontend,
@@ -246,6 +245,7 @@ export const modelProviderRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const result = await ctx.app.modelProviders.upsert({
         id: input.id,
+        actorId: ctx.session.user.id,
         projectId: input.projectId,
         organizationId: input.organizationId,
         provider: input.provider,
@@ -290,7 +290,10 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectOrOrganizationPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
-      return await ctx.app.modelProviders.delete(input);
+      return await ctx.app.modelProviders.delete({
+        ...input,
+        actorId: ctx.session.user.id,
+      });
     }),
 
   /**
@@ -343,7 +346,10 @@ export const modelProviderRouter = createTRPCRouter({
     .input(testConnectionInputSchema.superRefine(requireTenantAnchor))
     .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
-      return await ctx.app.modelProviders.testConnection(input);
+      return await ctx.app.modelProviders.testConnection({
+        ...input,
+        actorId: ctx.session.user.id,
+      });
     }),
 
   /**
@@ -394,6 +400,7 @@ export const modelProviderRouter = createTRPCRouter({
 
       const saved = await ctx.app.modelProviders.upsert({
         projectId: input.projectId,
+        actorId: ctx.session.user.id,
         provider: "openai_codex",
         enabled: true,
         customKeys: poll.keys,

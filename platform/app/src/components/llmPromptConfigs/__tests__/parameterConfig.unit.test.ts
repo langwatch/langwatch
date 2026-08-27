@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { ReasoningConfig } from "../../../server/modelProviders/llmModels.types";
+import type { ReasoningConfig } from "@langwatch/model-provider-contract";
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,

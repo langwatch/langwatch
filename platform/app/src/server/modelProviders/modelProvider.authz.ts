@@ -1,11 +1,11 @@
 import type { PrismaClient } from "~/generated/prisma/client";
+import { ModelProviderScopeForbiddenError } from "@langwatch/model-provider-contract";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
   probeTeamPermission,
 } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
-import { ModelProviderScopeForbiddenError } from "./errors";
 
 /**
  * Minimum shape the RBAC helpers need. Matches the tRPC ctx slice that

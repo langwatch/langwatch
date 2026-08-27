@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useEffect, useId, useMemo, useRef } from "react";
-import type { CustomModelEntry } from "../../../../../server/modelProviders/customModel.schema";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
 
 type ModelOption = { label: string; value: string };

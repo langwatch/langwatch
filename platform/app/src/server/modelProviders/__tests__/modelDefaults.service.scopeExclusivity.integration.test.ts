@@ -14,15 +14,10 @@
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { OrganizationUserRole } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
-import type { Session } from "../../auth";
 import { prisma } from "../../db";
-import {
-  assertCanWriteScope,
-  createConfig,
-  updateConfig,
-} from "../modelDefaults.service";
 import { resolveModelForFeature } from "../resolveModelForFeature";
 
 wireDefaultTestApp();
@@ -36,7 +31,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   let apiProjectId: string;
   let memberUserId: string;
 
-  const ctx = () => ({ prisma });
+  const defaults = () => getApp().modelProviders;
 
   const attachmentsAt = (
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
@@ -116,12 +111,12 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   describe("when a new config is created at a scope that already has one", () => {
     /** @scenario Creating a config at a scope that already has one replaces that scope's config */
     it("claims the scope and deletes the emptied previous config", async () => {
-      const old = await createConfig(ctx(), {
+      const old = await defaults().saveDefaultConfig({
         config: { DEFAULT: "openai/gpt-5.5" },
         scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
         authorId: null,
       });
-      const replacement = await createConfig(ctx(), {
+      const replacement = await defaults().saveDefaultConfig({
         config: { DEFAULT: "gemini/gemini-2.5-pro" },
         scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
         authorId: null,
@@ -149,7 +144,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   describe("when the previous holder is attached to other scopes too", () => {
     /** @scenario Claiming a scope held by a multi-scope config detaches only that scope */
     it("keeps the multi-scope config alive with its remaining scopes", async () => {
-      const multi = await createConfig(ctx(), {
+      const multi = await defaults().saveDefaultConfig({
         config: { DEFAULT: "openai/gpt-5.5" },
         scopes: [
           { scopeType: "PROJECT", scopeId: webProjectId },
@@ -157,7 +152,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
         ],
         authorId: null,
       });
-      const claimer = await createConfig(ctx(), {
+      const claimer = await defaults().saveDefaultConfig({
         config: { DEFAULT: "gemini/gemini-2.5-pro" },
         scopes: [{ scopeType: "PROJECT", scopeId: webProjectId }],
         authorId: null,
@@ -178,18 +173,18 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   describe("when an update attaches a scope another config holds", () => {
     /** @scenario Adding a scope to an existing config claims it from its previous config */
     it("claims the scope for the updated config and deletes the emptied holder", async () => {
-      const projectConfig = await createConfig(ctx(), {
+      const projectConfig = await defaults().saveDefaultConfig({
         config: { DEFAULT: "openai/gpt-5.4-mini" },
         scopes: [{ scopeType: "PROJECT", scopeId: apiProjectId }],
         authorId: null,
       });
-      const orgConfig = await createConfig(ctx(), {
+      const orgConfig = await defaults().saveDefaultConfig({
         config: { DEFAULT: "openai/gpt-5.5" },
         scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
         authorId: null,
       });
 
-      await updateConfig(ctx(), {
+      await defaults().saveDefaultConfig({
         id: orgConfig.id,
         scopes: [
           { scopeType: "ORGANIZATION", scopeId: organizationId },
@@ -211,7 +206,7 @@ describe("given default-model configs with scope attachments (real DB)", () => {
     /** @scenario Saving a brand-new config with every key on Inherit is refused with a handled error */
     it("refuses with a handled validation_error instead of a plain 500", async () => {
       await expect(
-        createConfig(ctx(), {
+        defaults().saveDefaultConfig({
           config: {},
           scopes: [{ scopeType: "TEAM", scopeId: teamId }],
           authorId: null,
@@ -229,13 +224,13 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   describe("when an existing config is edited down to no keys", () => {
     /** @scenario Editing an existing config to all-Inherit deletes it */
     it("deletes the config and its scope attachments", async () => {
-      const config = await createConfig(ctx(), {
+      const config = await defaults().saveDefaultConfig({
         config: { FAST: "openai/gpt-5.4-mini" },
         scopes: [{ scopeType: "TEAM", scopeId: teamId }],
         authorId: null,
       });
 
-      await updateConfig(ctx(), { id: config.id, config: {} });
+      await defaults().saveDefaultConfig({ id: config.id, config: {} });
 
       const row = await prisma.modelDefaultConfig.findUnique({
         where: { id: config.id },
@@ -249,16 +244,12 @@ describe("given default-model configs with scope attachments (real DB)", () => {
   describe("when the caller cannot manage the target scope", () => {
     /** @scenario Saving into a scope the caller cannot manage is refused with a handled error */
     it("raises model_default_scope_forbidden with a 403 and writes nothing", async () => {
-      const session = { user: { id: memberUserId } } as Session;
-      // The guard runs before the write, the way every save path
-      // (tRPC drawer save, REST create/update/delete) orders them. A
-      // refactor that dropped the guard would create the row here.
       const save = async () => {
-        await assertCanWriteScope({ prisma, session }, "ORGANIZATION", organizationId);
-        await createConfig(ctx(), {
+        await defaults().saveDefaultConfig({
           config: { DEFAULT: "openai/gpt-5.5" },
           scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
           authorId: null,
+          actorId: memberUserId,
         });
       };
 

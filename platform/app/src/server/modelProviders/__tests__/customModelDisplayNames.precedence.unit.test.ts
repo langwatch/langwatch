@@ -37,8 +37,8 @@
  * contract can't regress them.
  */
 import { describe, expect, it } from "vitest";
-import { toLegacyCompatibleCustomModels } from "../customModel.schema";
-import { buildCustomModelDisplayNames } from "../customModelDisplayNames";
+import { toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
+import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { makeProvider } from "./test-helpers";
 
 describe("given a real display name and a legacy identity row that collide on the same model id", () => {

@@ -22,12 +22,11 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { batchScopePermissions, hasProjectPermission } from "../../api/rbac";
 import { prisma } from "../../db";
-import { getDefaultModelsSnapshot } from "../modelDefaults.read";
-import { ModelDefaultsRepository } from "../modelDefaults.repository";
 
 wireDefaultTestApp();
 
@@ -116,9 +115,8 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
     // One PROJECT-scoped default-models config per team project —
     // mirrors the customer data (all configs project-scoped, none at
     // org or team scope).
-    const repository = new ModelDefaultsRepository(prisma);
     for (const projectId of [projectAId, projectBId]) {
-      const { id } = await repository.create({
+      const { id } = await getApp().modelProviders.saveDefaultConfig({
         config: { FAST: "azure/gpt-5.4-mini" },
         scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         authorId: null,
@@ -184,8 +182,9 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
 
     /** @scenario Default Models list is visible to members whose access comes from role bindings */
     it("lists the project-scoped configs in the Default Models snapshot", async () => {
-      const snapshot = await getDefaultModelsSnapshot(memberCtx(), {
+      const snapshot = await getApp().modelProviders.getDefaultSnapshot({
         projectId: projectAId,
+        actorId: bindingMemberUserId,
       });
 
       const scopedProjectIds = snapshot.configs.flatMap((c) => c.scopes.map((s) => s.id));
@@ -195,8 +194,9 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
     });
 
     it("offers the team's projects as writable scopes (team MEMBER holds project:update)", async () => {
-      const snapshot = await getDefaultModelsSnapshot(memberCtx(), {
+      const snapshot = await getApp().modelProviders.getDefaultSnapshot({
         projectId: projectAId,
+        actorId: bindingMemberUserId,
       });
 
       const writableProjectIds = snapshot.available.projects.map((p) => p.id);

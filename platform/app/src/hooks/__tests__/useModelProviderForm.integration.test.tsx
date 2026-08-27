@@ -5,8 +5,8 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 
 // Mock the api module

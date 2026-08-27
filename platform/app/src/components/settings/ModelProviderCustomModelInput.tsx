@@ -5,8 +5,8 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import type { CustomModelEntry } from "@langwatch/model-provider-contract";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { SmallLabel } from "../SmallLabel";
 import { Menu } from "@langwatch/design-system/menu";
 import { AddCustomEmbeddingsModelDialog } from "./AddCustomEmbeddingsModelDialog";

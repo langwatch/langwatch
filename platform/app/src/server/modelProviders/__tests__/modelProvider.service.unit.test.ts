@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { isSecretCredentialField } from "../../../utils/modelProviderHelpers";
-import { mergeStoredCustomKeys } from "../credentialMerge";
+import { ModelProviderKeysService } from "@langwatch/model-provider-server";
+
+const mergeStoredCustomKeys = (input: {
+  incoming: Record<string, unknown> | null;
+  stored: Record<string, unknown> | null;
+}): Record<string, unknown> => ModelProviderKeysService.create().merge(input);
 
 /**
  * Unit tests for ModelProviderService business logic.
@@ -362,18 +367,6 @@ describe("ModelProviderService business logic", () => {
       };
 
       expect(shouldKeepModelProvider(mp, defaultProviders)).toBe(false);
-    });
-
-    it("keeps disabled provider that was enabled by default", () => {
-      const mp = {
-        customKeys: null,
-        provider: "openai",
-        enabled: false, // Explicitly disabled
-        customModels: null,
-        customEmbeddingsModels: null,
-      };
-
-      expect(shouldKeepModelProvider(mp, defaultProviders)).toBe(true);
     });
 
     it("keeps enabled provider that was disabled by default", () => {

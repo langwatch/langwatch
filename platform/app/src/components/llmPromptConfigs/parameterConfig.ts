@@ -13,7 +13,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import type { ReasoningConfig } from "../../server/modelProviders/llmModels.types";
+import type { ReasoningConfig } from "@langwatch/model-provider-contract";
 import { type ParameterDefinition, parameterRegistry } from "./parameterRegistry";
 
 // ============================================================================

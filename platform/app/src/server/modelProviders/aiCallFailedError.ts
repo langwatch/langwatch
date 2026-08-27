@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { ModelRole } from "./featureRegistry";
+import type { ModelRole } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 
 const logger = createLogger("langwatch:modelProviders:aiCall");

@@ -19,7 +19,7 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../../hooks/useModelProviderForm";
-import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { ProviderScopeSection } from "../ModelProviderScopeSection";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
