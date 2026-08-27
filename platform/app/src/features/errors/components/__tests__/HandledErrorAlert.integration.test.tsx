@@ -8,7 +8,7 @@
  * reads it back out or that a hostile one is refused.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -471,6 +471,74 @@ describe("<HandledErrorAlert />", () => {
       const { container } = renderAlert({ error: null });
 
       expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  /**
+   * An inline alert outlives the moment it describes: the panel behind it
+   * stays failed, so the alert stays on screen. A reader who has read it and
+   * cannot act on it had no way to put it down and carry on.
+   */
+  describe("given a reader who has read the alert", () => {
+    it("puts it away when they dismiss it", () => {
+      renderAlert({ error: handledError({ code: "query_timeout" }) });
+      expect(screen.getByText("This search took too long")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+      expect(
+        screen.queryByText("This search took too long"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("tells a caller that keeps its own state", () => {
+      const onDismiss = vi.fn();
+      renderAlert({
+        error: handledError({ code: "query_timeout" }),
+        onDismiss,
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    describe("when a different failure arrives afterwards", () => {
+      it("comes back, so dismissing one cannot swallow the next", () => {
+        const { rerender } = renderAlert({
+          error: handledError({ code: "query_timeout" }),
+        });
+        fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+        expect(
+          screen.queryByText("This search took too long"),
+        ).not.toBeInTheDocument();
+
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <HandledErrorAlert
+              error={handledError({ code: "validation_error" })}
+              fallbackTitle="Couldn't save"
+            />
+          </ChakraProvider>,
+        );
+
+        expect(
+          screen.getByRole("alert"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the alert is the only thing explaining a dead control", () => {
+      it("offers no way to dismiss it", () => {
+        renderAlert({
+          error: handledError({ code: "query_timeout" }),
+          dismissible: false,
+        });
+
+        expect(
+          screen.queryByRole("button", { name: /dismiss/i }),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 });

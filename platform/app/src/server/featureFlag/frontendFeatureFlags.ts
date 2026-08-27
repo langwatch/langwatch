@@ -117,7 +117,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   // procedure that answers 401 rather than false to a visitor with no session.
   // It resolves from this browser's own override, set by `?ff_<flag>=on` and
   // remembered locally, and falls back to the deployment's `IDENTITY_ROUTER_V2`
-  // when no override is set. See useIdentityFrontDoor.
+  // when no override is set. See useIdentityAuthScreens.
   "release_ui_identity_front_door_enabled",
 ] as const;
 

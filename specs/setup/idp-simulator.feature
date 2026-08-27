@@ -143,6 +143,50 @@ Feature: Local IdP simulator (idpsim)
     When the control API is asked to push the tenant's directory at a SCIM target with a bearer token
     Then the target receives each user and group as SCIM 2.0 create requests carrying that token
 
+  # --- Provisioning into LangWatch --------------------------------------
+
+  # SCIM only ever runs one way: the identity provider sends its directory to
+  # the application, so the application issues the credential. LangWatch mints
+  # its SCIM token -- or takes one the administrator already had -- and the
+  # provider presents it. A token the simulator generated would open nothing,
+  # so the tenant takes one rather than inventing one, exactly as it takes a
+  # domain verification value rather than minting it.
+  @unit
+  Scenario: A tenant is given the address and token of the application it provisions into
+    Given LangWatch has issued a SCIM token
+    When an administrator connects the tenant to LangWatch's SCIM address with that token
+    Then the tenant reports it is provisioning into that address
+    And only enough of the token is shown to recognize which one was pasted
+    But an address nothing can be sent to is refused rather than stored
+
+  # The page carries two SCIM tokens pointing opposite ways, and only one of
+  # them can be copied -- so the one on the clipboard is the wrong one.
+  @unit
+  Scenario: The tenant's own SCIM token is refused as the token to provision with
+    When an administrator pastes the tenant's own SCIM token as the application's
+    Then the connection is refused, naming which end each token belongs to
+
+  @unit
+  Scenario: A connected tenant pushes its directory without being told where again
+    Given a tenant connected to a SCIM service provider
+    When the tenant is asked to push its directory
+    Then the users and groups arrive at the connected address carrying the connected token
+    And the push is recorded in the tenant's activity with what landed
+
+  @unit
+  Scenario: What the application ended up holding can be read back
+    Given a tenant connected to a SCIM service provider
+    When the tenant is asked to read the directory back
+    Then it reports the users and groups the application says it holds
+    And a target that refuses the read says so rather than reading as empty
+
+  @unit
+  Scenario: Resetting a tenant's users does not forget where it provisions
+    Given a tenant connected to a SCIM service provider
+    When the control API resets the tenant
+    Then the connection is still there, because putting the seeded users back
+      is not a reason to forget where they were going
+
   # --- Domain verification ---------------------------------------------
 
   @unit
@@ -168,6 +212,30 @@ Feature: Local IdP simulator (idpsim)
     Given a well-known verification token configured through the control API
     When a client fetches the well-known verification path for that domain
     Then the response body is exactly the configured token
+
+  # Proving a domain is the one step of single sign-on setup that happens
+  # somewhere else: you leave the product, sign in to whoever administers the
+  # domain, add a record, and come back. Locally there is no somewhere else --
+  # a reserved name like acme.test has no registrar and no resolver answers
+  # for it -- so the simulator is that registrar, and adding a record has to
+  # be something a person does rather than a curl command a person is told
+  # about. The value is LangWatch's, minted once and shown once; publishing
+  # takes it rather than inventing one, because a proof against a token the
+  # product never issued is a green tick that means nothing.
+  @unit
+  Scenario: A domain proof can be published from the simulator's own page
+    Given LangWatch has minted a verification value for a domain
+    When an administrator publishes that value in the simulator's DNS registry
+    Then the TXT record answers at the name the verifier asks for
+    And the same value is served as the well-known token
+    But publishing without a value is refused rather than silently recorded
+
+  @unit
+  Scenario: A published record can be taken back out again
+    Given a verification value published in the simulator's DNS registry
+    When the administrator removes that record
+    Then the TXT lookup stops finding it
+    And the well-known token stops being served, so neither channel still proves it
 
   # --- Tenant range ------------------------------------------------------
 

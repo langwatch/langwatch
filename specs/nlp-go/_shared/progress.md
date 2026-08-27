@@ -198,7 +198,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] `_shared/contract.md` — wire-level decisions (sarah)
 - [x] `_shared/progress.md` — this doc (ash)
 - [x] `engine.feature`, `dataset-block.feature`, `code-block.feature`, `http-block.feature` (sarah)
-- [x] `llm-block.feature`, `proxy.feature`, `feature-flag.feature`, `parallel-deployment.feature`, `front-door.feature` (ash)
+- [x] `llm-block.feature`, `proxy.feature`, `feature-flag.feature`, `parallel-deployment.feature`, `auth-screen.feature` (ash)
 - [x] `telemetry.feature` (ash)
 - [x] `services/nlpgo/` scaffold (sarah) — chi router, HMAC auth, uvicorn child manager, reverse-proxy fall-through, healthz aggregating child, `cmd/service/main.go` registers nlpgo subcommand
 - [x] `services/nlpgo/app/ports.go` interfaces (sarah) — `GatewayClient`, `LLMClient`, `LLMRequest`/`LLMResponse`, `ChatMessage`, `Tool`, `CodeRunner`, `CodeRequest`/`CodeResult`, `ChildHealth`, `ChildProxy`, `ChildManager`, `SecretsResolver`. Translator maps Provider/Model + Origin + reasoning_effort. `go build ./services/nlpgo/... ./cmd/service/...` clean.

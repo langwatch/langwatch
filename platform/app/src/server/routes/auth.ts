@@ -18,6 +18,7 @@ import { tryGetApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 import { auth } from "~/server/better-auth";
 import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
+import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 
@@ -190,17 +191,28 @@ const betterAuthCatchAll = async (c: Context) => {
     return c.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
   }
 
-  // ADR-116 §3: the born-finalized entrance's request-scoped marker, set
+  // ADR-116 §3: the born-finalized entrance's request-scoped marker, decided
   // HERE and only here, and only once the backend allowlist check has
   // passed. Nothing below re-decides it, and outside a marked request the
   // entrance is never reached — which is what makes deploying it a no-op
   // until an operator targets an organization.
-  if (await isBornFinalizedSignUp({ request: c.req.raw })) {
-    return runWithIdentityBirth(() => auth.handler(c.req.raw));
-  }
-
-  // BetterAuth's auth.handler is fetch-compatible (Request => Response)
-  return auth.handler(c.req.raw);
+  const isBorn = await isBornFinalizedSignUp({ request: c.req.raw });
+  // BetterAuth's auth.handler is fetch-compatible (Request => Response). The
+  // marker only changes which BRANCH the writes inside it take; the answer
+  // that comes back is the same shape either way, and is translated the same
+  // way below. Handling the two through one `response` is what stops them
+  // drifting: the entrance used to return straight out of here, so a sign-up
+  // the allowlist had opted IN was the one sign-up whose refusals skipped the
+  // handled-error contract and reached the browser in better-auth's own
+  // vocabulary.
+  const response = await (isBorn
+    ? runWithIdentityBirth(() => auth.handler(c.req.raw))
+    : auth.handler(c.req.raw));
+  // better-auth's refusals speak its own vocabulary, which is neither a
+  // registered code nor copy anybody wrote for a customer. This is where the
+  // families we have translated join the handled-error contract; everything
+  // else passes through byte for byte. See `better-auth/handled-errors.ts`.
+  return translateBetterAuthError({ response, path: c.req.path });
 };
 
 // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach

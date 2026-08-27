@@ -21,7 +21,7 @@ Feature: The platform operator identity lookup - the end of database surgery
   #   an email address in
   #        │
   #        ▼
-  #   ┌ routing ───── what the front door would decide for it, and the ────┐
+  #   ┌ routing ───── what the auth screens would decide for it, and the ────┐
   #   │               reason it would carry                                │
   #   ├ people ────── every user holding any part of that address, with    │
   #   │               the organizations they belong to                     │
@@ -50,40 +50,40 @@ Feature: The platform operator identity lookup - the end of database surgery
 
   # ── The read is authorized, and the read is recorded ───────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Resolving an address across organizations is recorded as an act
     When "olive" looks up "sam@acme.com"
     Then a record names "olive", the address she resolved and when she resolved it
     And that record is written whether or not she then changes anything
 
-  @unit @unimplemented
+  @unit
   Scenario: A lookup that finds nobody is recorded exactly like one that finds somebody
     When "olive" looks up an address nobody holds
     Then the answer says nobody holds it
     And the same record is written against "olive"
 
-  @integration @unimplemented
+  @integration
   Scenario: A refused lookup is recorded as an attempt, and reveals nothing
     Given "mallory" holds no platform operator access
     When "mallory" requests the lookup for "sam@acme.com"
     Then the request is refused and nothing about the address comes back
     And the attempt is recorded with who made it
 
-  @unit @unimplemented
+  @unit
   Scenario: Without platform operator access the surface is not there at all
     Given "mallory" holds no platform operator access
     When "mallory" opens the lookup address directly
     Then the answer is indistinguishable from an address this installation does not serve
     And nothing tells "mallory" the surface exists
 
-  @integration @unimplemented
+  @integration
   Scenario: Who looked somebody up is readable by an operator, on this surface
     Given several operators have resolved addresses today
     When "olive" opens what operators have done recently
     Then who resolved which address, and when, is readable
     And it is the same trail the repairs write to, not a second one
 
-  @unit @unimplemented
+  @unit
   Scenario: The recorded address is the address, and the history is not a copy of the person
     When any lookup is recorded
     Then the record carries the address resolved and who resolved it
@@ -91,114 +91,114 @@ Feature: The platform operator identity lookup - the end of database surgery
 
   # ── What the lookup answers ────────────────────────────────────────────
 
-  @integration @unimplemented
-  Scenario: One address answers the question the front door would answer
+  @integration
+  Scenario: One address answers the question the auth screens would answer
     When "olive" looks up "sam@acme.com"
-    Then the routing decision the front door would reach is shown with the reason it carries
+    Then the routing decision the auth screens would reach is shown with the reason it carries
     And the words beside it are the ones the person signing in would have read
 
-  @integration @unimplemented
+  @integration
   Scenario: Every person holding any part of the address is listed
     Given "sam@acme.com" is held by one user as a proved method and by a second user as a detached one
     When "olive" looks the address up
     Then both users are listed, each with the organizations they belong to
     And neither is presented as the only answer
 
-  @unit @unimplemented
+  @unit
   Scenario: Each person's sign-in methods are listed whatever state they are in
     When "olive" opens a person from the lookup
     Then every sign-in method that person holds is listed, in every state
     And each says what proved it, when it was attached, and when it stopped counting if it has
 
-  @integration @unimplemented
+  @integration
   Scenario: The most recent identity history is shown newest first
     When "olive" opens a person from the lookup
     Then the most recent facts about that person's identity are listed newest first
     And each says what happened, who caused it and when
 
-  @integration @unimplemented
+  @integration
   Scenario: Everything waiting on a human is on one panel
     When "olive" opens a person from the lookup
     Then sign-ins awaiting confirmation, invitations with their expiry, and domain claims awaiting review are on one panel
     And a panel with nothing waiting collapses to a single line rather than filling the page to say so
 
-  @unit @unimplemented
-  Scenario: The address is resolved the way the front door resolves it
+  @unit
+  Scenario: The address is resolved the way the auth screens resolves it
     When "olive" pastes an address with different capitalization and a plus tag
-    Then it resolves to the person the front door would have resolved
+    Then it resolves to the person the auth screens would have resolved
     And what she typed and what it resolved to are both on screen
 
-  @unit @unimplemented
+  @unit
   Scenario: People and organizations are shown by name, never by identifier alone
     When any result is rendered
     Then organizations and people are named
     And an identifier that must be shown is shortened in its middle, with a way to copy it whole
 
-  @integration @unimplemented
+  @integration
   Scenario: An organization's own connection state is readable from the person who signs in through it
     Given "acme" signs in through a connection that is paused
     When "olive" looks up "sam@acme.com"
     Then the connection and its state are named beside the routing decision
-    And the reason the front door would give matches the connection's state
+    And the reason the auth screens would give matches the connection's state
 
   # ── Repairing a person's sign-in ───────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Confirming a proposed sign-in attaches the method and lets the person in
     Given a sign-in for "sam@acme.com" is waiting for somebody to confirm it
     When "olive" confirms it
     Then the method is attached through the ordinary ceremony, with "olive" recorded as who confirmed it
     And "sam" signs in with it the next time without anything else happening
 
-  @integration @unimplemented
+  @integration
   Scenario: Rejecting a proposed sign-in records the decision and changes nothing else
     Given a sign-in for "sam@acme.com" is waiting for somebody to confirm it
     When "olive" rejects it
     Then the rejection is recorded with "olive" on it
     And "sam" keeps every method held before, and gains none
 
-  @unit @unimplemented
+  @unit
   Scenario: A proposal somebody already decided cannot be decided twice
     Given a proposal another operator already confirmed
     When "olive" decides it
     Then it is refused with the code "identity_link_proposal_resolved"
     And the words say what was already decided and by whom
 
-  @integration @unimplemented
+  @integration
   Scenario: Detaching somebody's last way in is refused
     Given "sam" holds exactly one working sign-in method
     When "olive" detaches it
     Then it is refused with the code "identity_detach_strands_user"
     And the words name what "sam" would be left with, which is nothing
 
-  @integration @unimplemented
+  @integration
   Scenario: Detaching a method somebody has a replacement for takes effect and is recorded
     Given "sam" holds a work method and a personal one, both working
     When "olive" detaches the personal one
     Then the detachment is recorded with "olive" on it
     And "sam" signs in with the work method, and the personal one no longer signs anybody in
 
-  @integration @unimplemented
+  @integration
   Scenario: Sessions can be ended for a person or for one of their sign-in methods
     Given "sam" is signed in on two devices through different methods
     When "olive" ends the sessions belonging to one method
     Then that device is signed out and the other stays signed in
     And ending the person's sessions instead signs both out
 
-  @unit @unimplemented
+  @unit
   Scenario: Every repair names the organization it lands on before it runs
     When "olive" starts any repair from this surface
     Then the confirmation names the organization and the person by name
     And it says what will change, in words a person reads rather than a value
 
-  @unit @unimplemented
+  @unit
   Scenario: A repair whose target cannot be named is withheld rather than confirmed
     Given the organization behind a result cannot be named
     When "olive" opens the row's actions
     Then the repairs are not offered
     And the row says why, without offering a confirmation against something unreadable
 
-  @unit @unimplemented
+  @unit
   Scenario: An operator who may look but not repair is shown nothing they cannot use
     Given "olive" may see the lookup but may not act on it
     When she opens a person
@@ -207,20 +207,20 @@ Feature: The platform operator identity lookup - the end of database surgery
 
   # ── Invitations, from the operator's side ──────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Outstanding invitations are listed with what is left of them
     When "olive" looks up an address that was invited and never accepted
     Then the invitation is listed with the organization, who sent it, and when it expires
     And an invitation past its expiry says so rather than looking live
 
-  @integration @unimplemented
+  @integration
   Scenario: Resending an invitation from here does what resending does anywhere
     Given an invitation to "sam@acme.com" has expired
     When "olive" resends it
     Then a fresh invitation goes out and the previous one stops working
     And the resend is recorded with "olive" on it
 
-  @unit @unimplemented
+  @unit
   Scenario: Extending an invitation moves its expiry and says by how much
     Given an invitation expires tomorrow
     When "olive" extends it
@@ -257,7 +257,7 @@ Feature: The platform operator identity lookup - the end of database surgery
     Then it is refused with the code "sso_domain_claim_already_decided"
     And the words say what was decided and by whom
 
-  @integration @unimplemented
+  @integration
   Scenario: The claims queue puts the longest wait first and says how long it has been
     Given claims from several organizations are waiting
     When "olive" opens the queue
@@ -266,26 +266,26 @@ Feature: The platform operator identity lookup - the end of database surgery
 
   # ── The surfaces stay separate, structurally ───────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: The operator lookup shares no page, address or query with the organization surface
     When the operator lookup and the organization identity surface are compared
     Then they share no page and no address
     And no query serving one can be reached from the other
 
-  @unit @unimplemented
+  @unit
   Scenario: Every repair is a guarded command, and no raw edit exists on the surface
     When any repair on this surface runs
     Then it is a guarded command carrying the operator as the actor
     And no control on the surface writes a row directly
 
-  @unit @unimplemented
+  @unit
   Scenario: Every page this surface adds opens from the operator menu
     Given the operator menu offers the identity lookup
     When each menu link is resolved against the application's route table
     Then each resolves to a route registered for that exact path
     And no link falls through to the catch-all route
 
-  @unit @unimplemented
+  @unit
   Scenario: A refused repair says what to do about it, never "unknown"
     When a repair is refused for a reason we can name
     Then the answer carries a stable code and the words registered for it

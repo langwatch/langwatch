@@ -4,7 +4,7 @@ Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 �
 
 # Overview
 
-Replace the `NEXTAUTH_PROVIDER` one-method front door with identifier-first routing: enter email → normalize → route by verified ACTIVE connection domain → IdP redirect; otherwise a uniform method picker. Self-hosted keeps the single-login case as the priority: one ACTIVE connection ⇒ auto-redirect, with a break-glass local path. Ends account-linking dead ends via auto-link / org-admin-confirm.
+Replace the `NEXTAUTH_PROVIDER` one-method auth screens with identifier-first routing: enter email → normalize → route by verified ACTIVE connection domain → IdP redirect; otherwise a uniform method picker. Self-hosted keeps the single-login case as the priority: one ACTIVE connection ⇒ auto-redirect, with a break-glass local path. Ends account-linking dead ends via auto-link / org-admin-confirm.
 
 # Requirements
 

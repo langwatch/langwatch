@@ -192,6 +192,22 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "manage"],
     scopes: ["project", "team", "organization"],
   },
+  // D05. Seeing a connection and changing one are two permissions, because
+  // they are two jobs: a security reviewer reads which domains route and who
+  // proved them; an IT administrator sets the thing up. Org-tier only, like
+  // `governance` and `webhookEndpoints` above — a connection decides how
+  // EVERYONE in the organization signs in, so a team- or project-scoped
+  // grant of it would be a grant whose blast radius is the whole
+  // organization while its label says otherwise.
+  //
+  // The directory that provisions people into the organization is gated by
+  // these same two: federating sign-in and letting a directory write your
+  // membership are set up by the same administrator, out of the same
+  // connection, and a second pair would have been a second name for one job.
+  sso: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
 } as const satisfies Record<
   string,
   {

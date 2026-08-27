@@ -1,0 +1,22 @@
+-- Put `Session.impersonating` back where a rebase took it away.
+--
+-- The column is expand-then-contract: nothing reads or writes it any more,
+-- and it stays for ONE release because `prisma migrate deploy` runs at
+-- container start, so the first pod of a new release would otherwise drop a
+-- column while the previous release's pods are still selecting it on every
+-- authenticated request. Dropping it in the same release that stops reading
+-- it signs everybody out for the length of the rollout.
+--
+-- WHAT WENT WRONG. An earlier numbering of this branch carried
+-- `20260825050002_drop_session_impersonating`, which contracted a release
+-- early. It ran on developer databases. The rebase renumbered the branch and
+-- that migration is no longer in the tree — so a database that ran the old
+-- numbering has no column, while `schema.prisma` still declares one, and
+-- every Session read fails with "column does not exist". It never reached
+-- main, so no deployed environment contracted; this repairs the developer
+-- databases that did.
+--
+-- Idempotent on purpose: on a database built from the current tree the
+-- column is already there from 20260406120000 and this states nothing.
+
+ALTER TABLE "Session" ADD COLUMN IF NOT EXISTS "impersonating" JSONB;

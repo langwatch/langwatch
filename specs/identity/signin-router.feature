@@ -1,4 +1,4 @@
-Feature: The identifier-first sign-in router - one front door, routed by data
+Feature: The identifier-first sign-in router - one auth screens, routed by data
   As a person signing in to LangWatch
   I need my email to route me to the right identity provider or method set
   So that every sign-in method works through one door, without the screen
@@ -42,12 +42,68 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     Then the decision is the instance's default method set
     And the decision carries the reason code "no_domain_match"
 
+  # RETIRED, and replaced by the four scenarios below (ADR-117, revision
+  # 2026-08-25). The router used to answer a known address and an unknown one
+  # identically, by construction. It no longer does, and the argument is in
+  # the ADR: the sign-up door already answers "does this address have an
+  # account" to anybody who asks, so the router's silence bought nothing an
+  # attacker could not get next door — and it cost every real customer a
+  # password box in front of a passkey-only account, or in front of no
+  # account at all. What survives is named below: one credential refusal, one
+  # rate limit, and no secret ever read.
+
   @unit
-  Scenario: The decision never depends on whether an account exists
+  Scenario: A router that was never asked about accounts answers as it always did
     Given "home.net" belongs to no ACTIVE connection
-    When an email with an account and an email without one are submitted
-    Then both decisions are the same decision, field for field
-    And nothing in either response names the account's existence
+    And this deployment never wired the account lookup
+    When "sam@home.net" is submitted to the router
+    Then the decision is the instance's default method set
+    And the decision carries the reason code "no_domain_match"
+
+  @unit
+  Scenario: An address with no account carries on as a sign-up
+    Given "home.net" belongs to no ACTIVE connection
+    And no account holds "nobody@home.net"
+    When "nobody@home.net" is submitted to the router
+    Then the decision routes to sign-up with the reason code "identifier_unknown"
+    And the decision offers no method at all
+    And the routing log records the domain and never the address
+
+  @unit
+  Scenario: The methods offered are the ones that account holds
+    Given "home.net" belongs to no ACTIVE connection
+    And the account for "sam@home.net" holds a passkey and no password
+    When "sam@home.net" is submitted to the router
+    Then the decision offers the passkey and not the password
+    And the methods are ordered strongest first
+    And a method this deployment does not offer is never offered
+
+  @unit
+  Scenario: A connected domain routes before the account is consulted
+    Given "acme.com" belongs to a connection in state ACTIVE
+    And no account holds "newhire@acme.com"
+    When "newhire@acme.com" is submitted to the router
+    Then the decision redirects to that connection's identity provider
+    And the account is never looked up
+
+  @unit
+  Scenario: An account whose every method was turned off still gets a way in
+    Given "home.net" belongs to no ACTIVE connection
+    And the account for "sam@home.net" holds only a method this deployment stopped offering
+    When "sam@home.net" is submitted to the router
+    Then the decision is the instance's default method set
+    And the decision is not a sign-up
+
+  # The half of the no-oracle that is NOT retired, and the reason the retirement
+  # is safe. Knowing an account exists is now cheap; knowing which half of a
+  # submitted pair was wrong is what turns credential stuffing from guessing
+  # pairs into guessing one field at a time, and that is still never told.
+  @unit
+  Scenario: A refused credential still refuses in one way
+    Given an account holds "sam@home.net"
+    When a wrong password for it and a password for an address nobody holds are submitted
+    Then both are refused with the code "identity_sign_in_refused"
+    And neither refusal says which half was wrong
 
   @unit
   Scenario: A suspended connection stops routing its domain

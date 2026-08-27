@@ -207,6 +207,17 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
   // Bulk egress of an org's data — the same disclosure axis as `share` above,
   // at a family granularity instead of an action one.
   complianceExport: "bulk export of an org's data is egress, not access",
+  // Wave 3 (D09). Both are the auth scope in the most literal sense the word
+  // has: a connection decides WHO MAY SIGN IN AT ALL, and a directory token
+  // is a credential that provisions and deactivates people. Reading either —
+  // explaining where a connection stands, or why somebody was deactivated —
+  // is useful and safe, which is exactly the split this bucket encodes.
+  sso:
+    "a single sign-on connection decides who can sign in, and holds the " +
+    "identity provider's own credentials",
+  scim:
+    "a directory token is a credential, and the sync it drives creates " +
+    "and deactivates people",
 };
 
 /**

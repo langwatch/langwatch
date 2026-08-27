@@ -1,8 +1,11 @@
 import { z } from "zod";
 import {
+  ssoArrivalPolicySchema,
   ssoConnectionSourceSchema,
   ssoConnectionTypeSchema,
+  ssoDomainClaimAuthoritySchema,
   ssoIdpMetadataSchema,
+  ssoPublishedProofChannelSchema,
   ssoVerificationCeremonyMethodSchema,
 } from "./connection";
 import { identityActorSchema } from "./vocabulary";
@@ -37,7 +40,21 @@ export const REQUEST_VERIFICATION_COMMAND_TYPE =
   "lw.identity.request_verification" as const;
 export const ATTEST_DOMAIN_COMMAND_TYPE =
   "lw.identity.attest_domain" as const;
+export const WITHDRAW_DOMAIN_COMMAND_TYPE =
+  "lw.identity.withdraw_domain" as const;
 export const VERIFY_DOMAIN_COMMAND_TYPE = "lw.identity.verify_domain" as const;
+/**
+ * What a re-check saw (ADR-123). Two verbs and no third, because a DNS
+ * lookup has three outcomes and only two of them are facts about the
+ * customer's domain: the record is there, or it is not. A lookup that FAILED
+ * has no verb at all — the scheduler simply does not command, which is what
+ * makes "an outage of ours never spends a customer's grace" true by
+ * construction rather than by a branch somebody could delete.
+ */
+export const RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE =
+  "lw.identity.record_domain_proof_absent" as const;
+export const RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE =
+  "lw.identity.record_domain_proof_present" as const;
 export const ACTIVATE_CONNECTION_COMMAND_TYPE =
   "lw.identity.activate_connection" as const;
 export const SUSPEND_CONNECTION_COMMAND_TYPE =
@@ -48,6 +65,16 @@ export const REQUEST_TEARDOWN_COMMAND_TYPE =
   "lw.identity.request_teardown" as const;
 export const COMPLETE_TEARDOWN_COMMAND_TYPE =
   "lw.identity.complete_teardown" as const;
+/**
+ * Who this connection admits, said out loud (ADR-117 §3).
+ *
+ * A verb of its own rather than a field on `register`, because it is asked
+ * after a domain is proved — the answer "anybody on a domain you proved"
+ * means nothing until there is one — and because it is a decision an
+ * organization revisits without re-registering anything.
+ */
+export const SET_ARRIVAL_POLICY_COMMAND_TYPE =
+  "lw.identity.set_arrival_policy" as const;
 /**
  * The one command that STATES HISTORY rather than commanding a change: the
  * grandfather migration's, which records what an organization's `ssoDomain`
@@ -67,12 +94,16 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   DISCARD_CONNECTION_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
 ] as const;
 export type SsoConnectionCommandType =
@@ -113,7 +144,7 @@ function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
 export const registerConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  allowsJit: z.boolean(),
+  arrivalPolicy: ssoArrivalPolicySchema,
 });
 export type RegisterConnectionCommandData = z.infer<
   typeof registerConnectionCommandDataSchema
@@ -128,8 +159,20 @@ export type ClaimDomainCommandData = z.infer<
   typeof claimDomainCommandDataSchema
 >;
 
-export const approveDomainClaimCommandDataSchema =
-  commandDataSchema(domainShape);
+/**
+ * Approving a claim, and what authorized it (D05 tier 2).
+ *
+ * `authority` is not the caller asserting its own authorization — it names
+ * WHICH check the guard must run, and the guard runs it against a port
+ * either way. `platform-operator` asks the platform-operator port about the
+ * actor; `license` asks the licence port about the INSTALLATION, which is
+ * the only thing a licence can speak for. A hosted deployment's licence port
+ * answers no to every organization, so naming the licence there buys nothing.
+ */
+export const approveDomainClaimCommandDataSchema = commandDataSchema({
+  ...domainShape,
+  authority: ssoDomainClaimAuthoritySchema.optional(),
+});
 export type ApproveDomainClaimCommandData = z.infer<
   typeof approveDomainClaimCommandDataSchema
 >;
@@ -153,6 +196,9 @@ export const requestVerificationCommandDataSchema = commandDataSchema({
   /** `sha256:…`. The caller hashes the token it showed the operator; this
    *  boundary never sees the token, so it cannot leak one. */
   tokenHash: z.string().min(1),
+  /** When the record stops proving anything; null or absent for a ceremony
+   *  that does not expire, which is what the licence-bound one is. */
+  expiresAtMs: z.number().int().nonnegative().nullable().optional(),
 });
 export type RequestVerificationCommandData = z.infer<
   typeof requestVerificationCommandDataSchema
@@ -172,9 +218,56 @@ export type AttestDomainCommandData = z.infer<
   typeof attestDomainCommandDataSchema
 >;
 
-export const verifyDomainCommandDataSchema = commandDataSchema(domainShape);
+/**
+ * Take a domain back out of the connection — claim, approval, verification
+ * and pending ceremony with it. The guard refuses it for a VERIFIED domain
+ * on a connection that is deciding sign-in: while people route through a
+ * domain, the way to stop is removing the connection, which is graced and
+ * strand-checked, not tidying the domain out from under them.
+ */
+export const withdrawDomainCommandDataSchema = commandDataSchema(domainShape);
+export type WithdrawDomainCommandData = z.infer<
+  typeof withdrawDomainCommandDataSchema
+>;
+
+/**
+ * `channel` is which published channel the caller's check actually read the
+ * token from — the TXT record, or the file at the well-known path. Optional,
+ * and absent it defaults to the pending ceremony's own method, so every
+ * caller that predates the file channel keeps meaning what it always meant.
+ * The guard refuses a channel on a ceremony that has none (`license-token`
+ * publishes nothing).
+ */
+export const verifyDomainCommandDataSchema = commandDataSchema({
+  ...domainShape,
+  channel: ssoPublishedProofChannelSchema.optional(),
+});
 export type VerifyDomainCommandData = z.infer<
   typeof verifyDomainCommandDataSchema
+>;
+
+/**
+ * A re-check found no matching record on the domain (ADR-123).
+ *
+ * `graceMs` is supplied by the caller for the reason teardown's is: the
+ * window is a composed constant rather than a number this package invents,
+ * and the deadline it produces is written onto the fact so the customer keeps
+ * the deadline they were told.
+ */
+export const recordDomainProofAbsentCommandDataSchema = commandDataSchema({
+  ...domainShape,
+  graceMs: z.number().int().nonnegative(),
+});
+export type RecordDomainProofAbsentCommandData = z.infer<
+  typeof recordDomainProofAbsentCommandDataSchema
+>;
+
+/** A re-check found the record published. Carries the domain and nothing
+ *  else: recovery is unconditional and has no window. */
+export const recordDomainProofPresentCommandDataSchema =
+  commandDataSchema(domainShape);
+export type RecordDomainProofPresentCommandData = z.infer<
+  typeof recordDomainProofPresentCommandDataSchema
 >;
 
 export const activateConnectionCommandDataSchema = commandDataSchema({
@@ -214,6 +307,15 @@ export type CompleteTeardownCommandData = z.infer<
   typeof completeTeardownCommandDataSchema
 >;
 
+/** Who this connection admits, restated (ADR-117 §3). One field, decided by
+ *  the organization and revisited without re-registering anything. */
+export const setArrivalPolicyCommandDataSchema = commandDataSchema({
+  policy: ssoArrivalPolicySchema,
+});
+export type SetArrivalPolicyCommandData = z.infer<
+  typeof setArrivalPolicyCommandDataSchema
+>;
+
 /**
  * What the legacy strings imply, as one command. The whole history —
  * registered, claimed, approved, verified, activated — is stated in a single
@@ -227,7 +329,7 @@ export type CompleteTeardownCommandData = z.infer<
 export const grandfatherConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  allowsJit: z.boolean(),
+  arrivalPolicy: ssoArrivalPolicySchema,
   /** The domains `Organization.ssoDomain` carries, already normalized. */
   domains: z.array(z.string().min(1)).min(1),
   source: z.literal("legacy-grandfathered"),
@@ -262,6 +364,18 @@ export type SsoConnectionCommand =
   | { type: typeof ATTEST_DOMAIN_COMMAND_TYPE; data: AttestDomainCommandData }
   | { type: typeof VERIFY_DOMAIN_COMMAND_TYPE; data: VerifyDomainCommandData }
   | {
+      type: typeof WITHDRAW_DOMAIN_COMMAND_TYPE;
+      data: WithdrawDomainCommandData;
+    }
+  | {
+      type: typeof RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE;
+      data: RecordDomainProofAbsentCommandData;
+    }
+  | {
+      type: typeof RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE;
+      data: RecordDomainProofPresentCommandData;
+    }
+  | {
       type: typeof ACTIVATE_CONNECTION_COMMAND_TYPE;
       data: ActivateConnectionCommandData;
     }
@@ -280,6 +394,10 @@ export type SsoConnectionCommand =
   | {
       type: typeof COMPLETE_TEARDOWN_COMMAND_TYPE;
       data: CompleteTeardownCommandData;
+    }
+  | {
+      type: typeof SET_ARRIVAL_POLICY_COMMAND_TYPE;
+      data: SetArrivalPolicyCommandData;
     }
   | {
       type: typeof GRANDFATHER_CONNECTION_COMMAND_TYPE;

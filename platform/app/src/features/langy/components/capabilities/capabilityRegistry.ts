@@ -186,7 +186,7 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   annotations: { path: "annotations" },
   secrets: { path: "settings", deepLink: false },
   projects: { path: "settings/projects", deepLink: false },
-  apiKeys: { path: "settings/authentication", deepLink: false },
+  apiKeys: { path: "settings/api-keys", deepLink: false },
   modelProviders: { path: "settings/model-providers", deepLink: false },
   gateway: { path: "settings", deepLink: false },
   // The provisioning pages live at `/settings/...`, outside the project-slug

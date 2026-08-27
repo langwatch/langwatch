@@ -14,10 +14,10 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
-  FrontDoorShell,
-  useIdentityFrontDoor,
+  AuthShell,
+  useIdentityAuthScreens,
   VerificationFirstSignUp,
-} from "~/features/auth-front-door";
+} from "~/features/auth";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { signIn, useSession } from "~/utils/auth-client";
 import { useSearchParams } from "~/utils/compat/next-navigation";
@@ -50,13 +50,13 @@ const RECOVERY_FALLBACK =
 
 /**
  * Which sign-up screen this deployment has (ADR-117 §7). The legacy screen
- * below is untouched and answers whenever the front door is not enforced.
+ * below is untouched and answers whenever the auth screens is not enforced.
  */
 export default function SignUp() {
-  const frontDoor = useIdentityFrontDoor();
+  const auth = useIdentityAuthScreens();
 
-  if (!frontDoor.isResolved) return null;
-  if (frontDoor.enabled) {
+  if (!auth.isResolved) return null;
+  if (auth.enabled) {
     return (
       // The pitch is the hosted product's, and it lives OUTSIDE the card: the
       // card itself is the same on every installation.
@@ -68,7 +68,7 @@ export default function SignUp() {
       // argues we are compatible, when the question a stranger is asking is
       // whether anybody else trusts us. Leave it empty until there is a cleared
       // name to put in it; an empty slot beats furniture.
-      <FrontDoorShell
+      <AuthShell
         headline={"See what your agents\nare actually doing."}
         headlineAccent="actually"
         // Names the thing they are seconds away from, rather than listing what
@@ -77,7 +77,7 @@ export default function SignUp() {
         tagline="You are a minute away from watching a simulated user push your agent until it breaks. Free to start, no credit card."
       >
         <VerificationFirstSignUp />
-      </FrontDoorShell>
+      </AuthShell>
     );
   }
 

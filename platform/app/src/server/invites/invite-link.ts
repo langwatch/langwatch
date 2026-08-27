@@ -27,3 +27,17 @@ export function buildInviteAcceptUrl(inviteCode: string): string {
 export function buildMembersSettingsUrl(): string {
   return `${env.BASE_HOST}/settings/members`;
 }
+
+/**
+ * Where an administrator goes to re-publish the record that proves a domain
+ * (ADR-123).
+ *
+ * Carries no token and decides nothing, for the same reason the members link
+ * does not: the value of a verification record is a secret, and mailing one
+ * would hand anybody who reads that mailbox the ability to prove a domain
+ * they do not own. The page is where a fresh record is asked for, behind a
+ * session, by somebody who holds `sso:manage`.
+ */
+export function buildAccessSettingsUrl(): string {
+  return `${env.BASE_HOST}/settings/access`;
+}

@@ -30,7 +30,9 @@ Feature: Join before create - the choice happens before an organization is minte
   # they found their real team. This is the step that stops the bleeding; the
   # ones already there are a separate question.
   #
-  # Ships behind JOIN_REQUESTS, rendered by screens behind IDENTITY_ROUTER_V2.
+  # On for everybody — the JOIN_REQUESTS flag is retired (see
+  # specs/identity/join-requests.feature) — rendered by screens behind
+  # IDENTITY_ROUTER_V2.
 
   Background:
     Given the first-party sign-up screens are enforced
@@ -68,7 +70,7 @@ Feature: Join before create - the choice happens before an organization is minte
 
   # ── The invariant ──────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: No organization is created for somebody who did not ask for one
     Given an organization "acme" open to requests from "acme.com"
     When "sam" completes verification and asks to join "acme"
@@ -83,7 +85,7 @@ Feature: Join before create - the choice happens before an organization is minte
     And creating an organization anyway is offered as a plain, explicit choice
     And taking it creates exactly one organization and leaves the request open
 
-  @integration @unimplemented
+  @integration
   Scenario: Approval reaches somebody who created a workspace while waiting
     Given "sam" created an organization while a request to "acme" was open
     When "ana" approves the request
@@ -92,7 +94,7 @@ Feature: Join before create - the choice happens before an organization is minte
 
   # ── Existing users ─────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: An existing user is offered their colleagues once, and can dismiss it
     Given "sam" already has an account and a verified "acme.com" address
     And "acme" is open to requests from that domain
@@ -100,16 +102,34 @@ Feature: Join before create - the choice happens before an organization is minte
     Then the offer appears once for that domain
     And dismissing it stops it appearing again for that domain
 
-  @integration @unimplemented
+  @integration
   Scenario: Creating an organization on a matching domain is nudged, never blocked
     Given "sam" is an existing user whose domain matches "acme"
     When "sam" opens the create-organization screen
     Then a soft notice says "acme" is already here and offers joining instead
     And creating the organization is still available and still completes
 
+  @integration
+  Scenario: The step waits for its own answer before sending anybody anywhere
+    Given "sam" has a verified "acme.com" address
+    And the lookup for that domain has not answered yet
+    When the join step is reached
+    Then nothing is offered and nothing is decided
+    And "sam" is not sent on to workspace creation
+    And the offer appears as soon as the answer arrives
+
+  @integration
+  Scenario: A lookup that failed is not read as having found nothing
+    Given "sam" has a verified "acme.com" address
+    And the lookup for that domain fails
+    When the join step is reached
+    Then "sam" is told the check could not be made
+    And creating an organization stays available as an explicit choice
+    And "sam" is not sent on to workspace creation automatically
+
   # ── What the operator can see ──────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Organizations nobody meant to create are countable before the flag flips
     Given organizations created by people who joined another organization on
       the same domain within thirty days

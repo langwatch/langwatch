@@ -101,6 +101,78 @@ export const revokeAllSessionsForUser = async ({
 };
 
 /**
+ * Force-revoke the sessions ONE sign-in method minted (D06).
+ *
+ * `Session.identifierId` records which method signed a session in. Nothing
+ * reads it to decide whether a session is valid — which is exactly why it is
+ * safe to end sessions by it: the column is evidence about a sign-in, and
+ * this is the one place that acts on that evidence.
+ *
+ * A person signed in on two devices through two methods loses one device and
+ * keeps the other. Sessions with a null `identifierId` — every session that
+ * predates the column, and any mint we could not attribute — are left alone,
+ * because "we do not know which method minted this" is not a reason to end
+ * it. An operator who means all of them has {@link revokeAllSessionsForUser}.
+ *
+ * Redis first, Postgres second, exactly as the two above: BetterAuth reads
+ * its cache before the database, so deleting the row alone leaves the person
+ * signed in until the cache expires.
+ */
+export const revokeSessionsForIdentifier = async ({
+  prisma,
+  userId,
+  identifierId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  identifierId: string;
+}): Promise<{ ended: number }> => {
+  const doomed = await prisma.session.findMany({
+    where: { userId, identifierId },
+    select: { id: true, sessionToken: true },
+  });
+  if (doomed.length === 0) return { ended: 0 };
+
+  const redisConnection = getApp().redis;
+  if (redisConnection) {
+    try {
+      const doomedTokens = new Set(doomed.map((s) => s.sessionToken));
+      const indexKey = `better-auth:active-sessions-${userId}`;
+      const indexJson = await redisConnection.get(indexKey);
+      if (indexJson) {
+        const sessions = JSON.parse(indexJson) as Array<{
+          token: string;
+          expiresAt: number;
+        }>;
+        const remaining = sessions.filter((s) => !doomedTokens.has(s.token));
+        if (remaining.length > 0) {
+          await redisConnection.set(indexKey, JSON.stringify(remaining));
+        } else {
+          await redisConnection.del(indexKey);
+        }
+      }
+      for (const token of doomedTokens) {
+        await redisConnection.del(`better-auth:${token}`);
+      }
+    } catch (err) {
+      logger.error(
+        { err, userId, identifierId },
+        "Failed to clear Redis session cache while ending one method's sessions; proceeding with DB delete",
+      );
+    }
+  }
+
+  const result = await prisma.session.deleteMany({
+    where: { id: { in: doomed.map((s) => s.id) } },
+  });
+  logger.info(
+    { userId, identifierId, deleted: result.count },
+    "Revoked the sessions one sign-in method minted",
+  );
+  return { ended: result.count };
+};
+
+/**
  * Force-revoke all sessions for a user EXCEPT the one identified by
  * `keepSessionId`. Used by self-service flows like password change,
  * where we want to log out other devices but keep the user's current

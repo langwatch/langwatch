@@ -43,6 +43,7 @@
  */
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
+  CONFIRM_LINK_COMMAND_TYPE,
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
   type IdentityCommand,
@@ -51,17 +52,20 @@ import {
   type IdentityFactInput,
   MARK_PRIMARY_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
+  REJECT_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity";
 import type { IdentityLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
 import { createTenantId } from "~/server/event-sourcing";
+import type { Event } from "~/server/event-sourcing/domain/types";
 import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import { IDENTITY_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/identity/schemas/constants";
 import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,
@@ -87,7 +91,54 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [DETACH_IDENTIFIER_COMMAND_TYPE]: "detachIdentifier",
   [ERASE_USER_COMMAND_TYPE]: "eraseUser",
   [PROPOSE_LINK_COMMAND_TYPE]: "proposeLink",
+  [CONFIRM_LINK_COMMAND_TYPE]: "confirmLink",
+  [REJECT_LINK_COMMAND_TYPE]: "rejectLink",
 };
+
+/**
+ * The App's event store, waited for.
+ *
+ * Exported because the identity log has a second reader now (D05's operator
+ * lookup, which folds proposals and renders history out of the same events),
+ * and two copies of "wait for the App handle, then ask for the store" is two
+ * places for the deadline to drift.
+ */
+export async function resolveIdentityEventStore(): Promise<
+  EventStore<IdentityEvent>
+> {
+  return resolveEventStore<IdentityEvent>();
+}
+
+/**
+ * The same store, typed for whichever identity-area stream is being read.
+ *
+ * There is ONE store; the type parameter is the caller saying which stream's
+ * events it is about to narrow. The scim_sync log (ADR-126) reads through
+ * here rather than casting the identity resolver, which would have made the
+ * types say "identity events" about a stream that holds none.
+ */
+export async function resolveEventStore<TEvent extends Event>(): Promise<
+  EventStore<TEvent>
+> {
+  const deadline = Date.now() + IDENTITY_APP_HANDLE_WAIT_MS;
+  let app = tryGetApp();
+  while (!app && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    app = tryGetApp();
+  }
+  const eventStore = app?.eventSourcing?.isEnabled
+    ? app.eventSourcing.getEventStore<TEvent>()
+    : undefined;
+  if (!eventStore) {
+    // A plain Error on purpose (error doctrine): the caller cannot act on an
+    // unavailable event stack, and the ceremony degrades to a retryable
+    // failure with a trace id.
+    throw new Error(
+      "identity ledger cannot append: the event-sourcing stack is unavailable",
+    );
+  }
+  return eventStore;
+}
 
 /**
  * The pipeline's sender for one command, once the App exists.

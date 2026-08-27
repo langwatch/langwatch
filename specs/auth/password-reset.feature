@@ -149,14 +149,14 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   @integration
   Scenario: Password reset stays a credential-mode concept before the flip
     Given the deployment signs in through an identity provider
-    And the identifier-first front door is not enforced
+    And the identifier-first auth screens is not enforced
     When I open the reset screen
     Then I am told my password is managed by my identity provider
 
   @integration
-  Scenario: Password reset follows the identifier once the front door is enforced
+  Scenario: Password reset follows the identifier once the auth screens is enforced
     Given an installation that federates but holds passwords of its own
-    And the identifier-first front door is enforced
+    And the identifier-first auth screens is enforced
     When I request a password reset
     Then the reset is offered
     And the answer is the same confirmation whether or not the address has an account
@@ -167,6 +167,38 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     When I open the reset screen
     Then I am told my password is managed by my identity provider
     And no reset is offered that could not be completed
+
+  # --- After the reset: the moment to offer a passkey ---
+  #
+  # ADR-120's rule is that a passkey is offered where somebody already is, and
+  # this is one of the three places they already are: they just proved control
+  # of the address, they are thinking about how they get in, and the thing
+  # they have most recently learned is that the password did not work.
+  #
+  # It is an OFFER and it behaves like one. It never stands between them and
+  # finishing, it can be waved away, and it never opens a system prompt on its
+  # own - the ceremony starts on a real gesture, the same rule the sign-in
+  # screen's conditional offer obeys.
+
+  @integration
+  Scenario: A completed reset offers a passkey rather than assuming one
+    Given I have just set a new password from a valid link
+    Then the screen confirms the reset and offers to add a passkey
+    And signing in is still the plain, unmissable way on
+
+  @integration
+  Scenario: Declining the offer costs nothing
+    Given I am offered a passkey after resetting my password
+    When I dismiss the offer
+    Then the confirmation and the way to sign in are both still there
+    And the offer does not come back on this screen
+
+  @unit
+  Scenario: No passkey is offered where the auth screens cannot take one
+    Given the deployment does not sign people in with passkeys
+    When a reset completes
+    Then no passkey is offered
+    And the screen is the confirmation it always was
 
   # --- Full end-to-end (manual dogfood) ---
 

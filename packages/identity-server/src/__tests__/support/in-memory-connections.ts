@@ -8,6 +8,7 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoLicenseAuthorityRepository,
   SsoPlatformOperatorRepository,
 } from "../../sso-connection.repository";
 
@@ -44,6 +45,24 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
     return null;
   }
 
+  /**
+   * The one connection an organization is setting up or running. Terminal
+   * states are excluded, exactly as the Prisma read does — a torn-down
+   * connection is a tombstone rather than a setup in progress.
+   */
+  async findConnectionForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoConnectionState | null> {
+    for (const state of this.states.values()) {
+      if (state.organizationId !== organizationId) continue;
+      if (state.state === "DISCARDED" || state.state === "TORN_DOWN") continue;
+      return state;
+    }
+    return null;
+  }
+
   /** Fold facts in, exactly as the projection would. */
   apply({
     connectionId,
@@ -61,6 +80,12 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
     }
     this.states.set(connectionId, state);
     return state;
+  }
+
+  /** Every connection this store holds — what a cross-organization read,
+   *  such as the tier-3 claim queue, scans. */
+  all(): readonly SsoConnectionState[] {
+    return [...this.states.values()];
   }
 
   /** Put a connection into a state directly, for a precondition a test does
@@ -97,6 +122,24 @@ export class StubPlatformOperators implements SsoPlatformOperatorRepository {
 
   async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
     return this.operators.has(actorId);
+  }
+}
+
+/**
+ * Whether the installation's licence may authorize a domain claim (D05 tier
+ * 2). A boolean rather than a set, because a licence speaks for an
+ * INSTALLATION and not for a person — which is the whole reason a hosted
+ * organization can never reach the licence-bound path.
+ */
+export class StubLicenseAuthority implements SsoLicenseAuthorityRepository {
+  constructor(private licensed = false) {}
+
+  async licenseAuthorizesDomainClaims(): Promise<boolean> {
+    return this.licensed;
+  }
+
+  set(licensed: boolean): void {
+    this.licensed = licensed;
   }
 }
 

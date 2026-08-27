@@ -169,3 +169,39 @@ export interface IdentityResolutionPort {
     providerAccountId: string;
   }): Promise<IdentityResolution | null>;
 }
+
+/**
+ * The issuer a connection registered, read both ways (D04).
+ *
+ * better-auth 1.7 keys an account by `(issuer, accountId)` and looks one up
+ * by exactly those two — no provider id anywhere in the clause. For a
+ * built-in provider that is answerable without asking anybody, because the
+ * issuer we hold is one we SYNTHESISED from the provider id and can decode
+ * straight back (`providerIdFromIssuer`). For a connection it is not: the
+ * issuer is the identity provider's own URL, it decodes to nothing, and the
+ * legacy `Account` table has no column to have stored it in.
+ *
+ * So the legacy branch could neither find a connection's account by its
+ * issuer nor hand one back carrying it, and both halves broke the same
+ * ceremony: the first sign-in created the row, every sign-in after it failed
+ * to find that row, and better-auth created it again into the unique
+ * constraint on the provider and its subject. Every RETURNING person on a
+ * connection.
+ *
+ * This is the mapping that closes it, and it is a READ of something already
+ * written down — the connection's registration — rather than a guess. An
+ * issuer nobody registered resolves to null and stays unanswerable, which is
+ * what keeps one identity provider's subject from resolving another's user.
+ */
+export interface IdentityConnectionIssuersPort {
+  /** The provider id that registered this issuer, if any connection did. */
+  providerIdForIssuer(args: { issuer: string }): Promise<string | null>;
+  /**
+   * The issuer this provider id registered, if it is a connection at all.
+   *
+   * Null for every built-in provider, which is the signal to mint the
+   * synthetic form instead — the legacy table never stored a real issuer for
+   * those, and 1.7 expects to see one on any row it is handed.
+   */
+  registeredIssuerFor(args: { providerId: string }): Promise<string | null>;
+}

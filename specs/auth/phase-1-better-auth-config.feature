@@ -33,7 +33,7 @@ Feature: BetterAuth config (unmounted)
   #
   # What these scenarios assert is MOUNTING: which providers the instance
   # stands up, and whether email and password sign-in is enabled beside them.
-  # That survives the front door (ADR-117 §4) - the env's provider becomes the
+  # That survives the auth screens (ADR-117 §4) - the env's provider becomes the
   # default method set, one element, offered automatically, which is what a
   # single-provider deployment already does. Where a person is SENT is no
   # longer decided here.
@@ -138,7 +138,7 @@ Feature: BetterAuth config (unmounted)
     And pendingSsoSetup remains false
 
   # `pendingSsoSetup` is the flag this sets; it is reconciled once against
-  # identifier data and dropped at bake end. Under the front door the same
+  # identifier data and dropped at bake end. Under the auth screens the same
   # situation is a routing decision the screen explains instead (ADR-117 §6).
   Scenario: Existing user with wrong SSO provider gets pending flag
     Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
@@ -148,24 +148,31 @@ Feature: BetterAuth config (unmounted)
     And pendingSsoSetup is set to true
 
   # ============================================================================
-  # Admin impersonation via the legacy Session.impersonating JSON column
+  # RETIRED at D06 — the legacy impersonation pair, and the plugin allow-list
   #
-  # We deliberately do NOT use BetterAuth's `admin()` plugin — it expects
-  # `User.role` / `User.banned` columns our schema doesn't have, and it
-  # would force an additional schema migration for no behavioral benefit.
-  # Impersonation is handled end-to-end by `src/pages/api/admin/impersonate.ts`
-  # writing to the existing `Session.impersonating` JSON column, and
-  # `src/server/auth.ts` reading it to rewrite `session.user` on each
-  # request. The compat layer also re-verifies the target user is still
-  # active on each request.
+  # This block described impersonation as the `Session.impersonating` JSON
+  # column, and asserted that generic OAuth was the ONLY registered plugin.
+  # Both statements are now false and neither is worth restating here.
+  #
+  # Impersonation rides the authorization principal, `{actor, subject}`, and
+  # what a session carries is described where the rest of the session shape
+  # is: specs/identity/mfa-and-session-shape.feature. The behaviour it used to
+  # protect survives untouched in specs/auth/impersonation-banner.feature,
+  # specs/ops/dejaview-impersonation-access.feature and
+  # specs/features/backoffice-user-impersonation-reason.feature — only the
+  # mechanism underneath swapped.
+  #
+  # The plugin allow-list moved too, and for a reason this block could not
+  # have carried: which plugins are registered is a question about FLAGS now.
+  # The two-factor plugin joins generic OAuth when MFA_ENROLLMENT_OPEN is on
+  # and the passkey plugin when PASSKEYS_ENABLED is, so "only genericOAuth"
+  # was an assertion about one configuration of several. What survives is the
+  # part that was ever load-bearing — BetterAuth's `admin()` plugin is
+  # deliberately NOT registered, because it expects `User.role` / `User.banned`
+  # columns our schema does not have and would take impersonation over — and
+  # that lives with the flag scenarios in
+  # specs/identity/mfa-and-session-shape.feature and specs/identity/passkeys.feature.
   # ============================================================================
-
-  Scenario: The BetterAuth admin plugin is intentionally omitted
-    Given the BetterAuth instance is initialized
-    When I inspect the configured plugins
-    Then only genericOAuth is present in the plugins array
-    And impersonation is handled via the legacy Session.impersonating JSON column
-    And the compat layer re-verifies the impersonation target on every request
 
   # ============================================================================
   # bcrypt-compatible password verification
