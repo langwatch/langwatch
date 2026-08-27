@@ -8,7 +8,6 @@ import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { trackServerEvent } from "~/server/posthog";
-import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { projectSchema } from "./schemas";
 
@@ -130,26 +129,21 @@ export const scenarioCrudRouter = createTRPCRouter({
       logger.info({ projectId: input.projectId, scenarioId: input.id }, "Updating scenario");
 
       const { id, projectId, expectedVersion, ...data } = input;
-      const service = ScenarioService.create(ctx.prisma);
       try {
-        const result = await service.update({
+        const result = await ctx.app.scenarios.update({
           id,
           projectId,
-          data: {
-            ...data,
-            lastUpdatedById: ctx.session.user.id,
-          },
-          options: {
-            actor: { userId: ctx.session.user.id, label: "user" },
-            expectedVersion,
-          },
+          ...data,
+          lastUpdatedById: ctx.session.user.id,
+          actor: { userId: ctx.session.user.id, label: "user" },
+          expectedVersion,
         });
 
         logger.info({ projectId, scenarioId: id }, "Scenario updated");
         return result;
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+          throw new TRPCError({ code: "NOT_FOUND", message: "Scenario not found" });
         }
         throw error;
       }
@@ -169,7 +163,7 @@ export const scenarioCrudRouter = createTRPCRouter({
         if (error instanceof ScenarioNotFoundError) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: error.message,
+            message: "Scenario not found",
           });
         }
         throw error;
@@ -195,16 +189,15 @@ export const scenarioCrudRouter = createTRPCRouter({
         "Moving scenario to folder",
       );
 
-      const service = ScenarioService.create(ctx.prisma);
       try {
-        return await service.moveToFolder({
+        return await ctx.app.scenarios.moveToFolder({
           scenarioId: input.scenarioId,
           projectId: input.projectId,
           folderId: input.folderId,
         });
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+          throw new TRPCError({ code: "NOT_FOUND", message: "Scenario not found" });
         }
         throw error;
       }
@@ -219,16 +212,15 @@ export const scenarioCrudRouter = createTRPCRouter({
         "Duplicating scenario",
       );
 
-      const service = ScenarioService.create(ctx.prisma);
       try {
-        return await service.duplicate({
+        return await ctx.app.scenarios.duplicate({
           scenarioId: input.scenarioId,
           projectId: input.projectId,
           lastUpdatedById: ctx.session.user.id,
         });
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+          throw new TRPCError({ code: "NOT_FOUND", message: "Scenario not found" });
         }
         throw error;
       }

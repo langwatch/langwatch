@@ -2,8 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { ScenarioNotFoundError } from "~/server/scenarios/errors";
-import { ScenarioService } from "~/server/scenarios/scenario.service";
+import { ScenarioNotFoundError } from "@langwatch/scenario-contract";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenarios:versions");
@@ -15,7 +14,7 @@ const logger = createLogger("langwatch:api:scenarios:versions");
  */
 const mapScenarioError = (error: unknown): never => {
   if (error instanceof ScenarioNotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+    throw new TRPCError({ code: "NOT_FOUND", message: "Scenario not found" });
   }
   throw error;
 };
@@ -37,8 +36,7 @@ export const scenarioVersionRouter = createTRPCRouter({
     )
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      const service = ScenarioService.create(ctx.prisma);
-      const page = await service
+      const page = await ctx.app.scenarios
         .listVersions({
           projectId: input.projectId,
           scenarioId: input.scenarioId,
@@ -52,29 +50,18 @@ export const scenarioVersionRouter = createTRPCRouter({
       // because it is a display concern of this list.
       const authorIds = [
         ...new Set(
-          page.versions
-            .map((version) => version.authorId)
-            .filter((id): id is string => !!id),
+          page.versions.map((version) => version.authorId).filter((id): id is string => !!id),
         ),
       ];
       const authors =
-        authorIds.length > 0
-          ? await ctx.prisma.user.findMany({
-              where: { id: { in: authorIds } },
-              select: { id: true, name: true },
-            })
-          : [];
-      const nameById = new Map(
-        authors.map((author) => [author.id, author.name]),
-      );
+        authorIds.length > 0 ? await ctx.app.users.getProfiles({ userIds: authorIds }) : [];
+      const nameById = new Map(authors.map((author) => [author.id, author.name]));
 
       return {
         ...page,
         versions: page.versions.map((version) => ({
           ...version,
-          authorName: version.authorId
-            ? (nameById.get(version.authorId) ?? null)
-            : null,
+          authorName: version.authorId ? (nameById.get(version.authorId) ?? null) : null,
         })),
       };
     }),
@@ -88,8 +75,7 @@ export const scenarioVersionRouter = createTRPCRouter({
     )
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      const service = ScenarioService.create(ctx.prisma);
-      return await service
+      return await ctx.app.scenarios
         .getVersion({
           projectId: input.projectId,
           scenarioId: input.scenarioId,
@@ -115,8 +101,7 @@ export const scenarioVersionRouter = createTRPCRouter({
         },
         "Restoring scenario version",
       );
-      const service = ScenarioService.create(ctx.prisma);
-      return await service
+      return await ctx.app.scenarios
         .restoreVersion({
           projectId: input.projectId,
           scenarioId: input.scenarioId,

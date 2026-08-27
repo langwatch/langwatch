@@ -12,6 +12,12 @@ import {
   type ScenarioReferenceState,
   type ScenarioRunConfig,
   type ScenarioUpdateInput,
+  type ScenarioActor,
+  type ScenarioVersionDetail,
+  type ScenarioVersionInput,
+  type ScenarioVersionListInput,
+  type ScenarioVersionRestoreInput,
+  type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/simulation-contract";
 import { describe, expect, it } from "vitest";
@@ -80,17 +86,20 @@ class MemoryScenarioRepository extends ScenarioRepository {
   readonly rows = new Map<string, Scenario>();
   readonly folders = new Map<string, ScenarioFolder>();
 
-  async create(input: ScenarioCreateInput & { id: string }): Promise<Scenario> {
+  async create(
+    input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
+  ): Promise<Scenario> {
+    const { actor: _, ...scenarioInput } = input;
     const row: Scenario = {
-      ...input,
-      parameters: input.parameters ?? null,
-      simulatorModel: input.simulatorModel ?? null,
-      judgeModel: input.judgeModel ?? null,
-      maxTurns: input.maxTurns ?? null,
-      minTurns: input.minTurns ?? null,
-      folderId: input.folderId ?? null,
+      ...scenarioInput,
+      parameters: scenarioInput.parameters ?? null,
+      simulatorModel: scenarioInput.simulatorModel ?? null,
+      judgeModel: scenarioInput.judgeModel ?? null,
+      maxTurns: scenarioInput.maxTurns ?? null,
+      minTurns: scenarioInput.minTurns ?? null,
+      folderId: scenarioInput.folderId ?? null,
       version: 1,
-      lastUpdatedById: input.lastUpdatedById ?? null,
+      lastUpdatedById: scenarioInput.lastUpdatedById ?? null,
       archivedAt: null,
       createdAt: new Date(0),
       updatedAt: new Date(0),
@@ -104,6 +113,24 @@ class MemoryScenarioRepository extends ScenarioRepository {
     return Promise.resolve(
       row?.projectId === input.projectId && row.archivedAt === null ? row : null,
     );
+  }
+
+  async findById(input: { id: string; projectId: string }): Promise<Scenario> {
+    const row = this.rows.get(input.id);
+    if (row?.projectId !== input.projectId || row.archivedAt !== null) {
+      throw new ScenarioNotFoundError(input.id);
+    }
+
+    return row;
+  }
+
+  async findByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario> {
+    const row = this.rows.get(input.id);
+    if (row?.projectId !== input.projectId) {
+      throw new ScenarioNotFoundError(input.id);
+    }
+
+    return row;
   }
 
   tryFindByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario | null> {
@@ -123,13 +150,34 @@ class MemoryScenarioRepository extends ScenarioRepository {
     return (await this.findAll(input)).length;
   }
 
-  async update(input: ScenarioUpdateInput): Promise<Scenario> {
+  async update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario> {
     const existing = await this.tryFindByIdIncludingArchived(input);
     if (!existing) throw new ScenarioNotFoundError(input.id);
-    const { id: _, projectId: __, ...data } = input;
+    const {
+      actor: _,
+      changeDescription: __,
+      expectedVersion: ___,
+      id: ____,
+      projectId: _____,
+      ...data
+    } = input;
     const row = { ...existing, ...data, updatedAt: new Date(1) };
     this.rows.set(row.id, row);
     return row;
+  }
+
+  findVersions(
+    _input: ScenarioVersionListInput & { take: number },
+  ): Promise<ScenarioVersionSummary[]> {
+    throw new Error("Version history is not exercised by this repository double");
+  }
+
+  findVersion(_input: ScenarioVersionInput): Promise<ScenarioVersionDetail> {
+    throw new Error("Version history is not exercised by this repository double");
+  }
+
+  restoreVersion(_input: ScenarioVersionRestoreInput): Promise<Scenario> {
+    throw new Error("Version history is not exercised by this repository double");
   }
 
   async tryArchive(input: {
@@ -280,7 +328,12 @@ describe("ScenarioService", () => {
     expect(await service.tryGetById({ id: "scenario_1", projectId: "project-b" })).toBeNull();
     await expect(
       service.getById({ id: "scenario_1", projectId: "project-b" }),
-    ).rejects.toBeInstanceOf(ScenarioNotFoundError);
+    ).rejects.toMatchObject({
+      name: "ScenarioNotFoundError",
+      code: "scenario_not_found",
+      httpStatus: 404,
+      meta: { scenarioId: "scenario_1" },
+    });
     expect(await service.list({ projectId: "project-a" })).toHaveLength(1);
     await expect(service.count({ projectId: "project-a" })).resolves.toBe(1);
     await expect(service.count({ projectId: "project-b" })).resolves.toBe(0);
@@ -357,6 +410,7 @@ describe("ScenarioService", () => {
     ).resolves.toEqual({
       parameters: { region: "eu-central" },
       secretParameters: {},
+      scenarioVersion: 1,
     });
     await expect(
       service.getRunConfigs({
@@ -429,6 +483,7 @@ describe("ScenarioService", () => {
         scenarioId: "scenario_1",
         parameters: { region: "eu" },
         secretParameters: { api_token: "encrypted:token-live" },
+        scenarioVersion: 1,
       },
     ]);
   });
@@ -492,11 +547,11 @@ describe("ScenarioService", () => {
       failed: [
         {
           id: "scenario_missing",
-          error: "ScenarioNotFoundError: Scenario scenario_missing was not found.",
+          error: "Not found",
         },
         {
           id: "scenario_missing",
-          error: "ScenarioNotFoundError: Scenario scenario_missing was not found.",
+          error: "Not found",
         },
       ],
     });

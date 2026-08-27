@@ -9,9 +9,9 @@
  */
 
 import { useCallback, useRef } from "react";
+import type { ScenarioTabNavigatePayload } from "@langwatch/scenario-contract";
 import { useScenarioTabFollow } from "~/hooks/useScenarioTabFollow";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
-import type { ScenarioTabNavigatePayload } from "~/server/scenarios/browser-tab/scenario-tab-events";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { toAgentTestingRunPath } from "./results/run-plans";
@@ -20,9 +20,7 @@ import { toAgentTestingRunPath } from "./results/run-plans";
  * Takes a run handed off by another tab. The address the handoff carries names
  * the v1 page, so it is read as the Agent Testing run it means.
  */
-function useFollowRunInThisTab(): (
-  payload: ScenarioTabNavigatePayload,
-) => void {
+function useFollowRunInThisTab(): (payload: ScenarioTabNavigatePayload) => void {
   const router = useRouter();
   const lastFollowedRef = useRef<string | null>(null);
 
@@ -30,9 +28,7 @@ function useFollowRunInThisTab(): (
     (payload: ScenarioTabNavigatePayload) => {
       const target = new URL(payload.url);
       if (target.origin !== window.location.origin) return;
-      const path =
-        toAgentTestingRunPath(target.pathname) ??
-        target.pathname + target.search;
+      const path = toAgentTestingRunPath(target.pathname) ?? target.pathname + target.search;
       if (path === window.location.pathname) return;
       // A handoff is parked as well as broadcast, so a tab that took the live
       // one and then re-subscribed is offered the same run again.

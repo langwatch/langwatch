@@ -3,13 +3,19 @@ import {
   ScenarioNotFoundError,
   ScenarioService as ScenarioServiceContract,
   scenarioCreateInputSchema,
+  scenarioDuplicateInputSchema,
   scenarioFolderCreateInputSchema,
   scenarioFolderIdInputSchema,
   scenarioFolderRenameInputSchema,
   scenarioFolderUpdateInputSchema,
   scenarioIdInputSchema,
+  scenarioMoveInputSchema,
+  scenarioParameterDefinitionsSchema,
   runParameterValuesSchema,
   scenarioUpdateInputSchema,
+  scenarioVersionInputSchema,
+  scenarioVersionListInputSchema,
+  scenarioVersionRestoreInputSchema,
   type Scenario,
   type ScenarioCreateInput,
   type ScenarioFolder,
@@ -22,6 +28,14 @@ import {
   type ScenarioReferenceState,
   type ScenarioRunConfig,
   type ScenarioUpdateInput,
+  type ScenarioActor,
+  type ScenarioDuplicateInput,
+  type ScenarioMoveInput,
+  type ScenarioVersionDetail,
+  type ScenarioVersionInput,
+  type ScenarioVersionListInput,
+  type ScenarioVersionRestoreInput,
+  type ScenarioVersionSummary,
   type ResolveScenarioRunParametersInput,
   type ResolvedScenarioRunParameters,
   type ResolvedScenarioRunParametersForScenario,
@@ -35,8 +49,17 @@ import type { ScenarioRepository } from "../repositories/scenario.repository";
 import type { ScenarioClockPort } from "../ports/scenario-clock.port";
 import type { ScenarioFolderIdPort, ScenarioIdPort } from "../ports/scenario-id.port";
 import type { ScenarioSecretCipherPort } from "../ports/scenario-secret-cipher.port";
+import { ScenarioRunSecretsService } from "./scenario-run-secrets.service";
 
 const logger = createLogger("langwatch:scenarios");
+
+const defaultVersionPageSize = 20;
+
+function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
+  return lastUpdatedById
+    ? { userId: lastUpdatedById, label: "user" }
+    : { userId: null, label: "api" };
+}
 
 export type ScenarioServiceOptions = {
   repository: ScenarioRepository;
@@ -52,25 +75,25 @@ export class ScenarioService extends ScenarioServiceContract {
     return new ScenarioService(options);
   }
 
+  private readonly runSecrets: ScenarioRunSecretsService;
+
   private constructor(private readonly options: ScenarioServiceOptions) {
     super();
+    this.runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
   }
 
   create(input: ScenarioCreateInput): Promise<Scenario> {
     const parsed = scenarioCreateInputSchema.parse(input);
+
     return this.options.repository.create({
       ...parsed,
       id: this.options.ids.next(),
+      actor: parsed.actor ?? actorFor(parsed.lastUpdatedById),
     });
   }
 
-  async getById(input: ScenarioIdInput): Promise<Scenario> {
-    const parsed = scenarioIdInputSchema.parse(input);
-    const scenario = await this.options.repository.tryFindById(parsed);
-    if (!scenario) {
-      throw new ScenarioNotFoundError(parsed.id);
-    }
-    return scenario;
+  getById(input: ScenarioIdInput): Promise<Scenario> {
+    return this.options.repository.findById(scenarioIdInputSchema.parse(input));
   }
 
   tryGetById(input: ScenarioIdInput): Promise<Scenario | null> {
@@ -94,7 +117,97 @@ export class ScenarioService extends ScenarioServiceContract {
   }
 
   update(input: ScenarioUpdateInput): Promise<Scenario> {
-    return this.options.repository.update(scenarioUpdateInputSchema.parse(input));
+    const parsed = scenarioUpdateInputSchema.parse(input);
+
+    return this.options.repository.update({
+      ...parsed,
+      actor: parsed.actor ?? actorFor(parsed.lastUpdatedById),
+    });
+  }
+
+  moveToFolder(input: ScenarioMoveInput): Promise<Scenario> {
+    const parsed = scenarioMoveInputSchema.parse(input);
+
+    return this.update({
+      id: parsed.scenarioId,
+      projectId: parsed.projectId,
+      folderId: parsed.folderId,
+    });
+  }
+
+  async duplicate(input: ScenarioDuplicateInput): Promise<Scenario> {
+    const parsed = scenarioDuplicateInputSchema.parse(input);
+    const original = await this.getById({
+      id: parsed.scenarioId,
+      projectId: parsed.projectId,
+    });
+
+    return this.create({
+      projectId: original.projectId,
+      name: `${original.name} (copy)`,
+      situation: original.situation,
+      criteria: original.criteria,
+      labels: original.labels,
+      parameters: scenarioParameterDefinitionsSchema.nullable().parse(original.parameters),
+      simulatorModel: original.simulatorModel,
+      judgeModel: original.judgeModel,
+      maxTurns: original.maxTurns,
+      minTurns: original.minTurns,
+      folderId: original.folderId,
+      lastUpdatedById: parsed.lastUpdatedById ?? null,
+    });
+  }
+
+  async listVersions(input: ScenarioVersionListInput): Promise<{
+    versions: ScenarioVersionSummary[];
+    nextCursor: number | null;
+  }> {
+    const parsed = scenarioVersionListInputSchema.parse(input);
+    const scenario = await this.options.repository.findByIdIncludingArchived({
+      id: parsed.scenarioId,
+      projectId: parsed.projectId,
+    });
+
+    const take = parsed.limit ?? defaultVersionPageSize;
+    const versions = await this.options.repository.findVersions({ ...parsed, take });
+    const storedVersionCount = versions.length;
+    const lastStoredVersion = versions[versions.length - 1];
+    const reachedBottom = versions.length < take;
+    const hasStoredFirstVersion = versions.some((version) => version.version === 1);
+    const pageCoversFirstVersion = parsed.cursor === void 0 || parsed.cursor > 1;
+    if (reachedBottom && !hasStoredFirstVersion && pageCoversFirstVersion) {
+      versions.push({
+        version: 1,
+        authorId: null,
+        authorLabel: null,
+        changeDescription: "Created",
+        changedFields: [],
+        createdAt: scenario.createdAt,
+        isSynthesized: true,
+      });
+    }
+
+    return {
+      versions,
+      nextCursor:
+        storedVersionCount === take && lastStoredVersion && lastStoredVersion.version > 1
+          ? lastStoredVersion.version
+          : null,
+    };
+  }
+
+  async getVersion(input: ScenarioVersionInput): Promise<ScenarioVersionDetail> {
+    const parsed = scenarioVersionInputSchema.parse(input);
+    await this.options.repository.findByIdIncludingArchived({
+      id: parsed.scenarioId,
+      projectId: parsed.projectId,
+    });
+
+    return this.options.repository.findVersion(parsed);
+  }
+
+  restoreVersion(input: ScenarioVersionRestoreInput): Promise<Scenario> {
+    return this.options.repository.restoreVersion(scenarioVersionRestoreInputSchema.parse(input));
   }
 
   async archive(input: ScenarioIdInput): Promise<Scenario> {
@@ -106,6 +219,7 @@ export class ScenarioService extends ScenarioServiceContract {
     if (!scenario) {
       throw new ScenarioNotFoundError(parsed.id);
     }
+
     return scenario;
   }
 
@@ -124,13 +238,15 @@ export class ScenarioService extends ScenarioServiceContract {
     });
     const failed = result.missing.map((id) => ({
       id,
-      error: String(new ScenarioNotFoundError(id)),
+      error: "Not found",
     }));
+
     return { archived: result.archived, failed };
   }
 
   createFolder(input: ScenarioFolderCreateInput): Promise<ScenarioFolder> {
     const parsed = scenarioFolderCreateInputSchema.parse(input);
+
     return this.options.repository.createFolder({
       ...parsed,
       id: this.options.folderIds.next(),
@@ -149,6 +265,7 @@ export class ScenarioService extends ScenarioServiceContract {
 
   async renameFolder(input: ScenarioFolderRenameInput): Promise<ScenarioFolder> {
     const parsed = scenarioFolderRenameInputSchema.parse(input);
+
     return this.options.repository.renameFolder(parsed);
   }
 
@@ -162,6 +279,7 @@ export class ScenarioService extends ScenarioServiceContract {
 
   async archiveFolder(input: ScenarioFolderIdInput): Promise<ScenarioFolder> {
     const parsed = scenarioFolderIdInputSchema.parse(input);
+
     return this.options.repository.archiveFolder({
       ...parsed,
       archivedAt: this.options.clock.now(),
@@ -198,12 +316,13 @@ export class ScenarioService extends ScenarioServiceContract {
       ids: [parsed.id],
       projectId: parsed.projectId,
     });
-    if (configs.length === 0) {
+    const [config] = configs;
+    if (!config) {
       throw new ScenarioNotFoundError(parsed.id);
     }
 
     const [forScenario] = await this.resolveRunParametersForScenarios({
-      scenarios: configs,
+      scenarios: [config],
       values,
     });
     if (!forScenario) {
@@ -213,6 +332,7 @@ export class ScenarioService extends ScenarioServiceContract {
     return {
       parameters: forScenario.parameters,
       secretParameters: forScenario.secretParameters,
+      scenarioVersion: config.version,
     };
   }
 
@@ -221,12 +341,23 @@ export class ScenarioService extends ScenarioServiceContract {
     values?: ResolveScenarioRunParametersInput["values"];
   }): Promise<ResolvedScenarioRunParametersForScenario[]> {
     const resolved = await resolveRunParameters(input);
+    const versionsById = new Map(
+      input.scenarios.map((scenario) => [scenario.id, scenario.version]),
+    );
 
-    return [...resolved].map(([scenarioId, values]) => ({
-      scenarioId,
-      parameters: values.parameters,
-      secretParameters: this.encryptSecretParameters(values.secretParameters),
-    }));
+    return [...resolved].map(([scenarioId, values]) => {
+      const scenarioVersion = versionsById.get(scenarioId);
+      if (scenarioVersion === void 0) {
+        throw new ScenarioNotFoundError(scenarioId);
+      }
+
+      return {
+        scenarioId,
+        parameters: values.parameters,
+        secretParameters: this.runSecrets.encrypt(values.secretParameters),
+        scenarioVersion,
+      };
+    });
   }
 
   async cancelJob(input: CancelScenarioRunInput): Promise<{ cancelled: boolean }> {
@@ -292,16 +423,5 @@ export class ScenarioService extends ScenarioServiceContract {
       cancelledCount,
       skippedCount: runs.length - cancellable.length,
     };
-  }
-
-  private encryptSecretParameters(
-    values: Record<string, string>,
-  ): ResolvedScenarioRunParameters["secretParameters"] {
-    return Object.fromEntries(
-      Object.entries(values).map(([name, value]) => [
-        name,
-        this.options.secretCipher.encrypt(value),
-      ]),
-    );
   }
 }

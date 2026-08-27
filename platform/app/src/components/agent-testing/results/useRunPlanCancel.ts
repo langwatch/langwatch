@@ -5,14 +5,13 @@
  */
 
 import { useCallback } from "react";
+import { isOnPlatformSet, type ScenarioRunData } from "@langwatch/scenario-contract";
+import { isSuiteSetId } from "@langwatch/suite-contract";
 import { useCancelScenarioRun } from "~/components/suites/useCancelScenarioRun";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useCan } from "~/hooks/useCan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
-import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { isSuiteSetId } from "@langwatch/suite-contract";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 /** What the person is told once a cancellation lands, and the list reread. */
@@ -55,12 +54,8 @@ export function useRunPlanCancel({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const { can } = useCan();
-  const cancellingJobId = useAgentTestingStore(
-    (state) => state.cancellingJobId,
-  );
-  const setCancellingJobId = useAgentTestingStore(
-    (state) => state.setCancellingJobId,
-  );
+  const cancellingJobId = useAgentTestingStore((state) => state.cancellingJobId);
+  const setCancellingJobId = useAgentTestingStore((state) => state.setCancellingJobId);
 
   const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun(
     cancelCallbacks({ refetch, setCancellingJobId }),
@@ -69,8 +64,7 @@ export function useRunPlanCancel({
   // Only a set the platform runs can be stopped from here, and only by a
   // person who may manage runs.
   const canStop =
-    can("scenarios:manage") &&
-    (isOnPlatformSet(scenarioSetId) || isSuiteSetId(scenarioSetId));
+    can("scenarios:manage") && (isOnPlatformSet(scenarioSetId) || isSuiteSetId(scenarioSetId));
 
   const handleCancelRun = useCallback(
     (scenarioRun: ScenarioRunData) => {

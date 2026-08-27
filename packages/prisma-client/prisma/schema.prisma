@@ -2860,7 +2860,8 @@ model Scenario {
   // The folder (a SimulationSuite with kind "folder") this scenario is filed
   // in, or null for an unfiled scenario. This column is the source of truth
   // for folder membership; the folder's scenarioIds is a denormalized copy
-  // kept in step by reconcileFolderMembership (server/suites/folder-membership.ts).
+  // kept in step transactionally by the canonical Scenario repository in
+  // @langwatch/scenario-server.
   // See specs/suites/folder-membership-invariant.feature.
   folderId        String?
   folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)

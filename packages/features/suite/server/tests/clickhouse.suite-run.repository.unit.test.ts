@@ -98,16 +98,28 @@ describe("ClickHouseSuiteRunRepository", () => {
     });
   });
 
-  it("preserves the default-set compatibility filter and history limit", async () => {
+  it("preserves the default-set compatibility filter and history limits", async () => {
     const { repository, query } = setup([]);
+    await repository.getBatchHistory({
+      projectId: "project_1",
+      scenarioSetId: "default",
+    });
     await repository.getBatchHistory({
       projectId: "project_1",
       scenarioSetId: "default",
       limit: 999,
     });
-    const input = query.mock.calls[0]?.[0] as { query_params: Record<string, unknown> };
-    expect(input.query_params.scenarioSetIds).toEqual(["default", ""]);
-    expect(input.query_params.limit).toBe(100);
+    const defaultInput = query.mock.calls[0]?.[0] as {
+      query_params: Record<string, unknown>;
+    };
+    const cappedInput = query.mock.calls[1]?.[0] as {
+      query_params: Record<string, unknown>;
+    };
+    expect(defaultInput.query_params).toMatchObject({
+      scenarioSetIds: ["default", ""],
+      limit: 50,
+    });
+    expect(cappedInput.query_params.limit).toBe(100);
   });
 
   it("wraps ClickHouse resolution failures instead of silently succeeding", async () => {

@@ -10,13 +10,13 @@
  */
 
 import { generate } from "@langwatch/ksuid";
+import { getOnPlatformSetId } from "@langwatch/scenario-contract";
+import { getSuiteSetId } from "@langwatch/suite-contract";
 import { useCallback, useRef } from "react";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRunScenario } from "~/hooks/useRunScenario";
 import { writeScenarioTarget } from "~/hooks/useScenarioTarget";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { getSuiteSetId } from "@langwatch/suite-contract";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { useAgentTestingStore } from "../useAgentTestingStore";
@@ -89,9 +89,7 @@ function useCaseRunScenario({
 function useCaseRun(input: BatchRunInput) {
   const { target, projectId, noteInput, runParameters } = input;
   const { onRunStarted, onClose, setMissingProvider } = input;
-  const setLastRunTarget = useAgentTestingStore(
-    (state) => state.setLastRunTarget,
-  );
+  const setLastRunTarget = useAgentTestingStore((state) => state.setLastRunTarget);
   const { hasEnabledProviders } = useModelProvidersSettings({
     projectId: projectId || undefined,
   });
@@ -161,14 +159,7 @@ function useQueueSuiteRun(input: BatchRunInput) {
         scenarioSetId: getSuiteSetId(suiteId),
       });
     },
-    [
-      projectId,
-      noteInput,
-      runParameters,
-      onRunStarted,
-      persistTargetChoice,
-      runSuite,
-    ],
+    [projectId, noteInput, runParameters, onRunStarted, persistTargetChoice, runSuite],
   );
 
   return { queueSuiteRun, isSuitePending: runSuite.isPending };
@@ -179,9 +170,7 @@ function useQueueAllRun(input: BatchRunInput) {
   const runAll = api.suites.runAll.useMutation();
   const { projectId, target, suiteTargets, noteInput, runParameters } = input;
   const { onRunStarted } = input;
-  const setLastRunTarget = useAgentTestingStore(
-    (state) => state.setLastRunTarget,
-  );
+  const setLastRunTarget = useAgentTestingStore((state) => state.setLastRunTarget);
 
   const queueAllRun = useCallback(
     async (attempt: RunAttempt) => {

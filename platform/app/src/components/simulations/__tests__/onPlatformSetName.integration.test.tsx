@@ -8,9 +8,9 @@
  * @see specs/suites/one-off-runs-surface.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
 import { SetCard } from "../SetCard";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

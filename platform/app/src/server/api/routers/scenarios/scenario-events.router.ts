@@ -1,10 +1,7 @@
 import { on } from "node:events";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import type {
-  SimulationBatchRunData,
-  SimulationService,
-} from "@langwatch/simulation-contract";
+import type { SimulationBatchRunData, SimulationService } from "@langwatch/simulation-contract";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { startScenarioTabPresence } from "@langwatch/scenario-contract";
@@ -163,10 +160,9 @@ export const scenarioEventsRouter = createTRPCRouter({
         .extend(dateRangeFields),
     )
     .permission("scenarios:view")
-    .query(async ({ input }) => {
-      const service = getApp().simulations.runs;
+    .query(async ({ input, ctx }) => {
       const dates = resolveDateRange(input);
-      return service.getLastResultSummaries({
+      return ctx.app.simulations.getLastResultSummaries({
         projectId: input.projectId,
         scenarioIds: input.scenarioIds,
         ...dates,
@@ -178,11 +174,7 @@ export const scenarioEventsRouter = createTRPCRouter({
   // response and invalidate getSuiteRunData only when the value advances,
   // instead of re-downloading run payloads on a timer.
   getSuiteRunFreshness: protectedProcedure
-    .input(
-      projectSchema
-        .extend({ scenarioSetId: z.string().optional() })
-        .extend(dateRangeFields),
-    )
+    .input(projectSchema.extend({ scenarioSetId: z.string().optional() }).extend(dateRangeFields))
     .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       const dates = resolveDateRange(input);
@@ -447,10 +439,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         for await (const eventArgs of on(emitter, "simulation_updated", {
           signal,
         })) {
-          logger.debug(
-            { projectId, event: eventArgs[0] },
-            "Simulation SSE event received",
-          );
+          logger.debug({ projectId, event: eventArgs[0] }, "Simulation SSE event received");
           yield eventArgs[0];
         }
       } catch (error) {

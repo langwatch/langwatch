@@ -12,7 +12,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { RunParameterValues } from "~/server/scenarios/parameters";
+import type { RunParameterValues } from "@langwatch/scenario-contract";
 import { serializeOptionalScalarValue } from "~/utils/jsonValueText";
 import { parseParameterLine } from "./parameter-line";
 
@@ -53,9 +53,7 @@ export function canCollapseRows(rows: ParameterRow[]): boolean {
 
 /** The named rows, keyed once so a repeated key keeps its last value. */
 function namedRows(rows: ParameterRow[]): ParameterRow[] {
-  return rows
-    .map((row) => ({ ...row, name: row.name.trim() }))
-    .filter((row) => row.name !== "");
+  return rows.map((row) => ({ ...row, name: row.name.trim() })).filter((row) => row.name !== "");
 }
 
 /**
@@ -102,9 +100,7 @@ function rowValueOf(row: ParameterRow) {
  * A row left with an empty value is dropped, the way the line drops one: the
  * run falls back to the default the cases declare for that name.
  */
-export function toStorableRowParameters(
-  rows: ParameterRow[],
-): RunParameterValues | undefined {
+export function toStorableRowParameters(rows: ParameterRow[]): RunParameterValues | undefined {
   const parameters: RunParameterValues = {};
   for (const row of namedRows(rows)) {
     if (row.secret) continue;
@@ -121,9 +117,7 @@ export function toStorableRowParameters(
  * The next dialog shows the row again with an empty value, so a run that
  * needs a credential asks for it every time instead of losing the row.
  */
-export function storableSecretRowNames(
-  rows: ParameterRow[],
-): string[] | undefined {
+export function storableSecretRowNames(rows: ParameterRow[]): string[] | undefined {
   const names = [
     ...new Set(
       namedRows(rows)

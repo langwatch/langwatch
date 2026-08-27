@@ -1,5 +1,8 @@
-import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "../scenarios/scenario-event.types";
+import {
+  type SimulationRunData as ScenarioRunData,
+  SimulationRunStatus as ScenarioRunStatus,
+  SimulationVerdict as Verdict,
+} from "@langwatch/simulation-contract";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 
@@ -92,15 +95,13 @@ export function mapClickHouseRowToScenarioRunData(
   const startedAt = row.StartedAt != null ? Number(row.StartedAt) : null;
   const createdAt = Number(row.CreatedAt);
   const finishedAt = row.FinishedAt != null ? Number(row.FinishedAt) : null;
-  const durationMs =
-    row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
+  const durationMs = row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
   // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
 
   // Unfinished runs collapse to IN_PROGRESS; only a finished run keeps its
   // stored status.
-  const resolvedStatus =
-    finishedAt != null ? baseStatus : ScenarioRunStatus.IN_PROGRESS;
+  const resolvedStatus = finishedAt != null ? baseStatus : ScenarioRunStatus.IN_PROGRESS;
 
   const verdictEnum = mapVerdict(row.Verdict);
 
@@ -152,19 +153,17 @@ export function mapClickHouseRowToScenarioRunData(
     ? (() => {
         try {
           const parsed: unknown = JSON.parse(row.Metadata);
-          if (
-            parsed == null ||
-            typeof parsed !== "object" ||
-            Array.isArray(parsed)
-          ) {
+          if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
             return null;
           }
           // A run's secret parameter values never belong in a stored row, and
           // the fold projection keeps them out. Dropped again on the way out
           // so a row written by another path cannot serve one. The names, on
           // `secretParameterNames`, stay.
-          const { secretParameters: _secretParameters, ...rest } =
-            parsed as Record<string, unknown>;
+          const { secretParameters: _secretParameters, ...rest } = parsed as Record<
+            string,
+            unknown
+          >;
           return rest;
         } catch {
           return null;
@@ -189,15 +188,9 @@ export function mapClickHouseRowToScenarioRunData(
     timestamp: startedAt ?? createdAt,
     updatedAt,
     durationInMs:
-      durationMs ??
-      (finishedAt != null
-        ? finishedAt - startTimestamp
-        : updatedAt - startTimestamp),
+      durationMs ?? (finishedAt != null ? finishedAt - startTimestamp : updatedAt - startTimestamp),
     totalCost: row.TotalCost ?? undefined,
-    roleCosts:
-      row.RoleCosts && Object.keys(row.RoleCosts).length > 0
-        ? row.RoleCosts
-        : undefined,
+    roleCosts: row.RoleCosts && Object.keys(row.RoleCosts).length > 0 ? row.RoleCosts : undefined,
     roleLatencies:
       row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0
         ? row.RoleLatencies

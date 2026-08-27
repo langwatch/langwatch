@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { scenarioParameterDefinitionsSchema } from "./scenario.parameters";
 
+export const scenarioAuthorLabelSchema = z.enum(["user", "api", "cli", "langy"]);
+export type ScenarioAuthorLabel = z.infer<typeof scenarioAuthorLabelSchema>;
+
+export const scenarioActorSchema = z
+  .object({
+    userId: z.string().min(1).nullable(),
+    label: scenarioAuthorLabelSchema,
+  })
+  .strict();
+export type ScenarioActor = z.infer<typeof scenarioActorSchema>;
+
 export const jsonValueSchema = z.json();
 export type JsonValue = z.infer<typeof jsonValueSchema>;
 
@@ -94,7 +105,7 @@ const scenarioFieldsSchema = z
     situation: z.string(),
     criteria: z.array(z.string()).default([]),
     labels: z.array(z.string()).default([]),
-    parameters: scenarioParameterDefinitionsSchema.optional(),
+    parameters: scenarioParameterDefinitionsSchema.nullable().optional(),
     simulatorModel: z.string().nullable().optional(),
     judgeModel: z.string().nullable().optional(),
     maxTurns: z.number().int().min(1).max(100).nullable().optional(),
@@ -106,12 +117,18 @@ const scenarioFieldsSchema = z
 
 export const scenarioCreateInputSchema = scenarioFieldsSchema.extend({
   projectId: z.string().min(1),
+  actor: scenarioActorSchema.optional(),
 });
 export type ScenarioCreateInput = z.infer<typeof scenarioCreateInputSchema>;
 
 export const scenarioUpdateInputSchema = scenarioFieldsSchema
   .partial()
-  .extend(scenarioIdInputSchema.shape)
+  .extend({
+    ...scenarioIdInputSchema.shape,
+    actor: scenarioActorSchema.optional(),
+    expectedVersion: z.number().int().positive().optional(),
+    changeDescription: z.string().min(1).optional(),
+  })
   .strict();
 export type ScenarioUpdateInput = z.infer<typeof scenarioUpdateInputSchema>;
 

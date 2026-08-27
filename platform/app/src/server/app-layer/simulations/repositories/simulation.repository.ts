@@ -1,12 +1,12 @@
 import type {
-  BatchHistoryResult,
-  BatchRunDataResult,
-  BatchSummary,
-  ExternalSetSummary,
-  ScenarioLastResultSummary,
-  ScenarioRunData,
-  ScenarioSetData,
-} from "~/server/scenarios/scenario-event.types";
+  SimulationBatchHistory as BatchHistoryResult,
+  SimulationBatchRunData as BatchRunDataResult,
+  SimulationBatchSummary as BatchSummary,
+  SimulationExternalSetSummary as ExternalSetSummary,
+  SimulationLastResultSummary as ScenarioLastResultSummary,
+  SimulationRunData as ScenarioRunData,
+  SimulationSetData as ScenarioSetData,
+} from "@langwatch/simulation-contract";
 
 /**
  * A run carrying the two columns the shared mapper drops but an export needs.
@@ -64,10 +64,7 @@ export interface SimulationRepository {
    * Counts for one batch, addressed by its batch run id alone. Returns null
    * when the project holds no run for that batch.
    */
-  getBatchSummary(params: {
-    projectId: string;
-    batchRunId: string;
-  }): Promise<BatchSummary | null>;
+  getBatchSummary(params: { projectId: string; batchRunId: string }): Promise<BatchSummary | null>;
 
   getRunDataForBatchRun(params: {
     projectId: string;
@@ -161,9 +158,7 @@ export interface SimulationRepository {
    * Returns distinct external (non-internal) scenario set IDs across the given projects.
    * Used for cross-org counting of scenario sets for limit enforcement.
    */
-  getDistinctExternalSetIds(params: {
-    projectIds: string[];
-  }): Promise<Set<string>>;
+  getDistinctExternalSetIds(params: { projectIds: string[] }): Promise<Set<string>>;
 
   /**
    * Total runs an export sweep will visit, for the progress total. Shares its

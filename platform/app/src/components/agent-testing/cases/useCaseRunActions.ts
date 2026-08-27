@@ -6,9 +6,9 @@
  */
 
 import { useCallback, useState } from "react";
+import { getOnPlatformSetId } from "@langwatch/scenario-contract";
 import { toaster } from "~/components/ui/toaster";
 import { readScenarioTarget } from "~/hooks/useScenarioTarget";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import type { RunDialogSubject, RunStartedInfo } from "../run/RunDialog";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { useAgentTestingStore } from "../useAgentTestingStore";
@@ -31,9 +31,7 @@ function runSubjectForSuite({
     scenarioIds: cases
       .filter((testCase) => testCase.folderId === suite.id)
       .map((testCase) => testCase.id),
-    initialTarget: persisted
-      ? { type: persisted.type, id: persisted.referenceId }
-      : null,
+    initialTarget: persisted ? { type: persisted.type, id: persisted.referenceId } : null,
     persistedTarget: persisted ?? null,
   };
 }

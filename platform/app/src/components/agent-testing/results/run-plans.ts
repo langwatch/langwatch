@@ -13,25 +13,17 @@
  * @see specs/suites/one-off-runs-surface.feature
  */
 
-import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
 import {
-  EXTERNAL_SET_PREFIX,
-  isExternalSetSelection,
-} from "~/components/suites/useSuiteRouting";
-import {
+  type ExternalSetSummary,
   getOnPlatformSetId,
   isOnPlatformSet,
-} from "~/server/scenarios/internal-set-id";
-import type {
-  ExternalSetSummary,
-  ScenarioRunData,
-  SuiteRunSummary,
+  type ScenarioRunData,
+  type SuiteRunSummary,
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
-import {
-  ONE_OFF_RUNS_PLAN_SLUG,
-  RESULTS_SEGMENT,
-} from "../useAgentTestingRouting";
+import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
+import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "~/components/suites/useSuiteRouting";
+import { ONE_OFF_RUNS_PLAN_SLUG, RESULTS_SEGMENT } from "../useAgentTestingRouting";
 
 /** What the one-off run plan reads as in the v2 interface. */
 export const ONE_OFF_RUNS_DISPLAY_NAME = "One-off runs";
@@ -122,10 +114,7 @@ export function toAgentTestingRunPath(pathname: string): string | null {
 }
 
 function toLastRun(
-  summary: Pick<
-    SuiteRunSummary,
-    "passedCount" | "failedCount" | "totalCount" | "lastRunTimestamp"
-  >,
+  summary: Pick<SuiteRunSummary, "passedCount" | "failedCount" | "totalCount" | "lastRunTimestamp">,
 ): RunPlanLastRun {
   return {
     passedCount: summary.passedCount,
@@ -200,9 +189,7 @@ export function buildRunPlans({
     lastRun: oneOffLastRun,
   };
 
-  return [...suitePlans, ...externalPlans]
-    .sort(byLastRunDesc)
-    .concat(oneOffPlan);
+  return [...suitePlans, ...externalPlans].sort(byLastRunDesc).concat(oneOffPlan);
 }
 
 /**
@@ -256,8 +243,7 @@ export function resolveRunPlan({
 export function toRunGroupSummary(lastRun: RunPlanLastRun): RunGroupSummary {
   const settledCount = lastRun.settledCount;
   return {
-    passRate:
-      settledCount > 0 ? (lastRun.passedCount / settledCount) * 100 : null,
+    passRate: settledCount > 0 ? (lastRun.passedCount / settledCount) * 100 : null,
     passedCount: lastRun.passedCount,
     failedCount: lastRun.failedCount,
     stalledCount: 0,
@@ -329,10 +315,7 @@ export function oneOffRunTitle(scenarioRuns: ScenarioRunData[]): string | null {
 }
 
 /** The window a run outside the current one needs, in days. */
-export function widenedWindowDays(
-  lastRunTimestamp: number,
-  now: number,
-): 30 | 90 | 365 {
+export function widenedWindowDays(lastRunTimestamp: number, now: number): 30 | 90 | 365 {
   const daysAgo = Math.ceil((now - lastRunTimestamp) / 86_400_000);
   if (daysAgo <= 30) return 30;
   if (daysAgo <= 90) return 90;

@@ -13,10 +13,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type {
-  RunParameterValues,
-  ScenarioParameterDefinition,
-} from "~/server/scenarios/parameters";
+import type { RunParameterValues, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import {
   displayOptionalValue,
   serializeOptionalScalarValue,
@@ -56,15 +53,10 @@ export function formatStoredParameterLine(values: RunParameterValues): string {
 }
 
 /** The line a set of declared parameters starts on: every default, in order. */
-export function formatParameterLine(
-  definitions: ScenarioParameterDefinition[],
-): string {
+export function formatParameterLine(definitions: ScenarioParameterDefinition[]): string {
   return definitions
     .filter((definition) => definition.secret !== true)
-    .map(
-      (definition) =>
-        `${definition.name}=${displayOptionalValue(definition.defaultValue)}`,
-    )
+    .map((definition) => `${definition.name}=${displayOptionalValue(definition.defaultValue)}`)
     .join(", ");
 }
 

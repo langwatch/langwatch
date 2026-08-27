@@ -32,6 +32,7 @@ const mockGetRunConfigByIds = vi.fn<
     situation: "User asks a question",
     criteria: ["Must respond politely"],
     parameters: null,
+    version: 1,
   })),
 );
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
@@ -135,7 +136,12 @@ describe("simulationRunnerRouter.run", () => {
           throw new ScenarioNotFoundError(input.scenarioId);
         }
 
-        return values;
+        const scenario = scenarios.find((candidate) => candidate.id === input.scenarioId);
+        if (!scenario) {
+          throw new ScenarioNotFoundError(input.scenarioId);
+        }
+
+        return { ...values, scenarioVersion: scenario.version };
       },
     );
     caller = createTestCaller();
@@ -170,9 +176,7 @@ describe("simulationRunnerRouter.run", () => {
 
   describe("given scenario does not exist", () => {
     beforeEach(() => {
-      mockResolveRunParameters.mockRejectedValue(
-        new ScenarioNotFoundError("nonexistent"),
-      );
+      mockResolveRunParameters.mockRejectedValue(new ScenarioNotFoundError("nonexistent"));
     });
 
     describe("when run is called", () => {
@@ -591,9 +595,9 @@ describe("simulationRunnerRouter.run", () => {
       });
 
       it("rejects a note longer than the limit before anything is queued", async () => {
-        await expect(
-          caller.run({ ...defaultInput, note: "a".repeat(201) }),
-        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(caller.run({ ...defaultInput, note: "a".repeat(201) })).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+        });
 
         expect(mockQueueRun).not.toHaveBeenCalled();
       });

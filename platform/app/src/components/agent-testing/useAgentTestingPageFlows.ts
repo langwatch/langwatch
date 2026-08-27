@@ -6,10 +6,10 @@
  */
 
 import { useCallback, useEffect } from "react";
+import { getOnPlatformSetId } from "@langwatch/scenario-contract";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOpenLiveRun } from "./cases/useOpenLiveRun";
@@ -18,9 +18,7 @@ import type { AgentTestingSelection } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
 /** The id of the suite the address names, or nothing for any other selection. */
-export function useSelectedSuiteFolderId(
-  selection: AgentTestingSelection,
-): string | null {
+export function useSelectedSuiteFolderId(selection: AgentTestingSelection): string | null {
   const { project } = useOrganizationTeamProject();
 
   // The rail reads the same list, so this is the cached copy rather than a
@@ -50,9 +48,7 @@ export function useHydrateViewFromUrl(): void {
 }
 
 /** Opens the run plan editor, and lands on the plan it saved. */
-export function useNewRunPlanFlow(
-  selectPlan: (planSlug: string | null) => void,
-): () => void {
+export function useNewRunPlanFlow(selectPlan: (planSlug: string | null) => void): () => void {
   const { openDrawer, setFlowCallbacks } = useDrawer();
 
   const handleSuiteSaved = useCallback(

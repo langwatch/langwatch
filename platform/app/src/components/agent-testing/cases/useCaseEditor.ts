@@ -9,29 +9,16 @@
  * @see specs/scenarios/scenario-versioning.feature
  */
 
-import {
-  type MutableRefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { readHandledError, showErrorToast } from "~/features/errors";
-import type { Scenario } from "~/generated/prisma/client";
+import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   parseScenarioParameterDefinitions,
   type ScenarioParameterDefinition,
-} from "~/server/scenarios/parameters";
+} from "@langwatch/scenario-contract";
+import { readHandledError, showErrorToast } from "~/features/errors";
+import type { Scenario } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
-import {
-  formatParameterLine,
-  toParameterDefinitions,
-} from "../run/parameter-line";
-import {
-  type CaseCustomizeBlocks,
-  useCaseCustomizeBlocks,
-} from "./useCaseCustomizeBlocks";
+import { formatParameterLine, toParameterDefinitions } from "../run/parameter-line";
+import { type CaseCustomizeBlocks, useCaseCustomizeBlocks } from "./useCaseCustomizeBlocks";
 
 /** What a person types into the editor. */
 export type CaseDraft = {
@@ -69,9 +56,7 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
     situation: scenario.situation,
     rubrics: scenario.criteria.join("\n"),
     labels: scenario.labels,
-    parameters: formatParameterLine(
-      parseScenarioParameterDefinitions(scenario.parameters),
-    ),
+    parameters: formatParameterLine(parseScenarioParameterDefinitions(scenario.parameters)),
     folderId: scenario.folderId,
     simulatorModel: scenario.simulatorModel,
     judgeModel: scenario.judgeModel,
@@ -156,8 +141,7 @@ function useCaseDraft({
   }, [seed, seededFrom?.id, folderId]);
 
   const setDraft = useCallback(
-    (update: Partial<CaseDraft>) =>
-      setDraftState((current) => ({ ...current, ...update })),
+    (update: Partial<CaseDraft>) => setDraftState((current) => ({ ...current, ...update })),
     [],
   );
 
@@ -187,8 +171,7 @@ function useCaseWrites({
       invalidate();
       onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create the test case" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create the test case" }),
   });
 
   const updateMutation = api.scenarios.update.useMutation({
@@ -246,8 +229,7 @@ function savePayload({
 function useCaseProblem(draft: CaseDraft): string | null {
   return useMemo(() => {
     if (!draft.title.trim()) return "A test case needs a title.";
-    if (rubricsOf(draft).length === 0)
-      return "A test case needs at least one rubric.";
+    if (rubricsOf(draft).length === 0) return "A test case needs at least one rubric.";
     return null;
   }, [draft]);
 }
@@ -273,9 +255,7 @@ function useCaseSave({
   runAfterSave: MutableRefObject<boolean>;
   createMutation: { mutate: (input: SavePayload) => void };
   updateMutation: {
-    mutate: (
-      input: SavePayload & { id: string; expectedVersion: number },
-    ) => void;
+    mutate: (input: SavePayload & { id: string; expectedVersion: number }) => void;
   };
 }) {
   return useCallback(
@@ -345,8 +325,11 @@ export function useCaseEditor({
 
   const customize = useCaseCustomizeBlocks({ seedCount, draft, setDraft });
 
-  const { createMutation, updateMutation, staleVersion, setStaleVersion } =
-    useCaseWrites({ projectId, onSaved, runAfterSave });
+  const { createMutation, updateMutation, staleVersion, setStaleVersion } = useCaseWrites({
+    projectId,
+    onSaved,
+    runAfterSave,
+  });
 
   useEffect(() => {
     if (open) setStaleVersion(null);

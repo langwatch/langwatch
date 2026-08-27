@@ -5,6 +5,7 @@ import {
   scenarioParameterDefinitionsSchema,
   ScenarioNotFoundError,
   type Scenario,
+  type ScenarioActor,
 } from "@langwatch/scenario-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
@@ -27,9 +28,7 @@ const scenarioResponseSchema = z.object({
   folderId: z
     .string()
     .nullable()
-    .describe(
-      "The test suite (folder) this scenario is filed in, or null when unfiled.",
-    ),
+    .describe("The test suite (folder) this scenario is filed in, or null when unfiled."),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
@@ -47,13 +46,9 @@ const scenarioVersionSummarySchema = z.object({
   authorId: z
     .string()
     .nullable()
-    .describe(
-      "The user who saved the version. Null when the save came from an API key.",
-    ),
+    .describe("The user who saved the version. Null when the save came from an API key."),
   changeDescription: z.string().nullable(),
-  changedFields: z
-    .array(z.string())
-    .describe("The fields whose value this save changed."),
+  changedFields: z.array(z.string()).describe("The fields whose value this save changed."),
   createdAt: z.string().describe("When the version was written, in ISO 8601."),
   isSynthesized: z
     .boolean()
@@ -68,32 +63,25 @@ const scenarioVersionListResponseSchema = z.object({
     .number()
     .int()
     .nullable()
-    .describe(
-      "Pass as cursor to read the page below this one. Null on the last page.",
-    ),
+    .describe("Pass as cursor to read the page below this one. Null on the last page."),
 });
 
-const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend(
-  {
-    schemaVersion: z
-      .number()
-      .int()
-      .describe("The shape the snapshot was written in."),
-    snapshot: z
-      .object({
-        name: z.string(),
-        situation: z.string(),
-        criteria: z.array(z.string()),
-        labels: z.array(z.string()),
-        parameters: z.array(scenarioParameterDefinitionSchema),
-        simulatorModel: z.string().nullable(),
-        judgeModel: z.string().nullable(),
-        maxTurns: z.number().nullable(),
-        minTurns: z.number().nullable(),
-      })
-      .describe("The editable content of the case as this version saved it."),
-  },
-);
+const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend({
+  schemaVersion: z.number().int().describe("The shape the snapshot was written in."),
+  snapshot: z
+    .object({
+      name: z.string(),
+      situation: z.string(),
+      criteria: z.array(z.string()),
+      labels: z.array(z.string()),
+      parameters: z.array(scenarioParameterDefinitionSchema),
+      simulatorModel: z.string().nullable(),
+      judgeModel: z.string().nullable(),
+      maxTurns: z.number().nullable(),
+      minTurns: z.number().nullable(),
+    })
+    .describe("The editable content of the case as this version saved it."),
+});
 
 const listScenarioVersionsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -120,9 +108,7 @@ const createScenarioSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()).optional().default([]),
   labels: z.array(z.string()).optional().default([]),
-  parameters: scenarioParameterDefinitionsSchema
-    .optional()
-    .describe(parametersDescription),
+  parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
   folderId: z.string().nullish().describe(folderIdDescription),
 });
 
@@ -131,9 +117,7 @@ const updateScenarioSchema = z.object({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
-  parameters: scenarioParameterDefinitionsSchema
-    .optional()
-    .describe(parametersDescription),
+  parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
   folderId: z.string().nullish().describe(folderIdDescription),
 });
 
@@ -310,6 +294,8 @@ function registerCreateScenarioRoute(
         criteria: body.criteria,
         labels: body.labels,
         ...(body.parameters !== undefined && { parameters: body.parameters }),
+        ...(body.folderId !== undefined && { folderId: body.folderId }),
+        actor: actorFromRequest(c),
       });
 
       return c.json(
@@ -379,6 +365,8 @@ function registerUpdateScenarioRoute(
         ...(body.criteria !== undefined && { criteria: body.criteria }),
         ...(body.labels !== undefined && { labels: body.labels }),
         ...(body.parameters !== undefined && { parameters: body.parameters }),
+        ...(body.folderId !== undefined && { folderId: body.folderId }),
+        actor: actorFromRequest(c),
       });
 
       return c.json({
@@ -475,14 +463,10 @@ function registerListScenarioVersionsRoute(
       const { id } = c.req.param();
       const { limit, cursor } = c.req.valid("query");
 
-      logger.info(
-        { projectId: project.id, scenarioId: id },
-        "Listing scenario versions",
-      );
+      logger.info({ projectId: project.id, scenarioId: id }, "Listing scenario versions");
 
-      const service = getService();
       try {
-        const page = await service.listVersions({
+        const page = await c.app.scenarios.listVersions({
           projectId: project.id,
           scenarioId: id,
           ...(limit !== undefined && { limit }),
@@ -549,14 +533,10 @@ function registerGetScenarioVersionRoute(
       const { id } = c.req.param();
       const { version } = c.req.valid("param");
 
-      logger.info(
-        { projectId: project.id, scenarioId: id, version },
-        "Getting scenario version",
-      );
+      logger.info({ projectId: project.id, scenarioId: id, version }, "Getting scenario version");
 
-      const service = getService();
       try {
-        const detail = await service.getVersion({
+        const detail = await c.app.scenarios.getVersion({
           projectId: project.id,
           scenarioId: id,
           version,
@@ -575,9 +555,7 @@ function registerGetScenarioVersionRoute(
             situation: detail.fields.situation,
             criteria: detail.fields.criteria,
             labels: detail.fields.labels,
-            parameters: parseScenarioParameterDefinitions(
-              detail.fields.parameters,
-            ),
+            parameters: parseScenarioParameterDefinitions(detail.fields.parameters),
             simulatorModel: detail.fields.simulatorModel,
             judgeModel: detail.fields.judgeModel,
             maxTurns: detail.fields.maxTurns,

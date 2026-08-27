@@ -7,9 +7,9 @@
  */
 
 import { useMemo } from "react";
+import { getOnPlatformSetId } from "@langwatch/scenario-contract";
 import type { Period } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
 import { buildRunPlans, type RunPlan, type RunPlanLastRun } from "./run-plans";
 
@@ -32,11 +32,10 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
 
   // Both kinds: a folder reads as a run plan of its own in the Test Runs
   // list, next to the hand-assembled custom plans.
-  const { data: suites, isLoading: isSuitesLoading } =
-    api.suites.getAll.useQuery(
-      { projectId, kinds: ["custom", "folder"] },
-      { enabled: !!project },
-    );
+  const { data: suites, isLoading: isSuitesLoading } = api.suites.getAll.useQuery(
+    { projectId, kinds: ["custom", "folder"] },
+    { enabled: !!project },
+  );
 
   const { data: suiteSummaries } = api.suites.getSummaries.useQuery(
     { projectId, startDate, endDate },
@@ -87,9 +86,7 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
   );
 
   const hasAnyPlans =
-    (suites?.length ?? 0) > 0 ||
-    (externalSets?.length ?? 0) > 0 ||
-    oneOffLastRun !== null;
+    (suites?.length ?? 0) > 0 || (externalSets?.length ?? 0) > 0 || oneOffLastRun !== null;
 
   return {
     plans,

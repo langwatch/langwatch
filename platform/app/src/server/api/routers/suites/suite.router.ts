@@ -7,6 +7,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { ValidationError } from "@langwatch/handled-error";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
 import type { SuiteRunSummary } from "@langwatch/scenario-contract";
@@ -228,16 +229,19 @@ export const suiteRouter = createTRPCRouter({
     )
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const projectRepository = new ProjectRepository(ctx.prisma);
-      const organizationId = await projectRepository.getOrganizationId({
-        projectId: input.projectId,
-      });
-      if (!organizationId) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Organization not found for project",
-        });
+      let organizationId: string;
+      try {
+        organizationId = await ctx.app.projects.getOrganizationId(input.projectId);
+      } catch (error) {
+        if (error instanceof ProjectNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Organization not found for project",
+          });
+        }
+        throw error;
       }
+
       const result = await ctx.app.suites.runAll({
         projectId: input.projectId,
         organizationId,

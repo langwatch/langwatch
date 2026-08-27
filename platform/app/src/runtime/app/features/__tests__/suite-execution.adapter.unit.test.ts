@@ -44,6 +44,7 @@ function input(
     projectId: "project_1",
     activeScenarioIds: ["scenario_1"],
     scenarioNames: new Map([["scenario_1", "Refund flow"]]),
+    scenarioVersions: new Map([["scenario_1", 3]]),
     scenarioConfigs: [
       {
         id: "scenario_1",
@@ -102,7 +103,11 @@ describe("AppSuiteExecutionPort", () => {
         scenarioSetId: "__internal__suite_1__suite",
         name: "Refund flow",
         metadata: {
-          langwatch: { targetReferenceId: "agent_1" },
+          langwatch: {
+            targetReferenceId: "agent_1",
+            targetType: "http",
+            scenarioVersion: 3,
+          },
           parameters: { account_tier: "platinum" },
         },
         target: { type: "http", referenceId: "agent_1" },
@@ -151,7 +156,11 @@ describe("AppSuiteExecutionPort", () => {
     expect(encrypted).toEqual(expect.objectContaining({ api_token: expect.any(String) }));
     expect(encrypted?.api_token).toBe("encrypted-token");
     expect(call.metadata).toEqual({
-      langwatch: { targetReferenceId: "agent_1" },
+      langwatch: {
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        scenarioVersion: 3,
+      },
       parameters: { account_tier: "gold" },
       secretParameterNames: ["api_token"],
     });

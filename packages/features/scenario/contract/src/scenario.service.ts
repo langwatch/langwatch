@@ -12,6 +12,15 @@ import type {
   ScenarioRunConfig,
   ScenarioUpdateInput,
 } from "./scenario";
+import type {
+  ScenarioDuplicateInput,
+  ScenarioMoveInput,
+  ScenarioVersionDetail,
+  ScenarioVersionInput,
+  ScenarioVersionListInput,
+  ScenarioVersionRestoreInput,
+  ScenarioVersionSummary,
+} from "./scenario.version";
 import type { RunParameterValues } from "./scenario.parameters";
 import type { RunSecretCiphertext } from "./run-secret-ciphertext";
 
@@ -38,6 +47,7 @@ export type ResolveScenarioRunParametersInput = {
 export type ResolvedScenarioRunParameters = {
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
+  scenarioVersion: number;
 };
 
 export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParameters & {
@@ -52,6 +62,14 @@ export abstract class ScenarioService {
   abstract list(input: { projectId: string }): Promise<Scenario[]>;
   abstract count(input: { projectId: string }): Promise<number>;
   abstract update(input: ScenarioUpdateInput): Promise<Scenario>;
+  abstract moveToFolder(input: ScenarioMoveInput): Promise<Scenario>;
+  abstract duplicate(input: ScenarioDuplicateInput): Promise<Scenario>;
+  abstract listVersions(input: ScenarioVersionListInput): Promise<{
+    versions: ScenarioVersionSummary[];
+    nextCursor: number | null;
+  }>;
+  abstract getVersion(input: ScenarioVersionInput): Promise<ScenarioVersionDetail>;
+  abstract restoreVersion(input: ScenarioVersionRestoreInput): Promise<Scenario>;
   abstract archive(input: ScenarioIdInput): Promise<Scenario>;
   abstract batchArchive(input: {
     ids: string[];

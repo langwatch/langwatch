@@ -54,18 +54,12 @@ function makeWindow(fromMs: number, toMs: number): SimulationWindowFragment {
   };
 }
 
-function makeRepository(
-  rows: unknown[][] = [],
-  windowedRead = new FixtureWindowedRead(),
-) {
+function makeRepository(rows: unknown[][] = [], windowedRead = new FixtureWindowedRead()) {
   const fixture = new FixtureClient(rows);
   return {
     fixture,
     windowedRead,
-    repository: SimulationClickHouseRepository.create(
-      async () => fixture.client,
-      windowedRead,
-    ),
+    repository: SimulationClickHouseRepository.create(async () => fixture.client, windowedRead),
   };
 }
 
@@ -152,14 +146,33 @@ describe("SimulationClickHouseRepository", () => {
     ).resolves.toBeNull();
   });
 
+  it("never serves secret values from stored run metadata", async () => {
+    const metadata = {
+      parameters: { account_tier: "gold" },
+      secretParameterNames: ["api_token"],
+      secretParameters: { api_token: "encrypted-token" },
+    };
+    const { repository } = makeRepository([[runRow({ Metadata: JSON.stringify(metadata) })]]);
+
+    const run = await repository.tryGetScenarioRunData({
+      projectId: "project-1",
+      scenarioRunId: "run-1",
+    });
+
+    expect(run?.metadata).toEqual({
+      parameters: { account_tier: "gold" },
+      secretParameterNames: ["api_token"],
+    });
+  });
+
   it("adds date and decoded cursor filters to a paginated scenario-set query", async () => {
     const { fixture, repository } = makeRepository([
       [{ BatchRunId: "batch-2", MaxCreatedAt: "4000" }],
       [runRow({ BatchRunId: "batch-2" })],
     ]);
-    const cursor = Buffer.from(
-      JSON.stringify({ ts: "5000", batchRunId: "batch-5" }),
-    ).toString("base64");
+    const cursor = Buffer.from(JSON.stringify({ ts: "5000", batchRunId: "batch-5" })).toString(
+      "base64",
+    );
 
     await repository.getRunDataForScenarioSet({
       projectId: "project-1",
@@ -228,9 +241,7 @@ describe("SimulationClickHouseRepository", () => {
       scenarioSetId: "set-1",
     });
 
-    const preview = fixture.calls.find((call) =>
-      call.query.includes("MessagePreviewRoles"),
-    );
+    const preview = fixture.calls.find((call) => call.query.includes("MessagePreviewRoles"));
     expect(windowedRead.inputs).toHaveLength(1);
     expect(windowedRead.inputs[0]).toMatchObject({
       table: "simulation_runs",
@@ -247,11 +258,7 @@ describe("SimulationClickHouseRepository", () => {
   it("makes a provisional history page explicitly unbounded", async () => {
     const windowedRead = new FixtureWindowedRead();
     const { fixture, repository } = makeRepository(
-      [
-        [{ TotalBatchCount: "1" }],
-        [aggregateRow({ MinStartedAt: "0", MaxStartedAt: "0" })],
-        [],
-      ],
+      [[{ TotalBatchCount: "1" }], [aggregateRow({ MinStartedAt: "0", MaxStartedAt: "0" })], []],
       windowedRead,
     );
 
@@ -260,9 +267,7 @@ describe("SimulationClickHouseRepository", () => {
       scenarioSetId: "set-1",
     });
 
-    const preview = fixture.calls.find((call) =>
-      call.query.includes("MessagePreviewRoles"),
-    );
+    const preview = fixture.calls.find((call) => call.query.includes("MessagePreviewRoles"));
     expect(windowedRead.inputs[0]).toMatchObject({ hintMs: null, fallback: "none" });
     expect(preview?.params).not.toHaveProperty("minStartedAtMs");
   });
@@ -312,14 +317,12 @@ describe("SimulationClickHouseRepository", () => {
 
   it("normalizes external set ids and avoids a resolver call for no projects", async () => {
     const empty = makeRepository();
-    await expect(
-      empty.repository.getDistinctExternalSetIds({ projectIds: [] }),
-    ).resolves.toEqual(new Set());
+    await expect(empty.repository.getDistinctExternalSetIds({ projectIds: [] })).resolves.toEqual(
+      new Set(),
+    );
     expect(empty.fixture.calls).toHaveLength(0);
 
-    const { repository } = makeRepository([
-      [{ ScenarioSetId: "" }, { ScenarioSetId: "default" }],
-    ]);
+    const { repository } = makeRepository([[{ ScenarioSetId: "" }, { ScenarioSetId: "default" }]]);
     await expect(
       repository.getDistinctExternalSetIds({ projectIds: ["project-1"] }),
     ).resolves.toEqual(new Set(["default"]));

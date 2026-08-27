@@ -1,32 +1,26 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import {
   DEFAULT_SET_ID,
   expandSetIdFilter,
   INTERNAL_SET_PREFIX,
-} from "~/server/scenarios/internal-set-id";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type {
-  BatchHistoryItem,
-  BatchSummary,
-  ExternalSetSummary,
-  ScenarioLastResultSummary,
-  ScenarioRunData,
-  ScenarioSetData,
-} from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/scenario-contract";
+import {
+  type SimulationBatchHistoryItem as BatchHistoryItem,
+  type SimulationBatchSummary as BatchSummary,
+  type SimulationExternalSetSummary as ExternalSetSummary,
+  type SimulationLastResultSummary as ScenarioLastResultSummary,
+  type SimulationRunData as ScenarioRunData,
+  SimulationRunStatus as ScenarioRunStatus,
+  type SimulationSetData as ScenarioSetData,
+} from "@langwatch/simulation-contract";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
   mapStatus,
 } from "~/server/simulations/simulation-run.mappers";
-import {
-  queryWindowed,
-  type WindowFragment,
-} from "../../clients/clickhouse/windowed-read";
-import type {
-  ExportableRun,
-  SimulationRepository,
-} from "./simulation.repository";
+import { queryWindowed, type WindowFragment } from "../../clients/clickhouse/windowed-read";
+import type { ExportableRun, SimulationRepository } from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
 
@@ -43,8 +37,7 @@ export const RUN_ID_CAP = 10000;
  * become unreachable for the rest of the sweep while the count still includes
  * them. Coalescing here means there is one definition and no fallback in TS.
  */
-const EXPORT_SORT_KEY =
-  "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
+const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
 
 /**
  * Every status a run carries while the batch still owes work.
@@ -108,9 +101,7 @@ type BatchAggregateRow = {
  * The note stays out for the same reason: the history page reads it off the
  * preview rows, the single-batch summary off its own aggregate.
  */
-function mapBatchAggregateRow(
-  row: BatchAggregateRow,
-): Omit<BatchSummary, "stalledCount" | "note"> {
+function mapBatchAggregateRow(row: BatchAggregateRow): Omit<BatchSummary, "stalledCount" | "note"> {
   const firstCompletedAt = Number(row.FirstCompletedAt);
   const allCompletedAt = Number(row.AllCompletedAt);
 
@@ -192,13 +183,7 @@ function unqualify(clause: string): string {
  * The WHERE on StartedAt enables partition pruning (~12x faster), the HAVING
  * on max(CreatedAt) ensures exact filtering for edge cases where they differ.
  */
-function buildDateFilter({
-  startDate,
-  endDate,
-}: {
-  startDate?: number;
-  endDate?: number;
-}): {
+function buildDateFilter({ startDate, endDate }: { startDate?: number; endDate?: number }): {
   havingClause: string | null;
   whereClause: string;
   params: Record<string, string>;
@@ -207,21 +192,13 @@ function buildDateFilter({
   const whereParts: string[] = [];
   const params: Record<string, string> = {};
   if (startDate !== undefined) {
-    havingParts.push(
-      "toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})",
-    );
-    whereParts.push(
-      "StartedAt >= fromUnixTimestamp64Milli(toUInt64({startDateMs:String}))",
-    );
+    havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})");
+    whereParts.push("StartedAt >= fromUnixTimestamp64Milli(toUInt64({startDateMs:String}))");
     params.startDateMs = String(startDate);
   }
   if (endDate !== undefined) {
-    havingParts.push(
-      "toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})",
-    );
-    whereParts.push(
-      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({endDateMs:String}))",
-    );
+    havingParts.push("toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})");
+    whereParts.push("StartedAt <= fromUnixTimestamp64Milli(toUInt64({endDateMs:String}))");
     params.endDateMs = String(endDate);
   }
   return {
@@ -467,9 +444,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
     // entire granules (~8K rows) for dedup, causing OOM on parts with large
     // payloads.
-    const rows = await this.queryRows<
-      ClickHouseSimulationRunRow & { ExportSortKey: string }
-    >(
+    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
       `SELECT ${RUN_COLUMNS},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
@@ -556,18 +531,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        ...(decoded
-          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
-          : {}),
+        ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
     );
 
-    const [totalCountRows, batchRows] = await Promise.all([
-      totalCountPromise,
-      batchRowsPromise,
-    ]);
+    const [totalCountRows, batchRows] = await Promise.all([totalCountPromise, batchRowsPromise]);
     const totalCount = parseInt(totalCountRows[0]?.TotalBatchCount ?? "0", 10);
 
     const hasMore = batchRows.length > validatedLimit;
@@ -614,12 +584,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     // Step 2: fetch slim item rows (preview columns only)
     const itemRows = await queryWindowed<PreviewItemRow[]>({
       table: TABLE_NAME,
-      hintMs: startedAtBounds
-        ? (startedAtBounds.minMs + startedAtBounds.maxMs) / 2
-        : null,
-      windowMs: startedAtBounds
-        ? (startedAtBounds.maxMs - startedAtBounds.minMs) / 2
-        : undefined,
+      hintMs: startedAtBounds ? (startedAtBounds.minMs + startedAtBounds.maxMs) / 2 : null,
+      windowMs: startedAtBounds ? (startedAtBounds.maxMs - startedAtBounds.minMs) / 2 : undefined,
       fallback: "none",
       isEmpty: (rows) => rows.length === 0,
       run: (window) => {
@@ -656,20 +622,16 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const batches: BatchHistoryItem[] = pageRows.map((b) => {
       const lastUpdatedAt = Number(b.LastUpdatedAt);
-      if (lastUpdatedAt > globalLastUpdatedAt)
-        globalLastUpdatedAt = lastUpdatedAt;
+      if (lastUpdatedAt > globalLastUpdatedAt) globalLastUpdatedAt = lastUpdatedAt;
 
       const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
         const baseStatus = mapStatus(r.Status);
-        const durationMs =
-          r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
+        const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
         const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
         // Stored status is the only truth: unfinished runs collapse to
         // IN_PROGRESS; stalled runs arrive as stored ERROR via the
         // process-manager stall watchdog.
-        const resolvedStatus = hasFinished
-          ? baseStatus
-          : ScenarioRunStatus.IN_PROGRESS;
+        const resolvedStatus = hasFinished ? baseStatus : ScenarioRunStatus.IN_PROGRESS;
         return {
           scenarioRunId: r.ScenarioRunId,
           name: r.Name,
@@ -688,9 +650,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       // Every run of a batch is stamped with the same note at queue time, so
       // the first non-empty one is the batch's note. Reading it here costs no
       // extra query: the preview rows are already loaded.
-      const note =
-        (itemsByBatch.get(b.BatchRunId) ?? []).find((r) => r.Note !== "")
-          ?.Note ?? null;
+      const note = (itemsByBatch.get(b.BatchRunId) ?? []).find((r) => r.Note !== "")?.Note ?? null;
 
       return {
         ...mapBatchAggregateRow(b),
@@ -723,8 +683,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     batchRunId: string;
   }): Promise<BatchSummary | null> {
-    const whereFilters =
-      "TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String}";
+    const whereFilters = "TenantId = {tenantId:String} AND BatchRunId = {batchRunId:String}";
 
     // The note read is safe here and not in BATCH_AGGREGATE_COLUMNS: this query
     // is bounded to one batch, while the history page shares those columns with
@@ -784,16 +743,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     // --wait polls with just the batch id. An empty string is a real value
     // that selects the default set, so only an absent id drops the predicate.
     const scenarioSetIds =
-      scenarioSetId === undefined
-        ? undefined
-        : expandSetIdFilter(scenarioSetId);
+      scenarioSetId === undefined ? undefined : expandSetIdFilter(scenarioSetId);
     const setFilter = (alias: string) =>
-      scenarioSetIds
-        ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})`
-        : "";
-    const rows = await this.queryRows<
-      ClickHouseSimulationRunRow & { ExportSortKey: string }
-    >(
+      scenarioSetIds ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})` : "";
+    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
       `SELECT ${RUN_COLUMNS},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
@@ -818,10 +771,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     );
 
     const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
-    const lastUpdatedAt = runs.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
-    );
+    const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
     return { changed: true, lastUpdatedAt, runs };
   }
 
@@ -862,9 +812,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]> {
-    const rows = await this.queryRows<
-      ClickHouseSimulationRunRow & { ExportSortKey: string }
-    >(
+    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
       `SELECT ${RUN_COLUMNS},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
@@ -939,9 +887,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
-        ...(decoded
-          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
-          : {}),
+        ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
@@ -957,9 +903,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const lastRow = pageRows[pageRows.length - 1];
 
     const nextCursor =
-      lastRow && hasMore
-        ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId)
-        : undefined;
+      lastRow && hasMore ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId) : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
     const runs = await this.getRunsForBatchIds({
@@ -1049,9 +993,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        LIMIT {fetchLimit:UInt32}`,
       {
         tenantId: projectId,
-        ...(decoded
-          ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
-          : {}),
+        ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
@@ -1083,10 +1025,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
     const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
-    const lastUpdatedAt = runs.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
-    );
+    const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
 
     return {
       changed: true,
@@ -1116,9 +1055,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       startDate: startDate ?? Date.now() - 30 * 24 * 60 * 60 * 1000,
       endDate,
     });
-    const setFilter = scenarioSetId
-      ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
-      : "";
+    const setFilter = scenarioSetId ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})" : "";
 
     // max(UpdatedAt) over all versions equals the latest version's UpdatedAt
     // (ReplacingMergeTree version column), so no dedup subquery is needed.
@@ -1131,9 +1068,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          ${dateFilter.whereClause}`,
       {
         tenantId: projectId,
-        ...(scenarioSetId
-          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
-          : {}),
+        ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}),
         ...dateFilter.params,
       },
     );
@@ -1176,9 +1111,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }): Promise<ExternalSetSummary[]> {
     const dateFilter = buildDateFilter({ startDate, endDate });
 
-    const havingClause = dateFilter.havingClause
-      ? `HAVING ${dateFilter.havingClause}`
-      : "";
+    const havingClause = dateFilter.havingClause ? `HAVING ${dateFilter.havingClause}` : "";
 
     const wherePredicate =
       filter === "external"
@@ -1266,9 +1199,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
     const dateFilter = buildDateFilter({ startDate, endDate });
     const scenarioFilter =
-      scenarioIds !== undefined
-        ? "AND ScenarioId IN ({scenarioIds:Array(String)})"
-        : "";
+      scenarioIds !== undefined ? "AND ScenarioId IN ({scenarioIds:Array(String)})" : "";
     const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause}`;
 
     const rows = await this.queryRows<{
@@ -1321,8 +1252,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       lastRunAt: Number(row.LastRunAt),
       batchRunId: row.LastBatchRunId,
       scenarioSetId: row.LastScenarioSetId,
-      durationInMs:
-        row.LastDurationMs === "" ? null : Number(row.LastDurationMs),
+      durationInMs: row.LastDurationMs === "" ? null : Number(row.LastDurationMs),
       totalCost: row.LastTotalCost === "" ? null : Number(row.LastTotalCost),
     }));
   }
@@ -1362,11 +1292,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return { runIds, reachedCap: runIds.length === RUN_ID_CAP };
   }
 
-  async getDistinctExternalSetIds({
-    projectIds,
-  }: {
-    projectIds: string[];
-  }): Promise<Set<string>> {
+  async getDistinctExternalSetIds({ projectIds }: { projectIds: string[] }): Promise<Set<string>> {
     const [firstProjectId] = projectIds;
     if (!firstProjectId) {
       return new Set();
@@ -1401,11 +1327,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       { tenantId: firstProjectId, projectIds },
     );
 
-    return new Set(
-      rows.map((r) =>
-        r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId,
-      ),
-    );
+    return new Set(rows.map((r) => (r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId)));
   }
 
   // ---- Export sweep ----
@@ -1499,9 +1421,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         )`
       : "";
 
-    const rows = await this.queryRows<
-      ClickHouseSimulationRunRow & { ExportSortKey: string }
-    >(
+    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
       `SELECT ${RUN_COLUMNS},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
@@ -1516,9 +1436,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       {
         tenantId: projectId,
         ...params,
-        ...(decoded
-          ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId }
-          : {}),
+        ...(decoded ? { cursorTs: decoded.ts, cursorRunId: decoded.scenarioRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -1535,8 +1453,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return {
       runs: pageRows.map((row) => ({
         ...mapClickHouseRowToScenarioRunData(row),
-        scenarioSetId:
-          row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
+        scenarioSetId: row.ScenarioSetId === "" ? DEFAULT_SET_ID : row.ScenarioSetId,
         traceIds: row.TraceIds ?? [],
       })),
       nextCursor,
@@ -1612,8 +1529,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     return {
-      stableClause:
-        stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
+      stableClause: stableParts.length > 0 ? `AND ${stableParts.join(" AND ")}` : "",
       dateClause,
       params,
     };
@@ -1627,22 +1543,16 @@ export class SimulationClickHouseRepository implements SimulationRepository {
    * shared pair so neither payload carries a field named for the other's key.
    */
   private encodeExportCursor(ts: string, scenarioRunId: string): string {
-    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString(
-      "base64",
-    );
+    return Buffer.from(JSON.stringify({ ts, scenarioRunId })).toString("base64");
   }
 
-  private decodeExportCursor(
-    cursor: string,
-  ): { ts: string; scenarioRunId: string } | null {
+  private decodeExportCursor(cursor: string): { ts: string; scenarioRunId: string } | null {
     try {
-      const parsed = JSON.parse(
-        Buffer.from(cursor, "base64").toString("utf-8"),
-      ) as Record<string, unknown>;
-      if (
-        typeof parsed.ts !== "string" ||
-        typeof parsed.scenarioRunId !== "string"
-      ) {
+      const parsed = JSON.parse(Buffer.from(cursor, "base64").toString("utf-8")) as Record<
+        string,
+        unknown
+      >;
+      if (typeof parsed.ts !== "string" || typeof parsed.scenarioRunId !== "string") {
         return null;
       }
       return { ts: parsed.ts, scenarioRunId: parsed.scenarioRunId };
@@ -1660,10 +1570,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     try {
       const json = Buffer.from(cursor, "base64").toString("utf-8");
       const parsed = JSON.parse(json) as Record<string, unknown>;
-      if (
-        typeof parsed.ts !== "string" ||
-        typeof parsed.batchRunId !== "string"
-      ) {
+      if (typeof parsed.ts !== "string" || typeof parsed.batchRunId !== "string") {
         return null;
       }
       return { ts: parsed.ts, batchRunId: parsed.batchRunId };
@@ -1712,9 +1619,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       {
         tenantId: projectId,
         batchRunIds,
-        ...(scenarioSetId
-          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
-          : {}),
+        ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}),
       },
     );
 

@@ -292,11 +292,11 @@ describe.skipIf(!databaseUrl)("Scenario folder persistence", () => {
     expect(batch.failed).toEqual([
       {
         id: "scenario_missing",
-        error: "ScenarioNotFoundError: Scenario scenario_missing was not found.",
+        error: "Not found",
       },
       {
         id: "scenario_missing",
-        error: "ScenarioNotFoundError: Scenario scenario_missing was not found.",
+        error: "Not found",
       },
     ]);
     expect(stored).toEqual(

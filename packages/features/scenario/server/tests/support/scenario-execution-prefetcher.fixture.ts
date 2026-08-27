@@ -1,8 +1,4 @@
-import {
-  AgentNotFoundError,
-  type Agent,
-  type AgentService,
-} from "@langwatch/agent-contract";
+import { AgentNotFoundError, type Agent, type AgentService } from "@langwatch/agent-contract";
 import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
@@ -59,8 +55,7 @@ export interface SuiteConfigFetcher {
       referenceId: string;
       scenarioMappings?: Record<
         string,
-        | { type: "source"; sourceId: string; path: string[] }
-        | { type: "value"; value: string }
+        { type: "source"; sourceId: string; path: string[] } | { type: "value"; value: string }
       >;
     }>;
   } | null>;
@@ -146,9 +141,7 @@ class TestScenarioSecretCipher extends ScenarioSecretCipherPort {
 
 const cipher = new TestScenarioSecretCipher();
 
-export function encryptTestRunSecrets(
-  values: Record<string, string>,
-): Record<string, string> {
+export function encryptTestRunSecrets(values: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(values).map(([name, value]) => [name, cipher.encrypt(value)]),
   );
@@ -171,6 +164,8 @@ function scenarioService(deps: ScenarioPrefetchFixture): ScenarioService {
         judgeModel: null,
         maxTurns: null,
         minTurns: null,
+        folderId: null,
+        version: 1,
         lastUpdatedById: null,
         archivedAt: null,
         createdAt: now,
@@ -199,6 +194,8 @@ function suiteService(deps: ScenarioPrefetchFixture): SuiteService {
         labels: [],
         simulatorModel: value.simulatorModel,
         judgeModel: value.judgeModel,
+        kind: "custom",
+        scope: null,
         archivedAt: null,
         createdAt: now,
         updatedAt: now,
@@ -377,9 +374,7 @@ function modelProviderService(deps: ScenarioPrefetchFixture): ModelProviderServi
       scope: "project",
     }),
     tryGetProviderForProject: async (input) =>
-      deps.disabledProviders?.has(input.provider)
-        ? disabledProvider(input.provider)
-        : null,
+      deps.disabledProviders?.has(input.provider) ? disabledProvider(input.provider) : null,
     prepareExecution: async (input) => {
       const result = await deps.modelParamsProvider.prepare(input.projectId, input.model);
       if (result.success) return result.params;

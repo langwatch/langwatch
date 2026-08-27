@@ -11,6 +11,7 @@ export * from "./scenario-failure-results";
 export * from "./scenario-infra-error";
 export * from "./scenario.parameters";
 export * from "./scenario.service";
+export * from "./scenario.version";
 export * from "./scenario-execution-data";
 export * from "./scenario-execution.constants";
 export * from "./scenario-execution.service";

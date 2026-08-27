@@ -71,12 +71,8 @@ async function resolveParametersForRun({
 }): Promise<{
   parameters: RunParameterValues;
   secretParameters: RunSecretCiphertext;
-  /**
-   * The scenario's version at this read, stamped onto the queued run so it
-   * says which state of the scenario it ran. Undefined only when the read
-   * found no scenario, in which case the prefetch refuses the run anyway.
-   */
-  scenarioVersion: number | undefined;
+  /** The scenario version read with the parameters and stamped onto the run. */
+  scenarioVersion: number;
 }> {
   try {
     return await scenarios.resolveRunParameters({ projectId, scenarioId, values });
@@ -152,10 +148,7 @@ async function queueRun({
       occurredAt: Date.now(),
     });
   } catch (error) {
-    logger.error(
-      { error, projectId, scenarioRunId, batchRunId },
-      "Failed to queue scenario run",
-    );
+    logger.error({ error, projectId, scenarioRunId, batchRunId }, "Failed to queue scenario run");
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "Failed to queue scenario run",
@@ -182,7 +175,7 @@ export const simulationRunnerRouter = createTRPCRouter({
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
       const batchRunId = input.batchRunId ?? generateBatchRunId();
 
-      const { parameters, secretParameters } = await resolveParametersForRun({
+      const { parameters, secretParameters, scenarioVersion } = await resolveParametersForRun({
         scenarios: ctx.app.scenarios,
         projectId: input.projectId,
         scenarioId: input.scenarioId,

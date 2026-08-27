@@ -1610,6 +1610,14 @@ const presentations = {
     describe: () =>
       "It may have been archived or removed. Reload, then pick a test suite again.",
   },
+  scenario_folder_slug_unavailable: {
+    title: "That test suite name isn't available",
+    describe: () => "Choose a different name and try again.",
+  },
+  scenario_not_found: {
+    title: "That test case isn't available",
+    describe: () => "It may have been archived or removed. Reload and try again.",
+  },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
     describe: (error) => {

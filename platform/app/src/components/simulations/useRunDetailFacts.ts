@@ -6,9 +6,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { shouldShowNoResponse } from "./scenario-run-status.utils";
 import type { ScenarioRunState } from "./useRunStateStream";
@@ -29,9 +29,7 @@ function useRunDisplayTitle(scenarioState: RunStateInput) {
 
   return useMemo(() => {
     const targetRefId = scenarioState?.metadata?.langwatch?.targetReferenceId;
-    const targetName = targetRefId
-      ? (targetNameMap.get(targetRefId) ?? null)
-      : null;
+    const targetName = targetRefId ? (targetNameMap.get(targetRefId) ?? null) : null;
     return buildDisplayTitle({
       scenarioName: scenarioState?.name ?? "",
       targetName,
@@ -41,13 +39,7 @@ function useRunDisplayTitle(scenarioState: RunStateInput) {
 }
 
 /** Relative time that auto-updates every 30s while the drawer is open. */
-function useRunTimeAgo({
-  isOpen,
-  timestamp,
-}: {
-  isOpen: boolean;
-  timestamp: number | undefined;
-}) {
+function useRunTimeAgo({ isOpen, timestamp }: { isOpen: boolean; timestamp: number | undefined }) {
   const [timeAgo, setTimeAgo] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -104,9 +96,7 @@ function useRunParameters(scenarioState: RunStateInput) {
   // The values are not recorded, so the section shows the names and a mask in
   // place of a value.
   const secretParameterNames = useMemo(() => {
-    const parsed = secretParameterNamesSchema.safeParse(
-      metadata?.secretParameterNames,
-    );
+    const parsed = secretParameterNamesSchema.safeParse(metadata?.secretParameterNames);
     return parsed.success ? parsed.data : [];
   }, [metadata]);
 

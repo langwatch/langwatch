@@ -9,7 +9,7 @@
  */
 
 import { Box, Input, Text } from "@chakra-ui/react";
-import { MAX_RUN_NOTE_LENGTH } from "~/server/scenarios/run-note";
+import { MAX_RUN_NOTE_LENGTH } from "@langwatch/scenario-contract";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 
@@ -42,12 +42,7 @@ export function RunNoteField({ value, onChange, onRemove }: RunNoteFieldProps) {
         onChange={(event) => onChange(event.target.value)}
       />
       {isTooLong && (
-        <Text
-          marginTop={1}
-          fontSize="11px"
-          color="red.fg"
-          data-testid="run-note-too-long"
-        >
+        <Text marginTop={1} fontSize="11px" color="red.fg" data-testid="run-note-too-long">
           The note is too long: it can hold {MAX_RUN_NOTE_LENGTH} characters.
         </Text>
       )}

@@ -5,9 +5,9 @@
  */
 
 import { HStack, Input, Text, VStack } from "@chakra-ui/react";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Lock } from "lucide-react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 
 /** What a secret parameter with no value yet says under its field. */
 const MISSING_SECRET_MESSAGE = "Type the value to start the run.";
@@ -84,12 +84,7 @@ function RunParameterField({
       <HStack gap={2}>
         <HStack gap={0} width="180px" flexShrink={0} minWidth={0}>
           {isSecret && <Lock size={12} color="var(--chakra-colors-fg-muted)" />}
-          <Text
-            fontSize="sm"
-            fontFamily="mono"
-            truncate
-            paddingLeft={isSecret ? 1 : 0}
-          >
+          <Text fontSize="sm" fontFamily="mono" truncate paddingLeft={isSecret ? 1 : 0}>
             {parameter.name}
           </Text>
           {parameter.description && (

@@ -164,7 +164,6 @@
       "platform/app/src/server/routes/misc.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/playground.ts": ["~/env.mjs"],
       "platform/app/src/server/routes/workflows.ts": ["~/optimization_studio/server/addEnvs"],
-      "platform/app/src/server/scenarios/errors.ts": ["~/features/errors/logic/codes"],
       "platform/app/src/server/scenarios/execution/child-environment.ts": ["~/env.mjs"],
       "platform/app/src/server/scenarios/execution/data-prefetcher.ts": [
         "~/env.mjs",

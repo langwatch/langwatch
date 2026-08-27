@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { showErrorToast } from "~/features/errors";
-import type { RunParameterValues } from "~/server/scenarios/parameters";
+import type { RunParameterValues } from "@langwatch/scenario-contract";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
 import { api } from "../utils/api";
@@ -145,8 +145,7 @@ export function useRunScenario({
 
   const runScenario = useCallback(
     async (params: RunScenarioParams) => {
-      const { scenarioId, target, setId, batchRunId, note, parameters } =
-        params;
+      const { scenarioId, target, setId, batchRunId, note, parameters } = params;
       if (!projectId || !projectSlug || !target) return;
 
       // Check if model providers are configured before attempting to run
