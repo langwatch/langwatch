@@ -1,17 +1,13 @@
 export * from "./templating/banner";
-export * from "./templating/blockKitAllowlist";
+export * from "./templating/block-kit-allowlist";
 export * from "./templating/defaults";
 export * from "./templating/engine";
-export * from "./templating/exampleContext";
+export * from "./templating/example-context";
 export * from "./templating/markdown";
-export * from "./templating/renderEmail";
-export type {
-  SlackPayload,
-  SlackRenderDefaults,
-  RenderedSlack,
-} from "./templating/renderSlack";
-export { renderTriggerSlack } from "./templating/renderSlack";
-export * from "./templating/renderWebhookBody";
-export * from "./templating/renderWithFallback";
-export * from "./templating/templateContext";
+export * from "./templating/render-email";
+export type { SlackPayload, SlackRenderDefaults, RenderedSlack } from "./templating/render-slack";
+export { renderTriggerSlack } from "./templating/render-slack";
+export * from "./templating/render-webhook-body";
+export * from "./templating/render-with-fallback";
+export * from "./templating/template-context";
 export * from "./templating/validate";

@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TriggerAction } from "~/generated/prisma/client";
+import { TriggerAction } from "@langwatch/automation-contract";
 import { DeliveryPicker } from "../DeliveryPicker";
 
 // Transitive: provider ConfigForms import ~/utils/api at module scope.
@@ -46,9 +46,7 @@ describe("DeliveryPicker", () => {
     it("does not render the action-category cards at all", () => {
       renderPicker({ source: "customGraph" });
 
-      expect(
-        screen.queryByRole("button", { name: /add to dataset/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /add to dataset/i })).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /add to annotation queue/i }),
       ).not.toBeInTheDocument();
@@ -58,12 +56,8 @@ describe("DeliveryPicker", () => {
     it("keeps the notify cards enabled", () => {
       renderPicker({ source: "customGraph" });
 
-      expect(screen.getByRole("button", { name: /email/i })).not.toHaveAttribute(
-        "aria-disabled",
-      );
-      expect(screen.getByRole("button", { name: /slack/i })).not.toHaveAttribute(
-        "aria-disabled",
-      );
+      expect(screen.getByRole("button", { name: /email/i })).not.toHaveAttribute("aria-disabled");
+      expect(screen.getByRole("button", { name: /slack/i })).not.toHaveAttribute("aria-disabled");
     });
   });
 
@@ -105,9 +99,7 @@ describe("DeliveryPicker", () => {
         "true",
       );
       expect(screen.getByText(/saved setup is read-only/i)).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /edit setup/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /edit setup/i })).not.toBeInTheDocument();
     });
   });
 });

@@ -5,8 +5,7 @@
  * and NOT template-controllable (see ADR-036).
  */
 
-export const TEST_FIRE_NOTICE =
-  "TEST FIRE — sent by the trigger test button, not by a real match.";
+export const TEST_FIRE_NOTICE = "TEST FIRE — sent by the trigger test button, not by a real match.";
 
 export const TEST_FIRE_EMAIL_SUBJECT_PREFIX = "[TEST] ";
 

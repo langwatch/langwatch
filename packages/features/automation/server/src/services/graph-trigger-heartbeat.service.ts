@@ -23,23 +23,15 @@
  * analytics data.
  */
 
-import type {
-  AutomationService,
-  GraphTriggerSweepCandidate,
-} from "@langwatch/automation-contract";
-import { isNoDataPredicate } from "@langwatch/automation-contract";
+import { isNoDataPredicate, type GraphTriggerSweepCandidate } from "@langwatch/automation-contract";
+import { z } from "zod";
 import type {
   AnalyticsMetricSource as RepositoryMetricSource,
   GraphTriggerSentRepository,
 } from "../repositories/graph-trigger-sent.repository";
 import type { TriggerRepository } from "../repositories/trigger.repository";
+import type { AutomationHeartbeatPort, AutomationLoggerPort } from "../ports/automation-graph.port";
 
-type ActionParams = {
-  operator?: string;
-  threshold?: number;
-  timePeriod?: number;
-  seriesName?: string;
-};
 export type AnalyticsMetricSource = RepositoryMetricSource;
 export type ClickHouseClient = {
   query(input: {
@@ -51,6 +43,15 @@ export type ClickHouseClient = {
 
 export const GRAPH_TRIGGER_HEARTBEAT_NAME = "graphTriggerHeartbeat" as const;
 export const GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS = 30_000;
+
+const heartbeatActionParamsSchema = z
+  .object({
+    operator: z.string().optional(),
+    threshold: z.number().optional(),
+    timePeriod: z.number().optional(),
+    seriesName: z.string().optional(),
+  })
+  .passthrough();
 
 interface CandidateTrigger {
   triggerId: string;
@@ -69,26 +70,10 @@ interface CandidateTrigger {
 }
 
 export interface GraphTriggerHeartbeatDeps {
-  triggers?: TriggerRepository;
-  /** Characterisation-test compatibility; production injects the repository. */
-  automation?: AutomationService;
-  /** Canonical semantic persistence port owned by Automation. */
+  triggers: TriggerRepository;
   triggerSent: GraphTriggerSentRepository;
-  /** Resolver matching the slim repository's contract — same signature so
-   *  tests can stub a single client and the prod path uses the default
-   *  per-project resolver. */
-  resolveClickHouseClient: (projectId: string) => Promise<ClickHouseClient | null>;
-  telemetry?: {
-    error(fields: Record<string, unknown>, message: string): void;
-    info(fields: Record<string, unknown>, message: string): void;
-    warn(fields: Record<string, unknown>, message: string): void;
-  };
-}
-
-/** Test-only candidate override retained outside the public package surface. */
-export interface HeartbeatCandidateSources {
-  loadProjectsWithGraphTriggers(): Promise<string[]>;
-  loadProjectsWithOpenGraphTriggerSent(): Promise<Set<string>>;
+  heartbeat: AutomationHeartbeatPort;
+  logger: AutomationLoggerPort;
 }
 
 /**
@@ -131,27 +116,17 @@ export class GraphTriggerHeartbeatService {
     return new GraphTriggerHeartbeatService(deps);
   }
 
-  async decide({
-    sources,
-    now,
-  }: {
-    sources?: HeartbeatCandidateSources;
-    now: Date;
-  }): Promise<GraphTriggerSweepCandidate[]> {
+  async decide({ now }: { now: Date }): Promise<GraphTriggerSweepCandidate[]> {
     const deps = this.deps;
     const triggerSent = deps.triggerSent;
     // Step 1: load the union of "has graph triggers" + "has open sent"
     // projects. Every such project is processed — the event-sourced path is
     // the sole graph-alert path (ADR-034: the K8s cron was removed).
     const [graphProjects, openSentProjects] = await Promise.all([
-      sources?.loadProjectsWithGraphTriggers() ??
-        triggerSent.findProjectsWithGraphTriggers(),
-      sources?.loadProjectsWithOpenGraphTriggerSent() ??
-        triggerSent.findProjectsWithOpenGraphTriggerSent(),
+      triggerSent.findProjectsWithGraphTriggers(),
+      triggerSent.findProjectsWithOpenGraphTriggerSent(),
     ]);
-    const projectIds = Array.from(
-      new Set<string>([...graphProjects, ...openSentProjects]),
-    );
+    const projectIds = Array.from(new Set<string>([...graphProjects, ...openSentProjects]));
     if (projectIds.length === 0) {
       return [];
     }
@@ -172,7 +147,7 @@ export class GraphTriggerHeartbeatService {
         // is the ONLY path that fires no-data alerts, so a single project's
         // transient DB error would otherwise silence every flagged project's
         // absence alerts for as long as it persists.
-        deps.telemetry?.error(
+        deps.logger.error(
           {
             projectId,
             error: error instanceof Error ? error.message : String(error),
@@ -183,21 +158,13 @@ export class GraphTriggerHeartbeatService {
     }
 
     if (candidates.length > 0) {
-      deps.telemetry?.info(
+      deps.logger.info(
         { count: candidates.length },
         "graphTriggerHeartbeat surfacing absence/resolve evaluations",
       );
     }
-    return candidates;
-  }
 
-  /** Test seam for characterisation coverage of the heartbeat algorithm. */
-  static decide(input: {
-    deps: GraphTriggerHeartbeatDeps;
-    sources?: HeartbeatCandidateSources;
-    now: Date;
-  }): Promise<GraphTriggerSweepCandidate[]> {
-    return new GraphTriggerHeartbeatService(input.deps).decide(input);
+    return candidates;
   }
 }
 
@@ -252,18 +219,20 @@ async function collectCandidatesForProject({
     if (!recency) {
       continue;
     }
+
     const cutoff = now.getTime() - candidate.windowMs;
     if (recency.lastOccurredAtMs !== null && recency.lastOccurredAtMs > cutoff) {
       // Real-time path is firing for this trigger; skip.
       continue;
     }
+
     surviving.push({
       triggerId: candidate.triggerId,
       projectId,
-      reason:
-        candidate.reasonKind === "absence" ? "heartbeat-absence" : "heartbeat-resolve",
+      reason: candidate.reasonKind === "absence" ? "heartbeat-absence" : "heartbeat-resolve",
     });
   }
+
   return surviving;
 }
 
@@ -276,11 +245,9 @@ async function loadCandidatesForProject({
   projectId: string;
   hasOpenSent: boolean;
 }): Promise<CandidateTrigger[]> {
-  const triggers = deps.triggers
-    ? (await deps.triggers.findActiveForProject(projectId)).filter(
-        (trigger) => trigger.customGraphId !== null && trigger.triggerKind !== "REPORT",
-      )
-    : await deps.automation!.getActiveGraphTriggersForProject(projectId);
+  const triggers = (await deps.triggers.findActiveForProject(projectId)).filter(
+    (trigger) => trigger.customGraphId !== null && trigger.triggerKind !== "REPORT",
+  );
   if (triggers.length === 0) {
     return [];
   }
@@ -291,19 +258,26 @@ async function loadCandidatesForProject({
 
   const candidates: CandidateTrigger[] = [];
   for (const trigger of triggers) {
-    const params = (trigger.actionParams ?? {}) as unknown as ActionParams;
+    const parsed = heartbeatActionParamsSchema.safeParse(trigger.actionParams ?? {});
+    if (!parsed.success) {
+      continue;
+    }
+
+    const params = parsed.data;
     const operator = params.operator;
     const threshold = params.threshold;
     const timePeriod = params.timePeriod;
-    if (operator === undefined || threshold === undefined || timePeriod === undefined) {
+    if (operator === void 0 || threshold === void 0 || timePeriod === void 0) {
       continue;
     }
+
     const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
     const isNoData = isNoDataPredicate({ operator, threshold });
     const isOpen = openIds.has(trigger.id);
     if (!isNoData && !isOpen) {
       continue;
     }
+
     if (!trigger.customGraphId) {
       continue;
     }
@@ -327,6 +301,7 @@ async function loadCandidatesForProject({
       source,
     });
   }
+
   return candidates;
 }
 
@@ -342,6 +317,7 @@ function groupCandidatesBySource(
       groups.set(c.source, [c]);
     }
   }
+
   return groups;
 }
 
@@ -360,9 +336,9 @@ async function loadProjectRecency({
 }): Promise<ProjectRecency> {
   let client: ClickHouseClient | null;
   try {
-    client = await deps.resolveClickHouseClient(projectId);
+    client = await deps.heartbeat.tryResolveClickHouseClient(projectId);
   } catch (error) {
-    deps.telemetry?.warn(
+    deps.logger.warn(
       {
         projectId,
         source,
@@ -370,8 +346,10 @@ async function loadProjectRecency({
       },
       "graphTriggerHeartbeat: ClickHouse client unavailable, treating recency as unknown (no skip)",
     );
+
     return { projectId, source, lastOccurredAtMs: null };
   }
+
   if (!client) {
     return { projectId, source, lastOccurredAtMs: null };
   }
@@ -411,14 +389,15 @@ async function loadProjectRecency({
     if (!row || row.lastMs === null || row.lastMs === undefined) {
       return { projectId, source, lastOccurredAtMs: null };
     }
-    const ms =
-      typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
+
+    const ms = typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
     if (!Number.isFinite(ms) || ms <= 0) {
       return { projectId, source, lastOccurredAtMs: null };
     }
+
     return { projectId, source, lastOccurredAtMs: ms };
   } catch (error) {
-    deps.telemetry?.warn(
+    deps.logger.warn(
       {
         projectId,
         source,
@@ -426,6 +405,7 @@ async function loadProjectRecency({
       },
       "graphTriggerHeartbeat: ClickHouse recency query failed, treating recency as unknown",
     );
+
     return { projectId, source, lastOccurredAtMs: null };
   }
 }

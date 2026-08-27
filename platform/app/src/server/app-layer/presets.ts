@@ -70,6 +70,7 @@ import {
   AppAutomationClock,
   AppAutomationRuntime,
   createAppAutomationEmailCaps,
+  createAppAutomationTestPersistCaps,
 } from "~/runtime/app/features/automation";
 import { AppGovernanceRuntime } from "@langwatch/enterprise-api/governance/runtime";
 import { AppTraceRuntime } from "~/runtime/app/features/trace";
@@ -88,10 +89,7 @@ import {
   AppEvaluationRuntime,
 } from "~/runtime/app/features/evaluation";
 import type { EvaluationClickHouseClient } from "@langwatch/evaluation-server";
-import {
-  AppWorkflowExecutionPort,
-  AppWorkflowRuntime,
-} from "~/runtime/app/features/workflow";
+import { AppWorkflowExecutionPort, AppWorkflowRuntime } from "~/runtime/app/features/workflow";
 import {
   AppWorkflowEnvironmentEncryption,
   AppWorkflowLlmParametersPort,
@@ -142,8 +140,8 @@ import {
   NullLwqlKeyMapRepository,
 } from "~/server/analytics/lwql/lwqlKeyMap.repository";
 import { LwqlKeyMapService } from "~/server/analytics/lwql/lwql-key-map.service";
-import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { sendRenderedSlackMessage } from "~/runtime/app/features/automation-adapters/delivery/sendSlackWebhook";
+import { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
 import { resolveLangyCapabilityProgress } from "@langwatch/langy-server/streaming/langy-capability-progress";
 import { createAppLangyCredentialComposition } from "~/server/app-layer/langy/langy-credential-adapters";
@@ -162,10 +160,7 @@ import {
   getClickHouseClientForTenant,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import {
-  _getSharedClickHouseClient,
-  closeClickHouseClient,
-} from "~/server/clickhouse/client";
+import { _getSharedClickHouseClient, closeClickHouseClient } from "~/server/clickhouse/client";
 import { closePrismaConnection, prisma as globalPrisma } from "~/server/db";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
@@ -224,16 +219,16 @@ import {
   AppUsageLimitEmailAdapter,
 } from "./billing/enterprise/billing-runtime.adapter";
 import { EESubscriptionService } from "./billing/enterprise/subscription.service";
-import {
-  EEWebhookService,
-  type WebhookService,
-} from "./billing/enterprise/webhook.service";
+import { EEWebhookService, type WebhookService } from "./billing/enterprise/webhook.service";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { PrismaDataRetentionAdapter } from "@langwatch/data-retention-server";
 import { AppEventingRetentionAdapter } from "~/runtime/app/features/eventing-retention.adapter";
 import { PostgresShareAdapter } from "@langwatch/share-server";
-import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
-import { PostgresAutomationGraphDeliveryAdapter } from "@langwatch/automation-server";
+import { buildAutomationDispatchPorts } from "~/runtime/app/features/automation-dispatch.wiring";
+import {
+  AutomationPersistCapService,
+  PostgresAutomationGraphDeliveryAdapter,
+} from "@langwatch/automation-server";
 import { createAutomationGraphPorts } from "~/runtime/app/features/automation-graph-ports";
 import {
   createAutomationTestFirePort,
@@ -336,10 +331,7 @@ import {
   OVERDUE_WAKE_MS,
 } from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
-import {
-  NullProcessAuditSink,
-  ProcessAuditRepository,
-} from "./ops/process-audit.repository";
+import { NullProcessAuditSink, ProcessAuditRepository } from "./ops/process-audit.repository";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -374,10 +366,7 @@ import { AppSuiteExecutionPort } from "~/runtime/app/features/suite-execution.ad
 import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
-import type {
-  ClusteringPageOutcome,
-  ClusteringRunContext,
-} from "./topic-clustering/clustering";
+import type { ClusteringPageOutcome, ClusteringRunContext } from "./topic-clustering/clustering";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
@@ -535,15 +524,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       generateProjectId: nanoid,
       generateApiKey,
       organizations: canonicalOrganizations,
-      keyMap: LwqlKeyMapService.create(
-        new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
-      ),
+      keyMap: LwqlKeyMapService.create(new LwqlKeyMapClickHouseRepository(resolveClickHouseClient)),
       storedObjects: {
         deleteOwnedBy: (input) => createStoredObjectsService(input).deleteOwnedBy(input),
       },
       diagnostics: {
-        error: (context, message) =>
-          createLogger("langwatch:project").error(context, message),
+        error: (context, message) => createLogger("langwatch:project").error(context, message),
         capture: (error, context) => captureException(error, { extra: context }),
       },
     }).build(),
@@ -563,9 +549,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   }).build();
   const apiKeyPepper = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
   if (!apiKeyPepper) {
-    throw new Error(
-      "API key pepper not configured: set CREDENTIALS_SECRET or NEXTAUTH_SECRET",
-    );
+    throw new Error("API key pepper not configured: set CREDENTIALS_SECRET or NEXTAUTH_SECRET");
   }
   const apiKeys = traced(
     AppApiKeyRuntime.create({
@@ -594,13 +578,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // #4888: the same factory backs the customer-facing full=true read path; the
   // composition root passes its own ClickHouse decision/resolver so the
   // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
-  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps(
-    traceCanonicalisation,
-    {
-      clickhouseEnabled,
-      resolveClickHouseClient,
-    },
-  );
+  const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps(traceCanonicalisation, {
+    clickhouseEnabled,
+    resolveClickHouseClient,
+  });
   // Shared between SpanStorageService and TraceSummaryService's full read.
   const spanStorageRepository = clickhouseEnabled
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
@@ -698,15 +679,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const experiments = traced(
     AppExperimentRuntime.create({
       database: prisma,
-      resolveClickHouseClient: clickhouseEnabled
-        ? resolveClickHouseClient
-        : async () => null,
+      resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : async () => null,
       tupleParam: (values) => new TupleParam(values),
       runHistoryTelemetry: AppExperimentRunHistoryTelemetry.create(),
       dspyRetention: AppExperimentDspyRetentionPort.create(dataRetentionService),
-      execution: AppExperimentEventingAdapter.create(
-        () => commands.experimentRuns,
-      ).build(),
+      execution: AppExperimentEventingAdapter.create(() => commands.experimentRuns).build(),
       slugify,
       newId: () => nanoid(8),
     }).build(),
@@ -786,10 +763,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     session: null,
     workflows,
   });
-  const evaluators = traced(
-    EvaluatorFeature.create({ prisma, workflows }),
-    "EvaluatorService",
-  );
+  const evaluators = traced(EvaluatorFeature.create({ prisma, workflows }), "EvaluatorService");
   const traceService = TraceService.create({
     prisma,
     blobResolutionDeps: {
@@ -892,12 +866,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // Suite execution commands are registered after the Suite adapter is built.
   // Deferred dispatchers let the adapter's one run-state repository be shared
   // with Eventing during pipeline registration without a second service.
-  const suiteStartRun = new Deferred<AppCommands["suiteRuns"]["startSuiteRun"]>(
-    "suiteStartRun",
-  );
-  const suiteQueueRun = new Deferred<AppCommands["simulations"]["queueRun"]>(
-    "suiteQueueRun",
-  );
+  const suiteStartRun = new Deferred<AppCommands["suiteRuns"]["startSuiteRun"]>("suiteStartRun");
+  const suiteQueueRun = new Deferred<AppCommands["simulations"]["queueRun"]>("suiteQueueRun");
   const suiteRuntime = AppSuiteRuntime.create({
     database: prisma,
     agents,
@@ -986,9 +956,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       prices: billingCatalogue.prices,
       customerCurrency,
     });
-    const itemCalculator = SubscriptionItemCalculatorService.create(
-      billingCatalogue.prices,
-    );
+    const itemCalculator = SubscriptionItemCalculatorService.create(billingCatalogue.prices);
     billingCustomer = CustomerService.create({
       stripe: stripeClient,
       organizations,
@@ -1001,8 +969,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     });
     const licensePurchaseService = LicensePurchaseService.create({
       sendLicenseEmail,
-      notifyLicensePurchase: (input) =>
-        getApp().notifications.sendSlackLicensePurchase(input),
+      notifyLicensePurchase: (input) => getApp().notifications.sendSlackLicensePurchase(input),
     });
     webhookService = EEWebhookService.create({
       db: prisma,
@@ -1037,15 +1004,26 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     clock: automationClock,
   });
   const automationEmailCaps = createAppAutomationEmailCaps(redis);
-  const graphPorts = createAutomationGraphPorts({
-    database: prisma,
+  const automationPersistCaps = AutomationPersistCapService.create({
+    projects,
+    planProvider,
+    config: {
+      free: env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      paid: env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      enterprise: env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
+    },
     redis: redis ?? null,
+  });
+  const graphPorts = createAutomationGraphPorts({
+    redis: redis ?? null,
+    clock: automationClock,
     emailCaps: automationEmailCaps,
     delivery: automationDelivery,
     projects,
+    authz: authzFeature.permissions,
     analytics: analyticsService,
     resolveClickHouseClient,
-    baseHost: config.baseHost ?? env.BASE_HOST,
+    baseHost: config.baseHost,
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
   });
@@ -1055,6 +1033,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     graph: graphPorts,
     clock: automationClock,
     testFire: AppAutomationTestFireAdapter.create(),
+    persistCaps: automationPersistCaps,
   }).build();
   const tokenizer = new TokenizerService(
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
@@ -1159,9 +1138,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     processStore,
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(prisma),
-    topicClusteringRunHistory: new PrismaTopicClusteringRunHistoryProjectionRepository(
-      prisma,
-    ),
+    topicClusteringRunHistory: new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
     topicModel: new PrismaTopicModelProjectionRepository(prisma),
     langyTurnAdmission: langyPersistence.langyTurnAdmission,
   };
@@ -1188,10 +1165,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         endpoints: webhookEndpointService,
         pruneExpiredIdempotencyReceipts: (now: Date) =>
           pruneExpiredIdempotencyReceipts({ prisma, now }),
-        dispatch: ({ destination, ...input }) =>
-          webhookDestinationFor(destination).send(input),
-        getPlan: (organizationId: string) =>
-          planProvider.getActivePlan({ organizationId }),
+        dispatch: ({ destination, ...input }) => webhookDestinationFor(destination).send(input),
+        getPlan: (organizationId: string) => planProvider.getActivePlan({ organizationId }),
       }
     : undefined;
 
@@ -1227,9 +1202,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const governanceKpisRepository = clickhouseEnabled
     ? new AppGovernanceKpisAdapter(resolveClickHouseClient)
     : undefined;
-  const governanceKpisSync = governanceKpisRepository
-    ? { governanceKpisRepository }
-    : undefined;
+  const governanceKpisSync = governanceKpisRepository ? { governanceKpisRepository } : undefined;
 
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
   // subscriber sync writes through it, the puller worker and the workspace-view
@@ -1263,8 +1236,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // registered. Request transports then receive that one capability through
   // `ctx.app`; the worker uses the same project service directly.
   const governanceVirtualKeys = VirtualKeyService.create(prisma);
-  const governanceIngestionPullHost =
-    AppGovernanceIngestionPullHost.create(featureFlagService);
+  const governanceIngestionPullHost = AppGovernanceIngestionPullHost.create(featureFlagService);
   const governanceOptions = {
     organizations,
     projects,
@@ -1326,16 +1298,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
           redis,
           policy: {
             globalConcurrency:
-              Number.isSafeInteger(configuredGlobalConcurrency) &&
-              configuredGlobalConcurrency > 0
+              Number.isSafeInteger(configuredGlobalConcurrency) && configuredGlobalConcurrency > 0
                 ? configuredGlobalConcurrency
                 : undefined,
-            compression:
-              process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true" ? "zstd" : "gzip",
+            compression: process.env.GROUP_QUEUE_ZSTD_WRITES_ENABLED === "true" ? "zstd" : "gzip",
             payloadCodec:
-              process.env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED === "true"
-                ? "msgpack"
-                : "json",
+              process.env.GROUP_QUEUE_MSGPACK_WRITES_ENABLED === "true" ? "msgpack" : "json",
           },
           objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
           resolveStorageDestination: resolveProjectStorageDestination,
@@ -1368,22 +1336,30 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     processStore: repositories.processStore,
   });
 
+  const traceTree = clickhouseEnabled
+    ? AppTraceRuntime.create({
+        resolveClient: resolveClickHouseClient,
+        modelProviders,
+        queryFieldValues: AppTraceQueryFieldValuesAdapter.create(traceList),
+      }).build()
+    : AppTraceRuntime.createNull(modelProviders);
+
   // ADR-052: automation dispatch ports for the process-manager runtime the
   // registry composes (triggerSettlement + graphAlertSweep). Built on every
   // role — registration is passive shape; the outbox/wake worker loops
   // start only where roleRunsWorkers() is true.
   const automationPorts = buildAutomationDispatchPorts({
     prisma,
-    redis: redis ?? null,
     automation,
     emailCaps: automationEmailCaps,
     projects,
     evaluations: evaluationService,
-    traces: { canonicalisation: traceCanonicalisation, spans: spanStorage },
-    traceSummaryRepository: repositories.traceSummaryFold,
-    analytics: analyticsService,
-    resolveClickHouseClient,
+    traces: { canonicalisation: traceCanonicalisation, tree: traceTree },
+    dataset,
     annotations,
+    baseHost: config.baseHost,
+    emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+    tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
   });
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
@@ -1421,8 +1397,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
           deps: {
             loadTrigger: ({ projectId, triggerId }) =>
               automation.tryGetById({ triggerId, projectId }),
-            loadProject: (projectId) =>
-              prisma.project.findUnique({ where: { id: projectId } }),
+            loadProject: (projectId) => prisma.project.findUnique({ where: { id: projectId } }),
             sendEmail: sendRenderedTriggerEmail,
             sendSlack: sendRenderedSlackMessage,
             sendSlackBot: postSlackChatMessage,
@@ -1439,14 +1414,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
             // finally matches on what the author asked for. (The older
             // filters-OBJECT builder could not: it emits `ts.`-aliased
             // conditions for a JOIN context, invalid here.)
-            listReportTraces: async ({
-              projectId,
-              projectSlug,
-              query,
-              from,
-              to,
-              limit,
-            }) => {
+            listReportTraces: async ({ projectId, projectSlug, query, from, to, limit }) => {
               const page = await traceList.getList({
                 tenantId: projectId,
                 timeRange: { from, to },
@@ -1455,8 +1423,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
                 pageSize: limit,
                 visibilityCutoffMs: null,
                 filterWhere:
-                  translateFilterToClickHouse(query, projectId, { from, to }) ??
-                  undefined,
+                  translateFilterToClickHouse(query, projectId, { from, to }) ?? undefined,
               });
               const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
               return page.items.map((item) => toReportTraceRow({ item, projectUrl }));
@@ -1707,9 +1674,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     workerCallbackUrl:
       env.LANGY_WORKER_CALLBACK_URL ?? env.LANGWATCH_ENDPOINT ?? env.LANGWATCH_API_URL,
     workerGatewayBaseUrl:
-      env.LANGY_WORKER_GATEWAY_URL ??
-      env.LW_GATEWAY_PUBLIC_URL ??
-      env.LW_GATEWAY_BASE_URL,
+      env.LANGY_WORKER_GATEWAY_URL ?? env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL,
     mirrorProjectId: env.LANGY_MIRROR_PROJECT_ID,
   });
 
@@ -1935,14 +1900,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "SessionGroupsService",
   );
 
-  const traceTree = clickhouseEnabled
-    ? AppTraceRuntime.create({
-        resolveClient: resolveClickHouseClient,
-        modelProviders,
-        queryFieldValues: AppTraceQueryFieldValuesAdapter.create(traceList),
-      }).build()
-    : AppTraceRuntime.createNull(modelProviders);
-
   const traces = {
     canonicalisation: traceCanonicalisation,
     read: traceService,
@@ -1990,9 +1947,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   if (systemMigrations) {
     // Aborts the pass between tenants; a truncated pass is harmless because
     // every migration is idempotent and the next boot resumes the sweep.
-    shutdownResources.register("subscriber", "system-migrations", () =>
-      systemMigrations.stop(),
-    );
+    shutdownResources.register("subscriber", "system-migrations", () => systemMigrations.stop());
   }
   shutdownResources.register("database", "prisma", closePrismaConnection);
 
@@ -2027,16 +1982,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     users,
     scheduler: {
       repository: new PrismaScheduledJobStore(prisma),
-      wake: redis
-        ? RedisSchedulerWakeAdapter.create(redis)
-        : NoopSchedulerWakeService.create(),
+      wake: redis ? RedisSchedulerWakeAdapter.create(redis) : NoopSchedulerWakeService.create(),
       projects,
     },
   }).build();
 
-  const replayRepo = redis
-    ? new ReplayRedisRepository(redis)
-    : new NullReplayRepository();
+  const replayRepo = redis ? new ReplayRedisRepository(redis) : new NullReplayRepository();
   const snapshots = redis ? RedisOpsSnapshotAdapter.create({ redis }) : null;
   snapshots?.start().catch((error) => {
     logger.error({ error }, "Failed to start ops snapshot service");
@@ -2066,9 +2017,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       });
     })(),
     replay: new ReplayService(replayRepo, eventingRetention),
-    metricsCollector: redis
-      ? getOpsMetricsCollector({ redis, ops: opsService, snapshots })
-      : null,
+    metricsCollector: redis ? getOpsMetricsCollector({ redis, ops: opsService, snapshots }) : null,
     snapshots,
   });
 
@@ -2105,9 +2054,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     },
     filters: {
       options: new FilterService(
-        clickhouseEnabled
-          ? new FilterOptionsClickHouseRepository(resolveClickHouseClient)
-          : null,
+        clickhouseEnabled ? new FilterOptionsClickHouseRepository(resolveClickHouseClient) : null,
       ),
     },
     clickhouse: {
@@ -2118,9 +2065,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     },
     redis,
     billing: {
-      events: new BillableEventsMeterClickHouseRepository(
-        getClickHouseClientForOrganization,
-      ),
+      events: new BillableEventsMeterClickHouseRepository(getClickHouseClientForOrganization),
     },
     governance,
     billableEvents: billableEventsRepository ?? undefined,
@@ -2132,9 +2077,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     },
     github: githubService,
     storedObjects: {
-      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(
-        getAllClickHouseInstances,
-      ),
+      crossTenantOwnerLookup: new StoredObjectOwnerClickHouseRepository(getAllClickHouseInstances),
     },
     opsExplain: {
       service: new OpsExplainService(
@@ -2322,8 +2265,7 @@ export function createTestApp(
     diagnostics: AppApiKeyDiagnostics.create(createLogger("langwatch:api-key:test")),
   }).build();
   const testGovernanceVirtualKeys = VirtualKeyService.create(testPrisma);
-  const testGovernanceIngestionPullHost =
-    AppGovernanceIngestionPullHost.create(featureFlagService);
+  const testGovernanceIngestionPullHost = AppGovernanceIngestionPullHost.create(featureFlagService);
   const testPlanProvider =
     overrides?.planProvider ??
     PlanProviderService.create({
@@ -2539,11 +2481,7 @@ export function createTestApp(
           "TraceSummaryService",
         ),
         list: traced(
-          new TraceListService(
-            new NullTraceListRepository(),
-            testEvaluationService,
-            testTopics,
-          ),
+          new TraceListService(new NullTraceListRepository(), testEvaluationService, testTopics),
           "TraceListService",
         ),
         sessionGroups: traced(
@@ -2627,6 +2565,7 @@ export function createTestApp(
       redis: null,
       graph: createAutomationTestRuntime(),
       testFire: createAutomationTestFirePort(),
+      persistCaps: createAppAutomationTestPersistCaps(),
     }).build(),
     simulations: testSimulations,
     simulationExports: ScenarioRunExportService.create(testSimulations),
@@ -2727,13 +2666,9 @@ export function createTestApp(
         apiKeys,
         github: () => testGithub,
         workerCallbackUrl:
-          env.LANGY_WORKER_CALLBACK_URL ??
-          env.LANGWATCH_ENDPOINT ??
-          env.LANGWATCH_API_URL,
+          env.LANGY_WORKER_CALLBACK_URL ?? env.LANGWATCH_ENDPOINT ?? env.LANGWATCH_API_URL,
         workerGatewayBaseUrl:
-          env.LANGY_WORKER_GATEWAY_URL ??
-          env.LW_GATEWAY_PUBLIC_URL ??
-          env.LW_GATEWAY_BASE_URL,
+          env.LANGY_WORKER_GATEWAY_URL ?? env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL,
         mirrorProjectId: env.LANGY_MIRROR_PROJECT_ID,
       }),
       feedbackPromptRedis: null,

@@ -11,9 +11,9 @@ import {
 
 class TestRunawayPort extends AutomationRunawayPort {
   readonly paused = vi.fn();
-  readonly emailed = vi.fn<
-    (input: { kind: "ceiling_reached" | "paused" }) => Promise<void>
-  >(async () => undefined);
+  readonly emailed = vi.fn<(input: { kind: "ceiling_reached" | "paused" }) => Promise<void>>(
+    async () => undefined,
+  );
   private readonly claimed = new Set<string>();
   count = 1_000;
   failEmail = false;
@@ -56,9 +56,7 @@ class TestRunawayPort extends AutomationRunawayPort {
   info(): void {}
 }
 
-const trigger = (
-  overrides: Partial<AutomationRunawayTrigger> = {},
-): AutomationRunawayTrigger => ({
+const trigger = (overrides: Partial<AutomationRunawayTrigger> = {}): AutomationRunawayTrigger => ({
   id: "trigger-1",
   name: "Every trace",
   triggerKind: "AUTOMATION",
@@ -68,9 +66,7 @@ const trigger = (
   ...overrides,
 });
 
-function breach(
-  overrides: Partial<AutomationPersistCapBreach> = {},
-): AutomationPersistCapBreach {
+function breach(overrides: Partial<AutomationPersistCapBreach> = {}): AutomationPersistCapBreach {
   return {
     trigger: trigger(),
     projectId: "project-1",
@@ -119,9 +115,7 @@ describe("runaway containment policy", () => {
       }),
     );
     expect(port.paused).not.toHaveBeenCalled();
-    expect(port.emailed).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "ceiling_reached" }),
-    );
+    expect(port.emailed).toHaveBeenCalledWith(expect.objectContaining({ kind: "ceiling_reached" }));
   });
 
   it("contains notifier failures and releases the day claim for retry", async () => {

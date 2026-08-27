@@ -358,16 +358,6 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/components/AutomationTypePicker.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/components/CadenceField.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/components/CadenceSection.tsx",
       "kind": "page-shell"
     },
@@ -383,32 +373,12 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/components/FacetSection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/components/MainSectionList.tsx",
       "kind": "page-shell"
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/components/NameField.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/components/page/AutomationTableCells.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/components/QueryFilterInput.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/components/ReportScheduleField.tsx",
       "kind": "page-shell"
     },
     {
@@ -423,37 +393,12 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/components/SeveritySection.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/components/SourceCard.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/components/SubjectSection.tsx",
       "kind": "page-shell"
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/components/TraceDebounceField.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/editors/liquidMonaco.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/editors/templateAuthoring.tsx",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/logic/conditionQuery.ts",
       "kind": "legacy-implementation"
     },
     {
@@ -494,21 +439,6 @@
     {
       "feature": "automation",
       "file": "platform/app/src/features/automations/providers/slack/templates/registry.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/providers/slack/templates/TemplatePicker.tsx",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/providers/slack/templates/wireframes.tsx",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/providers/TestFireButton.tsx",
       "kind": "legacy-implementation"
     },
     {
@@ -585,181 +515,6 @@
       "feature": "automation",
       "file": "platform/app/src/server/api/routers/emailSuppression.ts",
       "kind": "transport"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/delivery/deliverWebhook.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/delivery/sendSlackWebhook.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/delivery/slackWebApi.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/delivery/slackWebhookGuard.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/dispatch/confirmSettledMatch.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/dispatch/graphAlertActionDispatch.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/dispatch/persistCap.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/dispatch/resolveRedis.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/dispatch/triggerActionDispatch.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/graph-alert.builder.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/providers/annotationQueue/server.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/providers/dataset/server.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/providers/email/server.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/providers/registry.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/providers/slack/server.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/providers/types.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/providers/webhook/server.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/report.builder.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/trigger-summary.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/trigger.types.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/automationDispatch.wiring.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/index.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/pipeline.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/process-manager/graphAlertSweep.process.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/process-manager/index.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/process-manager/triggerSettlement.process.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/process-manager/triggerSettlementIntentHandlers.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/process-manager/triggerSettlementProcess.types.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/process-manager/webhookDeliveryPrune.process.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/schemas/constants.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/schemas/events.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/settleWindow.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber.ts",
-      "kind": "legacy-implementation"
     },
     {
       "feature": "billing",
@@ -1040,11 +795,6 @@
       "feature": "dataset",
       "file": "platform/app/src/server/api/routers/datasetRecord.ts",
       "kind": "transport"
-    },
-    {
-      "feature": "dataset",
-      "file": "platform/app/src/server/app-layer/automations/providers/dataset/server.ts",
-      "kind": "legacy-implementation"
     },
     {
       "feature": "evaluation",
@@ -5435,11 +5185,6 @@
       "feature": "webhook",
       "file": "platform/app/src/runtime/app/features/webhooks.ts",
       "kind": "composition"
-    },
-    {
-      "feature": "webhook",
-      "file": "platform/app/src/server/app-layer/automations/providers/webhook/server.ts",
-      "kind": "legacy-implementation"
     },
     {
       "feature": "webhook",

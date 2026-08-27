@@ -139,6 +139,25 @@ describe("ViewAutomationDrawer conditions section", () => {
     });
   });
 
+  describe("given an automation with canonical object filters", () => {
+    const filters = { "spans.model": ["gpt-5-mini"] };
+
+    beforeEach(() => {
+      mockTriggerRow = {
+        ...baseTrigger,
+        filterQuery: null,
+        filters,
+      };
+    });
+
+    it("shows every condition through the existing filter display", () => {
+      renderDrawer();
+
+      expect(screen.getByTestId("filter-display").textContent).toBe(JSON.stringify(filters));
+      expect(screen.queryByText("No conditions")).toBeNull();
+    });
+  });
+
   describe("given an automation with no query and empty filters", () => {
     beforeEach(() => {
       mockTriggerRow = {

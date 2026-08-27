@@ -63,15 +63,13 @@ export const slackActionParamsSchema = z
   });
 export type SlackActionParams = z.infer<typeof slackActionParamsSchema>;
 
-export function slackDeliveryMethodOf(
-  params: Pick<SlackActionParams, "slackDelivery">,
-): SlackDeliveryMethod {
+export function slackDeliveryMethodOf(params: {
+  slackDelivery?: SlackActionParams["slackDelivery"];
+}): SlackDeliveryMethod {
   return params.slackDelivery ?? "webhook";
 }
 
-export type SlackPreviewPayload =
-  | { text: string }
-  | { blocks: Record<string, unknown>[] };
+export type SlackPreviewPayload = { text: string } | { blocks: Record<string, unknown>[] };
 export interface SlackPreview extends PreviewEnvelope {
   channel: "slack";
   payload: SlackPreviewPayload;

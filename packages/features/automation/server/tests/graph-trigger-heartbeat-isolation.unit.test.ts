@@ -13,15 +13,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type GraphTriggerHeartbeatDeps,
-  type HeartbeatCandidateSources,
   GraphTriggerHeartbeatService,
 } from "../src/services/graph-trigger-heartbeat.service";
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import type { AutomationService } from "@langwatch/automation-contract";
 import type { GraphTriggerSentRepository } from "../src/repositories/graph-trigger-sent.repository";
+import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
-const decideGraphTriggerHeartbeat = GraphTriggerHeartbeatService.decide;
 
 const BROKEN = "proj-broken";
 const HEALTHY = "proj-healthy";
@@ -37,18 +35,24 @@ const NO_DATA_PARAMS = {
 function makeTrigger(id: string, customGraphId: string): TriggerSummary {
   return {
     id,
+    name: id,
     projectId: HEALTHY,
     customGraphId,
-    active: true,
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: "ALERT",
     actionParams: NO_DATA_PARAMS,
-  } as unknown as TriggerSummary;
-}
-
-function makeSources(): HeartbeatCandidateSources {
-  return {
-    loadProjectsWithGraphTriggers: async () => [BROKEN, HEALTHY],
-    loadProjectsWithOpenGraphTriggerSent: async () => new Set<string>(),
+    filters: {},
+    alertType: null,
+    message: null,
+    notificationCadence: "immediate",
+    filterQuery: null,
+    traceDebounceMs: 30_000,
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+    },
   };
 }
 
@@ -60,10 +64,13 @@ function makeDeps({
   const clickHouse = {
     query: vi.fn(async () => ({ json: async () => [{ lastMs: null }] })),
   };
+  const triggers = new HeartbeatTriggerRepository({});
+  triggers.findActiveForProject = getActiveGraphTriggersForProject;
+
   return {
-    automation: { getActiveGraphTriggersForProject } as unknown as AutomationService,
+    triggers,
     triggerSent: {
-      findProjectsWithGraphTriggers: async () => [],
+      findProjectsWithGraphTriggers: async () => [BROKEN, HEALTHY],
       findProjectsWithOpenGraphTriggerSent: async () => new Set(),
       tryFindGraphTriggerSource: async () => "trace",
       findOpenTriggerIdsForProject: async () => new Set(),
@@ -73,8 +80,8 @@ function makeDeps({
       deleteOpenClaim: async () => undefined,
       markResolvedById: async () => undefined,
     } satisfies GraphTriggerSentRepository,
-    resolveClickHouseClient: (async () =>
-      clickHouse) as unknown as GraphTriggerHeartbeatDeps["resolveClickHouseClient"],
+    heartbeat: { tryResolveClickHouseClient: async () => clickHouse },
+    logger: new SilentAutomationLogger(),
   };
 }
 
@@ -87,32 +94,30 @@ describe("decideGraphTriggerHeartbeat per-project isolation", () => {
 
   describe("given one project's candidate load throws", () => {
     it("still enqueues the healthy project's absence evaluation", async () => {
-      const requests = await decideGraphTriggerHeartbeat({
-        deps: makeDeps({
+      const service = GraphTriggerHeartbeatService.create(
+        makeDeps({
           getActiveGraphTriggersForProject: async (projectId: string) => {
             if (projectId === BROKEN) throw new Error("db unavailable");
             return [makeTrigger("trig-healthy", "graph-healthy")];
           },
         }),
-        sources: makeSources(),
-        now,
-      });
+      );
+      const requests = await service.decide({ now });
 
       expect(requests).toHaveLength(1);
       expect(requests[0]).toMatchObject({ projectId: HEALTHY });
     });
 
     it("does not enqueue anything for the failing project", async () => {
-      const requests = await decideGraphTriggerHeartbeat({
-        deps: makeDeps({
+      const service = GraphTriggerHeartbeatService.create(
+        makeDeps({
           getActiveGraphTriggersForProject: async (projectId: string) => {
             if (projectId === BROKEN) throw new Error("db unavailable");
             return [makeTrigger("trig-healthy", "graph-healthy")];
           },
         }),
-        sources: makeSources(),
-        now,
-      });
+      );
+      const requests = await service.decide({ now });
 
       const projectIds = requests.map((r) => r.projectId);
       expect(projectIds).not.toContain(BROKEN);

@@ -86,9 +86,7 @@ describe("renderLiquid", () => {
 
   describe("when the template has a syntax error", () => {
     it("rejects", async () => {
-      await expect(
-        renderLiquid({ template: "{% if %}", context: {} }),
-      ).rejects.toBeDefined();
+      await expect(renderLiquid({ template: "{% if %}", context: {} })).rejects.toBeDefined();
     });
   });
 

@@ -21,9 +21,9 @@ import {
   registerLiquidLanguage,
   setModelVariables,
   setupLiquidJsonSchema,
-  type VariableInfo,
+  type MonacoVariableInfo as VariableInfo,
   validateLiquidModel,
-} from "./liquidMonaco";
+} from "@langwatch/automation-web";
 
 export type { VariableInfo };
 
@@ -173,8 +173,7 @@ export function LiquidEditor({
   jsonSchema?: object;
   jsonSchemaShadowUri?: string;
 }) {
-  const isLiquid =
-    language === LIQUID_LANGUAGE_ID || language === LIQUID_JSON_LANGUAGE_ID;
+  const isLiquid = language === LIQUID_LANGUAGE_ID || language === LIQUID_JSON_LANGUAGE_ID;
   const theme = useMonacoTheme();
   const monacoRef = useRef<Monaco | null>(null);
   const modelRef = useRef<MonacoTextModel | null>(null);
@@ -392,11 +391,7 @@ export function CompactSlackPreview({
     // nabbing vector (the cross-origin Block Kit Builder cannot navigate
     // this tab via `opener.location = …`) while keeping the forward sync
     // channel alive.
-    const popup = window.open(
-      builderUrl,
-      SYNCED_BUILDER_WINDOW_NAME,
-      "width=1200,height=900",
-    );
+    const popup = window.open(builderUrl, SYNCED_BUILDER_WINDOW_NAME, "width=1200,height=900");
     if (popup) {
       try {
         popup.opener = null;
@@ -414,13 +409,7 @@ export function CompactSlackPreview({
 
   const blockCount = payload.blocks.length;
   return (
-    <Box
-      bg="bg.subtle"
-      borderRadius="md"
-      padding={4}
-      border="1px solid"
-      borderColor="border"
-    >
+    <Box bg="bg.subtle" borderRadius="md" padding={4} border="1px solid" borderColor="border">
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <Text textStyle="sm" fontWeight="semibold">
@@ -466,13 +455,7 @@ export function CompactSlackPreview({
 function SlackTextPreviewCard({ text }: { text: string }) {
   const asMarkdown = useMemo(() => slackMrkdwnToCommonMark(text), [text]);
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
-      overflow="hidden"
-      bg="bg.panel"
-    >
+    <Box borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden" bg="bg.panel">
       <HStack
         gap={2}
         align="center"

@@ -1,5 +1,5 @@
 import type { TriggerFire, TriggerFireStats } from "@langwatch/automation-contract";
-import type { AutomationDatabase } from "../../ports/automation-database.port";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { TriggerFireHistoryRepository } from "../trigger-fire-history.repository";
 const mapFire = (row: unknown): TriggerFire => {
   const value = row as Record<string, unknown>;
@@ -12,11 +12,11 @@ const mapFire = (row: unknown): TriggerFire => {
   };
 };
 export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryRepository {
-  private constructor(private readonly database: AutomationDatabase) {
+  private constructor(private readonly database: PrismaClient) {
     super();
   }
-  static create(database: AutomationDatabase): PrismaTriggerFireHistoryRepository {
-    return new PrismaTriggerFireHistoryRepository(database);
+  static create(database: object): PrismaTriggerFireHistoryRepository {
+    return new PrismaTriggerFireHistoryRepository(database as PrismaClient);
   }
   async create(input: {
     projectId: string;

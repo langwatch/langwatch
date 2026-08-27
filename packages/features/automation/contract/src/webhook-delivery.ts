@@ -1,9 +1,4 @@
-export const WEBHOOK_DELIVERY_OUTCOMES = [
-  "success",
-  "retryable",
-  "terminal",
-  "pending",
-] as const;
+export const WEBHOOK_DELIVERY_OUTCOMES = ["success", "retryable", "terminal", "pending"] as const;
 export type WebhookDeliveryOutcome = (typeof WEBHOOK_DELIVERY_OUTCOMES)[number];
 
 export type WebhookFailureResponse = {

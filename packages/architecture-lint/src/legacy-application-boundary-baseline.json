@@ -49,15 +49,6 @@
         "~/shared/traces/media-refs"
       ],
       "platform/app/src/server/api/routers/user.ts": ["../../../env.mjs"],
-      "platform/app/src/server/app-layer/automations/delivery/sendSlackWebhook.ts": [
-        "~/env.mjs"
-      ],
-      "platform/app/src/server/app-layer/automations/dispatch/persistCap.ts": [
-        "~/env.mjs"
-      ],
-      "platform/app/src/server/app-layer/automations/graph-trigger-evaluation.service.ts": [
-        "~/components/analytics/CustomGraph"
-      ],
       "platform/app/src/server/app-layer/bug-reports/bug-report-slack.ts": ["~/env.mjs"],
       "platform/app/src/server/app-layer/config.ts": ["../../env-create.mjs"],
       "platform/app/src/server/app-layer/github/githubAppConfig.ts": ["~/env.mjs"],
@@ -119,9 +110,6 @@
       "platform/app/src/server/evaluators/runCodeEvaluator.ts": [
         "~/optimization_studio/server/addEnvs",
         "~/optimization_studio/types/events"
-      ],
-      "platform/app/src/server/event-sourcing/pipelines/automations/automationDispatch.wiring.ts": [
-        "~/env.mjs"
       ],
       "platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/services/trace-attribute-accumulation.service.ts": [
         "~/shared/traces/media-refs"
@@ -946,26 +934,6 @@
       ],
       "platform/app/src/experiments-v3/utils/mappingValidation.ts": [
         "~/server/evaluations/evaluators"
-      ],
-      "platform/app/src/features/automations/AutomationDrawer.tsx": [
-        "~/server/filters/types"
-      ],
-      "platform/app/src/features/automations/components/CadenceSection.tsx": [
-        "~/server/app-layer/automations/graph-alert.builder"
-      ],
-      "platform/app/src/features/automations/components/SubjectSection.tsx": [
-        "~/server/filters/types"
-      ],
-      "platform/app/src/features/automations/logic/draftReducer.ts": [
-        "~/server/app-layer/automations/graph-alert.builder",
-        "~/server/app-layer/automations/report.builder",
-        "~/server/filters/types"
-      ],
-      "platform/app/src/features/automations/logic/reportSchedule.ts": [
-        "~/server/app-layer/automations/report.builder"
-      ],
-      "platform/app/src/features/automations/providers/dataset/client.tsx": [
-        "~/server/datasets/types"
       ],
       "platform/app/src/features/briefing/hooks/useLangyBriefing.ts": [
         "~/server/analytics/registry",

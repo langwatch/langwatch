@@ -82,9 +82,7 @@ function findMatchingCloseTag(
   return startAfterOpenerEnd + m.index + m[0].length;
 }
 
-export function substituteLiquidForJsonValidation(
-  source: string,
-): LiquidSubstitutionResult {
+export function substituteLiquidForJsonValidation(source: string): LiquidSubstitutionResult {
   const liquidRanges: LiquidSubstitutionResult["liquidRanges"] = [];
   let out = "";
   let i = 0;
@@ -93,11 +91,7 @@ export function substituteLiquidForJsonValidation(
     const nextOutput = source.indexOf("{{", i);
     const nextTag = source.indexOf("{%", i);
     const next =
-      nextOutput === -1
-        ? nextTag
-        : nextTag === -1
-          ? nextOutput
-          : Math.min(nextOutput, nextTag);
+      nextOutput === -1 ? nextTag : nextTag === -1 ? nextOutput : Math.min(nextOutput, nextTag);
 
     if (next === -1) {
       out += source.slice(i);

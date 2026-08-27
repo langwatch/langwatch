@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import {
   isReservedWebhookHeader,
@@ -24,12 +15,9 @@ import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { VariableInfoIcon } from "@langwatch/automation-web";
-import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
-import {
-  FieldHeader,
-  LiquidEditor,
-} from "~/features/automations/editors/templateAuthoring";
-import { TestFireButton } from "../TestFireButton";
+import { LIQUID_JSON_LANGUAGE_ID } from "@langwatch/automation-web";
+import { FieldHeader, LiquidEditor } from "../../editors/templateAuthoring";
+import { AutomationTestFireButton } from "@langwatch/automation-web";
 import type {
   ConfigFormCtx,
   ConfigFormProps,
@@ -56,7 +44,7 @@ interface HeaderRow {
 }
 
 let headerRowSeq = 0;
-function newHeaderRow(partial?: Partial<Omit<HeaderRow, "id">>): HeaderRow {
+function newHeaderRow(partial?: { name?: string; value?: string; kept?: boolean }): HeaderRow {
   headerRowSeq += 1;
   return {
     id: `hdr_${headerRowSeq}`,
@@ -311,8 +299,8 @@ function HeadersEditor({
         </Button>
       </VStack>
       <Field.HelperText>
-        Sent with every request — for example an Authorization header your endpoint
-        expects. Values are stored encrypted and never shown again.
+        Sent with every request — for example an Authorization header your endpoint expects. Values
+        are stored encrypted and never shown again.
       </Field.HelperText>
     </Field.Root>
   );
@@ -358,8 +346,8 @@ function SigningSecretField({
         ) : null}
       </HStack>
       <Field.HelperText>
-        When set, deliveries carry an X-LangWatch-Signature header the receiver can
-        verify. Leave it empty to send unsigned deliveries.
+        When set, deliveries carry an X-LangWatch-Signature header the receiver can verify. Leave it
+        empty to send unsigned deliveries.
       </Field.HelperText>
     </Field.Root>
   );
@@ -372,8 +360,7 @@ function WebhookConfigForm({
   onChange,
   ctx,
 }: ConfigFormProps<WebhookSlice, WebhookPreview>) {
-  const urlProblem =
-    slice.url.trim() === "" ? null : validateWebhookUrlShape(slice.url.trim());
+  const urlProblem = slice.url.trim() === "" ? null : validateWebhookUrlShape(slice.url.trim());
   const defaults = defaultsForSourceKind(ctx.sourceKind);
   const templateValue = slice.template.value || defaults.webhookBody;
   const variables = useMemo(
@@ -415,7 +402,7 @@ function WebhookConfigForm({
       {/* Try the real request straight from the destination section; the
           outcome (status code / failure) lands right below the button. */}
       <VStack align="start" gap={2}>
-        <TestFireButton
+        <AutomationTestFireButton
           onTestFire={ctx.onTestFire}
           loading={ctx.testFireLoading}
           disabled={!isComplete(slice)}
@@ -431,8 +418,8 @@ function WebhookConfigForm({
       />
       <VStack align="stretch" gap={2}>
         <Text textStyle="xs" color="fg.muted">
-          Write the JSON your endpoint receives. Values in braces fill in from your trace
-          or alert when the request sends.
+          Write the JSON your endpoint receives. Values in braces fill in from your trace or alert
+          when the request sends.
         </Text>
         <Box data-testid="webhook-body-editor">
           <LiquidEditor
@@ -440,9 +427,7 @@ function WebhookConfigForm({
             height="280px"
             language={LIQUID_JSON_LANGUAGE_ID}
             value={templateValue}
-            onChange={(value) =>
-              onChange({ ...slice, template: { value, usingDefault: false } })
-            }
+            onChange={(value) => onChange({ ...slice, template: { value, usingDefault: false } })}
           />
         </Box>
         {preview ? (

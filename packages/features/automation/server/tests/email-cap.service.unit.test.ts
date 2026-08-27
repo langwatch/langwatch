@@ -12,9 +12,7 @@ const redisMock = vi.hoisted(() => ({
   connection: undefined as AutomationEmailCapStorePort | undefined,
 }));
 
-function makeStore(
-  overrides: Partial<AutomationEmailCapStorePort>,
-): AutomationEmailCapStorePort {
+function makeStore(overrides: Partial<AutomationEmailCapStorePort>): AutomationEmailCapStorePort {
   return {
     trySet: vi.fn().mockResolvedValue("OK"),
     tryGet: vi.fn().mockResolvedValue(null),
@@ -514,10 +512,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
         });
 
         expect(incr).not.toHaveBeenCalled();
-        expect(incrby).toHaveBeenCalledWith(
-          expect.stringMatching(/^trigger-email-tenant-cap:/),
-          1,
-        );
+        expect(incrby).toHaveBeenCalledWith(expect.stringMatching(/^trigger-email-tenant-cap:/), 1);
       });
     });
 

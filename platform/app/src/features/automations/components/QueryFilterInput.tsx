@@ -1,6 +1,6 @@
 import { Box, Textarea } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getSuggestionState } from "~/features/traces-v2/components/SearchBar/getSuggestionState";
+import { getSuggestionState } from "@langwatch/trace-web";
 import { SuggestionDropdown } from "~/features/traces-v2/components/SearchBar/SuggestionDropdown";
 import { SyntaxHelpDrawerHost } from "~/features/traces-v2/components/SearchBar/SyntaxHelpDrawer";
 import {
@@ -40,9 +40,7 @@ export function QueryFilterInput({
 
   const ui = useMemo(
     () =>
-      open
-        ? buildSuggestionUI({ state, previousSelected: selectedIndex })
-        : CLOSED_SUGGESTION,
+      open ? buildSuggestionUI({ state, previousSelected: selectedIndex }) : CLOSED_SUGGESTION,
     [open, state, selectedIndex],
   );
 

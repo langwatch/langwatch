@@ -1,14 +1,14 @@
-import type { AutomationDatabase } from "../../ports/automation-database.port";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   EmailSuppressionNameRepository,
   type UnsubscribeNames,
 } from "../email-suppression-name.repository";
 export class PrismaEmailSuppressionNameRepository extends EmailSuppressionNameRepository {
-  private constructor(private readonly database: AutomationDatabase) {
+  private constructor(private readonly database: PrismaClient) {
     super();
   }
-  static create(database: AutomationDatabase): PrismaEmailSuppressionNameRepository {
-    return new PrismaEmailSuppressionNameRepository(database);
+  static create(database: object): PrismaEmailSuppressionNameRepository {
+    return new PrismaEmailSuppressionNameRepository(database as PrismaClient);
   }
   async tryLookupNames(input: {
     projectId: string;

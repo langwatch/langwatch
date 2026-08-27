@@ -1,5 +1,4 @@
-import type { DrawerType } from "~/components/drawerRegistry";
-import { getDrawerStack } from "~/hooks/useDrawer";
+import { getDrawerStack, type DrawerType } from "~/hooks/useDrawer";
 
 /**
  * The drawer keys that mount the authoring drawer. `editAutomationFilter` is

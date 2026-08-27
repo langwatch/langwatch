@@ -154,9 +154,7 @@ describe("SlackConfigForm authoring tiers", () => {
       it("renders the synced preview", () => {
         renderForm();
 
-        expect(
-          screen.getByText(/preview in slack's block kit builder/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/preview in slack's block kit builder/i)).toBeInTheDocument();
       });
     });
   });
@@ -189,10 +187,8 @@ describe("SlackConfigForm authoring tiers", () => {
   // has customised nothing. A draft that claimed otherwise would show a
   // hand-customised field on a pristine report and turn Reset into a no-op.
   describe("given a fresh report draft", () => {
-    const reportCtx = () =>
-      makeCtx({ sourceKind: "report", reportSourceKind: "traceQuery" });
-    const layoutFor = (id: string) =>
-      SLACK_BLOCK_KIT_TEMPLATES.find((opt) => opt.id === id)!;
+    const reportCtx = () => makeCtx({ sourceKind: "report", reportSourceKind: "traceQuery" });
+    const layoutFor = (id: string) => SLACK_BLOCK_KIT_TEMPLATES.find((opt) => opt.id === id)!;
 
     it("seeds the layout that matches what the report sends", () => {
       const onChangeSpy = vi.fn();
@@ -264,9 +260,7 @@ describe("SlackConfigForm delivery method", () => {
       expect(screen.getByPlaceholderText(/xoxb-/i)).toBeInTheDocument();
       // A new automation cannot pick a webhook — no field, no connection toggle.
       expect(screen.queryByPlaceholderText(/hooks\.slack\.com/i)).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("radio", { name: /incoming webhook/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: /incoming webhook/i })).not.toBeInTheDocument();
     });
   });
 
@@ -282,12 +276,8 @@ describe("SlackConfigForm delivery method", () => {
       renderForm({ initial: legacySlice() });
 
       expect(screen.getByPlaceholderText(/hooks\.slack\.com/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole("radio", { name: /incoming webhook/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /switch to a slack app/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /incoming webhook/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /switch to a slack app/i })).toBeInTheDocument();
     });
 
     it("can switch to a bot connection", async () => {
@@ -304,9 +294,7 @@ describe("SlackConfigForm delivery method", () => {
     it("offers to keep the saved token without retyping", () => {
       renderForm({ initial: botSlice({ botTokenAlreadySet: true }) });
 
-      expect(
-        screen.getByPlaceholderText(/unchanged, leave blank to keep/i),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/unchanged, leave blank to keep/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /replace token/i })).toBeInTheDocument();
     });
 
@@ -584,9 +572,7 @@ describe("SlackConfigForm channel picker", () => {
       it("tells the author the list is incomplete", async () => {
         renderForm({ initial: botSlice({ channelId: "" }) });
 
-        expect(
-          await screen.findByText(/more channels than we can list/i),
-        ).toBeInTheDocument();
+        expect(await screen.findByText(/more channels than we can list/i)).toBeInTheDocument();
       });
 
       it("points the author at entering the channel themselves", async () => {
@@ -633,12 +619,8 @@ describe("SlackConfigForm channel picker", () => {
       it("says nothing about the list being short", () => {
         renderForm({ initial: botSlice({ channelId: "" }) });
 
-        expect(
-          screen.queryByText(/more channels than we can list/i),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByText(/private channels aren't listed/i),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/more channels than we can list/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/private channels aren't listed/i)).not.toBeInTheDocument();
       });
     });
 
@@ -653,9 +635,9 @@ describe("SlackConfigForm channel picker", () => {
 
         await user.click(screen.getByText(/setup steps/i));
 
-        expect(
-          await screen.findByText(/public channels work straight away/i),
-        ).toHaveTextContent(/private channel, add the app to that channel/i);
+        expect(await screen.findByText(/public channels work straight away/i)).toHaveTextContent(
+          /private channel, add the app to that channel/i,
+        );
       });
     });
 
@@ -679,9 +661,7 @@ describe("Slack client slice contract", () => {
 
     describe("when the channel is set but no token exists yet", () => {
       it("reports the config as incomplete", () => {
-        expect(slackClient.isComplete(botSlice({ botTokenAlreadySet: false }))).toBe(
-          false,
-        );
+        expect(slackClient.isComplete(botSlice({ botTokenAlreadySet: false }))).toBe(false);
       });
     });
 

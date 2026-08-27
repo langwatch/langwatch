@@ -3,18 +3,18 @@ import type {
   WebhookDeliveryRow,
   WebhookFailureResponse,
 } from "@langwatch/automation-contract";
-import type { AutomationDatabase } from "../../ports/automation-database.port";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { WebhookDeliveryRepository } from "../webhook-delivery.repository";
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export class PrismaWebhookDeliveryRepository extends WebhookDeliveryRepository {
-  private constructor(private readonly database: AutomationDatabase) {
+  private constructor(private readonly database: PrismaClient) {
     super();
   }
 
-  static create(database: AutomationDatabase): PrismaWebhookDeliveryRepository {
-    return new PrismaWebhookDeliveryRepository(database);
+  static create(database: object): PrismaWebhookDeliveryRepository {
+    return new PrismaWebhookDeliveryRepository(database as PrismaClient);
   }
 
   async create(input: WebhookDeliveryInput): Promise<void> {
@@ -51,11 +51,9 @@ export class PrismaWebhookDeliveryRepository extends WebhookDeliveryRepository {
       const value = row as Record<string, unknown>;
       return {
         id: String(value.id),
-        triggerId:
-          typeof value.triggerId === "string" ? value.triggerId : input.triggerId,
+        triggerId: typeof value.triggerId === "string" ? value.triggerId : input.triggerId,
         dispatchId: String(value.dispatchId),
-        responseStatus:
-          typeof value.responseStatus === "number" ? value.responseStatus : null,
+        responseStatus: typeof value.responseStatus === "number" ? value.responseStatus : null,
         latencyMs: typeof value.latencyMs === "number" ? value.latencyMs : null,
         error: typeof value.error === "string" ? value.error : null,
         response: (value.response as WebhookFailureResponse | null) ?? null,

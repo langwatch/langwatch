@@ -14,9 +14,13 @@ private to the server package and is supplied through repository ports and
 composition adapters.
 
 Provider schemas, sentinels, action vocabulary, graph-alert/report policy, and
-reusable templating live in the automation contract. Browser-safe authoring,
-provider forms, Monaco behaviour, and controlled overview presentation live in
-`automation-web`;
+reusable templating live in the automation contract. Portable authoring facets,
+Monaco behaviour, cadence controls, and controlled overview presentation live
+in `automation-web`. Provider forms and the drawer controller remain with the
+application that owns tRPC, project identity, trace filters, and the drawer
+stack. They move into `apps/ui` only with those real dependencies; placeholder
+hooks or a raw tRPC context are not a composition boundary. The app owns the
+transport boundary for those forms;
 threshold/series policy lives in the contract and delivery persistence policy
 lives in `automation-server`. The server package also owns persist-cap runaway
 containment as a claim-gated policy over injected pause, counting, notification,
@@ -27,7 +31,9 @@ Template validation and test-fire rendering are operations on the same
 Slack, and generic webhooks; transports do not receive a callback bag.
 
 Graph-trigger evaluation, heartbeat candidate selection, and runaway containment
-are operations on the same concrete `AutomationService`. Construction receives
+are operations on the same concrete `AutomationService`. The Automation server
+package also owns the trigger-match command, event schema, deterministic
+settlement/sweep/prune process topology, and reusable subscribers. Construction receives
 canonical Analytics/Project services plus explicit notifier, ClickHouse,
 provider, claim, and telemetry ports; Eventing supplies only trigger id/reason
 and heartbeat time. The server package also owns the shared per-trigger hourly
@@ -36,7 +42,17 @@ explicitly and a documented per-worker in-memory fallback. `AutomationEmailCapSe
 is separate because its lifetime follows the process-owned Redis connection and
 fallback counters, rather than the persisted trigger service. It is composed
 once and shared by both dispatch paths; callers cannot select its store.
-Graph incident persistence is a private Automation repository.
+Graph incident persistence is a private Automation repository. The host composes
+retry-safe intent executors with concrete delivery, trace, queue, Redis, and
+telemetry capabilities; it does not recreate automation state transitions.
+
+Terminal Evaluation events use the separate
+`AutomationEvaluationSubscriberService` contract because their lifecycle is
+owned by Eventing's delay, deduplication, and redelivery rather than an
+ordinary request. The single process-lifetime implementation receives the
+complete `AutomationService` and `TraceService`, Automation's trigger-filter
+service, and a named trigger-match-command port; Evaluation consumes this
+complete service.
 
 ## Context
 
@@ -61,8 +77,8 @@ repository or concrete service.
 ## Persistence
 
 Trigger, TriggerSent, and EmailSuppression rows are private to server
-repositories. Prisma-shaped database access enters through
-`AutomationDatabase`; callers do not pass a global Prisma client to handlers.
+repositories. The generated Prisma client is imported only by those private
+repository adapters; callers do not pass a global Prisma client to handlers.
 
 ## Runtime and registration
 

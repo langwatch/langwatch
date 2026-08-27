@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AutomationClock } from "../src/ports/automation-clock.port";
-import {
-  ScheduledJobStore,
-  type ScheduledJobRecord,
-} from "../src/ports/scheduled-jobs.port";
+import { ScheduledJobStore, type ScheduledJobRecord } from "../src/ports/scheduled-jobs.port";
 import { SchedulerWake } from "../src/ports/scheduler-wake.port";
 import { ReportScheduleService } from "../src/services/report-schedule.service";
 

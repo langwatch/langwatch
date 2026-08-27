@@ -21,10 +21,10 @@ import { SchedulerWake } from "../src/ports/scheduler-wake.port";
 import { CustomGraphRepository } from "../src/repositories/custom-graph.repository";
 import { WebhookDeliveryRepository } from "../src/repositories/webhook-delivery.repository";
 import { GraphTriggerSentRepository } from "../src/repositories/graph-trigger-sent.repository";
-import type {
-  WebhookDeliveryInput,
-  WebhookDeliveryRow,
-} from "@langwatch/automation-contract";
+import { AutomationGraphService } from "../src/services/trigger-graph.service";
+import { AutomationTemplateService } from "../src/services/automation-template.service";
+import { AutomationPersistCapService } from "../src/services/persist-cap.service";
+import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 import { createAutomationTestRuntime } from "../src/testing";
 
 class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
@@ -64,10 +64,7 @@ const suppression = (email: string, triggerId: string | null): EmailSuppression 
   createdAt: new Date(),
 });
 
-const summary = (
-  id: string,
-  overrides: Partial<TriggerSummary> = {},
-): TriggerSummary => ({
+const summary = (id: string, overrides: Partial<TriggerSummary> = {}): TriggerSummary => ({
   id,
   projectId: "p",
   name: id,
@@ -96,17 +93,10 @@ class Suppressions extends EmailSuppressionRepository {
   }
   findMatching(input: { triggerId: string }) {
     return Promise.resolve(
-      this.rows.filter(
-        (row) => row.triggerId === null || row.triggerId === input.triggerId,
-      ),
+      this.rows.filter((row) => row.triggerId === null || row.triggerId === input.triggerId),
     );
   }
-  create(input: {
-    projectId: string;
-    email: string;
-    triggerId: string | null;
-    reason: string;
-  }) {
+  create(input: { projectId: string; email: string; triggerId: string | null; reason: string }) {
     const row = suppression(input.email, input.triggerId);
     this.rows.push(row);
     return Promise.resolve(row);
@@ -148,11 +138,7 @@ class Jobs extends ScheduledJobStore {
       },
     ];
   }
-  async deactivateForTarget(input: {
-    projectId: string;
-    targetType: string;
-    targetId: string;
-  }) {
+  async deactivateForTarget(input: { projectId: string; targetType: string; targetId: string }) {
     for (const row of this.rows) {
       if (row.targetId === input.targetId) row.active = false;
     }
@@ -260,24 +246,59 @@ const makeService = (
   triggers = new Triggers(),
   history = new Fires(),
   webhookDeliveries = new EmptyWebhookDeliveries(),
-): AutomationService =>
-  AutomationService.create({
-    triggers,
-    history,
-    suppressions: new Suppressions(),
-    names: new Names(),
-    verifier: new Verifier(),
-    reportSchedules: ReportScheduleService.create({
-      jobs: new Jobs(),
-      clock: new Clock(),
-      wake: new Wake(),
-    }),
+  reportSchedules = ReportScheduleService.create({
+    jobs: new Jobs(),
     clock: new Clock(),
-    customGraphs: new EmptyCustomGraphs(),
-    webhookDeliveries,
-    graphTriggerSent: new EmptyGraphTriggerSent(),
-    ...createAutomationTestRuntime(),
-  });
+    wake: new Wake(),
+  }),
+  suppressions = new Suppressions(),
+): AutomationService =>
+  (() => {
+    const runtime = createAutomationTestRuntime();
+    const clock = new Clock();
+    const customGraphs = new EmptyCustomGraphs();
+    const graph = AutomationGraphService.create({
+      triggers,
+      customGraphs,
+      projects: runtime.projects,
+      analytics: runtime.analytics,
+      triggerSent: new EmptyGraphTriggerSent(),
+      notifier: runtime.notifier,
+      logger: runtime.logger,
+      slackTokens: runtime.slackTokens,
+      dispatchErrors: runtime.dispatchErrors,
+      heartbeat: runtime.heartbeat,
+      runaway: runtime.runaway,
+      clock,
+      baseHost: runtime.baseHost,
+    });
+    const templates = AutomationTemplateService.create({
+      baseHost: runtime.baseHost,
+      delivery: runtime.testFire,
+    });
+    const persistCaps = AutomationPersistCapService.create({
+      projects: runtime.projects,
+      planProvider: {
+        getActivePlan: async () => ({ type: "FREE", free: true }),
+      },
+      config: { free: 100, paid: 1_000, enterprise: 10_000 },
+      redis: null,
+    });
+    return AutomationService.create({
+      triggers,
+      history,
+      suppressions,
+      names: new Names(),
+      verifier: new Verifier(),
+      reportSchedules,
+      clock,
+      customGraphs,
+      webhookDeliveries,
+      graph,
+      templates,
+      persistCaps,
+    });
+  })();
 
 describe("AutomationService trigger and fire-history lifecycle", () => {
   it("keeps reports out of trace and graph dispatch projections", async () => {
@@ -433,23 +454,17 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
 describe("AutomationService email suppression", () => {
   it("normalizes addresses and applies project-wide rows", async () => {
     const repo = new Suppressions();
-    const service = AutomationService.create({
-      triggers: new Triggers(),
-      history: new Fires(),
-      suppressions: repo,
-      names: new Names(),
-      verifier: new Verifier(),
-      reportSchedules: ReportScheduleService.create({
+    const service = makeService(
+      new Triggers(),
+      new Fires(),
+      new EmptyWebhookDeliveries(),
+      ReportScheduleService.create({
         jobs: new Jobs(),
         clock: new Clock(),
         wake: new Wake(),
       }),
-      clock: new Clock(),
-      customGraphs: new EmptyCustomGraphs(),
-      webhookDeliveries: new EmptyWebhookDeliveries(),
-      graphTriggerSent: new EmptyGraphTriggerSent(),
-      ...createAutomationTestRuntime(),
-    });
+      repo,
+    );
     await service.suppressEmail({
       projectId: "p",
       email: " Alice@Example.COM ",
@@ -495,23 +510,16 @@ describe("AutomationService email suppression", () => {
         active: false,
       },
     ];
-    const service = AutomationService.create({
+    const service = makeService(
       triggers,
-      history: new Fires(),
-      suppressions: new Suppressions(),
-      names: new Names(),
-      verifier: new Verifier(),
-      reportSchedules: ReportScheduleService.create({
+      new Fires(),
+      new EmptyWebhookDeliveries(),
+      ReportScheduleService.create({
         jobs,
         clock: new Clock(),
         wake: new Wake(),
       }),
-      clock: new Clock(),
-      customGraphs: new EmptyCustomGraphs(),
-      webhookDeliveries: new EmptyWebhookDeliveries(),
-      graphTriggerSent: new EmptyGraphTriggerSent(),
-      ...createAutomationTestRuntime(),
-    });
+    );
 
     expect(await service.reconcileReportSchedules()).toEqual({ repaired: 1 });
     expect(jobs.rows.map((row) => [row.targetId, row.active])).toEqual([

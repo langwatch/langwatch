@@ -1,11 +1,15 @@
 export * from "./automation";
+export * from "./automation.events";
 export * from "./automation.commands";
 export * from "./automation.errors";
+export * from "./automation-filters";
 export * from "./automation.queries";
 export * from "./automation.service";
+export * from "./automation-evaluation-subscriber.service";
 export {
   alertTypeSchema,
   notificationCadenceSchema,
+  parseTriggerTemplatesWire,
   triggerActionSchema,
   triggerKindSchema,
   triggerSchema,
@@ -22,6 +26,7 @@ export * from "./custom-graph";
 export * from "./graph-alert";
 export * from "./pause-reasons";
 export * from "./runaway";
+export * from "./persist-cap";
 export * from "./test-fire";
 export * from "./webhook-delivery";
 export * from "./report";

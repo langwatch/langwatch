@@ -1,117 +1,44 @@
-import { annotationQueueProvider as annotationQueueShared } from "@langwatch/automation-contract";
-import { datasetProvider as datasetShared } from "@langwatch/automation-contract";
+import { TriggerAction } from "@langwatch/automation-contract";
 import {
-  emailProvider as emailShared,
-  type EmailPreview,
-} from "@langwatch/automation-contract";
-import {
-  slackProvider as slackShared,
-  type SlackPreview,
-} from "@langwatch/automation-contract";
-import {
-  webhookProvider as webhookShared,
-  type WebhookPreview,
-} from "@langwatch/automation-contract";
-import { TriggerAction } from "~/generated/prisma/client";
-import annotationQueueClient, {
-  type AnnotationQueueSlice,
-} from "./annotationQueue/client";
+  createClientProviderRegistry,
+  createAutomationDraftModel,
+  initialSlices as initialProviderSlices,
+  isNotifyProviderAction,
+  type AllSlices as ProviderAllSlices,
+  type NotifyPreview as ProviderNotifyPreview,
+  type SliceFor as ProviderSliceFor,
+} from "@langwatch/automation-web";
+import annotationQueueClient, { type AnnotationQueueSlice } from "./annotationQueue/client";
 import datasetClient, { type DatasetSlice } from "./dataset/client";
 import emailClient, { type EmailSlice } from "./email/client";
 import slackClient, { type SlackSlice } from "./slack/client";
-import {
-  type ClientEntry,
-  isNotifyEntry,
-  type NotifyClientEntry,
-} from "@langwatch/automation-web";
 import webhookClient, { type WebhookSlice } from "./webhook/client";
 
-/** Per-action slice type — adding a new action means adding one entry. */
-export interface SliceFor {
-  [TriggerAction.SEND_EMAIL]: EmailSlice;
-  [TriggerAction.SEND_SLACK_MESSAGE]: SlackSlice;
-  [TriggerAction.SEND_WEBHOOK]: WebhookSlice;
-  [TriggerAction.ADD_TO_DATASET]: DatasetSlice;
-  [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: AnnotationQueueSlice;
-}
+export const CLIENT_PROVIDERS = createClientProviderRegistry({
+  [TriggerAction.SEND_EMAIL]: emailClient,
+  [TriggerAction.SEND_SLACK_MESSAGE]: slackClient,
+  [TriggerAction.SEND_WEBHOOK]: webhookClient,
+  [TriggerAction.ADD_TO_DATASET]: datasetClient,
+  [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: annotationQueueClient,
+});
 
-/** Per-action preview type. Action providers have no preview — they get
- *  `never`. The sum of notify previews is `NotifyPreview` below. */
-export interface PreviewFor {
-  [TriggerAction.SEND_EMAIL]: EmailPreview;
-  [TriggerAction.SEND_SLACK_MESSAGE]: SlackPreview;
-  [TriggerAction.SEND_WEBHOOK]: WebhookPreview;
-  [TriggerAction.ADD_TO_DATASET]: never;
-  [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: never;
-}
+export const AUTOMATION_DRAFT_MODEL = createAutomationDraftModel(CLIENT_PROVIDERS);
 
-/** The sum of every notify provider's render-time preview shape — the
- *  type the drawer's client-side template render produces and the
- *  type every notify ConfigForm narrows from. Built from the registry,
- *  not enumerated here. */
-export type NotifyPreview = PreviewFor[keyof PreviewFor];
-
-/** The full slice record — one slice per provider, all present. The
- *  drawer keeps every slice in state so type-switching never loses
- *  user-entered data on the other provider. */
-export type AllSlices = { [K in TriggerAction]: SliceFor[K] };
-
-/** The client-side provider registry — pairs each shared definition with
- *  its client peer. Indexed by `TriggerAction`.
- *
- *  Each provider's slice + preview generics are independent, so the
- *  registry's value type can only be `ClientEntry` (the unknown-erased
- *  shape). Specific providers stay typed at their own call sites — the
- *  drawer's helpers (notifyChannel, slice access via SliceFor) keep
- *  per-action narrowing. */
-export const CLIENT_PROVIDERS: Record<TriggerAction, ClientEntry> = {
-  [TriggerAction.SEND_EMAIL]: {
-    shared: emailShared,
-    client: emailClient,
-  } as ClientEntry,
-  [TriggerAction.SEND_SLACK_MESSAGE]: {
-    shared: slackShared,
-    client: slackClient,
-  } as ClientEntry,
-  [TriggerAction.SEND_WEBHOOK]: {
-    shared: webhookShared,
-    client: webhookClient,
-  } as ClientEntry,
-  [TriggerAction.ADD_TO_DATASET]: {
-    shared: datasetShared,
-    client: datasetClient,
-  } as ClientEntry,
-  [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: {
-    shared: annotationQueueShared,
-    client: annotationQueueClient,
-  } as ClientEntry,
+export type AutomationProviderRegistry = typeof CLIENT_PROVIDERS;
+export type AutomationProviderClients = {
+  [A in TriggerAction]: AutomationProviderRegistry[A]["client"];
 };
+export type SliceFor<A extends TriggerAction> = ProviderSliceFor<AutomationProviderClients, A>;
+export type AllSlices = ProviderAllSlices<AutomationProviderClients>;
+export type NotifyPreview = ProviderNotifyPreview<AutomationProviderClients>;
 
-/** Convenience indexes for the UI. */
-export const NOTIFY_PROVIDERS: NotifyClientEntry[] = Object.values(
-  CLIENT_PROVIDERS,
-).filter((p): p is NotifyClientEntry => isNotifyEntry(p));
+export const initialSlices = (): AllSlices => initialProviderSlices(CLIENT_PROVIDERS);
 
-export const ACTION_PROVIDERS: ClientEntry[] = Object.values(CLIENT_PROVIDERS).filter(
-  (p) => p.shared.category === "action",
+export const NOTIFY_PROVIDERS = Object.values(CLIENT_PROVIDERS).filter((entry) =>
+  isNotifyProviderAction(entry.shared.action),
+);
+export const ACTION_PROVIDERS = Object.values(CLIENT_PROVIDERS).filter(
+  (entry) => !isNotifyProviderAction(entry.shared.action),
 );
 
-/** Typed slice lookup — returns the right slice type for an action. */
-export function getSlice<A extends TriggerAction>(
-  slices: AllSlices,
-  action: A,
-): SliceFor[A] {
-  return slices[action];
-}
-
-/** Build the initial slice record by asking each provider for its empty
- *  state. Used by the reducer's INITIAL_DRAFT. */
-export function initialSlices(): AllSlices {
-  return {
-    [TriggerAction.SEND_EMAIL]: emailClient.initialSlice(),
-    [TriggerAction.SEND_SLACK_MESSAGE]: slackClient.initialSlice(),
-    [TriggerAction.SEND_WEBHOOK]: webhookClient.initialSlice(),
-    [TriggerAction.ADD_TO_DATASET]: datasetClient.initialSlice(),
-    [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: annotationQueueClient.initialSlice(),
-  };
-}
+export type { AnnotationQueueSlice, DatasetSlice, EmailSlice, SlackSlice, WebhookSlice };

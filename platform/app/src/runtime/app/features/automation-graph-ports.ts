@@ -1,25 +1,33 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AuthzService } from "@langwatch/authz-contract";
+import type { SlackPayload } from "@langwatch/automation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
+  AutomationClock,
   AutomationDispatchErrorPort,
   AutomationGraphDeliveryPort,
   AutomationGraphNotifierPort,
-  AutomationGraphTelemetryPort,
+  AutomationLoggerPort,
   AutomationHeartbeatPort,
+  AutomationNotificationDeliveryPort,
   AutomationRunawayPort,
   AutomationSlackBotTokenDecryptorPort,
+  GraphAlertDispatchService,
+  WebhookProviderAdapter,
 } from "@langwatch/automation-server";
 import type {
   AutomationEmailCapService,
   GraphAlertDispatchInput,
+  WebhookDeliveryRequest,
+  WebhookSendResult,
 } from "@langwatch/automation-server";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import type { Cluster, Redis } from "ioredis";
-import { OrganizationUserRole, type PrismaClient } from "~/generated/prisma/client";
 import type { SlackActionParams } from "@langwatch/automation-contract";
+import { z } from "zod";
 import {
   incrementAutomationAutoPausedTotal,
   incrementAutomationCeilingBreachTotal,
@@ -27,12 +35,17 @@ import {
 } from "~/server/metrics";
 import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendWebhook } from "~/server/webhooks/sendWebhook";
-import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
-import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import { sendRenderedTriggerEmail, sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import {
+  sendRenderedSlackMessage,
+  sendSlackWebhook,
+} from "~/runtime/app/features/automation-adapters/delivery/sendSlackWebhook";
+import { deliverWebhook } from "~/runtime/app/features/automation-adapters/delivery/deliverWebhook";
+import { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
+import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
+import { decrypt, encrypt } from "~/utils/encryption";
+import type { TriggerData } from "~/runtime/app/features/automation-adapters/trigger.types";
+import type { AlertType } from "~/generated/prisma/client";
 
 /** Named host capabilities supplied to the one process-owned AutomationService. */
 export type AppAutomationGraphPorts = {
@@ -41,14 +54,14 @@ export type AppAutomationGraphPorts = {
   analytics: AnalyticsService;
   notifier: AutomationGraphNotifierPort;
   baseHost: string;
-  telemetry: AutomationGraphTelemetryPort;
+  logger: AutomationLoggerPort;
   slackTokens: AutomationSlackBotTokenDecryptorPort;
   dispatchErrors: AutomationDispatchErrorPort;
   heartbeat: AutomationHeartbeatPort;
   runaway: AutomationRunawayPort;
 };
 
-class AppAutomationTelemetryAdapter extends AutomationGraphTelemetryPort {
+class AppAutomationLoggerAdapter extends AutomationLoggerPort {
   constructor(private readonly logger: Logger) {
     super();
   }
@@ -159,64 +172,122 @@ async function releaseClaim({
   if (claimMemory.get(lease.key)?.token === lease.token) claimMemory.delete(lease.key);
 }
 
+class AppAutomationNotificationDeliveryAdapter extends AutomationNotificationDeliveryPort {
+  sendLegacyEmail(input: {
+    recipients: string[];
+    triggerData: TriggerData[];
+    triggerName: string;
+    triggerId: string;
+    projectId: string;
+    projectSlug: string;
+    triggerType: AlertType | null;
+    triggerMessage: string;
+    isRecipientSent(recipientHash: string): Promise<boolean>;
+    recordRecipientSent(recipientHash: string): Promise<void>;
+  }): Promise<void> {
+    return sendTriggerEmail({
+      triggerEmails: input.recipients,
+      triggerData: input.triggerData,
+      triggerName: input.triggerName,
+      triggerId: input.triggerId,
+      projectId: input.projectId,
+      projectSlug: input.projectSlug,
+      triggerType: input.triggerType,
+      triggerMessage: input.triggerMessage,
+      isRecipientSent: input.isRecipientSent,
+      recordRecipientSent: input.recordRecipientSent,
+    });
+  }
+
+  sendEmail(input: {
+    recipients: string[];
+    triggerId: string;
+    projectId: string;
+    subject: string;
+    html: string;
+    isRecipientSent(recipientHash: string): Promise<boolean>;
+    recordRecipientSent(recipientHash: string): Promise<void>;
+  }): Promise<void> {
+    return sendRenderedTriggerEmail({
+      triggerEmails: input.recipients,
+      triggerId: input.triggerId,
+      projectId: input.projectId,
+      subject: input.subject,
+      html: input.html,
+      isRecipientSent: input.isRecipientSent,
+      recordRecipientSent: input.recordRecipientSent,
+    });
+  }
+
+  sendSlackWebhook(input: {
+    webhook: string;
+    triggerName: string;
+    payload: SlackPayload;
+  }): Promise<void> {
+    return sendRenderedSlackMessage({
+      triggerWebhook: input.webhook,
+      triggerName: input.triggerName,
+      payload: input.payload,
+    });
+  }
+
+  sendLegacySlackWebhook(input: {
+    webhook: string;
+    triggerData: TriggerData[];
+    triggerName: string;
+    projectSlug: string;
+    triggerType: AlertType | null;
+    triggerMessage: string;
+    baseHost: string;
+  }): Promise<void> {
+    return sendSlackWebhook({
+      triggerWebhook: input.webhook,
+      triggerData: input.triggerData,
+      triggerName: input.triggerName,
+      projectSlug: input.projectSlug,
+      triggerType: input.triggerType,
+      triggerMessage: input.triggerMessage,
+      baseHost: input.baseHost,
+    });
+  }
+
+  sendSlackBot(input: {
+    token: string;
+    channel: string;
+    payload: SlackPayload;
+    triggerName: string;
+  }): Promise<void> {
+    return postSlackChatMessage(input);
+  }
+
+  sendWebhook(input: WebhookDeliveryRequest): Promise<WebhookSendResult> {
+    return deliverWebhook(input);
+  }
+}
+
+/** One named host adapter shared by graph and settled-trace delivery. */
+export function createAutomationNotificationDeliveryPort(): AutomationNotificationDeliveryPort {
+  return new AppAutomationNotificationDeliveryAdapter();
+}
+
 class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
-  constructor(
-    private readonly input: {
-      delivery: AutomationGraphDeliveryPort;
-      emailCaps: AutomationEmailCapService;
-      emailHourlyCap: number;
-      tenantDailyCap: number;
-    },
-  ) {
+  constructor(private readonly service: GraphAlertDispatchService) {
     super();
   }
 
   dispatch(input: GraphAlertDispatchInput) {
-    return dispatchGraphAlertAction({
-      deps: {
-        sendEmail: sendRenderedTriggerEmail,
-        sendSlack: sendRenderedSlackMessage,
-        sendSlackBot: postSlackChatMessage,
-        sendWebhook,
-        recordWebhookDelivery: (value) =>
-          this.input.delivery.recordWebhookDelivery(value),
-        filterSuppressedRecipients: (value) =>
-          this.input.delivery.filterSuppressed(value),
-        consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
-          this.input.emailCaps.consumeHourly({
-            projectId,
-            triggerId,
-            now,
-            cap: this.input.emailHourlyCap,
-            dedupKey,
-          }),
-        emailHourlyCap: this.input.emailHourlyCap,
-        consumeTenantEmailCapSlot: ({ projectId, now, cap, recipientCount, dedupKey }) =>
-          this.input.emailCaps.consumeDaily({
-            projectId,
-            now,
-            cap,
-            recipientCount,
-            dedupKey,
-          }),
-        tenantDailyCap: this.input.tenantDailyCap,
-        isRecipientSent: (value) => this.input.delivery.isSendClaimed(value),
-        recordRecipientSent: async (value) => {
-          await this.input.delivery.claimSend(value);
-        },
-      },
-      input,
-    });
+    return this.service.dispatch(input);
   }
 }
 
 /** Complete process capability set for the constructed AutomationService. */
 export function createAutomationGraphPorts(input: {
-  database: PrismaClient;
   redis: Redis | Cluster | null;
+  clock: AutomationClock;
   emailCaps: AutomationEmailCapService;
   delivery: AutomationGraphDeliveryPort;
   projects: ProjectService;
+  authz: AuthzService;
   analytics: AnalyticsService;
   resolveClickHouseClient: ClickHouseClientResolver;
   baseHost: string;
@@ -224,28 +295,32 @@ export function createAutomationGraphPorts(input: {
   tenantDailyCap: number;
 }): AppAutomationGraphPorts {
   const graphLogger = createLogger("langwatch:graph-trigger-automation");
-  const telemetry = new AppAutomationTelemetryAdapter(graphLogger);
+  const logger = new AppAutomationLoggerAdapter(graphLogger);
+  const notifier = GraphAlertDispatchService.create({
+    persistence: input.delivery,
+    emailCaps: input.emailCaps,
+    delivery: createAutomationNotificationDeliveryPort(),
+    webhooks: WebhookProviderAdapter.create({ encrypt, decrypt }),
+    clock: input.clock,
+    emailHourlyCap: input.emailHourlyCap,
+    tenantDailyCap: input.tenantDailyCap,
+  });
 
   return {
     emailCaps: input.emailCaps,
     projects: input.projects,
     analytics: input.analytics,
-    notifier: new AppAutomationGraphNotifierAdapter({
-      delivery: input.delivery,
-      emailCaps: input.emailCaps,
-      emailHourlyCap: input.emailHourlyCap,
-      tenantDailyCap: input.tenantDailyCap,
-    }),
+    notifier: new AppAutomationGraphNotifierAdapter(notifier),
     slackTokens: new AppAutomationSlackTokensAdapter(),
     dispatchErrors: new AppAutomationDispatchErrorsAdapter(),
     baseHost: input.baseHost,
-    telemetry,
+    logger,
     heartbeat: new AppAutomationHeartbeatAdapter(input.resolveClickHouseClient),
     runaway: new AppAutomationRunawayAdapter({
-      prisma: input.database,
       redis: input.redis,
       delivery: input.delivery,
       projects: input.projects,
+      authz: input.authz,
       baseHost: input.baseHost,
       resolveClickHouseClient: input.resolveClickHouseClient,
     }),
@@ -257,10 +332,10 @@ class AppAutomationRunawayAdapter extends AutomationRunawayPort {
 
   constructor(
     private readonly input: {
-      prisma: PrismaClient;
       redis: Redis | Cluster | null;
       delivery: AutomationGraphDeliveryPort;
       projects: ProjectService;
+      authz: AuthzService;
       baseHost: string;
       resolveClickHouseClient: ClickHouseClientResolver;
     },
@@ -276,23 +351,21 @@ class AppAutomationRunawayAdapter extends AutomationRunawayPort {
       query_params: { tenantId: projectId },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{ Total: string }>;
+    const rows = z.array(z.object({ Total: z.string() })).parse(await result.json());
     return Number.parseInt(rows[0]?.Total ?? "0", 10);
   }
 
-  async notificationRecipients(input: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<string[]> {
+  async notificationRecipients(input: { projectId: string; triggerId: string }): Promise<string[]> {
     const { projectId, triggerId } = input;
     const organizationId = await this.input.projects.getOrganizationId(projectId);
-    const admins = await this.input.prisma.organizationUser.findMany({
-      where: { organizationId, role: OrganizationUserRole.ADMIN },
-      select: { user: { select: { email: true } } },
-    });
-    const emails = admins.flatMap((admin: { user: { email: string | null } }) =>
-      admin.user.email ? [admin.user.email] : [],
-    );
+    const bindings = await this.input.authz.listOrganizationBindings({ organizationId });
+    const emails = [
+      ...new Set(
+        bindings.flatMap((binding) =>
+          binding.role === "ADMIN" && binding.user?.email ? [binding.user.email] : [],
+        ),
+      ),
+    ];
     if (emails.length === 0) return emails;
     try {
       return await this.input.delivery.filterSuppressed({ projectId, triggerId, emails });
@@ -321,10 +394,7 @@ class AppAutomationRunawayAdapter extends AutomationRunawayPort {
     return sendAutomationLimitEmail(params);
   }
 
-  tryClaimOnce(
-    key: string,
-    ttlSeconds?: number,
-  ): Promise<{ key: string; token: string } | null> {
+  tryClaimOnce(key: string, ttlSeconds?: number): Promise<{ key: string; token: string } | null> {
     return claimOnce({ connection: this.input.redis, key, ttlSeconds });
   }
 

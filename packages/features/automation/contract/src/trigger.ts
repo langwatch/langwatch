@@ -17,6 +17,34 @@ export const triggerTemplateSchema = z.object({
   emailSubjectTemplate: z.string().nullable(),
   emailBodyTemplate: z.string().nullable(),
 });
+
+const legacyTriggerTemplateSchema = z.object({
+  slackTemplateType: z.string().nullable().optional(),
+  slackTemplate: z.string().nullable().optional(),
+  emailSubjectTemplate: z.string().nullable().optional(),
+  emailBodyTemplate: z.string().nullable().optional(),
+});
+
+const triggerTemplateWireSchema = z.union([
+  z.object({ templates: triggerTemplateSchema }),
+  legacyTriggerTemplateSchema,
+]);
+
+export function parseTriggerTemplatesWire(value: unknown): TriggerTemplate {
+  const parsed = triggerTemplateWireSchema.parse(value);
+  const canonical = z.object({ templates: triggerTemplateSchema }).safeParse(parsed);
+  if (canonical.success) {
+    return canonical.data.templates;
+  }
+
+  const legacy = legacyTriggerTemplateSchema.parse(parsed);
+  return {
+    slackTemplateType: legacy.slackTemplateType ?? null,
+    slackTemplate: legacy.slackTemplate ?? null,
+    emailSubjectTemplate: legacy.emailSubjectTemplate ?? null,
+    emailBodyTemplate: legacy.emailBodyTemplate ?? null,
+  };
+}
 export const triggerSchema = z.object({
   id: z.string(),
   projectId: z.string(),

@@ -90,10 +90,7 @@ export interface ConfigFormProps<S, TPreview = unknown> {
 }
 
 /** Notify-specific client additions. Generic over slice and preview. */
-export interface NotifyClientDef<S = unknown, TPreview = unknown> extends ClientDef<
-  S,
-  TPreview
-> {
+export interface NotifyClientDef<S = unknown, TPreview = unknown> extends ClientDef<S, TPreview> {
   /** Channel accepted by preview and test-fire transports. */
   readonly channel: "email" | "slack" | "webhook";
   /** Webhook for the test-fire mutation. ADR-031: email test fires resolve
@@ -123,16 +120,4 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown> extends Client
 export interface ClientEntry<S = unknown, TPreview = unknown> {
   shared: SharedDef;
   client: ClientDef<S, TPreview> | NotifyClientDef<S, TPreview>;
-}
-
-export interface NotifyClientEntry<S = unknown, TPreview = unknown> extends ClientEntry<
-  S,
-  TPreview
-> {
-  shared: SharedDef & { category: "notify" };
-  client: NotifyClientDef<S, TPreview>;
-}
-
-export function isNotifyEntry(entry: ClientEntry): entry is NotifyClientEntry {
-  return entry.shared.category === "notify";
 }

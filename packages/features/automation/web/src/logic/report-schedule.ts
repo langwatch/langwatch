@@ -44,13 +44,7 @@ export function cronScheduleError({
 }
 
 /** A schedule the server accepts and the scheduler can actually run. */
-export function isValidCron({
-  cron,
-  timezone,
-}: {
-  cron: string;
-  timezone: string;
-}): boolean {
+export function isValidCron({ cron, timezone }: { cron: string; timezone: string }): boolean {
   return cronScheduleError({ cron, timezone }) === null;
 }
 
@@ -128,7 +122,7 @@ export function ordinal(n: number): string {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** `HH:MM` for a time input, from the parts' hour + minute. */
-export function timeOfDay(parts: Pick<ScheduleParts, "hour" | "minute">): string {
+export function timeOfDay(parts: { hour: number; minute: number }): string {
   return `${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
@@ -269,9 +263,7 @@ export function supportedTimezones(): string[] {
  * first "/"), so a 400-entry native select reads as a tidy continent list.
  * Single-segment zones (UTC, GMT) collect under "General".
  */
-export function groupTimezones(
-  zones: string[],
-): Array<{ region: string; zones: string[] }> {
+export function groupTimezones(zones: string[]): Array<{ region: string; zones: string[] }> {
   const groups = new Map<string, string[]>();
   for (const zone of zones) {
     const slash = zone.indexOf("/");

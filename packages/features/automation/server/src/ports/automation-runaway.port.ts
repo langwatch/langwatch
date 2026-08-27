@@ -21,10 +21,7 @@ export abstract class AutomationRunawayPort {
   abstract tryClaimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | null>;
   abstract releaseClaim(lease: ClaimLease): Promise<void>;
   abstract projectName(projectId: string): Promise<string>;
-  abstract automationUrl(params: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<string>;
+  abstract automationUrl(params: { projectId: string; triggerId: string }): Promise<string>;
   abstract onCeilingBreach(): void;
   abstract onAutoPaused(reason: string): void;
   abstract onContainmentFailed(): void;

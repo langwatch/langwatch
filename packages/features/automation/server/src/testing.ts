@@ -2,12 +2,15 @@ import {
   AutomationDispatchErrorPort,
   AutomationEmailCapService,
   AutomationGraphNotifierPort,
-  AutomationGraphTelemetryPort,
+  AutomationLoggerPort,
   AutomationHeartbeatPort,
   AutomationRunawayPort,
   AutomationSlackBotTokenDecryptorPort,
   AutomationTestFirePort,
+  AutomationPersistCapService,
 } from "./index";
+
+export { AutomationPersistCapService };
 
 class TestNotifier extends AutomationGraphNotifierPort {
   async dispatch() {
@@ -19,7 +22,7 @@ class TestNotifier extends AutomationGraphNotifierPort {
     };
   }
 }
-class TestTelemetry extends AutomationGraphTelemetryPort {
+class TestLogger extends AutomationLoggerPort {
   error(): void {}
   debug(): void {}
   info(): void {}
@@ -90,7 +93,7 @@ export function createAutomationTestRuntime() {
     analytics: {} as never,
     notifier: new TestNotifier(),
     baseHost: "http://automation.test",
-    telemetry: new TestTelemetry(),
+    logger: new TestLogger(),
     slackTokens: new TestSlackTokens(),
     dispatchErrors: new TestDispatchErrors(),
     heartbeat: new TestHeartbeat(),

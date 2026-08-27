@@ -2,11 +2,7 @@ import type { AnnotationQueueActionParams } from "@langwatch/automation-contract
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { Users } from "lucide-react";
 import { AddParticipants } from "~/components/traces/AddParticipants";
-import type {
-  ClientDef,
-  ConfigFormProps,
-  SummaryIdentity,
-} from "@langwatch/automation-web";
+import type { ClientDef, ConfigFormProps, SummaryIdentity } from "@langwatch/automation-web";
 
 export interface AnnotationQueueSlice {
   annotators: { id: string; name: string }[];
@@ -37,10 +33,7 @@ function toActionParams(slice: AnnotationQueueSlice): AnnotationQueueActionParam
   return { annotators: slice.annotators };
 }
 
-function AnnotationQueueConfigForm({
-  slice,
-  onChange,
-}: ConfigFormProps<AnnotationQueueSlice>) {
+function AnnotationQueueConfigForm({ slice, onChange }: ConfigFormProps<AnnotationQueueSlice>) {
   return (
     <AddParticipants
       annotators={slice.annotators}
@@ -49,11 +42,9 @@ function AnnotationQueueConfigForm({
           ...slice,
           annotators:
             typeof value === "function"
-              ? (
-                  value as (
-                    prev: { id: string; name: string }[],
-                  ) => { id: string; name: string }[]
-                )(slice.annotators)
+              ? (value as (prev: { id: string; name: string }[]) => { id: string; name: string }[])(
+                  slice.annotators,
+                )
               : value,
         })
       }

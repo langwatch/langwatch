@@ -385,9 +385,7 @@ export type TemplateSourceKind = "trace" | "graphAlert" | "report";
  * actually sent must all resolve the same set, or the author is shown a
  * template that will never be sent.
  */
-export function defaultsForSourceKind(
-  sourceKind: TemplateSourceKind,
-): TriggerTemplateDefaults {
+export function defaultsForSourceKind(sourceKind: TemplateSourceKind): TriggerTemplateDefaults {
   switch (sourceKind) {
     case "graphAlert":
       return ALERT_TRIGGER_DEFAULTS;

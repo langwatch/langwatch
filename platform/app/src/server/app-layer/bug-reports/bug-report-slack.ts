@@ -1,17 +1,13 @@
 import { env } from "~/env.mjs";
 import type { BugReport } from "~/generated/prisma/client";
-import { postSlackChatMessage } from "../automations/delivery/slackWebApi";
+import { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
 
 /**
  * Team alert for a new bug report. Active only where the bot token is
  * configured (production); silently a no-op everywhere else so intake never
  * depends on Slack being reachable or configured.
  */
-export async function notifyBugReportOnSlack({
-  report,
-}: {
-  report: BugReport;
-}): Promise<void> {
+export async function notifyBugReportOnSlack({ report }: { report: BugReport }): Promise<void> {
   const token = env.SLACK_BUG_REPORTS_BOT_TOKEN;
   if (!token) return;
   const channel = env.SLACK_BUG_REPORTS_CHANNEL ?? "#dev";

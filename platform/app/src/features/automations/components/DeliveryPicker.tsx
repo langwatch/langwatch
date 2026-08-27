@@ -1,12 +1,11 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Settings2 } from "lucide-react";
-import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
-import type { ClientEntry } from "@langwatch/automation-web";
-import { TriggerAction } from "~/generated/prisma/client";
+import { TriggerAction } from "@langwatch/automation-contract";
+import { FacetSection, type FacetAccordionProps } from "@langwatch/automation-web";
+import { CLIENT_PROVIDERS, type AutomationProviderRegistry } from "../providers/registry";
 import type { ConditionSource } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";
 import { useConfigComplete, useConfigurationSummary } from "../state/selectors";
-import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 
 /** The active channel card is tinted with the preset's list-page accent. */
 const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {
@@ -14,6 +13,8 @@ const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {
   customGraph: "orange",
   report: "purple",
 };
+
+type AutomationProviderEntry = AutomationProviderRegistry[keyof AutomationProviderRegistry];
 
 /**
  * The Delivery facet (ADR-043 facet 6) — where it goes and what it sends.
@@ -118,8 +119,8 @@ export function DeliveryPicker({
             bg="colorPalette.subtle"
           >
             <Text textStyle="sm">
-              Webhook delivery is unavailable for this project. This saved setup is
-              read-only. Choose another channel to replace it.
+              Webhook delivery is unavailable for this project. This saved setup is read-only.
+              Choose another channel to replace it.
             </Text>
           </Box>
         ) : null}
@@ -164,7 +165,7 @@ function DeliveryGroup({
 }: {
   label: string;
   description: string;
-  entries: ClientEntry[];
+  entries: AutomationProviderEntry[];
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
   isAlertKind: boolean;
@@ -215,7 +216,7 @@ function DeliveryCard({
   webhookEnabled,
   readOnly,
 }: {
-  entry: ClientEntry;
+  entry: AutomationProviderEntry;
   active: boolean;
   onClick: () => void;
   isAlertKind: boolean;

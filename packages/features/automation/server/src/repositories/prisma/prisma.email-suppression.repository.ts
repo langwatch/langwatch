@@ -1,16 +1,13 @@
-import {
-  emailSuppressionSchema,
-  type EmailSuppression,
-} from "@langwatch/automation-contract";
-import type { AutomationDatabase } from "../../ports/automation-database.port";
+import { emailSuppressionSchema, type EmailSuppression } from "@langwatch/automation-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EmailSuppressionRepository } from "../email-suppression.repository";
 const map = (row: unknown): EmailSuppression => emailSuppressionSchema.parse(row);
 export class PrismaEmailSuppressionRepository extends EmailSuppressionRepository {
-  private constructor(private readonly database: AutomationDatabase) {
+  private constructor(private readonly database: PrismaClient) {
     super();
   }
-  static create(database: AutomationDatabase): PrismaEmailSuppressionRepository {
-    return new PrismaEmailSuppressionRepository(database);
+  static create(database: object): PrismaEmailSuppressionRepository {
+    return new PrismaEmailSuppressionRepository(database as PrismaClient);
   }
   async findAll(input: { projectId: string }): Promise<EmailSuppression[]> {
     return (
@@ -20,10 +17,7 @@ export class PrismaEmailSuppressionRepository extends EmailSuppressionRepository
       })
     ).map(map);
   }
-  async findMatching(input: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<EmailSuppression[]> {
+  async findMatching(input: { projectId: string; triggerId: string }): Promise<EmailSuppression[]> {
     return (
       await this.database.emailSuppression.findMany({
         where: {

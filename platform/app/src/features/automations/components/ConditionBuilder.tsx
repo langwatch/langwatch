@@ -18,12 +18,13 @@ import {
 import {
   type Condition,
   type ConditionOperator,
+  type ConditionValueType,
   defaultOperatorForField,
   operatorsForValueType,
   queryToConditions,
   serializeConditions,
   valueTypeOfField,
-} from "../logic/conditionQuery";
+} from "@langwatch/automation-web";
 
 const OPERATOR_LABEL: Record<ConditionOperator, string> = {
   is: "is",
@@ -61,9 +62,7 @@ export function ConditionBuilder({
   query: string;
   onChange: (query: string) => void;
 }) {
-  const [conditions, setConditions] = useState<Condition[]>(
-    () => queryToConditions(query) ?? [],
-  );
+  const [conditions, setConditions] = useState<Condition[]>(() => queryToConditions(query) ?? []);
   // The last string we emitted, so the parent echoing it straight back doesn't
   // re-parse (and clobber the ids / in-progress blank rows) on every keystroke.
   const lastEmitted = useRef<string | null>(null);
@@ -106,10 +105,7 @@ export function ConditionBuilder({
     );
 
   const addCondition = () =>
-    commit([
-      ...conditions,
-      { id: `n${nextId.current++}`, field: "", operator: "is", value: "" },
-    ]);
+    commit([...conditions, { id: `n${nextId.current++}`, field: "", operator: "is", value: "" }]);
 
   const removeCondition = (id: string) => commit(conditions.filter((c) => c.id !== id));
 
@@ -119,12 +115,7 @@ export function ConditionBuilder({
         <VStack key={condition.id} align="stretch" gap={2}>
           {index > 0 ? (
             <HStack gap={2} align="center">
-              <Text
-                textStyle="2xs"
-                fontWeight="bold"
-                letterSpacing="0.08em"
-                color="fg.muted"
-              >
+              <Text textStyle="2xs" fontWeight="bold" letterSpacing="0.08em" color="fg.muted">
                 AND
               </Text>
               <Box flex={1} height="1px" bg="border.subtle" />
@@ -204,9 +195,7 @@ function ConditionRow({
             size="sm"
             collection={operatorCollection}
             value={[condition.operator]}
-            onValueChange={({ value }) =>
-              value[0] && onOperator(value[0] as ConditionOperator)
-            }
+            onValueChange={({ value }) => value[0] && onOperator(value[0] as ConditionOperator)}
           >
             <Select.Trigger>
               <Select.ValueText />
@@ -253,7 +242,7 @@ function ValueControl({
   onValueTo,
 }: {
   condition: Condition;
-  valueType: ReturnType<typeof valueTypeOfField>;
+  valueType: ConditionValueType | undefined;
   onValue: (value: string) => void;
   onValueTo: (valueTo: string) => void;
 }) {
@@ -301,9 +290,7 @@ function ValueControl({
       : [];
 
   if (suggestions.length > 0) {
-    return (
-      <ValuePicker value={condition.value} suggestions={suggestions} onValue={onValue} />
-    );
+    return <ValuePicker value={condition.value} suggestions={suggestions} onValue={onValue} />;
   }
 
   return (

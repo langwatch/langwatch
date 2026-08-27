@@ -159,14 +159,9 @@ describe("SubjectSection", () => {
         seedGraphDraft();
         render(<SubjectSection />, { wrapper: Wrapper });
 
-        await user.selectOptions(
-          selectContainingOption(/select a series/i),
-          "p95 latency",
-        );
+        await user.selectOptions(selectContainingOption(/select a series/i), "p95 latency");
 
-        expect(
-          useAutomationStore.getState().draft.graphAlert.seriesName.length,
-        ).toBeGreaterThan(0);
+        expect(useAutomationStore.getState().draft.graphAlert.seriesName.length).toBeGreaterThan(0);
       });
     });
   });

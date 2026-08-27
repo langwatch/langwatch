@@ -1,16 +1,16 @@
 import type { CustomGraph, CustomGraphNameRef } from "@langwatch/automation-contract";
 import { CustomGraphRepository } from "../custom-graph.repository";
-import type { AutomationDatabase } from "../../ports/automation-database.port";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 const BUILDER_CHART_KIND = "builder";
 
 export class PrismaCustomGraphRepository extends CustomGraphRepository {
-  private constructor(private readonly database: AutomationDatabase) {
+  private constructor(private readonly database: PrismaClient) {
     super();
   }
 
-  static create(database: AutomationDatabase): PrismaCustomGraphRepository {
-    return new PrismaCustomGraphRepository(database);
+  static create(database: object): PrismaCustomGraphRepository {
+    return new PrismaCustomGraphRepository(database as PrismaClient);
   }
 
   async tryFindById(input: {
@@ -26,10 +26,7 @@ export class PrismaCustomGraphRepository extends CustomGraphRepository {
     })) as CustomGraph | null;
   }
 
-  async existsInProject(input: {
-    customGraphId: string;
-    projectId: string;
-  }): Promise<boolean> {
+  async existsInProject(input: { customGraphId: string; projectId: string }): Promise<boolean> {
     const row = await this.database.customGraph.findUnique({
       where: {
         id: input.customGraphId,

@@ -26,13 +26,14 @@ The process-owned composition root is
 `platform/app/src/runtime/app/features/automation.ts` (`AppAutomationRuntime`).
 It builds one `AutomationService`; routes and workers consume that capability.
 
-The application retains transport and composition code where it requires
-Prisma, tRPC, page/routing composition, mail/Slack credentials, or Eventing
-wiring: `platform/app/src/features/automations/`,
-`platform/app/src/components/automations/`, and the app-layer delivery
-adapters. The remaining app-layer delivery slice is provider-secret handling,
-mail/Slack/webhook transports, and persist-cap plan resolution; it does not
-introduce another AutomationService.
+Reusable facets, schedule/cadence controls, list cells, query/templating
+helpers, and browser presentation live in `web/`. Until the physical UI app
+owns the real project, tRPC, filter, and drawer composition, the transport-bound
+drawer controller and provider forms remain in
+`platform/app/src/features/automations/`; no placeholder host exists in
+`apps/ui`. The remaining app-layer delivery slice is
+provider-secret handling, mail/Slack/webhook transports, and persist-cap plan
+resolution; it does not introduce another AutomationService.
 
 The app constructs one `AutomationService` and one process-lifetime
 `AutomationEmailCapService`. Eventing calls the canonical service's graph

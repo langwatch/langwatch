@@ -1,4 +1,5 @@
-import { sendSlackWebhook } from "../server/app-layer/automations/delivery/sendSlackWebhook";
+import { sendSlackWebhook } from "../runtime/app/features/automation-adapters/delivery/sendSlackWebhook";
+import { env } from "../env.mjs";
 
 export default async function execute(webhook: string) {
   await sendSlackWebhook({
@@ -25,5 +26,6 @@ export default async function execute(webhook: string) {
     projectSlug: "inbox-narrator",
     triggerType: "WARNING",
     triggerMessage: "",
+    baseHost: env.BASE_HOST,
   });
 }

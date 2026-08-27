@@ -2,7 +2,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "@langwatch/automation-server";
 import { createEvaluationProcessingPipeline } from "../pipeline";
 import type { EvaluationAnalyticsData } from "../projections/evaluationAnalytics.foldProjection";
 import {

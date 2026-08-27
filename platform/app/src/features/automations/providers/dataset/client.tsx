@@ -4,16 +4,11 @@ import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
-import type { Dataset } from "~/generated/prisma/client";
-import { useDrawer } from "~/hooks/useDrawer";
 import { type DatasetColumns, datasetColumnsSchema } from "@langwatch/dataset-contract";
+import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
-import type {
-  ClientDef,
-  ConfigFormProps,
-  SummaryIdentity,
-} from "@langwatch/automation-web";
+import type { ClientDef, ConfigFormProps, SummaryIdentity } from "@langwatch/automation-web";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
  *  shape the dispatcher casts to `TraceMapping` — `source` names a
@@ -85,7 +80,7 @@ export function deriveMappingFromColumns(columns: DatasetColumns): DatasetMappin
 
 /** Read a dataset's `columnTypes` JSON column into the typed column list,
  *  tolerating malformed/legacy values (returns []). */
-function columnsOf(dataset: Dataset | undefined): DatasetColumns {
+function columnsOf(dataset: { columnTypes: unknown } | undefined): DatasetColumns {
   if (!dataset) return [];
   const parsed = datasetColumnsSchema.safeParse(dataset.columnTypes);
   return parsed.success ? parsed.data : [];
@@ -177,8 +172,8 @@ function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlic
         onCreateNew={openDatasetCreation}
       />
       <Text color="fg.muted" textStyle="xs">
-        Columns map to the matching trace fields automatically; refine the mapping from
-        the dataset view after creating.
+        Columns map to the matching trace fields automatically; refine the mapping from the dataset
+        view after creating.
       </Text>
     </VStack>
   );
@@ -199,7 +194,13 @@ function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlic
     let hasCreatedDataset = false;
 
     openDrawer("addOrEditDataset", {
-      onSuccess: ({ datasetId, columnTypes }) => {
+      onSuccess: ({
+        datasetId,
+        columnTypes,
+      }: {
+        datasetId: string;
+        columnTypes: DatasetColumns;
+      }) => {
         hasCreatedDataset = true;
         void datasets.refetch();
         onChange({

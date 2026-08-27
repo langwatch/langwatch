@@ -4,7 +4,7 @@ import { emailActionParamsSchema } from "@langwatch/automation-contract";
 import { slackActionParamsSchema } from "@langwatch/automation-contract";
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { TriggerAction } from "~/generated/prisma/client";
+import { TriggerAction } from "@langwatch/automation-contract";
 import type { AnnotationQueueSlice } from "../annotationQueue/client";
 import { type DatasetSlice, deriveMappingFromColumns } from "../dataset/client";
 import type { EmailSlice } from "../email/client";
@@ -161,9 +161,7 @@ describe("provider actionParams schemas", () => {
         });
         expect(result.success).toBe(true);
         if (result.success) {
-          expect(
-            (result.data as { createdByUserId?: string }).createdByUserId,
-          ).toBeUndefined();
+          expect((result.data as { createdByUserId?: string }).createdByUserId).toBeUndefined();
         }
       });
     });

@@ -2,11 +2,8 @@ import {
   evaluateCustomGraphThreshold,
   type GraphTriggerEvaluationResult,
 } from "@langwatch/automation-contract";
-import { resolveGraphIncident } from "./graph-trigger-evaluator.helpers";
-import type {
-  GraphEvaluationPlan,
-  GraphSeriesEvaluation,
-} from "./graph-trigger-evaluator.types";
+import { TriggerEvaluatorService } from "./trigger-evaluator.service";
+import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "./trigger-evaluator.service";
 import { GraphTriggerAlertDeliveryService } from "./graph-trigger-alert-delivery.service";
 
 export class GraphTriggerIncidentService {
@@ -35,6 +32,7 @@ export class GraphTriggerIncidentService {
         ? this.alreadyFiring(plan, values.currentValue)
         : this.delivery.deliver(plan, values);
     }
+
     return open
       ? this.resolve(plan, values.currentValue, open)
       : this.notBreached(plan, values.currentValue);
@@ -48,6 +46,7 @@ export class GraphTriggerIncidentService {
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
     });
+
     return { ...plan.request, status: "already_firing", value };
   }
 
@@ -56,7 +55,7 @@ export class GraphTriggerIncidentService {
     value: number,
     open: { id: string; triggerId: string; projectId: string; customGraphId: string },
   ): Promise<GraphTriggerEvaluationResult> {
-    await resolveGraphIncident({
+    await TriggerEvaluatorService.resolveGraphIncident({
       deps: plan.request.deps,
       openTriggerSent: open,
       projectId: plan.request.projectId,
@@ -66,6 +65,7 @@ export class GraphTriggerIncidentService {
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
     });
+
     return { ...plan.request, status: "resolved", value };
   }
 
@@ -77,6 +77,7 @@ export class GraphTriggerIncidentService {
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
     });
+
     return { ...plan.request, status: "not_breached", value };
   }
 }

@@ -10,7 +10,7 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   graphTriggerActivityGroupKey,
-} from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+} from "@langwatch/automation-server";
 import {
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
@@ -66,9 +66,7 @@ export interface EvaluationProcessingPipelineDeps {
  * - startEvaluation: Records eval start to CH (API handler path)
  * - completeEvaluation: Records eval result to CH (API handler path)
  */
-export function createEvaluationProcessingPipeline(
-  deps: EvaluationProcessingPipelineDeps,
-) {
+export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPipelineDeps) {
   return definePipeline<EvaluationProcessingEvent>({
     name: "evaluation_processing",
     aggregate: defineAggregate({

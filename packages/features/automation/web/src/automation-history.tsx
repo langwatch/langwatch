@@ -27,10 +27,7 @@ export type AutomationActivityEntry = {
   at: Date;
 };
 
-const KIND_META: Record<
-  ActivityKind,
-  { label: string; icon: typeof Zap; palette: string }
-> = {
+const KIND_META: Record<ActivityKind, { label: string; icon: typeof Zap; palette: string }> = {
   fired: { label: "Matched", icon: Zap, palette: "blue" },
   alertOpened: { label: "Started firing", icon: AlertTriangle, palette: "red" },
   alertRecovered: { label: "Recovered", icon: CheckCircle, palette: "green" },
@@ -124,7 +121,7 @@ export function AutomationHistory({
   triggers: readonly AutomationActivityTrigger[];
   isLoading: boolean;
   onOpenAutomation: (triggerId: string) => void;
-  formatTimeAgo: (timestamp: number) => string;
+  formatTimeAgo: (timestamp: number) => string | undefined;
 }) {
   const triggersById = useMemo(
     () => new Map(triggers.map((trigger) => [trigger.id, trigger])),
@@ -167,8 +164,8 @@ export function AutomationHistory({
         textAlign="center"
       >
         <Text textStyle="sm" color="fg.muted">
-          Nothing has fired yet. When your automations, alerts, and reports run, you'll
-          see what they did here.
+          Nothing has fired yet. When your automations, alerts, and reports run, you'll see what
+          they did here.
         </Text>
       </Box>
     );
@@ -211,7 +208,7 @@ function ActivityRow({
   onOpen,
 }: {
   entry: AutomationActivityEntry;
-  formatTimeAgo: (timestamp: number) => string;
+  formatTimeAgo: (timestamp: number) => string | undefined;
   onOpen: () => void;
 }) {
   const meta = KIND_META[entry.kind];
@@ -236,13 +233,8 @@ function ActivityRow({
         {meta.label}
       </Badge>
       <Box flex="1" />
-      <Text
-        textStyle="xs"
-        color="fg.muted"
-        flexShrink={0}
-        title={entry.at.toLocaleString()}
-      >
-        {formatTimeAgo(entry.at.getTime())}
+      <Text textStyle="xs" color="fg.muted" flexShrink={0} title={entry.at.toLocaleString()}>
+        {formatTimeAgo(entry.at.getTime()) ?? "—"}
       </Text>
     </HStack>
   );

@@ -1,7 +1,4 @@
-import type {
-  WebhookDeliveryInput,
-  WebhookDeliveryRow,
-} from "@langwatch/automation-contract";
+import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 
 export abstract class WebhookDeliveryRepository {
   abstract create(input: WebhookDeliveryInput): Promise<void>;

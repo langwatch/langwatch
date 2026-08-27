@@ -5,9 +5,7 @@ import {
   type AutomationActivityTrigger,
 } from "../src/automation-history";
 
-function makeTrigger(
-  overrides: Partial<AutomationActivityTrigger>,
-): AutomationActivityTrigger {
+function makeTrigger(overrides: Partial<AutomationActivityTrigger>): AutomationActivityTrigger {
   return {
     id: "trig-1",
     name: "My automation",

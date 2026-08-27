@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import {
   type Trigger,
+  type UpdateTriggerCommand,
   TriggerFiltersRequiredError,
 } from "@langwatch/automation-contract";
 import { describeRoute, resolver } from "hono-openapi";
@@ -274,7 +275,7 @@ secured.access(requires("triggers:update")).patch(
       throw new TriggerFiltersRequiredError();
     }
 
-    const data: Parameters<typeof c.app.automation.update>[0] = {
+    const data: UpdateTriggerCommand = {
       id,
       projectId: project.id,
     };

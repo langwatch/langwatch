@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "@langwatch/automation-server";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,

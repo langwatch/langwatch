@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type {
-  CustomGraph,
-  Trigger,
-  AutomationService,
-} from "@langwatch/automation-contract";
+import type { CustomGraph, Trigger, AutomationService } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
@@ -209,11 +205,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     this.allRows = this.allRows.filter((r) => r.id !== params.id);
   }
 
-  async markResolvedById(params: {
-    id: string;
-    projectId: string;
-    now: Date;
-  }): Promise<void> {
+  async markResolvedById(params: { id: string; projectId: string; now: Date }): Promise<void> {
     this.resolveCalls.push(params);
     // Resolve frees the identity (clears openIncidentKey): the row leaves the
     // OPEN set so the next claim on the same triggerId succeeds. It stays in
@@ -243,14 +235,12 @@ function makeHarness({
   project?: ProjectIdentity | null;
   series: TimeseriesResult;
 }): Harness {
-  const dispatch = vi.fn<(input: unknown) => Promise<GraphAlertDispatchResult>>(
-    async () => ({
-      channel: "email",
-      didSend: true,
-      missingVariables: [],
-      renderErrors: [],
-    }),
-  );
+  const dispatch = vi.fn<(input: unknown) => Promise<GraphAlertDispatchResult>>(async () => ({
+    channel: "email",
+    didSend: true,
+    missingVariables: [],
+    renderErrors: [],
+  }));
   const getTimeseries = vi.fn(async () => series);
   const updateLastRunAt = vi.fn(async () => undefined);
   const loadTrigger = vi.fn(async () => trigger);
@@ -271,11 +261,15 @@ function makeHarness({
     } as unknown as AnalyticsService,
     triggerSent,
     notifier: { dispatch } as never,
-    telemetry: { error: () => undefined, debug: () => undefined } as never,
+    logger: {
+      error: () => undefined,
+      debug: () => undefined,
+      info: () => undefined,
+      warn: () => undefined,
+    },
     slackTokens: { tryDecrypt: () => null } as never,
     dispatchErrors: {
-      isTerminal: (error: unknown) =>
-        (error as { retryable?: unknown }).retryable === false,
+      isTerminal: (error: unknown) => (error as { retryable?: unknown }).retryable === false,
       createTerminal: (message: string) => new Error(message),
     } as never,
     clock: { now: () => NOW } as never,
@@ -526,9 +520,7 @@ describe("evaluateGraphTrigger", () => {
         { timestamp: "2026-06-20T11:00:00Z", value: 15 },
       ]);
       expect((arg.context as unknown as { sparkline: string }).sparkline).toHaveLength(1);
-      expect(
-        (arg.context as unknown as { previousValue: number | null }).previousValue,
-      ).toBeNull();
+      expect((arg.context as unknown as { previousValue: number | null }).previousValue).toBeNull();
       expect(arg.context.project.url).toBe("https://app.langwatch.test/demo");
       expect(arg.recipients).toEqual(["a@example.com"]);
       expect(arg.slackWebhook).toBeNull();
@@ -854,9 +846,7 @@ describe("evaluateGraphTrigger", () => {
     });
 
     it("propagates the dispatch error even when the rollback itself fails", async () => {
-      vi.spyOn(harness.triggerSent, "deleteOpenClaim").mockRejectedValue(
-        new Error("db gone"),
-      );
+      vi.spyOn(harness.triggerSent, "deleteOpenClaim").mockRejectedValue(new Error("db gone"));
 
       await expect(
         evaluateGraphTrigger({

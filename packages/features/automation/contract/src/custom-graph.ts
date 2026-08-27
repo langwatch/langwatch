@@ -7,4 +7,7 @@ export type CustomGraph = {
   filters: unknown;
 };
 
-export type CustomGraphNameRef = Pick<CustomGraph, "id" | "name">;
+export type CustomGraphNameRef = {
+  id: string;
+  name: string;
+};

@@ -6,14 +6,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { refetchMock, openDrawerMock, goBackMock, keepDraftOnReturnMock } = vi.hoisted(
-  () => ({
-    refetchMock: vi.fn(),
-    openDrawerMock: vi.fn(),
-    goBackMock: vi.fn(),
-    keepDraftOnReturnMock: vi.fn(),
-  }),
-);
+const { refetchMock, openDrawerMock, goBackMock, keepDraftOnReturnMock } = vi.hoisted(() => ({
+  refetchMock: vi.fn(),
+  openDrawerMock: vi.fn(),
+  goBackMock: vi.fn(),
+  keepDraftOnReturnMock: vi.fn(),
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {

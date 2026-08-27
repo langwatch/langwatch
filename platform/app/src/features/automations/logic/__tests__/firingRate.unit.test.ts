@@ -120,8 +120,6 @@ describe("estimateRatePerDay", () => {
       cadence: "immediate" as const,
       canBatch: true,
     };
-    expect(estimateFiringRate(input)).toContain(
-      String(Math.round(estimateRatePerDay(input) / 24)),
-    );
+    expect(estimateFiringRate(input)).toContain(String(Math.round(estimateRatePerDay(input) / 24)));
   });
 });

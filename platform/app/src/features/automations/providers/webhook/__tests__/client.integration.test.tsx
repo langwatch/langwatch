@@ -31,9 +31,8 @@ vi.mock("@monaco-editor/react", () => ({ default: () => null }));
  *  one export as a textarea carrying its `value`, so a test can read back the
  *  template the editor was seeded with. Everything else in the module stays
  *  real (FieldHeader is exercised as-is). */
-vi.mock("~/features/automations/editors/templateAuthoring", async (original) => {
-  const actual =
-    await original<typeof import("~/features/automations/editors/templateAuthoring")>();
+vi.mock("../../../editors/templateAuthoring", async (original) => {
+  const actual = await original<typeof import("../../../editors/templateAuthoring")>();
   return {
     ...actual,
     LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
@@ -42,6 +41,8 @@ vi.mock("~/features/automations/editors/templateAuthoring", async (original) => 
 
 import type { WebhookPreview } from "@langwatch/automation-contract";
 import webhookClient, { type WebhookSlice } from "../client";
+
+afterEach(() => cleanup());
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -78,9 +79,7 @@ function Harness({
   initial?: WebhookSlice;
   onChangeSpy?: (next: WebhookSlice) => void;
 }) {
-  const [slice, setSlice] = useState<WebhookSlice>(
-    initial ?? webhookClient.initialSlice(),
-  );
+  const [slice, setSlice] = useState<WebhookSlice>(initial ?? webhookClient.initialSlice());
   const Form = webhookClient.ConfigForm;
   return (
     <Form
@@ -118,9 +117,7 @@ describe("WebhookConfigForm URL validation", () => {
     it("shows no error before anything is typed", () => {
       renderForm();
 
-      expect(
-        screen.queryByText(/the webhook url must use https/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/the webhook url must use https/i)).not.toBeInTheDocument();
     });
   });
 
@@ -128,10 +125,9 @@ describe("WebhookConfigForm URL validation", () => {
     it("shows the https-only error", () => {
       renderForm();
 
-      fireEvent.change(
-        screen.getByPlaceholderText("https://example.com/hooks/langwatch"),
-        { target: { value: "http://example.com/hooks" } },
-      );
+      fireEvent.change(screen.getByPlaceholderText("https://example.com/hooks/langwatch"), {
+        target: { value: "http://example.com/hooks" },
+      });
 
       expect(screen.getByText(/the webhook url must use https/i)).toBeInTheDocument();
     });
@@ -141,10 +137,9 @@ describe("WebhookConfigForm URL validation", () => {
     it("shows the default-port-only error", () => {
       renderForm();
 
-      fireEvent.change(
-        screen.getByPlaceholderText("https://example.com/hooks/langwatch"),
-        { target: { value: "https://example.com:8443/hooks" } },
-      );
+      fireEvent.change(screen.getByPlaceholderText("https://example.com/hooks/langwatch"), {
+        target: { value: "https://example.com:8443/hooks" },
+      });
 
       expect(screen.getByText(/only the default https port/i)).toBeInTheDocument();
     });
@@ -162,9 +157,7 @@ describe("WebhookConfigForm URL validation", () => {
         target: { value: "https://example.com/hooks/langwatch" },
       });
 
-      expect(
-        screen.queryByText(/the webhook url must use https/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/the webhook url must use https/i)).not.toBeInTheDocument();
     });
   });
 });
@@ -301,9 +294,7 @@ describe("webhookClient signing secret", () => {
 
       expect(signingSecretInput()).toHaveValue("");
       expect(signingSecretInput()).toHaveAttribute("placeholder", "•••••• (saved)");
-      expect(
-        screen.queryByDisplayValue(WEBHOOK_HEADER_VALUE_KEPT),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue(WEBHOOK_HEADER_VALUE_KEPT)).not.toBeInTheDocument();
     });
 
     it("re-sends the kept sentinel on toActionParams without further edits", () => {

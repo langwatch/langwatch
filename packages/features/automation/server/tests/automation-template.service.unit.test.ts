@@ -223,10 +223,7 @@ describe("testFireTrigger", () => {
         {
           type: "data_table",
           caption: "matches",
-          rows: [
-            [{ type: "raw_text", text: "Trace" }],
-            [{ type: "raw_text", text: "t-1" }],
-          ],
+          rows: [[{ type: "raw_text", text: "Trace" }], [{ type: "raw_text", text: "t-1" }]],
         },
         { type: "section", text: { type: "mrkdwn", text: "fallback" } },
       ]);

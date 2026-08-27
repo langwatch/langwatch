@@ -55,7 +55,7 @@ export function getLiquidEngine(): Liquid {
     });
     // Slack mrkdwn escaping for user-controlled content (trace input/output,
     // evaluation labels). Mirrors `escapeMrkdwn` in the legacy Slack webhook
-    // path (src/server/app-layer/automations/delivery/sendSlackWebhook.ts): Slack treats only `&`,
+    // host delivery adapter: Slack treats only `&`,
     // `<`, `>` as control characters in message text, so escaping them stops
     // user-authored content from forging mrkdwn links (`<https://evil|click>`)
     // or broadcasts (`<!channel>`). See the Slack-mrkdwn-injection finding;
@@ -159,10 +159,7 @@ export class RenderTimeoutError extends Error {
   }
 }
 
-function hasNestedPath(
-  context: Record<string, unknown>,
-  segments: PathSegment[],
-): boolean {
+function hasNestedPath(context: object, segments: PathSegment[]): boolean {
   let current: unknown = context;
   for (const segment of segments) {
     if (current == null) return false;
@@ -173,8 +170,8 @@ function hasNestedPath(
       continue;
     }
     if (typeof current !== "object") return false;
-    if (!(segment in (current as Record<string, unknown>))) return false;
-    current = (current as Record<string, unknown>)[segment];
+    if (!Object.hasOwn(current, segment)) return false;
+    current = Reflect.get(current, segment);
   }
   return true;
 }
@@ -184,7 +181,7 @@ function detectMissingVariables({
   context,
 }: {
   template: string;
-  context: Record<string, unknown>;
+  context: object;
 }): string[] {
   try {
     // The referenced segment paths are cached per source string (see
@@ -219,12 +216,12 @@ export async function renderLiquid({
   timeoutMs = RENDER_TIMEOUT_MS,
 }: {
   template: string;
-  context: Record<string, unknown>;
+  context: object;
   timeoutMs?: number;
 }): Promise<LiquidRenderResult> {
   const missingVariables = detectMissingVariables({ template, context });
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timer: NodeJS.Timeout | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new RenderTimeoutError(timeoutMs)), timeoutMs);
   });

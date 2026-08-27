@@ -42,7 +42,6 @@ export function resolveSeriesLabel(graph: unknown, seriesKey: string): string | 
   }
 
   return (
-    deriveSeriesOptionsFromGraph(graph).find((option) => option.key === seriesKey)
-      ?.label ?? null
+    deriveSeriesOptionsFromGraph(graph).find((option) => option.key === seriesKey)?.label ?? null
   );
 }

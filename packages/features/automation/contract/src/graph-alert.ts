@@ -72,10 +72,7 @@ export const graphSeriesCollectionSchema = z
   .passthrough();
 
 /** The persisted series key for a graph alert: `<index>/<metric>/<aggregation>`. */
-export function deriveSeriesIdentifier(
-  graph: unknown,
-  index: number,
-): string | undefined {
+export function deriveSeriesIdentifier(graph: unknown, index: number): string | undefined {
   const parsed = graphSeriesCollectionSchema.safeParse(graph);
   if (!parsed.success) {
     return void 0;
@@ -140,10 +137,7 @@ export type GraphAlertTriggerData = {
 };
 
 /** Event/heartbeat reason carried through the singular AutomationService. */
-export type GraphTriggerEvaluationReason =
-  | "real-time"
-  | "heartbeat-absence"
-  | "heartbeat-resolve";
+export type GraphTriggerEvaluationReason = "real-time" | "heartbeat-absence" | "heartbeat-resolve";
 
 export type GraphTriggerEvaluationStatus =
   | "fired"

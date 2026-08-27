@@ -1,7 +1,4 @@
-import type {
-  GraphAlertOperator,
-  GraphAlertTimePeriod,
-} from "@langwatch/automation-contract";
+import type { GraphAlertOperator, GraphAlertTimePeriod } from "@langwatch/automation-contract";
 
 /** Display fields read from an automation row's action-parameters JSON. */
 export interface TriggerActionParams {

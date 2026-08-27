@@ -2,15 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -347,6 +339,19 @@ describe("AutomationDrawer", () => {
         });
         expect(screen.getByText("Edit automation")).toBeInTheDocument();
       });
+
+      it("hydrates canonical object filters without dropping them", async () => {
+        mockTriggerRow = savedRow({
+          filters: { "metadata.labels": ["production"] },
+        });
+        renderDrawer({ automationId: "trigger-1" });
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.filters).toEqual({
+            "metadata.labels": ["production"],
+          });
+        });
+      });
     });
 
     describe("when the saved row is still loading", () => {
@@ -417,9 +422,7 @@ describe("AutomationDrawer", () => {
         });
 
         // Author edits the name mid-session.
-        useAutomationStore
-          .getState()
-          .dispatch({ type: "SET_NAME", value: "My local edit" });
+        useAutomationStore.getState().dispatch({ type: "SET_NAME", value: "My local edit" });
 
         // tRPC refetches in the background and hands back a row whose name
         // changed server-side. The hydratedFromServerFor guard must NOT
@@ -675,8 +678,8 @@ describe("AutomationDrawer", () => {
 
       it("refreshes the automations list and the dashboard graph cards", async () => {
         const user = userEvent.setup();
-        mockUpsertMutate.mockImplementation(
-          (_input: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.(),
+        mockUpsertMutate.mockImplementation((_input: unknown, opts?: { onSuccess?: () => void }) =>
+          opts?.onSuccess?.(),
         );
         mockTriggerRow = savedReportRow();
         renderDrawer({ automationId: "trigger-1" });
@@ -710,13 +713,9 @@ describe("AutomationDrawer", () => {
         await waitFor(() => {
           expect(useAutomationStore.getState().draft.report.cron).toBe("* * * * *");
         });
-        expect(
-          await screen.findByRole("button", { name: "Save schedule" }),
-        ).toBeDisabled();
+        expect(await screen.findByRole("button", { name: "Save schedule" })).toBeDisabled();
         // And says why, in the cadence field itself.
-        expect(
-          screen.getByText(/can send at most every 15 minutes/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/can send at most every 15 minutes/i)).toBeInTheDocument();
       });
     });
   });

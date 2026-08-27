@@ -28,25 +28,17 @@ import { generate as ksuid } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { AlertType, TriggerAction, TriggerKind } from "~/generated/prisma/client";
-import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
-import {
-  readPersistCapCounts,
-  resolvePersistDailyCap,
-} from "~/server/app-layer/automations/dispatch/persistCap";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { listSlackChannels } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
+import { NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automation-contract";
 import {
   actionParamsSchemaFor,
+  type AutomationWebhookStoredParams,
+  automationWebhookProvider,
   persistActionParamsFor,
   redactActionParamsFor,
-} from "~/server/app-layer/automations/providers/registry";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
-import {
-  decryptWebhookHeaders,
-  decryptWebhookSigningSecrets,
-  type WebhookStoredActionParams,
-} from "~/server/app-layer/automations/providers/webhook/server";
+} from "~/runtime/app/features/automation-adapters/providers/registry";
+import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
-import { featureFlagService } from "~/server/featureFlag";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -143,7 +135,7 @@ const actionParamsSchema = z.object({
   slackBotTokenSet: z.boolean().optional(),
   datasetId: z.string().optional(),
   datasetMapping: z
-    .object({ mapping: z.any(), expansions: z.array(z.string()).optional() })
+    .object({ mapping: z.unknown(), expansions: z.array(z.string()).optional() })
     .optional(),
   annotators: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
   // ADR-040 SEND_WEBHOOK destination — the per-action provider schema
@@ -255,7 +247,7 @@ export const automationRouter = createTRPCRouter({
           datasetId: z.string().optional(),
           datasetMapping: z
             .object({
-              mapping: z.any(),
+              mapping: z.unknown(),
               expansions: z.array(z.string()).optional(),
             })
             .optional(),
@@ -279,8 +271,7 @@ export const automationRouter = createTRPCRouter({
       if (input.action === TriggerAction.SEND_WEBHOOK) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message:
-            "Webhook automations must be created through the provider-aware upsert API.",
+          message: "Webhook automations must be created through the provider-aware upsert API.",
         });
       }
 
@@ -299,8 +290,7 @@ export const automationRouter = createTRPCRouter({
       if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
         // Server-stamp the creator — the schema does not expose this to the
         // wire (builder5015-002), so we widen locally to mutate.
-        (input.actionParams as Record<string, unknown>).createdByUserId =
-          ctx.session?.user.id;
+        (input.actionParams as Record<string, unknown>).createdByUserId = ctx.session?.user.id;
 
         if (!input.actionParams.annotators) {
           throw new TRPCError({
@@ -341,10 +331,7 @@ export const automationRouter = createTRPCRouter({
         filters: input.filters,
         projectId: input.projectId,
         lastRunAt: new Date(),
-        notificationCadence: resolveCadenceForCreate(
-          input.action,
-          input.notificationCadence,
-        ),
+        notificationCadence: resolveCadenceForCreate(input.action, input.notificationCadence),
       });
 
       await ctx.app.automation.invalidate(input.projectId);
@@ -379,9 +366,7 @@ export const automationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const allCheckIds = triggers.flatMap((trigger) =>
-        extractCheckKeys(trigger.filters),
-      );
+      const allCheckIds = triggers.flatMap((trigger) => extractCheckKeys(trigger.filters));
 
       const allChecks = await ctx.app.monitors.getAllByIds({
         monitorIds: allCheckIds,
@@ -437,8 +422,8 @@ export const automationRouter = createTRPCRouter({
   getDailyCap: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("triggers:view")
-    .query(async ({ input }) => ({
-      cap: await resolvePersistDailyCap(input.projectId),
+    .query(async ({ ctx, input }) => ({
+      cap: await ctx.app.automation.resolvePersistDailyCap(input.projectId),
     })),
   /**
    * Today's confirmed-match count and skipped count per automation, so the
@@ -457,11 +442,11 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("triggers:view")
     .query(async ({ ctx, input }) => {
-      const cap = await resolvePersistDailyCap(input.projectId);
+      const cap = await ctx.app.automation.resolvePersistDailyCap(input.projectId);
       const triggers = await ctx.app.automation.getAllForProject({
         projectId: input.projectId,
       });
-      const counts = await readPersistCapCounts({
+      const counts = await ctx.app.automation.readPersistCapCounts({
         projectId: input.projectId,
         triggerIds: triggers.map((trigger) => trigger.id),
         now: new Date(),
@@ -711,12 +696,7 @@ export const automationRouter = createTRPCRouter({
         channel: z.enum(["email", "slack", "webhook"]),
         trigger: triggerIdentitySchema,
         draft: templateDraftSchema,
-        webhook: z
-          .string()
-          .url()
-          .startsWith("https://hooks.slack.com/")
-          .nullable()
-          .default(null),
+        webhook: z.string().url().startsWith("https://hooks.slack.com/").nullable().default(null),
         /** ADR-040 generic HTTP test fire: the full request shape, body
          *  template included (it lives in actionParams, not the four Trigger
          *  template columns). URL shape is re-validated by the provider
@@ -784,10 +764,11 @@ export const automationRouter = createTRPCRouter({
         // flag-gated client-side, and the server refuses the channel too so
         // the flag can't be bypassed by calling the API directly.
         if (input.channel === "webhook") {
-          const allowed = await featureFlagService.isEnabled(
-            "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
-          );
+          const allowed = await ctx.app.featureFlags.isEnabled("release_webhook_automations", {
+            kind: "project",
+            userId: ctx.session.user.id,
+            projectId: input.projectId,
+          });
           if (!allowed) {
             throw new TRPCError({
               code: "FORBIDDEN",
@@ -837,9 +818,7 @@ export const automationRouter = createTRPCRouter({
               triggerId: input.automationId,
               projectId: input.projectId,
             });
-            token = decryptSlackBotToken(
-              (saved?.actionParams ?? {}) as SlackActionParams,
-            );
+            token = decryptSlackBotToken((saved?.actionParams ?? {}) as SlackActionParams);
           }
           if (!token || !channel) {
             throw new TRPCError({
@@ -870,15 +849,14 @@ export const automationRouter = createTRPCRouter({
               triggerId: input.automationId,
               projectId: input.projectId,
             });
-            const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
-            if (stored.url !== webhookDestination.url) {
+            const stored = (row?.actionParams ?? {}) as AutomationWebhookStoredParams;
+            if (stored?.url !== webhookDestination.url) {
               throw new TRPCError({
                 code: "BAD_REQUEST",
-                message:
-                  "Re-enter webhook header values after changing the destination URL.",
+                message: "Re-enter webhook header values after changing the destination URL.",
               });
             }
-            saved = decryptWebhookHeaders(stored);
+            saved = automationWebhookProvider.decryptHeaders(stored);
           }
           const headers: Record<string, string> = {};
           for (const [name, value] of Object.entries(webhookDestination.headers)) {
@@ -900,8 +878,8 @@ export const automationRouter = createTRPCRouter({
             triggerId: input.automationId,
             projectId: input.projectId,
           });
-          const signingSecrets = decryptWebhookSigningSecrets(
-            (row?.actionParams ?? {}) as WebhookStoredActionParams,
+          const signingSecrets = automationWebhookProvider.decryptSigningSecrets(
+            (row?.actionParams ?? {}) as AutomationWebhookStoredParams,
           );
           if (signingSecrets.length > 0) {
             webhookDestination = { ...webhookDestination, signingSecrets };
@@ -963,10 +941,11 @@ export const automationRouter = createTRPCRouter({
         // The webhook channel ships dark (ADR-040 §7): gate the save route as
         // well as the picker, so the flag can't be bypassed via the API.
         if (input.action === TriggerAction.SEND_WEBHOOK) {
-          const allowed = await featureFlagService.isEnabled(
-            "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
-          );
+          const allowed = await ctx.app.featureFlags.isEnabled("release_webhook_automations", {
+            kind: "project",
+            userId: ctx.session.user.id,
+            projectId: input.projectId,
+          });
           if (!allowed) {
             throw new TRPCError({
               code: "FORBIDDEN",
@@ -980,8 +959,7 @@ export const automationRouter = createTRPCRouter({
           if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message:
-                "Graph alerts only support notify channels (Email, Slack, or a webhook).",
+              message: "Graph alerts only support notify channels (Email, Slack, or a webhook).",
             });
           }
           if (!input.graphAlert) {
@@ -1069,9 +1047,7 @@ export const automationRouter = createTRPCRouter({
       // malformed query is rejected here with author feedback rather than
       // silently failing closed (matching nothing) at dispatch time.
       const filterQuery =
-        input.filterQuery && input.filterQuery.trim() !== ""
-          ? input.filterQuery.trim()
-          : null;
+        input.filterQuery && input.filterQuery.trim() !== "" ? input.filterQuery.trim() : null;
       if (filterQuery !== null) {
         try {
           translateFilterToClickHouse(filterQuery, input.projectId, {

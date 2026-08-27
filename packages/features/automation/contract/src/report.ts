@@ -103,9 +103,7 @@ export type ReportTriggerData = {
   active: true;
 };
 
-export function buildReportTriggerData(
-  input: BuildReportTriggerDataInput,
-): ReportTriggerData {
+export function buildReportTriggerData(input: BuildReportTriggerDataInput): ReportTriggerData {
   return {
     id: input.id,
     name: input.name.trim(),

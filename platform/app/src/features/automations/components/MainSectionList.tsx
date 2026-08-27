@@ -1,12 +1,15 @@
 import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
+import {
+  AutomationNameField,
+  AutomationSeveritySection,
+  AutomationTypePicker,
+  type AutomationSource,
+} from "@langwatch/automation-web";
 import { useAutomationStore } from "../state/automationStore";
-import { useDraft } from "../state/selectors";
-import { AutomationTypePicker } from "./AutomationTypePicker";
+import { useConfigComplete, useDraft } from "../state/selectors";
 import { CadenceSection } from "./CadenceSection";
 import { DeliveryPicker } from "./DeliveryPicker";
-import { NameField } from "./NameField";
-import { SeveritySection } from "./SeveritySection";
 import { SubjectSection } from "./SubjectSection";
 
 /** The collapsible facets, in ADR-043 order. Name sits above as a plain field;
@@ -41,6 +44,7 @@ export function MainSectionList({
 }) {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);
+  const configComplete = useConfigComplete();
 
   // Everything starts open; the author folds away what they've finished. Track
   // only the collapsed set so a fresh drawer shows the whole form. Independent
@@ -59,14 +63,39 @@ export function MainSectionList({
 
   return (
     <VStack align="stretch" gap={3}>
-      <NameField isEdit={isEdit} />
-      <AutomationTypePicker sourceLocked={sourceLocked} accordion={facetProps("type")} />
-      <SubjectSection
-        prefilledGraphId={prefilledGraphId}
-        accordion={facetProps("subject")}
+      <AutomationNameField
+        source={draft.source}
+        value={draft.name}
+        isEdit={isEdit}
+        configComplete={configComplete}
+        noun={
+          draft.source === "customGraph"
+            ? "alert"
+            : draft.source === "report"
+              ? "schedule"
+              : "automation"
+        }
+        onChange={(value) => dispatch({ type: "SET_NAME", value })}
       />
+      <AutomationTypePicker
+        source={draft.source as AutomationSource}
+        sourceLocked={sourceLocked}
+        accordion={facetProps("type")}
+        onChange={(source) => {
+          dispatch({ type: "SET_SOURCE", value: source });
+          if (source === "customGraph" && draft.alertType === null) {
+            dispatch({ type: "SET_ALERT_TYPE", value: "WARNING" });
+          }
+        }}
+      />
+      <SubjectSection prefilledGraphId={prefilledGraphId} accordion={facetProps("subject")} />
       <CadenceSection isEdit={isEdit} accordion={facetProps("cadence")} />
-      <SeveritySection accordion={facetProps("severity")} />
+      <AutomationSeveritySection
+        source={draft.source}
+        value={draft.alertType}
+        accordion={facetProps("severity")}
+        onChange={(value) => dispatch({ type: "SET_ALERT_TYPE", value })}
+      />
       <DeliveryPicker
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}

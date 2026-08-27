@@ -18,12 +18,8 @@ describe("deriveSeriesIdentifier", () => {
         0,
       ),
     ).toBe("0/performance.total_cost/sum");
-    expect(deriveSeriesIdentifier({ series: [{ aggregation: "p95" }] }, 0)).toBe(
-      "0/value/p95",
-    );
-    expect(deriveSeriesIdentifier({ series: [{ key: "trace_id" }] }, 0)).toBe(
-      "0/trace_id/count",
-    );
+    expect(deriveSeriesIdentifier({ series: [{ aggregation: "p95" }] }, 0)).toBe("0/value/p95");
+    expect(deriveSeriesIdentifier({ series: [{ key: "trace_id" }] }, 0)).toBe("0/trace_id/count");
   });
 
   it("declines malformed graphs and indexes outside the series array", () => {

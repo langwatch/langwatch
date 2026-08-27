@@ -15,7 +15,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   graphTriggerActivityGroupKey,
-} from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+} from "@langwatch/automation-server";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,

@@ -25,8 +25,8 @@ export abstract class AutomationGraphNotifierPort {
   abstract dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult>;
 }
 
-/** Host observability used by graph evaluation and heartbeat isolation. */
-export abstract class AutomationGraphTelemetryPort {
+/** Process logger used by graph evaluation and heartbeat isolation. */
+export abstract class AutomationLoggerPort {
   abstract error(fields: Record<string, unknown>, message: string): void;
   abstract debug(fields: Record<string, unknown>, message: string): void;
   abstract info(fields: Record<string, unknown>, message: string): void;
@@ -35,9 +35,7 @@ export abstract class AutomationGraphTelemetryPort {
 
 /** Technical ClickHouse resolver used only by the heartbeat recency query. */
 export abstract class AutomationHeartbeatPort {
-  abstract tryResolveClickHouseClient(
-    projectId: string,
-  ): Promise<ClickHouseClient | null>;
+  abstract tryResolveClickHouseClient(projectId: string): Promise<ClickHouseClient | null>;
 }
 
 /** Host crypto boundary for stored Slack bot credentials. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { PreconditionTraceData } from "../precondition-matchers";
 import {
   buildPreconditionTraceDataFromFoldState,

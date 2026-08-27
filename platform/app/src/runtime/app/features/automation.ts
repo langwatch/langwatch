@@ -3,6 +3,7 @@ import {
   AutomationClock,
   AutomationEmailCapService,
   AutomationEmailCapStorePort,
+  AutomationPersistCapService,
   PostgresAutomationAdapter,
   SchedulerWake,
   UnsubscribeTokenVerifier,
@@ -53,9 +54,7 @@ class AppAutomationEmailCapStore extends AutomationEmailCapStorePort {
   }
 }
 
-export function createAppAutomationEmailCaps(
-  redis: SchedulerRedis,
-): AutomationEmailCapService {
+export function createAppAutomationEmailCaps(redis: SchedulerRedis): AutomationEmailCapService {
   const store = redis ? new AppAutomationEmailCapStore(redis) : null;
   return AutomationEmailCapService.create({ store });
 }
@@ -90,6 +89,7 @@ export class AppAutomationRuntime {
     private readonly graph: AppAutomationGraphPorts,
     private readonly clock: AutomationClock,
     private readonly testFire: AutomationTestFirePort,
+    private readonly persistCaps: AutomationPersistCapService,
   ) {}
 
   static create(options: {
@@ -98,6 +98,7 @@ export class AppAutomationRuntime {
     graph: AppAutomationGraphPorts;
     clock?: AutomationClock;
     testFire: AutomationTestFirePort;
+    persistCaps: AutomationPersistCapService;
   }): AppAutomationRuntime {
     return new AppAutomationRuntime(
       options.database,
@@ -105,6 +106,7 @@ export class AppAutomationRuntime {
       options.graph,
       options.clock ?? new AppAutomationClock(),
       options.testFire,
+      options.persistCaps,
     );
   }
 
@@ -119,6 +121,7 @@ export class AppAutomationRuntime {
       wake: new AppSchedulerWake(this.redis),
       ...this.graph,
       testFire: this.testFire,
+      persistCaps: this.persistCaps,
     }).build();
   }
 }
@@ -129,4 +132,16 @@ export function createAppAutomationTestGraphPorts(): AppAutomationGraphPorts {
 
 export function createAppAutomationTestFirePort(): AutomationTestFirePort {
   return createTestFirePort();
+}
+
+export function createAppAutomationTestPersistCaps(): AutomationPersistCapService {
+  const projects = createAutomationTestRuntime().projects;
+
+  return AutomationPersistCapService.create({
+    projects,
+    planProvider: {
+      getActivePlan: async () => ({ type: "FREE", free: true }),
+    },
+    config: { free: 1_000, paid: 10_000, enterprise: 100_000 },
+  });
 }

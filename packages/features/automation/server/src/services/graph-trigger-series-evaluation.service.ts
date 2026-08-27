@@ -1,19 +1,14 @@
-import {
-  aggregateSeriesValues,
-  extractSeriesPoints,
-} from "@langwatch/analytics-contract";
+import { aggregateSeriesValues, extractSeriesPoints } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult } from "@langwatch/automation-contract";
 import {
-  buildGraphSeriesName,
   GRAPH_TRIGGER_MAX_RESULT_ROWS,
-  isTimeseriesResultTooLarge,
-  skippedGraphEvaluation,
-} from "./graph-trigger-evaluator.helpers";
+  TriggerEvaluatorService,
+} from "./trigger-evaluator.service";
 import type {
   GraphEvaluationPlan,
   GraphSeriesEvaluation,
   TimeseriesResult,
-} from "./graph-trigger-evaluator.types";
+} from "./trigger-evaluator.service";
 
 export class GraphTriggerSeriesEvaluationService {
   private constructor() {}
@@ -29,6 +24,7 @@ export class GraphTriggerSeriesEvaluationService {
     if ("status" in result) {
       return result;
     }
+
     return this.values(plan, result);
   }
 
@@ -40,10 +36,11 @@ export class GraphTriggerSeriesEvaluationService {
         maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
       })) as TimeseriesResult;
     } catch (error) {
-      if (!isTimeseriesResultTooLarge(error)) {
+      if (!TriggerEvaluatorService.isTimeseriesResultTooLarge(error)) {
         throw error;
       }
-      plan.request.deps.telemetry.error(
+
+      plan.request.deps.logger.error(
         {
           projectId: plan.request.projectId,
           triggerId: plan.request.triggerId,
@@ -54,28 +51,19 @@ export class GraphTriggerSeriesEvaluationService {
         },
         "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
       );
-      return skippedGraphEvaluation({
+
+      return TriggerEvaluatorService.skippedGraphEvaluation({
         ...plan.request,
         detail: "timeseries result exceeds the row ceiling",
       });
     }
   }
 
-  private values(
-    plan: GraphEvaluationPlan,
-    result: TimeseriesResult,
-  ): GraphSeriesEvaluation {
-    const key = buildGraphSeriesName(plan.timeseriesInput.series[0]!, 0);
-    const currentPoints = extractSeriesPoints(
-      result.currentPeriod,
-      key,
-      plan.graph.groupBy,
-    );
-    const previousPoints = extractSeriesPoints(
-      result.previousPeriod,
-      key,
-      plan.graph.groupBy,
-    );
+  private values(plan: GraphEvaluationPlan, result: TimeseriesResult): GraphSeriesEvaluation {
+    const key = TriggerEvaluatorService.buildGraphSeriesName(plan.timeseriesInput.series[0]!, 0);
+    const currentPoints = extractSeriesPoints(result.currentPeriod, key, plan.graph.groupBy);
+    const previousPoints = extractSeriesPoints(result.previousPeriod, key, plan.graph.groupBy);
+
     return {
       currentPoints,
       previousPoints,

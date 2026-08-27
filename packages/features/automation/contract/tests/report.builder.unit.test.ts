@@ -36,9 +36,7 @@ describe("buildReportTriggerData", () => {
       expect(data.name).toBe("Weekly errors");
       expect(data.filters).toEqual({});
       expect(data.active).toBe(true);
-      expect((data.actionParams as { source: { kind: string } }).source.kind).toBe(
-        "traceQuery",
-      );
+      expect((data.actionParams as { source: { kind: string } }).source.kind).toBe("traceQuery");
       expect((data.actionParams as { slackWebhook: string }).slackWebhook).toBe(
         "https://hooks.slack.com/services/x",
       );
@@ -101,9 +99,9 @@ describe("reportScheduleSchema", () => {
 describe("reportSourceSchema", () => {
   describe("when discriminating the source kind", () => {
     it("accepts dashboard, customGraph, and traceQuery, and rejects unknown", () => {
-      expect(
-        reportSourceSchema.safeParse({ kind: "dashboard", dashboardId: "d1" }).success,
-      ).toBe(true);
+      expect(reportSourceSchema.safeParse({ kind: "dashboard", dashboardId: "d1" }).success).toBe(
+        true,
+      );
       expect(
         reportSourceSchema.safeParse({
           kind: "customGraph",

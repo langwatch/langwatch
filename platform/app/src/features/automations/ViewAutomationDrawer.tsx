@@ -11,21 +11,19 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { differenceInMinutes, differenceInSeconds } from "date-fns";
+import { parseAutomationFiltersWire } from "@langwatch/automation-contract";
 import { useState } from "react";
 import { Calendar, TrendingUp } from "react-feather";
 import { resolveSeriesLabel, type TriggerActionParams } from "@langwatch/automation-web";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  OPERATOR_LABELS,
-  TIME_PERIOD_LABELS,
-} from "~/features/automations/logic/draftReducer";
-import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
-import { TriggerKind } from "~/generated/prisma/client";
+import { OPERATOR_LABELS, TIME_PERIOD_LABELS } from "./logic/draftReducer";
+import { CLIENT_PROVIDERS } from "./providers/registry";
+import type { RouterOutputs } from "~/utils/api";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api, type RouterOutputs } from "~/utils/api";
+import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 interface ViewAutomationDrawerProps {
@@ -44,21 +42,6 @@ function formatDurationBetween(from: Date, to: Date): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
-}
-
-/** Parse the trigger's legacy structured-filters JSON string, tolerating
- *  malformed payloads (returns null so the caller falls back to the empty
- *  state instead of crashing the drawer). */
-function parseFiltersObject(filters: string): Record<string, unknown> | null {
-  try {
-    const parsed: unknown = JSON.parse(filters);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 export function ViewAutomationDrawer({ automationId }: ViewAutomationDrawerProps) {
@@ -84,7 +67,7 @@ export function ViewAutomationDrawer({ automationId }: ViewAutomationDrawerProps
   const trigger = triggerQuery.data;
   const isGraphAlert = !!trigger?.customGraphId;
   const isWebhook = trigger?.action === "SEND_WEBHOOK";
-  const isSchedule = trigger?.triggerKind === TriggerKind.REPORT;
+  const isSchedule = trigger?.triggerKind === "REPORT";
   const actionParams = (trigger?.actionParams ?? {}) as TriggerActionParams;
 
   // Resolve the watched graph's JSON so the stored series key renders as its
@@ -152,12 +135,8 @@ export function ViewAutomationDrawer({ automationId }: ViewAutomationDrawerProps
   const conditionsSummary = () => {
     if (!trigger) return null;
     if (isGraphAlert) {
-      const operator = actionParams.operator
-        ? OPERATOR_LABELS[actionParams.operator]
-        : null;
-      const window = actionParams.timePeriod
-        ? TIME_PERIOD_LABELS[actionParams.timePeriod]
-        : null;
+      const operator = actionParams.operator ? OPERATOR_LABELS[actionParams.operator] : null;
+      const window = actionParams.timePeriod ? TIME_PERIOD_LABELS[actionParams.timePeriod] : null;
       const seriesLabel = actionParams.seriesName
         ? (resolveSeriesLabel(graphQuery.data?.graph, actionParams.seriesName) ??
           actionParams.seriesName)
@@ -180,14 +159,9 @@ export function ViewAutomationDrawer({ automationId }: ViewAutomationDrawerProps
         </Code>
       );
     }
-    // Legacy structured filters are stored as a JSON string — "{}" (no
-    // conditions) is truthy, so emptiness has to be checked on the parsed
-    // object or the "No conditions" fallback is unreachable.
-    if (trigger.filters && typeof trigger.filters === "string") {
-      const parsed = parseFiltersObject(trigger.filters);
-      if (parsed && Object.keys(parsed).length > 0) {
-        return <FilterDisplay filters={trigger.filters} hasBorder={true} />;
-      }
+    const filters = parseAutomationFiltersWire(trigger.filters);
+    if (Object.keys(filters).length > 0) {
+      return <FilterDisplay filters={JSON.stringify(filters)} hasBorder={true} />;
     }
     return (
       <Text textStyle="sm" color="fg.muted">
@@ -213,8 +187,7 @@ export function ViewAutomationDrawer({ automationId }: ViewAutomationDrawerProps
               <Skeleton height="24px" width="200px" />
             ) : (
               <Heading size="md">
-                {trigger?.name ??
-                  (isGraphAlert ? "Alert" : isSchedule ? "Schedule" : "Automation")}
+                {trigger?.name ?? (isGraphAlert ? "Alert" : isSchedule ? "Schedule" : "Automation")}
               </Heading>
             )}
             {isGraphAlert ? (
@@ -272,10 +245,7 @@ export function ViewAutomationDrawer({ automationId }: ViewAutomationDrawerProps
                     : "This automation has not fired yet."}
                 </Text>
               ) : (
-                <RecentFiresList
-                  fires={recentFiresQuery.data ?? []}
-                  isGraphAlert={isGraphAlert}
-                />
+                <RecentFiresList fires={recentFiresQuery.data ?? []} isGraphAlert={isGraphAlert} />
               )}
             </VStack>
 
@@ -323,13 +293,7 @@ type RecentFire = RouterOutputs["automation"]["getRecentFires"][number];
  * shares a relative-time label collapses into one "Fired 7 times" row. Alerts
  * stay per-incident because each open/resolve is a distinct event.
  */
-function RecentFiresList({
-  fires,
-  isGraphAlert,
-}: {
-  fires: RecentFire[];
-  isGraphAlert: boolean;
-}) {
+function RecentFiresList({ fires, isGraphAlert }: { fires: RecentFire[]; isGraphAlert: boolean }) {
   const rows = isGraphAlert
     ? fires.map((fire) => {
         const firedAt = new Date(fire.createdAt);
@@ -391,9 +355,7 @@ function RecentFiresList({
 /** Collapse consecutive fires that share a relative-time label ("6 minutes
  *  ago") into one counted row. Input is newest-first, so equal labels are
  *  always adjacent. */
-function groupFiresByLabel(
-  fires: RecentFire[],
-): { key: string; label: string; count: number }[] {
+function groupFiresByLabel(fires: RecentFire[]): { key: string; label: string; count: number }[] {
   const groups: { key: string; label: string; count: number }[] = [];
   for (const fire of fires) {
     const label = formatTimeAgo(new Date(fire.createdAt).getTime()) ?? "";
@@ -467,8 +429,7 @@ function WebhookDeliveriesList({ deliveries }: { deliveries: WebhookDelivery[] }
  *  their own self-explanatory error text instead. */
 function guidanceForStatus(status: number | null): string | undefined {
   if (status === null) return undefined;
-  if (status === 429)
-    return "The endpoint asked us to slow down. Delivery backs off and retries.";
+  if (status === 429) return "The endpoint asked us to slow down. Delivery backs off and retries.";
   if (status === 408 || status >= 500)
     return "The endpoint had a server error. Delivery retries automatically.";
   if (status >= 400)
@@ -506,12 +467,7 @@ function DeliveryAttemptRow({
         cursor={hasDetail ? "pointer" : "default"}
         onClick={() => hasDetail && setOpen((v) => !v)}
       >
-        <Box
-          boxSize={2}
-          borderRadius="full"
-          flexShrink={0}
-          bg={OUTCOME_DOT[attempt.outcome]}
-        />
+        <Box boxSize={2} borderRadius="full" flexShrink={0} bg={OUTCOME_DOT[attempt.outcome]} />
         <Text textStyle="sm" flex="1" minWidth="0">
           {total > 1 ? `Attempt ${index + 1} · ` : ""}
           {statusText}

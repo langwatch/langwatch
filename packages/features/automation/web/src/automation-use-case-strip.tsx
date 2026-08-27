@@ -1,13 +1,6 @@
 import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { TriggerAction } from "@langwatch/automation-contract";
-import {
-  AlertTriangle,
-  Database,
-  DollarSign,
-  Edit3,
-  Flag,
-  TrendingDown,
-} from "lucide-react";
+import { AlertTriangle, Database, DollarSign, Edit3, Flag, TrendingDown } from "lucide-react";
 
 export type AutomationUseCaseKind = "alert" | "automation";
 
@@ -117,13 +110,7 @@ function UseCaseCard({
       _hover={{ bg: "bg.muted", borderColor: "border.emphasized" }}
       onClick={() => onOpen(useCase.prefill)}
     >
-      <Text
-        textStyle="sm"
-        fontWeight="semibold"
-        display="inline-flex"
-        alignItems="center"
-        gap={2}
-      >
+      <Text textStyle="sm" fontWeight="semibold" display="inline-flex" alignItems="center" gap={2}>
         <Icon size={14} />
         {useCase.title}
       </Text>

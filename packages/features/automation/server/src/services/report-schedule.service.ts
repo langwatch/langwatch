@@ -28,11 +28,13 @@ export class ReportScheduleService {
     if (!next) {
       throw new Error(`No report run exists after ${input.after.toISOString()}`);
     }
+
     return next;
   }
 
   static tryExtract(actionParams: unknown): ReportActionParams | null {
     const parsed = reportActionParamsSchema.safeParse(actionParams);
+
     return parsed.success ? parsed.data : null;
   }
 
@@ -75,6 +77,7 @@ export class ReportScheduleService {
       projectId: input.projectId,
       targetType: REPORT_SCHEDULER_TARGET_TYPE,
     });
+
     return rows.map((row) => ({
       triggerId: row.targetId,
       nextRunAt: row.active ? row.nextRunAt : null,

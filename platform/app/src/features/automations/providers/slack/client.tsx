@@ -33,28 +33,24 @@ import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA, VariableInfoIcon } from "@langwatch/automation-web";
-import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
+import { LIQUID_JSON_LANGUAGE_ID } from "@langwatch/automation-web";
 import {
   CompactSlackPreview,
   FieldHeader,
   LiquidEditor,
   TemplateDisclosure,
-} from "~/features/automations/editors/templateAuthoring";
+} from "../../editors/templateAuthoring";
 import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
-import { TestFireButton } from "../TestFireButton";
-import type {
-  ConfigFormProps,
-  NotifyClientDef,
-  SummaryIdentity,
-} from "@langwatch/automation-web";
+import { AutomationTestFireButton } from "@langwatch/automation-web";
+import type { ConfigFormProps, NotifyClientDef, SummaryIdentity } from "@langwatch/automation-web";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,
   reportSourceIsAutoLayout,
   SLACK_BLOCK_KIT_TEMPLATES,
-} from "./templates/registry";
-import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
+} from "@langwatch/automation-web";
+import { SlackBlockKitTemplatePicker } from "@langwatch/automation-web";
 
 /** A template field. `usingDefault` means "the author has not customised this"
  *  — it is what the Reset affordance and the default badge read. `value` is the
@@ -223,13 +219,7 @@ oauth_config:
  *  app, which unlocks the richer templates a webhook can't render. */
 function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      bg="bg.subtle"
-      padding={3}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" bg="bg.subtle" padding={3}>
       <HStack justify="space-between" gap={3} align="center">
         <VStack align="start" gap={0}>
           <Text textStyle="xs" fontWeight="medium" color="fg">
@@ -310,7 +300,7 @@ function SlackChannelField({
   // we don't fire mid-type) or the stored token of a saved automation (loaded
   // server-side by id). No button to click; the list just appears.
   const fetchKey = typedToken
-    ? /^xoxb-/.test(typedToken)
+    ? typedToken.startsWith("xoxb-")
       ? `typed:${typedToken}`
       : null
     : slice.botTokenAlreadySet || automationId
@@ -337,10 +327,7 @@ function SlackChannelField({
   // SELECTION: the machine rewrites its input from the selected item's label,
   // and an entry whose label is the typed text survives that rewrite unchanged.
   const [customChannel, setCustomChannel] = useState("");
-  const listedIds = useMemo(
-    () => new Set((channelData ?? []).map((c) => c.id)),
-    [channelData],
-  );
+  const listedIds = useMemo(() => new Set((channelData ?? []).map((c) => c.id)), [channelData]);
   useEffect(() => {
     const listed = (channelData ?? []).map(channelOption);
     set(
@@ -396,8 +383,7 @@ function SlackChannelField({
   }, [channelData, slice.channelId]);
 
   const canLoad = typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
-  const returnedError =
-    list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
+  const returnedError = list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
   // A listing can succeed and still be short of the workspace. Saying nothing
   // is the worst option: the author scrolls a list that looks complete, doesn't
   // find their channel, and concludes the integration is broken.
@@ -550,11 +536,7 @@ function previewOptions(slice: SlackSlice) {
   return { allowGatedBlocks: slice.deliveryMethod === "bot" };
 }
 
-function SlackConfigForm({
-  slice,
-  onChange,
-  ctx,
-}: ConfigFormProps<SlackSlice, SlackPreview>) {
+function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice, SlackPreview>) {
   const isBlockKit = slice.templateType === "block_kit";
   const isReport = ctx.sourceKind === "report";
   // A dashboard report maps straight onto its panels — no layout to pick.
@@ -577,9 +559,7 @@ function SlackConfigForm({
   // not the framework default) lands on the Code tab so their custom layout
   // is visible; everyone else starts on the Template gallery.
   const isCustomBlockKit =
-    isBlockKit &&
-    !slice.template.usingDefault &&
-    !findTemplateOptionBySource(slice.template.value);
+    isBlockKit && !slice.template.usingDefault && !findTemplateOptionBySource(slice.template.value);
   const [messageMode, setMessageMode] = useState<"template" | "code">(
     isCustomBlockKit ? "code" : "template",
   );
@@ -600,8 +580,7 @@ function SlackConfigForm({
   useEffect(() => {
     const preset = findTemplateOptionBySource(slice.template.value);
     if (!preset) return;
-    const cadenceMismatch =
-      preset.cadenceFit !== "both" && preset.cadenceFit !== ctx.cadenceMode;
+    const cadenceMismatch = preset.cadenceFit !== "both" && preset.cadenceFit !== ctx.cadenceMode;
     const kindMismatch = preset.kind !== ctx.sourceKind;
     const reportSourceMismatch =
       preset.kind === "report" &&
@@ -637,16 +616,9 @@ function SlackConfigForm({
       template: { value: option.source, usingDefault: true },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    isReport,
-    isBlockKit,
-    slice.template.usingDefault,
-    ctx.reportSourceKind,
-    ctx.cadenceMode,
-  ]);
+  }, [isReport, isBlockKit, slice.template.usingDefault, ctx.reportSourceKind, ctx.cadenceMode]);
 
-  const usePlainText = () =>
-    onChange({ ...slice, templateType: "string", template: EMPTY_FIELD });
+  const usePlainText = () => onChange({ ...slice, templateType: "string", template: EMPTY_FIELD });
   const useGuidedTemplates = () =>
     onChange({ ...slice, templateType: "block_kit", template: EMPTY_FIELD });
 
@@ -686,9 +658,7 @@ function SlackConfigForm({
         />
       ) : (
         <VStack align="stretch" gap={3}>
-          <UpgradeToBotBanner
-            onUpgrade={() => onChange({ ...slice, deliveryMethod: "bot" })}
-          />
+          <UpgradeToBotBanner onUpgrade={() => onChange({ ...slice, deliveryMethod: "bot" })} />
           <Field.Root>
             <Field.Label>Slack webhook URL</Field.Label>
             <Input
@@ -705,7 +675,7 @@ function SlackConfigForm({
         </VStack>
       )}
       {/* Try the real message straight from the destination section. */}
-      <TestFireButton
+      <AutomationTestFireButton
         onTestFire={ctx.onTestFire}
         loading={ctx.testFireLoading}
         disabled={!isComplete(slice)}
@@ -745,8 +715,8 @@ function SlackConfigForm({
               // A dashboard IS its panels — there is no layout to choose, so the
               // gallery would be a menu of one. Switch to Code to edit the copy.
               <Text textStyle="xs" color="fg.muted">
-                Every panel on the dashboard is sent as its own chart. There's nothing to
-                lay out; switch to Code to edit the message yourself.
+                Every panel on the dashboard is sent as its own chart. There's nothing to lay out;
+                switch to Code to edit the message yourself.
               </Text>
             ) : (
               <SlackBlockKitTemplatePicker
@@ -785,8 +755,8 @@ function SlackConfigForm({
             // schema drives in-editor markers.
             <VStack align="stretch" gap={2}>
               <Text textStyle="xs" color="fg.muted">
-                Write the layout yourself in Block Kit. Values in braces fill in from your
-                trace or alert when the message sends.
+                Write the layout yourself in Block Kit. Values in braces fill in from your trace or
+                alert when the message sends.
               </Text>
               <Box data-testid="slack-code-editor">
                 <LiquidEditor
@@ -897,8 +867,8 @@ function SlackBotFields({
       >
         <VStack align="stretch" gap={2}>
           <Text textStyle="xs" color="fg">
-            Post to your Slack workspace with a bot token. Create a Slack app, then paste
-            its token below.
+            Post to your Slack workspace with a bot token. Create a Slack app, then paste its token
+            below.
           </Text>
           <HStack gap={3}>
             <Link
@@ -932,8 +902,8 @@ function SlackBotFields({
             <List.Root as="ol" gap={1} paddingLeft={4}>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste the copied
-                  manifest — it sets the permissions for you.
+                  Create the app with &ldquo;From a manifest&rdquo; and paste the copied manifest —
+                  it sets the permissions for you.
                 </Text>
               </List.Item>
               <List.Item>
@@ -944,8 +914,8 @@ function SlackBotFields({
               </List.Item>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Public channels work straight away. To post to a private channel, add
-                  the app to that channel first.
+                  Public channels work straight away. To post to a private channel, add the app to
+                  that channel first.
                 </Text>
               </List.Item>
             </List.Root>
@@ -961,9 +931,7 @@ function SlackBotFields({
           value={slice.botToken}
           onChange={(e) => onChange({ ...slice, botToken: e.target.value })}
           placeholder={
-            slice.botTokenAlreadySet
-              ? "•••••••• (unchanged, leave blank to keep)"
-              : "xoxb-…"
+            slice.botTokenAlreadySet ? "•••••••• (unchanged, leave blank to keep)" : "xoxb-…"
           }
         />
         {tokenKept ? (

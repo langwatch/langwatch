@@ -5,10 +5,9 @@ export const annotationQueueActionParamsSchema = z.object({
   annotators: z
     .array(z.object({ id: z.string(), name: z.string() }))
     .min(1, "Add at least one annotator."),
+  createdByUserId: z.string().min(1).optional(),
 });
-export type AnnotationQueueActionParams = z.infer<
-  typeof annotationQueueActionParamsSchema
->;
+export type AnnotationQueueActionParams = z.infer<typeof annotationQueueActionParamsSchema>;
 
 const definition: SharedDef = {
   action: "ADD_TO_ANNOTATION_QUEUE",

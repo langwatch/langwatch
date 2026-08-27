@@ -5,10 +5,7 @@ export abstract class CustomGraphRepository {
     customGraphId: string;
     projectId: string;
   }): Promise<CustomGraph | null>;
-  abstract existsInProject(input: {
-    customGraphId: string;
-    projectId: string;
-  }): Promise<boolean>;
+  abstract existsInProject(input: { customGraphId: string; projectId: string }): Promise<boolean>;
   abstract findAllNamesByIds(input: {
     customGraphIds: string[];
     projectId: string;

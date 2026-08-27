@@ -16,6 +16,7 @@ import type {
   GraphTriggerSweepCandidate,
 } from "./graph-alert";
 import type { AutomationPersistCapBreach } from "./runaway";
+import type { AutomationPersistCapCount, AutomationPersistCapDecision } from "./persist-cap";
 import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire";
 export abstract class AutomationService {
   abstract validateTemplateDraft(input: TestFireTemplateDraft): void;
@@ -25,23 +26,29 @@ export abstract class AutomationService {
     projectId: string;
     reason: GraphTriggerEvaluationReason;
   }): Promise<GraphTriggerEvaluationResult>;
-  abstract decideGraphTriggerHeartbeat(input: {
-    now: Date;
-  }): Promise<GraphTriggerSweepCandidate[]>;
+  abstract decideGraphTriggerHeartbeat(input: { now: Date }): Promise<GraphTriggerSweepCandidate[]>;
   abstract handlePersistCapBreach(input: AutomationPersistCapBreach): Promise<void>;
-  abstract getById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
-  abstract tryGetById(input: {
-    triggerId: string;
+  abstract resolvePersistDailyCap(projectId: string): Promise<number>;
+  abstract consumePersistCapSlot(input: {
     projectId: string;
-  }): Promise<Trigger | null>;
+    triggerId: string;
+    now: Date;
+    cap: number;
+    dedupKey: string;
+  }): Promise<AutomationPersistCapDecision>;
+  abstract readPersistCapCounts(input: {
+    projectId: string;
+    triggerIds: readonly string[];
+    now: Date;
+    cap: number;
+  }): Promise<Record<string, AutomationPersistCapCount>>;
+  abstract getById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
+  abstract tryGetById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
   abstract getAllForProject(input: { projectId: string }): Promise<Trigger[]>;
   abstract create(input: CreateTriggerCommand): Promise<Trigger>;
   abstract update(input: UpdateTriggerCommand): Promise<Trigger>;
   abstract archive(input: { triggerId: string; projectId: string }): Promise<Trigger>;
-  abstract softDeleteById(input: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<Trigger>;
+  abstract softDeleteById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
   abstract tryGetByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
@@ -67,10 +74,7 @@ export abstract class AutomationService {
     traceIds: string[];
     projectId: string;
   }): Promise<Set<string>>;
-  abstract updateLastRunAt(input: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<void>;
+  abstract updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void>;
   abstract invalidate(projectId: string): Promise<void>;
   abstract getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]>;
   abstract syncReportSchedule(input: {
@@ -79,10 +83,7 @@ export abstract class AutomationService {
     cron: string;
     timezone: string;
   }): Promise<void>;
-  abstract removeReportSchedule(input: {
-    projectId: string;
-    triggerId: string;
-  }): Promise<void>;
+  abstract removeReportSchedule(input: { projectId: string; triggerId: string }): Promise<void>;
   /**
    * Repairs report triggers whose durable scheduler row was not persisted
    * alongside the trigger. Existing paused rows must remain untouched.

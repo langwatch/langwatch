@@ -1,4 +1,4 @@
-import type { AutomationDatabase } from "../../ports/automation-database.port";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
@@ -7,7 +7,7 @@ import { parseSeriesIndex } from "@langwatch/automation-contract";
 
 /** Prisma-backed graph-alert incident ledger, private to Automation server. */
 export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository {
-  private constructor(private readonly database: AutomationDatabase) {
+  private constructor(private readonly database: PrismaClient) {
     super();
   }
 
@@ -15,8 +15,8 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
     return `graph-alert:${triggerId}`;
   }
 
-  static create(database: AutomationDatabase): PrismaGraphTriggerSentRepository {
-    return new PrismaGraphTriggerSentRepository(database);
+  static create(database: object): PrismaGraphTriggerSentRepository {
+    return new PrismaGraphTriggerSentRepository(database as PrismaClient);
   }
 
   async findProjectsWithGraphTriggers(): Promise<string[]> {
@@ -161,11 +161,7 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
     await this.database.triggerSent.delete({ where: input });
   }
 
-  async markResolvedById(input: {
-    id: string;
-    projectId: string;
-    now: Date;
-  }): Promise<void> {
+  async markResolvedById(input: { id: string; projectId: string; now: Date }): Promise<void> {
     await this.database.triggerSent.update({
       where: { id: input.id, projectId: input.projectId },
       data: { resolvedAt: input.now, openIncidentKey: null },

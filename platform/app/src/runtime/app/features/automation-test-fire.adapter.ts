@@ -13,7 +13,7 @@ import {
 } from "~/server/mailer/triggerNoReply";
 import { assertWebhookDelivered, sendWebhook } from "~/server/webhooks/sendWebhook";
 import { isSlackWebhookUrl } from "@langwatch/automation-contract";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
 
 export class AppAutomationTestFireAdapter extends AutomationTestFirePort {
   private constructor() {
@@ -43,9 +43,7 @@ export class AppAutomationTestFireAdapter extends AutomationTestFirePort {
       throw new Error("Slack webhook must be a valid https://hooks.slack.com/ URL.");
     }
 
-    await new IncomingWebhook(input.webhook).send(
-      input.payload as IncomingWebhookSendArguments,
-    );
+    await new IncomingWebhook(input.webhook).send(input.payload as IncomingWebhookSendArguments);
   }
 
   async sendSlackBot(input: TestFireSlackBot): Promise<void> {

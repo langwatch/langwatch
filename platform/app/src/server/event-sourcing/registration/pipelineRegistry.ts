@@ -58,7 +58,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import { NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automation-contract";
 import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
@@ -115,10 +115,12 @@ import type { TraceSummaryData } from "../../app-layer/traces/types";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import { publishCancellation } from "../../scenarios/cancellation-channel";
 import type { ScenarioExecutionPool } from "../../scenarios/execution/execution-pool";
-import type { AutomationDispatchPorts } from "../pipelines/automations/automationDispatch.wiring";
-import { createAutomationsPipeline } from "../pipelines/automations/pipeline";
-import { createEvaluationAlertTriggerMatchHandler } from "../pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
-import { createGraphTriggerActivityHandler } from "../pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import {
+  createAutomationsPipeline,
+  createGraphTriggerActivityHandler,
+} from "@langwatch/automation-server";
+import type { AutomationDispatchPorts } from "~/runtime/app/features/automation-dispatch.wiring";
+import { AppAutomationEvaluationSubscriberRuntime } from "~/runtime/app/features/evaluation-automation-subscribers.adapter";
 import { ReportUsageForMonthCommand } from "../pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
@@ -541,9 +543,9 @@ export class PipelineRegistry {
    * clustering pipeline (whose command it dispatches) registers later —
    * late-bound like the other cross-pipeline dispatchers.
    */
-  private readonly bootstrapTopicClustering = new Deferred<
-    (projectId: string) => Promise<void>
-  >("bootstrapTopicClustering");
+  private readonly bootstrapTopicClustering = new Deferred<(projectId: string) => Promise<void>>(
+    "bootstrapTopicClustering",
+  );
 
   private cached<State>(
     inner: FoldProjectionStore<State>,
@@ -561,24 +563,12 @@ export class PipelineRegistry {
     );
 
     const automationPorts = this.deps.automations.ports;
-    const graphActivityHandler = createGraphTriggerActivityHandler({
-      automation: this.deps.automation,
-      evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
-    });
+    const graphActivityHandler = createGraphTriggerActivityHandler(this.deps.automation);
     const automationPipeline = this.deps.eventSourcing.register(
       createAutomationsPipeline({
-        dispatch: automationPorts.settlementDeps,
-        sweep: {
-          decideSweepCandidates: automationPorts.decideSweepCandidates,
-          evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
-          deleteDispatchedBefore: (params) =>
-            this.deps.repositories.processStore.deleteDispatchedBefore(params),
-        },
-        prune: {
-          pruneExpired: automationPorts.pruneWebhookDeliveries,
-          deleteDispatchedBefore: (params) =>
-            this.deps.repositories.processStore.deleteDispatchedBefore(params),
-        },
+        scheduledIntents: this.deps.automation,
+        settlement: automationPorts.settlement,
+        retention: this.deps.repositories.processStore,
       }),
     );
     // Queue-infrastructure maintenance. Registered unconditionally: the runtime
@@ -649,16 +639,17 @@ export class PipelineRegistry {
     const governanceTraceAlertMatches = AppGovernanceTraceAlertMatchPort.create(
       automationPipeline.commands.recordTriggerMatch,
     );
+    const evaluationAutomationSubscribers = AppAutomationEvaluationSubscriberRuntime.create({
+      automation: this.deps.automation,
+      traces: this.deps.traces.tree,
+      recordTriggerMatch: automationPipeline.commands.recordTriggerMatch,
+    });
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
-        triggerMatchHandler: createEvaluationAlertTriggerMatchHandler({
-          automation: this.deps.automation,
-          traceSummaryStore,
-          recordTriggerMatch: {
-            send: automationCommands.recordTriggerMatch,
-          },
-        }),
-        graphActivityHandler,
+        triggerMatchHandler: (event, context) =>
+          evaluationAutomationSubscribers.handleEvaluationTriggerMatch(event, context),
+        graphActivityHandler: (event, context) =>
+          evaluationAutomationSubscribers.handleEvaluationGraphTriggerActivity(event, context),
       },
     });
     // Registered BEFORE the metric, log and trace pipelines: their
@@ -705,24 +696,23 @@ export class PipelineRegistry {
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
           traceCanonicalisation: this.deps.traceCanonicalisation,
-          getNormalizedSpanById: (params) =>
-            this.deps.traces.spans.getNormalizedSpanById(params),
+          getNormalizedSpanById: (params) => this.deps.traces.spans.getNormalizedSpanById(params),
         }),
       ],
     });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const { pipeline: simulationPipeline, scenarioExecutionPool } =
-      this.registerSimulationPipeline({
+    const { pipeline: simulationPipeline, scenarioExecutionPool } = this.registerSimulationPipeline(
+      {
         suiteRunPipeline,
         traceSummaryStore,
         simComputeRunMetrics,
-      });
+      },
+    );
 
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
-    const { pipeline: langyConversationPipeline } =
-      this.registerLangyConversationPipeline();
+    const { pipeline: langyConversationPipeline } = this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } = this.registerTopicClusteringPipeline();
     const enterprisePipelines = AppGovernanceEventingAdapter.create(
       this.deps.eventSourcing,
@@ -910,17 +900,11 @@ export class PipelineRegistry {
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
         langyConversationProjectionStore: conversationStore,
-        langyConversationTurnProjectionStore:
-          this.deps.repositories.langyConversationTurnState,
+        langyConversationTurnProjectionStore: this.deps.repositories.langyConversationTurnState,
         langyMessageProjectionStore: this.deps.repositories.langyMessageStorage,
-        langyAnalyticsEventProjectionStore:
-          this.deps.repositories.langyAnalyticsEventStorage,
+        langyAnalyticsEventProjectionStore: this.deps.repositories.langyAnalyticsEventStorage,
         langyProcessPorts: effectPorts,
-        subscribers: [
-          livenessSubscriber,
-          broadcastSubscriber,
-          admissionLifecycleSubscriber,
-        ],
+        subscribers: [livenessSubscriber, broadcastSubscriber, admissionLifecycleSubscriber],
       }),
     );
 
@@ -1223,12 +1207,12 @@ export class PipelineRegistry {
     const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>(
       "resolveOrigin",
     );
-    const scheduleDeferred = new Deferred<
-      (payload: DeferredOriginPayload) => Promise<void>
-    >("scheduleDeferred");
-    const simComputeRunMetrics = new Deferred<
-      CommandDispatcher<ComputeRunMetricsCommandData>
-    >("simComputeRunMetrics");
+    const scheduleDeferred = new Deferred<(payload: DeferredOriginPayload) => Promise<void>>(
+      "scheduleDeferred",
+    );
+    const simComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>(
+      "simComputeRunMetrics",
+    );
 
     const originGateHandler = createOriginGateHandler({
       scheduleDeferred: scheduleDeferred.fn,
@@ -1263,8 +1247,7 @@ export class PipelineRegistry {
 
     const projectMetadataHandler = createProjectMetadataHandler({
       projects: this.deps.projects,
-      bootstrapTopicClustering: (projectId) =>
-        this.bootstrapTopicClustering.fn(projectId),
+      bootstrapTopicClustering: (projectId) => this.bootstrapTopicClustering.fn(projectId),
     });
 
     const simulationMetricsSyncHandler = createSimulationMetricsSyncHandler({
@@ -1284,9 +1267,7 @@ export class PipelineRegistry {
     const experimentMetricsSyncHandler = createExperimentMetricsSyncHandler({
       computeExperimentRunMetrics: async (data) => {
         if (!expComputeRunMetrics) {
-          logger.warn(
-            "experiment computeExperimentRunMetrics not yet initialized, skipping",
-          );
+          logger.warn("experiment computeExperimentRunMetrics not yet initialized, skipping");
           return;
         }
         return expComputeRunMetrics(data);
@@ -1311,18 +1292,14 @@ export class PipelineRegistry {
     const governanceKpisSync = governanceKpis
       ? {
           fold: "traceSummary" as const,
-          when: (
-            event: TraceProcessingEvent,
-            context: TriggerContext<TraceSummaryData>,
-          ) => governanceKpis.when(event, context),
+          when: (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) =>
+            governanceKpis.when(event, context),
           ...throttledWindow<TraceProcessingEvent>({
             makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
             windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
           }),
-          handler: (
-            event: TraceProcessingEvent,
-            context: TriggerContext<TraceSummaryData>,
-          ) => governanceKpis.handle(event, context),
+          handler: (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) =>
+            governanceKpis.handle(event, context),
         }
       : undefined;
 
@@ -1334,18 +1311,14 @@ export class PipelineRegistry {
     const governanceOcsfEventsSync = governanceOcsf
       ? {
           fold: "traceSummary" as const,
-          when: (
-            event: TraceProcessingEvent,
-            context: TriggerContext<TraceSummaryData>,
-          ) => governanceOcsf.when(event, context),
+          when: (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) =>
+            governanceOcsf.when(event, context),
           ...throttledWindow<TraceProcessingEvent>({
             makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
             windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
           }),
-          handler: (
-            event: TraceProcessingEvent,
-            context: TriggerContext<TraceSummaryData>,
-          ) => governanceOcsf.handle(event, context),
+          handler: (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) =>
+            governanceOcsf.handle(event, context),
         }
       : undefined;
 
@@ -1433,20 +1406,17 @@ export class PipelineRegistry {
     // ADR-032 D5: the Dataset package owns normalization and its persistence;
     // this process root only mounts the durable queue and hands the sender back
     // to that process-owned capability.
-    const datasetNormalizeQueue =
-      tracePipeline.service.registerJob<DatasetNormalizePayload>({
-        name: "datasetNormalize",
-        process: (payload) => this.deps.datasetNormalization.process(payload),
-        // The per-dataset group key already serializes to concurrency-1, so no
-        // deduplication block is needed; the 200ms debounce default is
-        // surprising and could swallow a fast retry (m1).
-        groupKeyFn: (p) => p.datasetId,
-      });
+    const datasetNormalizeQueue = tracePipeline.service.registerJob<DatasetNormalizePayload>({
+      name: "datasetNormalize",
+      process: (payload) => this.deps.datasetNormalization.process(payload),
+      // The per-dataset group key already serializes to concurrency-1, so no
+      // deduplication block is needed; the 200ms debounce default is
+      // surprising and could swallow a fast retry (m1).
+      groupKeyFn: (p) => p.datasetId,
+    });
 
     if (datasetNormalizeQueue) {
-      this.deps.datasetNormalization.connect((payload) =>
-        datasetNormalizeQueue.send(payload),
-      );
+      this.deps.datasetNormalization.connect((payload) => datasetNormalizeQueue.send(payload));
     }
     // With no queue, the same capability runs its serialized inline fallback.
 
@@ -1510,12 +1480,12 @@ export class PipelineRegistry {
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
 
     // Deferred dispatchers — resolved after pipeline registration.
-    const selfComputeRunMetrics = new Deferred<
-      CommandDispatcher<ComputeRunMetricsCommandData>
-    >("selfComputeRunMetrics");
-    const scheduleRetry = new Deferred<
-      (payload: ComputeRunMetricsCommandData) => Promise<void>
-    >("scheduleRetry");
+    const selfComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>(
+      "selfComputeRunMetrics",
+    );
+    const scheduleRetry = new Deferred<(payload: ComputeRunMetricsCommandData) => Promise<void>>(
+      "scheduleRetry",
+    );
     // The process manager's finish intent reports through this same
     // pipeline's commands, which exist only after `.build()`.
     const selfExecutionCommands = new Deferred<() => SimulationRunExecutionCommands>(
@@ -1526,16 +1496,14 @@ export class PipelineRegistry {
     const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
       scheduleRetry: scheduleRetry.fn,
-      deriveScenarioRoleMetrics: (params) =>
-        traceReadDerivation.deriveScenarioRoleMetrics(params),
+      deriveScenarioRoleMetrics: (params) => traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
     // ECST backfill: FinishRunCommand loads the run's prior events straight
     // from the canonical event store (aggregateType "simulation_run").
     const finishRunCommand = new FinishRunCommand({
       loadPriorEvents: async ({ tenantId, scenarioRunId }) => {
-        const eventStore =
-          this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
+        const eventStore = this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
         if (!eventStore) return [];
         return eventStore.getEvents(
           scenarioRunId,
@@ -1587,25 +1555,24 @@ export class PipelineRegistry {
     const retryJobId = (payload: ComputeRunMetricsCommandData) =>
       `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
 
-    const retryQueue =
-      simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
-        name: "deferredComputeRunMetrics",
-        process: async (payload) => {
-          await simCommands.computeRunMetrics(payload);
-        },
-        delay: COMPUTE_METRICS_RETRY_DELAY_MS,
-        deduplication: {
-          makeId: retryJobId,
-          extend: false,
-          replace: true,
-        },
-        spanAttributes: (payload) => ({
-          "deferred.tenant_id": payload.tenantId,
-          "deferred.scenario_run_id": payload.scenarioRunId,
-          "deferred.trace_id": payload.traceId,
-          "deferred.retry_count": payload.retryCount,
-        }),
-      });
+    const retryQueue = simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
+      name: "deferredComputeRunMetrics",
+      process: async (payload) => {
+        await simCommands.computeRunMetrics(payload);
+      },
+      delay: COMPUTE_METRICS_RETRY_DELAY_MS,
+      deduplication: {
+        makeId: retryJobId,
+        extend: false,
+        replace: true,
+      },
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.scenario_run_id": payload.scenarioRunId,
+        "deferred.trace_id": payload.traceId,
+        "deferred.retry_count": payload.retryCount,
+      }),
+    });
 
     if (retryQueue) {
       scheduleRetry.resolve((payload) => retryQueue.send(payload));
@@ -1633,12 +1600,9 @@ export class PipelineRegistry {
       organizations: this.deps.organizations,
       billingCheckpoints: this.deps.billingCheckpoints,
       getUsageReportingService: () => this.deps.usageReportingService,
-      queryBillableEventsTotal: (input) =>
-        getApp().billingQueries.queryBillableEventsTotal(input),
+      queryBillableEventsTotal: (input) => getApp().billingQueries.queryBillableEventsTotal(input),
       selfDispatch: (data) => {
-        const pipeline = this.deps.eventSourcing.getPipeline(
-          BILLING_REPORTING_PIPELINE_NAME,
-        );
+        const pipeline = this.deps.eventSourcing.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
         return pipeline.commands.reportUsageForMonth.send(data);
       },
     });
@@ -1653,9 +1617,7 @@ export class PipelineRegistry {
   private registerExperimentRunPipeline({
     wireExperimentDeps,
   }: {
-    wireExperimentDeps: ReturnType<
-      PipelineRegistry["registerTracePipeline"]
-    >["wireExperimentDeps"];
+    wireExperimentDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireExperimentDeps"];
   }) {
     const experimentRunStore = this.cached<ExperimentRunStateData>(
       createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
@@ -1675,10 +1637,7 @@ export class PipelineRegistry {
     // The experimentId lookup, pre-built at the composition root (presets.ts)
     // over the App's ClickHouse resolver — the registry consumes it directly,
     // it does not resolve a client itself (see PipelineRepositories above).
-    const lookupExperimentId = async (
-      tenantId: string,
-      runId: string,
-    ): Promise<string | null> => {
+    const lookupExperimentId = async (tenantId: string, runId: string): Promise<string | null> => {
       try {
         return await this.deps.repositories.experimentIdLookup.findExperimentId({
           tenantId,
@@ -1784,14 +1743,12 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
 export function getSubscriberMetadata(): SubscriberMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldSubscribers.values()).map(
-      ({ projectionName, definition }) => ({
-        subscriberName: definition.name,
-        pipelineName,
-        aggregateType,
-        afterProjection: projectionName,
-      }),
-    );
+    return Array.from(def.foldSubscribers.values()).map(({ projectionName, definition }) => ({
+      subscriberName: definition.name,
+      pipelineName,
+      aggregateType,
+      afterProjection: projectionName,
+    }));
   });
 }
 

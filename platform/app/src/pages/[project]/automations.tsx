@@ -10,16 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMemo } from "react";
-import {
-  Calendar,
-  Edit2,
-  Eye,
-  Filter,
-  MoreVertical,
-  Trash,
-  TrendingUp,
-  Zap,
-} from "react-feather";
+import { Calendar, Edit2, Eye, Filter, MoreVertical, Trash, TrendingUp, Zap } from "react-feather";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { HoverableBigText } from "~/components/HoverableBigText";
@@ -48,7 +39,7 @@ import {
   ReportSubjectCell,
   SectionHeader,
   TableShell,
-} from "~/features/automations/components/page/AutomationTableCells";
+} from "@langwatch/automation-web";
 import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
@@ -64,26 +55,24 @@ type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
 type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
 
-const sectionDetails: Record<AutomationSection, { title: string; description: string }> =
-  {
-    overview: {
-      title: "Overview",
-      description:
-        "See what is firing, what is scheduled next, and recent automation activity.",
-    },
-    automations: {
-      title: "Automations",
-      description: "Act on every incoming trace that matches your filters.",
-    },
-    alerts: {
-      title: "Alerts",
-      description: "Get told when a metric crosses a threshold and when it recovers.",
-    },
-    schedules: {
-      title: "Schedules",
-      description: "Send a dashboard, graph, or trace table on a recurring cadence.",
-    },
-  };
+const sectionDetails: Record<AutomationSection, { title: string; description: string }> = {
+  overview: {
+    title: "Overview",
+    description: "See what is firing, what is scheduled next, and recent automation activity.",
+  },
+  automations: {
+    title: "Automations",
+    description: "Act on every incoming trace that matches your filters.",
+  },
+  alerts: {
+    title: "Alerts",
+    description: "Get told when a metric crosses a threshold and when it recovers.",
+  },
+  schedules: {
+    title: "Schedules",
+    description: "Send a dashboard, graph, or trace table on a recurring cadence.",
+  },
+};
 
 const sectionFromPath = (pathname: string): AutomationSection => {
   if (pathname.includes("/automations/automations")) return "automations";
@@ -157,17 +146,14 @@ function AutomationsPage() {
     [triggers.data],
   );
   const traceAutomations = useMemo(
-    () =>
-      (triggers.data ?? []).filter((t) => !t.customGraphId && t.triggerKind !== "REPORT"),
+    () => (triggers.data ?? []).filter((t) => !t.customGraphId && t.triggerKind !== "REPORT"),
     [triggers.data],
   );
   // Only needed to resolve dataset names on ADD_TO_DATASET rows. Gated on
   // the project being loaded (an empty projectId trips the permission
   // middleware with a spurious "no permission" toast) and on the list
   // actually containing a dataset automation.
-  const hasDatasetTriggers = (triggers.data ?? []).some(
-    (t) => t.action === "ADD_TO_DATASET",
-  );
+  const hasDatasetTriggers = (triggers.data ?? []).some((t) => t.action === "ADD_TO_DATASET");
   const getDatasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && hasDatasetTriggers },
@@ -177,8 +163,7 @@ function AutomationsPage() {
     () =>
       reports.some(
         (r) =>
-          (r.actionParams as { source?: { kind?: string } } | null)?.source?.kind ===
-          "customGraph",
+          (r.actionParams as { source?: { kind?: string } } | null)?.source?.kind === "customGraph",
       ),
     [reports],
   );
@@ -195,19 +180,13 @@ function AutomationsPage() {
     },
   );
   const graphJsonById = useMemo(
-    () =>
-      new Map<string, unknown>(
-        (graphsQuery.data ?? []).map((g) => [g.id, g.graph as unknown]),
-      ),
+    () => new Map<string, unknown>((graphsQuery.data ?? []).map((g) => [g.id, g.graph as unknown])),
     [graphsQuery.data],
   );
   const graphNameById = useMemo(
     () =>
       new Map<string, string>(
-        (graphsQuery.data ?? []).map((g) => [
-          g.id,
-          (g as { name?: string }).name ?? "graph",
-        ]),
+        (graphsQuery.data ?? []).map((g) => [g.id, (g as { name?: string }).name ?? "graph"]),
       ),
     [graphsQuery.data],
   );
@@ -237,10 +216,7 @@ function AutomationsPage() {
     if (actionParams.datasetId) {
       return (
         <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
-          {
-            getDatasets.data?.find((dataset) => dataset.id === actionParams.datasetId)
-              ?.name
-          }
+          {getDatasets.data?.find((dataset) => dataset.id === actionParams.datasetId)?.name}
         </Link>
       );
     }
@@ -475,8 +451,7 @@ function AutomationsPage() {
       }))
       .sort((left, right) => left.at - right.at)[0];
     const nextName = next
-      ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)?.name ??
-        null)
+      ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)?.name ?? null)
       : null;
 
     return { firingNow, fired30d, next, nextName };
@@ -551,9 +526,7 @@ function AutomationsPage() {
                           <Table.Row>
                             <Table.ColumnHeader>Name</Table.ColumnHeader>
                             <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              Fires when
-                            </Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">Fires when</Table.ColumnHeader>
                             <Table.ColumnHeader>Notifies</Table.ColumnHeader>
                             <Table.ColumnHeader whiteSpace="nowrap">
                               <MetricHeader
@@ -573,8 +546,7 @@ function AutomationsPage() {
                         </Table.Header>
                         <Table.Body>
                           {alerts.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
+                            const actionParams = trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
                             return (
                               // Armed, the row can be handed to Langy; its own click (open the
@@ -589,15 +561,11 @@ function AutomationsPage() {
                                 })}
                               >
                                 <Table.Row {...sharedRowProps(trigger)}>
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
+                                  <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
                                   <Table.Cell maxWidth="260px">
                                     <AlertSubjectCell
                                       graphName={trigger.customGraph?.name ?? null}
-                                      graph={graphJsonById.get(
-                                        trigger.customGraphId ?? "",
-                                      )}
+                                      graph={graphJsonById.get(trigger.customGraphId ?? "")}
                                       seriesName={actionParams.seriesName}
                                     />
                                   </Table.Cell>
@@ -608,7 +576,11 @@ function AutomationsPage() {
                                     {actionItems(trigger.action, actionParams)}
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
-                                    <LastFiredCell trigger={trigger} stats={stats} />
+                                    <LastFiredCell
+                                      trigger={trigger}
+                                      stats={stats}
+                                      formatTimeAgo={formatTimeAgo}
+                                    />
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
                                     <FiringStatus firing={!!stats?.currentlyFiring} />
@@ -632,11 +604,7 @@ function AutomationsPage() {
                     <StatTile
                       label="Firing now"
                       value={overview.firingNow}
-                      sub={
-                        overview.firingNow > 0
-                          ? "alerts over their threshold"
-                          : "all clear"
-                      }
+                      sub={overview.firingNow > 0 ? "alerts over their threshold" : "all clear"}
                       alert={overview.firingNow > 0}
                     />
                     <StatTile
@@ -646,9 +614,7 @@ function AutomationsPage() {
                     />
                     <StatTile
                       label="Next scheduled"
-                      value={
-                        overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"
-                      }
+                      value={overview.next ? (formatTimeAgo(overview.next.at) ?? "—") : "—"}
                       sub={overview.nextName ?? "no schedules queued"}
                     />
                   </SimpleGrid>
@@ -723,9 +689,7 @@ function AutomationsPage() {
                           <Table.Row>
                             <Table.ColumnHeader>Name</Table.ColumnHeader>
                             <Table.ColumnHeader>Sends</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              Schedule
-                            </Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">Schedule</Table.ColumnHeader>
                             <Table.ColumnHeader whiteSpace="nowrap">
                               <MetricHeader
                                 label="Next run"
@@ -733,10 +697,7 @@ function AutomationsPage() {
                               />
                             </Table.ColumnHeader>
                             <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Last run"
-                                help="The last time this was sent."
-                              />
+                              <MetricHeader label="Last run" help="The last time this was sent." />
                             </Table.ColumnHeader>
                             <Table.ColumnHeader>Delivery</Table.ColumnHeader>
                             <Table.ColumnHeader>Active</Table.ColumnHeader>
@@ -745,8 +706,7 @@ function AutomationsPage() {
                         </Table.Header>
                         <Table.Body>
                           {reports.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
+                            const actionParams = trigger.actionParams as TriggerActionParams;
                             const schedule = (
                               actionParams as {
                                 schedule?: {
@@ -777,9 +737,7 @@ function AutomationsPage() {
                                     })
                                   }
                                 >
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
+                                  <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
                                   <Table.Cell>
                                     <ReportSubjectCell
                                       actionParams={actionParams}
@@ -799,11 +757,10 @@ function AutomationsPage() {
                                   <ReportRunCells
                                     schedule={scheduleByTriggerId.get(trigger.id)}
                                     loading={reportSchedules.isLoading}
+                                    formatTimeAgo={formatTimeAgo}
                                   />
                                   <Table.Cell>
-                                    {trigger.action === "SEND_SLACK_MESSAGE"
-                                      ? "Slack"
-                                      : "Email"}
+                                    {trigger.action === "SEND_SLACK_MESSAGE" ? "Slack" : "Email"}
                                   </Table.Cell>
                                   {activeCell(trigger)}
                                   <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
@@ -861,8 +818,7 @@ function AutomationsPage() {
                         </Table.Header>
                         <Table.Body>
                           {traceAutomations.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
+                            const actionParams = trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
                             return (
                               // Armed, the row can be handed to Langy; its own click (open the
@@ -877,9 +833,7 @@ function AutomationsPage() {
                                 })}
                               >
                                 <Table.Row {...sharedRowProps(trigger)}>
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
+                                  <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
                                   <Table.Cell maxWidth="360px">
                                     <VStack gap={2} align="stretch">
                                       {applyChecks(
@@ -902,10 +856,7 @@ function AutomationsPage() {
                                       ) : trigger.filters &&
                                         typeof trigger.filters === "string" &&
                                         trigger.filters !== "{}" ? (
-                                        <FilterDisplay
-                                          filters={trigger.filters}
-                                          hasBorder={true}
-                                        />
+                                        <FilterDisplay filters={trigger.filters} hasBorder={true} />
                                       ) : null}
                                     </VStack>
                                   </Table.Cell>
@@ -920,7 +871,11 @@ function AutomationsPage() {
                                     </VStack>
                                   </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
-                                    <LastFiredCell trigger={trigger} stats={stats} />
+                                    <LastFiredCell
+                                      trigger={trigger}
+                                      stats={stats}
+                                      formatTimeAgo={formatTimeAgo}
+                                    />
                                   </Table.Cell>
                                   <Table.Cell>
                                     <Text as="span" color="fg.muted">

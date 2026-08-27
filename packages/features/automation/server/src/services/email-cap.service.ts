@@ -7,8 +7,6 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 const HOURLY_TTL_SECONDS = 7_200;
 const DAILY_TTL_SECONDS = 90_000;
-const MEMORY_GC_THRESHOLD = 1_000;
-
 const EXPIRE_IF_UNSET_SCRIPT = `
 if redis.call('TTL', KEYS[1]) < 0 then
   redis.call('EXPIRE', KEYS[1], ARGV[1])
@@ -20,11 +18,6 @@ type CapDecision = {
   count: number;
 };
 
-type MemoryEntry = {
-  count: number;
-  expiresAt: number;
-};
-
 type ConsumeInput = {
   counterKey: string;
   claimKey: string;
@@ -34,6 +27,63 @@ type ConsumeInput = {
   ttlSeconds: number;
   degradation: "hourly" | "daily";
 };
+
+type MemoryEntry = {
+  count: number;
+  expiresAt: number;
+};
+
+/** Per-process fallback kept private to the process-owned cap service. */
+class EmailCapMemoryStore {
+  private readonly entries = new Map<string, MemoryEntry>();
+
+  consume(input: ConsumeInput): CapDecision {
+    const now = input.now.getTime();
+    this.sweepExpired(now);
+
+    const claim = this.entries.get(`claim:${input.claimKey}`);
+    const alreadyClaimed = claim !== void 0 && claim.expiresAt > now;
+    const counterKey = `counter:${input.counterKey}`;
+    const existing = this.entries.get(counterKey);
+
+    if (alreadyClaimed) {
+      const count = existing && existing.expiresAt > now ? existing.count : 0;
+
+      return { allowed: count <= input.cap, count };
+    }
+
+    this.entries.set(`claim:${input.claimKey}`, {
+      count: 0,
+      expiresAt: now + input.ttlSeconds * 1_000,
+    });
+
+    if (!existing || existing.expiresAt <= now) {
+      this.entries.set(counterKey, {
+        count: input.increment,
+        expiresAt: now + input.ttlSeconds * 1_000,
+      });
+
+      return {
+        allowed: input.increment <= input.cap,
+        count: input.increment,
+      };
+    }
+
+    existing.count += input.increment;
+
+    return { allowed: existing.count <= input.cap, count: existing.count };
+  }
+
+  private sweepExpired(now: number): void {
+    if (this.entries.size >= 1_000) {
+      for (const [key, entry] of this.entries) {
+        if (entry.expiresAt <= now) {
+          this.entries.delete(key);
+        }
+      }
+    }
+  }
+}
 
 export type ConsumeHourlyEmailCapInput = {
   projectId: string;
@@ -57,14 +107,11 @@ export type ConsumeDailyEmailCapInput = {
  * a boundary-straddling retry still sees its original claim.
  */
 export class AutomationEmailCapService {
-  private readonly counters = new Map<string, MemoryEntry>();
-  private readonly claims = new Map<string, number>();
+  private readonly memory = new EmailCapMemoryStore();
 
   private constructor(private readonly store: AutomationEmailCapStorePort | null) {}
 
-  static create(input: {
-    store: AutomationEmailCapStorePort | null;
-  }): AutomationEmailCapService {
+  static create(input: { store: AutomationEmailCapStorePort | null }): AutomationEmailCapService {
     return new AutomationEmailCapService(input.store);
   }
 
@@ -102,7 +149,7 @@ export class AutomationEmailCapService {
       return distributed;
     }
 
-    return this.consumeInMemory(input);
+    return this.memory.consume(input);
   }
 
   private async tryConsumeDistributed(input: ConsumeInput): Promise<CapDecision | null> {
@@ -111,13 +158,7 @@ export class AutomationEmailCapService {
     }
 
     try {
-      const claimed = await this.store.trySet(
-        input.claimKey,
-        "1",
-        "EX",
-        input.ttlSeconds,
-        "NX",
-      );
+      const claimed = await this.store.trySet(input.claimKey, "1", "EX", input.ttlSeconds, "NX");
 
       if (!claimed) {
         const rawCount = await this.store.tryGet(input.counterKey);
@@ -131,66 +172,13 @@ export class AutomationEmailCapService {
           ? await this.store.incr(input.counterKey)
           : await this.store.incrby(input.counterKey, input.increment);
 
-      await this.store.eval(
-        EXPIRE_IF_UNSET_SCRIPT,
-        1,
-        input.counterKey,
-        String(input.ttlSeconds),
-      );
+      await this.store.eval(EXPIRE_IF_UNSET_SCRIPT, 1, input.counterKey, String(input.ttlSeconds));
 
       return { allowed: count <= input.cap, count };
     } catch (error) {
       this.logDegradation(input, error);
+
       return null;
-    }
-  }
-
-  private consumeInMemory(input: ConsumeInput): CapDecision {
-    const now = input.now.getTime();
-    this.sweepExpired(now);
-
-    const claimExpiry = this.claims.get(input.claimKey);
-    const alreadyClaimed = claimExpiry !== void 0 && claimExpiry > now;
-    const existing = this.counters.get(input.counterKey);
-
-    if (alreadyClaimed) {
-      const count = existing && existing.expiresAt > now ? existing.count : 0;
-      return { allowed: count <= input.cap, count };
-    }
-
-    this.claims.set(input.claimKey, now + input.ttlSeconds * 1_000);
-
-    if (!existing || existing.expiresAt <= now) {
-      this.counters.set(input.counterKey, {
-        count: input.increment,
-        expiresAt: now + input.ttlSeconds * 1_000,
-      });
-
-      return {
-        allowed: input.increment <= input.cap,
-        count: input.increment,
-      };
-    }
-
-    existing.count += input.increment;
-    return { allowed: existing.count <= input.cap, count: existing.count };
-  }
-
-  private sweepExpired(now: number): void {
-    if (this.counters.size >= MEMORY_GC_THRESHOLD) {
-      for (const [key, entry] of this.counters) {
-        if (entry.expiresAt <= now) {
-          this.counters.delete(key);
-        }
-      }
-    }
-
-    if (this.claims.size >= MEMORY_GC_THRESHOLD) {
-      for (const [key, expiresAt] of this.claims) {
-        if (expiresAt <= now) {
-          this.claims.delete(key);
-        }
-      }
     }
   }
 
@@ -206,6 +194,7 @@ export class AutomationEmailCapService {
           "in-memory counters until Redis recovers; cross-worker rate may " +
           "exceed the configured cap",
       );
+
       return;
     }
 

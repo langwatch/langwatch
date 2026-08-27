@@ -9,7 +9,7 @@ vi.mock("~/server/mailer/emailSender", () => ({
   sendEmail,
 }));
 
-vi.mock("~/server/app-layer/automations/delivery/slackWebApi", () => ({
+vi.mock("~/runtime/app/features/automation-adapters/delivery/slackWebApi", () => ({
   postSlackChatMessage: vi.fn(),
 }));
 
@@ -35,9 +35,7 @@ describe("AppAutomationTestFireAdapter", () => {
     });
 
     expect(sendEmail).toHaveBeenCalledWith({
-      to: expect.stringMatching(
-        /^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/,
-      ),
+      to: expect.stringMatching(/^LangWatch Triggers <no-reply\+[a-f0-9]{12}@langwatch\.ai>$/),
       bcc: ["author@acme.test"],
       subject: "test fire",
       html: "<p>test</p>",

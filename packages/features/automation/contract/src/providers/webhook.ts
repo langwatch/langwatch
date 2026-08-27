@@ -21,9 +21,7 @@ export function isReservedWebhookHeader(name: string): boolean {
   return RESERVED_HEADER_NAMES.has(lower) || lower.startsWith(RESERVED_HEADER_PREFIX);
 }
 
-export function sanitizeWebhookHeaders(
-  headers: Record<string, string>,
-): Record<string, string> {
+export function sanitizeWebhookHeaders(headers: Record<string, string>): Record<string, string> {
   const output: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
     const key = name.trim();
@@ -36,12 +34,7 @@ export function sanitizeWebhookHeaders(
   return output;
 }
 
-export type WebhookUrlProblemCode =
-  | "invalid_url"
-  | "scheme"
-  | "host"
-  | "port"
-  | "credentials";
+export type WebhookUrlProblemCode = "invalid_url" | "scheme" | "host" | "port" | "credentials";
 export interface WebhookUrlProblem {
   code: WebhookUrlProblemCode;
   message: string;

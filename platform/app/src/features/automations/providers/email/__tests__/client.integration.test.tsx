@@ -24,9 +24,8 @@ vi.mock("@monaco-editor/react", () => ({ default: () => null }));
  *  one export as a textarea carrying its `value`, so a test can read back the
  *  template the editor was seeded with — the template an author's first
  *  keystroke would persist. Everything else in the module stays real. */
-vi.mock("~/features/automations/editors/templateAuthoring", async (original) => {
-  const actual =
-    await original<typeof import("~/features/automations/editors/templateAuthoring")>();
+vi.mock("../../../editors/templateAuthoring", async (original) => {
+  const actual = await original<typeof import("../../../editors/templateAuthoring")>();
   return {
     ...actual,
     LiquidEditor: ({ value }: { value: string }) => <textarea readOnly value={value} />,
@@ -103,9 +102,7 @@ describe("EmailConfigForm authoring tiers", () => {
       it("offers a customize wording expander", () => {
         renderForm();
 
-        expect(
-          screen.getByRole("button", { name: /customize wording/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /customize wording/i })).toBeInTheDocument();
       });
     });
   });

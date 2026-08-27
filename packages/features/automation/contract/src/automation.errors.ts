@@ -39,14 +39,10 @@ export class TemplateValidationError extends HandledError {
     public readonly field: string,
     public readonly syntaxError: string,
   ) {
-    super(
-      "template_validation_error",
-      `Template "${field}" failed validation: ${syntaxError}`,
-      {
-        meta: { field, syntaxError },
-        httpStatus: 422,
-      },
-    );
+    super("template_validation_error", `Template "${field}" failed validation: ${syntaxError}`, {
+      meta: { field, syntaxError },
+      httpStatus: 422,
+    });
     this.name = "TemplateValidationError";
   }
 }
@@ -82,11 +78,10 @@ export class MissingSlackBotTokenError extends HandledError {
   declare readonly code: "missing_slack_bot_token";
 
   constructor() {
-    super(
-      "missing_slack_bot_token",
-      "A Slack bot token is required for a bot connection.",
-      { meta: { field: "slackBotToken" }, httpStatus: 422 },
-    );
+    super("missing_slack_bot_token", "A Slack bot token is required for a bot connection.", {
+      meta: { field: "slackBotToken" },
+      httpStatus: 422,
+    });
     this.name = "MissingSlackBotTokenError";
   }
 }
@@ -110,11 +105,10 @@ export class MissingSlackWebhookError extends HandledError {
   declare readonly code: "missing_slack_webhook";
 
   constructor() {
-    super(
-      "missing_slack_webhook",
-      "A Slack webhook URL is required for Slack automations.",
-      { meta: { field: "slackWebhook" }, httpStatus: 422 },
-    );
+    super("missing_slack_webhook", "A Slack webhook URL is required for Slack automations.", {
+      meta: { field: "slackWebhook" },
+      httpStatus: 422,
+    });
     this.name = "MissingSlackWebhookError";
   }
 }
@@ -123,9 +117,7 @@ export class NotificationDeliveryError extends HandledError {
   declare readonly code: "notification_delivery_error";
 
   constructor(message: string, options: { customerMessage?: string } = {}) {
-    const customerMeta = options.customerMessage
-      ? { message: options.customerMessage }
-      : {};
+    const customerMeta = options.customerMessage ? { message: options.customerMessage } : {};
 
     super("notification_delivery_error", message, {
       meta: { field: "slackChannelId", ...customerMeta },

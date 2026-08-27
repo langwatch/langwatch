@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { Graph } from "@langwatch/dashboard-contract";
-import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
+import { redactActionParamsFor } from "~/runtime/app/features/automation-adapters/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -92,9 +92,7 @@ export const graphsRouter = createTRPCRouter({
       });
       const triggerByGraphId = new Map(
         triggers.flatMap((trigger) =>
-          trigger.customGraphId === null
-            ? []
-            : [[trigger.customGraphId, trigger] as const],
+          trigger.customGraphId === null ? [] : [[trigger.customGraphId, trigger] as const],
         ),
       );
 
@@ -110,10 +108,7 @@ export const graphsRouter = createTRPCRouter({
           trigger: trigger
             ? {
                 ...trigger,
-                actionParams: redactActionParamsFor(
-                  trigger.action,
-                  trigger.actionParams ?? {},
-                ),
+                actionParams: redactActionParamsFor(trigger.action, trigger.actionParams ?? {}),
               }
             : null,
         };
@@ -157,9 +152,7 @@ export const graphsRouter = createTRPCRouter({
       }
 
       // Basic validation to ensure filters have the expected structure
-      let validatedFilters:
-        | Record<FilterField, string[] | Record<string, string[]>>
-        | undefined;
+      let validatedFilters: Record<FilterField, string[] | Record<string, string[]>> | undefined;
 
       if (graph.filters && typeof graph.filters === "object") {
         const validFilters: Record<string, unknown> = {};

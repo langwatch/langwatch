@@ -161,9 +161,9 @@ describe("evaluateCustomGraphThreshold", () => {
           operator: "neq",
         }),
       ).toEqual({ breached: false });
-      expect(
-        evaluateCustomGraphThreshold({ value: 5, threshold: 0, operator: "" }),
-      ).toEqual({ breached: false });
+      expect(evaluateCustomGraphThreshold({ value: 5, threshold: 0, operator: "" })).toEqual({
+        breached: false,
+      });
     });
   });
 });

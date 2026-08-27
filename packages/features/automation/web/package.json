@@ -21,13 +21,20 @@
   "dependencies": {
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "lucide-react": "^1.22.0"
+    "@langwatch/trace-contract": "workspace:*",
+    "@monaco-editor/react": "^4.7.0",
+    "liqe": "^3.8.7",
+    "lucide-react": "^1.22.0",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "14.6.1",
     "@types/react": "^19.2.14",
     "jsdom": "^30.0.1",
+    "monaco-editor": "^0.55.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^7.0.2",

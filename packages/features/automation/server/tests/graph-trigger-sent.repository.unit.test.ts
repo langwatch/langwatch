@@ -16,9 +16,7 @@ describe("PrismaGraphTriggerSentRepository candidate discovery", () => {
     } as never);
 
     expect(await repository.findProjectsWithGraphTriggers()).toEqual(["project-a"]);
-    expect(await repository.findProjectsWithOpenGraphTriggerSent()).toEqual(
-      new Set(["project-b"]),
-    );
+    expect(await repository.findProjectsWithOpenGraphTriggerSent()).toEqual(new Set(["project-b"]));
     expect(triggerFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {

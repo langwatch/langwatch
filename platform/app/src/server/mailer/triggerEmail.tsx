@@ -14,8 +14,8 @@ import {
 import { render } from "@react-email/render";
 import { createHash } from "crypto";
 import type { AlertType } from "~/generated/prisma/client";
-import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
-import { env } from "../../env.mjs";
+import type { TriggerData } from "~/runtime/app/features/automation-adapters/trigger.types";
+import { env } from "~/env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {
   buildTriggerNoReplyAddress,

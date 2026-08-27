@@ -25,9 +25,16 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "croner": "^10.0.1"
+    "@langwatch/trace-contract": "workspace:*",
+    "croner": "^10.0.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

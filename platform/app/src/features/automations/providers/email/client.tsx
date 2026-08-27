@@ -15,14 +15,10 @@ import {
   FieldHeader,
   LiquidEditor,
   TemplateDisclosure,
-} from "~/features/automations/editors/templateAuthoring";
+} from "../../editors/templateAuthoring";
 import { api } from "~/utils/api";
-import { TestFireButton } from "../TestFireButton";
-import type {
-  ConfigFormProps,
-  NotifyClientDef,
-  SummaryIdentity,
-} from "@langwatch/automation-web";
+import { AutomationTestFireButton } from "@langwatch/automation-web";
+import type { ConfigFormProps, NotifyClientDef, SummaryIdentity } from "@langwatch/automation-web";
 
 /** A "field that defaults to the framework template until the user
  *  edits it" — `usingDefault=true` means the editor renders the default
@@ -94,11 +90,7 @@ function templatesFromSlice(slice: EmailSlice) {
  * "External" warning badge. A "+ Add email" input accepts arbitrary
  * addresses validated against `EMAIL_RX`.
  */
-function EmailConfigForm({
-  slice,
-  onChange,
-  ctx,
-}: ConfigFormProps<EmailSlice, EmailPreview>) {
+function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, EmailPreview>) {
   const teamWithMembers = api.team.getTeamWithMembers.useQuery(
     { slug: ctx.teamSlug ?? "", organizationId: ctx.organizationId ?? "" },
     { enabled: !!ctx.teamSlug && !!ctx.organizationId },
@@ -120,9 +112,7 @@ function EmailConfigForm({
   const [addError, setAddError] = useState<string | null>(null);
 
   const toggleMember = (email: string, checked: boolean) => {
-    const next = checked
-      ? [...slice.members, email]
-      : slice.members.filter((m) => m !== email);
+    const next = checked ? [...slice.members, email] : slice.members.filter((m) => m !== email);
     onChange({ ...slice, members: next });
   };
 
@@ -152,9 +142,7 @@ function EmailConfigForm({
   // persists whatever it was showing, so seeding the wrong kind's template
   // freezes copy that renders empty against the context it will be sent with.
   const defaults = defaultsForSourceKind(ctx.sourceKind);
-  const subjectValue = slice.subject.usingDefault
-    ? defaults.emailSubject
-    : slice.subject.value;
+  const subjectValue = slice.subject.usingDefault ? defaults.emailSubject : slice.subject.value;
   const bodyValue = slice.body.usingDefault ? defaults.emailBody : slice.body.value;
 
   const emailPreview = ctx.preview;
@@ -261,7 +249,7 @@ function EmailConfigForm({
       </Box>
 
       {/* Try the real message straight from the recipients section. */}
-      <TestFireButton
+      <AutomationTestFireButton
         onTestFire={ctx.onTestFire}
         loading={ctx.testFireLoading}
         disabled={!isComplete(slice)}
@@ -273,8 +261,7 @@ function EmailConfigForm({
           Message
         </Text>
         <Text textStyle="xs" color="fg.muted">
-          We send a ready-made summary email. Customize the wording to change the subject
-          or body.
+          We send a ready-made summary email. Customize the wording to change the subject or body.
         </Text>
         {/* "Edit text" tier: the subject and body editors sit behind an
             opt-in so the default surface stays a preview only. */}
@@ -294,9 +281,7 @@ function EmailConfigForm({
               variables={variables}
               height="56px"
               value={subjectValue}
-              onChange={(value) =>
-                onChange({ ...slice, subject: { value, usingDefault: false } })
-              }
+              onChange={(value) => onChange({ ...slice, subject: { value, usingDefault: false } })}
             />
           </Box>
           <FieldHeader
@@ -310,9 +295,7 @@ function EmailConfigForm({
               variables={variables}
               height="520px"
               value={bodyValue}
-              onChange={(value) =>
-                onChange({ ...slice, body: { value, usingDefault: false } })
-              }
+              onChange={(value) => onChange({ ...slice, body: { value, usingDefault: false } })}
             />
           </Box>
         </TemplateDisclosure>

@@ -18,13 +18,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function Harness({
-  initial,
-  onChangeSpy,
-}: {
-  initial: string;
-  onChangeSpy?: (q: string) => void;
-}) {
+function Harness({ initial, onChangeSpy }: { initial: string; onChangeSpy?: (q: string) => void }) {
   const [query, setQuery] = useState(initial);
   return (
     <ConditionBuilder

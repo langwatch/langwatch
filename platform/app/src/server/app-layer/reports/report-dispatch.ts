@@ -1,13 +1,7 @@
-import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
-} from "@langwatch/automation-contract";
+import { type SlackActionParams, slackDeliveryMethodOf } from "@langwatch/automation-contract";
 import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automation-contract";
 import { renderTriggerEmail } from "@langwatch/automation-contract";
-import {
-  renderTriggerSlack,
-  type SlackTemplateType,
-} from "@langwatch/automation-contract";
+import { renderTriggerSlack, type SlackTemplateType } from "@langwatch/automation-contract";
 import {
   buildReportTemplateContext,
   type ReportChart,
@@ -18,9 +12,9 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Cron } from "croner";
 import type { Project, Trigger } from "~/generated/prisma/client";
-import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import type { sendRenderedSlackMessage } from "~/runtime/app/features/automation-adapters/delivery/sendSlackWebhook";
+import type { postSlackChatMessage } from "~/runtime/app/features/automation-adapters/delivery/slackWebApi";
+import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
@@ -68,11 +62,7 @@ export interface ReportDispatchDeps {
    * history and last-sent alongside everything else. Without this a report can
    * run for a month and leave no trace that it ever did.
    */
-  recordFire(params: {
-    projectId: string;
-    triggerId: string;
-    firedAt: Date;
-  }): Promise<void>;
+  recordFire(params: { projectId: string; triggerId: string; firedAt: Date }): Promise<void>;
   baseHost: string;
 }
 

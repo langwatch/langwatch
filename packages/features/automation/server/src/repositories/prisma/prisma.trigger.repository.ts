@@ -5,22 +5,44 @@ import {
   type TriggerSummary,
   type UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
-import type { AutomationDatabase } from "../../ports/automation-database.port";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository";
 import { mapTriggerRow } from "./prisma.trigger.mapper";
 import type { AutomationClock } from "../../ports/automation-clock.port";
+
+function toPrismaJsonValue(value: unknown): Prisma.InputJsonValue | null {
+  if (value === null) return null;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) return value.map((entry) => toPrismaJsonValue(entry));
+  if (typeof value === "object") {
+    const result: Record<string, Prisma.InputJsonValue | null> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry !== undefined) result[key] = toPrismaJsonValue(entry);
+    }
+    return result;
+  }
+  throw new Error("Automation action parameters must contain JSON values");
+}
+
+function toPrismaJsonObject(value: Record<string, unknown>): Prisma.InputJsonObject {
+  const result: Record<string, Prisma.InputJsonValue | null> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry !== undefined) result[key] = toPrismaJsonValue(entry);
+  }
+  return result;
+}
+
 export class PrismaTriggerRepository extends TriggerRepository {
   private constructor(
-    private readonly database: AutomationDatabase,
+    private readonly database: PrismaClient,
     private readonly clock: AutomationClock,
   ) {
     super();
   }
-  static create(
-    database: AutomationDatabase,
-    clock: AutomationClock,
-  ): PrismaTriggerRepository {
-    return new PrismaTriggerRepository(database, clock);
+  static create(database: object, clock: AutomationClock): PrismaTriggerRepository {
+    return new PrismaTriggerRepository(database as PrismaClient, clock);
   }
   async findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
     const rows = await this.database.trigger.findMany({
@@ -88,20 +110,14 @@ export class PrismaTriggerRepository extends TriggerRepository {
       data: { lastRunAt: this.clock.now().getTime() },
     });
   }
-  async findByIdOrThrow(input: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<Trigger> {
+  async findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
     const row = await this.database.trigger.findFirst({
       where: { id: input.triggerId, projectId: input.projectId },
     });
     if (row === null) throw new TriggerNotFoundError();
     return mapTriggerRow(row);
   }
-  async tryFindById(input: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<Trigger | null> {
+  async tryFindById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     const row = await this.database.trigger.findFirst({
       where: { id: input.triggerId, projectId: input.projectId },
     });
@@ -137,13 +153,15 @@ export class PrismaTriggerRepository extends TriggerRepository {
     return rows.map((row: unknown) => mapTriggerRow(row));
   }
   async create(input: CreateTriggerCommand): Promise<Trigger> {
+    const { actionParams, filters, ...rest } = input;
     const row = await this.database.trigger.create({
       data: {
-        ...(input.id ? { id: input.id } : {}),
-        ...input,
+        ...(rest.id ? { id: rest.id } : {}),
+        ...rest,
+        actionParams: toPrismaJsonObject(actionParams),
         lastRunAt: input.lastRunAt?.getTime() ?? this.clock.now().getTime(),
         triggerKind: input.triggerKind ?? "AUTOMATION",
-        filters: input.filters ?? {},
+        filters: toPrismaJsonObject(filters ?? {}),
         filterQuery: input.filterQuery ?? null,
         message: input.message ?? null,
         alertType: input.alertType ?? null,
@@ -153,11 +171,13 @@ export class PrismaTriggerRepository extends TriggerRepository {
     return mapTriggerRow(row);
   }
   async update(input: UpdateTriggerCommand): Promise<Trigger> {
-    const { id, projectId, lastRunAt, ...data } = input;
+    const { id, projectId, lastRunAt, actionParams, filters, ...data } = input;
     const row = await this.database.trigger.update({
       where: { id, projectId },
       data: {
         ...data,
+        ...(actionParams !== undefined ? { actionParams: toPrismaJsonObject(actionParams) } : {}),
+        ...(filters !== undefined ? { filters: toPrismaJsonObject(filters) } : {}),
         ...(lastRunAt !== undefined
           ? { lastRunAt: lastRunAt === null ? 0 : lastRunAt.getTime() }
           : {}),

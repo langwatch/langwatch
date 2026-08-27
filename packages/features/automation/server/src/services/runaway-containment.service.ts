@@ -48,10 +48,13 @@ export class RunawayContainmentService {
       ) {
         return;
       }
+
       if (await this.isMisconfigured(input)) {
         await this.pauseAndNotify(input, now, dayBucket);
+
         return;
       }
+
       await this.notifyOncePerDay(
         input,
         "ceiling_reached",
@@ -74,7 +77,9 @@ export class RunawayContainmentService {
     if (isMatchEverythingTrigger(input.trigger)) {
       return true;
     }
+
     const projectTraces = await this.runaway.countProjectTraces24h(input.projectId);
+
     return (
       projectTraces >= RUNAWAY_MIN_PROJECT_TRACES &&
       input.count >= projectTraces * RUNAWAY_TRAFFIC_SHARE
@@ -94,6 +99,7 @@ export class RunawayContainmentService {
     ) {
       return;
     }
+
     await this.triggers.update({
       id: input.trigger.id,
       projectId: input.projectId,
@@ -127,10 +133,12 @@ export class RunawayContainmentService {
     if (!lease) {
       return;
     }
+
     try {
       await this.notify(input, kind);
     } catch (error) {
       await this.runaway.releaseClaim(lease);
+
       throw error;
     }
   }
@@ -148,8 +156,10 @@ export class RunawayContainmentService {
         { projectId: input.projectId, triggerId: input.trigger.id, kind },
         "No recipients to notify about an automation limit",
       );
+
       return;
     }
+
     await this.runaway.sendLimitEmail({
       to,
       kind,

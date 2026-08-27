@@ -8,19 +8,17 @@ import {
   type GraphAlertTemplateContext,
 } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { AlertType, TriggerAction } from "~/generated/prisma/client";
-import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";
+import { AlertType, TriggerAction } from "@langwatch/automation-contract";
 import { ACTION_PROVIDERS, CLIENT_PROVIDERS, NOTIFY_PROVIDERS } from "../registry";
 import {
   SLACK_BLOCK_KIT_TEMPLATES,
   type SlackBlockKitTemplateOption,
-} from "../slack/templates/registry";
+} from "@langwatch/automation-web";
 
 /**
- * The provider system enforces two invariants here. Failures mean the
- * registries have drifted from the `TriggerAction` enum or each other —
- * which would silently break the drawer or the server dispatcher when a
- * new action type lands. Keep this test passing.
+ * The browser provider registry enforces its client-facing invariants here.
+ * Failures mean it has drifted from the `TriggerAction` enum or its category
+ * partitions, which would silently break the drawer when a new action lands.
  */
 describe("provider registry parity", () => {
   describe("given the TriggerAction enum", () => {
@@ -29,19 +27,6 @@ describe("provider registry parity", () => {
         for (const action of Object.values(TriggerAction)) {
           expect(CLIENT_PROVIDERS[action]).toBeDefined();
           expect(CLIENT_PROVIDERS[action].shared.action).toBe(action);
-        }
-      });
-
-      it("registers every TriggerAction on the server", () => {
-        for (const action of Object.values(TriggerAction)) {
-          expect(SERVER_PROVIDERS[action]).toBeDefined();
-          expect(SERVER_PROVIDERS[action].shared.action).toBe(action);
-        }
-      });
-
-      it("shares the same shared definition between client and server per action", () => {
-        for (const action of Object.values(TriggerAction)) {
-          expect(CLIENT_PROVIDERS[action].shared).toBe(SERVER_PROVIDERS[action].shared);
         }
       });
 
@@ -56,7 +41,9 @@ describe("provider registry parity", () => {
 
       it("gives notify providers a channel string the preview/testFire endpoints accept", () => {
         for (const p of NOTIFY_PROVIDERS) {
-          expect(["email", "slack", "webhook"]).toContain(p.client.channel);
+          if ("channel" in p.client) {
+            expect(["email", "slack", "webhook"]).toContain(p.client.channel);
+          }
         }
       });
 
@@ -201,9 +188,7 @@ describe("provider registry parity", () => {
         project: { id: "p1", name: "Acme", slug: "acme" },
         baseHost: "https://app.langwatch.ai",
       });
-    const contextForReport = (
-      template: SlackBlockKitTemplateOption,
-    ): Record<string, unknown> => {
+    const contextForReport = (template: SlackBlockKitTemplateOption): Record<string, unknown> => {
       const sources = template.reportSources ?? [];
       if (sources.includes("dashboard")) {
         return reportChartContext("dashboard") as unknown as Record<string, unknown>;
@@ -292,36 +277,24 @@ describe("provider registry parity", () => {
     });
     const modernExamples: Record<string, () => Record<string, unknown>> = {
       graph_alert_detailed: () =>
-        graphAlertContextFor("graph_alert_detailed") as unknown as Record<
-          string,
-          unknown
-        >,
+        graphAlertContextFor("graph_alert_detailed") as unknown as Record<string, unknown>,
       graph_alert_resolved: () =>
-        graphAlertContextFor("graph_alert_resolved") as unknown as Record<
-          string,
-          unknown
-        >,
+        graphAlertContextFor("graph_alert_resolved") as unknown as Record<string, unknown>,
       graph_alert_no_data: () =>
         graphAlertContextFor("graph_alert_no_data") as unknown as Record<string, unknown>,
       graph_alert_history_table: () =>
-        graphAlertContextFor("graph_alert_history_table") as unknown as Record<
-          string,
-          unknown
-        >,
+        graphAlertContextFor("graph_alert_history_table") as unknown as Record<string, unknown>,
       trace_card_rich: () => richTraceContext as unknown as Record<string, unknown>,
       eval_failure_rich: () => richTraceContext as unknown as Record<string, unknown>,
-      digest_evaluator_rollup: () =>
-        digestTraceContext as unknown as Record<string, unknown>,
+      digest_evaluator_rollup: () => digestTraceContext as unknown as Record<string, unknown>,
       digest_table: () => digestTraceContext as unknown as Record<string, unknown>,
       report_summary_card: () => reportTraceContext as unknown as Record<string, unknown>,
       report_table: () => reportTraceContext as unknown as Record<string, unknown>,
       report_digest: () => reportTraceContext as unknown as Record<string, unknown>,
-      report_chart: () =>
-        reportChartContext("customGraph") as unknown as Record<string, unknown>,
+      report_chart: () => reportChartContext("customGraph") as unknown as Record<string, unknown>,
       report_chart_card: () =>
         reportChartContext("customGraph") as unknown as Record<string, unknown>,
-      report_dashboard: () =>
-        reportChartContext("dashboard") as unknown as Record<string, unknown>,
+      report_dashboard: () => reportChartContext("dashboard") as unknown as Record<string, unknown>,
     };
 
     describe("when a modern-suite template (ADR-041) renders against a complete example", () => {

@@ -4,18 +4,11 @@
  * Router-level tests for automation filter validation and update sanitization.
  */
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
+import { MemoryFeatureFlagService } from "@langwatch/feature-flag-server/testing";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
+import { env } from "~/env.mjs";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
@@ -50,7 +43,6 @@ const {
   mockRemoveReportSchedule,
   mockTriggerSentGroupBy,
   mockTriggerSentFindMany,
-  mockFeatureFlagIsEnabled,
   mockRateLimit,
 } = vi.hoisted(() => ({
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
@@ -67,16 +59,11 @@ const {
   mockRemoveReportSchedule: vi.fn().mockResolvedValue(undefined),
   mockTriggerSentGroupBy: vi.fn(),
   mockTriggerSentFindMany: vi.fn(),
-  mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
   mockRateLimit: vi.fn().mockResolvedValue({
     allowed: true,
     remaining: 9,
     resetAt: Date.now() + 60_000,
   }),
-}));
-
-vi.mock("~/server/featureFlag", () => ({
-  featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
 }));
 
 vi.mock("../../../rateLimit", () => ({
@@ -106,13 +93,7 @@ vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-import {
-  _resetMemoryPersistCapStore,
-  consumePersistCapSlot,
-  persistCapClaimKey,
-  persistCapKey,
-  resolvePersistDailyCap,
-} from "../../../app-layer/automations/dispatch/persistCap";
+import { AutomationPersistCapService } from "@langwatch/automation-server/testing";
 import {
   AppAutomationRuntime,
   createAppAutomationTestFirePort,
@@ -163,6 +144,20 @@ function createTestCaller() {
   return automationRouter.createCaller(ctx);
 }
 
+function persistCapDependencies() {
+  const app = globalForApp.__langwatch_app;
+  if (!app) throw new Error("test app has not been composed");
+  return {
+    projects: app.projects,
+    planProvider: app.planProvider,
+    config: {
+      free: env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      paid: env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      enterprise: env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
+    },
+  };
+}
+
 describe("automationRouter", () => {
   let caller: ReturnType<typeof createTestCaller>;
   let previousApp: typeof globalForApp.__langwatch_app;
@@ -185,14 +180,27 @@ describe("automationRouter", () => {
       redis: connection,
       graph: createAppAutomationTestGraphPorts(),
       testFire: createAppAutomationTestFirePort(),
+      persistCaps: AutomationPersistCapService.create({
+        projects: { getOrganizationId: async () => "org_test" } as never,
+        planProvider: { getActivePlan: async () => ({ type: "FREE", free: true }) },
+        config: {
+          free: env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+          paid: env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+          enterprise: env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
+        },
+        redis: connection,
+      }),
     }).build();
     Object.assign(automation, {
       invalidate: mockTriggersInvalidate,
       syncReportSchedule: mockSyncReportSchedule,
       removeReportSchedule: mockRemoveReportSchedule,
     });
+    const featureFlags = MemoryFeatureFlagService.create();
+    featureFlags.setFlag("release_webhook_automations", true);
     globalForApp.__langwatch_app = createTestApp({
       automation,
+      featureFlags,
       // The cap counters this suite asserts on live on the real Redis, and
       // both the router's read and the direct consume calls take it from here.
       redis: connection,
@@ -371,12 +379,8 @@ describe("automationRouter", () => {
 
           const result = await caller.upsert(baseGraphAlertInput as any);
 
-          expect(
-            (result.actionParams as Record<string, unknown>).slackBotToken,
-          ).toBeUndefined();
-          expect((result.actionParams as Record<string, unknown>).slackBotTokenSet).toBe(
-            true,
-          );
+          expect((result.actionParams as Record<string, unknown>).slackBotToken).toBeUndefined();
+          expect((result.actionParams as Record<string, unknown>).slackBotTokenSet).toBe(true);
         });
       });
 
@@ -896,9 +900,7 @@ describe("automationRouter", () => {
           },
         ]);
         mockMonitorFindMany.mockResolvedValueOnce([]);
-        mockCustomGraphFindMany.mockResolvedValueOnce([
-          { id: "graph-1", name: "p95 latency" },
-        ]);
+        mockCustomGraphFindMany.mockResolvedValueOnce([{ id: "graph-1", name: "p95 latency" }]);
 
         const result = await caller.getTriggers({ projectId: "proj_123" });
 
@@ -1136,27 +1138,32 @@ describe("automationRouter", () => {
     describe("when the automations list reads the daily cap status", () => {
       /** @scenario "The automations list shows what was skipped today" */
       it("reports today's skipped count per automation alongside the ceiling", async () => {
-        _resetMemoryPersistCapStore();
+        AutomationPersistCapService.resetMemoryStore();
         const projectId = `proj_${nanoid(8)}`;
         const busyTrigger = `trigger_busy_${nanoid(8)}`;
         const quietTrigger = `trigger_quiet_${nanoid(8)}`;
         const now = new Date();
 
-        const cap = await resolvePersistDailyCap(projectId);
+        const persistCaps = AutomationPersistCapService.create(persistCapDependencies());
+        const cap = await persistCaps.resolvePersistDailyCap(projectId);
         writtenKeys.push(
           `ttlcache:persist-daily-cap:${projectId}`,
-          persistCapKey({ projectId, triggerId: busyTrigger, now }),
+          AutomationPersistCapService.persistCapKey({
+            projectId,
+            triggerId: busyTrigger,
+            now,
+          }),
         );
         for (let index = 0; index <= cap; index++) {
           const dedupKey = `${projectId}/${busyTrigger}:persist:trace-${index}`;
           writtenKeys.push(
-            persistCapClaimKey({
+            AutomationPersistCapService.persistCapClaimKey({
               projectId,
               triggerId: busyTrigger,
               dedupKey,
             }),
           );
-          await consumePersistCapSlot({
+          await persistCaps.consumePersistCapSlot({
             projectId,
             triggerId: busyTrigger,
             now,
@@ -1165,10 +1172,7 @@ describe("automationRouter", () => {
           });
         }
 
-        mockTriggerFindMany.mockResolvedValue([
-          { id: busyTrigger },
-          { id: quietTrigger },
-        ]);
+        mockTriggerFindMany.mockResolvedValue([{ id: busyTrigger }, { id: quietTrigger }]);
 
         const status = await caller.getDailyCapStatus({ projectId });
 
@@ -1182,22 +1186,31 @@ describe("automationRouter", () => {
         // The status used to take the ids from the caller, capped at 500, so
         // the badge silently vanished from every automation after that. The
         // count is read here for whatever the project owns.
-        _resetMemoryPersistCapStore();
+        AutomationPersistCapService.resetMemoryStore();
         const projectId = `proj_${nanoid(8)}`;
         const lateTrigger = `trigger_late_${nanoid(8)}`;
         const now = new Date();
 
-        const cap = await resolvePersistDailyCap(projectId);
+        const persistCaps = AutomationPersistCapService.create(persistCapDependencies());
+        const cap = await persistCaps.resolvePersistDailyCap(projectId);
         writtenKeys.push(
           `ttlcache:persist-daily-cap:${projectId}`,
-          persistCapKey({ projectId, triggerId: lateTrigger, now }),
+          AutomationPersistCapService.persistCapKey({
+            projectId,
+            triggerId: lateTrigger,
+            now,
+          }),
         );
         for (let index = 0; index <= cap; index++) {
           const dedupKey = `${projectId}/${lateTrigger}:persist:trace-${index}`;
           writtenKeys.push(
-            persistCapClaimKey({ projectId, triggerId: lateTrigger, dedupKey }),
+            AutomationPersistCapService.persistCapClaimKey({
+              projectId,
+              triggerId: lateTrigger,
+              dedupKey,
+            }),
           );
-          await consumePersistCapSlot({
+          await persistCaps.consumePersistCapSlot({
             projectId,
             triggerId: lateTrigger,
             now,

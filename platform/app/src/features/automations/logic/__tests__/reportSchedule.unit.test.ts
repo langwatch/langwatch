@@ -57,10 +57,7 @@ describe("reportSchedule", () => {
 
   describe("given partsFromCron", () => {
     const roundTrips: Array<[string, ScheduleParts]> = [
-      [
-        "0 9 * * *",
-        { frequency: "daily", hour: 9, minute: 0, dayOfWeek: 1, dayOfMonth: 1 },
-      ],
+      ["0 9 * * *", { frequency: "daily", hour: 9, minute: 0, dayOfWeek: 1, dayOfMonth: 1 }],
       [
         "30 8 * * 5",
         {
@@ -143,10 +140,7 @@ describe("reportSchedule", () => {
 
     it("describes a daily schedule", () => {
       expect(
-        summarizeSchedule(
-          { ...DEFAULT_PARTS, frequency: "daily", hour: 7, minute: 5 },
-          "UTC",
-        ),
+        summarizeSchedule({ ...DEFAULT_PARTS, frequency: "daily", hour: 7, minute: 5 }, "UTC"),
       ).toBe("Sends every day at 07:05 (UTC)");
     });
 
@@ -199,12 +193,7 @@ describe("reportSchedule", () => {
 
   describe("given groupTimezones", () => {
     it("groups zones by region and pins General to the top", () => {
-      const grouped = groupTimezones([
-        "Europe/Paris",
-        "UTC",
-        "America/New_York",
-        "Europe/Berlin",
-      ]);
+      const grouped = groupTimezones(["Europe/Paris", "UTC", "America/New_York", "Europe/Berlin"]);
 
       expect(grouped[0]).toEqual({ region: "General", zones: ["UTC"] });
       expect(grouped.map((g) => g.region)).toEqual(["General", "America", "Europe"]);

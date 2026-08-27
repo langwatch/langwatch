@@ -5,15 +5,8 @@ import {
   slackDeliveryMethodOf,
 } from "@langwatch/automation-contract";
 import type { GraphAlertDispatchResult } from "../ports/automation-graph.port";
-import {
-  graphAlertFireDigest,
-  noDataDetail,
-  skippedGraphEvaluation,
-} from "./graph-trigger-evaluator.helpers";
-import type {
-  GraphEvaluationPlan,
-  GraphSeriesEvaluation,
-} from "./graph-trigger-evaluator.types";
+import { TriggerEvaluatorService } from "./trigger-evaluator.service";
+import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "./trigger-evaluator.service";
 
 export class GraphTriggerAlertDeliveryService {
   private constructor() {}
@@ -28,8 +21,12 @@ export class GraphTriggerAlertDeliveryService {
   ): Promise<GraphTriggerEvaluationResult> {
     const project = await plan.request.deps.projects.tryGetById(plan.request.projectId);
     if (!project) {
-      return skippedGraphEvaluation({ ...plan.request, detail: "project not found" });
+      return TriggerEvaluatorService.skippedGraphEvaluation({
+        ...plan.request,
+        detail: "project not found",
+      });
     }
+
     const botDestination = this.botDestination(plan);
     const previousFire = await plan.request.deps.triggerSent.tryFindLatestForGraphAlert({
       triggerId: plan.request.triggerId,
@@ -44,26 +41,20 @@ export class GraphTriggerAlertDeliveryService {
     if (!claim) {
       return this.alreadyFiring(plan, values.currentValue);
     }
-    return this.dispatch(
-      plan,
-      values,
-      project,
-      botDestination,
-      previousFire?.id ?? null,
-      claim.id,
-    );
+
+    return this.dispatch(plan, values, project, botDestination, previousFire?.id ?? null, claim.id);
   }
 
-  private botDestination(
-    plan: GraphEvaluationPlan,
-  ): { token: string; channel: string } | null {
+  private botDestination(plan: GraphEvaluationPlan): { token: string; channel: string } | null {
     if (plan.trigger.action !== "SEND_SLACK_MESSAGE") {
       return null;
     }
+
     const params = (plan.trigger.actionParams ?? {}) as SlackActionParams;
     if (slackDeliveryMethodOf(params) !== "bot") {
       return null;
     }
+
     const token = plan.request.deps.slackTokens.tryDecrypt(params);
     const channel = params.slackChannelId?.trim();
     if (!token || !channel) {
@@ -71,6 +62,7 @@ export class GraphTriggerAlertDeliveryService {
         `Slack bot connection for alert "${plan.trigger.name}" is missing its token or channel — the alert cannot be delivered.`,
       );
     }
+
     return { token, channel };
   }
 
@@ -90,15 +82,17 @@ export class GraphTriggerAlertDeliveryService {
         recipients: plan.params.members ?? [],
         slackWebhook: plan.params.slackWebhook ?? null,
         botDestination,
-        fireDigest: graphAlertFireDigest({
+        fireDigest: TriggerEvaluatorService.graphAlertFireDigest({
           triggerId: plan.request.triggerId,
           customGraphId: plan.customGraphId,
           previousFireId,
         }),
       });
+
       return this.finish(plan, values.currentValue, result, claimId);
     } catch (error) {
       await this.rollbackRetryableClaim(plan, claimId, error);
+
       throw error;
     }
   }
@@ -132,21 +126,18 @@ export class GraphTriggerAlertDeliveryService {
     });
   }
 
-  private async rollbackRetryableClaim(
-    plan: GraphEvaluationPlan,
-    claimId: string,
-    error: unknown,
-  ) {
+  private async rollbackRetryableClaim(plan: GraphEvaluationPlan, claimId: string, error: unknown) {
     if (plan.request.deps.dispatchErrors.isTerminal(error)) {
       return;
     }
+
     try {
       await plan.request.deps.triggerSent.deleteOpenClaim({
         id: claimId,
         projectId: plan.request.projectId,
       });
     } catch (cleanupError) {
-      plan.request.deps.telemetry.error(
+      plan.request.deps.logger.error(
         {
           triggerId: plan.request.triggerId,
           projectId: plan.request.projectId,
@@ -173,6 +164,7 @@ export class GraphTriggerAlertDeliveryService {
         triggerId: plan.request.triggerId,
         projectId: plan.request.projectId,
       });
+
       return {
         ...plan.request,
         status: "not_delivered",
@@ -183,15 +175,17 @@ export class GraphTriggerAlertDeliveryService {
         missingVariables: result.missingVariables,
       };
     }
+
     await plan.request.deps.triggers.updateLastRunAt({
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
     });
+
     return {
       ...plan.request,
       status: "fired",
       value,
-      detail: noDataDetail(plan.operator, plan.threshold),
+      detail: TriggerEvaluatorService.tryNoDataDetail(plan.operator, plan.threshold),
       didSend: true,
       renderErrors: result.renderErrors,
       missingVariables: result.missingVariables,
@@ -202,7 +196,7 @@ export class GraphTriggerAlertDeliveryService {
     plan: GraphEvaluationPlan,
     value: number,
   ): Promise<GraphTriggerEvaluationResult> {
-    plan.request.deps.telemetry.debug(
+    plan.request.deps.logger.debug(
       {
         triggerId: plan.request.triggerId,
         projectId: plan.request.projectId,
@@ -214,6 +208,7 @@ export class GraphTriggerAlertDeliveryService {
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
     });
+
     return { ...plan.request, status: "already_firing", value };
   }
 }

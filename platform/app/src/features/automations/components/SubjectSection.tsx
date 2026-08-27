@@ -13,22 +13,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { NotificationCadence } from "@langwatch/automation-contract";
+import {
+  type NotificationCadence,
+  sanitizeAutomationFilters,
+} from "@langwatch/automation-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { describeError } from "~/features/errors";
-import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  type FilterField,
-  sanitizeTriggerFilters,
-  type TriggerFilterValue,
-} from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { queryIsStructurable } from "../logic/conditionQuery";
+import { queryIsStructurable } from "@langwatch/automation-web";
 import {
   type DailyCapAdvice,
   dailyCapAdvice,
@@ -36,6 +33,7 @@ import {
   estimateRatePerDay,
   deriveSeriesOptionsFromGraph,
 } from "@langwatch/automation-web";
+import { FacetSection, type FacetAccordionProps } from "@langwatch/automation-web";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -47,7 +45,6 @@ import {
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { ConditionBuilder } from "./ConditionBuilder";
-import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 import { QueryFilterInput } from "./QueryFilterInput";
 
 /** One-line preview shown when the Subject facet is collapsed. */
@@ -70,8 +67,7 @@ function subjectSummary(draft: AutomationDraft): string {
 const SUBJECT_HELP = {
   trace:
     "Which incoming traces this automation acts on. It fires when a trace matches every condition you set.",
-  customGraph:
-    "The metric this alert watches — one series on one of your analytics graphs.",
+  customGraph: "The metric this alert watches — one series on one of your analytics graphs.",
   report:
     "What this schedule sends: a table of matching traces, a single graph, or a whole dashboard.",
 } as const;
@@ -165,9 +161,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
         </NativeSelect.Root>
         <Field.ErrorText>Pick a custom graph to continue.</Field.ErrorText>
         {isPrefilled ? (
-          <Field.HelperText>
-            Set from the dashboard graph that opened this drawer.
-          </Field.HelperText>
+          <Field.HelperText>Set from the dashboard graph that opened this drawer.</Field.HelperText>
         ) : null}
       </Field.Root>
 
@@ -339,16 +333,15 @@ function TraceSubject() {
     return (
       <VStack align="stretch" gap={2}>
         <Text textStyle="xs" color="fg.muted">
-          This automation uses the older structured filters. It keeps working as is —
-          clear these conditions to switch it to a search query.
+          This automation uses the older structured filters. It keeps working as is — clear these
+          conditions to switch it to a search query.
         </Text>
         <FieldsFilters
-          filters={draft.filters as Record<FilterField, FilterParam>}
+          filters={draft.filters}
           setFilters={(next) =>
             dispatch({
               type: "SET_FILTERS",
-              value: sanitizeTriggerFilters(next as Record<string, TriggerFilterValue>)
-                .sanitized as Partial<Record<FilterField, FilterParam>>,
+              value: sanitizeAutomationFilters(next),
             })
           }
         />
@@ -568,13 +561,7 @@ function SubjectModeToggle({
 
   return (
     <HStack gap={2} align="center" flexShrink={0}>
-      <HStack
-        gap={0}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        overflow="hidden"
-      >
+      <HStack gap={0} borderWidth="1px" borderColor="border" borderRadius="md" overflow="hidden">
         {builderEnabled ? (
           builderButton
         ) : (
@@ -675,13 +662,7 @@ function TracePreview({
       ? estimateFiringRate({ matchesLast7Days: totalHits, cadence, canBatch })
       : "in the last 7 days";
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
-      bg="bg.subtle"
-    >
+    <Box borderWidth="1px" borderColor="border" borderRadius="md" overflow="hidden" bg="bg.subtle">
       <HStack
         gap={2}
         align="baseline"
@@ -752,10 +733,9 @@ function DailyCapAdviceAlert({
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Description textStyle="xs">
-            About {advice.perDay.toLocaleString()} matches a day is over your plan&apos;s
-            daily automation limit of {advice.cap.toLocaleString()}. Matches past the
-            limit are skipped for the rest of the day. Narrow the condition so it selects
-            fewer traces.
+            About {advice.perDay.toLocaleString()} matches a day is over your plan&apos;s daily
+            automation limit of {advice.cap.toLocaleString()}. Matches past the limit are skipped
+            for the rest of the day. Narrow the condition so it selects fewer traces.
           </Alert.Description>
         </Alert.Content>
         <Button
@@ -778,12 +758,7 @@ function DailyCapAdviceAlert({
 function PreviewTraceRow({ trace }: { trace: PreviewTrace }) {
   return (
     <HStack gap={2.5} paddingX={3} paddingY={1.5} _hover={{ bg: "bg.muted" }}>
-      <Box
-        boxSize={2}
-        borderRadius="full"
-        bg={STATUS_DOT_COLOR[trace.status]}
-        flexShrink={0}
-      />
+      <Box boxSize={2} borderRadius="full" bg={STATUS_DOT_COLOR[trace.status]} flexShrink={0} />
       <Text textStyle="xs" color="fg" truncate flex={1} minWidth={0}>
         {trace.name || trace.traceId}
       </Text>

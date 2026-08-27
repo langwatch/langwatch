@@ -1,6 +1,3 @@
-import { useShallow } from "zustand/react/shallow";
-import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
-import { isNotifyEntry, type NotifyClientEntry } from "@langwatch/automation-web";
 import {
   cadenceIsSet,
   conditionsAreSet,
@@ -22,8 +19,7 @@ export const useDraft = () => useAutomationStore((s) => s.draft);
 export const useSection = () => useAutomationStore((s) => s.section);
 export const useTestHistory = () => useAutomationStore((s) => s.testHistory);
 
-export const useConditionsSet = () =>
-  useAutomationStore((s) => conditionsAreSet(s.draft));
+export const useConditionsSet = () => useAutomationStore((s) => conditionsAreSet(s.draft));
 export const useSubjectSet = () => useAutomationStore((s) => subjectIsSet(s.draft));
 export const useCadenceSet = () => useAutomationStore((s) => cadenceIsSet(s.draft));
 /** Preset noun set (heading / button / toast copy) for the chosen type.
@@ -33,40 +29,7 @@ export const usePresetLabels = (isEdit: boolean) => {
   const source = useAutomationStore((s) => s.draft.source);
   return presetLabels(source, isEdit);
 };
-export const useConfigComplete = () =>
-  useAutomationStore((s) => configIsComplete(s.draft));
+export const useConfigComplete = () => useAutomationStore((s) => configIsComplete(s.draft));
 export const useConfigurationSummary = () =>
   useAutomationStore((s) => configurationSummary(s.draft));
 export const useNotifyChannel = () => useAutomationStore((s) => notifyChannel(s.draft));
-
-/**
- * Resolves the active notify provider + its slice, or null when the
- * active action is not a notify provider. Used by the test-fire section
- * and the preview pane gating.
- */
-export interface NotifyContext {
-  provider: NotifyClientEntry;
-  slice: unknown;
-}
-export const useNotifyContext = (): NotifyContext | null =>
-  useAutomationStore(
-    useShallow((s): NotifyContext | null => {
-      if (!s.draft.action) return null;
-      const entry = CLIENT_PROVIDERS[s.draft.action];
-      if (!isNotifyEntry(entry)) return null;
-      return { provider: entry, slice: s.draft.slices[s.draft.action] };
-    }),
-  );
-
-/**
- * Resolves the active provider entry + its slice for the configuration
- * secondary drawer to render. Returns null when no type is chosen yet.
- */
-export const useActiveProvider = () =>
-  useAutomationStore(
-    useShallow((s) => {
-      if (!s.draft.action) return null;
-      const entry = CLIENT_PROVIDERS[s.draft.action];
-      return { provider: entry, slice: s.draft.slices[s.draft.action] };
-    }),
-  );

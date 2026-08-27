@@ -1,9 +1,6 @@
 import { parseSeriesIndex } from "@langwatch/automation-contract";
-import type {
-  GraphTriggerEvaluationResult,
-  Trigger,
-} from "@langwatch/automation-contract";
-import { skippedGraphEvaluation } from "./graph-trigger-evaluator.helpers";
+import type { GraphTriggerEvaluationResult, Trigger } from "@langwatch/automation-contract";
+import { TriggerEvaluatorService } from "./trigger-evaluator.service";
 import type {
   GraphActionParams,
   GraphEvaluationPlan,
@@ -11,7 +8,7 @@ import type {
   GraphSeries,
   StoredGraphConfig,
   TimeseriesInputType,
-} from "./graph-trigger-evaluator.types";
+} from "./trigger-evaluator.service";
 
 export class GraphTriggerEvaluationPlanService {
   private constructor() {}
@@ -28,6 +25,7 @@ export class GraphTriggerEvaluationPlanService {
     if ("status" in ready) {
       return ready;
     }
+
     const graph = await request.deps.customGraphs.tryFindById({
       customGraphId: ready.customGraphId,
       projectId: request.projectId,
@@ -35,6 +33,7 @@ export class GraphTriggerEvaluationPlanService {
     if (!graph) {
       return this.skip(request, "graph not found");
     }
+
     return this.createGraphPlan(request, ready, graph);
   }
 
@@ -42,23 +41,24 @@ export class GraphTriggerEvaluationPlanService {
     if (!trigger) {
       return this.skip(request, "trigger missing");
     }
+
     if (!trigger.active) {
       return this.skip(request, "trigger inactive");
     }
+
     if (!trigger.customGraphId) {
       return this.skip(request, "trigger has no customGraphId");
     }
+
     const params = (trigger.actionParams ?? {}) as GraphActionParams;
-    if (
-      params.threshold === void 0 ||
-      params.operator === void 0 ||
-      params.timePeriod === void 0
-    ) {
+    if (params.threshold === void 0 || params.operator === void 0 || params.timePeriod === void 0) {
       return this.skip(request, "missing threshold / operator / timePeriod");
     }
+
     if (!params.seriesName) {
       return this.skip(request, "missing seriesName");
     }
+
     return { trigger, customGraphId: trigger.customGraphId, params };
   }
 
@@ -75,12 +75,15 @@ export class GraphTriggerEvaluationPlanService {
     if (!graph?.series?.length) {
       return this.skip(request, "graph has no series");
     }
+
     const series = this.series(request, graph, trigger.params.seriesName!);
     if ("status" in series) {
       return series;
     }
+
     const now = request.deps.clock.now();
     const startDate = new Date(now.getTime() - trigger.params.timePeriod! * 60 * 1000);
+
     return {
       request,
       ...trigger,
@@ -104,19 +107,17 @@ export class GraphTriggerEvaluationPlanService {
     };
   }
 
-  private series(
-    request: GraphEvaluationRequest,
-    graph: StoredGraphConfig,
-    seriesName: string,
-  ) {
+  private series(request: GraphEvaluationRequest, graph: StoredGraphConfig, seriesName: string) {
     const index = parseSeriesIndex(seriesName);
     if (Number.isNaN(index) || index < 0 || index >= graph.series.length) {
       return this.skip(request, `series index ${index} not in graph`);
     }
+
     const series = graph.series[index];
     if (!series?.name || !series.metric || !series.aggregation) {
       return this.skip(request, "invalid series configuration");
     }
+
     return series;
   }
 
@@ -140,10 +141,7 @@ export class GraphTriggerEvaluationPlanService {
     };
   }
 
-  private skip(
-    request: GraphEvaluationRequest,
-    detail: string,
-  ): GraphTriggerEvaluationResult {
-    return skippedGraphEvaluation({ ...request, detail });
+  private skip(request: GraphEvaluationRequest, detail: string): GraphTriggerEvaluationResult {
+    return TriggerEvaluatorService.skippedGraphEvaluation({ ...request, detail });
   }
 }

@@ -1,19 +1,14 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Skeleton,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   MAX_TRACE_DEBOUNCE_MS,
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
+  AlertType,
+  parseAutomationFiltersWire,
+  parseTriggerTemplatesWire,
   type NotificationCadence,
+  TriggerAction,
 } from "@langwatch/automation-contract";
 import { defaultsForSourceKind } from "@langwatch/automation-contract";
 import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "@langwatch/automation-contract";
@@ -29,42 +24,22 @@ import {
   type TemplateContext,
 } from "@langwatch/automation-contract";
 import { Mail, Send } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  CLIENT_PROVIDERS,
-  type NotifyPreview,
-} from "~/features/automations/providers/registry";
-import { type ConfigFormCtx, isNotifyEntry } from "@langwatch/automation-web";
+import { CLIENT_PROVIDERS, type NotifyPreview } from "./providers/registry";
+import { type ConfigFormCtx } from "@langwatch/automation-web";
 import { explainAnyError, readHandledError, showErrorToast } from "~/features/errors";
-import { AlertType, TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import type { FilterParam } from "~/hooks/useFilterParams";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  type FilterField,
-  sanitizeTriggerFilters,
-  type TriggerFilterValue,
-} from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
-import {
-  ALERT_TEMPLATE_VARIABLES,
-  REPORT_TEMPLATE_VARIABLES,
-} from "@langwatch/automation-web";
+import { ALERT_TEMPLATE_VARIABLES, REPORT_TEMPLATE_VARIABLES } from "@langwatch/automation-web";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
@@ -82,37 +57,10 @@ import {
 } from "./logic/draftReducer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
-import {
-  useConditionsSet,
-  useConfigComplete,
-  useDraft,
-  useSection,
-} from "./state/selectors";
+import { useConditionsSet, useConfigComplete, useDraft, useSection } from "./state/selectors";
 import { consumeDraftKeptOnSubFlowReturn, isInAutomationFlow } from "./state/subFlow";
 
-/**
- * Headlines naming the template the server rejected.
- *
- * An automation carries up to four Liquid templates, so "This template isn't
- * valid" — the registry's copy for `template_validation_error`, which has no
- * way to know which drawer this is — leaves the author opening each editor in
- * turn to find the syntax error the description is describing. The failing
- * field rides on the handled payload's `meta.field`; these are the words for
- * each one.
- *
- * A KNOWN EXCEPTION to the one-authoring-surface rule, and the only one in this
- * feature. `ErrorPresentation.title` is a static string, so a code whose
- * headline depends on its own `meta` cannot express itself in the registry
- * today — which leaves one code with words in two files, the exact shape the
- * deleted `errorExplainer.ts` was removed for. It is deliberate rather than
- * accidental: the alternative is four near-identical codes for one failure, or
- * a headline that makes the author hunt.
- *
- * The fix belongs in the registry, not here: widening `title` to
- * `string | ((error) => string)` would let `template_validation_error` pick its
- * own headline off `meta.field` and delete this map outright. Until then, this
- * map and the registry entry must be changed together.
- */
+/** Maps template-validation field metadata to the editor-specific headline. */
 const TEMPLATE_FIELD_TITLES: Record<string, string> = {
   emailSubjectTemplate: "Your email subject template isn't valid",
   emailBodyTemplate: "Your email body template isn't valid",
@@ -154,8 +102,7 @@ function saveDisabledReason({
   if (!nameSet) missing.push("give it a name");
   if (!subjectIsSet(draft)) missing.push(subjectTodo(draft));
   else if (!cadenceIsSet(draft)) missing.push(cadenceTodo(draft));
-  if (draft.source === "customGraph" && draft.alertType === null)
-    missing.push("set a severity");
+  if (draft.source === "customGraph" && draft.alertType === null) missing.push("set a severity");
   if (!actionPicked) missing.push("pick a delivery channel");
   else if (!configComplete) missing.push("complete the setup");
   if (missing.length === 0) return "";
@@ -256,16 +203,12 @@ export function AutomationDrawer({
   // Single source of truth for every heading / button / toast noun. Treat a
   // graph-prefilled create as an alert from the first paint so the title
   // doesn't flash "Add automation" before the prefill effect lands.
-  const labels = presetLabels(
-    prefilledGraphId ? "customGraph" : draft.source,
-    !!automationId,
-  );
+  const labels = presetLabels(prefilledGraphId ? "customGraph" : draft.source, !!automationId);
   // A saved graph alert or report can't become a trace automation mid-edit
   // (the kind decides the row's whole shape — schedule, source, dispatcher),
   // and a drawer opened from a specific chart is pinned to that alert — lock
   // the Type cards visibly in all three cases.
-  const sourceLocked =
-    (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
+  const sourceLocked = (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
   const hydrate = useAutomationStore((s) => s.hydrate);
@@ -399,24 +342,14 @@ export function AutomationDrawer({
     // Same defensive parse as edit hydration — a malformed param falls back
     // to no filters rather than crashing the open.
     if (initialFilters && initialSource !== "customGraph") {
-      try {
-        const raw = JSON.parse(initialFilters) as Record<string, TriggerFilterValue>;
-        const { sanitized } = sanitizeTriggerFilters(raw);
-        dispatch({
-          type: "SET_FILTERS",
-          value: sanitized as Partial<Record<FilterField, FilterParam>>,
-        });
-      } catch {
-        // Ignore malformed prefill — the user sets conditions themselves.
-      }
+      dispatch({
+        type: "SET_FILTERS",
+        value: parseAutomationFiltersWire(initialFilters),
+      });
     }
     // ADR-043: seed the trace-subject query from the traces view's Automate
     // button. Only for a trace automation — customGraph/report don't carry one.
-    if (
-      initialFilterQuery &&
-      initialSource !== "customGraph" &&
-      initialSource !== "report"
-    ) {
+    if (initialFilterQuery && initialSource !== "customGraph" && initialSource !== "report") {
       dispatch({ type: "SET_FILTER_QUERY", value: initialFilterQuery });
     }
     prefilledFromParams.current = true;
@@ -451,25 +384,13 @@ export function AutomationDrawer({
     }
     const action = row.action as TriggerAction;
     const provider = CLIENT_PROVIDERS[action];
-    // `Trigger.filters` is persisted as a JSON string via `JSON.stringify`, but a
-    // malformed legacy row would crash the prefill if we trusted that. Fall
-    // back to an empty filter set on parse error so the drawer still opens —
-    // the user can re-enter the conditions instead of seeing the whole
-    // automations page fail to render.
-    let filtersRaw: Record<string, TriggerFilterValue> = {};
-    if (typeof row.filters === "string") {
-      try {
-        filtersRaw = JSON.parse(row.filters) as Record<string, TriggerFilterValue>;
-      } catch {
-        filtersRaw = {};
-      }
-    }
-    const { sanitized } = sanitizeTriggerFilters(filtersRaw);
+    const filters = parseAutomationFiltersWire(row.filters);
+    const templates = parseTriggerTemplatesWire(row);
     // The row's KIND is what it is — a REPORT hydrated as a trace automation
     // would lose its schedule and content source on the next Save (the router
     // rewrites the row from what the drawer sends). `customGraphId` is only a
     // reliable signal for alerts, so read `triggerKind` first.
-    const isReportRow = row.triggerKind === TriggerKind.REPORT;
+    const isReportRow = row.triggerKind === "REPORT";
     const next: AutomationDraft = {
       ...INITIAL_DRAFT,
       action,
@@ -488,10 +409,8 @@ export function AutomationDrawer({
         : INITIAL_DRAFT.graphAlert,
       // Same for a report's content source + schedule, so the Subject and
       // Cadence facets open on what was saved rather than the blank defaults.
-      report: isReportRow
-        ? extractReportFromTriggerRow(row.actionParams)
-        : INITIAL_DRAFT.report,
-      filters: sanitized as Partial<Record<FilterField, FilterParam>>,
+      report: isReportRow ? extractReportFromTriggerRow(row.actionParams) : INITIAL_DRAFT.report,
+      filters,
       // Defensive narrow: column is a free-form TEXT (see the repo parser).
       notificationCadence: (NOTIFICATION_CADENCES as readonly string[]).includes(
         row.notificationCadence,
@@ -504,9 +423,7 @@ export function AutomationDrawer({
         MAX_TRACE_DEBOUNCE_MS,
         Math.max(
           MIN_TRACE_DEBOUNCE_MS,
-          typeof row.traceDebounceMs === "number"
-            ? row.traceDebounceMs
-            : DEFAULT_TRACE_DEBOUNCE_MS,
+          typeof row.traceDebounceMs === "number" ? row.traceDebounceMs : DEFAULT_TRACE_DEBOUNCE_MS,
         ),
       ),
       // The saved row's cadence was chosen (or accepted) when it was created,
@@ -520,10 +437,10 @@ export function AutomationDrawer({
           alertType: row.alertType,
           action,
           actionParams: row.actionParams,
-          emailSubjectTemplate: row.templates.emailSubjectTemplate,
-          emailBodyTemplate: row.templates.emailBodyTemplate,
-          slackTemplate: row.templates.slackTemplate,
-          slackTemplateType: row.templates.slackTemplateType,
+          emailSubjectTemplate: templates.emailSubjectTemplate,
+          emailBodyTemplate: templates.emailBodyTemplate,
+          slackTemplate: templates.slackTemplate,
+          slackTemplateType: templates.slackTemplateType,
         }),
       },
     };
@@ -560,9 +477,7 @@ export function AutomationDrawer({
           slug: project?.slug ?? "project",
         },
         baseHost:
-          typeof window !== "undefined"
-            ? window.location.origin
-            : "https://app.langwatch.ai",
+          typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai",
         matches: EXAMPLE_MATCHES,
       }),
     [project?.name, project?.slug],
@@ -607,9 +522,7 @@ export function AutomationDrawer({
       // chart the report will really send — not an empty trace-shaped message.
       return buildExampleReportTemplateContext({
         baseHost:
-          typeof window !== "undefined"
-            ? window.location.origin
-            : "https://app.langwatch.ai",
+          typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai",
         project: {
           name: project?.name ?? "Project",
           slug: project?.slug ?? "project",
@@ -624,9 +537,7 @@ export function AutomationDrawer({
       // preview shows what a real fire renders — not the trace shape.
       return buildExampleGraphAlertTemplateContext({
         baseHost:
-          typeof window !== "undefined"
-            ? window.location.origin
-            : "https://app.langwatch.ai",
+          typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai",
         project: {
           name: project?.name ?? "Project",
           slug: project?.slug ?? "project",
@@ -683,11 +594,24 @@ export function AutomationDrawer({
     // Mirror the provider's delivery rules (Slack: modern blocks render only
     // over a bot connection) so the preview never promises more than the
     // configured channel will deliver.
-    const entry = draft.action ? CLIENT_PROVIDERS[draft.action] : undefined;
-    const renderOptions =
-      entry && isNotifyEntry(entry) && entry.client.previewOptions
-        ? entry.client.previewOptions(draft.slices[draft.action!] as never)
-        : {};
+    const renderOptions = (() => {
+      switch (draft.action) {
+        case TriggerAction.SEND_EMAIL:
+          return CLIENT_PROVIDERS.SEND_EMAIL.client.previewOptions?.(draft.slices.SEND_EMAIL) ?? {};
+        case TriggerAction.SEND_SLACK_MESSAGE:
+          return (
+            CLIENT_PROVIDERS.SEND_SLACK_MESSAGE.client.previewOptions?.(
+              draft.slices.SEND_SLACK_MESSAGE,
+            ) ?? {}
+          );
+        case TriggerAction.SEND_WEBHOOK:
+          return (
+            CLIENT_PROVIDERS.SEND_WEBHOOK.client.previewOptions?.(draft.slices.SEND_WEBHOOK) ?? {}
+          );
+        default:
+          return {};
+      }
+    })();
     void (async () => {
       try {
         if (channel === "email") {
@@ -758,15 +682,7 @@ export function AutomationDrawer({
         if (token === previewToken.current) setPreview(undefined);
       }
     })();
-  }, [
-    channel,
-    section,
-    draft.action,
-    draft.slices,
-    previewContext,
-    isGraphAlert,
-    isReport,
-  ]);
+  }, [channel, section, draft.action, draft.slices, previewContext, isGraphAlert, isReport]);
 
   // Edit mode must not render the (blank) INITIAL_DRAFT form while the saved
   // row is still loading: a keystroke during the load makes the hydration
@@ -785,18 +701,25 @@ export function AutomationDrawer({
   // "confirm the cadence" detour to gate on — subject + cadence validity is
   // folded into conditionsSet.
   const canSave =
-    nameSet &&
-    conditionsSet &&
-    configComplete &&
-    !editLoading &&
-    !editError &&
-    !webhookReadOnly;
+    nameSet && conditionsSet && configComplete && !editLoading && !editError && !webhookReadOnly;
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
-    const entry = CLIENT_PROVIDERS[draft.action];
-    if (!isNotifyEntry(entry)) return;
-    const target = entry.client.testFireTarget(draft.slices[draft.action] as never);
+    const target = (() => {
+      switch (draft.action) {
+        case TriggerAction.SEND_EMAIL:
+          return CLIENT_PROVIDERS.SEND_EMAIL.client.testFireTarget(draft.slices.SEND_EMAIL);
+        case TriggerAction.SEND_SLACK_MESSAGE:
+          return CLIENT_PROVIDERS.SEND_SLACK_MESSAGE.client.testFireTarget(
+            draft.slices.SEND_SLACK_MESSAGE,
+          );
+        case TriggerAction.SEND_WEBHOOK:
+          return CLIENT_PROVIDERS.SEND_WEBHOOK.client.testFireTarget(draft.slices.SEND_WEBHOOK);
+        default:
+          return null;
+      }
+    })();
+    if (!target) return;
     testFire.mutate(
       // Alert drafts carry a non-null `graphAlert` so the server renders the
       // alert-shaped example context (not trace matches) — see
@@ -820,7 +743,7 @@ export function AutomationDrawer({
             status: "success",
             recipientCount: r.recipientCount,
             usedDefault: r.usedDefault,
-            httpStatus: r.httpStatus,
+            httpStatus: r.httpStatus ?? undefined,
           });
           toaster.create({
             title: "Test fire sent",
@@ -847,8 +770,7 @@ export function AutomationDrawer({
             channel,
             status: "failure",
             errorTitle:
-              templateTitle ??
-              (explanation.isRegistered ? explanation.title : "Test fire failed"),
+              templateTitle ?? (explanation.isRegistered ? explanation.title : "Test fire failed"),
             // The title when the code has no description of its own. The
             // attempt log is persistent history a person reads back later, and
             // a title-only code otherwise wrote a blank row into it.
@@ -862,16 +784,7 @@ export function AutomationDrawer({
         },
       },
     );
-  }, [
-    channel,
-    draft,
-    projectId,
-    testFire,
-    pushAttempt,
-    isGraphAlert,
-    graphName,
-    seriesLabel,
-  ]);
+  }, [channel, draft, projectId, testFire, pushAttempt, isGraphAlert, graphName, seriesLabel]);
 
   const onSave = useCallback(() => {
     if (!canSave || !draft.action) return;
@@ -897,8 +810,7 @@ export function AutomationDrawer({
         // The graph-alert threshold rule travels alongside the destination
         // keys; the router merges them into the persisted `actionParams`.
         graphAlert: draft.source === "customGraph" ? draft.graphAlert : undefined,
-        report:
-          draft.source === "report" ? reportInputFromDraft(draft.report) : undefined,
+        report: draft.source === "report" ? reportInputFromDraft(draft.report) : undefined,
         actionParams: actionParamsFromDraft(draft) as never,
         templates: templatesFromDraft(draft),
         notificationCadence: draft.notificationCadence,
@@ -936,9 +848,7 @@ export function AutomationDrawer({
   // the dormant draft cadence says otherwise.
   const cadenceMode: "immediate" | "digest" =
     isGraphAlert || draft.notificationCadence === "immediate" ? "immediate" : "digest";
-  const hasEvaluationFilter = Object.keys(draft.filters).some((k) =>
-    k.startsWith("evaluations."),
-  );
+  const hasEvaluationFilter = Object.keys(draft.filters).some((k) => k.startsWith("evaluations."));
 
   const configCtx = useMemo<ConfigFormCtx<NotifyPreview>>(
     () => ({
@@ -1007,8 +917,7 @@ export function AutomationDrawer({
   // hydrate/create time. Guards an accidental close from silently dropping an
   // in-progress multi-stage draft. Until the baseline lands we treat the
   // draft as clean so a close during the first paint never prompts.
-  const isDirty =
-    baselineRef.current !== null && JSON.stringify(draft) !== baselineRef.current;
+  const isDirty = baselineRef.current !== null && JSON.stringify(draft) !== baselineRef.current;
 
   const requestClose = useCallback(() => {
     if (isDirty) {
@@ -1134,17 +1043,13 @@ export function AutomationDrawer({
           </Dialog.Header>
           <Dialog.Body>
             <Text color="fg.muted" textStyle="sm">
-              This {labels.noun} has changes you haven't saved yet. Close the drawer and
-              discard them?
+              This {labels.noun} has changes you haven't saved yet. Close the drawer and discard
+              them?
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
             <HStack gap={2}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmDiscardOpen(false)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setConfirmDiscardOpen(false)}>
                 Keep editing
               </Button>
               <Button
@@ -1187,8 +1092,7 @@ function EmailLinkLandingBanner() {
           <Mail size={16} />
         </Box>
         <Text textStyle="sm" color="fg">
-          Opened from an email notification. You're editing the automation that produced
-          that alert.
+          Opened from an email notification. You're editing the automation that produced that alert.
         </Text>
       </HStack>
     </Box>

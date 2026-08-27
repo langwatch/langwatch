@@ -11,17 +11,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalyticsMetricSource } from "@langwatch/analytics-contract";
 import {
   type GraphTriggerHeartbeatDeps,
-  type HeartbeatCandidateSources,
   type ClickHouseClient,
   GraphTriggerHeartbeatService,
 } from "../src/services/graph-trigger-heartbeat.service";
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import type { AutomationService } from "@langwatch/automation-contract";
 import type { GraphTriggerSentRepository } from "../src/repositories/graph-trigger-sent.repository";
+import { HeartbeatTriggerRepository, SilentAutomationLogger } from "./support/heartbeat.fakes";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 const TriggerKind = { ALERT: "ALERT" } as const;
-const decideGraphTriggerHeartbeat = GraphTriggerHeartbeatService.decide;
+type HeartbeatCandidateSources = {
+  loadProjectsWithGraphTriggers(): Promise<string[]>;
+  loadProjectsWithOpenGraphTriggerSent(): Promise<Set<string>>;
+};
+
+async function decideGraphTriggerHeartbeat(input: {
+  deps: GraphTriggerHeartbeatDeps;
+  sources: HeartbeatCandidateSources;
+  now: Date;
+}) {
+  input.deps.triggerSent.findProjectsWithGraphTriggers =
+    input.sources.loadProjectsWithGraphTriggers;
+  input.deps.triggerSent.findProjectsWithOpenGraphTriggerSent =
+    input.sources.loadProjectsWithOpenGraphTriggerSent;
+
+  return GraphTriggerHeartbeatService.create(input.deps).decide({ now: input.now });
+}
 
 const PROJECT = "proj-mixed";
 const TRIGGER_TRACE = "trig-trace";
@@ -55,19 +70,8 @@ function makeTrigger(
   };
 }
 
-function makeTriggersService(
-  perProject: Record<string, TriggerSummary[]>,
-): AutomationService {
-  return {
-    getActiveTraceTriggersForProject: vi.fn(async () => []),
-    getActiveGraphTriggersForProject: vi.fn(
-      async (projectId: string) => perProject[projectId] ?? [],
-    ),
-    claimSend: vi.fn(),
-    isSendClaimed: vi.fn(),
-    updateLastRunAt: vi.fn(),
-    invalidate: vi.fn(),
-  } as unknown as AutomationService;
+function makeTriggersService(perProject: Record<string, TriggerSummary[]>) {
+  return new HeartbeatTriggerRepository(perProject);
 }
 
 function makeSources(overrides: {
@@ -108,17 +112,15 @@ function makeClickHouseStub(): {
 } {
   const calls: QueryCall[] = [];
   const client = {
-    query: vi.fn(
-      async (params: { query: string; query_params: { tenantId: string } }) => {
-        calls.push({
-          query: params.query,
-          tenantId: params.query_params.tenantId,
-        });
-        // Return null recency so EVERY candidate enqueues (the test cares
-        // about query routing, not enqueue filtering).
-        return { json: async () => [{ lastMs: null }] };
-      },
-    ),
+    query: vi.fn(async (params: { query: string; query_params: { tenantId: string } }) => {
+      calls.push({
+        query: params.query,
+        tenantId: params.query_params.tenantId,
+      });
+      // Return null recency so EVERY candidate enqueues (the test cares
+      // about query routing, not enqueue filtering).
+      return { json: async () => [{ lastMs: null }] };
+    }),
   } as unknown as ClickHouseClient;
   return { client, calls };
 }
@@ -154,9 +156,10 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       };
 
       const deps: GraphTriggerHeartbeatDeps = {
-        automation: triggers,
+        triggers,
         triggerSent: makeTriggerSentStub(sourceByTrigger),
-        resolveClickHouseClient: async () => clickHouseStub.client,
+        heartbeat: { tryResolveClickHouseClient: async () => clickHouseStub.client },
+        logger: new SilentAutomationLogger(),
       };
 
       const requests = await decideGraphTriggerHeartbeat({
@@ -170,9 +173,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
 
       // Exactly two queries — one per source.
       expect(clickHouseStub.calls).toHaveLength(2);
-      const traceCall = clickHouseStub.calls.find((c) =>
-        c.query.includes("FROM trace_analytics"),
-      );
+      const traceCall = clickHouseStub.calls.find((c) => c.query.includes("FROM trace_analytics"));
       const evalCall = clickHouseStub.calls.find((c) =>
         c.query.includes("FROM evaluation_analytics"),
       );
@@ -196,9 +197,10 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       });
 
       const deps: GraphTriggerHeartbeatDeps = {
-        automation: triggers,
+        triggers,
         triggerSent: makeTriggerSentStub({ [TRIGGER_EVAL]: "evaluation" }),
-        resolveClickHouseClient: async () => clickHouseStub.client,
+        heartbeat: { tryResolveClickHouseClient: async () => clickHouseStub.client },
+        logger: new SilentAutomationLogger(),
       };
 
       const requests = await decideGraphTriggerHeartbeat({
@@ -227,9 +229,10 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       });
 
       const deps: GraphTriggerHeartbeatDeps = {
-        automation: triggers,
+        triggers,
         triggerSent: makeTriggerSentStub(),
-        resolveClickHouseClient: async () => clickHouseStub.client,
+        heartbeat: { tryResolveClickHouseClient: async () => clickHouseStub.client },
+        logger: new SilentAutomationLogger(),
       };
 
       await decideGraphTriggerHeartbeat({

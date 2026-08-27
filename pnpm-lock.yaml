@@ -1588,15 +1588,36 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../eventing
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../prisma-client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       croner:
         specifier: ^10.0.1
         version: 10.0.1
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -1613,22 +1634,43 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
+      '@monaco-editor/react':
+        specifier: ^4.7.0
+        version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      liqe:
+        specifier: ^3.8.7
+        version: 3.8.7
       lucide-react:
         specifier: ^1.22.0
         version: 1.22.0(react@19.2.8)
+      zustand:
+        specifier: ^4.5.7
+        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
       '@chakra-ui/react':
         specifier: ^3.36.0
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/jest-dom':
+        specifier: ^7.0.1
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@4.1.10)
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
       react:
         specifier: ^19.2.7
         version: 19.2.8

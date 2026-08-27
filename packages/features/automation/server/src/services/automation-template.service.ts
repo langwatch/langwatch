@@ -18,6 +18,7 @@ import {
   type TestFireInput,
   type TestFireResult,
   type TestFireTemplateDraft,
+  type TriggerTemplateDefaults,
 } from "@langwatch/automation-contract";
 import type { AutomationTestFirePort } from "../ports/automation-test-fire.port";
 
@@ -58,10 +59,7 @@ export class AutomationTemplateService {
 
       const result = validateLiquid(source);
       if (!result.valid) {
-        throw new TemplateValidationError(
-          column,
-          result.error ?? "Invalid Liquid syntax",
-        );
+        throw new TemplateValidationError(column, result.error ?? "Invalid Liquid syntax");
       }
     }
   }
@@ -85,8 +83,7 @@ export class AutomationTemplateService {
 
   private validateSlackType(draft: TestFireTemplateDraft): void {
     const type = draft.slackTemplateType;
-    const knownType =
-      type === null || type === void 0 || SLACK_TEMPLATE_TYPE_SET.has(type);
+    const knownType = type === null || type === void 0 || SLACK_TEMPLATE_TYPE_SET.has(type);
 
     if (!knownType) {
       throw new TemplateValidationError(
@@ -155,7 +152,7 @@ export class AutomationTemplateService {
   private async sendEmail(
     input: TestFireInput,
     context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext,
-    defaults: ReturnType<typeof defaultsForSourceKind>,
+    defaults: TriggerTemplateDefaults,
   ): Promise<TestFireResult> {
     if (input.recipients.length === 0) {
       throw new TestFireUnavailableError(
@@ -227,7 +224,7 @@ export class AutomationTemplateService {
   private async sendSlack(
     input: TestFireInput,
     context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext,
-    defaults: ReturnType<typeof defaultsForSourceKind>,
+    defaults: TriggerTemplateDefaults,
   ): Promise<TestFireResult> {
     const rendered = await renderTriggerSlack({
       templateType: this.slackType(input.draft.slackTemplateType),

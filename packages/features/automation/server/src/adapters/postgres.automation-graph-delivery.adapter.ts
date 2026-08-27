@@ -1,25 +1,27 @@
 import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
 import type { AutomationClock } from "../ports/automation-clock.port";
-import type { AutomationDatabase } from "../ports/automation-database.port";
 import { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port";
 import { PrismaEmailSuppressionRepository } from "../repositories/prisma/prisma.email-suppression.repository";
 import { PrismaTriggerRepository } from "../repositories/prisma/prisma.trigger.repository";
 import { PrismaWebhookDeliveryRepository } from "../repositories/prisma/prisma.webhook-delivery.repository";
+import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository";
+import type { TriggerRepository } from "../repositories/trigger.repository";
+import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository";
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
 /** Process-composition adapter for graph delivery's Automation persistence. */
 export class PostgresAutomationGraphDeliveryAdapter extends AutomationGraphDeliveryPort {
   private constructor(
-    private readonly triggers: PrismaTriggerRepository,
-    private readonly suppressions: PrismaEmailSuppressionRepository,
-    private readonly webhookDeliveries: PrismaWebhookDeliveryRepository,
+    private readonly triggers: TriggerRepository,
+    private readonly suppressions: EmailSuppressionRepository,
+    private readonly webhookDeliveries: WebhookDeliveryRepository,
   ) {
     super();
   }
 
   static create(input: {
-    database: AutomationDatabase;
+    database: object;
     clock: AutomationClock;
   }): PostgresAutomationGraphDeliveryAdapter {
     return new PostgresAutomationGraphDeliveryAdapter(
@@ -47,11 +49,7 @@ export class PostgresAutomationGraphDeliveryAdapter extends AutomationGraphDeliv
     return this.triggers.isSendClaimed(input);
   }
 
-  claimSend(input: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<boolean> {
+  claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean> {
     return this.triggers.claimSend(input);
   }
 
