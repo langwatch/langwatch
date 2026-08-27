@@ -1041,10 +1041,6 @@ export class ActivityMonitorService {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Extracted helpers — pure functions, no this, no side effects
-// ---------------------------------------------------------------------------
-
 interface RolledSpendRow {
   bucketMs: number;
   key: string;
