@@ -1,6 +1,7 @@
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { HandledError } from "@langwatch/handled-error";
 
 import { createRestService } from "../builder.js";
 import type { InputDeclared, OutputDeclared, RestChain } from "../definition.js";
@@ -42,8 +43,87 @@ export type RestChainHasNoQuerySource = AssertFalse<
 export type RestChainHasNoParamsSource = AssertFalse<
   "withParams" extends keyof RestChain ? true : false
 >;
+export type RestChainHasNoErrorList = AssertFalse<
+  "withErrors" extends keyof RestChain ? true : false
+>;
+
+class SecretNotFoundError extends HandledError {
+  constructor() {
+    super("secret_not_found", "The requested secret does not exist", { httpStatus: 404 });
+    this.name = "SecretNotFoundError";
+  }
+}
 
 describe("public REST input", () => {
+  it("supports the Secret adoption shape without changing existing RPC routes", async () => {
+    const app = createRestService({
+      name: "secret",
+      logger: false,
+      tracer: false,
+    })
+      .withoutPermission("framework test endpoint")
+      .get(
+        "/lookup/:id",
+        "2026-01-15",
+        async (_context, input: { id: string; reveal: boolean }) => input,
+        (builder) =>
+          builder
+            .withInput(
+              z.object({
+                id: z.string(),
+                reveal: z.enum(["true", "false"]).transform((value) => value === "true"),
+              }),
+            )
+            .withOutput(z.object({ id: z.string(), reveal: z.boolean() })),
+      )
+      .post(
+        "/rotate/:id",
+        "2026-08-07",
+        async (_context, input: { id: string; value: string }) => input,
+        (builder) =>
+          builder
+            .withInput(z.object({ id: z.string(), value: z.string().min(1) }))
+            .withOutput(z.object({ id: z.string(), value: z.string() })),
+      )
+      .build();
+
+    const lookup = await app.request("/api/v1/secret/lookup/secret_1?reveal=true", {
+      headers: { [VERSION_HEADER]: "2026-01-15" },
+    });
+    const rotate = await app.request("/api/v1/secret/2026-08-07/rotate/secret_1", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [VERSION_HEADER]: "2026-08-07",
+      },
+      body: JSON.stringify({ value: "rotated" }),
+    });
+
+    expect(lookup.status).toBe(200);
+    await expect(lookup.json()).resolves.toEqual({ id: "secret_1", reveal: true });
+    expect(rotate.status).toBe(200);
+    await expect(rotate.json()).resolves.toEqual({ id: "secret_1", value: "rotated" });
+  });
+
+  it("maps handled errors centrally, without endpoint error declarations", async () => {
+    const app = service()
+      .get(
+        "/items/:id",
+        "2026-08-07",
+        async () => {
+          throw new SecretNotFoundError();
+        },
+        (builder) =>
+          builder.withInput(z.object({ id: z.string() })).withOutput(z.object({ id: z.string() })),
+      )
+      .build();
+
+    const response = await app.request("/api/v1/thing/items/item_1");
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: "secret_not_found" });
+  });
+
   it("takes GET input from query and merges path parameters", async () => {
     const app = service()
       .get(
