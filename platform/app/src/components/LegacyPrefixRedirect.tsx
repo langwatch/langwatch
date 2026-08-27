@@ -12,11 +12,21 @@ export function LegacyPrefixRedirect({ from, to }: { from: string; to: string })
   const suffix = location.pathname.startsWith(from)
     ? location.pathname.slice(from.length)
     : "";
+  // Only the pinParams path re-serializes the query; without it the
+  // original search travels byte-for-byte, as it always has.
+  let search = location.search;
+  if (pinParams) {
+    const params = new URLSearchParams(location.search);
+    for (const [key, value] of Object.entries(pinParams)) {
+      params.set(key, value);
+    }
+    search = params.toString();
+  }
   return (
     <Navigate
       to={{
         pathname: to + suffix,
-        search: location.search,
+        search,
         hash: location.hash,
       }}
       replace

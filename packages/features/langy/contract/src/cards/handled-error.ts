@@ -124,8 +124,7 @@ const GENERIC_CODES = new Set([
   "unknown error",
 ]);
 
-const isGenericCode = (code: string): boolean =>
-  GENERIC_CODES.has(code.trim().toLowerCase());
+const isGenericCode = (code: string): boolean => GENERIC_CODES.has(code.trim().toLowerCase());
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -204,7 +203,7 @@ interface ErrorBody {
 }
 
 /**
- * Read the platform's error body. The REST surface speaks this in THREE
+ * Read the platform's error body. The REST surface speaks this in FOUR
  * dialects, and all are real — verified against the routes, not assumed:
  *
  *   1. THE COMMON ONE, from the shared Hono error handler every `SecuredApp`
@@ -227,6 +226,14 @@ interface ErrorBody {
  *      and never crosses the boundary (ADR-045). Prose, when the server
  *      deliberately authored some, arrives as `meta.message` and wins.
  *
+ *   4. THE CANONICAL ONE, from every `SecuredApp` that publishes the canonical
+ *      envelope (`app/api/shared/schemas.ts`): the failure NESTED under `error`
+ *      — `{ error: { type, code, message, meta?, trace_id?, span_id? } }`, with
+ *      the trace ids in snake_case. Unreadable until this dialect existed, so
+ *      an agent got no code and a customer's card printed the whole envelope
+ *      verbatim under "this step couldn't be completed", with the one sentence
+ *      that explained the failure buried in the middle of it.
+ *
  * `code` is the name TypeScript uses, `type` the OpenAI-compatible name Go
  * emits; the framework sets all three to the same value (`errors.ts` assigns
  * `body.kind = body.code` and `body.type = body.code`), so which one answers
@@ -248,16 +255,10 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
 
   // Dialect 2: the serialised HandledError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);
-  if (
-    serialized &&
-    (typeof serialized.code === "string" || typeof serialized.kind === "string")
-  ) {
+  if (serialized && (typeof serialized.code === "string" || typeof serialized.kind === "string")) {
     const telemetry = asRecord(serialized.telemetry);
     return {
-      code:
-        typeof serialized.code === "string"
-          ? serialized.code
-          : (serialized.kind as string),
+      code: typeof serialized.code === "string" ? serialized.code : (serialized.kind as string),
       message:
         typeof record.error === "string"
           ? record.error
@@ -275,14 +276,45 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
       traceUrl: typeof serialized.traceUrl === "string" ? serialized.traceUrl : undefined,
       logsUrl: typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
       reasons: asReasons(serialized.reasons),
-      suggestions:
-        asSuggestions(serialized.tips) ?? asSuggestions(serialized.suggestions),
+      suggestions: asSuggestions(serialized.tips) ?? asSuggestions(serialized.suggestions),
       docUrl:
         typeof serialized.docsUrl === "string"
           ? serialized.docsUrl
           : typeof serialized.docUrl === "string"
             ? serialized.docUrl
             : undefined,
+    };
+  }
+
+  // Dialect 4: THE CANONICAL ONE, from the shared REST envelope
+  // (`app/api/shared/schemas.ts`) that the analytics-sql families and every
+  // new canonical-envelope route answer with:
+  // `{ error: { type, code, message, meta?, trace_id?, span_id? } }` — the
+  // whole failure NESTED under `error` as an object, so none of the flat
+  // readings below can see it. `code` is the discriminant, `type` the
+  // status-class alias the Go plane also emits; reasons ride inside
+  // `meta.reasons` and are lifted out. The Go plane's 402 additionally
+  // carries `tips` / `docs_url` at the same level.
+  const canonical = asRecord(record.error);
+  if (
+    canonical &&
+    !isSystemError(canonical) &&
+    (typeof canonical.code === "string" || typeof canonical.type === "string")
+  ) {
+    const code = typeof canonical.code === "string" ? canonical.code : (canonical.type as string);
+    const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
+    return {
+      code,
+      retryable: canonical.retryable === true,
+      message:
+        typeof canonical.message === "string" && canonical.message !== code
+          ? canonical.message
+          : undefined,
+      meta,
+      traceId: typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
+      reasons: asReasons(metaReasons),
+      suggestions: asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
+      docUrl: typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
     };
   }
 
@@ -403,12 +435,7 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
           : undefined,
     reasons: asReasons(reasons),
     suggestions: asSuggestions(tips) ?? asSuggestions(suggestions),
-    docUrl:
-      typeof docsUrl === "string"
-        ? docsUrl
-        : typeof docUrl === "string"
-          ? docUrl
-          : undefined,
+    docUrl: typeof docsUrl === "string" ? docsUrl : typeof docUrl === "string" ? docUrl : undefined,
   };
 };
 
@@ -583,9 +610,7 @@ export const readCliErrorDocument = (output: unknown): CliHandledError | null =>
     ...(typeof error.traceUrl === "string" ? { traceUrl: error.traceUrl } : {}),
     ...(typeof error.logsUrl === "string" ? { logsUrl: error.logsUrl } : {}),
     ...(asReasons(error.reasons) ? { reasons: asReasons(error.reasons) } : {}),
-    ...(asSuggestions(error.suggestions)
-      ? { suggestions: asSuggestions(error.suggestions) }
-      : {}),
+    ...(asSuggestions(error.suggestions) ? { suggestions: asSuggestions(error.suggestions) } : {}),
     ...(typeof error.docUrl === "string" ? { docUrl: error.docUrl } : {}),
   };
 };
@@ -630,9 +655,7 @@ const asAlreadyReadHandledError = (
     ...(typeof outer.traceUrl === "string" ? { traceUrl: outer.traceUrl } : {}),
     ...(typeof outer.logsUrl === "string" ? { logsUrl: outer.logsUrl } : {}),
     ...(asReasons(outer.reasons) ? { reasons: asReasons(outer.reasons) } : {}),
-    ...(asSuggestions(outer.suggestions)
-      ? { suggestions: asSuggestions(outer.suggestions) }
-      : {}),
+    ...(asSuggestions(outer.suggestions) ? { suggestions: asSuggestions(outer.suggestions) } : {}),
     ...(typeof outer.docUrl === "string" ? { docUrl: outer.docUrl } : {}),
   };
 };
@@ -679,10 +702,7 @@ export const handledErrorFromThrown = (error: unknown): CliHandledError => {
 
   // The SDK wraps the API's error body; the body is the thing worth reading.
   const cause =
-    asRecord(outer?.originalError) ??
-    asRecord(outer?.cause) ??
-    asRecord(outer?.body) ??
-    outer;
+    asRecord(outer?.originalError) ?? asRecord(outer?.cause) ?? asRecord(outer?.body) ?? outer;
 
   const status = statusOf(cause) || statusOf(outer);
   const parsed = parseHandledError({ status, body: cause });

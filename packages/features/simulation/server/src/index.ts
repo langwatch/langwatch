@@ -9,6 +9,7 @@ export {
 export { SimulationService } from "./services/simulation.service";
 export { STALL_THRESHOLD_MS } from "./processes/simulation-run-execution-evolution.process";
 export * from "./adapters/simulation-processing-commands.adapter";
+export type { QueueRunCommandData } from "./adapters/simulation-run.adapter";
 export {
   createSimulationProcessingPipeline,
   type SimulationProcessingPipelineDeps,

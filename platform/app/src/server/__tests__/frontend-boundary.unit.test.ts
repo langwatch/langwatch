@@ -64,8 +64,7 @@ const BROWSER_ONLY = [
  */
 const ALLOWED_PREFIXES = ["server/mailer/"];
 
-const isAllowedTerminal = (file: string) =>
-  ALLOWED_PREFIXES.some((p) => rel(file).startsWith(p));
+const isAllowedTerminal = (file: string) => ALLOWED_PREFIXES.some((p) => rel(file).startsWith(p));
 
 /** Backend trees: nothing under these may reach a browser-only package. */
 const BACKEND_TREES = [
@@ -181,11 +180,7 @@ const dynamicImports = (source: string): string[] => {
 
 const parseValueImports = (file: string): string[] => {
   const source = read(file);
-  return [
-    ...sideEffectImports(source),
-    ...boundImports(source),
-    ...dynamicImports(source),
-  ];
+  return [...sideEffectImports(source), ...boundImports(source), ...dynamicImports(source)];
 };
 
 const CANDIDATE_SUFFIXES = ["", ".ts", ".tsx", ".mts", ".cts", "/index.ts", "/index.tsx"];
@@ -206,7 +201,6 @@ const fileAt = (base: string): string | null => {
 const PATH_ALIASES: [prefix: string, target: string][] = [
   ["~/", SRC],
   ["@app/", path.join(SRC, "server", "app-layer")],
-  ["@ee/", path.join(APP_ROOT, "ee")],
 ];
 
 /** The file a package manifest points one subpath at, via `exports` or `main`. */
@@ -316,8 +310,7 @@ const bannedPackage = (spec: string): string | null =>
  * comment could over-report; none does today, and the failure direction of a
  * miss is a silent hole, so the check is deliberately the cheap one.
  */
-const rendersJsx = (file: string): boolean =>
-  /\.[jt]sx$/.test(file) && /<\/|\/>/.test(read(file));
+const rendersJsx = (file: string): boolean => /\.[jt]sx$/.test(file) && /<\/|\/>/.test(read(file));
 
 /**
  * The app-internal imports of one file, recording in `directHit` the first
@@ -543,10 +536,7 @@ describe("browser-only UI never reaches the backend", () => {
     });
 
     it("leaves a .tsx that renders nothing alone, so the rule is not the extension", () => {
-      const noJsx = path.join(
-        SRC,
-        "features/onboarding/regions/model-providers/registry.tsx",
-      );
+      const noJsx = path.join(SRC, "features/onboarding/regions/model-providers/registry.tsx");
       expect(fs.existsSync(noJsx)).toBe(true);
 
       expect(chainToBrowserUi(noJsx)).toBeNull();
@@ -566,9 +556,7 @@ describe("browser-only UI never reaches the backend", () => {
     });
 
     it("ignores one in type position, because the annotation is erased", () => {
-      const specs = valueImportsOf(
-        path.join(SRC, "server/api/routers/gatewayBudgets.ts"),
-      );
+      const specs = valueImportsOf(path.join(SRC, "server/api/routers/gatewayBudgets.ts"));
 
       expect(specs).not.toContain("~/generated/prisma/client");
     });
@@ -669,10 +657,7 @@ const chainFromVia = (root: string, via: Map<string, string | null>): string[] =
  * the same reason: a per-root BFS re-walks the whole graph once per root,
  * and there are hundreds of roots.
  */
-const chainsToTargets = (
-  roots: string[],
-  targets: ReadonlySet<string>,
-): Map<string, string[]> => {
+const chainsToTargets = (roots: string[], targets: ReadonlySet<string>): Map<string, string[]> => {
   const { children } = walkImportGraph(roots);
   const parents = invertEdges(children);
 
@@ -727,9 +712,7 @@ describe("client-imported vocabulary never reaches server-only state", () => {
     // the rbac vocabulary, the guard above has quietly become a walk over
     // nothing.
     it("derives rbac.ts among the roots, so the guard is not walking an empty set", () => {
-      expect(CLIENT_IMPORTED_SERVER_MODULES).toContain(
-        path.join(SRC, "server/api/rbac.ts"),
-      );
+      expect(CLIENT_IMPORTED_SERVER_MODULES).toContain(path.join(SRC, "server/api/rbac.ts"));
     });
   });
 
@@ -749,10 +732,7 @@ describe("client-imported vocabulary never reaches server-only state", () => {
   describe("given a server file that reaches the composition root transitively", () => {
     it("reports the chain through the AuthZ feature runtime", () => {
       const runtime = path.join(SRC, "runtime/app/features/authz.ts");
-      const chain = chainToServerModule(
-        path.join(SRC, "server/app-layer/presets.ts"),
-        runtime,
-      );
+      const chain = chainToServerModule(path.join(SRC, "server/app-layer/presets.ts"), runtime);
 
       expect(chain).not.toBeNull();
       expect(chain).toContain(rel(runtime));

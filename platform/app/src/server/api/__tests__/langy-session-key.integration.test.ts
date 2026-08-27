@@ -348,7 +348,8 @@ describe("Langy session key (caller-scoped)", () => {
         }
       });
 
-      it("is still refused the destructive grains the caller's role does grant", async () => {
+      /** @scenario Langy can delete my work, because I can */
+      it("reaches the destructive grains the caller's role grants", async () => {
         const { token } = await mintLangySessionApiKey({
           prisma,
           session: sessionFor(experimenterUserId),
@@ -368,6 +369,47 @@ describe("Langy session key (caller-scoped)", () => {
         for (const permission of ["evaluations:delete", "evaluations:manage"] as const) {
           await expect(
             enforceApiKeyCeiling({ resolved: resolved!, permission }),
+            `Langy was refused ${permission}, which the caller's own role grants`,
+          ).resolves.toBeUndefined();
+        }
+      });
+    });
+  });
+
+  // The mirror of the capability test above, and the half that carries the
+  // PR's whole safety argument: "the intersection is the real ceiling" is a
+  // sentence until a caller WITHOUT the destructive grain is refused it at
+  // the door. The editor's role has prompts view/create/update and no
+  // delete/manage anywhere, so a passing refusal here demonstrates the clamp
+  // rather than the candidate list simply never offering the grain.
+  describe("given an org member whose role grants no destructive grain", () => {
+    describe("when their Langy session key asks for one at the door", () => {
+      /** @scenario Langy cannot delete my work when I cannot */
+      it("is refused the delete its owner does not hold", async () => {
+        const { token } = await mintLangySessionApiKey({
+          prisma,
+          session: sessionFor(editorUserId),
+          projectId,
+          organizationId,
+        });
+
+        const resolved = await TokenResolver.create(prisma).resolve({
+          token,
+          projectId,
+        });
+        expect(resolved).not.toBeNull();
+
+        // The grain IS a candidate — the policy delegates prompts:delete —
+        // so the only thing standing between this key and the delete is the
+        // owner-ceiling re-check. That is the property under test.
+        for (const permission of [
+          "prompts:delete",
+          "evaluations:delete",
+        ] as const) {
+          await expect(
+            enforceApiKeyCeiling({ resolved: resolved!, permission }),
+            `${permission} cleared the ceiling for a caller whose role does ` +
+              `not hold it — the owner-intersection clamp is not holding`,
           ).rejects.toThrow();
         }
       });

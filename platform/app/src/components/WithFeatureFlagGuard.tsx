@@ -1,5 +1,5 @@
 import type React from "react";
-
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
@@ -54,6 +54,11 @@ export function withFeatureFlagGuard(
       );
       const orgId = organization?.id ?? "";
       const { enabled, isLoading: ffLoading } = useFeatureFlag(flag, {
+        // The guard covers project pages and organization pages alike. It
+        // states the project when the page has one, so a project rule and an
+        // organization rule both reach the page the same way they reach the
+        // menu item that links to it.
+        projectId: project?.id ?? NOT_TARGETED,
         organizationId: orgId,
         enabled: !!orgId,
       });

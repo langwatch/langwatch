@@ -477,9 +477,10 @@ export const inferAllEvaluatorMappings = (
       );
 
       if (Object.keys(newMappings).length > 0) {
-        if (!result[dataset.id]) {
-          result[dataset.id] = {};
-        }
+        // Copy the per-dataset bucket before writing into it: `result` is a
+        // shallow copy of the evaluator's mappings, so assigning straight into
+        // it would edit the caller's own state object.
+        result[dataset.id] = { ...result[dataset.id] };
         result[dataset.id]![target.id] = {
           ...existingMappings,
           ...newMappings,

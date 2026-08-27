@@ -59,8 +59,8 @@ COPY sdks/typescript ./sdks/typescript
 COPY platform/app/src/server/tracer/types.ts              ./platform/app/src/server/tracer/types.ts
 COPY platform/app/src/server/filters/types.ts             ./platform/app/src/server/filters/types.ts
 COPY platform/app/src/server/evaluations/types.ts         ./platform/app/src/server/evaluations/types.ts
-COPY platform/app/src/server/evaluations/evaluators.native.ts ./platform/app/src/server/evaluations/evaluators.native.ts
-COPY platform/app/src/server/modelProviders/llmModels.json ./platform/app/src/server/modelProviders/llmModels.json
+COPY packages/features/evaluator/contract/src/evaluators.native.ts ./packages/features/evaluator/contract/src/evaluators.native.ts
+COPY packages/features/model-provider/contract/src/catalog/model-catalog.json ./packages/features/model-provider/contract/src/catalog/model-catalog.json
 COPY platform/app/src/app/api/openapiLangWatch.json       ./platform/app/src/app/api/openapiLangWatch.json
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
 # are consumed as source, so pnpm install must see their package.json to link them

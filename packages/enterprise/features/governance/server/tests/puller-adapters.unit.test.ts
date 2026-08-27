@@ -2,10 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HttpPollingPullerAdapter } from "../src/adapters/http-poller.adapter";
 import { S3PollingPullerAdapter } from "../src/adapters/s3-puller.adapter";
-import {
-  GovernanceHttpPort,
-  type GovernanceHttpResponse,
-} from "../src/ports/governance-http.port";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../src/ports/governance-http.port";
 import { GovernanceObjectStoragePort } from "../src/ports/governance-object-storage.port";
 
 const httpConfig = {
@@ -95,9 +92,7 @@ class FakeHttp extends GovernanceHttpPort {
 
 class FakeObjects extends GovernanceObjectStoragePort {
   readonly list = vi.fn(
-    async (
-      _input: Parameters<GovernanceObjectStoragePort["list"]>[0],
-    ): Promise<string[]> => [],
+    async (_input: Parameters<GovernanceObjectStoragePort["list"]>[0]): Promise<string[]> => [],
   );
   readonly readText = vi.fn(
     async (_input: Parameters<GovernanceObjectStoragePort["readText"]>[0]) => "",
@@ -163,16 +158,9 @@ describe("HTTP polling puller", () => {
     );
     const adapter = httpAdapter(http);
 
-    const result = await adapter.runOnce(
-      { cursor: null },
-      adapter.validateConfig(httpConfig),
-    );
+    const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(httpConfig));
 
-    expect(result.events.map((item) => item.source_event_id)).toEqual([
-      "one",
-      "two",
-      "three",
-    ]);
+    expect(result.events.map((item) => item.source_event_id)).toEqual(["one", "two", "three"]);
     expect(http.calls[1]?.url).toContain("cursor=second");
     expect(http.calls[2]?.url).toBe(absolute);
   });
@@ -288,14 +276,11 @@ describe("S3 polling puller", () => {
       .mockRejectedValueOnce(new Error("missing object"));
     const adapter = s3Adapter(objects);
 
-    const result = await adapter.runOnce(
-      { cursor: null },
-      adapter.validateConfig(s3Config),
-    );
+    const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(s3Config));
 
     expect(result.events.map((item) => item.source_event_id)).toEqual(["one", "two"]);
     expect(result.cursor).toBe("logs/missing.ndjson");
-    expect(result.errorCount).toBe(1);
+    expect(result.errorCount).toBe(2);
   });
 
   it.each([

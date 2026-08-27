@@ -24,8 +24,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Every flag reads on, except the one that replaces the Simulations group
+// with Agent Testing: this file pins the rail as it stands today. The rail
+// under that flag is pinned by MainMenu.agentTesting.integration.test.tsx.
 vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true }),
+  useFeatureFlag: (flag: string) => ({
+    enabled: flag !== "release_ui_agent_testing_v2_enabled",
+  }),
 }));
 
 vi.mock("~/hooks/useOpsPermission", () => ({
@@ -112,7 +117,6 @@ describe("<MainMenu /> navigation", () => {
           "Dashboard",
           "Event Sourcing",
           "The Foundry",
-          "Deja View",
           "Feature Flags",
           "Migrations",
         ]),

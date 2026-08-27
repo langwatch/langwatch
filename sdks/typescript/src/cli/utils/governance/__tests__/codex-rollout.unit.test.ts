@@ -10,12 +10,7 @@ function rollout(...objs: unknown[]): string {
 
 const taskStarted = (traceId: string, turnId: string, startedAt = 1_780_000_000) => ({
   type: "event_msg",
-  payload: {
-    type: "task_started",
-    turn_id: turnId,
-    trace_id: traceId,
-    started_at: startedAt,
-  },
+  payload: { type: "task_started", turn_id: turnId, trace_id: traceId, started_at: startedAt },
 });
 const turnContext = (turnId: string, model = "gpt-5.5") => ({
   type: "turn_context",
@@ -23,23 +18,24 @@ const turnContext = (turnId: string, model = "gpt-5.5") => ({
 });
 const developerMsg = (text: string) => ({
   type: "response_item",
-  payload: {
-    type: "message",
-    role: "developer",
-    content: [{ type: "input_text", text }],
-  },
+  payload: { type: "message", role: "developer", content: [{ type: "input_text", text }] },
 });
 const userMsg = (text: string) => ({
   type: "response_item",
   payload: { type: "message", role: "user", content: [{ type: "input_text", text }] },
 });
-const assistantMsg = (text: string) => ({
+/** A user message carrying several content parts, the shape codex injects in. */
+const userMsgParts = (...texts: string[]) => ({
   type: "response_item",
   payload: {
     type: "message",
-    role: "assistant",
-    content: [{ type: "output_text", text }],
+    role: "user",
+    content: texts.map((text) => ({ type: "input_text", text })),
   },
+});
+const assistantMsg = (text: string) => ({
+  type: "response_item",
+  payload: { type: "message", role: "assistant", content: [{ type: "output_text", text }] },
 });
 const agentMessage = (message: string) => ({
   type: "event_msg",
@@ -77,9 +73,7 @@ describe("parseCodexRollout", () => {
           output: "a.txt b.txt",
           model: "gpt-5.5",
         });
-        expect(turns[0]!.inputMessages).toEqual([
-          { role: "user", content: "list the files" },
-        ]);
+        expect(turns[0]!.inputMessages).toEqual([{ role: "user", content: "list the files" }]);
         expect(turns[0]!.startedAtMs).toBe(1_780_000_000 * 1000);
       });
     });
@@ -180,9 +174,7 @@ describe("parseCodexRollout", () => {
         );
 
         expect(turns.map((t) => t.traceId)).toEqual(["t-one", "t-two"]);
-        expect(turns[0]!.inputMessages).toEqual([
-          { role: "user", content: "first question" },
-        ]);
+        expect(turns[0]!.inputMessages).toEqual([{ role: "user", content: "first question" }]);
         expect(turns[0]!.output).toBe("first answer");
         // Turn two carries the full prior conversation, as sent to the model.
         expect(turns[1]!.inputMessages).toEqual([
@@ -501,6 +493,103 @@ describe("parseCodexRollout", () => {
         );
 
         expect(meta?.firstUserMessage).toBe("fix the pricing bug");
+      });
+    });
+  });
+
+  describe("given an exec session, which emits no user_message event at all", () => {
+    describe("when the rollout is parsed", () => {
+      /** @scenario "A codex session is named by the prompt it was given" */
+      it("names it by the prompt in the conversation", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-2222", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+
+      /** @scenario "Context codex injects as a user message never names the session" */
+      it("skips the context codex writes to itself", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-3333", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            userMsg("<recommended_plugins>\nAirtable\nAlpaca\n"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+    });
+  });
+
+  describe("given a session that records the prompt in both places", () => {
+    const typedEvent = (message: string) => ({
+      type: "event_msg",
+      payload: { type: "user_message", message },
+    });
+
+    describe("when the rollout is parsed", () => {
+      /** @scenario "The event names the session even when the conversation also carries a prompt" */
+      it("keeps the event's prompt over anything in the conversation", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-4444", cwd: "/w" } },
+            typedEvent("review the diff on this branch"),
+            taskStarted("abc123", "t1"),
+            userMsg("<environment_context>\ncwd: /w\n"),
+            userMsg("a later user turn, which must not rename the session"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
+      });
+
+      /** @scenario "An injected bundle never names the session, whichever part carries the tag" */
+      it("skips a bundle whose tag sits behind an untagged heading", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-6666", cwd: "/w" } },
+            taskStarted("abc123", "t1"),
+            // The shape every real session on the agents box has: one message,
+            // two parts, the heading first and the tag second.
+            userMsgParts(
+              "# AGENTS.md instructions\n\n<INSTRUCTIONS>\nThis file is generated by the `agents-box` terraform module ...",
+              "<environment_context>\n  <cwd>/home/ubuntu/agent-workspaces/codex-proof/langwatch</cwd>\n  <shell>bash</shell>\n",
+            ),
+            userMsg(
+              "Review the diff of PR 7417 on this branch and tell me in two sentences what it changes.",
+            ),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe(
+          "Review the diff of PR 7417 on this branch and tell me in two sentences what it changes.",
+        );
+      });
+
+      /** @scenario "An injected event does not shut out the prompt in the conversation" */
+      it("skips an injected event and takes the conversation's typed prompt", () => {
+        const { meta } = parseCodexRollout(
+          rollout(
+            { type: "session_meta", payload: { id: "019ff127-5555", cwd: "/w" } },
+            typedEvent("<environment_context>\ncwd: /w\n</environment_context>"),
+            taskStarted("abc123", "t1"),
+            userMsg("review the diff on this branch"),
+            assistantMsg("done"),
+          ),
+        );
+
+        expect(meta?.firstUserMessage).toBe("review the diff on this branch");
       });
     });
   });

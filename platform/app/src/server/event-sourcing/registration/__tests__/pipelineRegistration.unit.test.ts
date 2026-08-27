@@ -60,6 +60,14 @@ describe("PipelineRegistry.registerAll", () => {
         expect(registeredPipelineNames()).toContain("langy_maintenance");
       });
 
+      it("mounts the agent sandbox key reaper", () => {
+        // Nothing revokes a sandbox key at the end of a run, so an unmounted
+        // sweep leaves every key of every run live until it expires.
+        expect(registeredPipelineNames()).toContain(
+          "agent_sandbox_maintenance",
+        );
+      });
+
       it("mounts the blob-maintenance sweep alongside it", () => {
         // Same class of defect, same guard: a scheduled sweep with no caller
         // is indistinguishable from a working one until the thing it protects

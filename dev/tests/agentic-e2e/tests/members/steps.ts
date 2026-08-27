@@ -21,7 +21,7 @@ import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
 export async function givenIAmOnTheMembersPage(page: Page) {
   // Members settings is org-scoped at /settings/members (resolved via the
   // session's active org), not project-prefixed — every app nav link uses this
-  // exact href (see platform/app/src/routes.tsx). The org context comes from the
+  // exact href. The org context comes from the
   // authenticated session, not the URL.
   await page.goto(`/settings/members`);
   await expect(page.getByRole("heading", { name: "Organization Members" })).toBeVisible({
@@ -49,8 +49,8 @@ export async function whenIClickAddMembers(page: Page) {
  */
 export async function whenIFillEmailWith(page: Page, email: string) {
   // The Add-members dialog uses a single comma/space-separated email input whose
-  // placeholder is an example list ("alice@example.com, bob@example.com") — see
-  // platform/app/src/components/AddMembersForm.tsx. Match it by a stable substring.
+  // placeholder is an example list ("alice@example.com, bob@example.com"). Match
+  // it by a stable substring.
   await page
     .getByPlaceholder(/alice@example\.com/i)
     .last()
@@ -96,26 +96,6 @@ export async function whenICloseInviteLinkDialog(page: Page) {
 }
 
 // =============================================================================
-// Invitation Action Steps
-// =============================================================================
-
-/**
- * Approve the invitation for a given email in the Invites table.
- */
-export async function whenIApproveInvitationFor(page: Page, email: string) {
-  const row = page.getByRole("row").filter({ hasText: email });
-  await row.getByRole("button", { name: /approve/i }).click();
-}
-
-/**
- * Reject the invitation for a given email in the Invites table.
- */
-export async function whenIRejectInvitationFor(page: Page, email: string) {
-  const row = page.getByRole("row").filter({ hasText: email });
-  await row.getByRole("button", { name: /reject/i }).click();
-}
-
-// =============================================================================
 // Assertion Steps
 // =============================================================================
 
@@ -134,22 +114,6 @@ export async function thenISeeSentInviteFor(page: Page, email: string) {
 }
 
 /**
- * Assert that an email appears in the "Invites" list with a pending badge.
- */
-export async function thenISeePendingApprovalFor(page: Page, email: string) {
-  const invitesHeading = page.getByRole("heading", { name: "Invites" });
-  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
-
-  const invitesSection = invitesHeading.locator("..");
-  const row = invitesSection.getByRole("row").filter({ hasText: email });
-
-  await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Pending Approval")).toBeVisible({
-    timeout: 5000,
-  });
-}
-
-/**
  * Assert that an email does NOT appear anywhere on the page.
  */
 export async function thenEmailIsNotVisible(page: Page, email: string) {
@@ -161,15 +125,6 @@ export async function thenEmailIsNotVisible(page: Page, email: string) {
  */
 export async function thenISeeSuccessToast(page: Page, titleText: string) {
   await expect(page.getByText(titleText, { exact: false })).toBeVisible({
-    timeout: 5000,
-  });
-}
-
-/**
- * Assert that the Invites section is NOT visible.
- */
-export async function thenPendingApprovalSectionIsHidden(page: Page) {
-  await expect(page.getByRole("heading", { name: "Invites" })).not.toBeVisible({
     timeout: 5000,
   });
 }
@@ -206,55 +161,13 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
   const org = (json?.["0"]?.result?.data?.json ?? [])[0];
   if (!org?.id || !org.teams?.[0]?.id) {
     throw new Error(
-      `Could not extract org/team IDs (status ${response.status()}): ${JSON.stringify(
-        json,
-      ).slice(0, 300)}`,
+      `Could not extract org/team IDs (status ${response.status()}): ${JSON.stringify(json).slice(
+        0,
+        300,
+      )}`,
     );
   }
   return { organizationId: org.id, teamId: org.teams[0].id };
-}
-
-/**
- * Create a WAITING_APPROVAL invitation via tRPC API.
- */
-export async function seedWaitingApprovalInvite({
-  page,
-  email,
-  organizationId,
-  teamId,
-}: {
-  page: Page;
-  email: string;
-  organizationId: string;
-  teamId: string;
-}) {
-  const response = await page.request.post("/api/trpc/organization.createInviteRequest", {
-    data: {
-      json: {
-        organizationId,
-        invites: [
-          {
-            email: email.toLowerCase(),
-            role: "MEMBER",
-            // Omit customRoleId entirely: the createInviteRequest schema types
-            // it as z.string().optional() (organization.ts), so a literal null
-            // fails validation with "Expected string, received null".
-            teams: [
-              {
-                teamId,
-                role: "MEMBER",
-              },
-            ],
-          },
-        ],
-      },
-    },
-  });
-
-  if (!response.ok()) {
-    const body = await response.text();
-    throw new Error(`Failed to seed invite for ${email}: ${response.status()} ${body}`);
-  }
 }
 
 /**
@@ -274,7 +187,7 @@ export function generateUniqueEmail(prefix: string): string {
  * Activate a test ENTERPRISE license (maxMembers=100) for the current org.
  *
  * A no-license self-hosted deployment resolves to FREE_PLAN (maxMembers=1), so
- * the owner alone is at the cap and createInviteRequest 403s. The app trusts
+ * the owner alone is at the cap and createInvites 403s. The app trusts
  * this test-signed license because e2e-ci sets LANGWATCH_LICENSE_PUBLIC_KEY to
  * the matching TEST_PUBLIC_KEY; getActivePlan re-reads the org's license from
  * Postgres on every call, so activation takes effect with no app restart.
@@ -289,10 +202,7 @@ export async function activateEnterpriseLicense(page: Page): Promise<void> {
   const result = await response.json().catch(() => null);
   if (!response.ok() || result?.["0"]?.error) {
     throw new Error(
-      `license.upload failed: ${response.status()} ${JSON.stringify(result).slice(
-        0,
-        500,
-      )}`,
+      `license.upload failed: ${response.status()} ${JSON.stringify(result).slice(0, 500)}`,
     );
   }
 }
@@ -319,10 +229,7 @@ export async function removeEnterpriseLicense(page: Page): Promise<void> {
   const result = await response.json().catch(() => null);
   if (!response.ok() || result?.["0"]?.error) {
     throw new Error(
-      `license.remove failed: ${response.status()} ${JSON.stringify(result).slice(
-        0,
-        500,
-      )}`,
+      `license.remove failed: ${response.status()} ${JSON.stringify(result).slice(0, 500)}`,
     );
   }
 }

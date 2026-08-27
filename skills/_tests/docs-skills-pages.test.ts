@@ -13,9 +13,7 @@ const skillsPagesDir = path.join(docsRoot, "skills");
 const manifest: Record<
   string,
   Record<string, { title: string; skill?: string; promptFile: string }[]>
-> = JSON.parse(
-  fs.readFileSync(path.join(skillsPagesDir, "skills-pages-manifest.json"), "utf8"),
-);
+> = JSON.parse(fs.readFileSync(path.join(skillsPagesDir, "skills-pages-manifest.json"), "utf8"));
 
 // Manifest keys are docs-relative paths (e.g. "skills/directory.mdx",
 // "agent-simulations/connect-your-agent.mdx") since the skill card reached
@@ -38,6 +36,18 @@ function extractAll(source: string, re: RegExp): string[] {
   return out;
 }
 
+// The generator renders a card in one of two shapes: the ordinary collapsible
+// accordion, and the static card, which is always open and carries no toggle.
+// Both count as one accordion. The trailing quote keeps this off the nested
+// `lw-accordion-header` / `-body` / `-actions` divs.
+const ACCORDION_OPEN = /<div className="lw-accordion(?: lw-accordion-static)?"/g;
+
+// A static card's header and the attributes it carries, which must stay empty:
+// posthog.js skips `.lw-accordion-static` in its header click handler, so the
+// header does nothing when activated and must not claim button semantics.
+const STATIC_ACCORDION_HEADER =
+  /<div className="lw-accordion lw-accordion-static"[^>]*>\s*<div className="lw-accordion-header"([^>]*)>/g;
+
 // The paths the published langwatch/skills repo actually contains, derived
 // from the same selection the publish sync writes (recipes nest under
 // recipes/<slug>). The accordion download URLs must only ever reference these.
@@ -49,9 +59,7 @@ describe("docs skills directory pages", () => {
   describe("given the publish sync defines which skills exist in langwatch/skills", () => {
     const manifestSkills = Object.values(manifest).flatMap((sections) =>
       Object.values(sections).flatMap((entries) =>
-        entries
-          .filter((e) => e.skill)
-          .map((e) => e.skill!.replace("langwatch/skills/", "")),
+        entries.filter((e) => e.skill).map((e) => e.skill!.replace("langwatch/skills/", "")),
       ),
     );
 
@@ -96,7 +104,7 @@ describe("docs skills directory pages", () => {
     it("renders every manifest accordion with its title and a server-rendered prompt block", () => {
       for (const { name, content } of pageFiles) {
         const entries = Object.values(manifest[name]!).flat();
-        const accordions = content.match(/<div className="lw-accordion">/g) ?? [];
+        const accordions = content.match(ACCORDION_OPEN) ?? [];
         expect(accordions.length, `${name} accordion count`).toBe(entries.length);
         const copyActions = content.match(/data-copy-source="prompt"/g) ?? [];
         expect(copyActions.length, `${name} prompt actions`).toBe(entries.length);
@@ -141,13 +149,10 @@ describe("docs skills directory pages", () => {
           const block = content.slice(start, end);
           let cursor = -1;
           for (const entry of entries) {
-            const idx = block.indexOf(
-              `data-track-title={${JSON.stringify(entry.title)}}`,
+            const idx = block.indexOf(`data-track-title={${JSON.stringify(entry.title)}}`);
+            expect(idx, `${name} ${sectionId}: "${entry.title}" present in order`).toBeGreaterThan(
+              cursor,
             );
-            expect(
-              idx,
-              `${name} ${sectionId}: "${entry.title}" present in order`,
-            ).toBeGreaterThan(cursor);
             cursor = idx;
           }
         }
@@ -168,10 +173,9 @@ describe("docs skills directory pages", () => {
         .flatMap((sections) => Object.values(sections).flat())
         .map((e) => e.promptFile)
         .filter((f) => !validNames.has(f));
-      expect(
-        bad,
-        `manifest promptFile entries with no compiler output: ${bad.join(", ")}`,
-      ).toEqual([]);
+      expect(bad, `manifest promptFile entries with no compiler output: ${bad.join(", ")}`).toEqual(
+        [],
+      );
     });
   });
 
@@ -185,9 +189,7 @@ describe("docs skills directory pages", () => {
         // Import statements inside fenced code blocks are inert content
         // (the prompts embed Python/TS examples); only page-level ESM counts.
         const withoutFences = content.replace(/^(`{3,})[^\n]*\n[\s\S]*?^\1$/gm, "");
-        return extractAll(withoutFences, /^(import\s[^\n]*)$/gm).map(
-          (line) => `${name}: ${line}`,
-        );
+        return extractAll(withoutFences, /^(import\s[^\n]*)$/gm).map((line) => `${name}: ${line}`);
       });
       expect(
         offenders,
@@ -217,18 +219,33 @@ describe("docs skills directory pages", () => {
 
     it("marks every interactive control as a focusable button", () => {
       for (const { name, content } of pageFiles) {
-        for (const cls of [
-          "lw-accordion-header",
-          "lw-accordion-action",
-          "lw-accordion-cmd-box",
-        ]) {
-          const total =
-            content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
+        // A static card never toggles, so its header is not an interactive
+        // control. The next test pins that it stays inert, which is what keeps
+        // this subtraction from hiding a header that lost its semantics.
+        const inertHeaders = content.match(STATIC_ACCORDION_HEADER)?.length ?? 0;
+        for (const cls of ["lw-accordion-header", "lw-accordion-action", "lw-accordion-cmd-box"]) {
+          const total = content.match(new RegExp(`className="${cls}[" ]`, "g"))?.length ?? 0;
           const buttons =
             content.match(
               new RegExp(`className="${cls}[" ][^>]*role="button" tabIndex=\\{0\\}`, "g"),
             )?.length ?? 0;
-          expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(total);
+          const interactive = cls === "lw-accordion-header" ? total - inertHeaders : total;
+          expect(buttons, `${name}: ${cls} keyboard semantics`).toBe(interactive);
+        }
+      }
+    });
+
+    it("leaves the static card header inert because nothing handles its click", () => {
+      const js = fs.readFileSync(path.join(docsRoot, "posthog.js"), "utf8");
+      expect(js, "the header click handler must skip static cards").toContain(
+        "lw-accordion-static",
+      );
+      for (const { name, content } of pageFiles) {
+        for (const [, attrs] of content.matchAll(STATIC_ACCORDION_HEADER)) {
+          expect(
+            attrs!.trim(),
+            `${name}: a static card header must claim no button semantics`,
+          ).toBe("");
         }
       }
     });

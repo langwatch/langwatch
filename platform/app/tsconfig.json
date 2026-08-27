@@ -22,11 +22,8 @@
     "verbatimModuleSyntax": true,
     "baseUrl": ".",
     "paths": {
-      "~/generated/prisma/client": [
-        "../../packages/prisma-client/src/generated/client.ts"
-      ],
+      "~/generated/prisma/client": ["../../packages/prisma-client/src/generated/client.ts"],
       "~/*": ["./src/*"],
-      "@ee/*": ["./ee/*"],
       "@app/*": ["./src/server/app-layer/*"],
       "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
     },

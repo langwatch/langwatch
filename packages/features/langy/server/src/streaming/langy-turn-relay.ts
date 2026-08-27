@@ -72,9 +72,7 @@ const NAVIGATE_RESOURCE = "navigate";
 const NAVIGATE_VERB = "open";
 
 /** The resource id a parsed invocation names, when it is `navigate open`. */
-function navigateResourceIdOf(
-  invocation: LangwatchCommand | null,
-): { resourceId: string } | null {
+function navigateResourceIdOf(invocation: LangwatchCommand | null): { resourceId: string } | null {
   if (
     !invocation ||
     invocation.resource !== NAVIGATE_RESOURCE ||
@@ -150,16 +148,8 @@ function collectItemPlatformLinks(payload: unknown): Array<{ id: string; href: s
 /** The slice of the token buffer the relay writes (the live edge). */
 export interface LangyRelayBuffer {
   appendChunk(a: { conversationId: string; turnId: string; text: string }): Promise<void>;
-  appendReasoning(a: {
-    conversationId: string;
-    turnId: string;
-    text: string;
-  }): Promise<void>;
-  appendStatus(a: {
-    conversationId: string;
-    turnId: string;
-    status: string;
-  }): Promise<void>;
+  appendReasoning(a: { conversationId: string; turnId: string; text: string }): Promise<void>;
+  appendStatus(a: { conversationId: string; turnId: string; status: string }): Promise<void>;
   appendProgress(a: {
     conversationId: string;
     turnId: string;
@@ -197,19 +187,12 @@ export interface LangyRelayBuffer {
   }): Promise<{ backstopped: boolean }>;
   markError(a: { conversationId: string; turnId: string; error: string }): Promise<void>;
   heartbeat(a: { conversationId: string; turnId: string }): Promise<void>;
-  appendNavigate(a: {
-    conversationId: string;
-    turnId: string;
-    href: string;
-  }): Promise<void>;
+  appendNavigate(a: { conversationId: string; turnId: string; href: string }): Promise<void>;
 }
 
 /** The slice of the conversation service the relay dispatches durable events through. */
 export interface LangyRelayConversations {
-  tryGetRunToken(a: {
-    projectId: string;
-    conversationId: string;
-  }): Promise<string | null>;
+  tryGetRunToken(a: { projectId: string; conversationId: string }): Promise<string | null>;
   recordToolCallStarted(a: {
     projectId: string;
     conversationId: string;
@@ -295,6 +278,20 @@ export interface LangyTurnRelayDeps {
     turnId: string;
   }): Promise<string | null>;
   /**
+   * Extend the turn's handoff by another full TTL.
+   *
+   * The handoff TTL is written once when the turn is dispatched, and the
+   * heartbeat below is the only ongoing proof that the worker is alive. Without
+   * this, a turn running longer than the handoff TTL lost the record it would
+   * be revived from while it was still working.
+   *
+   * No `projectId`, unlike `readHandoffRunToken`: that one runs BEFORE the MAC
+   * check and so cannot trust the conversation id it was handed, while this one
+   * runs after it, on a triple the signature has already proven. Optional dep so
+   * unit tests and non-relaying consumers stay thin.
+   */
+  refreshHandoffTtl?(a: { conversationId: string; turnId: string }): Promise<void>;
+  /**
    * Per-conversation memory of "which platform address did a lookup surface for
    * resource X". A `navigate` instruction resolves its destination from here.
    * Conversation-scoped (not this relay instance) so a resource looked up in one
@@ -307,10 +304,7 @@ export interface LangyTurnRelayDeps {
    * itself (see langyNavigateFallback). Null = not resolvable here → the
    * navigate drops. Optional so tests and non-navigating consumers stay thin.
    */
-  resolveResourceUrl?: (a: {
-    projectId: string;
-    resourceId: string;
-  }) => Promise<string | null>;
+  resolveResourceUrl?: (a: { projectId: string; resourceId: string }) => Promise<string | null>;
   logger?: {
     warn(o: unknown, m: string): void;
     debug?(o: unknown, m: string): void;
@@ -382,22 +376,21 @@ export class LangyTurnRelay {
     buffer?: LangyRelayBuffer;
     reserveFrameNonce?: LangyTurnRelayDeps["reserveFrameNonce"];
     readHandoffRunToken?: LangyTurnRelayDeps["readHandoffRunToken"];
+    refreshHandoffTtl?: LangyTurnRelayDeps["refreshHandoffTtl"];
     resourceLinks?: LangyResourceLinkStore;
     resolveResourceUrl?: LangyTurnRelayDeps["resolveResourceUrl"];
     resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
     logger?: LangyTurnRelayDeps["logger"];
   }): LangyTurnRelay {
     const redis = options.redis;
-    const buffer =
-      options.buffer ?? (redis ? LangyTokenBuffer.create({ redis }) : undefined);
+    const buffer = options.buffer ?? (redis ? LangyTokenBuffer.create({ redis }) : undefined);
     if (!buffer) {
       throw new Error("Langy relay requires Redis or a buffer");
     }
     const frameDedup = redis ? LangyFrameDedupStore.create({ redis }) : null;
     const handoff = redis ? LangyTurnHandoffStore.create({ redis }) : null;
     const resourceLinks =
-      options.resourceLinks ??
-      (redis ? LangyResourceLinksStore.create({ redis }) : undefined);
+      options.resourceLinks ?? (redis ? LangyResourceLinksStore.create({ redis }) : undefined);
     if (!resourceLinks) {
       throw new Error("Langy relay requires Redis or resource links");
     }
@@ -421,10 +414,17 @@ export class LangyTurnRelay {
               },
             }
           : {}),
+      ...(options.refreshHandoffTtl
+        ? { refreshHandoffTtl: options.refreshHandoffTtl }
+        : handoff
+          ? {
+              refreshHandoffTtl: async ({ conversationId, turnId }) => {
+                await handoff.refresh({ conversationId, turnId });
+              },
+            }
+          : {}),
       resourceLinks,
-      ...(options.resolveResourceUrl
-        ? { resolveResourceUrl: options.resolveResourceUrl }
-        : {}),
+      ...(options.resolveResourceUrl ? { resolveResourceUrl: options.resolveResourceUrl } : {}),
       ...(options.logger ? { logger: options.logger } : {}),
       baseHost: options.baseHost,
       ...(options.resolveCapabilityProgress
@@ -597,6 +597,24 @@ export class LangyTurnRelay {
       case "heartbeat":
         // Liveness only — refresh the turn's freshness, write no content.
         await this.deps.buffer.heartbeat(at);
+        // The same proof of life extends the handoff. One EXPIRE, never a
+        // rewrite of the record: this frame says the worker is alive, not that
+        // anything about the turn's resume inputs changed.
+        try {
+          await this.deps.refreshHandoffTtl?.(at);
+        } catch (error) {
+          // A heartbeat that reached the buffer has done its job. Failing the
+          // frame over the handoff would report a live worker as unreachable,
+          // which is the fault this refresh exists to prevent.
+          this.deps.logger?.warn(
+            {
+              projectId,
+              ...at,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "langy relay handoff ttl refresh failed; the handoff keeps its current expiry",
+          );
+        }
         return { status: "applied" };
 
       case "plan":
@@ -661,6 +679,9 @@ export class LangyTurnRelay {
           backstopSilentTurn: (frame.text ?? "").trim() === "",
         });
         const text = backstopped ? LANGY_EMPTY_TURN_FALLBACK : frame.text;
+        // markEnd first: it flushes the last tokens, so the turn's own account
+        // of what happened when is complete on the stream before the ingest
+        // reads it back to record the parts in that order.
         await this.deps.conversations.ingestAgentTurnResult({
           projectId,
           conversationId,
@@ -830,9 +851,7 @@ export class LangyTurnRelay {
 
     // Every nested item that carries its own precise link (a LIST surfaces
     // many resources in one call), keyed by each id it answers to.
-    const links = new Map(
-      collectItemPlatformLinks(payload).map(({ id, href }) => [id, href]),
-    );
+    const links = new Map(collectItemPlatformLinks(payload).map(({ id, href }) => [id, href]));
 
     // The single-resource shape: the call's digest names the resource, the
     // payload's top-level link addresses it.
@@ -859,9 +878,7 @@ export class LangyTurnRelay {
    * settled successfully: the agent's ONLY input here is which resource, never
    * an address, so there is nothing else to extract.
    */
-  private shellCommandOfFrame(
-    frame: Extract<LangyRelayFrame, { type: "tool" }>,
-  ): string | null {
+  private shellCommandOfFrame(frame: Extract<LangyRelayFrame, { type: "tool" }>): string | null {
     return this.cliEnvelope.tryShellCommandOf({
       id: frame.id,
       name: frame.name,

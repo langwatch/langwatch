@@ -228,6 +228,25 @@ export const FEATURE_FLAGS = [
     description:
       "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media stays inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
   },
+  // ADR-116 §3. The allowlist for the born-finalized entrance: a sign-up on
+  // a flag-listed organization is created ON the identity branch — its
+  // identifier history goes into the event log and its migration state is
+  // finalized before sign-up returns — instead of being created on the
+  // legacy branch and migrated off it later.
+  //
+  // Default OFF, and it must stay off until the entrance is hardened: a
+  // flagged sign-up is deliberately COUPLED to engine availability and fails
+  // loudly (`identity_engine_unavailable`) when the event stack is down,
+  // rather than falling back. That coupling is acceptable only while the
+  // population is an operator-chosen allowlist. Target it with a store
+  // targeting rule per organization; the env override is the dev-loop lever.
+  {
+    key: "release_identity_born_finalized_signup",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Creates new users directly on the identity branch: their sign-in history is recorded as identity events and their migration state is finalized as part of sign-up, instead of being backfilled afterwards. Off = new users are created exactly as before. Sign-up on a targeted organization fails rather than falling back when the event-sourcing stack is unavailable, so enable it per organization, knowingly.",
+  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
@@ -245,6 +264,14 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via the operator store (or deployment-wide via RELEASE_UI_AI_GOVERNANCE_ENABLED=0) to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
+  },
+  {
+    key: "release_ui_governance_billed_cost_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Reveals the Costs and Billed governance placeholder pages and their sidebar items (spec: specs/ai-gateway/governance/governance-home-routing.feature). Composed ON TOP of release_ui_ai_governance_enabled, never instead of it: the section flag off still hides everything. Default off — the pages are empty shells shipped ahead of the spend views. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled.",
+    family: "Governance",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
@@ -305,6 +332,15 @@ export const FEATURE_FLAGS = [
       "Runs Langy turns on the pi worker harness instead of opencode. On by default and evaluated once per turn; the operator store is the per-project rollback lever and environment overrides are disabled.",
   },
   {
+    key: "release_langy_ui_actions",
+    scope: "SYSTEM",
+    defaultValue: true,
+    envOverridable: false,
+    family: "Langy",
+    description:
+      "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
+  },
+  {
     key: "release_langy_promo_enabled",
     scope: "PRODUCT",
     defaultValue: false,
@@ -332,6 +368,24 @@ export const FEATURE_FLAGS = [
     family: "Langy",
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
+  },
+  {
+    key: "release_ui_agent_testing_v2_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the test cases and the results in tabs, test suites as folders of test cases, run notes, test case versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the current Simulations pages and menu group exactly as they are; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default off. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled.",
+  },
+  {
+    // D12 (ADR-117). Named `join_requests` rather than the usual
+    // `release_...` prefix so its auto-derived env override is exactly
+    // `JOIN_REQUESTS`, which is the operator lever the epic names and the
+    // one thing rollback consists of.
+    key: "join_requests",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Lets somebody with a verified company address find the organization their colleagues are already in and ask to join it, and lets an administrator turn that into automatic joining for a domain they name (spec: specs/identity/join-requests.feature, join-matching-and-privacy.feature, domain-auto-join.feature, join-before-create.feature). Off = the sign-up interstitial never renders, the members area shows no requests section, the lookup answers nothing to everyone, and no join command is ever dispatched. This is the whole of the rollback. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=join_requests, or set JOIN_REQUESTS=1 on a deployment.",
   },
   {
     key: "release_webhook_automations",

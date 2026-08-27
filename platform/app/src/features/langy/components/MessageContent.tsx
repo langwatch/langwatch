@@ -44,7 +44,7 @@ import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
 import { LangyPlanCard } from "./LangyPlanCard";
-import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
+import { hasLangyActivity, LangyActivityParts } from "./LangyToolActivity";
 
 export interface LangyProposal {
   langyProposal: true;
@@ -138,20 +138,26 @@ function MessageContentImpl({
     .filter((text) => text.length > 0)
     .join("\n\n");
 
-  // The block channel (ADR-060): a settled assistant message whose parts
-  // carry stamped `langy-card` / `langy-card-failed` parts renders as an
-  // ORDERED sequence — prose, card where the block sat, prose — instead of
-  // one joined markdown body. Fence-less messages keep the joined path
-  // untouched, and the live streaming turn never has stamped parts (the
-  // preview is Phase 4's seam), so `isStreaming` rendering is unaffected.
-  // Memoized: parts are replaced wholesale on settle/rehydrate, so identity
-  // is a faithful cache key and history messages never re-split per render.
-  const blockSegments = useMemo(
-    () =>
-      !isUser && !isStreaming && hasLangyBlockParts(message.parts)
-        ? langyAnswerSegments(message.parts)
-        : null,
-    [isUser, isStreaming, message.parts],
+  // A settled turn the reader WATCHED holds the copy this browser streamed,
+  // fences and all, and it is never replaced by the durable one (that would
+  // drop the mid-turn narration the saved reply does not keep). Nothing stamped
+  // that copy, so its fences are read at render — see `AnswerRun`. A RECORDED
+  // message is left alone: the relay already ruled on its fences.
+  const isRecorded =
+    (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
+
+  // A turn is a sequence, so it renders as one: the paragraphs and the calls in
+  // the order the parts carry, rather than every card in a pile above the whole
+  // reply joined underneath. Each answer run keeps the block channel's own
+  // ordering inside it (ADR-060 §1); each activity run is the same
+  // LangyActivityParts spine that used to render the message's tool parts all
+  // at once.
+  const runs = useMemo(
+    () => (isUser ? [] : langyTranscriptRuns(message.parts)),
+    [isUser, message.parts],
+  );
+  const lastActivityRunIndex = runs.findLastIndex(
+    (run) => run.kind === "activity",
   );
 
   // The agent's `question` TOOL call, mapped onto the choices contract
@@ -215,12 +221,12 @@ function MessageContentImpl({
   // something to render" so a turn whose only output is a running tool or a
   // settled card (no prose yet) still surfaces it.
   const showsActivity = isUser ? false : hasLangyActivity(message);
-  // The plan checklist, folded from the turn's `todowrite` tool parts. When
-  // present it becomes the activity spine (LangyPlanCard nests the tool cards
-  // under their step); absent, the flat LangyToolActivity list renders exactly
-  // as today (zero-regression path, pinned by test). On the LIVE streaming turn
-  // the manager's typed snapshot (store) is preferred over raw parsing, so the
-  // client honours the same caps the manager applied.
+  // The plan checklist, folded from the turn's `todowrite` tool parts. It is
+  // the steps only — the work itself is in the transcript, where it happened.
+  // On the LIVE streaming turn the manager's typed snapshot (store) is
+  // preferred over raw parsing, so the client honours the same caps the manager
+  // applied, and LangyPanel holds the checklist above the composer rather than
+  // letting it scroll away with the top of a long turn.
   // Completed messages do not need to subscribe to the mutable live-turn
   // snapshot. Keeping that subscription on every historical answer made one
   // plan tick reconcile the full transcript.
@@ -253,7 +259,10 @@ function MessageContentImpl({
         text: reasoningFold.text,
         hasActivity: hasActivityRecord,
       });
-  const hasBlocks = blockSegments !== null && blockSegments.length > 0;
+  // A turn whose only output is a stamped card block has no prose at all, and
+  // reading "No content" under a card the reader can see is worse than saying
+  // nothing.
+  const hasBlocks = !isUser && hasLangyBlockParts(message.parts);
   const hasContent = Boolean(
     displayText ||
     hasBlocks ||
@@ -323,30 +332,56 @@ function MessageContentImpl({
     // every answer was chrome, and at that size the mark was a smudge anyway.
     <HStack gap={2} align="flex-start" width="full">
       <VStack align="stretch" gap={2.5} flex={1} minWidth={0}>
-        {/* Tool activity, all of it as CARDS: a capability's in-progress shell
-            while it runs and its bespoke card once it settles, and a generic
-            activity card (tool name + what it's doing + the command/path) for
-            everything else. Raw JSON is developer-mode only. Single insertion
-            point; all mapping lives in LangyToolActivity. */}
-        {plan ? (
+        {/* The plan the turn is following. While it runs, LangyPanel holds this
+            above the composer instead (it must not scroll away on the long
+            turns that have one), so it renders here only once the turn is
+            over — the record of what the turn set out to do. */}
+        {plan && !isStreaming ? (
           <LangyCardBoundary scope="the plan">
             <LangyPlanCard
               plan={plan}
               reasoningTitles={reasoningFold.titles}
+              isStreaming={false}
+            />
+          </LangyCardBoundary>
+        ) : null}
+        {/* The turn itself, in its own order: a paragraph, the call it ran, the
+            paragraph after it. Tool activity is all CARDS — a capability's
+            in-progress shell while it runs and its bespoke card once it
+            settles, a generic activity card for everything else — and every
+            mapping still lives in LangyToolActivity. */}
+        {runs.map((run, index) =>
+          run.kind === "activity" ? (
+            <LangyCardBoundary
+              key={`activity-${index}`}
+              scope="the tool activity"
+            >
+              <LangyActivityParts
+                parts={run.parts}
+                // The receipt's thinking headlines belong to the turn, not to
+                // one run of it, so they ride the last activity run.
+                reasoningTitles={
+                  index === lastActivityRunIndex ? reasoningFold.titles : []
+                }
+                // A call is only ever closed by its own output, so a stopped or
+                // dead turn leaves its open calls looking like they still run.
+                // Off the streaming turn, an open call is an interrupted one.
+                live={isStreaming}
+              />
+            </LangyCardBoundary>
+          ) : (
+            <AnswerRun
+              key={`answer-${index}`}
+              parts={run.parts}
               isStreaming={isStreaming}
+              isRecorded={isRecorded}
+              hasActivity={hasActivityRecord}
+              projectSlug={project?.slug ?? null}
+              choicesTimeline={choicesTimeline}
+              onChoiceSelect={onChoiceSelect}
+              onVerifyDerivedCard={onVerifyDerivedCard}
             />
-          </LangyCardBoundary>
-        ) : (
-          <LangyCardBoundary scope="the tool activity">
-            <LangyToolActivity
-              message={message}
-              reasoningTitles={reasoningFold.titles}
-              // A call is only ever closed by its own output, so a stopped or
-              // dead turn leaves its open calls looking like they still run.
-              // Off the streaming turn, an open call is an interrupted one.
-              live={isStreaming}
-            />
-          </LangyCardBoundary>
+          ),
         )}
         {progressEvents.length > 0 && (
           <LangyCardBoundary scope="the progress card">
@@ -501,6 +536,91 @@ interface AnswerBlockContext {
     card: LangyDerivedChoicesCard;
   }) => void;
   onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
+}
+
+/**
+ * One run of the reply: the prose between two calls, with any card blocks
+ * stamped into it.
+ *
+ * The live turn takes the streaming path (the forming ```langy-card fence
+ * previews through the SAME validation the relay stamps with at settle,
+ * ADR-060 §7); a settled run renders its stamped blocks where they sat, and a
+ * settled run of a turn nobody stamped reads its own fences.
+ *
+ * The answer wears the theme's answer tokens (langyTheme.ts): half a step
+ * smaller than the user's `sm` bubble and a step dimmer than `fg`, so a glance
+ * separates "what I said" from "what it said".
+ */
+function AnswerRun({
+  parts,
+  isStreaming,
+  isRecorded,
+  ...context
+}: {
+  parts: readonly unknown[];
+  isStreaming: boolean;
+  /** A message the relay recorded: its fences were already ruled on. */
+  isRecorded: boolean;
+} & Omit<AnswerBlockContext, "firstTextIndex">) {
+  const text = langyRunText(parts);
+  // Blocks, when this run has any: stamped parts on a recorded message, or the
+  // fences of a copy this browser streamed and nothing has stamped.
+  const segments = useMemo(() => {
+    if (isStreaming) return null;
+    if (hasLangyBlockParts(parts)) return langyAnswerSegments(parts);
+    return isRecorded ? null : langyAnswerSegmentsFromText(text);
+  }, [isStreaming, isRecorded, parts, text]);
+  const cleaned = parseLangyFeedbackDirective(text).cleanedText;
+  const display = stripToolNarration({
+    text: isStreaming
+      ? cleaned
+      : stripReasoningTitles({
+          text: cleaned,
+          hasActivity: context.hasActivity,
+        }),
+    hasActivity: context.hasActivity,
+  });
+
+  if (segments) {
+    return segments.length > 0 ? (
+      <AnswerWithCards segments={segments} {...context} />
+    ) : null;
+  }
+  if (!display) return null;
+  // The live turn: prose streams as ever, and any forming ```langy-card fence
+  // previews through the SAME validation the relay stamps with at settle
+  // (ADR-060 §7). Fence-less streams take the plain path inside, unchanged.
+  if (isStreaming) {
+    return (
+      <Box paddingX="2px">
+        <StreamingAnswerWithCards
+          text={display}
+          projectSlug={context.projectSlug}
+        />
+      </Box>
+    );
+  }
+  return (
+    <Box
+      // The cards around it have a border plus their own inner padding, so a
+      // flush-left paragraph sat a hair OUTSIDE their text edge. Two pixels
+      // tucks the prose onto the same optical column.
+      paddingX="2px"
+      css={{
+        "& > div > :first-child": { marginTop: 0 },
+        "& > div > :last-child": { marginBottom: 0 },
+        "& table": { display: "block", overflowX: "auto" },
+      }}
+    >
+      <Markdown
+        fontSize="langyAnswer"
+        linkVariant="langy"
+        color="langy.answerFg"
+      >
+        {display}
+      </Markdown>
+    </Box>
+  );
 }
 
 /**

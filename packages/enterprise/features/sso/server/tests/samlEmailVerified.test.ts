@@ -57,9 +57,14 @@ describe("auth0 mapProfileToUser emailVerified", () => {
       auth0ClientSecret: "auth0-client-secret",
       auth0Issuer: "https://acme.eu.auth0.com",
     } as any);
+    // Through `unknown` deliberately. better-auth 1.7 types the profile as
+    // `GenericOAuthUserInfo`, which REQUIRES `emailVerified` — and the whole
+    // point of this suite is what the mapper does when the claim is absent,
+    // so the fixtures below omit it on purpose. Widening the fixture to
+    // satisfy the parameter type would delete the case under test.
     const auth0Config = configs.find(
       (c) => (c as { providerId?: string }).providerId === "auth0",
-    ) as {
+    ) as unknown as {
       mapProfileToUser: (p: Record<string, any>) => Record<string, unknown>;
     };
     return auth0Config.mapProfileToUser;

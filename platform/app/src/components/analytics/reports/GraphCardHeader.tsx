@@ -25,10 +25,15 @@ interface GraphCardHeaderProps {
     active: boolean;
     alertType: string | null;
   } | null;
+  /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
+  isWorkbenchChart?: boolean;
+  /** The datapoint step a workbench card runs at, when it has one stored. */
+  granularitySeconds?: number;
   isDragging: boolean;
   dragAttributes: DraggableAttributes;
   dragListeners: SyntheticListenerMap | undefined;
   onSizeChange: (size: SizeOption) => void;
+  onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
 }
@@ -43,10 +48,13 @@ export function GraphCardHeader({
   rowSpan,
   filters,
   trigger,
+  isWorkbenchChart = false,
+  granularitySeconds,
   isDragging,
   dragAttributes,
   dragListeners,
   onSizeChange,
+  onGranularityChange,
   onDelete,
   isDeleting,
 }: GraphCardHeaderProps) {
@@ -87,8 +95,14 @@ export function GraphCardHeader({
     [filters],
   );
 
-  // Check if this is a saved graph (has valid database ID)
-  const isSavedGraph = !!(graphId && graphId !== "custom" && graph);
+  // Check if this is a saved graph (has valid database ID).
+  //
+  // A workbench chart is excluded on purpose rather than by accident: the alert
+  // path reads a builder payload's `series` to name what it is thresholding,
+  // and a saved statement has no series to read. Offering the bell here would
+  // author an alert against a chart the threshold dispatcher cannot evaluate.
+  const isSavedGraph =
+    !isWorkbenchChart && !!(graphId && graphId !== "custom" && graph);
 
   // Opens the automations drawer in edit mode for this graph's existing
   // trigger. Shared by the bell's click and keyboard handlers so both entry
@@ -185,7 +199,10 @@ export function GraphCardHeader({
         dashboardId={dashboardId}
         colSpan={colSpan}
         rowSpan={rowSpan}
+        isWorkbenchChart={isWorkbenchChart}
+        {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
         onSizeChange={onSizeChange}
+        {...(onGranularityChange ? { onGranularityChange } : {})}
         onDelete={onDelete}
         isDeleting={isDeleting}
       />

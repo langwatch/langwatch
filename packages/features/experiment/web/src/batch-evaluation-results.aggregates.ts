@@ -9,10 +9,7 @@ import type {
   BatchResultRow,
   BatchTargetColumn,
 } from "./batch-evaluation-results.types";
-import {
-  computeMetricStats,
-  type MetricStats,
-} from "./batch-evaluation-results.metric-stats";
+import { computeMetricStats, type MetricStats } from "./batch-evaluation-results.metric-stats";
 
 /**
  * Aggregate statistics for a target's evaluator results.
@@ -177,10 +174,7 @@ export const computeBatchTargetAggregates = (
   }));
 
   // Compute overall pass rate (only from evaluators with explicit pass/fail results)
-  const totalPassFail = evaluatorAggregates.reduce(
-    (sum, e) => sum + e.passed + e.failed,
-    0,
-  );
+  const totalPassFail = evaluatorAggregates.reduce((sum, e) => sum + e.passed + e.failed, 0);
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
   const overallPassRate = totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
 

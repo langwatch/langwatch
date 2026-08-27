@@ -344,8 +344,8 @@ function pulledUsageFromRawOcsf(rawPayload: string): {
 } {
   let extension: unknown;
   try {
-    extension = (JSON.parse(rawPayload) as { metadata?: { extension?: unknown } })
-      ?.metadata?.extension;
+    extension = (JSON.parse(rawPayload) as { metadata?: { extension?: unknown } })?.metadata
+      ?.extension;
   } catch {
     extension = null;
   }
@@ -437,10 +437,7 @@ function emptySourceHealthMetrics(): SourceHealthMetrics {
   return { events24h: 0, events7d: 0, events30d: 0, lastSuccessIso: null };
 }
 
-function emptyDenseBuckets(
-  windowStartMs: number,
-  windowDays: number,
-): SpendOverTimeBucket[] {
+function emptyDenseBuckets(windowStartMs: number, windowDays: number): SpendOverTimeBucket[] {
   const dayMs = 24 * 60 * 60 * 1000;
   const buckets: SpendOverTimeBucket[] = [];
   for (let i = 0; i < windowDays; i++) {
@@ -464,10 +461,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     prisma: object;
     clickhouse: GovernanceClickHouseResolverPort;
   }): PrismaActivityMonitorRepository {
-    return new PrismaActivityMonitorRepository(
-      options.prisma as PrismaClient,
-      options.clickhouse,
-    );
+    return new PrismaActivityMonitorRepository(options.prisma as PrismaClient, options.clickhouse);
   }
 
   /**
@@ -493,10 +487,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     return this.clickhouse.tryResolve(organizationId);
   }
 
-  async summary(input: {
-    organizationId: string;
-    windowDays: number;
-  }): Promise<SummaryResult> {
+  async summary(input: { organizationId: string; windowDays: number }): Promise<SummaryResult> {
     const anomalyBreakdown = await this.openAnomalyBreakdown(input.organizationId);
     const openAnomalyCount =
       anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
@@ -679,8 +670,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       // Trend-vs-previous needs a windowed CTE comparison; deferred to 3b.
       trendVsPreviousPct: 0,
       hasPriorBaseline: false,
-      mostUsedTarget:
-        r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
+      mostUsedTarget: r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
     }));
   }
 
@@ -720,13 +710,12 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     const ch = await this.tryGetClickhouse(input.organizationId);
     if (!ch) return [];
 
-    const projectDepartmentById = new Map(
-      projects.map((p) => [p.id, p.departmentId] as const),
-    );
+    const projectDepartmentById = new Map(projects.map((p) => [p.id, p.departmentId] as const));
     const tenantIds = projects.map((p) => p.id);
 
-    const { userDepartmentByEmail, userTeamDepartmentByEmail } =
-      await this.resolveUserDepartments(input.organizationId);
+    const { userDepartmentByEmail, userTeamDepartmentByEmail } = await this.resolveUserDepartments(
+      input.organizationId,
+    );
     const activeDepartmentNames = await this.activeDepartmentNames(input.organizationId);
 
     const now = Date.now();
@@ -804,8 +793,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
           key === UNASSIGNED_DEPARTMENT ? "Unassigned" : activeDepartmentNames.get(key)!,
         spendUsd: nanoUsdToDecimalString(v.spendNanoUsd),
         requestCount: v.requestCount,
-        lastActivityIso:
-          v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
+        lastActivityIso: v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
       }))
       .sort((a, b) => {
         const aNano = usdToNanoUsd(a.spendUsd);
@@ -814,9 +802,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       });
   }
 
-  private async activeDepartmentNames(
-    organizationId: string,
-  ): Promise<Map<string, string>> {
+  private async activeDepartmentNames(organizationId: string): Promise<Map<string, string>> {
     const rows = await this.prisma.department.findMany({
       where: { organizationId, archivedAt: null },
       select: { id: true, name: true },
@@ -1024,13 +1010,9 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
         teamName: t.teamName,
         spendUsd: nanoUsdToDecimalString(t.thisSpendNano),
         requestCount: t.requestCount,
-        deltaPctVsPriorWindow: pctChange(
-          Number(t.thisSpendNano),
-          Number(t.prevSpendNano),
-        ),
+        deltaPctVsPriorWindow: pctChange(Number(t.thisSpendNano), Number(t.prevSpendNano)),
         hasPriorBaseline: t.prevSpendNano > 0n,
-        lastActivityIso:
-          t.lastActivityMs > 0 ? new Date(t.lastActivityMs).toISOString() : null,
+        lastActivityIso: t.lastActivityMs > 0 ? new Date(t.lastActivityMs).toISOString() : null,
         sourceCount: t.sourceCount,
       }));
   }
@@ -1145,9 +1127,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     if (input.groupBy === "team") {
       const sourceIds = Array.from(
         new Set(
-          rows
-            .map((r) => r.groupKey)
-            .filter((s): s is string => typeof s === "string" && s !== ""),
+          rows.map((r) => r.groupKey).filter((s): s is string => typeof s === "string" && s !== ""),
         ),
       );
       const sources = sourceIds.length
@@ -1203,9 +1183,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     }
 
     const buckets = emptyDenseBuckets(windowStart, windowDays);
-    const bucketIndexByMs = new Map(
-      buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const),
-    );
+    const bucketIndexByMs = new Map(buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const));
     for (const [composite, spendNanoUsd] of aggregated.entries()) {
       const sep = composite.indexOf("::");
       const bucketMs = Number(composite.slice(0, sep));
@@ -1260,9 +1238,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
       severity: row.severity as "critical" | "warning" | "info",
       triggerWindowStartIso: row.triggerWindowStart.toISOString(),
       triggerWindowEndIso: row.triggerWindowEnd.toISOString(),
-      triggerSpendUsd: row.triggerSpendUsd
-        ? Number(row.triggerSpendUsd.toString())
-        : null,
+      triggerSpendUsd: row.triggerSpendUsd ? Number(row.triggerSpendUsd.toString()) : null,
       triggerEventCount: row.triggerEventCount,
       detectedAtIso: row.detectedAt.toISOString(),
       state: row.state,
@@ -1406,10 +1382,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
         this.countPulledEventsBySource(args),
       ]);
       for (const row of counts.flat()) {
-        eventsBySource.set(
-          row.sourceId,
-          (eventsBySource.get(row.sourceId) ?? 0) + Number(row.c),
-        );
+        eventsBySource.set(row.sourceId, (eventsBySource.get(row.sourceId) ?? 0) + Number(row.c));
       }
     }
 
@@ -1559,8 +1532,8 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     return [...pushedEvents, ...pulledEvents]
       .sort(
         (a, b) =>
-          new Date(b.eventTimestampIso).getTime() -
-            new Date(a.eventTimestampIso).getTime() || b.eventId.localeCompare(a.eventId),
+          new Date(b.eventTimestampIso).getTime() - new Date(a.eventTimestampIso).getTime() ||
+          b.eventId.localeCompare(a.eventId),
       )
       .filter((event) => {
         if (seen.has(event.eventId)) return false;
@@ -1712,10 +1685,7 @@ export class PrismaActivityMonitorRepository extends ActivityMonitorRepository {
     const total = (pick: (row: WindowCountRow) => number | string) =>
       windows.reduce((sum, row) => sum + (row ? Number(pick(row) ?? 0) : 0), 0);
 
-    const lastMs = Math.max(
-      0,
-      ...windows.map((row) => (row?.lastMs ? Number(row.lastMs) : 0)),
-    );
+    const lastMs = Math.max(0, ...windows.map((row) => (row?.lastMs ? Number(row.lastMs) : 0)));
 
     return {
       events24h: total((r) => r.c24),

@@ -18,10 +18,7 @@ import type {
   LocalEvaluatorConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import {
-  COMPARISON_EVALUATOR_TYPE,
-  LEGACY_PAIRWISE_EVALUATOR_TYPE,
-} from "~/experiments-v3/types";
+import { isComparisonEvaluatorType } from "~/experiments-v3/types";
 import {
   applyHandledErrorToForm,
   FormServerError,

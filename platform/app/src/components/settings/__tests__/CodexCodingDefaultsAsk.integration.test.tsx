@@ -95,7 +95,7 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
   beforeEach(() => {
     vi.clearAllMocks();
     useCodexCodingDefaultsAskStore.setState({ pending: null });
-    useLangyStore.getState().setModelOverride("");
+    useLangyStore.setState({ modelOverride: "", isModelPickedByUser: false });
     mockInvalidate.mockResolvedValue(void 0);
     mockFetchResolved.mockResolvedValue({ model: CODEX_MODEL });
     mockApplyCodingDefaults.mockResolvedValue({ applied: true });
@@ -171,7 +171,7 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
 
       /** @scenario A model the user picked on purpose is not hijacked */
       it("keeps a model the user explicitly picked", async () => {
-        useLangyStore.getState().setModelOverride("anthropic/claude-sonnet-5");
+        useLangyStore.getState().pickModel("anthropic/claude-sonnet-5");
         renderHost();
 
         fireEvent.click(await screen.findByRole("button", { name: "Set as default" }));

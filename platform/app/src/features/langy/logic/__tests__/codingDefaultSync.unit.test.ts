@@ -39,7 +39,7 @@ function buildUtils({
 
 describe("syncLangyAfterDefaultModelWrite", () => {
   beforeEach(() => {
-    useLangyStore.getState().setModelOverride("");
+    useLangyStore.setState({ modelOverride: "", isModelPickedByUser: false });
   });
 
   describe("when the pill was following the outgoing default", () => {
@@ -74,7 +74,7 @@ describe("syncLangyAfterDefaultModelWrite", () => {
   describe("when the user explicitly picked a different model", () => {
     /** @scenario A model the user picked on purpose is not hijacked */
     it("leaves the pick alone", async () => {
-      useLangyStore.getState().setModelOverride("anthropic/claude-sonnet-5");
+      useLangyStore.getState().pickModel("anthropic/claude-sonnet-5");
       const { utils } = buildUtils({
         previousModel: OLD_DEFAULT,
         nextModel: CODEX_MODEL,
@@ -83,6 +83,45 @@ describe("syncLangyAfterDefaultModelWrite", () => {
       await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
       expect(useLangyStore.getState().modelOverride).toBe("anthropic/claude-sonnet-5");
+    });
+  });
+
+  describe("when the allowlist took the picked model away", () => {
+    /** @scenario A model the user picked on purpose is not hijacked */
+    it("follows the default again, because the pick no longer stands", async () => {
+      // The panel snaps the picker to an allowed model when the pick turns out
+      // to be outside the allowlist. That snap OVERRULES the user, so the pick
+      // is over: were the flag to survive it, the pill would sit on the forced
+      // model and refuse every later default for the rest of the conversation.
+      useLangyStore.getState().pickModel("anthropic/claude-sonnet-5");
+      useLangyStore.getState().setModelOverride(OLD_DEFAULT);
+      const { utils } = buildUtils({
+        previousModel: OLD_DEFAULT,
+        nextModel: CODEX_MODEL,
+      });
+
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
+
+      expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
+    });
+  });
+
+  describe("when the user picked the model that just became the default", () => {
+    /** @scenario A pick that matches the default is still the user's pick */
+    it("keeps their pick, even when the resolver answers something else", async () => {
+      // The "make it the default" flow: the pick and the new default are the
+      // same model, so any "is the pill still on the default?" test reads an
+      // explicit choice as untouched. A resolver answering the OLD model then
+      // pulled the picker back to it, in front of a user who had just chosen.
+      useLangyStore.getState().pickModel(CODEX_MODEL);
+      const { utils } = buildUtils({
+        previousModel: CODEX_MODEL,
+        nextModel: OLD_DEFAULT,
+      });
+
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
+
+      expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
     });
   });
 

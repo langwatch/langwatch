@@ -1,8 +1,8 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { forwardRef, useMemo } from "react";
-import { topLevelNavigationCommands } from "../command-registry";
 import { COMMAND_BAR_MAX_HEIGHT } from "../constants";
 import type { ListItem } from "../getIconInfo";
+import { useTopLevelNavigationCommands } from "../hooks/useCommandFeatureFlags";
 import type { FilteredProject } from "../hooks/useFilteredProjects";
 import type { Command, RecentItem, SearchResult } from "../types";
 import { CommandGroup } from "./CommandGroup";

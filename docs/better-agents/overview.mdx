@@ -168,7 +168,7 @@ describe("Customer Support Agent", () => {
       description: "Customer requests refund for defective product",
       agents: [
         customerSupportAgent,
-        scenario.userSimulatorAgent({ model: openai("gpt-4o") }),
+        scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
       ],
       script: [
         scenario.user("I want a refund for my order"),
@@ -223,7 +223,7 @@ Example prompt structure:
 ```yaml prompts/customer-support.yaml
 handle: customer-support-bot
 scope: PROJECT
-model: openai/gpt-4o-mini
+model: openai/gpt-5-mini
 prompt: |
   You are a helpful customer support agent.
 

@@ -259,8 +259,12 @@ export async function loadMembershipSet(
   userId: string,
 ): Promise<MembershipSet> {
   const [orgMembership, teamMemberships] = await Promise.all([
-    prisma.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
+    // `disabledAt` is part of the lookup, not a detail of it: `isOrgAdmin`
+    // below short-circuits visibility to every virtual key in the
+    // organization, so a membership an admin disabled to reclaim its seat
+    // must not answer here at all. A disabled row reads as no membership.
+    prisma.organizationUser.findFirst({
+      where: { userId, organizationId, disabledAt: null },
       select: { role: true },
     }),
     prisma.teamUser.findMany({

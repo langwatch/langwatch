@@ -14,6 +14,8 @@ export abstract class GovernanceHttpPort {
       headers?: Record<string, string>;
       body?: string;
       signal?: AbortSignal;
+      /** Forwarded to the SSRF-safe process adapter for secret-bearing calls. */
+      followRedirects?: boolean;
     },
   ): Promise<GovernanceHttpResponse>;
 }

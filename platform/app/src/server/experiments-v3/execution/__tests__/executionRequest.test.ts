@@ -198,6 +198,24 @@ describe("executionRequestSchema", () => {
       }).success,
     ).toBe(true);
 
+    // Target-rows scope, with and without the row subset
+    expect(
+      executionRequestSchema.safeParse({
+        ...baseRequest,
+        scope: {
+          type: "target-rows",
+          targetIds: ["target-1"],
+          rowIndices: [0, 1],
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      executionRequestSchema.safeParse({
+        ...baseRequest,
+        scope: { type: "target-rows", targetIds: ["target-1", "target-2"] },
+      }).success,
+    ).toBe(true);
+
     // Cell scope
     expect(
       executionRequestSchema.safeParse({

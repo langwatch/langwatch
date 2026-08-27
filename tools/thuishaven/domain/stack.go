@@ -9,6 +9,16 @@ type Service struct {
 	Hostname string `json:"hostname"`
 	URL      string `json:"url"`
 	Port     int    `json:"port"`
+	// DNSPort is the IdP simulator's verification nameserver, and is zero for
+	// every other service.
+	//
+	// It is a port haven allocates rather than the simulator's own default,
+	// because the default is a fixed well-known one: a second stack finds it
+	// busy, falls back to an ephemeral port, and says so in a log nobody
+	// reads — leaving the app pointed at the FIRST stack's nameserver, which
+	// answers confidently for somebody else's domains. Allocated here, the
+	// two sides are told the same number and there is nothing to collide.
+	DNSPort int `json:"dnsPort,omitempty"`
 	// IsFallback is true when this worktree does not run the service itself and the
 	// hostname resolves to a shared baseline stack's copy instead. The hostname is
 	// always defined; only the backing port differs.
@@ -92,7 +102,15 @@ type Stack struct {
 	// sandboxed. It decides whether the worker runs in colima or on the host and
 	// which callback URLs the overlay hands the control plane.
 	LangyTier LangyTier `json:"langyTier,omitempty"`
-	Services  []Service `json:"services"`
+	// PortlessDisabled marks a stack provisioned with PORTLESS=0: every service
+	// serves plain HTTP on its own loopback port instead of routing through the
+	// portless proxy. The zero value is false (portless enabled, the historical
+	// behavior), so a stack persisted before this field existed reads back as it
+	// always behaved. `up` compares it against the requested run so flipping
+	// PORTLESS between runs restarts the stack onto the requested mode instead of
+	// silently keeping the old one (see reconcileRunningStack).
+	PortlessDisabled bool      `json:"portlessDisabled,omitempty"`
+	Services         []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -107,23 +125,37 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{"gateway", "AI Gateway (Go)"},
 	{"nlp", "NLP engine (Go)"},
 	{"langyagent", "Langy agent manager (Go)"},
+	{"idp", "IdP simulator (Go)"},
 }
 
-// BaselinePort finds a live baseline stack that runs `service` locally (not itself
-// a fallback), so a worktree that opts out of the service can route its hostname
-// there. alive reports whether a launcher pid is still running.
-func BaselinePort(stacks []Stack, service string, alive func(pid int) bool) (int, bool) {
+// BaselineService finds a live baseline stack that runs `service` locally (not
+// itself a fallback), so a worktree that opts out of the service can route its
+// hostname there. alive reports whether a launcher pid is still running.
+//
+// The whole service is returned rather than its port alone, because a
+// fallback has to inherit every endpoint the real one has: an idp resolved
+// this way answers OIDC on the baseline's HTTP port AND domain proofs on the
+// baseline's nameserver, and taking only the first would point the app at a
+// nameserver that is not running.
+func BaselineService(stacks []Stack, service string, alive func(pid int) bool) (Service, bool) {
 	for _, st := range stacks {
 		if !st.IsBaseline || !alive(st.LauncherPID) {
 			continue
 		}
 		for _, s := range st.Services {
 			if s.Name == service && !s.IsFallback && s.Port != 0 {
-				return s.Port, true
+				return s, true
 			}
 		}
 	}
-	return 0, false
+	return Service{}, false
+}
+
+// BaselinePort is BaselineService's port alone, for the callers that route a
+// hostname and need nothing else.
+func BaselinePort(stacks []Stack, service string, alive func(pid int) bool) (int, bool) {
+	svc, ok := BaselineService(stacks, service, alive)
+	return svc.Port, ok
 }
 
 // Stale reports whether the stack's heartbeat is older than ttl (ttl <= 0

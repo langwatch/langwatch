@@ -24,9 +24,11 @@ import {
   AnthropicAdminPuller,
   ClaudeComplianceReferencePuller,
   CopilotStudioReferencePuller,
+  CopilotStudioDataversePuller,
   DatabricksGeniePuller,
   HttpPollingPullerAdapter,
   OpenAiComplianceReferencePuller,
+  OpenAiAdminPuller,
   PullerRegistryService,
   S3PollingPullerAdapter,
 } from "@langwatch/enterprise-governance-server";
@@ -45,6 +47,7 @@ export type GovernanceHttpRequest = {
   headers?: Record<string, string>;
   body?: string;
   signal?: AbortSignal;
+  followRedirects?: boolean;
 };
 
 type GovernanceObjectStorageListInput = {
@@ -68,10 +71,7 @@ type GovernanceObjectStorageReadTextInput = {
 
 /** Complete API-host boundary for one ingestion-pull worker installation. */
 export abstract class GovernanceIngestionPullHost {
-  abstract fetch(
-    url: string,
-    init: GovernanceHttpRequest,
-  ): Promise<GovernanceHttpResponse>;
+  abstract fetch(url: string, init: GovernanceHttpRequest): Promise<GovernanceHttpResponse>;
   abstract ratePulledUsage(input: PulledUsageRateInput): {
     costNanoUsd: number;
     rateVersion: string;
@@ -119,9 +119,7 @@ class AppGovernanceObjectStoragePort extends GovernanceObjectStoragePort {
           return keys;
         }
       }
-      continuationToken = response.IsTruncated
-        ? response.NextContinuationToken
-        : undefined;
+      continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
     } while (continuationToken && pages < MAX_S3_PAGES);
     return keys;
   }
@@ -145,9 +143,7 @@ class AppGovernanceObjectStoragePort extends GovernanceObjectStoragePort {
       }
       totalBytes += chunk.byteLength;
       if (totalBytes > input.maxBytes) {
-        throw new Error(
-          `file exceeds ${input.maxBytes} bytes: s3://${input.bucket}/${input.key}`,
-        );
+        throw new Error(`file exceeds ${input.maxBytes} bytes: s3://${input.bucket}/${input.key}`);
       }
       chunks.push(chunk);
     }
@@ -168,17 +164,13 @@ class AppGovernanceObjectStoragePort extends GovernanceObjectStoragePort {
     return new S3Client({
       region: input.region,
       credentials:
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey, sessionToken }
-          : undefined,
+        accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey, sessionToken } : undefined,
     });
   }
 }
 
 class AppGovernanceOcsfEventSinkPort extends GovernanceOcsfEventSinkPort {
-  private constructor(
-    private readonly events: AppGovernanceOcsfEventsAdapter | undefined,
-  ) {
+  private constructor(private readonly events: AppGovernanceOcsfEventsAdapter | undefined) {
     super();
   }
 
@@ -284,7 +276,9 @@ export class AppIngestionPullWorkerAdapter {
     pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
     pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));
     pullers.register(CopilotStudioReferencePuller.create({ http, diagnostics }));
+    pullers.register(CopilotStudioDataversePuller.create(http));
     pullers.register(OpenAiComplianceReferencePuller.create({ objects, diagnostics }));
+    pullers.register(OpenAiAdminPuller.create(http));
     pullers.register(ClaudeComplianceReferencePuller.create({ http, diagnostics }));
     pullers.register(AnthropicAdminPuller.create(http));
     pullers.register(DatabricksGeniePuller.create(http));
@@ -292,9 +286,7 @@ export class AppIngestionPullWorkerAdapter {
     const credentials = IngestionCredentialsService.create(
       AppGovernanceEncryptionPort.create(this.host.encryption),
     );
-    const pricing = PulledUsagePricingService.create(
-      AppPulledUsageRatePort.create(this.host),
-    );
+    const pricing = PulledUsagePricingService.create(AppPulledUsageRatePort.create(this.host));
     return IngestionPullWorkerService.create({
       sources: this.sources,
       registry,

@@ -99,6 +99,7 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Prompts", accessLevels: "read, write" },
       { category: "Playground", accessLevels: "read, write" },
       { category: "Secrets", accessLevels: "read, write" },
+      { category: "Agent Cache", accessLevels: "read, write" },
       { category: "Audit Log", accessLevels: "read" },
       { category: "Team", accessLevels: "read, write" },
       { category: "Project", accessLevels: "read, write" },

@@ -27,6 +27,7 @@
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/user-contract": "workspace:*",

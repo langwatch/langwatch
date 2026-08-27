@@ -1,4 +1,5 @@
 import type { IntentContext } from "@langwatch/eventing";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   createTopicClusteringRunHandler,
@@ -224,7 +225,48 @@ describe("createTopicClusteringRunHandler", () => {
     });
   });
 
+  describe("when clustering fails for a reason only the customer can fix", () => {
+    /** @scenario A failure only the customer can fix is recorded without burning retries */
+    it("records run_failed on the first attempt instead of retrying", async () => {
+      const commands = makeCommands();
+      const runClusteringPage = vi
+        .fn()
+        .mockRejectedValue(
+          new ModelNotConfiguredError(
+            "analytics.topic_clustering_llm",
+            "FAST",
+            "Topic clustering",
+            "project-1",
+          ),
+        );
+      const run = createTopicClusteringRunHandler(
+        makeDeps({
+          runClusteringPage,
+          commands,
+          classifyError: () => ({
+            code: "model_not_configured",
+            isUserActionable: true,
+          }),
+          clock: () => 999,
+        }),
+      );
+
+      // Resolving rather than throwing is what tells the outbox the intent is
+      // finished: a throw here is what would buy the two extra attempts.
+      await expect(run(makePayload(), makeContext({ attempt: 1 }))).resolves.toBeUndefined();
+
+      expect(runClusteringPage).toHaveBeenCalledTimes(1);
+      expect(commands.recordClusteringRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          errorCode: "model_not_configured",
+          isUserActionable: true,
+        }),
+      );
+    });
+  });
+
   describe("when clustering fails on the final attempt", () => {
+    /** @scenario A failing clustering effect retries then records a visible failure */
     it("records a durable run_failed with the classifier's verdict", async () => {
       const commands = makeCommands();
       const run = createTopicClusteringRunHandler(
@@ -376,6 +418,43 @@ describe("run outcome metrics (ADR-054)", () => {
 
       expect(metrics.incrementPageTotal).toHaveBeenCalledWith({
         outcome: "failed_retryable",
+      });
+      expect(metrics.incrementPageTotal).not.toHaveBeenCalledWith({
+        outcome: "failed_final",
+      });
+    });
+  });
+
+  describe("when the failure is the customer's to fix", () => {
+    it("counts a failed_customer page, keeping failed_final an internal-fault signal", async () => {
+      const metrics = makeMetrics();
+      const commands = makeCommands();
+      const run = createTopicClusteringRunHandler(
+        makeDeps({
+          runClusteringPage: vi
+            .fn()
+            .mockRejectedValue(
+              new ModelNotConfiguredError(
+                "analytics.topic_clustering_llm",
+                "FAST",
+                "Topic clustering",
+                "project-1",
+              ),
+            ),
+          commands,
+          classifyError: () => ({
+            code: "model_not_configured",
+            isUserActionable: true,
+          }),
+          metrics,
+          clock: () => 999,
+        }),
+      );
+
+      await run(makePayload(), makeContext({ attempt: 1 }));
+
+      expect(metrics.incrementPageTotal).toHaveBeenCalledWith({
+        outcome: "failed_customer",
       });
       expect(metrics.incrementPageTotal).not.toHaveBeenCalledWith({
         outcome: "failed_final",

@@ -2,7 +2,7 @@ import { resolveExperimentVerdictLabel } from "@langwatch/experiment-contract";
 import {
   COMPARISON_EVALUATOR_TYPE,
   type ComparisonEvaluatorConfig,
-  type EvaluatorConfig,
+  isComparisonEvaluatorType,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type PairwiseEvaluatorConfig,
   type TargetConfig,
@@ -47,6 +47,9 @@ type ComparisonCarrier = {
   pairwise?: PairwiseEvaluatorConfig;
   comparison?: ComparisonEvaluatorConfig;
 };
+
+/** A carrier that also names the evaluator type deciding what it may carry. */
+type EvaluatorCarrier = ComparisonCarrier & { evaluatorType?: string };
 
 /**
  * Fold a legacy pairwise config into the canonical comparison shape.
@@ -117,7 +120,9 @@ export const normalizeEvaluators = (evaluators: EvaluatorConfig[]): EvaluatorCon
   evaluators.map(normalizeCarrier);
 
 export const normalizeTargets = (targets: TargetConfig[]): TargetConfig[] =>
-  targets.map(normalizeCarrier);
+  targets.map((target) =>
+    stripNonEvaluatorComparison(normalizeCarrier(target)),
+  );
 
 /**
  * Whether a stored verdict label names this variant.

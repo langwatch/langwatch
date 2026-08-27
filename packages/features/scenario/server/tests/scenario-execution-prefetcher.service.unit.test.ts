@@ -77,6 +77,7 @@ describe("prefetchWithFixture", () => {
 
   const defaultProject = {
     apiKey: "test-api-key",
+    team: { organizationId: "organization_1" },
   };
 
   const defaultModelParams: LiteLLMParams = {
@@ -266,10 +267,7 @@ describe("prefetchWithFixture", () => {
 
           await prefetchWithFixture({ context: defaultContext, target, deps });
 
-          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
-            "proj_123",
-            "openai/gpt-4",
-          );
+          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith("proj_123", "openai/gpt-4");
         });
 
         /** @scenario "A prompt with its own model never consults the agent-under-test default" */
@@ -364,9 +362,7 @@ describe("prefetchWithFixture", () => {
 
           const agentUnderTestCalls = (
             deps.modelResolver.resolve as ReturnType<typeof vi.fn>
-          ).mock.calls.filter(
-            ([featureKey]) => featureKey === "scenarios.agent_under_test",
-          );
+          ).mock.calls.filter(([featureKey]) => featureKey === "scenarios.agent_under_test");
           expect(agentUnderTestCalls).toHaveLength(1);
         });
 
@@ -567,10 +563,7 @@ describe("prefetchWithFixture", () => {
             "scenarios.user_simulator",
             "proj_123",
           );
-          expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
-            "scenarios.judge",
-            "proj_123",
-          );
+          expect(deps.modelResolver.resolve).toHaveBeenCalledWith("scenarios.judge", "proj_123");
           expect(result.success).toBe(true);
           if (result.success) {
             expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
@@ -604,9 +597,7 @@ describe("prefetchWithFixture", () => {
 
           expect(result.success).toBe(true);
           if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe(
-              "anthropic/sim-override",
-            );
+            expect(result.data.simulatorModelParams?.model).toBe("anthropic/sim-override");
             expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
           }
         });
@@ -1194,9 +1185,7 @@ describe("prefetchWithFixture", () => {
           if (result.data.adapterData.type === "workflow") {
             expect(result.data.adapterData.agentId).toBe("agent_wf");
             expect(result.data.adapterData.workflowId).toBe("wf_1");
-            expect(result.data.adapterData.inputs).toEqual([
-              { identifier: "query", type: "str" },
-            ]);
+            expect(result.data.adapterData.inputs).toEqual([{ identifier: "query", type: "str" }]);
             expect(result.data.adapterData.outputs).toEqual([
               { identifier: "answer", type: "str" },
               { identifier: "trace", type: "str" },
@@ -1368,9 +1357,7 @@ describe("prefetchWithFixture", () => {
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<
-            Record<string, unknown>
-          >;
+          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
           const signatureNode = nodes.find(
             (n) => (n as { type?: unknown }).type === "signature",
           ) as Record<string, unknown> | undefined;
@@ -1378,12 +1365,8 @@ describe("prefetchWithFixture", () => {
           expect(signatureNode).toBeDefined();
 
           const data = signatureNode?.data as Record<string, unknown> | undefined;
-          const parameters = data?.parameters as
-            | Array<Record<string, unknown>>
-            | undefined;
-          const llmParam = parameters?.find(
-            (p) => p.identifier === "llm" && p.type === "llm",
-          );
+          const parameters = data?.parameters as Array<Record<string, unknown>> | undefined;
+          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
 
           expect(llmParam).toBeDefined();
 
@@ -1392,9 +1375,7 @@ describe("prefetchWithFixture", () => {
           expect(value).toBeDefined();
           expect(value?.litellm_params).toBeDefined();
 
-          const litellmParams = value?.litellm_params as
-            | Record<string, unknown>
-            | undefined;
+          const litellmParams = value?.litellm_params as Record<string, unknown> | undefined;
           expect(litellmParams?.api_key).toBeDefined();
           expect(litellmParams?.api_key).not.toBe("dummy");
           expect(litellmParams?.api_key).toBe(hydratedApiKey);
@@ -1530,10 +1511,7 @@ describe("prefetchWithFixture", () => {
           deps,
         });
 
-        expect(modelAwarePrepare).toHaveBeenCalledWith(
-          defaultContext.projectId,
-          CODEX_NODE_MODEL,
-        );
+        expect(modelAwarePrepare).toHaveBeenCalledWith(defaultContext.projectId, CODEX_NODE_MODEL);
         expect(result.success).toBe(false);
         if (!result.success) {
           expect(result.reason).toBe("preparation_error");
@@ -1752,19 +1730,17 @@ describe("prefetchWithFixture", () => {
         // litellm_params must be hydrated on the node
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<
-            Record<string, unknown>
-          >;
+          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
           const signatureNode = nodes.find(
             (n) => (n as { type?: unknown }).type === "signature",
           ) as Record<string, unknown> | undefined;
-          const parameters = (signatureNode?.data as Record<string, unknown>)
-            ?.parameters as Array<Record<string, unknown>> | undefined;
-          const llmParam = parameters?.find(
-            (p) => p.identifier === "llm" && p.type === "llm",
-          );
-          const litellmParams = (llmParam?.value as Record<string, unknown>)
-            ?.litellm_params as Record<string, unknown> | undefined;
+          const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
+            | Array<Record<string, unknown>>
+            | undefined;
+          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+          const litellmParams = (llmParam?.value as Record<string, unknown>)?.litellm_params as
+            | Record<string, unknown>
+            | undefined;
           expect(litellmParams?.api_key).toBe(hydratedApiKey);
         }
       });
@@ -1824,17 +1800,14 @@ describe("prefetchWithFixture", () => {
 
         expect(result.success).toBe(true);
         if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<
-            Record<string, unknown>
-          >;
+          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
           const signatureNode = nodes.find(
             (n) => (n as { type?: unknown }).type === "signature",
           ) as Record<string, unknown> | undefined;
-          const parameters = (signatureNode?.data as Record<string, unknown>)
-            ?.parameters as Array<Record<string, unknown>> | undefined;
-          const llmParam = parameters?.find(
-            (p) => p.identifier === "llm" && p.type === "llm",
-          );
+          const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
+            | Array<Record<string, unknown>>
+            | undefined;
+          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
           const value = llmParam?.value as Record<string, unknown> | undefined;
 
           expect(value?.model).toBe(DEFAULT_MODEL);
@@ -1891,9 +1864,9 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(true);
-          expect(
-            prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL),
-          ).toBe(false);
+          expect(prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL)).toBe(
+            false,
+          );
         },
       );
 
@@ -1907,9 +1880,9 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        expect(
-          prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL),
-        ).toBe(true);
+        expect(prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL)).toBe(
+          true,
+        );
       });
     });
   });
@@ -1960,12 +1933,8 @@ describe("prefetchWithFixture", () => {
 
         expect(result.success).toBe(true);
         if (!result.success) return;
-        expect(result.data.scenario.situation).toBe(
-          "A platinum customer asks for a refund",
-        );
-        expect(result.data.scenario.criteria).toEqual([
-          "Offers the platinum refund window",
-        ]);
+        expect(result.data.scenario.situation).toBe("A platinum customer asks for a refund");
+        expect(result.data.scenario.criteria).toEqual(["Offers the platinum refund window"]);
       });
 
       /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
@@ -2229,9 +2198,9 @@ describe("prefetchWithFixture", () => {
         expect(result.success).toBe(true);
         if (!result.success) return;
         expect(result.data.traceWaitTimeoutMs).toBe(45_000);
-        expect(
-          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
-        ).toHaveBeenCalledWith({ projectId: "proj_123" });
+        expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).toHaveBeenCalledWith({
+          projectId: "proj_123",
+        });
       });
     });
 
@@ -2256,9 +2225,7 @@ describe("prefetchWithFixture", () => {
         expect(result.success).toBe(true);
         if (!result.success) return;
         expect(result.data.traceWaitTimeoutMs).toBeUndefined();
-        expect(
-          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
-        ).not.toHaveBeenCalled();
+        expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
       });
     });
 
@@ -2270,9 +2237,7 @@ describe("prefetchWithFixture", () => {
               id: "agent_code",
               type: "code",
               config: {
-                parameters: [
-                  { identifier: "code", type: "code", value: "def f(): pass" },
-                ],
+                parameters: [{ identifier: "code", type: "code", value: "def f(): pass" }],
               },
             }),
           },
@@ -2287,9 +2252,7 @@ describe("prefetchWithFixture", () => {
         expect(result.success).toBe(true);
         if (!result.success) return;
         expect(result.data.traceWaitTimeoutMs).toBeUndefined();
-        expect(
-          deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs,
-        ).not.toHaveBeenCalled();
+        expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
       });
     });
   });

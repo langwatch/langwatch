@@ -14,27 +14,43 @@ import { EventingAuthzReadRepository } from "../../src/repositories/eventing/eve
  */
 const clientFor = (models: Record<string, unknown>) => models as unknown as AuthzDatabase;
 
-const member = () =>
-  vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
+const member = () => vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
 
 describe("EventingAuthzReadRepository", () => {
-  describe("when tryFindOrganizationRole reads the membership row", () => {
+  describe("when tryFindOrganizationMembership reads the membership row", () => {
     it("reads the membership row, which the ledger never projected", async () => {
-      const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
+      const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN", disabledAt: null });
       const repository = EventingAuthzReadRepository.create(
         clientFor({ organizationUser: { findFirst } }),
       );
 
       expect(
-        await repository.tryFindOrganizationRole({
+        await repository.tryFindOrganizationMembership({
           userId: "alice",
           organizationId: "org-1",
         }),
-      ).toBe("ADMIN");
+      ).toEqual({ role: "ADMIN", disabled: false });
       expect(findFirst).toHaveBeenCalledWith({
         where: { userId: "alice", organizationId: "org-1" },
-        select: { role: true },
+        select: { role: true, disabledAt: true },
       });
+    });
+
+    it("reports a seat-disabled row as disabled, so the denial can name the seat", async () => {
+      const repository = EventingAuthzReadRepository.create(
+        clientFor({
+          organizationUser: {
+            findFirst: vi.fn().mockResolvedValue({ role: "MEMBER", disabledAt: new Date() }),
+          },
+        }),
+      );
+
+      expect(
+        await repository.tryFindOrganizationMembership({
+          userId: "alice",
+          organizationId: "org-1",
+        }),
+      ).toEqual({ role: "MEMBER", disabled: true });
     });
   });
 
@@ -266,12 +282,8 @@ describe("EventingAuthzReadRepository", () => {
     it("reads the key's own grants with no membership gate", async () => {
       const findMany = vi
         .fn()
-        .mockResolvedValue([
-          { roleKey: "viewer", scopeType: "PROJECT", scopeId: "proj-1" },
-        ]);
-      const repository = EventingAuthzReadRepository.create(
-        clientFor({ grant: { findMany } }),
-      );
+        .mockResolvedValue([{ roleKey: "viewer", scopeType: "PROJECT", scopeId: "proj-1" }]);
+      const repository = EventingAuthzReadRepository.create(clientFor({ grant: { findMany } }));
 
       const bindings = await repository.findApiKeyBindings({
         apiKeyId: "key-1",
@@ -317,9 +329,7 @@ describe("EventingAuthzReadRepository", () => {
           team: { isPersonal: false },
         },
       ]);
-      const repository = EventingAuthzReadRepository.create(
-        clientFor({ teamUser: { findMany } }),
-      );
+      const repository = EventingAuthzReadRepository.create(clientFor({ teamUser: { findMany } }));
 
       expect(
         await repository.findLegacyTeamMemberships({
@@ -339,7 +349,9 @@ describe("EventingAuthzReadRepository", () => {
           userId: "alice",
           team: {
             organizationId: "org-1",
-            organization: { members: { some: { userId: "alice" } } },
+            organization: {
+              members: { some: { userId: "alice", disabledAt: null } },
+            },
           },
         },
         select: {
@@ -356,9 +368,7 @@ describe("EventingAuthzReadRepository", () => {
     describe("when the principal is a user", () => {
       it("fences on the organization and excludes every API-key system role", async () => {
         const findMany = vi.fn().mockResolvedValue([]);
-        const repository = EventingAuthzReadRepository.create(
-          clientFor({ role: { findMany } }),
-        );
+        const repository = EventingAuthzReadRepository.create(clientFor({ role: { findMany } }));
 
         await repository.findCustomRolePermissions({
           organizationId: "org-1",
@@ -456,9 +466,7 @@ describe("EventingAuthzReadRepository", () => {
             role: {
               findMany: vi
                 .fn()
-                .mockResolvedValue([
-                  { id: "role-1", permissions: [], kind: "system_api_key" },
-                ]),
+                .mockResolvedValue([{ id: "role-1", permissions: [], kind: "system_api_key" }]),
             },
             grant: {
               findMany: vi.fn().mockResolvedValue([
@@ -549,9 +557,7 @@ describe("EventingAuthzReadRepository", () => {
     describe("when the principal references no custom role", () => {
       it("asks nothing of storage", async () => {
         const findMany = vi.fn();
-        const repository = EventingAuthzReadRepository.create(
-          clientFor({ role: { findMany } }),
-        );
+        const repository = EventingAuthzReadRepository.create(clientFor({ role: { findMany } }));
 
         expect(
           await repository.findCustomRolePermissions({
@@ -837,9 +843,7 @@ describe("EventingAuthzReadRepository", () => {
         .fn()
         .mockResolvedValueOnce({ userId: null })
         .mockResolvedValueOnce(null);
-      const repository = EventingAuthzReadRepository.create(
-        clientFor({ apiKey: { findUnique } }),
-      );
+      const repository = EventingAuthzReadRepository.create(clientFor({ apiKey: { findUnique } }));
 
       expect(await repository.tryFindApiKeyOwner("service-key")).toEqual({
         userId: null,
@@ -856,17 +860,13 @@ describe("EventingAuthzReadRepository", () => {
           team: { id: "team-1", organizationId: "org-1" },
         })
         .mockResolvedValueOnce(null);
-      const repository = EventingAuthzReadRepository.create(
-        clientFor({ project: { findUnique } }),
-      );
+      const repository = EventingAuthzReadRepository.create(clientFor({ project: { findUnique } }));
 
       expect(await repository.tryFindProjectLineage({ projectId: "proj-1" })).toEqual({
         teamId: "team-1",
         organizationId: "org-1",
       });
-      expect(
-        await repository.tryFindProjectLineage({ projectId: "proj-ghost" }),
-      ).toBeNull();
+      expect(await repository.tryFindProjectLineage({ projectId: "proj-ghost" })).toBeNull();
     });
   });
 
@@ -876,16 +876,12 @@ describe("EventingAuthzReadRepository", () => {
         .fn()
         .mockResolvedValueOnce({ organizationId: "org-1" })
         .mockResolvedValueOnce(null);
-      const repository = EventingAuthzReadRepository.create(
-        clientFor({ team: { findUnique } }),
-      );
+      const repository = EventingAuthzReadRepository.create(clientFor({ team: { findUnique } }));
 
       expect(await repository.tryFindTeamOrganization({ teamId: "team-1" })).toEqual({
         organizationId: "org-1",
       });
-      expect(
-        await repository.tryFindTeamOrganization({ teamId: "team-ghost" }),
-      ).toBeNull();
+      expect(await repository.tryFindTeamOrganization({ teamId: "team-ghost" })).toBeNull();
     });
   });
 });

@@ -3,6 +3,7 @@
 import type { UserService } from "@langwatch/user-contract";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
 import { ScimCostCenterService } from "./scim-cost-center.service";
+import { ScimDeprovisionService } from "./scim-deprovision.service";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -13,18 +14,23 @@ export class ScimUserPatchService {
   private constructor(
     private readonly users: UserService,
     private readonly costCenters: ScimCostCenterService,
+    private readonly deprovision: ScimDeprovisionService,
+    private readonly provenOffboarding: boolean,
   ) {}
 
   static create(
     users: UserService,
     costCenters: ScimCostCenterService,
+    deprovision: ScimDeprovisionService,
+    provenOffboarding: boolean,
   ): ScimUserPatchService {
-    return new ScimUserPatchService(users, costCenters);
+    return new ScimUserPatchService(users, costCenters, deprovision, provenOffboarding);
   }
 
   async apply(input: {
     id: string;
     organizationId: string;
+    connectionId: string | null;
     operation: ScimPatchOperation;
   }): Promise<void> {
     const costCenter = this.costCenters.fromPatchOperation(input.operation);
@@ -39,7 +45,7 @@ export class ScimUserPatchService {
     if (input.operation.op !== "replace") return;
 
     if (input.operation.path === "active") {
-      await this.updateActive(input.id, input.operation.value);
+      await this.updateActive(input, input.operation.value);
       return;
     }
 
@@ -47,7 +53,7 @@ export class ScimUserPatchService {
 
     const updates = this.profileUpdates(input.operation.value);
     if (updates.hasActive) {
-      await this.updateActive(input.id, updates.active);
+      await this.updateActive(input, updates.active);
     }
     if (updates.name !== void 0 || updates.email !== void 0) {
       await this.users.updateProfile({
@@ -58,12 +64,27 @@ export class ScimUserPatchService {
     }
   }
 
-  private async updateActive(id: string, value: unknown): Promise<void> {
+  private async updateActive(
+    input: {
+      id: string;
+      organizationId: string;
+      connectionId: string | null;
+    },
+    value: unknown,
+  ): Promise<void> {
     if (value === false || value === "false") {
-      await this.users.deactivate({ id });
+      if (this.provenOffboarding) {
+        await this.deprovision.removeAccess({
+          userId: input.id,
+          organizationId: input.organizationId,
+          connectionId: input.connectionId,
+          op: "deactivate_user",
+        });
+      }
+      await this.users.deactivate({ id: input.id });
       return;
     }
-    await this.users.reactivate({ id });
+    await this.users.reactivate({ id: input.id });
   }
 
   private profileUpdates(value: Record<string, unknown>): {

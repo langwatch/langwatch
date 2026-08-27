@@ -13,7 +13,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Organization } from "~/generated/prisma/client";
-
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   cleanupTestData,

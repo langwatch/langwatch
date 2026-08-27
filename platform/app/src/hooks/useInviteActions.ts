@@ -8,8 +8,9 @@ import { api } from "../utils/api";
 import { useLicenseEnforcement } from "./useLicenseEnforcement";
 
 /**
- * Encapsulates invite mutation handlers: create invite (admin), create invite request (non-admin),
- * approve, reject, and delete. Keeps MembersList focused on rendering.
+ * Encapsulates invite mutation handlers: create, resend, and revoke (D11 -
+ * the member-approval request flow is retired; D12's join requests carry
+ * that motivation). Keeps MembersList focused on rendering.
  *
  * All pricing models go through enforcement first. When `pricingModel` is "SEAT_EVENT"
  * and the user has an active subscription, exceeding the limit opens the proration
@@ -17,7 +18,6 @@ import { useLicenseEnforcement } from "./useLicenseEnforcement";
  */
 export function useInviteActions({
   organizationId,
-  isAdmin,
   hasEmailProvider,
   onInviteCreated,
   onClose,
@@ -28,7 +28,6 @@ export function useInviteActions({
   activePlanSource,
 }: {
   organizationId: string;
-  isAdmin: boolean;
   hasEmailProvider: boolean;
   onInviteCreated: (invites: { inviteCode: string; email: string }[]) => void;
   onClose: () => void;
@@ -65,6 +64,7 @@ export function useInviteActions({
   const createInviteRequestMutation = api.organization.createInviteRequest.useMutation();
   const approveInviteMutation = api.organization.approveInvite.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
+  const resendInviteMutation = api.organization.resendInvite.useMutation();
 
   const performAdminInvite = (data: MembersForm) => {
     createInvitesMutation.mutate(
@@ -118,48 +118,6 @@ export function useInviteActions({
     );
   };
 
-  const performInviteRequest = (data: MembersForm) => {
-    createInviteRequestMutation.mutate(
-      {
-        organizationId,
-        invites: data.invites.map((invite) => ({
-          email: invite.email.toLowerCase(),
-          role:
-            invite.orgRole === OrganizationUserRole.EXTERNAL
-              ? ("EXTERNAL" as const)
-              : ("MEMBER" as const),
-          teams: invite.teams.map((team) => ({
-            teamId: team.teamId,
-            role: team.role,
-            customRoleId: team.customRoleId,
-          })),
-        })),
-      },
-      {
-        onSuccess: () => {
-          const count = data.invites.length;
-          toaster.create({
-            title:
-              count > 1
-                ? "Invitations sent for approval"
-                : "Invitation sent for approval",
-            description: "An admin will review your invitation request.",
-            type: "success",
-            duration: 2000,
-          });
-          onClose();
-          refetchInvites();
-          invalidateLimits();
-        },
-        onError: (error) =>
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't send the invitation for approval",
-          }),
-      },
-    );
-  };
-
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     const hasNewFullMembers = data.invites.some(
       (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
@@ -171,7 +129,7 @@ export function useInviteActions({
       (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
     ).length;
 
-    const performMutation = isAdmin ? performAdminInvite : performInviteRequest;
+    const performMutation = performAdminInvite;
 
     // Check lite member limits, then perform the mutation
     const proceedAfterLiteCheck = () => {
@@ -243,37 +201,14 @@ export function useInviteActions({
     }
   };
 
-  const approveInvite = (inviteId: string) => {
-    approveInviteMutation.mutate(
-      { inviteId, organizationId },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: "Invitation approved",
-            description: "The invitation has been approved and sent.",
-            type: "success",
-            duration: 5000,
-          });
-          refetchInvites();
-          invalidateLimits();
-        },
-        onError: (error) =>
-          showErrorToast({
-            error,
-            fallbackTitle: "Couldn't approve the invitation",
-          }),
-      },
-    );
-  };
-
-  const rejectInvite = (inviteId: string) => {
+  const revokeInvite = (inviteId: string) => {
     deleteInviteMutation.mutate(
       { inviteId, organizationId },
       {
         onSuccess: () => {
           toaster.create({
-            title: "Invitation rejected",
-            description: "The invitation request has been rejected.",
+            title: "Invitation revoked",
+            description: "The invitation link no longer works.",
             type: "success",
             duration: 5000,
           });
@@ -283,43 +218,56 @@ export function useInviteActions({
         onError: (error) =>
           showErrorToast({
             error,
-            fallbackTitle: "Couldn't reject the invitation",
+            fallbackTitle: "Couldn't revoke the invitation",
           }),
       },
     );
   };
 
-  const deleteInvite = (inviteId: string) => {
-    deleteInviteMutation.mutate(
+  /**
+   * One-click resend (D11): a fresh code, a fresh expiry, a fresh email.
+   * Without an email provider the fresh link is surfaced instead, the same
+   * way invite creation surfaces it.
+   */
+  const resendInvite = (inviteId: string) => {
+    resendInviteMutation.mutate(
       { inviteId, organizationId },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          if (data.emailNotSent) {
+            onInviteCreated([
+              {
+                inviteCode: data.invite.inviteCode,
+                email: data.invite.email,
+              },
+            ]);
+          }
           toaster.create({
-            title: "Invite deleted successfully",
-            description: "The invite has been deleted.",
+            title: "Invitation resent",
+            description:
+              hasEmailProvider && !data.emailNotSent
+                ? "A fresh invitation is on its way."
+                : "A fresh invite link is ready to share.",
             type: "success",
             duration: 5000,
           });
           refetchInvites();
-          invalidateLimits();
         },
         onError: (error) =>
           showErrorToast({
             error,
-            fallbackTitle: "Couldn't delete the invite",
+            fallbackTitle: "Couldn't resend the invitation",
           }),
       },
     );
   };
 
-  const isSubmitting =
-    createInvitesMutation.isPending || createInviteRequestMutation.isPending;
+  const isSubmitting = createInvitesMutation.isPending;
 
   return {
     onSubmit,
-    approveInvite,
-    rejectInvite,
-    deleteInvite,
+    revokeInvite,
+    resendInvite,
     isSubmitting,
   };
 }

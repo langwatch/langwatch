@@ -236,6 +236,188 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
+  describe("GET /api/suites with folders in the project", () => {
+    async function createFolder(name: string) {
+      return prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name,
+          slug: `${name.toLowerCase()}-${nanoid(6)}`,
+          kind: "folder",
+          scenarioIds: [],
+          targets: [],
+          labels: [],
+        },
+      });
+    }
+
+    describe("when no kind is named", () => {
+      /** @scenario "The v1 run plan list holds no folder rows" */
+      it("returns only custom run plans", async () => {
+        await createFolder("Refunds");
+        await createFolder("Checkout");
+        const plan = await createSuite({ name: "Nightly" });
+
+        const res = await helpers.api.get("/api/suites");
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.map((s: { id: string }) => s.id)).toEqual([plan.id]);
+        expect(body[0].kind).toBe("custom");
+      });
+    });
+
+    describe("when kind=folder is named", () => {
+      it("returns the folders only", async () => {
+        const folder = await createFolder("Refunds");
+        await createSuite({ name: "Nightly" });
+
+        const res = await helpers.api.get("/api/suites?kind=folder");
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.map((s: { id: string }) => s.id)).toEqual([folder.id]);
+        expect(body[0].kind).toBe("folder");
+      });
+    });
+  });
+
+  describe("POST /api/suites with a kind", () => {
+    describe("when the body names kind folder", () => {
+      /** @scenario "A new folder is created empty and appears in the rail" */
+      it("creates an empty folder without scenarios or targets", async () => {
+        const res = await helpers.api.post("/api/suites", {
+          name: "Refunds",
+          kind: "folder",
+        });
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.kind).toBe("folder");
+        expect(body.scenarioIds).toEqual([]);
+        expect(body.targets).toEqual([]);
+      });
+
+      it("refuses a folder body that carries scenarios or targets", async () => {
+        const res = await helpers.api.post("/api/suites", {
+          name: "Refunds",
+          kind: "folder",
+          scenarioIds: ["scen_1"],
+        });
+
+        expect(res.status).toBe(422);
+      });
+    });
+
+    describe("when the body names no kind", () => {
+      it("keeps requiring at least one scenario and one target", async () => {
+        const res = await helpers.api.post("/api/suites", {
+          name: "Empty plan",
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.fields).toContain("scenarioIds");
+        expect(body.fields).toContain("targets");
+      });
+    });
+  });
+
+  // A folder holds the cases filed into it, so archiving the folder archives
+  // them with it. A run plan only references cases and leaves them alone.
+  describe("DELETE /api/suites/:id for a folder", () => {
+    async function createFolderWithCases(name: string, caseCount: number) {
+      const folder = await prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name,
+          slug: `${name.toLowerCase()}-${nanoid(6)}`,
+          kind: "folder",
+          scenarioIds: [],
+          targets: [],
+          labels: [],
+        },
+      });
+      const cases: Scenario[] = [];
+      for (let index = 0; index < caseCount; index++) {
+        const scenario = await createScenario(`${name} case ${index}`);
+        await prisma.scenario.updateMany({
+          where: { id: scenario.id, projectId: testProjectId },
+          data: { folderId: folder.id },
+        });
+        cases.push(scenario);
+      }
+      await prisma.simulationSuite.updateMany({
+        where: { id: folder.id, projectId: testProjectId },
+        data: { scenarioIds: cases.map((one) => one.id) },
+      });
+      return { folder, cases };
+    }
+
+    it("archives the folder", async () => {
+      const { folder } = await createFolderWithCases("Refunds", 2);
+
+      const res = await helpers.api.delete(`/api/suites/${folder.id}`);
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ id: folder.id, archived: true });
+
+      const stored = await prisma.simulationSuite.findFirst({
+        where: { id: folder.id, projectId: testProjectId },
+      });
+      expect(stored?.archivedAt).not.toBeNull();
+    });
+
+    it("archives every test case filed in it", async () => {
+      const { folder, cases } = await createFolderWithCases("Refunds", 2);
+
+      await helpers.api.delete(`/api/suites/${folder.id}`);
+
+      const stored = await prisma.scenario.findMany({
+        where: {
+          id: { in: cases.map((one) => one.id) },
+          projectId: testProjectId,
+        },
+      });
+      expect(stored).toHaveLength(2);
+      for (const scenario of stored) {
+        expect(scenario.archivedAt).not.toBeNull();
+      }
+    });
+
+    it("leaves the cases of a run plan alone", async () => {
+      const scenario = await createScenario("Still active");
+      const plan = await prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name: "Nightly",
+          slug: `nightly-${nanoid(6)}`,
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: "agent_test" }],
+          repeatCount: 1,
+          labels: [],
+        },
+      });
+
+      const res = await helpers.api.delete(`/api/suites/${plan.id}`);
+
+      expect(res.status).toBe(200);
+      const stored = await prisma.scenario.findFirst({
+        where: { id: scenario.id, projectId: testProjectId },
+      });
+      expect(stored?.archivedAt).toBeNull();
+    });
+
+    it("answers 404 for an id that names no suite", async () => {
+      const res = await helpers.api.delete("/api/suites/suite_nonexistent");
+
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe("GET /api/suites/:id", () => {
     describe("when suite exists", () => {
       it("returns the suite with all fields", async () => {
@@ -402,6 +584,110 @@ describe("Feature: Suites REST API", () => {
             }),
           }),
         );
+      });
+    });
+
+    describe("when the run carries a note", () => {
+      async function createRunnableSuiteWithThreeCasesAndTwoTargets() {
+        const first = await createScenario("Refund Flow");
+        const second = await createScenario("Cancellation Flow");
+        const third = await createScenario("Upgrade Flow");
+        const firstTarget = await createHttpAgent();
+        const secondTarget = await createHttpAgent();
+        const suite = await prisma.simulationSuite.create({
+          data: {
+            id: `suite_${nanoid()}`,
+            projectId: testProjectId,
+            name: "Noted Suite",
+            slug: `noted-suite-${nanoid()}`,
+            scenarioIds: [first.id, second.id, third.id],
+            targets: [
+              { type: "http", referenceId: firstTarget.id },
+              { type: "http", referenceId: secondTarget.id },
+            ],
+            repeatCount: 1,
+            labels: [],
+          },
+        });
+        return suite;
+      }
+
+      /** @scenario "Every run of a batch carries the note stamped at queue time" */
+      /** @scenario "A note given on the command line is stored with the batch" */
+      it("stamps the note on every queued run of the batch", async () => {
+        const suite = await createRunnableSuiteWithThreeCasesAndTwoTargets();
+
+        const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-1",
+          note: "switched judge to the stricter rubric",
+        });
+
+        expect(res.status).toBe(200);
+        expect(queueSimulationRun).toHaveBeenCalledTimes(6);
+        for (const call of queueSimulationRun.mock.calls) {
+          expect(call[0].metadata).toMatchObject({
+            note: "switched judge to the stricter rubric",
+          });
+        }
+      });
+
+      it("removes the spaces around the note before storing it", async () => {
+        const { suite } = await createRunnableSuite();
+
+        await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-2",
+          note: "  retry after the timeout fix  ",
+        });
+
+        expect(queueSimulationRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              note: "retry after the timeout fix",
+            }),
+          }),
+        );
+      });
+
+      it("records no note key when the note is only spaces", async () => {
+        const { suite } = await createRunnableSuite();
+
+        await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-3",
+          note: "   ",
+        });
+
+        const queued = queueSimulationRun.mock.calls[0]?.[0];
+        expect(queued?.metadata).not.toHaveProperty("note");
+      });
+    });
+
+    describe("when the note is longer than the limit", () => {
+      /** @scenario "A note over two hundred characters is rejected with validation_error" */
+      it("rejects the run with validation_error naming the note field", async () => {
+        const { suite } = await createRunnableSuite();
+
+        const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-4",
+          note: "a".repeat(201),
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.error).toBe("validation_error");
+        expect(body.fields).toContain("note");
+      });
+
+      /** @scenario "A note over two hundred characters is rejected with validation_error" */
+      it("schedules nothing", async () => {
+        const { suite } = await createRunnableSuite();
+
+        await helpers.api.post(`/api/suites/${suite.id}/run`, {
+          idempotencyKey: "run-key-note-5",
+          note: "a".repeat(201),
+        });
+
+        expect(startSuiteRun).not.toHaveBeenCalled();
+        expect(queueSimulationRun).not.toHaveBeenCalled();
       });
     });
 

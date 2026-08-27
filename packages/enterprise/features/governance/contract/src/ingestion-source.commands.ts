@@ -6,25 +6,24 @@ export const GOVERNANCE_INGESTION_SOURCE_TYPES = [
   "claude_cowork",
   "workato",
   "copilot_studio",
+  "copilot_studio_dataverse",
   "openai_compliance",
+  "openai_admin",
   "claude_compliance",
   "anthropic_admin",
   "databricks_genie",
   "s3_custom",
   "http_custom",
 ] as const;
-export const governanceIngestionSourceTypeSchema = z.enum(
-  GOVERNANCE_INGESTION_SOURCE_TYPES,
-);
-export type GovernanceIngestionSourceType = z.infer<
-  typeof governanceIngestionSourceTypeSchema
->;
+export const governanceIngestionSourceTypeSchema = z.enum(GOVERNANCE_INGESTION_SOURCE_TYPES);
+export type GovernanceIngestionSourceType = z.infer<typeof governanceIngestionSourceTypeSchema>;
 
 export const governanceIngestionSourceSchema = z
   .object({
     id: z.string(),
     organizationId: z.string(),
     teamId: z.string().nullable(),
+    traceProjectId: z.string().nullable().optional(),
     sourceType: z.string(),
     name: z.string(),
     description: z.string().nullable(),
@@ -47,6 +46,7 @@ export const createGovernanceIngestionSourceCommandSchema = z
   .object({
     organizationId: z.string().min(1),
     teamId: z.string().nullable().optional(),
+    traceProjectId: z.string().nullable().optional(),
     sourceType: governanceIngestionSourceTypeSchema,
     name: z.string().min(1),
     description: z.string().nullable().optional(),
@@ -69,6 +69,7 @@ export const updateGovernanceIngestionSourceCommandSchema = z
     parserConfig: z.record(z.string(), z.unknown()).optional(),
     status: z.enum(["active", "disabled", "awaiting_first_event"]).optional(),
     teamId: z.string().nullable().optional(),
+    traceProjectId: z.string().nullable().optional(),
     pullSchedule: z.string().nullable().optional(),
   })
   .strict();

@@ -15,20 +15,57 @@ import {
   type ScimTokenIdentity,
 } from "../../ports/scim-repository.port";
 
-function isScimDatabase(value: object): value is PrismaClient {
+type ScimIdentityDatabase = {
+  ssoConnection: {
+    findFirst(input: {
+      where: { id: string; organizationId: string };
+      select: { id: true };
+    }): Promise<{ id: string } | null>;
+  };
+  scimExternalId: {
+    findUnique(input: {
+      where: {
+        connectionId_externalId: { connectionId: string; externalId: string };
+      };
+      select: { userId: true };
+    }): Promise<{ userId: string } | null>;
+    findMany(input: {
+      where: { userId: string };
+      select: { connectionId: true };
+    }): Promise<Array<{ connectionId: string }>>;
+    upsert(input: {
+      where: {
+        connectionId_externalId: { connectionId: string; externalId: string };
+      };
+      create: { connectionId: string; externalId: string; userId: string };
+      update: { userId: string };
+    }): Promise<unknown>;
+    deleteMany(input: {
+      where:
+        | { connectionId: string; externalId: string }
+        | { connectionId: string; userId: string };
+    }): Promise<unknown>;
+  };
+};
+
+type ScimDatabase = PrismaClient & ScimIdentityDatabase;
+
+function isScimDatabase(value: object): value is ScimDatabase {
   return (
     "organization" in value &&
     "organizationUser" in value &&
     "group" in value &&
     "groupMembership" in value &&
     "roleBinding" in value &&
-    "scimToken" in value
+    "scimToken" in value &&
+    "ssoConnection" in value &&
+    "scimExternalId" in value
   );
 }
 
 /** Strict generated-Prisma implementation of the SCIM persistence port. */
 export class PrismaScimRepository extends ScimRepositoryPort {
-  private constructor(private readonly prisma: PrismaClient) {
+  private constructor(private readonly prisma: ScimDatabase) {
     super();
   }
   static create(database: object): PrismaScimRepository {
@@ -38,9 +75,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
     return new PrismaScimRepository(database);
   }
 
-  tryFindOrganizationBySsoDomain(input: {
-    domain: string;
-  }): Promise<{ id: string } | null> {
+  tryFindOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null> {
     return this.prisma.organization.findUnique({
       where: { ssoDomain: input.domain },
       select: { id: true },
@@ -88,18 +123,12 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       data: { ...input, role: organizationUserRole(input.role) },
     });
   }
-  async removeMembership(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<void> {
+  async removeMembership(input: { organizationId: string; userId: string }): Promise<void> {
     await this.prisma.organizationUser.delete({
       where: { userId_organizationId: input },
     });
   }
-  tryFindGroup(input: {
-    organizationId: string;
-    id: string;
-  }): Promise<ScimGroupRecord | null> {
+  tryFindGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     return this.prisma.group.findFirst({
       where: { id: input.id, organizationId: input.organizationId },
     });
@@ -192,13 +221,8 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       where: { groupId: input.groupId, userId: { in: input.userIds } },
     });
   }
-  async groupSlugExists(input: {
-    organizationId: string;
-    slug: string;
-  }): Promise<boolean> {
-    return (
-      (await this.prisma.group.findFirst({ where: input, select: { id: true } })) !== null
-    );
+  async groupSlugExists(input: { organizationId: string; slug: string }): Promise<boolean> {
+    return (await this.prisma.group.findFirst({ where: input, select: { id: true } })) !== null;
   }
   listRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]> {
     return this.prisma.roleBinding.findMany({
@@ -228,6 +252,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
   }
   createToken(input: {
     organizationId: string;
+    connectionId: string;
     hashedToken: string;
     description: string | null;
   }): Promise<{ id: string }> {
@@ -239,6 +264,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       select: {
         id: true,
         organizationId: true,
+        connectionId: true,
         description: true,
         createdAt: true,
         lastUsedAt: true,
@@ -246,10 +272,7 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       orderBy: { createdAt: "desc" },
     });
   }
-  async revokeToken(input: {
-    organizationId: string;
-    tokenId: string;
-  }): Promise<boolean> {
+  async revokeToken(input: { organizationId: string; tokenId: string }): Promise<boolean> {
     return (
       (
         await this.prisma.scimToken.deleteMany({
@@ -258,10 +281,26 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       ).count > 0
     );
   }
+  tryFindToken(input: {
+    organizationId: string;
+    tokenId: string;
+  }): Promise<ScimTokenIdentity | null> {
+    return this.prisma.scimToken.findFirst({
+      where: { id: input.tokenId, organizationId: input.organizationId },
+      select: { id: true, organizationId: true, connectionId: true },
+    });
+  }
+  async revokeTokensForConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<number> {
+    const result = await this.prisma.scimToken.deleteMany({ where: input });
+    return result.count;
+  }
   tryFindTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null> {
     return this.prisma.scimToken.findFirst({
       where: { hashedToken },
-      select: { id: true, organizationId: true },
+      select: { id: true, organizationId: true, connectionId: true },
     });
   }
   async recordTokenUse(input: { tokenId: string; usedAt: Date }): Promise<void> {
@@ -269,6 +308,70 @@ export class PrismaScimRepository extends ScimRepositoryPort {
       where: { id: input.tokenId },
       data: { lastUsedAt: input.usedAt },
     });
+  }
+
+  async scimConnectionExists(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<boolean> {
+    const connection = await this.prisma.ssoConnection.findFirst({
+      where: {
+        id: input.connectionId,
+        organizationId: input.organizationId,
+      },
+      select: { id: true },
+    });
+    return connection !== null;
+  }
+
+  async tryFindDirectoryUserId(input: {
+    connectionId: string;
+    externalId: string;
+  }): Promise<string | null> {
+    const row = await this.prisma.scimExternalId.findUnique({
+      where: { connectionId_externalId: input },
+      select: { userId: true },
+    });
+    return row?.userId ?? null;
+  }
+
+  async rememberDirectoryIdentity(input: {
+    connectionId: string;
+    externalId: string;
+    userId: string;
+  }): Promise<void> {
+    await this.prisma.scimExternalId.upsert({
+      where: {
+        connectionId_externalId: {
+          connectionId: input.connectionId,
+          externalId: input.externalId,
+        },
+      },
+      create: input,
+      update: { userId: input.userId },
+    });
+  }
+
+  async forgetDirectoryIdentity(input: {
+    connectionId: string;
+    externalId: string;
+  }): Promise<void> {
+    await this.prisma.scimExternalId.deleteMany({ where: input });
+  }
+
+  async forgetDirectoryIdentitiesForUser(input: {
+    connectionId: string;
+    userId: string;
+  }): Promise<void> {
+    await this.prisma.scimExternalId.deleteMany({ where: input });
+  }
+
+  async listDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
+    const rows = await this.prisma.scimExternalId.findMany({
+      where: input,
+      select: { connectionId: true },
+    });
+    return rows.map((row) => row.connectionId);
   }
 }
 

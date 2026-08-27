@@ -120,10 +120,7 @@ describe("S3PollingPullerAdapter", () => {
         },
       ];
 
-      const result = await adapter.runOnce(
-        { cursor: null },
-        adapter.validateConfig(VALID_CONFIG),
-      );
+      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
 
       expect(result.errorCount).toBe(0);
       expect(result.cursor).toBe("anthropic/compliance/2026-05-03-01.ndjson");
@@ -161,9 +158,7 @@ describe("S3PollingPullerAdapter", () => {
         adapter.validateConfig(VALID_CONFIG),
       );
 
-      expect(storage.lastList?.startAfter).toBe(
-        "anthropic/compliance/2026-05-03-01.ndjson",
-      );
+      expect(storage.lastList?.startAfter).toBe("anthropic/compliance/2026-05-03-01.ndjson");
       expect(result.cursor).toBe("anthropic/compliance/2026-05-03-02.ndjson");
       expect(result.events).toHaveLength(1);
     });
@@ -180,6 +175,7 @@ describe("S3PollingPullerAdapter", () => {
       expect(result.errorCount).toBe(0);
     });
 
+    /** @scenario "Malformed file skipped, run continues" */
     it("skips malformed ndjson lines without aborting; cursor still advances", async () => {
       const adapter = makeAdapter();
       storage.objects = [
@@ -209,16 +205,34 @@ describe("S3PollingPullerAdapter", () => {
             }),
         },
       ];
-      const result = await adapter.runOnce(
-        { cursor: null },
-        adapter.validateConfig(VALID_CONFIG),
-      );
+      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
       expect(result.events).toHaveLength(2);
       expect(result.cursor).toBe("anthropic/compliance/bad.ndjson");
-      // The bad line silently skipped — parseNdjson returns 2 valid
-      // entries. errorCount stays 0 because the parser absorbs malformed
-      // lines without surfacing them up to mapEvent.
-      expect(result.errorCount).toBe(0);
+      // This assertion used to read `toBe(0)`, with a comment explaining that
+      // the parser absorbed malformed lines without surfacing them. That was
+      // the defect, written down as the expectation: a bad line was dropped in
+      // silence while the cursor advanced past the file, so nothing was ever
+      // alerted about corrupt input. The spec says errorCount reflects the
+      // number of bad lines seen, and now it does.
+      expect(result.errorCount).toBe(1);
+    });
+
+    /** @scenario "Malformed file skipped, run continues" */
+    it("counts every unreadable line, not just the first", async () => {
+      const adapter = makeAdapter();
+      storage.objects = [
+        {
+          key: "anthropic/compliance/worse.ndjson",
+          body: "not-json\nalso-not-json\nstill-not-json",
+        },
+      ];
+      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
+      expect(result.events).toHaveLength(0);
+      expect(result.errorCount).toBe(3);
+      // A file that is entirely unreadable is the truncated-upload case. It
+      // still advances, because re-pulling it forever is the failure this
+      // whole path exists to avoid.
+      expect(result.cursor).toBe("anthropic/compliance/worse.ndjson");
     });
   });
 

@@ -117,11 +117,7 @@ Configuration options for setting up LangWatch observability.
 
 Configuration for LangWatch integration.
 
-<ResponseField
-  name="apiKey"
-  type="Optional<string>"
-  default="process.env.LANGWATCH_API_KEY"
->
+<ResponseField name="apiKey" type="Optional<string>" default="process.env.LANGWATCH_API_KEY">
   LangWatch API key for authentication.
 </ResponseField>
 
@@ -129,11 +125,7 @@ Configuration for LangWatch integration.
   LangWatch endpoint URL for sending traces and logs.
 </ResponseField>
 
-<ResponseField
-  name="processorType"
-  type="Optional<'simple' | 'batch'>"
-  default="'simple'"
->
+<ResponseField name="processorType" type="Optional<'simple' | 'batch'>" default="'simple'">
   Type of span processor to use for LangWatch exporter.
 </ResponseField>
 
@@ -202,11 +194,7 @@ Get a LangWatch tracer from a specific OpenTelemetry tracer provider.
 ```typescript
 import { getLangWatchTracerFromProvider } from "langwatch/observability";
 
-const tracer = getLangWatchTracerFromProvider(
-  customTracerProvider,
-  "my-service",
-  "1.0.0",
-);
+const tracer = getLangWatchTracerFromProvider(customTracerProvider, "my-service", "1.0.0");
 ```
 
 <ParamField path="tracerProvider" type="TracerProvider" required>
@@ -231,26 +219,23 @@ The `LangWatchTracer` extends the standard OpenTelemetry `Tracer` with additiona
   path="startSpan"
   type="(name: string, options?: SpanOptions, context?: Context) => LangWatchSpan"
 >
-  Starts a new `LangWatchSpan` without setting it on context. This method does NOT modify
-  the current Context.
+  Starts a new `LangWatchSpan` without setting it on context. This method does NOT modify the
+  current Context.
 </ParamField>
 
-<ParamField
-  path="startActiveSpan"
-  type="(name: string, fn: (span: LangWatchSpan) => T) => T"
->
-  Starts a new `LangWatchSpan` and calls the given function passing it the created span as
-  first argument. The new span gets set in context and this context is activated for the
-  duration of the function call.
+<ParamField path="startActiveSpan" type="(name: string, fn: (span: LangWatchSpan) => T) => T">
+  Starts a new `LangWatchSpan` and calls the given function passing it the created span as first
+  argument. The new span gets set in context and this context is activated for the duration of the
+  function call.
 </ParamField>
 
 <ParamField
   path="withActiveSpan"
   type="(name: string, fn: (span: LangWatchSpan) => Promise<T> | T) => Promise<T>"
 >
-  Starts a new `LangWatchSpan`, runs the provided async function, and automatically
-  handles error recording, status setting, and span ending. This is a safer and more
-  ergonomic alternative to manually using try/catch/finally blocks.
+  Starts a new `LangWatchSpan`, runs the provided async function, and automatically handles error
+  recording, status setting, and span ending. This is a safer and more ergonomic alternative to
+  manually using try/catch/finally blocks.
 </ParamField>
 
 ### `createLangWatchSpan()`
@@ -282,23 +267,23 @@ The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional me
 #### Span Configuration Methods
 
 <ParamField path="setType" type="(type: SpanType) => this">
-  Set the type of the span (e.g., 'llm', 'rag', 'tool', etc). This is used for downstream
-  filtering and analytics.
+  Set the type of the span (e.g., 'llm', 'rag', 'tool', etc). This is used for downstream filtering
+  and analytics.
 </ParamField>
 
 <ParamField path="setRequestModel" type="(model: string) => this">
-  Set the request model name for the span. This is typically the model name sent in the
-  API request (e.g., 'gpt-5', 'claude-3').
+  Set the request model name for the span. This is typically the model name sent in the API request
+  (e.g., 'gpt-5', 'claude-sonnet-5').
 </ParamField>
 
 <ParamField path="setResponseModel" type="(model: string) => this">
-  Set the response model name for the span. This is the model name returned in the API
-  response, if different from the request.
+  Set the response model name for the span. This is the model name returned in the API response, if
+  different from the request.
 </ParamField>
 
 <ParamField path="setRAGContexts" type="(ragContexts: LangWatchSpanRAGContext[]) => this">
-  Set multiple RAG contexts for the span. Use this to record all retrieved
-  documents/chunks used as context for a generation.
+  Set multiple RAG contexts for the span. Use this to record all retrieved documents/chunks used as
+  context for a generation.
 </ParamField>
 
 <ParamField path="setRAGContext" type="(ragContext: LangWatchSpanRAGContext) => this">
@@ -310,8 +295,8 @@ The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional me
 </ParamField>
 
 <ParamField path="setSelectedPrompt" type="(prompt: Prompt) => this">
-  Set the selected prompt for the span. This will attach this prompt to the trace. If this
-  is set on multiple spans, the last one will be used.
+  Set the selected prompt for the span. This will attach this prompt to the trace. If this is set on
+  multiple spans, the last one will be used.
 </ParamField>
 
 #### Input/Output Methods
@@ -321,8 +306,8 @@ The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional me
 </ParamField>
 
 <ParamField path="setInput" type="(type: InputOutputType, input: unknown) => this">
-  Record the input to the span with explicit type control. Supports "text", "raw",
-  "chat_messages", "list", "json", "guardrail_result", and "evaluation_result" types.
+  Record the input to the span with explicit type control. Supports "text", "raw", "chat_messages",
+  "list", "json", "guardrail_result", and "evaluation_result" types.
 </ParamField>
 
 <ParamField path="setOutput" type="(output: unknown) => this">
@@ -439,8 +424,8 @@ const updatedPrompt = await langwatch.prompts.update("customer-support-bot", {
 </ResponseField>
 
 <Warning>
-  Each update operation creates a new version of the prompt. Previous versions are
-  preserved for version control and rollback purposes.
+  Each update operation creates a new version of the prompt. Previous versions are preserved for
+  version control and rollback purposes.
 </Warning>
 
 ### `langwatch.prompts.delete()`
@@ -491,8 +476,8 @@ const compiledPrompt = prompt.compile({
 </ResponseField>
 
 <Info>
-  Lenient compilation will not throw errors for missing variables, making it suitable for
-  dynamic content where some variables may be optional.
+  Lenient compilation will not throw errors for missing variables, making it suitable for dynamic
+  content where some variables may be optional.
 </Info>
 
 #### `prompt.compileStrict()`
@@ -508,8 +493,7 @@ const compiledPrompt = prompt.compileStrict({
 ```
 
 <ParamField path="variables" type="Record<string, any>" required>
-  Variables to substitute into the prompt template. All template variables must be
-  provided.
+  Variables to substitute into the prompt template. All template variables must be provided.
 </ParamField>
 
 **Returns**
@@ -523,8 +507,8 @@ const compiledPrompt = prompt.compileStrict({
 </ResponseField>
 
 <Warning>
-  Strict compilation will throw a `PromptCompilationError` if any template variables are
-  missing, ensuring all required data is provided.
+  Strict compilation will throw a `PromptCompilationError` if any template variables are missing,
+  ensuring all required data is provided.
 </Warning>
 
 ## Processors
@@ -591,10 +575,7 @@ Utility function to convert LangChain messages to a format compatible with LangW
 import { convertFromLangChainMessages } from "langwatch/observability/instrumentation/langchain";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-const messages = [
-  new SystemMessage("You are a helpful assistant."),
-  new HumanMessage("Hello!"),
-];
+const messages = [new SystemMessage("You are a helpful assistant."), new HumanMessage("Hello!")];
 
 const convertedMessages = convertFromLangChainMessages(messages);
 // Use with span.setInput("chat_messages", convertedMessages)
@@ -620,8 +601,8 @@ const exporter = new LangWatchExporter({
 ```
 
 <ParamField path="apiKey" type="Optional<string>" default="process.env.LANGWATCH_API_KEY">
-  Optional API key for LangWatch authentication. If not provided, will use environment
-  variables or fallback configuration.
+  Optional API key for LangWatch authentication. If not provided, will use environment variables or
+  fallback configuration.
 </ParamField>
 
 <ParamField
@@ -629,8 +610,8 @@ const exporter = new LangWatchExporter({
   type="Optional<string>"
   default="process.env.LANGWATCH_ENDPOINT_URL or https://app.langwatch.com"
 >
-  Optional custom endpoint URL for LangWatch ingestion. If not provided, will use
-  environment variables or fallback configuration.
+  Optional custom endpoint URL for LangWatch ingestion. If not provided, will use environment
+  variables or fallback configuration.
 </ParamField>
 
 ### `LangWatchTraceExporter`
@@ -810,13 +791,7 @@ Supported input/output types for span data:
 
 ```typescript
 type InputOutputType =
-  | "text"
-  | "raw"
-  | "chat_messages"
-  | "list"
-  | "json"
-  | "guardrail_result"
-  | "evaluation_result";
+  "text" | "raw" | "chat_messages" | "list" | "json" | "guardrail_result" | "evaluation_result";
 ```
 
 ### `LangWatchSpanRAGContext`
@@ -1156,10 +1131,7 @@ setupObservability({
   },
   dataCapture: (context) => {
     // Don't capture sensitive data in production
-    if (
-      context.environment === "production" &&
-      context.operationName.includes("password")
-    ) {
+    if (context.environment === "production" && context.operationName.includes("password")) {
       return "none";
     }
     return "all";
@@ -1202,6 +1174,6 @@ For practical examples and advanced usage patterns, see:
 - **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific setup and examples
 
 <Tip>
-  Start with the [Integration Guide](/integration/typescript/guide) for a quick setup,
-  then refer to this API reference for detailed configuration options.
+  Start with the [Integration Guide](/integration/typescript/guide) for a quick setup, then refer to
+  this API reference for detailed configuration options.
 </Tip>

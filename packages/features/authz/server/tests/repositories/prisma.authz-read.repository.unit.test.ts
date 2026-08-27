@@ -12,23 +12,50 @@ import { PrismaAuthzReadRepository } from "../../src/repositories/prisma/prisma.
  * key it was minted for.
  */
 describe("PrismaAuthzReadRepository", () => {
-  describe("tryFindOrganizationRole", () => {
-    describe("when the user is a member of the organization", () => {
+  describe("when reading organization membership", () => {
+    describe("when the user is an active member of the organization", () => {
       it("reads the membership row for this user in this organization", async () => {
-        const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
+        const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN", disabledAt: null });
         const prisma = {
           organizationUser: { findFirst },
         } as unknown as AuthzDatabase;
 
-        const role = await PrismaAuthzReadRepository.create(
+        const membership = await PrismaAuthzReadRepository.create(
           prisma,
-        ).tryFindOrganizationRole({ userId: "alice", organizationId: "org-1" });
+        ).tryFindOrganizationMembership({
+          userId: "alice",
+          organizationId: "org-1",
+        });
 
+        // `disabledAt` is SELECTED and not filtered on purpose: the row is a
+        // fact and the collector applies the policy. This assertion is the
+        // one that used to pin the opposite - a select without `disabledAt` -
+        // which is how a disabled member kept every permission.
         expect(findFirst).toHaveBeenCalledWith({
           where: { userId: "alice", organizationId: "org-1" },
-          select: { role: true },
+          select: { role: true, disabledAt: true },
         });
-        expect(role).toBe("ADMIN");
+        expect(membership).toEqual({ role: "ADMIN", disabled: false });
+      });
+    });
+
+    describe("when the membership has been disabled to free its seat", () => {
+      it("reports the row as disabled rather than hiding it, so the denial can say so", async () => {
+        const prisma = {
+          organizationUser: {
+            findFirst: vi.fn().mockResolvedValue({
+              role: "ADMIN",
+              disabledAt: new Date("2026-01-01"),
+            }),
+          },
+        } as unknown as AuthzDatabase;
+
+        expect(
+          await PrismaAuthzReadRepository.create(prisma).tryFindOrganizationMembership({
+            userId: "alice",
+            organizationId: "org-1",
+          }),
+        ).toEqual({ role: "ADMIN", disabled: true });
       });
     });
 
@@ -39,7 +66,7 @@ describe("PrismaAuthzReadRepository", () => {
         } as unknown as AuthzDatabase;
 
         expect(
-          await PrismaAuthzReadRepository.create(prisma).tryFindOrganizationRole({
+          await PrismaAuthzReadRepository.create(prisma).tryFindOrganizationMembership({
             userId: "alice",
             organizationId: "org-1",
           }),
@@ -71,7 +98,11 @@ describe("PrismaAuthzReadRepository", () => {
         where: {
           organizationId: "org-1",
           userId: "alice",
-          user: { orgMemberships: { some: { organizationId: "org-1" } } },
+          user: {
+            orgMemberships: {
+              some: { organizationId: "org-1", disabledAt: null },
+            },
+          },
         },
         select: {
           role: true,
@@ -122,7 +153,11 @@ describe("PrismaAuthzReadRepository", () => {
             members: {
               some: {
                 userId: "alice",
-                user: { orgMemberships: { some: { organizationId: "org-1" } } },
+                user: {
+                  orgMemberships: {
+                    some: { organizationId: "org-1", disabledAt: null },
+                  },
+                },
               },
             },
           },
@@ -182,8 +217,7 @@ describe("PrismaAuthzReadRepository", () => {
           apiKey: { findUnique },
         } as unknown as AuthzDatabase;
 
-        const owner =
-          await PrismaAuthzReadRepository.create(prisma).tryFindApiKeyOwner("key-1");
+        const owner = await PrismaAuthzReadRepository.create(prisma).tryFindApiKeyOwner("key-1");
 
         expect(findUnique).toHaveBeenCalledWith({
           where: { id: "key-1" },
@@ -358,9 +392,10 @@ describe("PrismaAuthzReadRepository", () => {
         teamUser: { findMany },
       } as unknown as AuthzDatabase;
 
-      const rows = await PrismaAuthzReadRepository.create(
-        prisma,
-      ).findLegacyTeamMemberships({ userId: "alice", organizationId: "org-1" });
+      const rows = await PrismaAuthzReadRepository.create(prisma).findLegacyTeamMemberships({
+        userId: "alice",
+        organizationId: "org-1",
+      });
 
       // Two predicates, not one: the team is in this organization AND the
       // user is a current member of it. A stale cross-org TeamUser row must
@@ -370,7 +405,9 @@ describe("PrismaAuthzReadRepository", () => {
           userId: "alice",
           team: {
             organizationId: "org-1",
-            organization: { members: { some: { userId: "alice" } } },
+            organization: {
+              members: { some: { userId: "alice", disabledAt: null } },
+            },
           },
         },
         select: {
@@ -408,9 +445,7 @@ describe("PrismaAuthzReadRepository", () => {
         teamId: "team-1",
         organizationId: "org-1",
       });
-      expect(
-        await repository.tryFindProjectLineage({ projectId: "proj-ghost" }),
-      ).toBeNull();
+      expect(await repository.tryFindProjectLineage({ projectId: "proj-ghost" })).toBeNull();
     });
   });
 });

@@ -263,10 +263,7 @@ export interface TopicClusteringOutcomeCommands {
  * clustering execution that OWNS the failure taxonomy (the app-layer
  * composition wires it in); the intent handler only consumes its verdict.
  */
-export type TopicClusteringErrorClassifier = (error: unknown) => {
-  code: string;
-  isUserActionable: boolean;
-};
+export type TopicClusteringErrorClassifier = (error: unknown) => ClassifiedClusteringError;
 
 /**
  * The page-execution metrics the executor reports (ADR-054). The concrete
@@ -274,7 +271,7 @@ export type TopicClusteringErrorClassifier = (error: unknown) => {
  */
 export interface TopicClusteringMetricsPort {
   incrementPageTotal(params: {
-    outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+    outcome: "completed" | "skipped" | "failed_customer" | "failed_retryable" | "failed_final";
   }): void;
   observePageDuration(params: { mode: TopicClusteringRunMode; durationMs: number }): void;
 }
@@ -354,15 +351,18 @@ async function announceRunStarted(params: {
  */
 async function recordClusteringFailure(params: {
   commands: TopicClusteringOutcomeCommands;
-  classifyError: TopicClusteringErrorClassifier;
   context: PageContext;
   occurredAt: number;
   error: unknown;
+  /** Classified by the caller, which already had to ask to pick its branch. */
+  classified: ReturnType<typeof classifyClusteringError>;
 }): Promise<void> {
   const { projectId, runId, page, attempt } = params.context;
   const errorMessage = errorText(params.error);
-  const classified = params.classifyError(params.error);
-  logger.error(
+  const { classified } = params;
+  // A user-actionable failure is the customer's to fix, not an incident of
+  // ours — it logs at warn, while an internal failure stays at error.
+  logger[classified.isUserActionable ? "warn" : "error"](
     {
       projectId,
       runId,
@@ -371,7 +371,9 @@ async function recordClusteringFailure(params: {
       error: errorMessage,
       errorCode: classified.code,
     },
-    "Clustering page failed on final attempt; recording run_failed",
+    classified.isUserActionable
+      ? "Clustering run needs customer action; recording run_failed with its code for the settings page"
+      : "Clustering page failed on final attempt; recording run_failed",
   );
   try {
     await params.commands.recordClusteringRunFailed({
@@ -456,10 +458,14 @@ async function recordClusteringSuccess(params: {
  * double-record.
  *
  * Failure contract, split by which half failed:
- * - the CLUSTERING call — attempts below the cap rethrow so the outbox
- *   retries with backoff; the final attempt records a durable run_failed
- *   instead and retires the message dispatched, so the failure is a visible
- *   outcome rather than a dead row an operator has to find.
+ * - the CLUSTERING call — a user-actionable failure (classified by
+ *   `classifyClusteringError`) records run_failed on the FIRST attempt:
+ *   retrying cannot configure the customer's model for them, and the code on
+ *   the record is what the settings page turns into guidance. Everything
+ *   else: attempts below the cap rethrow so the outbox retries with backoff;
+ *   the final attempt records a durable run_failed instead and retires the
+ *   message dispatched, so the failure is a visible outcome rather than a
+ *   dead row an operator has to find.
  * - the OUTCOME write — never retried through the outbox, on either branch,
  *   because that would redeliver the intent and re-run a page that has
  *   already either succeeded or exhausted its attempts.
@@ -491,6 +497,22 @@ export function createTopicClusteringRunHandler(
         page: payload.page,
       });
     } catch (error) {
+      // A user-actionable failure (no model configured, rejected credentials)
+      // cannot be fixed by retrying — only the customer changing their
+      // configuration can. Record the durable, visible outcome immediately
+      // instead of burning the retry budget re-asking the same question.
+      const classified = deps.classifyError(error);
+      if (classified.isUserActionable) {
+        deps.metrics.incrementPageTotal({ outcome: "failed_customer" });
+        await recordClusteringFailure({
+          commands,
+          context,
+          occurredAt: clock(),
+          error,
+          classified,
+        });
+        return;
+      }
       // Attempts below the cap rethrow so the outbox retries with backoff;
       // only the final attempt records the durable, visible failure.
       if (intentContext.attempt < maxAttempts) {
@@ -506,10 +528,10 @@ export function createTopicClusteringRunHandler(
       deps.metrics.incrementPageTotal({ outcome: "failed_final" });
       await recordClusteringFailure({
         commands,
-        classifyError: deps.classifyError,
         context,
         occurredAt: clock(),
         error,
+        classified,
       });
       return;
     }

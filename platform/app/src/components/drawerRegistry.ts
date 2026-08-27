@@ -227,9 +227,17 @@ const ScenarioRunDetailDrawer = lazyDefault({
   factory: () => import("./simulations/ScenarioRunDetailDrawer"),
   key: "ScenarioRunDetailDrawer",
 });
+const ScenarioVersionHistoryDrawer = lazyDefault({
+  factory: () => import("./agent-testing/drawers/ScenarioVersionHistoryDrawer"),
+  key: "ScenarioVersionHistoryDrawer",
+});
 const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
+});
+const AgentTestingPlanModal = lazyDefault({
+  factory: () => import("./agent-testing/plan/PlanModal"),
+  key: "PlanModal",
 });
 const TargetTypeSelectorDrawer = lazyDefault({
   factory: () => import("./targets/TargetTypeSelectorDrawer"),
@@ -295,6 +303,7 @@ export const drawers = {
   agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
+  // Experiments workbench
   comparisonLeaderboard: ComparisonLeaderboardDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
@@ -306,8 +315,11 @@ export const drawers = {
   // Scenarios
   scenarioEditor: ScenarioFormDrawerFromUrl,
   scenarioRunDetail: ScenarioRunDetailDrawer,
+  scenarioVersionHistory: ScenarioVersionHistoryDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
+  // Agent Testing v2 draws the same run plan in a dialog of its own.
+  agentTestingPlanEditor: AgentTestingPlanModal,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance

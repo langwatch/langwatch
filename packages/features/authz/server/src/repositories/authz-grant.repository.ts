@@ -8,6 +8,7 @@ import type { LedgerActor } from "@langwatch/actor";
 import {
   BindingMissingError,
   DuplicateBindingError,
+  type GrantEventSource,
   type OffboardCounts,
   type RoleBindingScopeType,
   type TeamUserRole,
@@ -52,6 +53,7 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
   abstract createBinding(args: {
     row: RoleBindingWrite;
     actor: LedgerActor;
+    source?: GrantEventSource;
   }): Promise<void>;
   /**
    * @throws DuplicateBindingError on a unique-index collision.

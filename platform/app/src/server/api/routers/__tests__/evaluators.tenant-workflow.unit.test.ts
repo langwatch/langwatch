@@ -43,7 +43,10 @@ const prisma = {
     }),
   },
   organizationUser: {
-    findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.ADMIN }),
+    findFirst: vi.fn().mockResolvedValue({
+      role: OrganizationUserRole.ADMIN,
+      disabledAt: null,
+    }),
   },
   groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
   roleBinding: {

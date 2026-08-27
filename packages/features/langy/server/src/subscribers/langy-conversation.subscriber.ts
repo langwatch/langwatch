@@ -19,9 +19,7 @@ import {
 } from "../adapters/langy.turn-errors.adapter";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
-const broadcastLogger = createLogger(
-  "langwatch:langy:conversation-update-broadcast-subscriber",
-);
+const broadcastLogger = createLogger("langwatch:langy:conversation-update-broadcast-subscriber");
 
 export const LANGY_HEARTBEAT_GRACE_MS = 30_000;
 const MAX_STALL_MS = LANGY_HEARTBEAT_GRACE_MS * 3;
@@ -59,16 +57,8 @@ export interface LangyLivenessBufferPort {
     now: number;
     graceMs: number;
   }): Promise<{ stale: boolean }>;
-  appendStatus(params: {
-    conversationId: string;
-    turnId: string;
-    status: string;
-  }): Promise<void>;
-  markError(params: {
-    conversationId: string;
-    turnId: string;
-    error: string;
-  }): Promise<void>;
+  appendStatus(params: { conversationId: string; turnId: string; status: string }): Promise<void>;
+  markError(params: { conversationId: string; turnId: string; error: string }): Promise<void>;
 }
 export interface LangyWorkerDispatchPort {
   dispatch(params: {
@@ -100,10 +90,7 @@ export interface LangyTurnHandoffRecord {
   resumeToken?: string;
 }
 export interface LangyTurnHandoffReader {
-  read(params: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<LangyTurnHandoffRecord | null>;
+  read(params: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffRecord | null>;
 }
 export interface AgentTurnLivenessSubscriberDeps {
   buffer: LangyLivenessBufferPort;
@@ -132,13 +119,8 @@ export interface LangyConversationUpdateBroadcastSubscriberDeps {
   conversations: LangyConversationFreshnessReader;
 }
 
-function projectionNotReadyError(params: {
-  projectionName: string;
-  eventId: string;
-}): Error {
-  return new Error(
-    `${params.projectionName} has not projected event ${params.eventId} yet`,
-  );
+function projectionNotReadyError(params: { projectionName: string; eventId: string }): Error {
+  return new Error(`${params.projectionName} has not projected event ${params.eventId} yet`);
 }
 function turnIdOf(event: LangyConversationProcessingEvent): string | null {
   return "turnId" in event.data ? (event.data.turnId ?? null) : null;
@@ -203,23 +185,29 @@ export function createAgentTurnLivenessSubscriber(
         candidateHandoff.turnId === turnId
           ? candidateHandoff
           : null;
-      if (stalledMs > MAX_STALL_MS || !handoff) {
+      if (stalledMs > MAX_STALL_MS) {
         livenessLogger.warn(
           {
             projectId,
             conversationId,
             turnId,
             stalledMs,
-            reason: stalledMs > MAX_STALL_MS ? "stall_expired" : "no_handoff",
+            reason: "stall_expired",
+            hasHandoff: handoff !== null,
           },
           "failing a stalled langy turn",
         );
         const error = serializeLangyTurnError(new LangyWorkerStoppedError());
-        await deps.buffer
-          .markError({ conversationId, turnId, error })
-          .catch(() => undefined);
+        await deps.buffer.markError({ conversationId, turnId, error }).catch(() => undefined);
         await deps.failTurn.failTurn({ projectId, conversationId, turnId, error });
         return;
+      }
+      if (!handoff) {
+        throw new DispatchError({
+          message: `langy turn ${turnId} has no handoff but is still active (${stalledMs}ms); re-checking liveness`,
+          retryable: true,
+          retryAfterMs: LANGY_HEARTBEAT_GRACE_MS,
+        });
       }
       await deps.buffer
         .appendStatus({ conversationId, turnId, status: "Reconnecting to the agent…" })

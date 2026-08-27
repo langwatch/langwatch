@@ -3,8 +3,6 @@ import { parseEvaluationResult } from "~/utils/evaluationResults";
 import type { EvaluationResults, EvaluatorConfig, TargetConfig } from "../types";
 import { resolveVerdictLabel, toComparisonConfig } from "./normalizeComparison";
 
-export { computeMetricStats, type MetricStats };
-
 /**
  * Aggregate statistics for a target's evaluator results.
  */

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { LangyFinalPartsService } from "@langwatch/langy-server/services/langy-final-parts.service";
 
-const buildFinalAssistantParts = (
-  input: Parameters<LangyFinalPartsService["build"]>[0],
-) => LangyFinalPartsService.create().build(input);
+const buildFinalAssistantParts = (input: Parameters<LangyFinalPartsService["build"]>[0]) =>
+  LangyFinalPartsService.create().build(input);
 
 /** A well-formed stats block, fenced the way the model emits it. */
 const statsFence = [
@@ -188,9 +187,7 @@ describe("buildFinalAssistantParts", () => {
 
   describe("given a block that validates nowhere", () => {
     it("records a langy-card-failed part carrying the raw text — never silent", () => {
-      const bad = ["before", "```langy-card", "this is not json", "```", "after"].join(
-        "\n",
-      );
+      const bad = ["before", "```langy-card", "this is not json", "```", "after"].join("\n");
       const parts = buildFinalAssistantParts({ text: bad });
       expect(parts).toEqual([
         { type: "text", text: "before", role: "assistant" },
@@ -218,14 +215,9 @@ describe("buildFinalAssistantParts", () => {
     });
 
     it("mints deterministic failed ids so both finalize paths stamp identically", () => {
-      const twoBad = [
-        "```langy-card",
-        "junk one",
-        "```",
-        "```langy-card",
-        "junk two",
-        "```",
-      ].join("\n");
+      const twoBad = ["```langy-card", "junk one", "```", "```langy-card", "junk two", "```"].join(
+        "\n",
+      );
       const first = buildFinalAssistantParts({ text: twoBad });
       const second = buildFinalAssistantParts({ text: twoBad });
       expect(first).toEqual(second);
@@ -267,6 +259,183 @@ describe("buildFinalAssistantParts", () => {
       expect(buildFinalAssistantParts({ text })).toEqual([
         { type: "text", text, role: "assistant" },
       ]);
+    });
+  });
+
+  describe("given the turn's own account of what happened when", () => {
+    const twoCalls = [
+      { id: "c1", name: "search", output: "found" },
+      { id: "c2", name: "run", output: "ok" },
+    ];
+
+    /** @scenario "The record keeps the paragraphs written between the calls" */
+    it("records the paragraphs and the calls in the order they happened", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Both are policy gaps.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Reading the failed rows." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Now running the candidate." },
+          { kind: "tool", id: "c2" },
+          { kind: "text", text: "Both are policy gaps." },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual([
+        "text",
+        "tool-search",
+        "text",
+        "tool-run",
+        "text",
+      ]);
+      expect(parts.map((part) => ("text" in part ? part.text : null))).toEqual([
+        "Reading the failed rows.",
+        null,
+        "Now running the candidate.",
+        null,
+        "Both are policy gaps.",
+      ]);
+    });
+
+    /** @scenario "The record keeps the paragraphs written between the calls" */
+    it("keeps the reply once, not once per source", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: [twoCalls[0]!],
+        order: [
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Done." },
+        ],
+      });
+      expect(parts.filter((part) => part.type === "text")).toHaveLength(1);
+    });
+
+    it("prefers the agent's own reply over the copy the stream caught", () => {
+      // The last text on the stream is whatever had streamed when the turn
+      // ended; `text` is the reply the agent asked to keep.
+      const parts = buildFinalAssistantParts({
+        text: "Improved the pass rate from 30% to 100%.",
+        toolCalls: [twoCalls[0]!],
+        order: [
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Improved the pass ra" },
+        ],
+      });
+      expect(parts).toEqual([
+        {
+          type: "tool-search",
+          toolCallId: "c1",
+          state: "output-available",
+          output: "found",
+        },
+        {
+          type: "text",
+          text: "Improved the pass rate from 30% to 100%.",
+          role: "assistant",
+        },
+      ]);
+    });
+
+    it("keeps a call the account never named, rather than dropping it", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Looking." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Done." },
+        ],
+      });
+      expect(parts.map((part) => part.type)).toEqual(["text", "tool-search", "tool-run", "text"]);
+    });
+
+    /** @scenario "A turn that ends on a call does not repeat what it already wrote" */
+    it("does not repeat its narration when the turn ended on a call", () => {
+      // A turn that goes quiet after its last call hands over its WHOLE
+      // narration as the reply, because there is no closing paragraph to hand
+      // over instead. Appending it after the account would print every
+      // paragraph a second time.
+      const parts = buildFinalAssistantParts({
+        text: "Reading the failed rows.\nNow running the candidate.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Reading the failed rows." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Now running the candidate." },
+          { kind: "tool", id: "c2" },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual(["text", "tool-search", "text", "tool-run"]);
+      expect(parts.map((part) => ("text" in part ? part.text : null))).toEqual([
+        "Reading the failed rows.",
+        null,
+        "Now running the candidate.",
+        null,
+      ]);
+    });
+
+    /** @scenario "A turn that ends on a call does not repeat what it already wrote" */
+    it("keeps the reply when a turn ending on a call wrote no prose of its own", () => {
+      // Nothing was written between the calls, so `text` is the only prose
+      // there is and dropping it would record a turn that said nothing.
+      const parts = buildFinalAssistantParts({
+        text: "Annotation added.",
+        toolCalls: [twoCalls[0]!],
+        order: [{ kind: "tool", id: "c1" }],
+      });
+      expect(parts.map((part) => part.type)).toEqual(["tool-search", "text"]);
+    });
+
+    it("drops a blank paragraph rather than recording an empty block", () => {
+      const parts = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: [twoCalls[0]!],
+        order: [
+          { kind: "text", text: "   " },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Done." },
+        ],
+      });
+      expect(parts.map((part) => part.type)).toEqual(["tool-search", "text"]);
+    });
+
+    /** @scenario "A reloaded turn reads the same as the turn that was watched" */
+    it("records a turn the panel reads back in the order it happened", () => {
+      // The reload path end to end, minus the pixels: what the record keeps,
+      // handed to the split the panel draws a turn with
+      // (features/langy/logic/langyTranscript).
+      const parts = buildFinalAssistantParts({
+        text: "Both are policy gaps.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Reading the failed rows." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Now running the candidate." },
+          { kind: "tool", id: "c2" },
+          { kind: "text", text: "Both are policy gaps." },
+        ],
+      });
+
+      const runs = parts.map((part) => (part.type === "text" ? "answer" : "activity"));
+
+      expect(runs).toEqual(["answer", "activity", "answer", "activity", "answer"]);
+    });
+
+    /** @scenario "A turn with no ordered account on hand records what it always did" */
+    it("records its calls before its reply when there is no account", () => {
+      const withoutOrder = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: twoCalls,
+      });
+      const withEmptyOrder = buildFinalAssistantParts({
+        text: "Done.",
+        toolCalls: twoCalls,
+        order: [],
+      });
+      expect(withEmptyOrder).toEqual(withoutOrder);
+      expect(withoutOrder.map((part) => part.type)).toEqual(["tool-search", "tool-run", "text"]);
     });
   });
 });

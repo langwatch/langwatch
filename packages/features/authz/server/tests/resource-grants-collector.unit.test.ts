@@ -1,13 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AuthzCollectorService } from "../src/services/authz-collector.service";
 import { makeReader } from "./support/authz-read.stub";
-import {
-  liveShareLinkRow,
-  ORG,
-  PROJECT,
-  TEAM,
-  traceScope,
-} from "./support/resource-fixtures";
+import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/resource-fixtures";
 
 const customRoleBinding = [
   {
@@ -32,7 +26,7 @@ describe("collector at the resource tier", () => {
       expect(grants.bindings).toEqual([]);
       expect(grants.isOrgMember).toBe(false);
       expect(grants.legacyTeamMemberships).toEqual([]);
-      expect(reader.tryFindOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.tryFindOrganizationMembership).not.toHaveBeenCalled();
       expect(reader.findUserBindings).not.toHaveBeenCalled();
     });
   });
@@ -56,7 +50,7 @@ describe("collector at the resource tier", () => {
       expect(grants.organizationRole).toBeNull();
       expect(grants.isOrgMember).toBe(false);
       expect(grants.legacyTeamMemberships).toEqual([]);
-      expect(reader.tryFindOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.tryFindOrganizationMembership).not.toHaveBeenCalled();
       expect(reader.findLegacyTeamMemberships).not.toHaveBeenCalled();
       expect(reader.findCustomRolePermissions).toHaveBeenCalledWith({
         organizationId: ORG,
@@ -69,11 +63,11 @@ describe("collector at the resource tier", () => {
   describe("when a custom role's stored payload is malformed", () => {
     const collectWith = async (permissions: unknown) => {
       const reader = makeReader({
-        tryFindOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
-        findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
-        findCustomRolePermissions: vi
+        tryFindOrganizationMembership: vi
           .fn()
-          .mockResolvedValue([{ id: "cr-1", permissions }]),
+          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
+        findCustomRolePermissions: vi.fn().mockResolvedValue([{ id: "cr-1", permissions }]),
       });
       const grants = await AuthzCollectorService.create({
         reader,
@@ -281,9 +275,7 @@ describe("collector at the resource tier", () => {
 describe("tryResolveResourceScopeRef", () => {
   it("derives the project lineage from storage, never the caller", async () => {
     const reader = makeReader({
-      tryFindProjectLineage: vi
-        .fn()
-        .mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
+      tryFindProjectLineage: vi.fn().mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
     });
     const scope = await AuthzCollectorService.create({
       reader,
@@ -322,9 +314,7 @@ describe("tryResolveResourceScopeRef", () => {
 
   it("gives a thread no parents — threads are the top of the shareable tree", async () => {
     const reader = makeReader({
-      tryFindProjectLineage: vi
-        .fn()
-        .mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
+      tryFindProjectLineage: vi.fn().mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
     });
     const scope = await AuthzCollectorService.create({
       reader,

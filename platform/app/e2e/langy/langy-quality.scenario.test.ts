@@ -157,28 +157,30 @@ describe("Langy quality bar", () => {
     it("never ends a turn with nothing rendered", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
-        setId: SET_ID,
-        name: "vague opener still gets a visible reply",
-        description:
-          "The user types a short, low-information opener and then a second one. Neither is a task Langy can act on directly, but both must still produce something the user can read. An empty reply is the failure under test.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Every one of Langy's replies contains readable text — no reply is blank.",
-              "Langy responds to the vague opener with something actionable or orienting rather than silence.",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user("hm"),
-          scenario.agent(),
-          scenario.user("ok so what now"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          setId: SET_ID,
+          name: "vague opener still gets a visible reply",
+          description:
+            "The user types a short, low-information opener and then a second one. Neither is a task Langy can act on directly, but both must still produce something the user can read. An empty reply is the failure under test.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Every one of Langy's replies contains readable text — no reply is blank.",
+                "Langy responds to the vague opener with something actionable or orienting rather than silence.",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("hm"),
+            scenario.agent(),
+            scenario.user("ok so what now"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
 
       const text = lastAssistantText(result);
@@ -198,25 +200,27 @@ describe("Langy quality bar", () => {
     it("answers from the project rather than from the model's memory", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
-        setId: SET_ID,
-        name: "sourced answer with concrete figures",
-        description:
-          "The user wants to know what their traffic actually looked like over the last day and where it is going wrong. There is no correct answer that does not come from this project's own traces — a generic explanation of observability is a failure.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: LANGY_SOURCED_ANSWER_CRITERIA,
-          }),
-        ],
-        script: [
-          scenario.user(
-            "how much traffic did we get in the last 24 hours, and what's the most common thing going wrong?",
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          setId: SET_ID,
+          name: "sourced answer with concrete figures",
+          description:
+            "The user wants to know what their traffic actually looked like over the last day and where it is going wrong. There is no correct answer that does not come from this project's own traces — a generic explanation of observability is a failure.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: LANGY_SOURCED_ANSWER_CRITERIA,
+            }),
+          ],
+          script: [
+            scenario.user(
+              "how much traffic did we get in the last 24 hours, and what's the most common thing going wrong?",
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
 
       const text = lastAssistantText(result);
@@ -281,27 +285,29 @@ describe("Langy quality bar", () => {
     it("does not narrate a checkout it never obtained", async () => {
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
-        setId: SET_ID,
-        name: "does not narrate a checkout it never obtained",
-        description:
-          "The user asks Langy to open a file in their repository and refactor it, then pushes again when the first answer does not do it. Langy's shell has no copy of that code — it would have to clone the repository first. Going and getting it is a correct answer, and so is saying it does not have the file yet; describing the contents of a file it never obtained is the failure under test.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: LANGY_NO_PHANTOM_CHECKOUT_CRITERIA,
-          }),
-        ],
-        script: [
-          scenario.user(
-            "open src/agent.py in my project and refactor the retry logic, it's a mess",
-          ),
-          scenario.agent(),
-          scenario.user("just read the file and show me the diff"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          setId: SET_ID,
+          name: "does not narrate a checkout it never obtained",
+          description:
+            "The user asks Langy to open a file in their repository and refactor it, then pushes again when the first answer does not do it. Langy's shell has no copy of that code — it would have to clone the repository first. Going and getting it is a correct answer, and so is saying it does not have the file yet; describing the contents of a file it never obtained is the failure under test.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: LANGY_NO_PHANTOM_CHECKOUT_CRITERIA,
+            }),
+          ],
+          script: [
+            scenario.user(
+              "open src/agent.py in my project and refactor the retry logic, it's a mess",
+            ),
+            scenario.agent(),
+            scenario.user("just read the file and show me the diff"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
 
       const text = lastAssistantText(result);
@@ -332,25 +338,27 @@ describe("Langy quality bar", () => {
 
       const langy = makeLangyAdapter();
       const result = await runScenarioAndLog({
-        setId: SET_ID,
-        name: "monitor create completes end to end",
-        description:
-          "The user wants to be alerted when their agent starts giving off-topic answers in production. They do not know the difference between an evaluator and a monitor and should not have to — they asked for the outcome, and Langy can deliver all of it.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: LANGY_POLICY_BOUNDARY_CRITERIA,
-          }),
-        ],
-        script: [
-          scenario.user(
-            `set up a monitor called ${MONITOR_SCENARIO_NAME} that flags production answers that go off-topic`,
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          setId: SET_ID,
+          name: "monitor create completes end to end",
+          description:
+            "The user wants to be alerted when their agent starts giving off-topic answers in production. They do not know the difference between an evaluator and a monitor and should not have to — they asked for the outcome, and Langy can deliver all of it.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: LANGY_POLICY_BOUNDARY_CRITERIA,
+            }),
+          ],
+          script: [
+            scenario.user(
+              `set up a monitor called ${MONITOR_SCENARIO_NAME} that flags production answers that go off-topic`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
 
       // `>= 1`, not `=== 1`: runScenarioAndLog retries once on a transient
@@ -388,26 +396,28 @@ describe("Langy quality bar", () => {
     it("answers inside the latency budget", async () => {
       const { adapter: langy, turnDurationsMs } = withTurnTimings(makeLangyAdapter());
       const result = await runScenarioAndLog({
-        setId: SET_ID,
-        name: "single-lookup question inside the budget",
-        description:
-          "The user asks one narrow question with a one-command answer. There is nothing here to plan, decompose, or iterate on.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy answers the question with a concrete count or a clear zero.",
-              "Langy does NOT expand the narrow question into a broader investigation the user did not ask for. (A sentence of context around the count — e.g. how many succeeded or errored — is proportionate and fine; running extra analyses or a multi-part report is not.)",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user("how many traces do I have from today?"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          setId: SET_ID,
+          name: "single-lookup question inside the budget",
+          description:
+            "The user asks one narrow question with a one-command answer. There is nothing here to plan, decompose, or iterate on.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy answers the question with a concrete count or a clear zero.",
+                "Langy does NOT expand the narrow question into a broader investigation the user did not ask for. (A sentence of context around the count — e.g. how many succeeded or errored — is proportionate and fine; running extra analyses or a multi-part report is not.)",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("how many traces do I have from today?"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
 
       // Without this, an empty `turnDurationsMs` makes `Math.max(0, ...[])`

@@ -8,9 +8,7 @@ import {
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationPassAlreadyRunningError,
-  MigrationRollbackRequiresMigratedOrFinalizedError,
   MigrationRunRequiresEnrollmentError,
-  MigrationStateNotFoundError,
   MigrationUnknownError,
 } from "../errors";
 import {
@@ -24,11 +22,15 @@ const TENANT = "org_acme";
 function migrationOf({
   name,
   runsAutomaticallyOnSelfHosted = true,
+  enrolledAutomatically = false,
   requiresOperatorConfirmation = false,
+  tenant,
 }: {
   name: string;
   runsAutomaticallyOnSelfHosted?: boolean;
+  enrolledAutomatically?: boolean;
   requiresOperatorConfirmation?: boolean;
+  tenant?: "organization" | "user";
 }) {
   return {
     name,
@@ -36,6 +38,8 @@ function migrationOf({
     description: name,
     requiresOperatorConfirmation,
     runsAutomaticallyOnSelfHosted,
+    enrolledAutomatically,
+    ...(tenant ? { tenant } : {}),
   };
 }
 
@@ -86,7 +90,10 @@ function targetedPassStub() {
       held: 0,
       parked: 0,
       skipped: 0,
+      alreadyFinalized: 0,
+      alreadyRolledBack: 0,
       claimed: 0,
+      advanced: 0,
     });
 }
 
@@ -109,7 +116,10 @@ function serviceWith({
   >;
   rollbackGuards?: Record<
     string,
-    (args: { tenantId: string; record: TenantMigrationRecord }) => Promise<void>
+    (args: {
+      tenantId: string;
+      record: TenantMigrationRecord | null;
+    }) => Promise<void>
   >;
   isSaaS?: boolean;
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
@@ -418,30 +428,59 @@ describe("SystemMigrationsService.rollBack", () => {
   });
 
   describe("given an organization the migration never processed", () => {
-    it("refuses with migration_state_not_found and writes nothing", async () => {
+    /** @scenario "An operator holds an organization out of a rollout before it is reached" */
+    it("pins it anyway, so a pass that would reach it automatically never does", async () => {
       const { service, upserts } = serviceWith({ record: null });
-      await expect(
-        service.rollBack({
-          migrationName: MIGRATION,
-          tenantId: TENANT,
-          actorUserId: "user_alex",
-        }),
-      ).rejects.toThrow(MigrationStateNotFoundError);
-      expect(upserts).toHaveLength(0);
+
+      await service.rollBack({
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        actorUserId: "user_alex",
+      });
+
+      // The pin is the only runtime lever left for an automatically enrolled
+      // migration, so it has to be placeable before the pass arrives.
+      expect(upserts).toHaveLength(1);
+      expect(upserts[0]).toMatchObject({
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        status: "rolled_back",
+      });
+    });
+
+    /** @scenario "An operator holds an organization out of a rollout before it is reached" */
+    it("runs no rollback effect, because nothing ever cut over", async () => {
+      const effect = vi.fn().mockResolvedValue(undefined);
+      const { service } = serviceWith({
+        record: null,
+        rollbackEffects: { [MIGRATION]: effect },
+      });
+
+      await service.rollBack({
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        actorUserId: "user_alex",
+      });
+
+      expect(effect).not.toHaveBeenCalled();
     });
   });
 
-  describe("given an organization that is parked rather than migrated or finalized", () => {
-    it("refuses with migration_rollback_requires_migrated_or_finalized, naming the actual status", async () => {
+  describe("given an organization parked on every pass", () => {
+    /** @scenario "An operator stops a rollout for an organization that keeps erroring" */
+    it("pins it, so the convergence loop stops re-driving it", async () => {
+      const effect = vi.fn().mockResolvedValue(undefined);
       const { service, upserts } = serviceWith({
         record: {
           migrationName: MIGRATION,
           tenantId: TENANT,
           status: "parked",
-          report: null,
+          report: { kind: "error", message: "ledger unreachable" },
         },
+        rollbackEffects: { [MIGRATION]: effect },
       });
-      const attempt = service.rollBack({
+
+      await service.rollBack({
         migrationName: MIGRATION,
         tenantId: TENANT,
         actorUserId: "user_alex",
@@ -692,6 +731,7 @@ describe("SystemMigrationsService enrollment", () => {
             description: "What the first step does.",
             requiresOperatorConfirmation: false,
             runsAutomaticallyOnSelfHosted: true,
+            enrolledAutomatically: false,
           },
           {
             name: "second",
@@ -699,6 +739,7 @@ describe("SystemMigrationsService enrollment", () => {
             description: "What the second step does.",
             requiresOperatorConfirmation: false,
             runsAutomaticallyOnSelfHosted: true,
+            enrolledAutomatically: false,
           },
         ],
       });
@@ -845,7 +886,10 @@ describe("SystemMigrationsService.runForOrganization", () => {
           held: 0,
           parked: 0,
           skipped: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 0,
           claimed: 1,
+          advanced: 0,
         }),
       });
 
@@ -856,6 +900,145 @@ describe("SystemMigrationsService.runForOrganization", () => {
           actorUserId: "user_alex",
         }),
       ).rejects.toThrow(MigrationPassAlreadyRunningError);
+    });
+  });
+
+  describe("when one member of a user-rooted run is claimed and the rest finish", () => {
+    /** @scenario "One contended member does not discard a user-rooted run's outcome" */
+    it("reports the organization instead of discarding the members that finalized", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 2,
+          finalized: 1,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 0,
+          claimed: 1,
+          advanced: 0,
+        }),
+      });
+
+      // A user-rooted run's tenants are the organization's members, so one
+      // contended member is partial progress. Aborting on it would throw away
+      // the outcome of every member that finished — and the contended one
+      // keeps the organization on the operator's list until the next pass.
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: "migrated", waiting: false });
+    });
+
+    it("still refuses when EVERY member was claimed, because the run did nothing", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 2,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 0,
+          claimed: 2,
+          advanced: 0,
+        }),
+      });
+
+      await expect(
+        service.runForOrganization({
+          organizationId: TENANT,
+          migrationName: MIGRATION,
+          actorUserId: "user_alex",
+        }),
+      ).rejects.toThrow(MigrationPassAlreadyRunningError);
+    });
+  });
+
+  describe("given a user-rooted migration whose members are all already terminal", () => {
+    it("answers finalized rather than pretending no member was in the cohort", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 3,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyFinalized: 3,
+          alreadyRolledBack: 0,
+          claimed: 0,
+          advanced: 0,
+        }),
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: "finalized", waiting: false });
+    });
+
+    it("answers rolled_back when the members were rolled back, never finalized", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 3,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 3,
+          claimed: 0,
+          advanced: 0,
+        }),
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: "rolled_back", waiting: false });
+    });
+
+    it("still answers null for a run where no member was in the cohort at all", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [migrationOf({ name: MIGRATION, tenant: "user" })],
+        runTargetedPass: targetedPassStub().mockResolvedValue({
+          tenantsSeen: 0,
+          finalized: 0,
+          held: 0,
+          parked: 0,
+          skipped: 0,
+          alreadyFinalized: 0,
+          alreadyRolledBack: 0,
+          claimed: 0,
+          advanced: 0,
+        }),
+      });
+
+      const outcome = await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: MIGRATION,
+        actorUserId: "user_alex",
+      });
+
+      expect(outcome).toEqual({ status: null, waiting: false });
     });
   });
 

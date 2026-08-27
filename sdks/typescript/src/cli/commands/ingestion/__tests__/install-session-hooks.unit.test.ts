@@ -57,6 +57,19 @@ const entryFor = (tool: "claude_code" | "codex") => ({
   hooks: [{ type: "command", command: sessionContextHookCommand(tool), timeout: 10 }],
 });
 
+// Claude's SessionStart entry carries the guidance hook as a second command:
+// same entry, so the one-langwatch-entry-per-event invariant holds.
+const ourSessionStartEntry = {
+  hooks: [
+    {
+      type: "command",
+      command: sessionContextHookCommand("claude_code"),
+      timeout: 10,
+    },
+    { type: "command", command: "langwatch ingest guidance claude-code", timeout: 10 },
+  ],
+};
+
 const ourEntry = entryFor("claude_code");
 
 const userEntry = {
@@ -146,7 +159,7 @@ describe("the claude_code ingestion install", () => {
       await runInstall();
 
       expect(readJson().hooks).toEqual({
-        SessionStart: [ourEntry],
+        SessionStart: [ourSessionStartEntry],
         Stop: [ourEntry],
       });
     });
@@ -200,11 +213,15 @@ describe("the claude_code ingestion install", () => {
     });
 
     /** @scenario "User-authored hooks survive the merge untouched" */
+    /** @scenario "The raw claude hooks carry the guidance entry" */
     it("keeps the user's entry exactly as it was, with ours alongside", async () => {
       await runInstall();
 
       const settings = readJson();
-      expect(settings.hooks.SessionStart).toEqual([userEntry, ourEntry]);
+      expect(settings.hooks.SessionStart).toEqual([
+        userEntry,
+        ourSessionStartEntry,
+      ]);
       expect(settings.model).toBe("claude-sonnet-5");
     });
   });

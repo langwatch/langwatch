@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { LangyTurnHandoffStore, type LangyHandoffRedis } from "@langwatch/langy-server";
+import { describe, expect, it, vi } from "vitest";
+import {
+  LANGY_HANDOFF_TTL_SECONDS,
+  LangyTurnHandoffStore,
+  type LangyHandoffRedis,
+} from "@langwatch/langy-server";
 
 function fakeRedis(): LangyHandoffRedis & { values: Map<string, string> } {
   const values = new Map<string, string>();
@@ -11,6 +15,9 @@ function fakeRedis(): LangyHandoffRedis & { values: Map<string, string> } {
     },
     async get(key) {
       return values.get(key) ?? null;
+    },
+    async expire(key, _ttl) {
+      return values.has(key) ? 1 : 0;
     },
   };
 }
@@ -64,5 +71,32 @@ describe("LangyTurnHandoffStore", () => {
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
     ).resolves.toBeNull();
+  });
+
+  it("refreshes a live handoff without rewriting it", async () => {
+    const redis = fakeRedis();
+    const expire = vi.spyOn(redis, "expire");
+    const set = vi.spyOn(redis, "set");
+    const store = LangyTurnHandoffStore.create({ redis });
+    await store.stash(handoff);
+    set.mockClear();
+
+    await expect(
+      store.refresh({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toBe(true);
+    expect(expire).toHaveBeenCalledWith(
+      "langy:handoff:{conversation-1}:turn-1",
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it("does not recreate an expired handoff", async () => {
+    const redis = fakeRedis();
+    const store = LangyTurnHandoffStore.create({ redis });
+
+    await expect(
+      store.refresh({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toBe(false);
   });
 });

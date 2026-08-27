@@ -19,6 +19,9 @@ type Set struct {
 	// restructure. Entries found there on the base branch are merged history —
 	// a branch that moves them is not adding them.
 	PreviousDirectories []string
+	// ForbiddenDirectories are old roots that may still exist in base history
+	// but must never contain entries at the branch head.
+	ForbiddenDirectories []string
 	// Key extracts the numeric ordering key from an entry name; its first
 	// capture group must be the digits the entries sort by.
 	Key *regexp.Regexp
@@ -34,8 +37,12 @@ var Sets = []Set{
 		Name:                "Prisma",
 		Directory:           "packages/prisma-client/prisma/migrations",
 		PreviousDirectories: []string{"platform/app/prisma/migrations", "langwatch/prisma/migrations"},
-		Key:                 regexp.MustCompile(`^(\d{14})_`),
-		Format:              "YYYYMMDDHHMMSS_name",
+		ForbiddenDirectories: []string{
+			"platform/app/prisma/migrations",
+			"langwatch/prisma/migrations",
+		},
+		Key:    regexp.MustCompile(`^(\d{14})_`),
+		Format: "YYYYMMDDHHMMSS_name",
 		// A literal key rather than a $(date) expansion: free keys count up from
 		// the newest timestamp in play, so twins renamed from one comment get
 		// distinct names instead of colliding on the same second.

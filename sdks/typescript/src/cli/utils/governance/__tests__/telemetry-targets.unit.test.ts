@@ -13,21 +13,15 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { writeCodexGatewayBlock, writeCodexOtelBlock } from "../../codex-config-toml";
-import {
-  appSettingsTargetFor,
-  claudeProjectSettingsTarget,
-  installAppEnv,
-} from "../app-settings";
+import { appSettingsTargetFor, claudeProjectSettingsTarget, installAppEnv } from "../app-settings";
 import {
   installOpencodeSessionContextPlugin,
   OPENCODE_PLUGIN_FILE_NAME,
   opencodePluginTarget,
 } from "../opencode-plugin";
 import { telemetryEnvVarNames } from "../otel-env-block";
-import {
-  installSessionContextHooks,
-  sessionContextHookCommand,
-} from "../session-context-hooks";
+import { defaultCodexAgentsMdPath, installCodexAgentGuidance } from "../codex-agents-md";
+import { installSessionContextHooks, sessionContextHookCommand } from "../session-context-hooks";
 import { buildScopedToolFunction, persistBlockToRc, toolMarkers } from "../shell-rc";
 import { scanTelemetryTargets } from "../telemetry-targets";
 import {
@@ -70,13 +64,8 @@ const claudeCommandsRun = (): string[] =>
   spawnSyncMock.mock.calls.map((call: unknown[]) => (call[1] as string[]).join(" "));
 
 /** Write a plugin state file under the temp home's claude directory. */
-const writeClaudeJson = ({
-  segments,
-  value,
-}: {
-  segments: string[];
-  value: unknown;
-}): void => writeClaudeJsonFixture({ home: tmpHome, segments, value });
+const writeClaudeJson = ({ segments, value }: { segments: string[]; value: unknown }): void =>
+  writeClaudeJsonFixture({ home: tmpHome, segments, value });
 
 const seedLangwatchPlugin = (): void => seedInstalledPlugin({ home: tmpHome });
 
@@ -220,9 +209,7 @@ describe("scanTelemetryTargets", () => {
       );
       installSessionContextHooks({ tool: "claude_code" });
 
-      expect(presentLabels().some((l) => l.startsWith("claude session hooks"))).toBe(
-        true,
-      );
+      expect(presentLabels().some((l) => l.startsWith("claude session hooks"))).toBe(true);
 
       for (const t of scan().filter((t) => t.present)) {
         expect(t.remove()).toBe(true);
@@ -230,9 +217,7 @@ describe("scanTelemetryTargets", () => {
 
       const after = JSON.parse(fs.readFileSync(claude.path, "utf8"));
       expect(after.hooks).toEqual({ SessionStart: [userEntry] });
-      expect(JSON.stringify(after)).not.toContain(
-        sessionContextHookCommand("claude_code"),
-      );
+      expect(JSON.stringify(after)).not.toContain(sessionContextHookCommand("claude_code"));
       expect(presentLabels()).toEqual([]);
     });
   });
@@ -261,16 +246,31 @@ describe("scanTelemetryTargets", () => {
       fs.mkdirSync(path.dirname(target.path), { recursive: true });
       fs.writeFileSync(target.path, "export const Mine = async () => ({});\n");
 
-      expect(presentLabels().some((l) => l.startsWith("opencode session plugin"))).toBe(
-        false,
-      );
+      expect(presentLabels().some((l) => l.startsWith("opencode session plugin"))).toBe(false);
 
       for (const t of scan()) t.remove();
 
-      expect(fs.readFileSync(target.path, "utf8")).toBe(
-        "export const Mine = async () => ({});\n",
-      );
+      expect(fs.readFileSync(target.path, "utf8")).toBe("export const Mine = async () => ({});\n");
       expect(path.basename(target.path)).toBe(OPENCODE_PLUGIN_FILE_NAME);
+    });
+  });
+
+  describe("when the codex AGENTS.md carries the guidance block and user content", () => {
+    /** @scenario "Logout removes exactly the LangWatch AGENTS.md block" */
+    it("reports the guidance, removes only our block, and keeps theirs", () => {
+      const agentsMd = defaultCodexAgentsMdPath();
+      fs.mkdirSync(path.dirname(agentsMd), { recursive: true });
+      fs.writeFileSync(agentsMd, "# My rules\n");
+      installCodexAgentGuidance(agentsMd);
+
+      expect(presentLabels().some((l) => l.startsWith("codex agent guidance"))).toBe(true);
+
+      for (const t of scan().filter((t) => t.present)) {
+        expect(t.remove()).toBe(true);
+      }
+
+      expect(fs.readFileSync(agentsMd, "utf8")).toContain("# My rules");
+      expect(presentLabels().some((l) => l.startsWith("codex agent guidance"))).toBe(false);
     });
   });
 
@@ -293,9 +293,7 @@ describe("scanTelemetryTargets", () => {
         expect(t.remove()).toBe(true);
       }
 
-      expect(claudeCommandsRun()).toContain(
-        "plugin uninstall langwatch@langwatch --scope user",
-      );
+      expect(claudeCommandsRun()).toContain("plugin uninstall langwatch@langwatch --scope user");
       expect(claudeCommandsRun()).toContain("plugin marketplace remove langwatch");
     });
   });
@@ -334,13 +332,11 @@ describe("scanTelemetryTargets", () => {
     it("does not report it, and remove() runs no claude subprocess", () => {
       seedMarketplace("somebody-else/their-plugins");
 
-      expect(
-        presentLabels().some((l) => l.startsWith("claude langwatch plugin marketplace")),
-      ).toBe(false);
+      expect(presentLabels().some((l) => l.startsWith("claude langwatch plugin marketplace"))).toBe(
+        false,
+      );
 
-      const target = scan().find((t) =>
-        t.label.startsWith("claude langwatch plugin marketplace"),
-      )!;
+      const target = scan().find((t) => t.label.startsWith("claude langwatch plugin marketplace"))!;
       expect(target.remove()).toBe(false);
       expect(claudeCommandsRun()).toEqual([]);
     });
@@ -372,17 +368,15 @@ describe("scanTelemetryTargets", () => {
     });
 
     it("reports the pin as present and removes it on logout", () => {
-      expect(
-        presentLabels().some((l) => l.startsWith("claude project telemetry pin")),
-      ).toBe(true);
+      expect(presentLabels().some((l) => l.startsWith("claude project telemetry pin"))).toBe(true);
 
       for (const t of scan().filter((t) => t.present)) {
         expect(t.remove()).toBe(true);
       }
 
-      expect(
-        fs.existsSync(path.join(tmpHome, "project", ".claude", "settings.local.json")),
-      ).toBe(false);
+      expect(fs.existsSync(path.join(tmpHome, "project", ".claude", "settings.local.json"))).toBe(
+        false,
+      );
       expect(presentLabels()).toEqual([]);
     });
   });
@@ -401,9 +395,7 @@ describe("scanTelemetryTargets", () => {
       });
       const before = fs.readFileSync(claude.path, "utf8");
 
-      expect(presentLabels().some((l) => l.startsWith("claude telemetry env"))).toBe(
-        false,
-      );
+      expect(presentLabels().some((l) => l.startsWith("claude telemetry env"))).toBe(false);
 
       const target = scan().find((t) => t.label.startsWith("claude telemetry env"))!;
       expect(target.remove()).toBe(false);
@@ -417,9 +409,7 @@ describe("scanTelemetryTargets", () => {
     beforeEach(() => {
       const projectDir = path.join(tmpHome, "project");
       fs.mkdirSync(projectDir, { recursive: true });
-      cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(projectDir) as ReturnType<
-        typeof vi.spyOn
-      >;
+      cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(projectDir) as ReturnType<typeof vi.spyOn>;
       installAppEnv(claudeProjectSettingsTarget(projectDir), {
         OTEL_EXPORTER_OTLP_ENDPOINT: "https://api.honeycomb.io",
       });
@@ -433,13 +423,9 @@ describe("scanTelemetryTargets", () => {
       const pinPath = path.join(tmpHome, "project", ".claude", "settings.local.json");
       const before = fs.readFileSync(pinPath, "utf8");
 
-      expect(
-        presentLabels().some((l) => l.startsWith("claude project telemetry pin")),
-      ).toBe(false);
+      expect(presentLabels().some((l) => l.startsWith("claude project telemetry pin"))).toBe(false);
 
-      const target = scan().find((t) =>
-        t.label.startsWith("claude project telemetry pin"),
-      )!;
+      const target = scan().find((t) => t.label.startsWith("claude project telemetry pin"))!;
       expect(target.remove()).toBe(false);
       expect(fs.readFileSync(pinPath, "utf8")).toBe(before);
     });
@@ -453,13 +439,9 @@ describe("scanTelemetryTargets", () => {
       fs.mkdirSync(path.dirname(profilePath), { recursive: true });
       fs.writeFileSync(profilePath, "# a file the user put here themselves\n");
 
-      expect(
-        presentLabels().some((l) => l.startsWith("codex langwatch profile file")),
-      ).toBe(false);
+      expect(presentLabels().some((l) => l.startsWith("codex langwatch profile file"))).toBe(false);
 
-      const target = scan().find((t) =>
-        t.label.startsWith("codex langwatch profile file"),
-      )!;
+      const target = scan().find((t) => t.label.startsWith("codex langwatch profile file"))!;
       expect(target.remove()).toBe(false);
       expect(fs.existsSync(profilePath)).toBe(true);
     });
@@ -479,9 +461,7 @@ describe("scanTelemetryTargets", () => {
           ),
           toolMarkers("opencode"),
         );
-        expect(presentLabels().some((l) => l.startsWith("opencode shell function"))).toBe(
-          true,
-        );
+        expect(presentLabels().some((l) => l.startsWith("opencode shell function"))).toBe(true);
       } finally {
         if (prevShell === undefined) delete process.env.SHELL;
         else process.env.SHELL = prevShell;

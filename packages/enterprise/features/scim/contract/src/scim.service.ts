@@ -19,16 +19,22 @@ export abstract class ScimService {
   }): Promise<{ id: string } | null>;
   abstract generateToken(input: {
     organizationId: string;
+    connectionId?: string | null;
     description?: string;
-  }): Promise<{ token: string; tokenId: string }>;
+  }): Promise<{ token: string; tokenId: string; connectionId: string }>;
   abstract listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]>;
   abstract revokeToken(input: {
     organizationId: string;
     tokenId: string;
   }): Promise<{ success: true }>;
+  abstract revokeTokensForConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<{ revoked: number }>;
   abstract verifyToken(input: { token: string }): Promise<ScimTokenEntitlement>;
   abstract createUser(input: {
     organizationId: string;
+    connectionId?: string | null;
     request: ScimCreateUserRequest;
   }): Promise<ScimUser>;
   abstract getUser(input: { organizationId: string; id: string }): Promise<ScimUser>;
@@ -41,14 +47,20 @@ export abstract class ScimService {
   abstract replaceUser(input: {
     organizationId: string;
     id: string;
+    connectionId?: string | null;
     request: ScimCreateUserRequest;
   }): Promise<ScimUser>;
   abstract updateUser(input: {
     organizationId: string;
     id: string;
+    connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimUser>;
-  abstract deleteUser(input: { organizationId: string; id: string }): Promise<void>;
+  abstract deleteUser(input: {
+    organizationId: string;
+    id: string;
+    connectionId?: string | null;
+  }): Promise<void>;
 
   abstract listGroups(input: {
     organizationId: string;
@@ -64,6 +76,7 @@ export abstract class ScimService {
   }): Promise<ScimGroup>;
   abstract createGroup(input: {
     organizationId: string;
+    connectionId?: string | null;
     request: ScimCreateGroupRequest;
   }): Promise<ScimGroup>;
   abstract replaceGroup(input: {
@@ -76,8 +89,5 @@ export abstract class ScimService {
     externalScimId: string;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup>;
-  abstract deleteGroup(input: {
-    organizationId: string;
-    externalScimId: string;
-  }): Promise<void>;
+  abstract deleteGroup(input: { organizationId: string; externalScimId: string }): Promise<void>;
 }

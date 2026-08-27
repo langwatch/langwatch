@@ -8,6 +8,7 @@ import {
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
 import { LangyCliEnvelopeService } from "./langy-cli-envelope.service";
+import type { LangyTurnSegment } from "../streaming/langy-turn-order";
 
 export type LangyBlockCounter = (reason: string) => void;
 
@@ -58,29 +59,82 @@ export class LangyFinalPartsService {
   build({
     text,
     toolCalls = [],
+    order,
     countBlock = () => undefined,
   }: {
     text: string;
     toolCalls?: LangyFinalToolCall[];
+    order?: readonly LangyTurnSegment[];
     countBlock?: LangyBlockCounter;
   }): LangyMessagePart[] {
-    const toolParts: LangyMessagePart[] = toolCalls.map((rawCall) => {
-      const call = this.cliEnvelope.normalizeToolFrame({
-        frame: { ...rawCall, phase: "end" },
-      });
-      return langyMessagePartSchema.parse({
-        type: `tool-${call.name}`,
-        toolCallId: call.id,
-        state: call.isError ? "output-error" : "output-available",
-        ...(call.input !== undefined ? { input: call.input } : {}),
-        ...(call.digest !== undefined ? { digest: call.digest } : {}),
-        ...(call.result !== undefined ? { result: call.result } : {}),
-        ...(call.isError
-          ? { errorText: call.output ?? "Tool call failed" }
-          : { output: call.output ?? "" }),
-      });
+    if (!order?.length) {
+      return [
+        ...toolCalls.map((call) => this.toolPart(call)),
+        ...this.assistantTextParts(text, countBlock),
+      ];
+    }
+
+    return this.orderedParts({ text, toolCalls, order, countBlock });
+  }
+
+  private toolPart(rawCall: LangyFinalToolCall): LangyMessagePart {
+    const call = this.cliEnvelope.normalizeToolFrame({
+      frame: { ...rawCall, phase: "end" },
     });
-    return [...toolParts, ...this.assistantTextParts(text, countBlock)];
+    return langyMessagePartSchema.parse({
+      type: `tool-${call.name}`,
+      toolCallId: call.id,
+      state: call.isError ? "output-error" : "output-available",
+      ...(call.input !== undefined ? { input: call.input } : {}),
+      ...(call.digest !== undefined ? { digest: call.digest } : {}),
+      ...(call.result !== undefined ? { result: call.result } : {}),
+      ...(call.isError
+        ? { errorText: call.output ?? "Tool call failed" }
+        : { output: call.output ?? "" }),
+    });
+  }
+
+  private orderedParts({
+    text,
+    toolCalls,
+    order,
+    countBlock,
+  }: {
+    text: string;
+    toolCalls: LangyFinalToolCall[];
+    order: readonly LangyTurnSegment[];
+    countBlock: LangyBlockCounter;
+  }): LangyMessagePart[] {
+    const last = order.at(-1);
+    const endedOnParagraph = last?.kind === "text" && last.text.trim() !== "";
+    const callsById = new Map(toolCalls.map((call) => [call.id, call]));
+    const recorded = new Set<string>();
+    const parts: LangyMessagePart[] = [];
+    let hasProse = false;
+
+    for (const [index, segment] of order.entries()) {
+      if (segment.kind === "tool") {
+        const call = callsById.get(segment.id);
+        if (call && !recorded.has(call.id)) {
+          recorded.add(call.id);
+          parts.push(this.toolPart(call));
+        }
+        continue;
+      }
+
+      if ((endedOnParagraph && index === order.length - 1) || segment.text.trim() === "") {
+        continue;
+      }
+      hasProse = true;
+      parts.push(...this.assistantTextParts(segment.text, countBlock));
+    }
+
+    const unrecorded = toolCalls.filter((call) => !recorded.has(call.id));
+    parts.push(...unrecorded.map((call) => this.toolPart(call)));
+    if (endedOnParagraph || !hasProse) {
+      parts.push(...this.assistantTextParts(text, countBlock));
+    }
+    return parts;
   }
 
   /**
@@ -103,10 +157,7 @@ export class LangyFinalPartsService {
    * final frame, durable HTTP ingest) build parts through here and the
    * turn-terminal dedupe relies on the two producing identical parts.
    */
-  private assistantTextParts(
-    text: string,
-    countBlock: LangyBlockCounter,
-  ): LangyMessagePart[] {
+  private assistantTextParts(text: string, countBlock: LangyBlockCounter): LangyMessagePart[] {
     const segments = splitLangyCardFences(text);
     if (!segments.some((segment) => segment.type === "fence")) {
       // Fence-less turns record byte-for-byte what they always did, including

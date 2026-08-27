@@ -168,6 +168,27 @@ describe("evaluateEligibility", () => {
     });
   });
 
+  describe("when the command reads the caller's own environment", () => {
+    // The forwarded-env allowlist carries neither the session identity
+    // (CLAUDE_CODE_SESSION_ID) nor TRACEPARENT nor CODEX_HOME, so a
+    // daemon-served declaration resolves the wrong session or none.
+    it.each([
+      [["ingest", "context"]],
+      [["ingest", "guidance", "claude-code"]],
+    ])("refuses %j", (args) => {
+      expect(evaluateEligibility(piped({ args }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
+    });
+
+    it("keeps serving the other ingest commands", () => {
+      expect(evaluateEligibility(piped({ args: ["ingest", "list"] }))).toEqual({
+        eligible: true,
+      });
+    });
+  });
+
   describe("when the command mutates identity or takes over stdio", () => {
     it.each([
       ["login"],

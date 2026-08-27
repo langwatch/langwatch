@@ -48,6 +48,7 @@ function serviceWith({
         description: name,
         requiresOperatorConfirmation: false,
         runsAutomaticallyOnSelfHosted: false,
+        enrolledAutomatically: false,
       })),
     isSaaS: () => isSaaS,
     enrollments: {
@@ -106,7 +107,7 @@ describe("SystemMigrationsService.enrollCohort", () => {
         );
       });
 
-      /** @scenario "A cohort never includes an enterprise organization" */
+      /** @scenario "A cohort leaves out a private-dataplane organization by default" */
       it("asks the pool to exclude the private-dataplane organizations from the environment", async () => {
         const { service, findCohortEligibleOrganizations } = serviceWith({
           privateDataplaneOrganizationIds: ["org_isolated_inc"],
@@ -122,7 +123,49 @@ describe("SystemMigrationsService.enrollCohort", () => {
           migrationName: MIGRATION,
           enrolledForMigrationName: undefined,
           excludeOrganizationIds: ["org_isolated_inc"],
+          includeEnterprise: false,
         });
+      });
+
+      /** @scenario "An operator can draw private-dataplane organizations into a cohort" */
+      it("stops naming the private-dataplane ids when that class is included", async () => {
+        const { service, findCohortEligibleOrganizations } = serviceWith({
+          privateDataplaneOrganizationIds: ["org_isolated_inc"],
+        });
+
+        await service.enrollCohort({
+          migrationName: MIGRATION,
+          sampleSize: 5,
+          actorUserId: "user_ops",
+          includePrivateDataplane: true,
+        });
+
+        // Not naming the ids IS the lift: the environment's routing table
+        // stays the only place those organizations are listed.
+        expect(findCohortEligibleOrganizations).toHaveBeenCalledWith(
+          expect.objectContaining({ excludeOrganizationIds: [] }),
+        );
+      });
+
+      /** @scenario "Including one held-back class does not include the other" */
+      it("keeps the private-dataplane exclusion when only enterprise is included", async () => {
+        const { service, findCohortEligibleOrganizations } = serviceWith({
+          privateDataplaneOrganizationIds: ["org_isolated_inc"],
+        });
+
+        await service.enrollCohort({
+          migrationName: MIGRATION,
+          sampleSize: 5,
+          actorUserId: "user_ops",
+          includeEnterprise: true,
+        });
+
+        expect(findCohortEligibleOrganizations).toHaveBeenCalledWith(
+          expect.objectContaining({
+            includeEnterprise: true,
+            excludeOrganizationIds: ["org_isolated_inc"],
+          }),
+        );
       });
 
       /** @scenario "A later step's cohort samples only organizations enrolled for the step before it" */
@@ -202,6 +245,30 @@ describe("SystemMigrationsService.enrollCohort", () => {
             }),
           );
         }
+      });
+
+      /** @scenario "A widened cohort says so in the audit trail" */
+      it("records which held-back classes the draw included", async () => {
+        const { service, audit } = serviceWith({ eligible: organizations(2) });
+
+        await service.enrollCohort({
+          migrationName: MIGRATION,
+          sampleSize: 2,
+          actorUserId: "user_ops",
+          includeEnterprise: true,
+        });
+
+        // On the row, not only in the log: "was this organization drawn
+        // because someone lifted an exclusion?" is asked of ONE organization,
+        // and the trail is where that is answered.
+        expect(audit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            args: expect.objectContaining({
+              includeEnterprise: true,
+              includePrivateDataplane: false,
+            }),
+          }),
+        );
       });
     });
   });

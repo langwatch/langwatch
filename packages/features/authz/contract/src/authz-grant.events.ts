@@ -6,8 +6,7 @@ export const GRANT_ATTACHED_EVENT_TYPE = "lw.authz.grant.attached" as const;
 export const GRANT_ROLE_CHANGED_EVENT_TYPE = "lw.authz.grant.role_changed" as const;
 export const GRANT_REVOKED_EVENT_TYPE = "lw.authz.grant.revoked" as const;
 export const ROLE_DEFINED_EVENT_TYPE = "lw.authz.role.defined" as const;
-export const ROLE_PERMISSIONS_CHANGED_EVENT_TYPE =
-  "lw.authz.role.permissions_changed" as const;
+export const ROLE_PERMISSIONS_CHANGED_EVENT_TYPE = "lw.authz.role.permissions_changed" as const;
 export const ROLE_DELETED_EVENT_TYPE = "lw.authz.role.deleted" as const;
 
 export const AUTHZ_GRANT_EVENT_TYPES = [
@@ -28,21 +27,12 @@ export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-20" as const;
 
 export const ledgerPrincipalSchema = z
   .object({
-    type: z.enum([
-      "user",
-      "apiKey",
-      "group",
-      "team",
-      "organization",
-      "project",
-      "anyone",
-    ]),
+    type: z.enum(["user", "apiKey", "group", "team", "organization", "project", "anyone"]),
     id: z.string().nullable(),
   })
   .strict()
   .refine((principal) => (principal.type === "anyone") === (principal.id === null), {
-    message:
-      "principal id is null for `anyone` and required for every other principal type",
+    message: "principal id is null for `anyone` and required for every other principal type",
     path: ["id"],
   });
 export type LedgerPrincipal = z.infer<typeof ledgerPrincipalSchema>;
@@ -64,6 +54,7 @@ export const GRANT_EVENT_SOURCES = [
   "grants-service",
   "scim",
   "invite",
+  "join-request",
   "read-through-mint",
   "migration",
 ] as const;
@@ -99,11 +90,7 @@ export const grantShapeRefinement = {
     if (grant.principal.type === "anyone" && !isResourceScope) return false;
     const isOwnProjectCredential =
       grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
-    if (
-      grant.principal.type === "project" &&
-      !isResourceScope &&
-      !isOwnProjectCredential
-    ) {
+    if (grant.principal.type === "project" && !isResourceScope && !isOwnProjectCredential) {
       return false;
     }
     return (
@@ -172,9 +159,7 @@ export const rolePermissionsChangedPayloadSchema = z
     actor: grantsLedgerActorSchema,
   })
   .strict();
-export type RolePermissionsChangedPayload = z.infer<
-  typeof rolePermissionsChangedPayloadSchema
->;
+export type RolePermissionsChangedPayload = z.infer<typeof rolePermissionsChangedPayloadSchema>;
 
 export const roleDeletedPayloadSchema = z
   .object({

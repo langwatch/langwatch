@@ -8,11 +8,12 @@
  * ledger's insert-only subscriber (decision 17), not a direct write here.
  * This service owns validation, failure naming, and the offboarding proof.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import { toLedgerActor, type Actor, type LedgerActor } from "@langwatch/actor";
 import {
   AuthzGrantsService as AuthzGrantsServiceContract,
   DuplicateGrantError,
   GrantValidationError,
+  type GrantEventSource,
   type AuthzAttachGrantInput,
   type AuthzAttachBindingsInput,
   type AuthzAttachBindingsOutput,
@@ -71,13 +72,19 @@ export type AuthzGrantsServiceOptions = {
   bindings: AuthzBindingRepository;
 };
 
-type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "where"> & {
+type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "actor" | "where"> & {
+  actor: { userId: string } | Actor;
   where: AuthzScopeRef;
+  source?: GrantEventSource;
 };
 
 type AuthzReplaceGrantRequest = Omit<AuthzReplaceGrantInput, "from" | "to"> & {
   from: AuthzScopeRef;
   to: AuthzScopeRef;
+};
+
+type AuthzOffboardRequest = Omit<AuthzOffboardInput, "actor"> & {
+  actor: { userId: string } | Actor;
 };
 
 export type GrantableScope = GrantableAuthzScopeRef;
@@ -118,6 +125,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     who,
     role,
     where,
+    source = "grants-service",
   }: AuthzAttachGrantRequest): Promise<{ bindingId: string }> {
     if (where.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION, {
@@ -137,7 +145,11 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
 
     const row = this.bindingRow({ who, role, where, organizationId });
     try {
-      await repository.createBinding({ row, actor: this.writeActor(actor) });
+      await repository.createBinding({
+        row,
+        actor: this.writeActor(actor),
+        source,
+      });
     } catch (error) {
       this.rethrowKnownWriteFailure(error, {
         scopeType: where.type,
@@ -258,7 +270,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     actor,
     userId,
     organizationId,
-  }: AuthzOffboardInput): Promise<AuthzOffboardOutput> {
+  }: AuthzOffboardRequest): Promise<AuthzOffboardOutput> {
     const result = await this.offboarding.offboard({
       actor: this.writeActor(actor),
       userId,
@@ -346,8 +358,8 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     };
   }
 
-  private writeActor(actor: { userId: string }): LedgerActor {
-    return { type: "user", id: actor.userId };
+  private writeActor(actor: { userId: string } | Actor): LedgerActor {
+    return toLedgerActor("userId" in actor ? { type: "user", id: actor.userId } : actor);
   }
 
   private bindingNotFound(meta: Record<string, unknown>): GrantValidationError {

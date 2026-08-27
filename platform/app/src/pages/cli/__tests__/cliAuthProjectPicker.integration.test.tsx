@@ -209,6 +209,25 @@ const renderPage = () =>
 const approveButton = () =>
   screen.getByRole("button", { name: "Send API key" }) as HTMLButtonElement;
 
+/**
+ * Step one of the screen: the code check. The project picker and the send
+ * action do not exist until it passes, so every flow below confirms the
+ * terminal code right after rendering.
+ */
+const confirmCode = async (user: ReturnType<typeof userEvent.setup>) => {
+  await waitFor(() =>
+    expect(screen.getByText("WDJB-MJHT")).toBeInTheDocument(),
+  );
+  await user.click(screen.getByRole("button", { name: "Confirm" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByText(
+        "Confirm this matches the code shown in your terminal.",
+      ),
+    ).toBeNull(),
+  );
+};
+
 beforeEach(() => {
   fetchMock.mockReset();
   (mockRouter.push as unknown as Mock).mockClear();
@@ -232,7 +251,9 @@ describe("/cli/auth project picker, given an organization with no shared project
 
   /** @scenario a user with no shared projects gets their personal project preselected */
   it("preselects the personal project, explains it, and enables the approve button", async () => {
+    const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() =>
       expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(0),
@@ -245,6 +266,7 @@ describe("/cli/auth project picker, given an organization with no shared project
   it("offers Create project, passes the picked org, and adopts the created project", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /Create project/i })).toBeDefined(),
@@ -281,6 +303,7 @@ describe("/cli/auth project picker, given an organization with no shared project
   it("approves with the preselected personal project id", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() =>
       expect(screen.getAllByText("Personal Workspace").length).toBeGreaterThan(0),
@@ -306,6 +329,7 @@ describe("/cli/auth project picker, given a switched-to organization whose proje
       ]),
     ];
     renderPage();
+    await confirmCode(user);
     // Two orgs render the org chooser; move onto the org under test. Its
     // offered projects cannot match the ambient project (Home Org's), so
     // the picker legitimately starts with nothing selected.

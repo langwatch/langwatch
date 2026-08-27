@@ -5,16 +5,14 @@ sidebarTitle: Anomaly rules
 ---
 
 <Info>
-  **Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend
-  limits; anomaly rules detect patterns *before* a budget breach (spend-spike,
-  geo-mismatch, off-hours).
+  **Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits;
+  anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).
 </Info>
 
 <Note>
   **Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on
   `/governance/anomaly-rules` instead of the composer. See [Open-core
-  licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0,
-  Enterprise split.
+  licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.
 </Note>
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.

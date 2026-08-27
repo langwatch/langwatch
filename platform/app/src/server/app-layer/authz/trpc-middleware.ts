@@ -28,12 +28,14 @@
  * and refuses any procedure whose chain carries none.
  */
 import {
+  type AuthzDenialReason,
   type AuthzPermission,
+  BlankScopeIdError,
   type DeclaredAuthzMiddleware,
   type DeclaredScopeId,
   declareAuthzMiddleware,
-  declaredScopeId,
   PermissionDeniedError,
+  resolveDeclaredScope,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
 } from "@langwatch/authz-contract";
@@ -42,7 +44,10 @@ import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
 import { type App, getApp } from "../app";
-import { LiteMemberRestrictedError } from "../permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  MembershipDisabledError,
+} from "../permissions/errors";
 
 const logger = createLogger("langwatch:authz");
 
@@ -102,7 +107,12 @@ export const checkDeclaredPermission = ({
         scope,
       });
       if (!permitted) {
-        throw deniedError({ permission, scope, organizationRole });
+        throw deniedError({
+          permission,
+          scope,
+          organizationRole,
+          denialReason,
+        });
       }
       // Legacy parity: the organization tier never carried a role onto the
       // context, so only the project/team resolutions (non-null role) do.
@@ -131,11 +141,15 @@ export const checkDeclaredPermissionAny = (
       if (!ctx.session?.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
-      const projectId = input.projectId;
-      if (typeof projectId !== "string" || projectId.length === 0) {
-        throw wiringBug({ permission: permissions[0] });
-      }
-      const { permitted, organizationRole } = await appOf(
+      // Always the project tier, so the field is named outright — but read
+      // through the same resolution the single-permission seam uses, so the
+      // blank-versus-missing split is decided in exactly one place.
+      const { id: projectId } = requireDeclaredScope({
+        permission: permissions[0],
+        input,
+        via: "projectId",
+      });
+      const { permitted, organizationRole, denialReason } = await appOf(
         ctx,
       ).permissions.getProjectAnyDecision({
         userId: ctx.session.user.id,
@@ -147,6 +161,7 @@ export const checkDeclaredPermissionAny = (
           permission: permissions[0],
           scope: { tier: "project", id: projectId },
           organizationRole,
+          denialReason,
         });
       }
       ctx.organizationRole = organizationRole;
@@ -215,16 +230,39 @@ function requireDeclaredScope({
   input: ScopeInput;
   via?: ScopeTierField;
 }): DeclaredScopeId {
-  const scope = declaredScopeId({ permission, input, via });
-  if (scope) return scope;
+  const resolution = resolveDeclaredScope({ permission, input, via });
+  if (resolution.resolved) return resolution.scope;
+  if (resolution.unresolved.reason === "blank") {
+    throw blankScopeId({ field: resolution.unresolved.field });
+  }
   throw wiringBug({ permission, via });
 }
 
 /**
- * Nothing the caller did can fix a declaration whose input carries no usable
- * id, so the sentence they read says only that; which procedure is miswired
- * goes to the log. The types make this unreachable — this is the runtime
- * backstop for the day they are bypassed.
+ * The caller named the scope field and left it empty. Answered as the bad
+ * request it is, rather than as the wiring bug below: a blank id is something
+ * the caller can fix, and reporting it as an internal error both misleads them
+ * and pages us for their typo.
+ */
+function blankScopeId({ field }: { field: string }): TRPCError {
+  const blank = new BlankScopeIdError({ field });
+  return new TRPCError({
+    code: "BAD_REQUEST",
+    message: blank.message,
+    cause: blank,
+  });
+}
+
+/**
+ * The input names no scope field at all. Nothing the caller did can fix that,
+ * so the sentence they read says only that; which procedure is miswired goes
+ * to the log. The types make this unreachable — this is the runtime backstop
+ * for the day they are bypassed.
+ *
+ * A field that is present and empty is NOT this: the types only ever promised
+ * the field would exist, never that a caller would fill it, and treating a
+ * blank id as a wiring bug is what put a routine bad request on the error
+ * dashboard at ERROR severity. That case answers through `blankScopeId`.
  */
 function wiringBug({
   permission,
@@ -255,11 +293,25 @@ function deniedError({
   permission,
   scope,
   organizationRole,
+  denialReason,
 }: {
   permission: AuthzPermission;
   scope: DeclaredScopeId;
   organizationRole: OrganizationUserRole | null;
+  denialReason?: AuthzDenialReason;
 }): TRPCError {
+  // Checked before the role, because a disabled member HAS a role and the
+  // role-shaped answers would all be wrong for them: the lite-member modal
+  // offers an upgrade they cannot buy, and the generic denial names a
+  // permission nobody can grant them while the seat is off.
+  if (denialReason === "membership-disabled") {
+    const disabled = new MembershipDisabledError();
+    return new TRPCError({
+      code: "UNAUTHORIZED",
+      message: disabled.message,
+      cause: disabled,
+    });
+  }
   // String comparison on purpose: a VALUE import of the Prisma enum would put
   // the generated client on this module's graph for one constant.
   if (organizationRole === "EXTERNAL") {
@@ -272,7 +324,7 @@ function deniedError({
   const denied = new PermissionDeniedError({
     permission,
     scope: { type: scope.tier, id: scope.id },
-    denialReason: "no-binding",
+    denialReason: denialReason ?? "no-binding",
   });
   // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
   // here: `handledErrorMiddleware` re-derives it from the handled cause's

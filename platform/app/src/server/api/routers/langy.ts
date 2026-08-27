@@ -154,10 +154,7 @@ const langyModelOverrideSchema = z
  */
 const adoptableConversationIdSchema = z
   .string()
-  .regex(
-    ADOPTABLE_CONVERSATION_ID,
-    "conversationId must be 6-120 characters from [A-Za-z0-9_-]",
-  );
+  .regex(ADOPTABLE_CONVERSATION_ID, "conversationId must be 6-120 characters from [A-Za-z0-9_-]");
 
 /** Inputs shared by create + continue (the SAME turn-start operation). */
 const langyTurnInputShape = {
@@ -237,22 +234,19 @@ async function canWatchTurn({
   return !!conv;
 }
 
-/** How often the settlement watcher consults the durable fold + heartbeat. */
-const SETTLEMENT_POLL_MS = 5_000;
-/**
- * Consecutive settled reads required before synthesizing a terminal, so a single
- * projection blip can never end a live stream.
- */
-const SETTLEMENT_CONFIRM_POLLS = 2;
+/** The claim/complete side of the UI-action channel, on the shared app deps. */
+function createUiActionService(): LangyUiActionService {
+  const redis = getApp().redis as unknown as UiActionRedis;
+  return new LangyUiActionService({
+    redis,
+    conversations: getApp().langy.conversations,
+    buffer: createLangyTokenBuffer({ redis: getApp().redis }),
+  });
+}
 
 /**
- * Poll a turn's durable fold + per-turn heartbeat while its live edge is being
- * tailed, and resolve to the terminal entry the buffer never received — or null
- * if the stream ended first (aborted) or the turn never settled.
- *
- * Split out of `onTurnStream` so the subscription body stays at the orchestration
- * level and this confirmation loop is independently testable. The safety gate
- * itself lives in {@link decideSyntheticTerminal}.
+ * Poll the durable fold and heartbeat while the live edge is being tailed.
+ * A terminal is synthesized only after consecutive settled reads.
  */
 async function watchForMissedTerminal({
   projectId,
@@ -551,16 +545,12 @@ export const langyRouter = createTRPCRouter({
         : await ctx.app.langy.shouldAskFeedback({
             userId: ctx.session.user.id,
             conversationId: input.conversationId,
-            assistantAnswerCount: messages.filter(
-              (message) => message.role === "assistant",
-            ).length,
+            assistantAnswerCount: messages.filter((message) => message.role === "assistant").length,
           });
       return {
         messages,
         lastError:
-          conversation.status === LANGY_CONVERSATION_STATUS.FAILED
-            ? conversation.lastError
-            : null,
+          conversation.status === LANGY_CONVERSATION_STATUS.FAILED ? conversation.lastError : null,
         isTurnInFlight,
         // Only ever the id of a turn that IS in flight: a cleared/stale id
         // must never become a Stop target.
@@ -657,19 +647,17 @@ export const langyRouter = createTRPCRouter({
         ...langyTurnInputShape,
       }),
     )
-    .mutation(
-      async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
-        return acceptTurn({
-          langy: ctx.app.langy,
-          input: {
-            ...input,
-            messages: input.messages as LangyChatMessageInput[],
-          },
-          ...(input.conversationId ? { adoptConversationId: true } : {}),
-          session: ctx.session,
-        });
-      },
-    ),
+    .mutation(async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
+      return acceptTurn({
+        langy: ctx.app.langy,
+        input: {
+          ...input,
+          messages: input.messages as LangyChatMessageInput[],
+        },
+        ...(input.conversationId ? { adoptConversationId: true } : {}),
+        session: ctx.session,
+      });
+    }),
 
   /**
    * Continue an EXISTING conversation (same operation as create, minus the
@@ -684,18 +672,16 @@ export const langyRouter = createTRPCRouter({
         ...langyTurnInputShape,
       }),
     )
-    .mutation(
-      async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
-        return acceptTurn({
-          langy: ctx.app.langy,
-          input: {
-            ...input,
-            messages: input.messages as LangyChatMessageInput[],
-          },
-          session: ctx.session,
-        });
-      },
-    ),
+    .mutation(async ({ input, ctx }): Promise<{ conversationId: string; turnId: string }> => {
+      return acceptTurn({
+        langy: ctx.app.langy,
+        input: {
+          ...input,
+          messages: input.messages as LangyChatMessageInput[],
+        },
+        session: ctx.session,
+      });
+    }),
 
   /**
    * Stop an in-flight turn FOR REAL (ADR-078). The browser's `useChat` stop only
@@ -727,6 +713,71 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /**
+   * The page asking to execute a dispatched UI action
+   * (specs/langy/langy-ui-actions.feature). First successful claim wins across
+   * every tab and every stream replay; everyone else gets `isClaimed: false` and
+   * drops. `langy:view` on purpose: executing happens under the human's own
+   * session on their own page, and the dispatch already enforced the action's
+   * real permission against the agent's session key. The pending record the
+   * dispatch pinned in Redis is what this claim is verified against, so a
+   * claim can never attach to another project's or another conversation's
+   * action. The turn is not asked for: the page and the dispatch read it from
+   * two places that settle at different times, and refusing on the difference
+   * pushed live work to the backend behind the user's back.
+   */
+  claimUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        actionId: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ isClaimed: boolean }> => {
+      const userId = ctx.session.user.id;
+      const conversation = await getApp().langy.conversations.findByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId,
+      });
+      if (!conversation) return { isClaimed: false };
+      return await createUiActionService().claim({
+        projectId: input.projectId,
+        userId,
+        conversationId: input.conversationId,
+        actionId: input.actionId,
+      });
+    }),
+
+  /**
+   * The page reporting a claimed action's outcome. Only the claiming user may
+   * complete; anything else is dropped as `isAccepted: false`. The dispatch has
+   * its own timeout, so a dropped completion cannot wedge the agent.
+   */
+  completeUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        actionId: z.string(),
+        ok: z.boolean(),
+        result: z.unknown().optional(),
+        errorCode: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ isAccepted: boolean }> => {
+      return await createUiActionService().complete({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+        actionId: input.actionId,
+        completion: {
+          ok: input.ok,
+          ...(input.result !== undefined ? { result: input.result } : {}),
+          ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+        },
+      });
+    }),
+
+  /**
    * Pre-boot the conversation's worker on panel open, before the first message
    * (specs/langy/langy-worker-prewarm.feature). Returns the conversation id
    * the first message should adopt (server-minted when none is given) and
@@ -750,10 +801,7 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .mutation(
-      async ({
-        input,
-        ctx,
-      }): Promise<{ conversationId: string | null; warmed: boolean }> => {
+      async ({ input, ctx }): Promise<{ conversationId: string | null; warmed: boolean }> => {
         try {
           // The warm skips langyTurnProcedure so a panel open never spends the
           // message budget, but each call can mint a conversation, mint a
@@ -807,9 +855,7 @@ export const langyRouter = createTRPCRouter({
    */
   modelsAllowed: langyReadProcedure.query(
     async ({ input, ctx }): Promise<{ modelsAllowed: string[] | null }> => {
-      const modelsAllowed = await ctx.app.langy.tryGetModelsAllowedForProject(
-        input.projectId,
-      );
+      const modelsAllowed = await ctx.app.langy.tryGetModelsAllowedForProject(input.projectId);
       return { modelsAllowed };
     },
   ),
@@ -1084,20 +1130,15 @@ export const langyRouter = createTRPCRouter({
             })) {
               yield entry;
               if (entry.type === "end" || entry.type === "error") {
-                // A real terminal reached the buffer — never override it.
                 synthesized = null;
                 return;
               }
             }
           } finally {
             settle.abort();
-            await watcher; // already has its own .catch()
+            await watcher;
           }
 
-          // follow() ended with no buffered terminal. If the watcher proved the
-          // turn settled, deliver the synthesized terminal so the UI resolves
-          // instead of hanging; the client reconciles the transcript via
-          // langy.messages.
           if (synthesized) yield synthesized;
         }
       } finally {

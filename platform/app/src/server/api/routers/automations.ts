@@ -40,6 +40,7 @@ import {
 import { decryptSlackBotToken } from "~/runtime/app/features/automation-adapters/providers/slack/server";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,

@@ -38,10 +38,28 @@ export interface ClickHouseExperimentRunResultRecord {
   EvaluationCost: number | null;
   EvaluationInputs: string | null;
   EvaluationDurationMs: number | null;
+  /**
+   * 1 when the cell was copied into the run from the board, 0 when the run
+   * produced it. The run's cost and duration read only the rows it produced;
+   * its verdicts and scores read every row.
+   */
+  CarriedOver: number;
   OccurredAt: Date;
 }
 
 const resultEvents = [targetResultEventSchema, evaluatorResultEventSchema] as const;
+
+/**
+ * The verdict as ClickHouse holds it: a nullable flag.
+ *
+ * An evaluator that errored or was skipped reports no verdict at all, and that
+ * is not the same fact as a failure. It stays null so a pass rate counts it in
+ * neither half.
+ */
+const toPassedFlag = (passed: boolean | null | undefined): number | null => {
+  if (passed === undefined || passed === null) return null;
+  return passed ? 1 : 0;
+};
 
 /**
  * Map projection that transforms TargetResultEvent and EvaluatorResultEvent
@@ -106,6 +124,7 @@ export class ExperimentRunResultStorageMapProjection
       EvaluationCost: null,
       EvaluationInputs: null,
       EvaluationDurationMs: null,
+      CarriedOver: event.data.carriedOver ? 1 : 0,
       OccurredAt: new Date(event.occurredAt),
     };
   }
@@ -142,16 +161,12 @@ export class ExperimentRunResultStorageMapProjection
       EvaluationStatus: event.data.status,
       Score: event.data.score ?? null,
       Label: event.data.label ?? null,
-      Passed:
-        event.data.passed === undefined || event.data.passed === null
-          ? null
-          : event.data.passed
-            ? 1
-            : 0,
+      Passed: toPassedFlag(event.data.passed),
       EvaluationDetails: event.data.details ?? null,
       EvaluationCost: event.data.cost ?? null,
       EvaluationInputs: event.data.inputs ? JSON.stringify(event.data.inputs) : null,
       EvaluationDurationMs: normalizeDurationMs(event.data.duration),
+      CarriedOver: event.data.carriedOver ? 1 : 0,
       OccurredAt: new Date(event.occurredAt),
     };
   }

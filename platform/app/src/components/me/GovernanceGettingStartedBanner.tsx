@@ -119,7 +119,7 @@ export function GovernanceGettingStartedBanner() {
               _active={{ bg: "white/80", transform: "translateY(0)" }}
               transition="background-color 0.12s ease, transform 0.12s ease"
             >
-              <Link href="/governance/tool-catalog">
+              <Link href="/governance/inventory?tab=catalog">
                 Add your first tools
                 <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
               </Link>

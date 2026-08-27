@@ -27,10 +27,7 @@
 
 import * as os from "node:os";
 
-import {
-  writeCodexGatewayBlock,
-  writeCodexOtelBlock,
-} from "@/cli/utils/codex-config-toml";
+import { writeCodexGatewayBlock, writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
 import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 
 import { claudeProjectSettingsTarget } from "./app-settings";
@@ -43,6 +40,7 @@ import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { SHELL_FUNCTION_TOOLS, assertCodexTurnHarvest } from "./shell-rc";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
   type ClaudeProjectPinResult,
   ensureClaudeProjectTelemetryPin,
@@ -299,10 +297,7 @@ export async function resolveWrapperMode(
     // Probed with a placeholder VK because envForTool also returns empty
     // when no VK is stored yet, and that case is handled by the lazy
     // issue below, not by this guard.
-    const probe = envForTool(
-      { ...cfg, default_personal_vk: { secret: "vk-lw-probe" } },
-      tool,
-    );
+    const probe = envForTool({ ...cfg, default_personal_vk: { secret: "vk-lw-probe" } }, tool);
     if (Object.keys(probe.vars).length === 0) {
       throw new GovernanceCliError(
         501,
@@ -334,9 +329,7 @@ export async function resolveWrapperMode(
       const refreshed = envForTool(cfg, tool);
       effectiveGatewayVars = refreshed.vars;
       effectiveGatewayClears = refreshed.clears ?? gatewayClears;
-      process.stderr.write(
-        `${lwTag()} issued your personal virtual key for the gateway path.\n`,
-      );
+      process.stderr.write(`${lwTag()} issued your personal virtual key for the gateway path.\n`);
     }
     if (tool === "gemini") {
       warnIfGeminiOAuthSelected();
@@ -422,8 +415,11 @@ export async function resolveWrapperMode(
   // fresh personal mint. The mint route returns the plaintext key once,
   // so it is persisted to the per-tool cache below and read back on
   // later invocations rather than re-minted.
-  const { token, endpoint, minted, scope, projectLabel } =
-    await resolveIngestionCredential({ cfg, tool, sourceType });
+  const { token, endpoint, minted, scope, projectLabel } = await resolveIngestionCredential({
+    cfg,
+    tool,
+    sourceType,
+  });
 
   const vars = buildOtelEnvBlock(tool, endpoint, token);
 
@@ -488,11 +484,7 @@ export async function resolveWrapperMode(
   // the token. ADR-039 §Extension #2.
   if (tool === "code") {
     const vscodePlatform = process.platform;
-    if (
-      vscodePlatform === "darwin" ||
-      vscodePlatform === "linux" ||
-      vscodePlatform === "win32"
-    ) {
+    if (vscodePlatform === "darwin" || vscodePlatform === "linux" || vscodePlatform === "win32") {
       tryRefresh(
         "the VS Code terminal telemetry clear",
         () => {
@@ -539,6 +531,7 @@ export async function resolveWrapperMode(
     // The exporters carry no conversation; the turn harvest is what
     // recovers it, so the two are wired (and healed) together.
     assertCodexTurnHarvest();
+    assertCodexAgentGuidance();
   }
 
   if (tool === "opencode") {
@@ -605,11 +598,7 @@ export async function resolveWrapperMode(
  */
 function ingestionClears(tool: string): string[] {
   if (tool === "copilot") {
-    return [
-      "COPILOT_PROVIDER_TYPE",
-      "COPILOT_PROVIDER_BASE_URL",
-      "COPILOT_PROVIDER_API_KEY",
-    ];
+    return ["COPILOT_PROVIDER_TYPE", "COPILOT_PROVIDER_BASE_URL", "COPILOT_PROVIDER_API_KEY"];
   }
   if (tool === "code") {
     // An inherited `COPILOT_OTEL_EXPORTER_TYPE=file` (the ccusage setup)

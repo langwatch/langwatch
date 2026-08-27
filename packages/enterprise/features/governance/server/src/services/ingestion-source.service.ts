@@ -22,6 +22,7 @@ import type {
 import type { IngestionCredentialsService } from "./ingestion-credentials.service";
 import type { IngestionSecretService } from "./ingestion-source-secret.service";
 import type { PullDestinationService } from "./pull-destination.service";
+import { hasPollerCursor } from "../adapters/poller-cursor.adapter";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
@@ -36,8 +37,7 @@ export class IngestionSourceService {
     private readonly destinations: PullDestinationService,
     private readonly diagnostics: GovernanceDiagnosticsPort,
     private readonly now: () => number,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     repository: IngestionSourceRepository;
@@ -67,17 +67,12 @@ export class IngestionSourceService {
     return this.repository.list(organizationId);
   }
 
-  async tryFindById(
-    id: string,
-    organizationId: string,
-  ): Promise<GovernanceIngestionSource | null> {
+  async tryFindById(id: string, organizationId: string): Promise<GovernanceIngestionSource | null> {
     const row = await this.repository.tryFindById(id);
     return row?.organizationId === organizationId ? row : null;
   }
 
-  async tryFindByIngestSecret(
-    rawSecret: string,
-  ): Promise<GovernanceIngestionSource | null> {
+  async tryFindByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null> {
     const candidateHash = this.secrets.hash(rawSecret);
     const direct = await this.repository.tryFindByCurrentSecretHash(candidateHash);
     if (direct) return direct;
@@ -127,11 +122,15 @@ export class IngestionSourceService {
       ...(input.parserConfig ?? {}),
     };
     this.destinations.assertAllowed(requestedParserConfig);
-    const parserConfig =
-      this.credentials.tryEncryptParserConfig(requestedParserConfig) ?? {};
+    await this.assertTraceDestination({
+      organizationId: input.organizationId,
+      traceProjectId: input.traceProjectId,
+    });
+    const parserConfig = this.credentials.tryEncryptParserConfig(requestedParserConfig) ?? {};
     const source = await this.repository.create({
       organizationId: input.organizationId,
       teamId: input.teamId ?? null,
+      traceProjectId: input.traceProjectId ?? null,
       sourceType: input.sourceType,
       name: input.name,
       description: input.description ?? null,
@@ -151,10 +150,18 @@ export class IngestionSourceService {
     const existing = await this.getById(input.id, input.organizationId);
     this.assertPullSchedule(input.pullSchedule);
     const update: UpdateIngestionSourceRecord = {};
+    let cursorMustNotMove = false;
     if (input.name !== undefined) update.name = input.name;
     if (input.description !== undefined) update.description = input.description;
     if (input.status !== undefined) update.status = input.status;
     if (input.teamId !== undefined) update.teamId = input.teamId;
+    if (input.traceProjectId !== undefined) {
+      await this.assertTraceDestination({
+        organizationId: input.organizationId,
+        traceProjectId: input.traceProjectId,
+      });
+      update.traceProjectId = input.traceProjectId;
+    }
     if (input.pullSchedule !== undefined) update.pullSchedule = input.pullSchedule;
     if (input.parserConfig !== undefined) {
       const incoming = { ...input.parserConfig };
@@ -167,17 +174,34 @@ export class IngestionSourceService {
       }
       for (const key of Object.keys(existing.parserConfig)) {
         if (
-          (key === "credentials" || key.startsWith("_")) &&
+          (key === "credentials" ||
+            key === "adapter" ||
+            key === "schedule" ||
+            key.startsWith("_")) &&
           incoming[key] === undefined
         ) {
           incoming[key] = existing.parserConfig[key];
         }
       }
+      this.assertAdapterUnchanged(existing.parserConfig, incoming);
+      cursorMustNotMove = this.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
       update.parserConfig = this.credentials.tryEncryptParserConfig(incoming) ?? incoming;
     }
 
-    const source = await this.repository.update(existing.id, update);
+    const source = cursorMustNotMove
+      ? await this.repository.tryUpdateIfCursorUnchanged({
+          id: existing.id,
+          cursor: existing.pollerCursor,
+          update,
+        })
+      : await this.repository.update(existing.id, update);
+    if (source === null) {
+      const message =
+        "This source started pulling while the change was being saved, and the report " +
+        "can no longer be changed. Reload the source to see its current configuration.";
+      throw new GovernanceValidationError(message, { formErrors: [message] });
+    }
     if (existing.pullSchedule !== null || source.pullSchedule !== null) {
       await this.syncBestEffort(source);
     }
@@ -236,6 +260,54 @@ export class IngestionSourceService {
       complaints.join(" ") || "Pull schedule is not a valid cron expression",
       { formErrors: complaints },
     );
+  }
+
+  private assertAdapterUnchanged(
+    stored: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+  ): void {
+    const adapter = stored.adapter;
+    if (typeof adapter !== "string") return;
+    if (incoming.adapter === adapter) return;
+
+    const message =
+      `This source runs on the ${adapter} adapter, which is fixed when the source is created. ` +
+      "Archive this source and create a new one to change how it pulls.";
+    throw new GovernanceValidationError(message, { formErrors: [message] });
+  }
+
+  private assertReportUnchangedOncePulled(
+    existing: GovernanceIngestionSource,
+    incoming: Record<string, unknown>,
+  ): boolean {
+    const report = existing.parserConfig.report;
+    if (typeof report !== "string" || incoming.report === report) return false;
+    if (!hasPollerCursor(existing.pollerCursor)) return true;
+
+    const message =
+      incoming.report === undefined
+        ? `This source is configured for its ${report} report, and has already pulled it. ` +
+          "An update that replaces the configuration has to carry the same report value rather than omit it."
+        : `This source has already pulled its ${report} report. ` +
+          "Changing the report would record the same spend a second time, so it is fixed once a source has run.";
+    throw new GovernanceValidationError(message, { formErrors: [message] });
+  }
+
+  private async assertTraceDestination(input: {
+    organizationId: string;
+    traceProjectId: string | null | undefined;
+  }): Promise<void> {
+    if (!input.traceProjectId) return;
+
+    const project = await this.projects.tryGetWithTeam(input.traceProjectId);
+    const isAllowed =
+      project !== null &&
+      project.archivedAt === null &&
+      project.team.organizationId === input.organizationId;
+    if (isAllowed) return;
+
+    const message = "Trace destination must be an active project of this organization.";
+    throw new GovernanceValidationError(message, { formErrors: [message] });
   }
 
   private async syncBestEffort(source: GovernanceIngestionSource): Promise<void> {

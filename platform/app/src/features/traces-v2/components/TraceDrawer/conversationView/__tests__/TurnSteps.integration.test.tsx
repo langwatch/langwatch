@@ -24,7 +24,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project_1" } }),
 }));
 
-import { TurnSteps } from "../TurnSteps";
+import { TurnSteps, turnHasGenieSteps } from "../TurnSteps";
 
 const SPANS = [
   {
@@ -117,6 +117,48 @@ describe("TurnSteps", () => {
       );
 
       expect(container).toBeEmptyDOMElement();
+    });
+  });
+});
+
+describe("turnHasGenieSteps", () => {
+  describe("given a routed Genie turn", () => {
+    describe("when it carries a step beyond the root", () => {
+      it("admits the turn", () => {
+        expect(
+          turnHasGenieSteps({
+            traceName: "databricks_genie.message",
+            spanCount: 2,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the root is its only span", () => {
+      it("refuses the turn — the message generated no SQL, so the strip would announce steps and then find none", () => {
+        expect(
+          turnHasGenieSteps({
+            traceName: "databricks_genie.message",
+            spanCount: 1,
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given a turn that is not a routed Genie message", () => {
+    describe("when it carries a foreign trace name", () => {
+      it("refuses the turn regardless of span count", () => {
+        expect(
+          turnHasGenieSteps({ traceName: "my-app-trace", spanCount: 5 }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when it carries no trace name at all", () => {
+      it("refuses the turn regardless of span count", () => {
+        expect(turnHasGenieSteps({ spanCount: 5 })).toBe(false);
+      });
     });
   });
 });

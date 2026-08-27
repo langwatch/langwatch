@@ -237,19 +237,22 @@ describe("directUpload service", () => {
     });
 
     describe("when a same-origin (local-FS) PUT fails", () => {
-      it("surfaces the server's actionable message and does NOT signal a fallback", async () => {
-        // The local streaming route reports a real, fixable reason (unwritable
-        // LANGWATCH_LOCAL_STORAGE_PATH). It must reach the user verbatim — NOT a
-        // PresignedUploadFailedError, which would make the modal fall back to the
-        // in-browser parse and show the misleading "requires object storage" cap.
+      it("surfaces the server's own refusal and does NOT signal a fallback", async () => {
+        // The local streaming route reports a real, fixable reason as the
+        // handled `storage_not_writable` code. It must reach the user as the
+        // server sent it, NOT as a PresignedUploadFailedError, which would make
+        // the modal fall back to the in-browser parse and show the misleading
+        // "requires object storage" cap. The environment variables that fix it
+        // are in the error's tips and the server log, never in this message.
+        const serverMessage =
+          "Dataset storage is not writable, so nothing was saved";
         mockFetch().mockResolvedValue({
           ok: false,
           status: 500,
           json: () =>
             Promise.resolve({
-              error: "StorageNotWritable",
-              message:
-                'Dataset storage path "/var/lib/langwatch/objects" is not writable. Configure object storage (set S3_BUCKET_NAME) or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.',
+              error: "storage_not_writable",
+              message: serverMessage,
             }),
         });
         const file = new File(["x"], "data.csv");
@@ -260,7 +263,7 @@ describe("directUpload service", () => {
         ).catch((e: unknown) => e);
 
         expect(err).not.toBeInstanceOf(PresignedUploadFailedError);
-        expect((err as Error).message).toMatch(/LANGWATCH_LOCAL_STORAGE_PATH/);
+        expect((err as Error).message).toBe(serverMessage);
       });
 
       it("surfaces a fetch rejection directly rather than as a CORS fallback", async () => {

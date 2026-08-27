@@ -18,6 +18,8 @@ import {
 } from "./schemas";
 
 export const suiteRouter = createTRPCRouter({
+  folders: folderRouter,
+
   create: protectedProcedure
     .input(createSuiteSchema)
     .permission("scenarios:manage")
@@ -25,8 +27,14 @@ export const suiteRouter = createTRPCRouter({
       return ctx.app.suites.create(input);
     }),
 
+  // The kinds default is "custom" inside the service: v1 callers name no
+  // kind and must never receive folder rows. v2 callers name what they want.
   getAll: protectedProcedure
-    .input(projectSchema)
+    .input(
+      projectSchema.extend({
+        kinds: z.array(z.enum(SUITE_KINDS)).min(1).optional(),
+      }),
+    )
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
       return ctx.app.suites.list(input);
@@ -95,6 +103,11 @@ export const suiteRouter = createTRPCRouter({
          * supplied here overrides the scenario's own default for that name.
          */
         parameters: runParameterValuesSchema.optional(),
+        /**
+         * One short line describing why this batch was run, stamped onto every
+         * run of the batch.
+         */
+        note: runNoteSchema,
       }),
     )
     .permission("scenarios:manage")
@@ -119,8 +132,53 @@ export const suiteRouter = createTRPCRouter({
         idempotencyKey: input.idempotencyKey,
         batchRunId: input.batchRunId,
         parameters: input.parameters,
+        note: input.note,
       });
 
+      return {
+        scheduled: true,
+        ...result,
+      };
+    }),
+
+  /**
+   * Runs every non-archived test case of the project through the managed
+   * "All test cases" suite (created on first use, refreshed at each run).
+   */
+  runAll: protectedProcedure
+    .input(
+      projectSchema.extend({
+        idempotencyKey: z.string(),
+        /** Optional client-generated batch run ID for immediate placeholder feedback */
+        batchRunId: z.string().optional(),
+        /** Targets chosen in the run dialog; persisted for the next run's preselect. */
+        targets: z.array(suiteTargetSchema).optional(),
+        parameters: runParameterValuesSchema.optional(),
+        note: runNoteSchema,
+      }),
+    )
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      const projectRepository = new ProjectRepository(ctx.prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: input.projectId,
+      });
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found for project",
+        });
+      }
+      const service = createSuiteService(ctx.prisma);
+      const result = await service.runAll({
+        projectId: input.projectId,
+        organizationId,
+        idempotencyKey: input.idempotencyKey,
+        batchRunId: input.batchRunId,
+        targets: input.targets,
+        parameters: input.parameters,
+        note: input.note,
+      });
       return {
         scheduled: true,
         ...result,

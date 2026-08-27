@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   InternalProject,
   InternalProjectQuery,
+  ProjectWithTeam,
 } from "@langwatch/project-contract";
 import type {
   GovernanceIngestionSource,
@@ -12,6 +13,8 @@ import type {
 import { GovernanceEncryptionPort } from "../src/ports/governance-encryption.port";
 import {
   GovernanceOcsfEventSinkPort,
+  GovernanceTraceIngestionPort,
+  type GovernanceTraceRequest,
   type GovernanceOcsfEventInput,
   IngestionPullDiagnosticsPort,
   IngestionPullSourcePort,
@@ -55,9 +58,7 @@ function ingestionSource(
   };
 }
 
-function pulledUsageEvent(
-  overrides: Partial<NormalizedPullEvent> = {},
-): NormalizedPullEvent {
+function pulledUsageEvent(overrides: Partial<NormalizedPullEvent> = {}): NormalizedPullEvent {
   return {
     source_event_id: "usage:2026-08-24:workspace-1",
     event_timestamp: "2026-08-24T09:00:00.000Z",
@@ -89,17 +90,23 @@ class FakeSources extends IngestionPullSourcePort {
 }
 
 class FakeProjects extends TestProjectService {
+  constructor(private readonly traceDestination: ProjectWithTeam | null = null) {
+    super();
+  }
+
   tryFindInternal = async (_input: InternalProjectQuery): Promise<InternalProject | null> => null;
 
   ensureInternal = async (_input: InternalProjectQuery): Promise<InternalProject> => ({
-      id: "gov-project",
-      name: "Governance (internal)",
-      slug: "governance-org",
-      teamId: "team",
-      kind: "internal_governance",
-      archivedAtMs: null,
-      traceSharingEnabled: false,
+    id: "gov-project",
+    name: "Governance (internal)",
+    slug: "governance-org",
+    teamId: "team",
+    kind: "internal_governance",
+    archivedAtMs: null,
+    traceSharingEnabled: false,
   });
+
+  tryGetWithTeam = async (): Promise<ProjectWithTeam | null> => this.traceDestination;
 }
 
 class FakeSink extends GovernanceOcsfEventSinkPort {
@@ -143,6 +150,13 @@ class FakeDiagnostics extends IngestionPullDiagnosticsPort {
   capture = vi.fn();
 }
 
+class FakeTraceIngestion extends GovernanceTraceIngestionPort {
+  ingest = vi.fn(async (_input: { projectId: string; request: GovernanceTraceRequest }) => ({
+    rejectedSpans: 0,
+    ingestionFailures: 0,
+  }));
+}
+
 class IdentityEncryption extends GovernanceEncryptionPort {
   encrypt(value: string): string {
     return value;
@@ -163,6 +177,8 @@ function worker(input: {
   deadlineMs?: number;
   source?: GovernanceIngestionSource | null;
   entitlement?: boolean | Error;
+  traceDestination?: ProjectWithTeam | null;
+  traceIngestion?: GovernanceTraceIngestionPort;
 }) {
   const registry = PullerRegistryService.create();
   registry.register({
@@ -174,24 +190,91 @@ function worker(input: {
   const entitlement = new FakeEntitlement(input.entitlement);
   const diagnostics = new FakeDiagnostics();
   const service = IngestionPullWorkerService.create({
-    sources: new FakeSources(
-      input.source === undefined ? ingestionSource() : input.source,
-    ),
+    sources: new FakeSources(input.source === undefined ? ingestionSource() : input.source),
     registry,
     credentials: IngestionCredentialsService.create(new IdentityEncryption()),
-    projects: new FakeProjects(),
+    projects: new FakeProjects(input.traceDestination),
     sink,
     usageEntitlement: entitlement,
     usageRecords: PulledUsageRecordService.create(
       PulledUsagePricingService.create(new FakeRates()),
     ),
     diagnostics,
+    traceIngestion: input.traceIngestion,
     configuration: IngestionPullWorkerConfiguration.create({
       deadlineMs: input.deadlineMs,
     }),
     now: () => Date.parse("2026-08-24T10:00:00.000Z"),
   });
   return { service, sink, entitlement, diagnostics };
+}
+
+function traceDestination(organizationId = "org-1"): ProjectWithTeam {
+  const createdAt = new Date(0);
+  return {
+    id: "trace-project",
+    name: "Trace project",
+    slug: "trace-project",
+    apiKey: "api-key",
+    lwqlKey: "lwql-key",
+    teamId: "trace-team",
+    language: "other",
+    framework: "other",
+    kind: "application",
+    firstMessage: false,
+    integrated: false,
+    createdAt,
+    updatedAt: createdAt,
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "trace-team",
+      name: "Trace team",
+      slug: "trace-team",
+      organizationId,
+      createdAt,
+      updatedAt: createdAt,
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  };
+}
+
+function genieConversationEvent(): NormalizedPullEvent {
+  return {
+    source_event_id: "message-1",
+    event_timestamp: "2026-08-24T09:00:00.000Z",
+    actor: "analyst@example.com",
+    action: "genie_query",
+    target: "Sales",
+    cost_usd: "0",
+    tokens_input: 0,
+    tokens_output: 0,
+    raw_payload: JSON.stringify({
+      message_id: "message-1",
+      conversation_id: "conversation-1",
+      content: "Which region sold most?",
+      status: "COMPLETED",
+      created_timestamp: 1_756_036_800,
+      attachments: [{ text: { content: "EMEA", purpose: "ANSWER" } }],
+    }),
+    extra: { conversationId: "conversation-1", messageId: "message-1" },
+  };
 }
 
 describe("IngestionPullWorkerService", () => {
@@ -250,10 +333,94 @@ describe("IngestionPullWorkerService", () => {
       deadlineMs: 5,
     });
 
-    await expect(
-      service.run({ sourceId: "source-1", cursor: "held" }),
-    ).rejects.toBeInstanceOf(IngestionPullDeadlineExceededError);
+    await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toBeInstanceOf(
+      IngestionPullDeadlineExceededError,
+    );
     expect(sink.insertEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps collected events when an adapter reports errors after advancing", async () => {
+    const { service, sink } = worker({
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "after-unreadable-row",
+        errorCount: 1,
+      }),
+    });
+
+    await expect(
+      service.run({ sourceId: "source-1", cursor: "before-unreadable-row" }),
+    ).resolves.toEqual({
+      nextCursor: "after-unreadable-row",
+      eventCount: 1,
+    });
+    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails without writing when an adapter reports errors and makes no progress", async () => {
+    const { service, sink } = worker({
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "held",
+        errorCount: 1,
+      }),
+    });
+
+    await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toThrow(
+      "reported 1 error",
+    );
+    expect(sink.insertEvent).not.toHaveBeenCalled();
+  });
+
+  it("routes conversations through the trace port under the destination project", async () => {
+    const traceIngestion = new FakeTraceIngestion();
+    const { service } = worker({
+      source: ingestionSource({
+        sourceType: "databricks_genie",
+        traceProjectId: "trace-project",
+      }),
+      traceDestination: traceDestination(),
+      traceIngestion,
+      runOnce: async () => ({
+        events: [genieConversationEvent()],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(traceIngestion.ingest).toHaveBeenCalledWith({
+      projectId: "trace-project",
+      request: expect.objectContaining({
+        resourceSpans: expect.any(Array),
+      }),
+    });
+  });
+
+  it("does not route conversations into another organization's project", async () => {
+    const traceIngestion = new FakeTraceIngestion();
+    const { service, diagnostics } = worker({
+      source: ingestionSource({
+        sourceType: "databricks_genie",
+        traceProjectId: "trace-project",
+      }),
+      traceDestination: traceDestination("another-org"),
+      traceIngestion,
+      runOnce: async () => ({
+        events: [genieConversationEvent()],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(traceIngestion.ingest).not.toHaveBeenCalled();
+    expect(diagnostics.warn).toHaveBeenCalledWith(
+      expect.stringContaining("another organization"),
+      expect.objectContaining({ traceProjectId: "trace-project" }),
+    );
   });
 
   it("keeps the audit path and priced usage on the same durable retry boundary", async () => {

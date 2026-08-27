@@ -394,6 +394,7 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called without explicit setId", () => {
+      /** @scenario "A single test case run goes to the project internal run set" */
       it("dispatches queueRun command before scheduling", async () => {
         await caller.run(defaultInput);
 
@@ -407,6 +408,15 @@ describe("simulationRunnerRouter.run", () => {
             scenarioSetId: expectedSetId,
             occurredAt: expect.any(Number),
           }),
+        );
+      });
+
+      /** @scenario "A one-off batch carries the name of the test case that ran" */
+      it("stamps the scenario name onto the queued run", async () => {
+        await caller.run(defaultInput);
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Test Scenario" }),
         );
       });
 
@@ -476,6 +486,7 @@ describe("simulationRunnerRouter.run", () => {
               { name: "account_tier", defaultValue: "gold" },
               { name: "region", defaultValue: "eu-central" },
             ],
+            version: 5,
           })),
         );
       });
@@ -488,9 +499,9 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(mockQueueRun).toHaveBeenCalledWith(
           expect.objectContaining({
-            metadata: {
+            metadata: expect.objectContaining({
               parameters: { account_tier: "platinum", region: "eu-central" },
-            },
+            }),
           }),
         );
       });
@@ -520,6 +531,111 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(mockPrefetchScenarioData).not.toHaveBeenCalled();
         expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the run carries a note", () => {
+      /** @scenario "The note is written under the top-level note key of the run metadata" */
+      /** @scenario "A note on a single test case run is stored with that run" */
+      it("writes the note under the top-level note key of the run metadata", async () => {
+        await caller.run({ ...defaultInput, note: "nightly regression" });
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({ note: "nightly regression" }),
+          }),
+        );
+      });
+
+      /** @scenario "The note is written under the top-level note key of the run metadata" */
+      it("keeps the note out of the reserved langwatch namespace", async () => {
+        await caller.run({ ...defaultInput, note: "nightly regression" });
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata?: Record<string, unknown>;
+        };
+        expect(queued.metadata?.langwatch).not.toHaveProperty("note");
+      });
+
+      it("keeps the note beside the resolved parameters", async () => {
+        mockGetRunConfigByIds.mockImplementation(async ({ ids }) =>
+          ids.map((id) => ({
+            id,
+            name: "Test Scenario",
+            situation: "A {{ params.account_tier }} customer asks a question",
+            criteria: ["Must respond politely"],
+            parameters: [{ name: "account_tier", defaultValue: "gold" }],
+            version: 5,
+          })),
+        );
+
+        await caller.run({ ...defaultInput, note: "checking the gold path" });
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              note: "checking the gold path",
+              parameters: { account_tier: "gold" },
+            }),
+          }),
+        );
+      });
+
+      it("drops a note of only spaces", async () => {
+        await caller.run({ ...defaultInput, note: "   " });
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata?: Record<string, unknown>;
+        };
+        expect(queued.metadata).not.toHaveProperty("note");
+      });
+
+      it("rejects a note longer than the limit before anything is queued", async () => {
+        await expect(
+          caller.run({ ...defaultInput, note: "a".repeat(201) }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(mockQueueRun).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the run carries no note", () => {
+      /** @scenario "A run queued without a note records metadata identical to before notes existed" */
+      it("records no note key at all", async () => {
+        await caller.run(defaultInput);
+
+        const queued = mockQueueRun.mock.calls[0]?.[0] as {
+          metadata?: Record<string, unknown>;
+        };
+        expect(queued.metadata).not.toHaveProperty("note");
+        // Only the reserved namespace is recorded: the note added nothing.
+        expect(queued.metadata).toEqual({
+          langwatch: {
+            targetReferenceId: "prompt_123",
+            targetType: "prompt",
+            scenarioVersion: 5,
+          },
+        });
+      });
+    });
+
+    describe("the reserved langwatch namespace on a one-off run", () => {
+      /** @scenario "A one-off run records which target it ran against" */
+      /** @scenario "A one-off run of a single case records that case version" */
+      it("records the target, its kind and the scenario version read at queue time", async () => {
+        await caller.run(defaultInput);
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              langwatch: {
+                targetReferenceId: "prompt_123",
+                targetType: "prompt",
+                scenarioVersion: 5,
+              },
+            }),
+          }),
+        );
       });
     });
   });

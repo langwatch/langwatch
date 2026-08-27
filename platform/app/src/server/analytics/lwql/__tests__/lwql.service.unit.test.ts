@@ -20,10 +20,9 @@ import type { Protections } from "../../../traces/protections";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
   applyLangWatchQLResultLimits,
-  type LangWatchQLExecutionRequest,
-  type LangWatchQLExecutionResult,
   type LangWatchQLExecutor,
 } from "../executor";
+import { recordingExecutor } from "../executor.testFakes";
 import {
   closeLangWatchQLService,
   LangWatchQLService,
@@ -79,34 +78,6 @@ const WITHOUT_CONTENT: Protections = {
 const BOUNDED_COUNT =
   "SELECT count() AS value FROM analytics.traces " +
   "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)";
-
-interface RecordingExecutor extends LangWatchQLExecutor {
-  readonly calls: LangWatchQLExecutionRequest[];
-}
-
-function recordingExecutor(
-  result: Partial<LangWatchQLExecutionResult> = {},
-): RecordingExecutor {
-  const calls: LangWatchQLExecutionRequest[] = [];
-  return {
-    calls,
-    async execute(request) {
-      calls.push(request);
-      return {
-        columns: [{ name: "value", type: "UInt64" }],
-        rows: [{ value: 1 }],
-        truncated: false,
-        statistics: {
-          elapsedMs: 3,
-          rowsRead: 10,
-          bytesRead: 100,
-          rowsReturned: 1,
-        },
-        ...result,
-      };
-    },
-  };
-}
 
 function serviceWith(executor: LangWatchQLExecutor | null): LangWatchQLService {
   return new LangWatchQLService({ executor, database: DATABASE });
@@ -622,6 +593,41 @@ describe("given the LangWatchQL service", () => {
       expect(validated.followsTimeWindow).toBe(true);
       expect(validated.awaitingTimeWindow).toEqual(["period_end", "period_start"]);
     });
+
+    it("defers a declared granularity to the surface instead of refusing it as caller-missing", () => {
+      // The caller is forbidden to supply period_granularity_seconds, so the
+      // missing-parameter sweep naming it was a dead end: a refusal asking
+      // for a value the caller may never send. The declaration is awaiting
+      // the surface -- the granularity resolver binds the step at run.
+      const service = serviceWith(recordingExecutor());
+      const sql =
+        "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+        "count() AS value FROM analytics.traces " +
+        "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+        "GROUP BY bucket ORDER BY bucket";
+
+      const validated = service.validate({
+        projectId: PROJECT.id,
+        protections: FULLY_PERMITTED,
+        sql,
+        timeWindow: TIME_WINDOW,
+      });
+      expect(validated.awaitingTimeWindow).toEqual([
+        "period_granularity_seconds",
+      ]);
+
+      // Saving has no window either; the whole reserved trio is deferred.
+      const saved = service.validate({
+        projectId: PROJECT.id,
+        protections: FULLY_PERMITTED,
+        sql,
+      });
+      expect(saved.awaitingTimeWindow).toEqual([
+        "period_end",
+        "period_granularity_seconds",
+        "period_start",
+      ]);
+    });
   });
 
   describe("when the statement declares no time-window parameters", () => {
@@ -645,6 +651,139 @@ describe("given the LangWatchQL service", () => {
         executor.calls[0]!.parameters,
         "a window was injected into a statement that never asked for one",
       ).toBeUndefined();
+    });
+  });
+
+  describe("when the statement declares the granularity parameter", () => {
+    const GRANULARITY_SQL =
+      "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+      "count() AS value FROM analytics.traces " +
+      "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+      "GROUP BY bucket ORDER BY bucket";
+    const TIME_WINDOW = {
+      start: new Date("2026-02-20T00:00:00.000Z"),
+      end: new Date("2026-02-27T00:00:00.000Z"),
+    };
+    /** Seven days, in seconds — the window's own arithmetic. */
+    const WEEK_SECONDS = 7 * 24 * 3600;
+
+    /** @scenario "A chart declaring the granularity parameter runs at the step the surface supplies" */
+    it("binds the supplied step alongside the surface's window and reports both facts", async () => {
+      const executor = recordingExecutor();
+
+      const result = await serviceWith(executor).execute({
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        sql: GRANULARITY_SQL,
+        timeWindow: TIME_WINDOW,
+        granularitySeconds: 3600,
+      });
+
+      expect(executor.calls[0]!.parameters).toEqual({
+        period_start: "2026-02-20 00:00:00",
+        period_end: "2026-02-27 00:00:00",
+        period_granularity_seconds: 3600,
+      });
+      expect(result.followsGranularity).toBe(true);
+      expect(result.granularitySeconds).toBe(3600);
+      expect(result.followsTimeWindow).toBe(true);
+      // Nothing coarsened: an hour over a week fits the ceiling comfortably.
+      expect(result.coarsenedFromSeconds).toBeUndefined();
+    });
+
+    /** @scenario "A declared granularity with no step supplied refuses to run naming the parameter" */
+    it("refuses to run when no step was supplied, naming the parameter", async () => {
+      const executor = recordingExecutor();
+      const service = serviceWith(executor);
+      const run = () =>
+        service.execute({
+          project: PROJECT,
+          protections: FULLY_PERMITTED,
+          sql: GRANULARITY_SQL,
+          timeWindow: TIME_WINDOW,
+        });
+
+      expect(await codeOf(run)).toBe("lwql_parameter_missing");
+      expect(await metaOf(run)).toEqual({
+        parameters: ["period_granularity_seconds"],
+      });
+      expect(
+        executor.calls,
+        "a declared step with no value reached the database",
+      ).toHaveLength(0);
+
+      // Saving is not running: the same statement validates for a save with
+      // nothing refused, because the step belongs to whoever later renders
+      // the chart.
+      const validated = service.validate({
+        projectId: PROJECT.id,
+        protections: FULLY_PERMITTED,
+        sql: GRANULARITY_SQL,
+      });
+      expect(validated.awaitingTimeWindow).toEqual([
+        "period_end",
+        "period_granularity_seconds",
+        "period_start",
+      ]);
+    });
+
+    it("refuses a window finer than the bucket ceiling before execution, carrying the arithmetic", async () => {
+      const executor = recordingExecutor();
+      const service = serviceWith(executor);
+      const run = () =>
+        service.execute({
+          project: PROJECT,
+          protections: FULLY_PERMITTED,
+          sql: GRANULARITY_SQL,
+          timeWindow: TIME_WINDOW,
+          granularitySeconds: 1,
+        });
+
+      expect(await codeOf(run)).toBe("lwql_granularity_too_fine");
+      expect(await metaOf(run)).toMatchObject({
+        requestedGranularitySeconds: 1,
+        windowSeconds: WEEK_SECONDS,
+        maxBuckets: 10_000,
+      });
+      expect(
+        executor.calls,
+        "an overflowing budget reached the database",
+      ).toHaveLength(0);
+    });
+
+    it("runs a statement that does not declare the parameter untouched, reporting that it does not follow granularity", async () => {
+      const executor = recordingExecutor();
+
+      const result = await serviceWith(executor).execute({
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        sql: BOUNDED_COUNT,
+        granularitySeconds: 60,
+      });
+
+      expect(result.followsGranularity).toBe(false);
+      expect(result.granularitySeconds).toBeUndefined();
+      expect(
+        executor.calls[0]!.parameters,
+        "a step was injected into a statement that never asked for one",
+      ).toBeUndefined();
+    });
+
+    it("refuses a malformed step as a wrong declaration rather than running it", async () => {
+      for (const step of [0, -60, 1.5]) {
+        expect(
+          await codeOf(() =>
+            serviceWith(recordingExecutor()).execute({
+              project: PROJECT,
+              protections: FULLY_PERMITTED,
+              sql: GRANULARITY_SQL,
+              timeWindow: TIME_WINDOW,
+              granularitySeconds: step,
+            }),
+          ),
+          `step ${step}`,
+        ).toBe("lwql_granularity_parameter_type");
+      }
     });
   });
 

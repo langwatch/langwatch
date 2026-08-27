@@ -1,0 +1,93 @@
+---
+title: Automatic Prompt Optimization
+description: Langy scores the current prompt, duplicates it, rewrites the duplicate, runs both against your evaluator, and reports the pass rate before and after with the cost.
+sidebarTitle: Prompt Optimization
+keywords:
+  - prompt optimization
+  - optimize prompt
+  - improve prompt
+  - langy prompt
+  - prompt experiment
+---
+
+Prompt optimization is a Langy skill that measures your prompt's current score, writes a better version, and proves the improvement with your evaluator and dataset. Open it from the **Optimize this prompt** menu item on any prompt column in the Experiments Workbench.
+
+<Info>**Also check:** [Ask Langy](/langy/chat) (other things you can ask), [Experiments overview](/evaluations/experiments/overview) (what the workbench is), [Evaluators](/evaluations/evaluators/overview) (the scoring functions Langy uses).</Info>
+
+<video
+  controls
+  autoPlay
+  muted
+  loop
+  playsInline
+  style={{ width: "100%", borderRadius: "8px", marginTop: "1rem", marginBottom: "1rem" }}
+>
+  <source src="/media/videos/langy-prompt-optimization.webm" type="video/webm" />
+</video>
+
+## How it works
+
+<Steps>
+  <Step title="Langy scores the baseline">
+    Langy attaches your evaluator to the prompt column, maps the evaluator's fields to the dataset columns, and runs the baseline prompt against a subset of rows. The pass rate and cost land as the baseline score.
+  </Step>
+  <Step title="It duplicates and rewrites">
+    Langy duplicates the prompt column into a candidate and edits the candidate's template. The evaluator and its field mappings carry over from the baseline, so both columns are scored by the same criterion.
+  </Step>
+  <Step title="It runs the candidate">
+    Langy runs the candidate column against the same dataset rows and compares the results side by side.
+  </Step>
+  <Step title="It reports the result">
+    The closing message states both figures: the pass rate (or score) before and after, and what happened to cost. For example, "pass rate improved from 30% to 100%, total cost $0.12."
+  </Step>
+</Steps>
+
+The loop runs inside the Experiments Workbench while the page is open. Each run streams into the workbench table as it happens, so you see the per-row verdicts filling in.
+
+<Frame caption="The optimization result: baseline at 30% pass rate on the left, candidate at 100% on the right, with evaluator chips on both columns.">
+  ![Optimization result in the workbench](/images/langy/prompt-optimization/optimization-result.png)
+</Frame>
+
+## Starting a run
+
+Open any experiment that has a prompt column in the Experiments Workbench. Click the play button on the prompt column header and select **Optimize this prompt** from the menu.
+
+Langy opens in the side panel and starts the optimization loop. You do not need to configure the evaluator or the dataset in advance: Langy picks the evaluator from what is available on the project, maps its fields, and runs against the dataset already attached to the experiment.
+
+If no evaluator exists yet, Langy creates one, maps it, and runs the baseline before making any changes. If the evaluator's fields are not mapped, Langy maps them first.
+
+## What you see during the run
+
+The Langy panel streams each step as a tool-call activity card. In the workbench table, you see:
+
+- The baseline column's per-row outputs and evaluator verdicts.
+- The candidate column appearing with its own outputs and verdicts filling in.
+- Score chips on both column headers showing the aggregate pass rate.
+
+<Frame caption="Langy's closing report: the winning candidate, the pass rate before and after, and the cost per row.">
+  ![Langy's final report with pass rate and cost](/images/langy/prompt-optimization/final-report.png)
+</Frame>
+
+## After the run
+
+Langy asks what to do with the winning candidate:
+
+- **Publish the winning draft.** Save the candidate's prompt as a new published version, replacing the current one.
+- **Keep it as an experiment draft.** Leave the candidate column in the workbench for further iteration without publishing.
+
+The version history in the workbench records every save, so you can always compare or roll back.
+
+## What Langy will not do
+
+- **It will not create a standalone comparison column.** Only the Comparison judge (the pairwise evaluator) may own a comparison column. Langy attaches evaluators as chips on each prompt column, and the workbench enforces this rule at the schema, the transform, and the save boundary.
+- **It will not skip the baseline.** The loop always scores the current prompt first. A score from an unmapped evaluator, or from one that compares empty strings, is not trusted. Langy maps and reruns until real verdicts exist.
+
+## Running from chat
+
+You can also start the optimization from the [Langy chat panel](/langy/chat) by asking in plain language:
+
+- "Optimize the support classifier prompt."
+- "Can you improve this prompt's pass rate?"
+- "Try a better version of this prompt and compare."
+
+Langy finds the experiment, finds the prompt column, and runs the same loop.

@@ -70,6 +70,7 @@ export type ScimGrantBindingScope =
 export interface ScimTokenRecord {
   id: string;
   organizationId: string;
+  connectionId: string | null;
   description: string | null;
   createdAt: Date;
   lastUsedAt: Date | null;
@@ -77,13 +78,18 @@ export interface ScimTokenRecord {
 export interface ScimTokenIdentity {
   id: string;
   organizationId: string;
+  connectionId: string | null;
+}
+
+export interface ScimDirectoryIdentityRecord {
+  connectionId: string;
+  externalId: string;
+  userId: string;
 }
 
 /** Semantic store used by the SCIM service; no transport or ORM vocabulary. */
 export abstract class ScimGrantRepositoryPort {
-  abstract listRoleBindings(
-    scope: ScimGrantBindingScope,
-  ): Promise<ScimRoleBindingRecord[]>;
+  abstract listRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]>;
 }
 
 export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
@@ -105,10 +111,7 @@ export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
     userId: string;
     role: string;
   }): Promise<void>;
-  abstract removeMembership(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<void>;
+  abstract removeMembership(input: { organizationId: string; userId: string }): Promise<void>;
   abstract tryFindGroup(input: {
     organizationId: string;
     id: string;
@@ -130,33 +133,49 @@ export abstract class ScimRepositoryPort extends ScimGrantRepositoryPort {
   }): Promise<ScimGroupRecord>;
   abstract renameGroup(input: { id: string; name: string }): Promise<void>;
   abstract deleteGroup(input: { id: string }): Promise<void>;
-  abstract listGroupMembers(input: {
-    groupId: string;
-  }): Promise<ScimGroupMembershipRecord[]>;
+  abstract listGroupMembers(input: { groupId: string }): Promise<ScimGroupMembershipRecord[]>;
   abstract listGroupMemberIds(input: { groupId: string }): Promise<string[]>;
   abstract addGroupMember(input: {
     groupId: string;
     organizationId: string;
     userId: string;
   }): Promise<void>;
-  abstract removeGroupMembers(input: {
-    groupId: string;
-    userIds: string[];
-  }): Promise<void>;
-  abstract groupSlugExists(input: {
-    organizationId: string;
-    slug: string;
-  }): Promise<boolean>;
+  abstract removeGroupMembers(input: { groupId: string; userIds: string[] }): Promise<void>;
+  abstract groupSlugExists(input: { organizationId: string; slug: string }): Promise<boolean>;
   abstract createToken(input: {
     organizationId: string;
+    connectionId: string;
     hashedToken: string;
     description: string | null;
   }): Promise<{ id: string }>;
   abstract listTokens(organizationId: string): Promise<ScimTokenRecord[]>;
-  abstract revokeToken(input: {
+  abstract tryFindToken(input: {
     organizationId: string;
     tokenId: string;
-  }): Promise<boolean>;
+  }): Promise<ScimTokenIdentity | null>;
+  abstract revokeToken(input: { organizationId: string; tokenId: string }): Promise<boolean>;
+  abstract revokeTokensForConnection(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<number>;
   abstract tryFindTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null>;
   abstract recordTokenUse(input: { tokenId: string; usedAt: Date }): Promise<void>;
+  abstract scimConnectionExists(input: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<boolean>;
+  abstract tryFindDirectoryUserId(input: {
+    connectionId: string;
+    externalId: string;
+  }): Promise<string | null>;
+  abstract rememberDirectoryIdentity(input: ScimDirectoryIdentityRecord): Promise<void>;
+  abstract forgetDirectoryIdentity(input: {
+    connectionId: string;
+    externalId: string;
+  }): Promise<void>;
+  abstract forgetDirectoryIdentitiesForUser(input: {
+    connectionId: string;
+    userId: string;
+  }): Promise<void>;
+  abstract listDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]>;
 }

@@ -146,6 +146,7 @@ describe("TargetVariablesPanel", () => {
   });
 
   describe("missing mappings warning", () => {
+    /** @scenario "Opening drawer shows missing mapping warning" */
     it("shows warning when inputs are not mapped", () => {
       renderComponent();
       // context is not mapped - shows validation error

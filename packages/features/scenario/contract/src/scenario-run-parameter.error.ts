@@ -44,13 +44,7 @@ export class ScenarioParameterError extends HandledError {
 export class ScenarioParameterUnknownError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_unknown";
 
-  constructor({
-    unknownKeys,
-    declaredNames,
-  }: {
-    unknownKeys: string[];
-    declaredNames: string[];
-  }) {
+  constructor({ unknownKeys, declaredNames }: { unknownKeys: string[]; declaredNames: string[] }) {
     super({
       message: `Unknown scenario parameters: ${unknownKeys.join(", ")}. Declared: ${
         declaredNames.length > 0 ? declaredNames.join(", ") : "none"

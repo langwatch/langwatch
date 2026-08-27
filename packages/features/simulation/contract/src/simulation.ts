@@ -107,8 +107,22 @@ export const simulationBatchSummarySchema = z.object({
   lastUpdatedAt: z.number(),
   firstCompletedAt: z.number().nullable(),
   allCompletedAt: z.number().nullable(),
+  note: z.string().nullable(),
 });
 export type SimulationBatchSummary = z.infer<typeof simulationBatchSummarySchema>;
+
+export const simulationLastResultSummarySchema = z.object({
+  scenarioId: z.string(),
+  status: simulationRunStatusSchema,
+  metCriteriaCount: z.number(),
+  unmetCriteriaCount: z.number(),
+  lastRunAt: z.number(),
+  batchRunId: z.string(),
+  scenarioSetId: z.string(),
+  durationInMs: z.number().nullable(),
+  totalCost: z.number().nullable(),
+});
+export type SimulationLastResultSummary = z.infer<typeof simulationLastResultSummarySchema>;
 
 export const simulationBatchHistoryItemSchema = simulationBatchSummarySchema.extend({
   items: z.array(
@@ -164,6 +178,4 @@ export const simulationExternalSetSummarySchema = z.object({
   totalCount: z.number(),
   lastRunTimestamp: z.number(),
 });
-export type SimulationExternalSetSummary = z.infer<
-  typeof simulationExternalSetSummarySchema
->;
+export type SimulationExternalSetSummary = z.infer<typeof simulationExternalSetSummarySchema>;

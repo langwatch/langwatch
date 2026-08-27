@@ -15,6 +15,7 @@ import { LANGY_TURN_SKILL_IDS } from "@langwatch/langy-contract";
 import { LANGY_SKILLS } from "~/shared/langy/langySkills";
 import {
   type LangyResourceContext,
+  type LangyTurnContext,
   langyTurnContextSchema,
   renderLangyTurnContext,
 } from "../langy-turn-context.adapter";
@@ -24,9 +25,18 @@ const resources = langyTurnContextSchema.shape.pageContext.unwrap();
 /** Parse just the skill-chip array. */
 const skillsSchema = langyTurnContextSchema.shape.skills.unwrap();
 
-/** Render only page context — the common case in these tests. */
+/**
+ * Render a turn context with the UI-action surface OPEN, so the flag never
+ * hides a line these tests are about. The flag's own effect is pinned in its
+ * own describe below.
+ */
+function renderContext(context: LangyTurnContext) {
+  return renderLangyTurnContext({ context, isUiActionSurfaceOpen: true });
+}
+
+/** The common case in these tests: a chip list, and nothing else set. */
 function renderResources(pageContext: LangyResourceContext[] | undefined) {
-  return renderLangyTurnContext({ pageContext });
+  return renderContext({ pageContext });
 }
 
 describe("langyTurnContextSchema — resource chips", () => {
@@ -229,6 +239,61 @@ describe("renderLangyTurnContext", () => {
 });
 
 /**
+ * THE UI-ACTION LINE — the one part of the block that promises a surface the
+ * agent has to be able to reach.
+ *
+ * `routes/langy-ui-actions.ts` answers a dark 404 for `langwatch ui actions`
+ * and `langwatch ui call` while `release_langy_ui_actions` is off. Advertising
+ * them anyway would send the agent to a path that behaves as if the feature
+ * were never deployed, and it would spend the turn there.
+ */
+describe("renderLangyTurnContext — the live UI-action line", () => {
+  /** An experiment chip is the one kind that maps to a page manifest today. */
+  const experimentChip: LangyResourceContext = {
+    kind: "experiment",
+    ref: "my-exp",
+    label: "my-exp",
+  };
+
+  describe("given the UI-action surface is open", () => {
+    it("tells the agent the page can be driven live", () => {
+      const block = renderLangyTurnContext({
+        context: { pageContext: [experimentChip] },
+        isUiActionSurfaceOpen: true,
+      })!;
+      expect(block).toContain("langwatch ui actions");
+      expect(block).toContain("langwatch ui call");
+    });
+  });
+
+  describe("given the UI-action surface is closed", () => {
+    it("says nothing about the commands the dispatch route would 404", () => {
+      const block = renderLangyTurnContext({
+        context: { pageContext: [experimentChip] },
+        isUiActionSurfaceOpen: false,
+      })!;
+      expect(block).not.toContain("langwatch ui actions");
+      expect(block).not.toContain("langwatch ui call");
+      // The rest of the context still travels: the flag closes ONE channel,
+      // it does not blind the agent to what the user is looking at.
+      expect(block).toContain("my-exp");
+    });
+  });
+
+  describe("given a page with no UI-action manifest", () => {
+    it("stays silent even with the surface open", () => {
+      const block = renderLangyTurnContext({
+        context: {
+          pageContext: [{ kind: "trace", ref: "abc123", label: "trace abc" }],
+        },
+        isUiActionSurfaceOpen: true,
+      })!;
+      expect(block).not.toContain("langwatch ui actions");
+    });
+  });
+});
+
+/**
  * SKILL CHIPS — the composer's `/` command bar. A skill chip says "DO this",
  * optionally aimed at a resource ("…on this trace").
  *
@@ -312,7 +377,7 @@ describe("langyTurnContextSchema — skill chips", () => {
 describe("renderLangyTurnContext — skills", () => {
   describe("given a skill the user picked", () => {
     it("tells the agent to USE it — this is steering, not a hint", () => {
-      const block = renderLangyTurnContext({
+      const block = renderContext({
         skills: [{ id: "github", label: "GitHub" }],
       })!;
       expect(block).toContain("EXPLICITLY ASKED");
@@ -322,7 +387,7 @@ describe("renderLangyTurnContext — skills", () => {
 
   describe("given a skill bound to a resource", () => {
     it("renders the association, so 'use GitHub on this trace' lands", () => {
-      const block = renderLangyTurnContext({
+      const block = renderContext({
         pageContext: [{ kind: "trace", ref: "abc123", label: "trace abc1…23" }],
         skills: [{ id: "github", label: "GitHub", on: "trace abc1…23" }],
       })!;
@@ -334,7 +399,7 @@ describe("renderLangyTurnContext — skills", () => {
 
   describe("when a skill's fields try to smuggle in an instruction", () => {
     it("cannot forge a line of the system block", () => {
-      const block = renderLangyTurnContext({
+      const block = renderContext({
         skills: [
           {
             id: "github",
@@ -368,7 +433,7 @@ describe("renderLangyTurnContext — skills", () => {
      * (ADR-047), so a forged target dies at that boundary.
      */
     it("passes it through as inert text and resolves nothing", () => {
-      const block = renderLangyTurnContext({
+      const block = renderContext({
         pageContext: [
           {
             kind: "trace",

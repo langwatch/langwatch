@@ -19,7 +19,7 @@ prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
 dashboards/          — Custom analytics dashboards
 triggers/            — Automations / alerts
-ai-gateway/          — Virtual Keys, Budgets, Governance, Catalog (ingestion)
+ai-gateway/          — Virtual Keys, Budgets, Governance, Inventory (ingestion)
 settings/            — Model Providers, Model Defaults, Project Secrets
 ```
 
@@ -87,7 +87,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Virtual Keys                 |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
 | Budgets                      |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
 | Governance                   |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
-| Catalog (ingestion)          |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
+| Inventory (ingestion)        |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
 | **Settings**                 |        |        |        |     |              |     |     |                  |     |      |
 | Projects                     |   —    |   —    |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
 | Model Providers              |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
@@ -121,15 +121,17 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 
 ### API endpoints
 
-- **Hono routes** — `platform/app/src/app/api/<namespace>/[[...route]]/app.ts`
-- **Legacy Next.js routes** — `platform/app/src/pages/api/` (being migrated)
-- **tRPC routers** — `platform/app/src/server/api/routers/` (registered in `root.ts`)
+- **Contracts and handlers** — the owning singular feature under
+  `packages/features/<feature>/{contract,server}` or
+  `packages/enterprise/features/<feature>/{contract,server}`
+- **Transport composition** — `apps/api/`; compatibility routes still being
+  drained from the application are tracked in the extraction ledger
 
 ### Platform UI
 
-- **Route definitions** — `platform/app/src/utils/routes.ts`
-- **Sidebar menu** — `platform/app/src/components/MainMenu.tsx`
-- **Feature icons** — `platform/app/src/utils/featureIcons.ts`
+- **Reusable feature UI** — the owning feature's `web` package
+- **Routing and process composition** — `apps/ui/`
+- **Shared primitives** — `packages/design-system/`
 
 ### MCP tools
 
@@ -151,9 +153,9 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 
 ### Skills
 
-- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.md`
-- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.md`
-- **Meta** — `skills/level-up/SKILL.md` (orchestrates the feature skills)
+- **Feature skills** — `skills/{tracing,evaluations,scenarios,prompts}/SKILL.mdx`
+- **Cross-cutting** — `skills/{analytics,datasets}/SKILL.mdx`
+- **Meta** — `skills/level-up/SKILL.mdx` (orchestrates the feature skills)
 - **Recipes** — `skills/recipes/{debug-instrumentation,improve-setup,test-cli-usability,evaluate-multimodal,generate-rag-dataset,test-compliance}`
 
 ### Documentation
@@ -163,13 +165,16 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 
 ## Maintaining the Map
 
-When adding a feature or surface, update `feature-map.json` first — then update whatever derives from it (sidebar, skills, docs, this file). See `.claude/skills/feature-map/SKILL.md` for the update protocol.
+When adding a feature or surface, update `feature-map.json` first — then update whatever derives from it (sidebar, skills, docs, this file). Feature ownership itself is recorded in `packages/features/catalogue.json`.
 
 Validation checklist:
 
-- Every `api` value corresponds to a route in `platform/app/src/app/api/` or `platform/app/src/pages/api/`
+- Every `api` value corresponds to an owning feature handler mounted by
+  `apps/api`, or to a named compatibility adapter still recorded in the
+  extraction ledger
 - Every `mcp` tool name appears in `mcp/typescript/src/index.ts`
-- Every `skill` name has a `skills/{name}/SKILL.md`
+- Every `skill` name has a `skills/{name}/SKILL.mdx`
 - Every `cli` command exists in `sdks/typescript/src/cli/`
-- Every `ui` route exists in `platform/app/src/utils/routes.ts`
+- Every `ui` route is composed by `apps/ui`, or is recorded as residual UI in
+  the extraction ledger
 - No aspirational entries — use `plannedSync` for future intent

@@ -1,9 +1,5 @@
 import type { CommandEnvelope } from "@langwatch/eventing";
-import {
-  createTenantId,
-  REHYDRATION_WINDOW_MS,
-  type TenantId,
-} from "@langwatch/eventing";
+import { createTenantId, REHYDRATION_WINDOW_MS, type TenantId } from "@langwatch/eventing";
 import type { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type {
@@ -48,10 +44,7 @@ import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "@langwatch/langy-contract";
-import {
-  LangyFinalPartsService,
-  type LangyFinalToolCall,
-} from "./langy-final-parts.service";
+import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service";
 import type {
   LangyConversationListCursor,
   LangyConversationRepository,
@@ -62,6 +55,7 @@ import {
   type LangyMessageRow,
   NullLangyMessageRepository,
 } from "../repositories/langy-message.repository";
+import type { LangyTurnOrderReader, LangyTurnSegment } from "../streaming/langy-turn-order";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository";
 
@@ -253,9 +247,7 @@ function toListItem(row: LangyConversationRow, userId: string): ConversationList
     title: row.title,
     isShared: row.isShared,
     isOwn: row.userId === userId,
-    lastActivityAt: new Date(
-      row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs,
-    ),
+    lastActivityAt: new Date(row.lastActivityAtMs > 0 ? row.lastActivityAtMs : row.createdAtMs),
     messageCount: row.messageCount,
   };
 }
@@ -272,6 +264,7 @@ export class LangyConversationService {
     private readonly events: LangyConversationEventsReader | null = null,
     private readonly finalParts: LangyFinalPartsService = LangyFinalPartsService.create(),
     private readonly runtime: LangyConversationRuntime = defaultRuntime,
+    private readonly turnOrder: LangyTurnOrderReader | null = null,
   ) {}
 
   /**
@@ -528,8 +521,7 @@ export class LangyConversationService {
 
     return {
       items: pageRows.map((row) => toListItem(row, userId)),
-      nextCursor:
-        hasMore && last ? { lastActivityAtMs: rawCursorActivity, id: last.id } : null,
+      nextCursor: hasMore && last ? { lastActivityAtMs: rawCursorActivity, id: last.id } : null,
     };
   }
 
@@ -1030,13 +1022,46 @@ export class LangyConversationService {
       });
       return;
     }
+    const order = await this.readTurnOrder({ conversationId, turnId });
     await this.finalizeTurn({
       projectId,
       conversationId,
       turnId,
-      parts: this.finalParts.build({ text: text ?? "", toolCalls }),
+      parts: this.finalParts.build({
+        text: text ?? "",
+        toolCalls,
+        ...(order.length > 0 ? { order } : {}),
+      }),
       outcome: "completed",
     });
+  }
+
+  /**
+   * The turn's own account of what happened when, folded off its live stream.
+   *
+   * Read here rather than by the caller because two paths finalize a turn — the
+   * relay's terminal frame and the agent's own HTTP post — and whichever lands
+   * first is the one the record keeps. Reading in one place is what makes the
+   * two produce the same parts.
+   *
+   * Best effort by design: a turn long enough to outlive its buffer, or one
+   * whose read fails, records the shape it always did rather than failing a
+   * finalize that is otherwise complete.
+   */
+  private async readTurnOrder(at: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnSegment[]> {
+    if (!this.turnOrder) return [];
+    try {
+      return await this.turnOrder.readTurnOrder(at);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        { ...at, error },
+        "could not read a turn's order; recording its calls before its reply",
+      );
+      return [];
+    }
   }
 
   /**
@@ -1195,9 +1220,7 @@ export class LangyConversationService {
       occurredAt: Date.now(),
       conversationId: id,
       ...(title !== undefined ? { title } : {}),
-      ...(isShared !== undefined
-        ? { isShared, sharedById: isShared ? userId : null }
-        : {}),
+      ...(isShared !== undefined ? { isShared, sharedById: isShared ? userId : null } : {}),
     });
     // Optimistic echo: the fold is written asynchronously, so return the
     // caller's intended state rather than a possibly-stale re-read.
@@ -1236,6 +1259,7 @@ export class LangyConversationService {
     events?: LangyConversationEventsReader | null,
     finalParts?: LangyFinalPartsService,
     runtime?: LangyConversationRuntime,
+    turnOrder?: LangyTurnOrderReader | null,
   ): LangyConversationService {
     return new LangyConversationService(
       repository,
@@ -1244,6 +1268,7 @@ export class LangyConversationService {
       events,
       finalParts,
       runtime,
+      turnOrder,
     );
   }
 }

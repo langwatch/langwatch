@@ -40,6 +40,7 @@
 import type { LedgerActor } from "@langwatch/actor";
 import {
   type DefineRoleCommandData,
+  type GrantEventSource,
   type LedgerScopeType,
   type RevokeGrantCommandData,
   type TeamUserRole as AuthzTeamUserRole,
@@ -64,10 +65,7 @@ import type { AuthzDatabase } from "../repositories/authz-read.repository";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper";
 import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.mapper";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository";
-import {
-  AUTHZ_AUDIT_ACTION_PREFIX,
-  type AuthzAuditVerb,
-} from "./eventing.authz-audit.adapter";
+import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./eventing.authz-audit.adapter";
 import { PostgresAuthzCutoverAdapter } from "./postgres.authz-cutover.adapter";
 
 const logger = createLogger("langwatch:authz:ledger");
@@ -79,11 +77,7 @@ const logger = createLogger("langwatch:authz:ledger");
  * sunset): a credential whose access predates the ledger states it the first
  * time it is used, rather than being asked to be re-issued.
  */
-export type LedgerWriteSource =
-  | "grants-service"
-  | "scim"
-  | "invite"
-  | "read-through-mint";
+export type LedgerWriteSource = GrantEventSource;
 
 const CONVERGENCE_POLL_MS = 150;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
@@ -337,8 +331,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     }
     // One command per grant, and a command id derived from the batch's own
     // so a retry of the same attach dedupes per grant at the event store.
-    const batchId =
-      commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
+    const batchId = commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
       fresh.map((binding) =>
@@ -595,8 +588,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
           projectId,
           userId: resource.createdByUserId ?? null,
           visibility,
-          expiresAt:
-            resource.expiresAtMs === undefined ? null : new Date(resource.expiresAtMs),
+          expiresAt: resource.expiresAtMs === undefined ? null : new Date(resource.expiresAtMs),
           maxViews: resource.maxViews ?? null,
         },
       });
@@ -608,8 +600,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
     ).commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
-      commandId:
-        commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
+      commandId: commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       grant: {
         grantId,
         principal,
@@ -931,9 +922,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       grant: {
         grantId: row.id,
-        principal: AuthzLedgerMapper.principalForWhere(
-          AuthzLedgerMapper.principalWhereForRow(row),
-        ),
+        principal: AuthzLedgerMapper.principalForWhere(AuthzLedgerMapper.principalWhereForRow(row)),
         roleKey: AuthzLedgerMapper.roleKeyFor({ role, customRoleId }),
         scope: { type: row.scopeType, id: row.scopeId },
         source: "grants-service",
@@ -1145,10 +1134,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
       where: legacyWhere,
       select: { id: true },
     });
-    const grantWhere = AuthzLedgerMapper.grantWhereFromBindingWhere(
-      where,
-      organizationId,
-    );
+    const grantWhere = AuthzLedgerMapper.grantWhereFromBindingWhere(where, organizationId);
     const grantRows = grantWhere
       ? await this.options.database.grant.findMany({
           where: grantWhere,
@@ -1156,10 +1142,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
         })
       : [];
     const bindingIds = [
-      ...new Set([
-        ...bindingRows.map((row) => row.id),
-        ...grantRows.map((row) => row.id),
-      ]),
+      ...new Set([...bindingRows.map((row) => row.id), ...grantRows.map((row) => row.id)]),
     ];
     // revokeBindings early-returns on an empty id list, so no selector-only
     // fact is appended when nothing matched — the behaviour the old
@@ -1379,8 +1362,7 @@ export class EventingAuthzLedgerAdapter extends AuthzCompatibilityLedgerPort {
         },
       });
     } catch (error) {
-      if (AuthzLedgerMapper.isUniqueViolation(error))
-        throw new AuthzRoleDuplicateNameError();
+      if (AuthzLedgerMapper.isUniqueViolation(error)) throw new AuthzRoleDuplicateNameError();
       throw error;
     }
     const fact: Record<string, unknown> = {
@@ -1572,13 +1554,7 @@ export class AuthzLedgerMapper {
    * column is JSON, so anything that is not an array of the same strings in the
    * same order is a row the fold has not landed yet.
    */
-  static samePermissions({
-    stored,
-    wanted,
-  }: {
-    stored: unknown;
-    wanted: string[];
-  }): boolean {
+  static samePermissions({ stored, wanted }: { stored: unknown; wanted: string[] }): boolean {
     return (
       Array.isArray(stored) &&
       stored.length === wanted.length &&
@@ -1604,7 +1580,7 @@ export class AuthzLedgerMapper {
    * audit paths cannot drift into disagreeing about what earns a row.
    */
   private static auditableSource(source: LedgerWriteSource): boolean {
-    return source !== "read-through-mint";
+    return source !== "read-through-mint" && source !== "migration";
   }
 
   static roleKeyFor({

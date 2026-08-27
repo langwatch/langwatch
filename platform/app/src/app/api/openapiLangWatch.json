@@ -1238,7 +1238,7 @@
         }
       }
     },
-    "/api/agents": {
+    "/api/agent-cache/{name}": {
       "get": {
         "operationId": "getApiAgents",
         "deprecated": true,
@@ -51757,6 +51757,21 @@
             }
           }
         },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "custom",
+                "folder"
+              ],
+              "default": "custom"
+            },
+            "description": "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did."
+          }
+        ],
         "security": [
           {
             "project_api_key": []

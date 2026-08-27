@@ -76,9 +76,7 @@ function mergeScope(current: LangyScope | null, update: Partial<LangyScope>): La
 function isSameScope(a: LangyScope | null, b: LangyScope | null): boolean {
   if (!a || !b) return a === b;
   return (
-    a.userId === b.userId &&
-    a.organizationId === b.organizationId &&
-    a.projectId === b.projectId
+    a.userId === b.userId && a.organizationId === b.organizationId && a.projectId === b.projectId
   );
 }
 
@@ -267,6 +265,24 @@ interface LangyState extends TurnPhaseState {
   homeAskOpen: boolean;
   setHomeAskOpen: (open: boolean) => void;
 
+  /**
+   * What the page Langy is driving is doing this second, in the page's own
+   * words, or null when it is doing nothing.
+   *
+   * The status line may only say true things, so with no tool running and no
+   * tokens arriving it falls back to a verb that claims nothing ("Cooking…").
+   * That was honest and useless: while Langy runs a column the page knows
+   * which one and how many rows are back, and nothing carried that the few
+   * feet from the table to the panel. This is that channel, and the page that
+   * writes it is the page that is doing the work, so the line stays true.
+   *
+   * Session-only, never persisted: it describes this second. A page that
+   * reloaded into "running 12 of 20 rows" would be claiming work no one is
+   * doing, which is the whole failure this exists to avoid.
+   */
+  pageActivity: string | null;
+  setPageActivity: (activity: string | null) => void;
+
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
@@ -330,7 +346,26 @@ interface LangyState extends TurnPhaseState {
   setDraft: (draft: string) => void;
   /** Per-session model override for the next send. "" = use the project default. */
   modelOverride: string;
+  /**
+   * Seeding: the panel writing the resolved default, or an allowlist snap.
+   * Either way the model is not the user's choice, so this clears the pick
+   * flag. An allowlist snap in particular OVERRULES a pick, and a pick the
+   * panel has taken away must not go on holding the pill off the default.
+   */
   setModelOverride: (model: string) => void;
+  /** The user choosing a model in the picker. Their pick, not a seed. */
+  pickModel: (model: string) => void;
+  /**
+   * Whether the model in the picker is the user's own choice rather than a
+   * seeded value. Session-only, never persisted, and cleared with the
+   * conversation it was made in.
+   *
+   * The flag exists because the two are otherwise indistinguishable at the
+   * one moment it matters: accept "make it the default" and the pick BECOMES
+   * the default, so every "is this still the default?" test reads an explicit
+   * choice as untouched and the follow rules below overwrite it.
+   */
+  isModelPickedByUser: boolean;
   /**
    * Which conversation the picker was last seeded for from the durable
    * record — so a poll of the same history does not re-apply a model the
@@ -339,27 +374,18 @@ interface LangyState extends TurnPhaseState {
   modelSeededForConversationId: string | null;
   /**
    * A conversation remembers the model its last turn ran on; opening it
-   * brings that model back to the picker. Applies once per selection, only
-   * while the pick is still the seeded default (an explicit pick since the
-   * conversation was opened is never replaced).
+   * brings that model back to the picker. Applies once per selection, and
+   * never over the user's own pick.
    */
-  followConversationModel: (args: {
-    conversationId: string;
-    model: string;
-    resolvedDefault: string | null;
-  }) => void;
+  followConversationModel: (args: { conversationId: string; model: string }) => void;
   /**
    * The project's coding default changed server-side (a codex connect flow
    * wrote the LANGY role default). Follow it with the composer's pill ONLY
-   * when the pill is still on the default it replaced: an empty override, or
-   * one equal to the outgoing default (the panel seeds the override from the
-   * resolved default on open), both mean the user never explicitly diverged.
-   * A model the user picked on purpose is never hijacked.
+   * while the pill still holds a seeded value: the user's own pick is never
+   * hijacked, including when they picked the model that just became the
+   * default.
    */
-  followCodingDefaultChange: (change: {
-    previousDefault: string | null;
-    nextDefault: string;
-  }) => void;
+  followCodingDefaultChange: (change: { nextDefault: string }) => void;
 
   /**
    * Page-context chips the user has CHOSEN, by id.
@@ -703,6 +729,12 @@ export const useLangyStore = create<LangyState>()(
           activeConversationId: null,
           historyLoadConversationId: null,
           draft: "",
+          // The model pick belongs to the conversation being left behind, the
+          // same as a new chat. Kept, it would steer a conversation the user
+          // never picked it for, and hold the pill off the default for good.
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
           ...emptyConversationState(),
           // AFTER the spread: emptyConversationState() nulls `pendingPrompt`, so
           // the queued question is written last or it would be wiped out.
@@ -733,8 +765,7 @@ export const useLangyStore = create<LangyState>()(
       setPanelEffect: (panelEffect) => set({ panelEffect }),
 
       dockShellClaims: 0,
-      claimDockShell: () =>
-        set((state) => ({ dockShellClaims: state.dockShellClaims + 1 })),
+      claimDockShell: () => set((state) => ({ dockShellClaims: state.dockShellClaims + 1 })),
       releaseDockShell: () =>
         set((state) => ({
           dockShellClaims: Math.max(0, state.dockShellClaims - 1),
@@ -745,6 +776,9 @@ export const useLangyStore = create<LangyState>()(
 
       homeAskOpen: false,
       setHomeAskOpen: (homeAskOpen) => set({ homeAskOpen }),
+
+      pageActivity: null,
+      setPageActivity: (pageActivity) => set({ pageActivity }),
 
       activeConversationId: null,
       activeConversationScope: null,
@@ -763,13 +797,13 @@ export const useLangyStore = create<LangyState>()(
           // being opened seeds its own from the durable record (or the
           // default) once its history lands.
           modelOverride: "",
+          isModelPickedByUser: false,
           modelSeededForConversationId: null,
           ...emptyConversationState(),
         }),
       // The pending id is retired either way: adopted (the send used it and it
       // just became the active id) or superseded (the server minted its own).
-      adoptConversation: (id) =>
-        set({ activeConversationId: id, pendingConversationId: null }),
+      adoptConversation: (id) => set({ activeConversationId: id, pendingConversationId: null }),
       startNewConversation: () =>
         set((state) => ({
           activeConversationId: null,
@@ -783,6 +817,7 @@ export const useLangyStore = create<LangyState>()(
           // conversation" is the dialog's promise) — a new chat starts on
           // the resolved default again.
           modelOverride: "",
+          isModelPickedByUser: false,
           modelSeededForConversationId: null,
           chosenChipIds: new Set<string>(),
           // The targets the user pointed at were gathered for the conversation
@@ -799,30 +834,23 @@ export const useLangyStore = create<LangyState>()(
       draft: "",
       setDraft: (draft) => set({ draft }),
       modelOverride: "",
-      setModelOverride: (modelOverride) => set({ modelOverride }),
+      setModelOverride: (modelOverride) => set({ modelOverride, isModelPickedByUser: false }),
+      pickModel: (modelOverride) => set({ modelOverride, isModelPickedByUser: true }),
+      isModelPickedByUser: false,
       modelSeededForConversationId: null,
-      followConversationModel: ({ conversationId, model, resolvedDefault }) =>
+      followConversationModel: ({ conversationId, model }) =>
         set((state) => {
           if (state.activeConversationId !== conversationId) return state;
           if (state.modelSeededForConversationId === conversationId) return state;
-          // An empty override, or one equal to the resolved default the panel
-          // seeds on open, both mean the user never picked since opening this
-          // conversation — only then may the record's model take the pill.
-          const isUntouched =
-            state.modelOverride === "" || state.modelOverride === resolvedDefault;
-          return isUntouched
-            ? {
+          return state.isModelPickedByUser
+            ? { modelSeededForConversationId: conversationId }
+            : {
                 modelOverride: model,
                 modelSeededForConversationId: conversationId,
-              }
-            : { modelSeededForConversationId: conversationId };
+              };
         }),
-      followCodingDefaultChange: ({ previousDefault, nextDefault }) =>
-        set((state) =>
-          state.modelOverride === "" || state.modelOverride === previousDefault
-            ? { modelOverride: nextDefault }
-            : state,
-        ),
+      followCodingDefaultChange: ({ nextDefault }) =>
+        set((state) => (state.isModelPickedByUser ? state : { modelOverride: nextDefault })),
 
       chosenChipIds: new Set<string>(),
       chooseChip: (id) =>
@@ -867,9 +895,7 @@ export const useLangyStore = create<LangyState>()(
           };
         }),
       clearAttachedContext: () =>
-        set((state) =>
-          state.attachedContext.length === 0 ? state : { attachedContext: [] },
-        ),
+        set((state) => (state.attachedContext.length === 0 ? state : { attachedContext: [] })),
 
       skillChips: [],
       addSkillChip: (skill) =>
@@ -990,9 +1016,7 @@ export const useLangyStore = create<LangyState>()(
           // Only a stop that actually moved the machine counts as an
           // interruption — requestStop is a no-op outside `active`.
           interruptedConversationId:
-            s.turnPhase === "active"
-              ? s.activeConversationId
-              : s.interruptedConversationId,
+            s.turnPhase === "active" ? s.activeConversationId : s.interruptedConversationId,
         })),
       abandonStop: () =>
         set((s) => ({
@@ -1019,9 +1043,7 @@ export const useLangyStore = create<LangyState>()(
           // guard on the phase: the observeBackendTurn effect flips it to
           // `active` in this same commit, before this reducer runs.
           const adoptTurnId =
-            snapshot.currentTurnId &&
-            s.activeTurnId === null &&
-            turnProjection !== s.turnProjection
+            snapshot.currentTurnId && s.activeTurnId === null && turnProjection !== s.turnProjection
               ? snapshot.currentTurnId
               : null;
           // The phase reducers return the WHOLE state (`{...state, ...}`), so
@@ -1062,8 +1084,7 @@ export const useLangyStore = create<LangyState>()(
                 ? {
                     ...s,
                     settledTurnId: null,
-                    activeTurnId:
-                      s.activeTurnId === s.settledTurnId ? null : s.activeTurnId,
+                    activeTurnId: s.activeTurnId === s.settledTurnId ? null : s.activeTurnId,
                   }
                 : s;
             return {
@@ -1083,8 +1104,7 @@ export const useLangyStore = create<LangyState>()(
       turnReasoning: null,
       turnPlan: null,
       setTurnStatus: (turnStatus) => set({ turnStatus, turnStatusIsReadiness: false }),
-      setTurnReadinessStatus: (turnStatus) =>
-        set({ turnStatus, turnStatusIsReadiness: true }),
+      setTurnReadinessStatus: (turnStatus) => set({ turnStatus, turnStatusIsReadiness: true }),
       setTurnProgress: (turnProgress) => set({ turnProgress }),
       setTurnProgressSample: (turnProgressSample) => set({ turnProgressSample }),
       appendTurnReasoning: (text) =>
@@ -1103,12 +1123,10 @@ export const useLangyStore = create<LangyState>()(
       devMode: false,
       // Leaving dev mode takes the gallery with it — otherwise a user who
       // toggles dev mode off is left staring at a wall of fixtures.
-      setDevMode: (devMode) =>
-        set(devMode ? { devMode } : { devMode, cardGalleryOpen: false }),
+      setDevMode: (devMode) => set(devMode ? { devMode } : { devMode, cardGalleryOpen: false }),
 
       cardGalleryOpen: false,
-      toggleCardGallery: () =>
-        set((state) => ({ cardGalleryOpen: !state.cardGalleryOpen })),
+      toggleCardGallery: () => set((state) => ({ cardGalleryOpen: !state.cardGalleryOpen })),
       closeCardGallery: () => set({ cardGalleryOpen: false }),
 
       /**
@@ -1156,9 +1174,7 @@ export const useLangyStore = create<LangyState>()(
             activeConversationScope: unchanged ? current : merged,
             activeConversationId: unchanged ? state.activeConversationId : null,
             historyLoadConversationId: unchanged ? state.activeConversationId : null,
-            conversationEpoch: unchanged
-              ? state.conversationEpoch
-              : state.conversationEpoch + 1,
+            conversationEpoch: unchanged ? state.conversationEpoch : state.conversationEpoch + 1,
           };
         }),
 

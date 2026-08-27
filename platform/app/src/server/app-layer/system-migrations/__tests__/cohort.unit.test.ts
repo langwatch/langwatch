@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { migrationRunsOnThisInstallation, organizationMigrates } from "../cohort";
 
+/** The cohort question for a migration enrollment still paces. */
+function paced(
+  args: Partial<Parameters<typeof organizationMigrates>[0]>,
+): boolean {
+  return organizationMigrates({
+    isSaaS: true,
+    enrolledAutomatically: false,
+    enrolled: false,
+    ...args,
+  });
+}
+
 describe("organizationMigrates", () => {
   describe("when the installation is self-hosted", () => {
     /** @scenario "A self-hosted installation migrates every organization" */
@@ -10,7 +22,7 @@ describe("organizationMigrates", () => {
     });
   });
 
-  describe("when the installation is cloud", () => {
+  describe("when the installation is cloud and the migration is paced by enrollment", () => {
     /** @scenario "Cloud rollout processes only enrolled organizations" */
     it("includes exactly the enrolled organizations", () => {
       expect(organizationMigrates({ isSaaS: true, enrolled: true })).toBe(true);

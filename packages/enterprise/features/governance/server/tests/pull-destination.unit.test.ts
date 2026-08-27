@@ -27,12 +27,12 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
   describe("when the destination is checked", () => {
     /** @scenario "The token may only be sent to a Databricks workspace" */
     it("refuses a host the attacker controls", () => {
-      expect(() =>
-        pullDestination.assertAllowed(genie("https://attacker.example.com")),
-      ).toThrow(/Databricks workspace address/);
-      expect(() =>
-        pullDestination.assertAllowed(genie("https://attacker.example.com")),
-      ).toThrow(GovernanceValidationError);
+      expect(() => pullDestination.assertAllowed(genie("https://attacker.example.com"))).toThrow(
+        /Databricks workspace address/,
+      );
+      expect(() => pullDestination.assertAllowed(genie("https://attacker.example.com"))).toThrow(
+        GovernanceValidationError,
+      );
     });
 
     /**
@@ -57,25 +57,19 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
 
     it("refuses a lookalike that merely contains the real domain", () => {
       expect(() =>
-        pullDestination.assertAllowed(
-          genie("https://azuredatabricks.net.attacker.example.com"),
-        ),
+        pullDestination.assertAllowed(genie("https://azuredatabricks.net.attacker.example.com")),
       ).toThrow(/Databricks workspace address/);
     });
 
     it("refuses plain http, which would expose the token even to a real workspace", () => {
       expect(() =>
-        pullDestination.assertAllowed(
-          genie("http://adb-1234567890123456.7.azuredatabricks.net"),
-        ),
+        pullDestination.assertAllowed(genie("http://adb-1234567890123456.7.azuredatabricks.net")),
       ).toThrow(/Databricks workspace address/);
     });
 
     it("refuses a URL smuggling credentials in its userinfo", () => {
       expect(() =>
-        pullDestination.assertAllowed(
-          genie("https://user:pass@adb-1.7.azuredatabricks.net"),
-        ),
+        pullDestination.assertAllowed(genie("https://user:pass@adb-1.7.azuredatabricks.net")),
       ).toThrow(/Databricks workspace address/);
     });
 

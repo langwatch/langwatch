@@ -17,6 +17,14 @@ const sizeOptions: {
   { value: "2x2", label: "Large (2x2)", colSpan: 2, rowSpan: 2 },
 ];
 
+/**
+ * How each offered datapoint step is named in the menu: the noun form, because
+ * a menu item names the step rather than modifying a following word. Shared
+ * with the widget's coarsened notice so the two cannot drift apart.
+ */
+const granularityLabel = (seconds: number): string =>
+  describeLangWatchQLGranularityStep(seconds, "noun");
+
 const getCurrentSize = (colSpan: number, rowSpan: number): SizeOption => {
   if (colSpan === 2 && rowSpan === 2) return "2x2";
   if (colSpan === 2 && rowSpan === 1) return "2x1";
@@ -30,7 +38,16 @@ interface GraphCardMenuProps {
   dashboardId?: string;
   colSpan: number;
   rowSpan: number;
+  /**
+   * Whether this card is a saved LangWatchQL chart. Decides where Edit goes and
+   * whether the datapoint-step picker is offered at all — a builder graph has
+   * no granularity contract to pick against.
+   */
+  isWorkbenchChart?: boolean;
+  /** The step this workbench card runs at, when it has one stored. */
+  granularitySeconds?: number;
   onSizeChange: (size: SizeOption) => void;
+  onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
 }
@@ -41,14 +58,27 @@ export function GraphCardMenu({
   dashboardId,
   colSpan,
   rowSpan,
+  isWorkbenchChart = false,
+  granularitySeconds,
   onSizeChange,
+  onGranularityChange,
   onDelete,
   isDeleting,
 }: GraphCardMenuProps) {
   const router = useRouter();
   const currentSize = getCurrentSize(colSpan, rowSpan);
 
-  const editUrl = `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
+  // A workbench chart is edited in the workbench that wrote it, not in the
+  // builder — the builder cannot read a saved statement.
+  //
+  // The workbench opens charts through its own toolbar and has no deep-link
+  // parameter, so this lands on the surface rather than on the chart. Passing a
+  // `?chart=` it does not read would be worse than not passing one: the member
+  // would arrive at an empty workbench with a URL claiming otherwise. Opening
+  // the named chart directly waits on the workbench accepting a chart id.
+  const editUrl = isWorkbenchChart
+    ? `/${projectSlug}/analytics/query`
+    : `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
 
   return (
     <Menu.Root>
@@ -64,7 +94,7 @@ export function GraphCardMenu({
             void router.push(editUrl);
           }}
         >
-          <Edit /> Edit Graph
+          <Edit /> {isWorkbenchChart ? "Open in workbench" : "Edit Graph"}
         </Menu.Item>
 
         <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
@@ -84,6 +114,32 @@ export function GraphCardMenu({
             ))}
           </Menu.Content>
         </Menu.Root>
+
+        {isWorkbenchChart && onGranularityChange && (
+          <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+            <Menu.TriggerItem value="granularity">
+              <Clock /> Datapoints (
+              {granularityLabel(
+                granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
+              )}
+              )
+            </Menu.TriggerItem>
+            <Menu.Content>
+              {LWQL_GRANULARITY_STEPS.map((step) => (
+                <Menu.Item
+                  key={step}
+                  value={String(step)}
+                  onClick={() => onGranularityChange(step)}
+                >
+                  {granularityLabel(step)}
+                  {step ===
+                    (granularitySeconds ??
+                      LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS) && " ✓"}
+                </Menu.Item>
+              ))}
+            </Menu.Content>
+          </Menu.Root>
+        )}
 
         <Menu.Item value="delete" color="red.600" onClick={onDelete}>
           <Trash2 /> Delete Graph

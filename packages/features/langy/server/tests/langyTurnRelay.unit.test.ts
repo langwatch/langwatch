@@ -7,10 +7,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  mintRunToken,
-  signFrame,
-} from "@langwatch/langy-server/streaming/langy-frame-auth";
+import { mintRunToken, signFrame } from "@langwatch/langy-server/streaming/langy-frame-auth";
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
@@ -128,36 +125,41 @@ function makeRelay(
   over: {
     conversations?: ReturnType<typeof fakeConversations>;
     resourceLinks?: ReturnType<typeof fakeResourceLinks>;
-    resolveResourceUrl?: (a: {
-      projectId: string;
-      resourceId: string;
-    }) => Promise<string | null>;
+    resolveResourceUrl?: (a: { projectId: string; resourceId: string }) => Promise<string | null>;
     fresh?: boolean;
     readHandoffRunToken?: (a: {
       projectId: string;
       conversationId: string;
       turnId: string;
     }) => Promise<string | null>;
+    refreshHandoffTtl?: (a: { conversationId: string; turnId: string }) => Promise<void>;
   } = {},
 ) {
   const buffer = fakeBuffer();
   const conversations = over.conversations ?? fakeConversations();
   const resourceLinks = over.resourceLinks ?? fakeResourceLinks();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
+  const refreshHandoffTtl = over.refreshHandoffTtl ?? vi.fn(async () => undefined);
   const relay = LangyTurnRelay.create({
     buffer,
     conversations,
     reserveFrameNonce,
-    ...(over.readHandoffRunToken
-      ? { readHandoffRunToken: over.readHandoffRunToken }
-      : {}),
+    ...(over.readHandoffRunToken ? { readHandoffRunToken: over.readHandoffRunToken } : {}),
+    refreshHandoffTtl,
     resourceLinks,
     ...(over.resolveResourceUrl ? { resolveResourceUrl: over.resolveResourceUrl } : {}),
     baseHost: "https://app.langwatch.ai",
     resolveCapabilityProgress: (name) =>
       name === "langwatch.trace.search" ? { headline: "Searching traces" } : null,
   });
-  return { relay, buffer, conversations, reserveFrameNonce, resourceLinks };
+  return {
+    relay,
+    buffer,
+    conversations,
+    reserveFrameNonce,
+    resourceLinks,
+    refreshHandoffTtl,
+  };
 }
 
 /** A real signed envelope for a payload object. */
@@ -181,9 +183,7 @@ describe("LangyTurnRelay", () => {
 
     it("appends reasoning to the live buffer only — never durable", async () => {
       const { relay, buffer, conversations } = makeRelay();
-      const out = await relay.handle(
-        frame({ type: "reasoning", text: "let me check the traces" }),
-      );
+      const out = await relay.handle(frame({ type: "reasoning", text: "let me check the traces" }));
 
       expect(out).toEqual({ status: "applied" });
       expect(buffer.appendReasoning).toHaveBeenCalledWith({
@@ -204,11 +204,35 @@ describe("LangyTurnRelay", () => {
       });
     });
 
+    /** @scenario "A heartbeat keeps the turn's revival record alive" */
+    it("extends the turn's handoff on the same heartbeat", async () => {
+      const { relay, refreshHandoffTtl } = makeRelay();
+      await relay.handle(frame({ type: "heartbeat" }));
+      expect(refreshHandoffTtl).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
+    /** @scenario "A heartbeat still counts when the revival record cannot be reached" */
+    it("still counts the heartbeat when the handoff store refuses", async () => {
+      const refreshHandoffTtl = vi.fn(async () => {
+        throw new Error("redis unavailable");
+      });
+      const { relay, buffer } = makeRelay({ refreshHandoffTtl });
+
+      const out = await relay.handle(frame({ type: "heartbeat" }));
+
+      expect(out).toEqual({ status: "applied" });
+      expect(buffer.heartbeat).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
     it("renders a mid-stream UI card via the milestone slot", async () => {
       const { relay, buffer } = makeRelay();
-      await relay.handle(
-        frame({ type: "card", kind: "trace_download", detail: "trace-9" }),
-      );
+      await relay.handle(frame({ type: "card", kind: "trace_download", detail: "trace-9" }));
       expect(buffer.appendMilestone).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
@@ -581,10 +605,7 @@ describe("LangyTurnRelay", () => {
 
       const command =
         "langwatch simulation-run get run_1 --format json && langwatch navigate open run_1";
-      for (const phase of [
-        { phase: "start" as const },
-        { phase: "end" as const, output: "ok" },
-      ]) {
+      for (const phase of [{ phase: "start" as const }, { phase: "end" as const, output: "ok" }]) {
         await relay.handle(
           frame({
             type: "tool",
@@ -616,17 +637,12 @@ describe("LangyTurnRelay", () => {
       // fallback resolved only scenariorun_ ids, so the navigate silently
       // dropped for every other resource. The fallback table must answer.
       const resolveResourceUrl = vi.fn(
-        async () =>
-          "https://app.langwatch.ai/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_x",
+        async () => "https://app.langwatch.ai/acme/prompts?promptId=prompt_x",
       );
       const { relay, buffer } = makeRelay({ resolveResourceUrl });
 
-      const command =
-        "langwatch prompt list --format json && langwatch navigate open prompt_x";
-      for (const phase of [
-        { phase: "start" as const },
-        { phase: "end" as const, output: "ok" },
-      ]) {
+      const command = "langwatch prompt list --format json && langwatch navigate open prompt_x";
+      for (const phase of [{ phase: "start" as const }, { phase: "end" as const, output: "ok" }]) {
         await relay.handle(
           frame({
             type: "tool",
@@ -645,7 +661,7 @@ describe("LangyTurnRelay", () => {
       expect(buffer.appendNavigate).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
-        href: "/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_x",
+        href: "/acme/prompts?promptId=prompt_x",
       });
     });
 
@@ -797,8 +813,7 @@ describe("LangyTurnRelay", () => {
       // pass on their own, which means `isSoleLangwatchInvocation` is the ONLY
       // thing standing between this forged address and a cached navigate
       // target — delete the provenance gate and this test goes red.
-      const forged =
-        "https://app.langwatch.ai/other-project/settings?drawer.open=secrets";
+      const forged = "https://app.langwatch.ai/other-project/settings?drawer.open=secrets";
       for (const f of surfaceResourceFrames({
         resourceId: "run_1",
         command: `langwatch trace get run_1 >/dev/null; echo '{"trace_id":"run_1","platformUrl":"${forged}"}'`,
@@ -895,9 +910,7 @@ describe("LangyTurnRelay", () => {
         await relay.handle(f);
       }
       await relay.handle(frame({ type: "delta", text: "it passed." }));
-      const out = await relay.handle(
-        frame({ type: "final", text: "Here's the run: it passed." }),
-      );
+      const out = await relay.handle(frame({ type: "final", text: "Here's the run: it passed." }));
 
       expect(buffer.appendNavigate).toHaveBeenCalledTimes(1);
       expect(buffer.appendChunk).toHaveBeenCalledWith(
@@ -948,8 +961,7 @@ describe("LangyTurnRelay", () => {
       // The live edge must carry the same JSON domain error the browser parses
       // (readLangyStreamError) — a raw string collapses every named failure into
       // the generic "Something went wrong". Classified from the vetted `code`.
-      const markErrorArg = (buffer.markError as ReturnType<typeof vi.fn>).mock
-        .calls[0]![0] as {
+      const markErrorArg = (buffer.markError as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
         conversationId: string;
         turnId: string;
         error: string;
@@ -973,8 +985,9 @@ describe("LangyTurnRelay", () => {
           code: "worker_stopped",
         }),
       );
-      const markErrorArg = (buffer.markError as ReturnType<typeof vi.fn>).mock
-        .calls[0]![0] as { error: string };
+      const markErrorArg = (buffer.markError as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
+        error: string;
+      };
       expect(JSON.parse(markErrorArg.error)).toMatchObject({
         kind: "langy_worker_stopped",
       });
@@ -982,9 +995,7 @@ describe("LangyTurnRelay", () => {
 
     it("ends the stream and persists the resume token on a handoff (ADR-048)", async () => {
       const { relay, buffer, conversations } = makeRelay();
-      const out = await relay.handle(
-        frame({ type: "handoff", resumeToken: "opaque-resume" }),
-      );
+      const out = await relay.handle(frame({ type: "handoff", resumeToken: "opaque-resume" }));
       expect(out).toEqual({ status: "terminal" });
       // A handoff ends the stream without the turn having finished, so it never
       // asks for the fallback: the turn is re-driven on a fresh worker, and

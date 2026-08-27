@@ -6,6 +6,7 @@
     "platform/*.mdx",
     "ai-gateway/*.mdx",
     "ai-governance/*.mdx",
+    "coding-agents/*.mdx",
     "integration/overview.mdx",
     "integration/quick-start.mdx",
     "integration/code-examples.mdx",

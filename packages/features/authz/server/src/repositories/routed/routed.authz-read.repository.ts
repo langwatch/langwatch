@@ -6,7 +6,7 @@
  * about, asks the cutover gate whether that organization is served by the
  * engine, and delegates.
  *
- * `findOrganizationRole`, `findApiKeyOwner`, `findProjectLineage` and
+ * `findOrganizationMembership`, `findApiKeyOwner`, `findProjectLineage` and
  * `findTeamOrganization` go to legacy always, unconditionally - not an
  * exception to the fork: membership and lineage are not grants and were
  * never projected onto the ledger's head, so both implementations run the
@@ -51,7 +51,7 @@ import {
   type AuthzDatabase,
   type AuthzReadHeadSelector,
   type CustomRolePermissionsRow,
-  type OrganizationRole,
+  type OrganizationMembership,
   type ShareLinkRow,
 } from "../authz-read.repository";
 import { EventingAuthzReadRepository } from "../eventing/eventing.authz-read.repository";
@@ -98,11 +98,11 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return new RoutedAuthzReadRepository(this.selectHead, this.repositories);
   }
 
-  async tryFindOrganizationRole(args: {
+  async tryFindOrganizationMembership(args: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null> {
-    return this.repositories.legacy.tryFindOrganizationRole(args);
+  }): Promise<OrganizationMembership | null> {
+    return this.repositories.legacy.tryFindOrganizationMembership(args);
   }
 
   async findUserBindings(args: {

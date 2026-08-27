@@ -456,9 +456,7 @@ function reportUrl({
   page: string | null;
 }): URL {
   const url = new URL(
-    config.report === "usage"
-      ? `${API_BASE}/usage_report/messages`
-      : `${API_BASE}/cost_report`,
+    config.report === "usage" ? `${API_BASE}/usage_report/messages` : `${API_BASE}/cost_report`,
   );
   url.searchParams.set("starting_at", startingAt);
   if (config.report === "usage") {
@@ -494,10 +492,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
     return anthropicAdminPullConfigSchema.parse(config);
   }
 
-  async runOnce(
-    options: PullRunOptions,
-    config: AnthropicAdminPullConfig,
-  ): Promise<PullResult> {
+  async runOnce(options: PullRunOptions, config: AnthropicAdminPullConfig): Promise<PullResult> {
     const events: NormalizedPullEvent[] = [];
     // The window start does not move within a run; only the page token and
     // the in-window watermark do. Separate variables rather than one
@@ -637,9 +632,7 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
   }): Promise<unknown> {
     const apiKey = options.credentials?.token;
     if (!apiKey) {
-      throw new Error(
-        "anthropic admin puller requires an admin API key in credentials.token",
-      );
+      throw new Error("anthropic admin puller requires an admin API key in credentials.token");
     }
 
     const url = reportUrl({ config, startingAt, page });
@@ -655,6 +648,10 @@ export class AnthropicAdminPuller implements PullerAdapter<AnthropicAdminPullCon
         Accept: "application/json",
       },
       signal,
+      // The header above is the customer's admin API key. The fetch helper
+      // follows up to ten redirects by default and re-sends headers to each
+      // host, so a redirect would hand the key to wherever it points.
+      followRedirects: false,
     });
     if (!response.ok) {
       throw await fetchPageError(response, config.report);

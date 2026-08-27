@@ -1267,13 +1267,14 @@ export class OpsMetricsCollector {
       const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
       this.knownPipelinePaths = knownPaths;
 
+      // Reported on its own below as `pendingCount`, which stays pending-only.
       let totalPending = 0;
-      let totalActive = 0;
       for (const q of queues) {
         totalPending += q.totalPendingJobs;
-        totalActive += q.activeGroupCount;
       }
-      const totalInFlight = totalPending + totalActive;
+      // Parked groups included: see ./in-flight.ts for why the derived
+      // ingestion rate below is wrong without them.
+      const totalInFlight = computeTotalInFlight({ queues });
 
       const now = Date.now();
       const elapsed = (now - this.lastTimestamp) / 1000;

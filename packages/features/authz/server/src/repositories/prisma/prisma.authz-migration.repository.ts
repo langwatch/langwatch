@@ -40,9 +40,10 @@ export type AuthzMigrationDatabase = Readonly<{
   project: FindManyDelegate;
   shareLink: FindManyDelegate;
   grantUsage: GrantUsageDelegate;
+  $executeRawUnsafe?(query: string, ...values: unknown[]): Promise<number>;
 }>;
 
-const BUDGET_RAISE_CONCURRENCY = 25;
+const BUDGET_SEED_CHUNK = 5_000;
 
 /** Prisma-compatible adapter; generated Prisma values never cross this seam. */
 export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
@@ -140,11 +141,7 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     }));
   }
 
-  async findGrantHeadRows({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<GrantHeadRow[]> {
+  async findGrantHeadRows({ organizationId }: { organizationId: string }): Promise<GrantHeadRow[]> {
     const rows = await this.database.grant.findMany({
       where: { organizationId, scopeType: { not: "RESOURCE" } },
       select: {
@@ -172,11 +169,8 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     }));
   }
 
-  async findRoleHeads({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<RoleHeadRow[]> {
+  async findRoleHeads({ organizationId }: { organizationId: string }): Promise<RoleHeadRow[]> {
+    // Deleted heads remain in the parity proof as tombstones.
     const rows = await this.database.role.findMany({
       where: { organizationId },
       select: {
@@ -185,9 +179,17 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
         description: true,
         permissions: true,
         kind: true,
+        deletedAt: true,
       },
     });
-    return rows as RoleHeadRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      permissions: row.permissions,
+      kind: row.kind,
+      deleted: row.deletedAt !== null,
+    }));
   }
 
   async findLegacyTeamRows({
@@ -279,24 +281,19 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
    * The view budgets, handed over rather than restarted - and RAISED on a
    * re-run, never lowered (the port's own contract; decision 22).
    *
-   * Two writes, each safe on its own terms. The `createMany` with
-   * `skipDuplicates` lands missing rows without touching existing ones. The
-   * per-row guarded update then raises a row the legacy path has outgrown:
-   * while an organization is held, views keep landing on
-   * `ShareLink.viewCount`, and a usage row seeded on an earlier pass would
-   * otherwise sit permanently below it - wedging the import proof, which
-   * compares the two counts exactly. The `viewCount: { lt: ... }` predicate
-   * is the refund guard: a row already at or above the seeded count (a view
-   * consumed since the seed) is left exactly as it is.
+   * ONE guarded upsert per chunk: a missing row is inserted at the seeded
+   * count, an existing one raised only where the seed is strictly higher.
+   * That refund guard lives in the UPDATE itself, so a consume landing
+   * mid-flight cannot be walked back by a filter resolved in an earlier
+   * SELECT.
    *
-   * The raise is `update` on the filtered unique, not `updateMany`, for the
-   * same reason the share consume paths are: the query compiler keeps a
-   * filtered-unique `update`'s full WHERE on the UPDATE statement itself,
-   * while `updateMany` resolves the filter in a prior SELECT - a consume
-   * landing between the two would be silently walked back. A raise the guard
-   * refuses surfaces as P2025 and is swallowed as the no-op it means. Raises
-   * run concurrently in bounded batches; each targets a distinct row, so
-   * they cannot contend with each other.
+   * One statement per chunk rather than one per row because this rides every
+   * pass: the previous shape paid a round trip per share link, and on a
+   * converged organization every one matched nothing. The organization that
+   * found it never finished a pass at all, so never recorded a status.
+   *
+   * `organizationId` and `projectId` are matched rather than overwritten: a
+   * row that disagrees about where it lives is not this seed's to move.
    */
   async seedResourceGrantUsage({
     organizationId,
@@ -306,6 +303,26 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     seeds: readonly ResourceGrantUsageSeed[];
   }): Promise<void> {
     if (seeds.length === 0) return;
+    if (!this.database.$executeRawUnsafe) {
+      await this.seedResourceGrantUsageWithoutRaw({ organizationId, seeds });
+      return;
+    }
+
+    for (let offset = 0; offset < seeds.length; offset += BUDGET_SEED_CHUNK) {
+      await this.raiseGrantUsageBudgets({
+        organizationId,
+        seeds: seeds.slice(offset, offset + BUDGET_SEED_CHUNK),
+      });
+    }
+  }
+
+  private async seedResourceGrantUsageWithoutRaw({
+    organizationId,
+    seeds,
+  }: {
+    organizationId: string;
+    seeds: readonly ResourceGrantUsageSeed[];
+  }): Promise<void> {
     await this.database.grantUsage.createMany({
       data: seeds.map((seed) => ({
         grantId: seed.grantId,
@@ -315,38 +332,59 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
       })),
       skipDuplicates: true,
     });
-    for (let offset = 0; offset < seeds.length; offset += BUDGET_RAISE_CONCURRENCY) {
-      await Promise.all(
-        seeds
-          .slice(offset, offset + BUDGET_RAISE_CONCURRENCY)
-          .map((seed) => this.raiseGrantUsageBudget({ organizationId, seed })),
-      );
+
+    for (const seed of seeds) {
+      try {
+        await this.database.grantUsage.update({
+          where: {
+            grantId: seed.grantId,
+            organizationId,
+            projectId: seed.projectId,
+            viewCount: { lt: seed.viewCount },
+          },
+          data: { viewCount: seed.viewCount },
+        });
+      } catch (error) {
+        if (!PrismaAuthzMigrationRepository.isRecordNotFound(error)) {
+          throw error;
+        }
+      }
     }
   }
 
-  private async raiseGrantUsageBudget({
+  private raiseGrantUsageBudgets({
     organizationId,
-    seed,
+    seeds,
   }: {
     organizationId: string;
-    seed: ResourceGrantUsageSeed;
-  }): Promise<void> {
-    try {
-      await this.database.grantUsage.update({
-        where: {
-          grantId: seed.grantId,
-          organizationId,
-          projectId: seed.projectId,
-          viewCount: { lt: seed.viewCount },
-        },
-        data: { viewCount: seed.viewCount },
-      });
-    } catch (error) {
-      if (PrismaAuthzMigrationRepository.isRecordNotFound(error)) {
-        return;
-      }
-      throw error;
+    seeds: readonly ResourceGrantUsageSeed[];
+  }): Promise<number> {
+    const values = seeds.flatMap((seed) => [
+      seed.grantId,
+      organizationId,
+      seed.projectId,
+      seed.viewCount,
+    ]);
+    const rows = seeds.map((_, index) => {
+      const first = index * 4 + 1;
+      return `($${first}, $${first + 1}, $${first + 2}, $${first + 3}, NOW())`;
+    });
+    const statement = `
+      INSERT INTO "GrantUsage" (
+        "grantId", "organizationId", "projectId", "viewCount", "updatedAt"
+      ) VALUES ${rows.join(", ")}
+      ON CONFLICT ("grantId") DO UPDATE SET
+        "viewCount" = EXCLUDED."viewCount",
+        "updatedAt" = NOW()
+      WHERE "GrantUsage"."viewCount" < EXCLUDED."viewCount"
+        AND "GrantUsage"."organizationId" = EXCLUDED."organizationId"
+        AND "GrantUsage"."projectId" = EXCLUDED."projectId"
+    `;
+    const execute = this.database.$executeRawUnsafe;
+    if (!execute) {
+      throw new Error("Authz migration database does not support raw budget upserts");
     }
+    return execute.call(this.database, statement, ...values);
   }
 
   async findExternalMemberFacts({
@@ -410,7 +448,13 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     // "field for field" needs a second read to see it. No usage row means no
     // view has been counted, which is exactly zero.
     const usages = await this.database.grantUsage.findMany({
-      where: { organizationId, grantId: { in: rows.map((row) => row.id) } },
+      //
+      // Read BY ORGANIZATION, not by naming every grant: `GrantUsage` is
+      // organization-indexed and organization-scoped, so both spellings select
+      // the same budgets, but naming them binds a parameter per grant against
+      // Postgres' 65535 ceiling - which an organization with 428k share links
+      // clears on its own. The lookup below is by id, so extra rows are free.
+      where: { organizationId },
       select: { grantId: true, viewCount: true },
     });
     const viewCounts = new Map(usages.map((usage) => [usage.grantId, usage.viewCount]));
@@ -430,11 +474,6 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
   }
 
   private static isRecordNotFound(error: unknown): boolean {
-    return (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "P2025"
-    );
+    return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
   }
 }

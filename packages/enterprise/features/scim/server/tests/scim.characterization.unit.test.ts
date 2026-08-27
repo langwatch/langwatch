@@ -8,6 +8,8 @@ import { EntitlementService } from "@langwatch/entitlement-contract";
 import { ScimService } from "../src/services/scim.service";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../src/ports/scim-repository.port";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle";
+import type { ScimSyncLifecyclePort } from "../src/ports/scim-sync-lifecycle.port";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
@@ -16,9 +18,17 @@ function repository(overrides: Record<string, unknown> = {}): ScimRepositoryPort
     tryFindOrganizationBySsoDomain: vi.fn(),
     createToken: vi.fn(async () => ({ id: "token_1" })),
     listTokens: vi.fn(async () => []),
+    tryFindToken: vi.fn(async () => null),
     revokeToken: vi.fn(async () => false),
+    revokeTokensForConnection: vi.fn(async () => 0),
     tryFindTokenByHash: vi.fn(async () => null),
     recordTokenUse: vi.fn(async () => undefined),
+    scimConnectionExists: vi.fn(async () => true),
+    tryFindDirectoryUserId: vi.fn(async () => null),
+    rememberDirectoryIdentity: vi.fn(async () => undefined),
+    forgetDirectoryIdentity: vi.fn(async () => undefined),
+    forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
+    listDirectoryConnectionsForUser: vi.fn(async () => []),
     tryFindMembership: vi.fn(async () => null),
     listMemberships: vi.fn(async () => ({ rows: [], total: 0 })),
     addMembership: vi.fn(async () => undefined),
@@ -79,7 +89,11 @@ class FixedEntitlementService extends EntitlementService {
   }
 }
 
-function service(repo: ScimRepositoryPort, enterprise = true): ScimService {
+function service(
+  repo: ScimRepositoryPort,
+  enterprise = true,
+  lifecycle: ScimSyncLifecyclePort = new QuietScimSyncLifecycle(),
+): ScimService {
   return ScimService.create({
     prisma: repo,
     writer: new GrantsFake(),
@@ -100,6 +114,8 @@ function service(repo: ScimRepositoryPort, enterprise = true): ScimService {
       departmentAssignUser: vi.fn(async () => undefined),
     } as GovernanceService,
     entitlements: new FixedEntitlementService(enterprise),
+    lifecycle,
+    provenOffboarding: false,
   });
 }
 
@@ -110,17 +126,23 @@ describe("SCIM characterization: token lifecycle", () => {
         {
           id: "token_1",
           organizationId: "org_1",
+          connectionId: "connection_1",
           description: "okta",
           createdAt: now,
           lastUsedAt: null,
         },
       ]),
-      tryFindTokenByHash: vi.fn(async () => ({ id: "token_1", organizationId: "org_1" })),
+      tryFindTokenByHash: vi.fn(async () => ({
+        id: "token_1",
+        organizationId: "org_1",
+        connectionId: "connection_1",
+      })),
       revokeToken: vi.fn(async () => true),
     });
     const scim = service(repo);
     const minted = await scim.generateToken({
       organizationId: "org_1",
+      connectionId: "connection_1",
       description: "okta",
     });
     expect(minted.token).toHaveLength(64);
@@ -136,6 +158,7 @@ describe("SCIM characterization: token lifecycle", () => {
     expect(await scim.verifyToken({ token: minted.token })).toEqual({
       status: "ok",
       organizationId: "org_1",
+      connectionId: "connection_1",
     });
     expect(repo.recordTokenUse).toHaveBeenCalledWith(
       expect.objectContaining({ tokenId: "token_1" }),
@@ -145,9 +168,58 @@ describe("SCIM characterization: token lifecycle", () => {
     ).resolves.toEqual({ success: true });
   });
 
+  it("states token issue, revoke, and connection teardown on the injected lifecycle", async () => {
+    const lifecycle = new (class extends QuietScimSyncLifecycle {
+      tokenIssued = vi.fn(async () => undefined);
+      revoked = vi.fn(async () => undefined);
+    })();
+    const repo = repository({
+      tryFindToken: vi.fn(async () => ({
+        id: "token_1",
+        organizationId: "org_1",
+        connectionId: "connection_1",
+      })),
+      revokeToken: vi.fn(async () => true),
+      revokeTokensForConnection: vi.fn(async () => 2),
+    });
+    const scim = service(repo, true, lifecycle);
+
+    await scim.generateToken({
+      organizationId: "org_1",
+      connectionId: "connection_1",
+    });
+    await scim.revokeToken({ organizationId: "org_1", tokenId: "token_1" });
+    await scim.revokeTokensForConnection({
+      organizationId: "org_1",
+      connectionId: "connection_1",
+    });
+
+    expect(lifecycle.tokenIssued).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      connectionId: "connection_1",
+      tokenId: "token_1",
+    });
+    expect(lifecycle.revoked).toHaveBeenNthCalledWith(1, {
+      organizationId: "org_1",
+      connectionId: "connection_1",
+      tokenId: "token_1",
+      cause: "revoke",
+    });
+    expect(lifecycle.revoked).toHaveBeenNthCalledWith(2, {
+      organizationId: "org_1",
+      connectionId: "connection_1",
+      tokenId: null,
+      cause: "teardown",
+    });
+  });
+
   it("distinguishes invalid credentials, lapsed plans, and unknown revocation", async () => {
     const repo = repository({
-      tryFindTokenByHash: vi.fn(async () => ({ id: "token_1", organizationId: "org_1" })),
+      tryFindTokenByHash: vi.fn(async () => ({
+        id: "token_1",
+        organizationId: "org_1",
+        connectionId: "connection_1",
+      })),
     });
     expect(await service(repository()).verifyToken({ token: "bad" })).toEqual({
       status: "invalid_token",
@@ -227,6 +299,8 @@ describe("SCIM characterization: provisioning invariants", () => {
         departmentAssignUser: vi.fn(async () => undefined),
       } as GovernanceService,
       entitlements: new FixedEntitlementService(true),
+      lifecycle: new QuietScimSyncLifecycle(),
+      provenOffboarding: false,
     });
     await scim.createUser({
       organizationId: "org_1",

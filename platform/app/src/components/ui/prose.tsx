@@ -34,6 +34,18 @@ export const Prose = chakra("div", {
       textDecorationThickness: "2px",
       textDecorationColor: "border.muted",
       fontWeight: "500",
+      // Chakra's link recipe is `display: inline-flex`, which makes an anchor
+      // an atomic inline box: it cannot be split across line boxes, so the
+      // global `word-wrap: break-word` from the preflight never applies to it.
+      // An autolinked signed URL then grows the box to its full text width and
+      // paints outside the message. Prose links flow with the text, so put
+      // them back in the normal inline formatting context.
+      display: "inline",
+      // `break-word` alone only breaks a token that doesn't fit on its own
+      // line; it leaves min-content sizing at the full token width, so a link
+      // inside a table cell still forces the cell wide. `anywhere` shrinks
+      // min-content too.
+      overflowWrap: "anywhere",
     },
     [inWhere("& strong")]: {
       fontWeight: "600",
@@ -151,6 +163,14 @@ export const Prose = chakra("div", {
       lineHeight: "1.5em",
       marginTop: "2em",
       marginBottom: "2em",
+    },
+    // `table-layout: auto` sizes columns from their min-content width, and the
+    // preflight's `word-wrap: break-word` deliberately does not shrink
+    // min-content. A cell holding one unbreakable token therefore widens the
+    // whole table past its container. `anywhere` is the one value that lets a
+    // break opportunity count towards intrinsic sizing.
+    [inWhere("& th, td")]: {
+      overflowWrap: "anywhere",
     },
     [inWhere("& thead")]: {
       borderBottomWidth: "1px",

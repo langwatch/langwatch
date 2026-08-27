@@ -4,6 +4,7 @@ export * from "./components/pull-cadence-field";
 export * from "./components/quarantine-fill-alert";
 export * from "./components/source-events-table";
 export * from "./components/spend-by-team-bar";
+export * from "./components/trace-destination-field";
 export * from "./governance-events-pager";
 export * from "./hooks/use-source-events-pager";
 export * from "./ingestion-source-catalog";

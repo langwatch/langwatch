@@ -100,7 +100,7 @@ describe("AppLangyNavigateFallbackAdapter", () => {
       tryGetPromptByIdOrHandle.mockResolvedValue({ id: "prompt_abc" });
 
       expect(await resolve("prompt_abc")).toBe(
-        "https://app.langwatch.ai/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_abc",
+        "https://app.langwatch.ai/acme/prompts?promptId=prompt_abc",
       );
       expect(tryGetPromptByIdOrHandle).toHaveBeenCalledWith({
         idOrHandle: "prompt_abc",

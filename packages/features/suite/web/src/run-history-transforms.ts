@@ -304,9 +304,7 @@ export function groupRunsByTarget({
   const groups: RunGroup[] = [];
   for (const [targetId, scenarioRuns] of targetMap) {
     const label =
-      targetId === UNKNOWN_GROUP_KEY
-        ? "Unknown"
-        : (targetNameMap.get(targetId) ?? targetId);
+      targetId === UNKNOWN_GROUP_KEY ? "Unknown" : (targetNameMap.get(targetId) ?? targetId);
     groups.push({
       groupKey: targetId,
       groupLabel: label,
@@ -323,11 +321,7 @@ export function groupRunsByTarget({
  * Computes pass/fail summary for a single batch run.
  * Delegates to computeGroupSummary since BatchRun extends RunGroup.
  */
-export function computeBatchRunSummary({
-  batchRun,
-}: {
-  batchRun: BatchRun;
-}): RunGroupSummary {
+export function computeBatchRunSummary({ batchRun }: { batchRun: BatchRun }): RunGroupSummary {
   return computeGroupSummary({ group: batchRun });
 }
 
@@ -434,9 +428,9 @@ export function getScenarioDisplayNames({
 }): string {
   if (scenarioRuns.length === 0) return "";
 
-  const uniqueNames = [
-    ...new Set(scenarioRuns.map((run) => run.name || run.scenarioId)),
-  ].sort((a, b) => a.localeCompare(b));
+  const uniqueNames = [...new Set(scenarioRuns.map((run) => run.name || run.scenarioId))].sort(
+    (a, b) => a.localeCompare(b),
+  );
 
   const displayed = uniqueNames.slice(0, MAX_DISPLAYED_SCENARIO_NAMES);
   const remaining = uniqueNames.length - displayed.length;
@@ -514,17 +508,24 @@ export function buildDisplayTitle({
  * - Suite runs (matching __internal__<suiteId>__suite pattern): returns the suite name from suiteNameMap
  * - External runs: returns the raw scenario set ID as the label
  * - No set ID: returns null
+ *
+ * onPlatformLabel renames only the on-platform set, for a surface that calls
+ * it something else. Omitted, the label is the one v1 has always shown.
  */
 export function resolveOriginLabel({
   scenarioSetId,
   suiteNameMap,
+  onPlatformLabel,
 }: {
   scenarioSetId: string | undefined;
   suiteNameMap: Map<string, string>;
+  onPlatformLabel?: string;
 }): string | null {
   if (!scenarioSetId) return null;
 
-  if (isOnPlatformSet(scenarioSetId)) return ON_PLATFORM_DISPLAY_NAME;
+  if (isOnPlatformSet(scenarioSetId)) {
+    return onPlatformLabel ?? ON_PLATFORM_DISPLAY_NAME;
+  }
 
   if (isSuiteSetId(scenarioSetId)) {
     const suiteId = extractSuiteId(scenarioSetId);
@@ -539,11 +540,7 @@ export function resolveOriginLabel({
  * Computes aggregate totals from raw scenario runs.
  * Works regardless of grouping mode since it operates on flat runs.
  */
-export function computeRunHistoryTotals({
-  runs,
-}: {
-  runs: ScenarioRunData[];
-}): RunHistoryTotals {
+export function computeRunHistoryTotals({ runs }: { runs: ScenarioRunData[] }): RunHistoryTotals {
   let passedCount = 0;
   let failedCount = 0;
   let pendingCount = 0;

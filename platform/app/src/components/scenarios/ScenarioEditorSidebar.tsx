@@ -7,22 +7,25 @@ type ScenarioEditorSidebarProps = {
   form?: ScenarioFormController | null;
 };
 
-/**
- * Help sidebar for the scenario editor.
- * Provides tips and best practices for writing scenarios.
- */
-export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
+export function ScenarioEditorSidebar({
+  form,
+  variant,
+}: ScenarioEditorSidebarProps) {
+  const isAgentTesting = variant === "agent-testing";
+
   return (
     <VStack align="stretch" gap={4}>
       {/* AI Generation */}
       <ScenarioAIGeneration form={form ?? null} />
 
-      {/* Writing Great Scenarios */}
+      {/* Writing tips */}
       <Card.Root>
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <Text fontWeight="semibold" fontSize="sm">
-              Writing Great Scenarios
+              {isAgentTesting
+                ? "Writing great test cases"
+                : "Writing Great Scenarios"}
             </Text>
 
             <VStack align="stretch" gap={3}>
@@ -100,7 +103,9 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
                 </List.Indicator>
-                Start with small simulations to validate quickly
+                {isAgentTesting
+                  ? "Start with small test cases to validate quickly"
+                  : "Start with small simulations to validate quickly"}
               </List.Item>
               <List.Item fontSize="xs" color="fg.muted">
                 <List.Indicator asChild color="blue.500">

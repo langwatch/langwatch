@@ -50,7 +50,7 @@ export interface UseRunSuiteOptions {
  * and asking for the value behind a password field is what lets the person see
  * the conflict instead of typing a credential into a plain field first.
  */
-function unionParameterDefinitions({
+export function unionParameterDefinitions({
   scenarioIds,
   scenarios,
 }: {
@@ -86,7 +86,7 @@ function unionParameterDefinitions({
  * token, and reading it as a number would both change it and have the run
  * refuse it, because a secret value has to be a string.
  */
-function toRunParameters({
+export function toRunParameters({
   definitions,
   values,
 }: {

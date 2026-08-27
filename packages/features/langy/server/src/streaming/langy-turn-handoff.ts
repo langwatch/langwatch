@@ -22,6 +22,7 @@ export type LangyTurnHandoff = z.infer<typeof langyTurnHandoffSchema>;
 export interface LangyHandoffRedis {
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
   get(key: string): Promise<string | null>;
+  expire(key: string, ttl: number): Promise<number>;
 }
 
 export const LANGY_HANDOFF_TTL_SECONDS = 300;
@@ -43,18 +44,21 @@ export class LangyTurnHandoffStore {
     );
   }
 
-  async read(input: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<LangyTurnHandoff | null> {
-    const raw = await this.redis.get(
-      `langy:handoff:{${input.conversationId}}:${input.turnId}`,
-    );
+  async read(input: { conversationId: string; turnId: string }): Promise<LangyTurnHandoff | null> {
+    const raw = await this.redis.get(`langy:handoff:{${input.conversationId}}:${input.turnId}`);
     if (raw == null) return null;
     try {
       return langyTurnHandoffSchema.parse(JSON.parse(raw));
     } catch {
       return null;
     }
+  }
+
+  async refresh(input: { conversationId: string; turnId: string }): Promise<boolean> {
+    const refreshed = await this.redis.expire(
+      `langy:handoff:{${input.conversationId}}:${input.turnId}`,
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+    return refreshed === 1;
   }
 }

@@ -73,7 +73,7 @@ team entry overrides for users in that team. This is how admins say
 ## Empty state
 
 A fresh organization has an empty catalog. The first admin to visit
-`/governance/tool-catalog` sees a starter-pack import CTA
+`/governance/inventory?tab=catalog` sees a starter-pack import CTA
 ([Admin catalog](/ai-governance/personal-portal/admin-catalog#starter-pack)).
 End users on `/me` see a "your IT team is still setting things up"
 message until the admin publishes the catalog.
@@ -89,7 +89,7 @@ Two new RBAC permissions gate the portal surfaces:
   This is intentionally broad: the portal is the company's curated AI
   starting point and must work for everyone.
 - `aiTools:manage`, granted to ADMIN by default. Required to access
-  `/governance/tool-catalog` and to run any catalog
+  `/governance/inventory?tab=catalog` and to run any catalog
   mutation. Delegable to non-ADMIN roles via the `CustomRolePermissions`
   JSON column.
 
@@ -99,7 +99,7 @@ Two new RBAC permissions gate the portal surfaces:
   walks through each tile-class expand UX.
 - **Admin:** [Admin catalog](/ai-governance/personal-portal/admin-catalog)
   walks through the catalog editor at
-  `/governance/tool-catalog`, including starter-pack import,
+  `/governance/inventory?tab=catalog`, including starter-pack import,
   scope binding, and per-tile editing.
 - **Developer integrating with the catalog API:** the underlying tRPC
   router is `aiToolsCatalogRouter` (see source, not yet stable for

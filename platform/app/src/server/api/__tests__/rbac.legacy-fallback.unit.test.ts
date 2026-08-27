@@ -52,6 +52,7 @@ describe("legacy TeamUser fallback at the resolver seam", () => {
     });
     mockPrisma.organizationUser.findFirst.mockResolvedValue({
       role: OrganizationUserRole.MEMBER,
+      disabledAt: null,
     });
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
     // No bindings anywhere: the only source of access is the legacy row.

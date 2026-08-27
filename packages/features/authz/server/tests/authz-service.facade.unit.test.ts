@@ -31,7 +31,9 @@ describe("AuthzService portable facade", () => {
   it("routes declared and imperative checks through the same decision engine", async () => {
     const { service } = makeService({
       reader: makeReader({
-        tryFindOrganizationRole: vi.fn().mockResolvedValue("ADMIN"),
+        tryFindOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "ADMIN", disabled: false }),
       }),
     });
 

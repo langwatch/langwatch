@@ -1,6 +1,6 @@
 /**
- * The shape ./cutover-gate.ts and ./ledger-write-gate.ts both delegate to.
- * ./cutover-gate.unit.test.ts and ledger-write-gate.unit.test.ts
+ * The shape ../authz/engine-gate.ts and ../identity/write-gate.ts delegate to.
+ * Their own tests
  * already cover the per-gate TTL/fail-safe contract through the two public
  * gates; this suite covers the behaviours that live in the shared helper
  * itself and previously had no test anywhere: a read that throws is LOGGED,
@@ -208,6 +208,48 @@ describe("PerOrganizationCachedGateStore", () => {
       });
       expect(calls).toBe(1);
       expect(result).toBe(false);
+    });
+  });
+
+  describe("when a gate is sized with its own maxEntries", () => {
+    it("evicts the oldest subject at its own cap, not the default one", async () => {
+      const flag = gate({ maxEntries: 2 });
+      const readTrue = () => Promise.resolve(true);
+
+      await flag.get({ organizationId: "user-1", read: readTrue });
+      await flag.get({ organizationId: "user-2", read: readTrue });
+      // The third subject crosses the cap: user-1, the oldest, is evicted.
+      await flag.get({ organizationId: "user-3", read: readTrue });
+
+      // The survivors stayed cached - the cap evicted the oldest entry,
+      // not the whole map. Checked before touching user-1 again, because a
+      // re-read of the evicted subject would itself evict at the cap.
+      let cachedReads = 0;
+      await flag.get({
+        organizationId: "user-2",
+        read: () => {
+          cachedReads += 1;
+          return Promise.resolve(true);
+        },
+      });
+      await flag.get({
+        organizationId: "user-3",
+        read: () => {
+          cachedReads += 1;
+          return Promise.resolve(true);
+        },
+      });
+      expect(cachedReads).toBe(0);
+
+      let evictedReads = 0;
+      await flag.get({
+        organizationId: "user-1",
+        read: () => {
+          evictedReads += 1;
+          return Promise.resolve(true);
+        },
+      });
+      expect(evictedReads).toBe(1);
     });
   });
 

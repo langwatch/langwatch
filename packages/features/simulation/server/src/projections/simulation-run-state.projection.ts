@@ -236,6 +236,28 @@ function isTerminalStatus(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
+/**
+ * Whether the fold has seen an event that DEFINES the run, and so whether the
+ * state is worth a `simulation_runs` row.
+ *
+ * Every lifecycle event names the run it belongs to, and every handler for one
+ * writes that name onto `ScenarioRunId`. The metrics event is the exception:
+ * it carries a run id, a trace id and a cost, and no identity at all, so its
+ * handler leaves `ScenarioRunId` empty. A non-empty `ScenarioRunId` is
+ * therefore the exact statement "some event has said what this run is", and it
+ * needs no extra column to carry.
+ *
+ * Cost alone must not mint a run. The metrics command is driven by a span
+ * attribute, so a bad attribute value addresses an aggregate that no run ever
+ * created; writing the row anyway produced a run with no name, no scenario, no
+ * set and no end, whose cost grew with every trace that carried the same value.
+ * The store consults this before it writes, so the metrics accumulate in the
+ * fold state and reach the table with the run's first lifecycle event.
+ */
+export function hasRunDefiningEvent(state: SimulationRunStateData): boolean {
+  return state.ScenarioRunId.length > 0;
+}
+
 const simulationRunEvents = [
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -582,6 +604,12 @@ export class SimulationRunStateFoldProjection
     event: SimulationRunMetricsComputedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
+    // The event carries a `scenarioRunId` and this handler deliberately does
+    // not write it onto the state. The id is a span attribute the customer's
+    // agent sent, so it names a run only if a run said so, and
+    // `hasRunDefiningEvent` is what reads the difference. Copying it here would
+    // let a cost figure alone create a run in the simulations list.
+
     // Store per-trace breakdown, then recompute aggregates
     const traceMetrics = {
       ...state.TraceMetrics,

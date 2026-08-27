@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   type NavigationModeResolution,
   resolveNavigationMode,
@@ -50,6 +51,8 @@ export function useNavigationMode(): NavigationModeResolution {
   const { enabled: isFlagEnabled, isLoading: isFlagLoading } = useFeatureFlag(
     "release_ui_navigation_v2_enabled",
     {
+      // The shell also renders on organization pages, which hold no project.
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       // A reader who opted out of the new navigation pays for no flag
       // check, and the check waits until the organization is known (an

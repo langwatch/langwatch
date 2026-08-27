@@ -8,6 +8,28 @@ import { formatCost, formatDuration, formatTokens } from "@langwatch/trace-web";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";
+/**
+ * Routed Databricks Genie turns (ADR-088 v7): the generated-SQL span renders
+ * as a tool step — label is the query description, arg is the SQL itself.
+ */
+const GENIE_QUERY_SPAN = "databricks_genie.query";
+const GENIE_MESSAGE_SPAN = "databricks_genie.message";
+const TOOL_SPAN_NAMES = new Set([TOOL_SPAN, GENIE_QUERY_SPAN]);
+
+/**
+ * Whether a conversation turn is a routed Genie message with steps worth
+ * opening. Genie turns carry no coding-agent service name, so the mount site
+ * cannot reuse its Claude Code check; the trace name is the reliable signal
+ * (the mapper names every root span `databricks_genie.message`). A spanCount
+ * of 1 is the root alone — a message that generated no SQL — and mounting the
+ * strip there would announce steps and then find none.
+ */
+export function turnHasGenieSteps(turn: {
+  traceName?: string | null;
+  spanCount: number;
+}): boolean {
+  return turn.traceName === GENIE_MESSAGE_SPAN && turn.spanCount > 1;
+}
 
 const CELL = { fontFamily: "mono", fontSize: "11px" } as const;
 
@@ -116,12 +138,15 @@ interface Step {
 /** The turn's model calls and tool runs, in the order they happened. */
 function selectSteps(spans: SpanDetail[]): Step[] {
   return spans
-    .filter((span) => span.name === LLM_REQUEST_SPAN || span.name === TOOL_SPAN)
+    .filter(
+      (span) =>
+        span.name === LLM_REQUEST_SPAN || TOOL_SPAN_NAMES.has(span.name),
+    )
     .slice()
     .sort((a, b) => a.startTimeMs - b.startTimeMs)
     .map((span) => {
       const params = (span.params ?? {}) as Record<string, unknown>;
-      const isTool = span.name === TOOL_SPAN;
+      const isTool = TOOL_SPAN_NAMES.has(span.name);
       return {
         spanId: span.spanId,
         kind: isTool ? ("tool" as const) : ("model" as const),

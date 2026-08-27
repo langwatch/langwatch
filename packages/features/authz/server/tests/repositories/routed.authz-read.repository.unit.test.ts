@@ -8,7 +8,7 @@ import { RoutedAuthzReadRepository } from "../../src/repositories/routed/routed.
 const spyRepository = (name: string): AuthzReadRepository =>
   ({
     beginPass: vi.fn(),
-    tryFindOrganizationRole: vi.fn().mockResolvedValue(name),
+    tryFindOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
@@ -16,9 +16,7 @@ const spyRepository = (name: string): AuthzReadRepository =>
     findLegacyTeamMemberships: vi.fn().mockResolvedValue([]),
     findCustomRolePermissions: vi.fn().mockResolvedValue([]),
     findShareLinks: vi.fn().mockResolvedValue([]),
-    tryFindProjectLineage: vi
-      .fn()
-      .mockResolvedValue({ teamId: "team-1", organizationId: "org-1" }),
+    tryFindProjectLineage: vi.fn().mockResolvedValue({ teamId: "team-1", organizationId: "org-1" }),
     tryFindTeamOrganization: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
   }) as unknown as AuthzReadRepository;
 
@@ -79,11 +77,11 @@ describe("RoutedAuthzReadRepository", () => {
     const { legacy, eventing, repository } = repositoryFor(selectHead);
 
     expect(
-      await repository.tryFindOrganizationRole({
+      await repository.tryFindOrganizationMembership({
         userId: "alice",
         organizationId: "org-1",
       }),
-    ).toBe("legacy");
+    ).toEqual({ role: "MEMBER", disabled: false });
     expect(await repository.tryFindApiKeyOwner("key-1")).toEqual({
       userId: "legacy",
     });
@@ -91,7 +89,7 @@ describe("RoutedAuthzReadRepository", () => {
     await repository.tryFindTeamOrganization({ teamId: "team-1" });
 
     expect(selectHead).not.toHaveBeenCalled();
-    expect(eventing.tryFindOrganizationRole).not.toHaveBeenCalled();
+    expect(eventing.tryFindOrganizationMembership).not.toHaveBeenCalled();
     expect(legacy.tryFindTeamOrganization).toHaveBeenCalledWith({
       teamId: "team-1",
     });

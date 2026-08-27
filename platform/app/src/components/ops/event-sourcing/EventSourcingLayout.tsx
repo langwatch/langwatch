@@ -66,6 +66,23 @@ export function EventSourcingLayout({
             includePath: "/ops/event-sourcing/schedules",
             icon: <CalendarClock size={14} />,
           },
+          // Both were top-level Ops entries, and neither is a subsystem the
+          // operator watches for trouble — they are tools you reach for once
+          // you know where the trouble is. They read the same substrate as
+          // every section above, so the rail is where they belong; the Ops
+          // menu is for workspaces, not for each tool inside one.
+          {
+            label: "Payload store",
+            href: "/ops/blobs",
+            includePath: "/ops/blobs",
+            icon: <Database size={14} />,
+          },
+          {
+            label: "Deja View",
+            href: "/ops/dejaview",
+            includePath: "/ops/dejaview",
+            icon: <History size={14} />,
+          },
         ]}
       >
         {children}

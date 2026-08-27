@@ -64,18 +64,12 @@ import {
   removeAppEnvVars,
 } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
-import {
-  installSessionContextHooks,
-  removeSessionContextHooks,
-} from "./session-context-hooks";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import { extractLookupIdFromToken, listIngestionKeys, mintIngestionKey } from "./cli-api";
 import type { GovernanceConfig } from "./config";
-import {
-  buildOtelEnvBlock,
-  SOURCE_TYPE_BY_TOOL,
-  telemetryEnvVarNames,
-} from "./otel-env-block";
+import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL, telemetryEnvVarNames } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
   buildScopedToolFunction,
   type DetectedShell,
@@ -325,10 +319,9 @@ export function refreshScopedShellFunctions({
 }): string[] {
   const labels: string[] = [];
   const markers = toolMarkers(tool);
-  const requiredKeys = [
-    vars.OTEL_EXPORTER_OTLP_ENDPOINT,
-    vars.OTEL_EXPORTER_OTLP_HEADERS,
-  ].filter((v): v is string => Boolean(v));
+  const requiredKeys = [vars.OTEL_EXPORTER_OTLP_ENDPOINT, vars.OTEL_EXPORTER_OTLP_HEADERS].filter(
+    (v): v is string => Boolean(v),
+  );
   for (const shell of REFRESH_SHELLS) {
     if (!rcHasLangwatchBlock({ shell, markers })) continue;
     if (rcHasLangwatchBlock({ shell, markers, requiredKeys })) continue;
@@ -363,6 +356,7 @@ export function refreshCodexOtelBlockTo({
   // refresh that keeps the exporters healthy heals the harvest wiring too
   // (idempotent and quiet while the notify block is already in place).
   assertCodexTurnHarvest();
+  assertCodexAgentGuidance();
   if (result.action === "unchanged") return null;
   return `codex [otel] block (${displayCodexConfigPath()})`;
 }
@@ -492,10 +486,7 @@ function codexOtelWiringNeedsRefresh(expectedEndpoint: string): boolean {
   return codexOtelBlockEndpoint(configPath) !== codexTraceEndpoint(expectedEndpoint);
 }
 
-function scopedShellFunctionNeedsRefresh(
-  tool: string,
-  expectedEndpoint: string,
-): boolean {
+function scopedShellFunctionNeedsRefresh(tool: string, expectedEndpoint: string): boolean {
   const markers = toolMarkers(tool);
   return REFRESH_SHELLS.some(
     (shell) =>
@@ -563,6 +554,7 @@ export async function refreshTelemetryWiringForLogin(
       // when the hook is already in place.
       if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
         assertCodexTurnHarvest();
+        assertCodexAgentGuidance();
       }
       if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
       // allowOfflineFallback: false - see resolveLiveIngestionKey's doc.

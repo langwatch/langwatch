@@ -34,9 +34,7 @@ const sections: SectionCase[] = [
   },
 ];
 
-test("complex product areas share one local navigation layout", async ({
-  page,
-}, testInfo) => {
+test("complex product areas share one local navigation layout", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 2048, height: 1200 });
   const projectSlug = await getProjectSlug(page);
   const measurements: Array<{
@@ -89,9 +87,7 @@ test("complex product areas share one local navigation layout", async ({
     });
   }
 
-  expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual([
-    220, 220, 220,
-  ]);
+  expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual([220, 220, 220]);
   expect(new Set(measurements.map(({ containerWidth }) => containerWidth)).size).toBe(1);
   expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(1);
   for (const { borderColor } of measurements) {
@@ -102,8 +98,8 @@ test("complex product areas share one local navigation layout", async ({
   const governanceNavigation = page.getByRole("navigation", {
     name: "AI Governance navigation",
   });
-  await governanceNavigation.getByRole("link", { name: "Catalog", exact: true }).click();
-  await expect(page).toHaveURL("/governance/ingestion-sources");
+  await governanceNavigation.getByRole("link", { name: "Inventory", exact: true }).click();
+  await expect(page).toHaveURL("/governance/inventory");
 
   // The URL flips synchronously on pushState, but the router only commits the
   // new location once the lazily-loaded route resolves; until then the nav
@@ -114,16 +110,14 @@ test("complex product areas share one local navigation layout", async ({
       .getByRole("link", { name: "Overview", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     const activeBackground = await governanceNavigation
-      .getByRole("link", { name: "Catalog", exact: true })
+      .getByRole("link", { name: "Inventory", exact: true })
       .evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(overviewBackground).not.toBe(activeBackground);
   }).toPass({ timeout: 15_000 });
 
   await page.goto(sections[0]!.path(projectSlug));
   await page.getByRole("radio", { name: "Set theme to dark" }).click();
-  await expect(
-    page.getByRole("navigation", { name: "Automations navigation" }),
-  ).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Automations navigation" })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("automations-shared-layout-dark.png"),
     fullPage: true,

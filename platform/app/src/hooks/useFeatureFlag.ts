@@ -6,14 +6,41 @@ import { api } from "../utils/api";
 // browser keeps its resolved value for five minutes.
 export const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
+/**
+ * Targeting identity and query control for one flag read.
+ *
+ * `projectId` and `organizationId` are both required. A targeting rule that
+ * names a scope the read left out can never match, so an omitted field turns
+ * a per-organization or per-project rollout into a silent no-op. Requiring
+ * both makes a forgotten field a compile error.
+ *
+ * Each id takes one of three values:
+ * - a real id, so rules that name it can match.
+ * - `NOT_TARGETED`, when the surface has no such id at all. Rules that name
+ *   this scope never match, which is the point of saying it out loud.
+ * - `undefined`, when the id is still loading. Write it out and pair it with
+ *   `enabled: false`, so the read waits for the id instead of resolving
+ *   against an empty context.
+ */
 interface UseFeatureFlagOptions {
-  projectId?: string;
-  organizationId?: string;
+  /** The project this read is about, or `NOT_TARGETED`. */
+  projectId: FeatureFlagTargetId;
+  /** The organization this read is about, or `NOT_TARGETED`. */
+  organizationId: FeatureFlagTargetId;
   /**
    * Set to false to disable the query (e.g., while waiting for projectId).
    * Defaults to true.
    */
   enabled?: boolean;
+}
+
+/**
+ * JSON carries no `undefined`, so both "no such scope" and "not known yet"
+ * travel as `null`. The wire field itself stays required, so the request
+ * always states what it targets.
+ */
+function toWireTargetId(id: FeatureFlagTargetId): string | null {
+  return id === undefined || id === NOT_TARGETED ? null : id;
 }
 
 interface UseFeatureFlagResult {
@@ -30,15 +57,15 @@ interface UseFeatureFlagResult {
  */
 export function useFeatureFlag(
   flag: FrontendFeatureFlag,
-  options?: UseFeatureFlagOptions,
+  options: UseFeatureFlagOptions,
 ): UseFeatureFlagResult {
-  const queryEnabled = options?.enabled ?? true;
+  const queryEnabled = options.enabled ?? true;
 
   const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
     {
       flag,
-      projectId: options?.projectId,
-      organizationId: options?.organizationId,
+      projectId: toWireTargetId(options.projectId),
+      organizationId: toWireTargetId(options.organizationId),
     },
     {
       staleTime: CLIENT_FLAG_STALE_TIME_MS,

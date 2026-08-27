@@ -5,11 +5,7 @@
  */
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  aliasesForFile,
-  type ModuleAlias,
-  parseVitestConfigAliases,
-} from "../vitestAliasTable";
+import { aliasesForFile, type ModuleAlias, parseVitestConfigAliases } from "../vitestAliasTable";
 
 /** platform/app/, from src/test-utils/__tests__/. */
 const APP_ROOT = resolve(__dirname, "../../..");
@@ -32,7 +28,7 @@ describe("reading a vitest config's alias table", () => {
             "  resolve: {",
             "    alias: {",
             '      "~/": join(__dirname, "./src/"),',
-            '      "@ee/": join(__dirname, "./ee/"),',
+            '      "@app/": join(__dirname, "./src/server/app-layer/"),',
             "    },",
             "  },",
             "});",
@@ -40,7 +36,10 @@ describe("reading a vitest config's alias table", () => {
         ),
       ).toEqual([
         { find: "~/", replacement: join(APP_ROOT, "src/") },
-        { find: "@ee/", replacement: join(APP_ROOT, "ee/") },
+        {
+          find: "@app/",
+          replacement: join(APP_ROOT, "src/server/app-layer/"),
+        },
       ]);
     });
   });
@@ -142,11 +141,9 @@ describe("reading a vitest config's alias table", () => {
     it("fails loudly on a table that is neither an object nor an array", () => {
       expect(() =>
         parse(
-          [
-            "export default defineConfig({",
-            "  resolve: { alias: sharedAliases },",
-            "});",
-          ].join("\n"),
+          ["export default defineConfig({", "  resolve: { alias: sharedAliases },", "});"].join(
+            "\n",
+          ),
         ),
       ).toThrow(/neither an object nor an array/);
     });
@@ -210,9 +207,7 @@ describe("reading a vitest config's alias table", () => {
 
 describe("choosing the table in force for a file", () => {
   const appTable: ModuleAlias[] = [{ find: "~/", replacement: join(APP_ROOT, "src/") }];
-  const nestedTable: ModuleAlias[] = [
-    { find: "~", replacement: join(APP_ROOT, "e2e/src") },
-  ];
+  const nestedTable: ModuleAlias[] = [{ find: "~", replacement: join(APP_ROOT, "e2e/src") }];
   const tables = new Map<string, ModuleAlias[]>([
     [APP_ROOT, appTable],
     [join(APP_ROOT, "e2e/code-agent"), nestedTable],

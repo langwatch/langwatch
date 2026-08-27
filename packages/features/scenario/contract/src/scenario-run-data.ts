@@ -69,6 +69,14 @@ export type BatchSummary = {
   lastUpdatedAt: number; // max UpdatedAt (cache comparison key)
   firstCompletedAt: number | null; // earliest completion timestamp
   allCompletedAt: number | null; // max UpdatedAt once no run is running
+  /**
+   * The one short line the person left with this batch, or null when the batch
+   * was started without one. Every run of a batch carries the same note, so it
+   * is read back off the runs themselves.
+   *
+   * @see specs/suites/run-notes.feature
+   */
+  note: string | null;
 };
 
 /**
@@ -106,4 +114,24 @@ export type SuiteRunSummary = {
   failedCount: number;
   totalCount: number;
   lastRunTimestamp: number | null;
+};
+
+/**
+ * The latest result of one scenario inside a date window, for the last-result
+ * cell of the test cases table. batchRunId and scenarioSetId address the run
+ * it came from so the cell can link to it.
+ */
+export type ScenarioLastResultSummary = {
+  scenarioId: string;
+  status: ScenarioRunStatus;
+  metCriteriaCount: number;
+  unmetCriteriaCount: number;
+  /** Unix ms of the latest run's start. */
+  lastRunAt: number;
+  batchRunId: string;
+  scenarioSetId: string;
+  /** The latest run's execution time. Null while it has not finished. */
+  durationInMs: number | null;
+  /** The latest run's cost in USD. Null when no cost was recorded. */
+  totalCost: number | null;
 };

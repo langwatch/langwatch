@@ -21,6 +21,12 @@ export type ExecutionScope =
   | { type: "full" }
   | { type: "rows"; rowIndices: number[] }
   | { type: "target"; targetId: string }
+  | {
+      type: "target-rows";
+      targetIds: string[];
+      /** Omitted means every row of the dataset. */
+      rowIndices?: number[];
+    }
   | { type: "cell"; targetId: string; rowIndex: number }
   | {
       type: "evaluator";
@@ -41,6 +47,51 @@ export type ExecutionScope =
       /** Existing trace IDs by row index for reuse */
       traceIds: Record<number, string | undefined>;
     };
+
+/**
+ * One board cell a run carries rather than produces.
+ *
+ * A run holds a snapshot of the whole board, so opening it shows what the
+ * person was looking at instead of the single column they clicked. The cells
+ * outside the execution scope are copied in from the board at run start; the
+ * cells inside it fill in as they execute.
+ *
+ * The cell keeps what it cost and how long it took when it was produced,
+ * because the results page reads those to draw the column's header metrics.
+ * The run's own totals leave them out, which is what the recorded item's
+ * `carriedOver` flag is for.
+ */
+export type CarriedOverCell = {
+  rowIndex: number;
+  targetId: string;
+  output?: unknown;
+  cost?: number;
+  duration?: number;
+  traceId?: string;
+  /** The engine's raw string for a cell that failed. */
+  error?: string;
+  domainError?: SerializedHandledError;
+  /** Verdicts on this cell, by evaluator id. */
+  evaluatorResults: Array<{ evaluatorId: string; result: unknown }>;
+};
+
+export const carriedOverCellSchema = z.object({
+  rowIndex: z.number(),
+  targetId: z.string(),
+  output: z.unknown().optional(),
+  cost: z.number().optional(),
+  duration: z.number().optional(),
+  traceId: z.string().optional(),
+  error: z.string().optional(),
+  domainError: z
+    .custom<SerializedHandledError>(
+      (value) => typeof value === "object" && value !== null,
+    )
+    .optional(),
+  evaluatorResults: z.array(
+    z.object({ evaluatorId: z.string(), result: z.unknown() }),
+  ),
+});
 
 /**
  * Input to start an evaluation execution.
@@ -67,6 +118,12 @@ export type ExecutionRequest = {
     string,
     { output: unknown; cost?: number; duration?: number }
   >;
+  /**
+   * Board cells the run carries rather than produces, so the run holds the
+   * whole board and not only the column that was clicked. Sent by the page,
+   * because the page's board can be ahead of the last autosave.
+   */
+  carriedOverCells?: CarriedOverCell[];
   /** Inline row data to evaluate instead of a saved or attached dataset. */
   data?: Array<Record<string, unknown>>;
   /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
@@ -104,6 +161,15 @@ export const executionRequestSchema = z
       z.object({ type: z.literal("full") }),
       z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
       z.object({ type: z.literal("target"), targetId: z.string() }),
+      // Neither filter may be empty. Omitting `rowIndices` is how a caller
+      // asks for every row, so an empty list can only mean no rows, and an
+      // empty `targetIds` says the same about the columns. Either one reaches
+      // the engine as a run that reports success over zero cells.
+      z.object({
+        type: z.literal("target-rows"),
+        targetIds: z.array(z.string()).min(1),
+        rowIndices: z.array(z.number()).min(1).optional(),
+      }),
       z.object({
         type: z.literal("cell"),
         targetId: z.string(),
@@ -147,6 +213,7 @@ export const executionRequestSchema = z
         }),
       )
       .optional(),
+    carriedOverCells: z.array(carriedOverCellSchema).optional(),
   })
   .refine((req) => !(req.data && req.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",
@@ -173,6 +240,22 @@ export const runInputsBodySchema = z
     path: ["data"],
   });
 export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
+
+/**
+ * True when a run evaluates the experiment's own saved dataset, untouched.
+ *
+ * Only such a run may write its cells back into the workbench state. Rows sent
+ * in the request, a different saved dataset, or constant parameters all make
+ * the outputs disagree with the rows the workbench shows, so those runs leave
+ * the saved cells alone. A row subset is not an override: it fills the rows it
+ * ran and leaves the rest as they were.
+ */
+export const runsSavedDataset = (runInputs?: RunInputsBody): boolean => {
+  if (!runInputs) return true;
+  if (runInputs.data !== undefined) return false;
+  if (runInputs.dataset_id !== undefined) return false;
+  return Object.keys(runInputs.parameters ?? {}).length === 0;
+};
 
 // ============================================================================
 // SSE Event Types

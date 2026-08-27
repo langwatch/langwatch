@@ -84,9 +84,7 @@ describe("useSuiteForm()", () => {
           )();
         });
 
-        expect(capturedErrors.selectedTargets?.message).toBe(
-          "At least one target is required",
-        );
+        expect(capturedErrors.selectedTargets?.message).toBe("At least one target is required");
       });
     });
 
@@ -159,11 +157,7 @@ describe("useSuiteForm()", () => {
           result.current.selectAllScenarios();
         });
 
-        expect(result.current.selectedScenarioIds).toEqual([
-          "scen_1",
-          "scen_2",
-          "scen_3",
-        ]);
+        expect(result.current.selectedScenarioIds).toEqual(["scen_1", "scen_2", "scen_3"]);
       });
     });
 
@@ -195,9 +189,7 @@ describe("useSuiteForm()", () => {
           });
         });
 
-        expect(result.current.selectedTargets).toEqual([
-          { type: "http", referenceId: "agent_1" },
-        ]);
+        expect(result.current.selectedTargets).toEqual([{ type: "http", referenceId: "agent_1" }]);
         expect(result.current.isTargetSelected("http", "agent_1")).toBe(true);
       });
     });
@@ -271,9 +263,7 @@ describe("useSuiteForm()", () => {
           result.current.selectAllTargets();
         });
 
-        expect(result.current.selectedTargets).toEqual([
-          { type: "http", referenceId: "agent_1" },
-        ]);
+        expect(result.current.selectedTargets).toEqual([{ type: "http", referenceId: "agent_1" }]);
       });
     });
 
@@ -782,9 +772,7 @@ describe("useSuiteForm()", () => {
           });
         });
 
-        expect(result.current.selectedTargets).toEqual([
-          { type: "http", referenceId: "agent_1" },
-        ]);
+        expect(result.current.selectedTargets).toEqual([{ type: "http", referenceId: "agent_1" }]);
       });
     });
 

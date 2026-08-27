@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/web",
-  "version": "3.16.0",
+  "version": "3.17.0",
   "private": true,
   "workspaces": [],
   "scripts": {
@@ -80,6 +80,7 @@
     "@aws-sdk/credential-providers": "^3.1080.0",
     "@aws-sdk/s3-request-presigner": "^3.1080.0",
     "@azure/identity": "^4.13.1",
+    "@better-auth/passkey": "1.7.1",
     "@chakra-ui/react": "^3.36.0",
     "@clickhouse/client": "^1.23.0",
     "@clickhouse/parser": "0.3.0",
@@ -162,6 +163,8 @@
     "@langwatch/github-web": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/langy-server": "workspace:*",
@@ -273,7 +276,7 @@
     "ai": "^6.0.217",
     "ajv": "^8.20.0",
     "bcrypt": "^6.0.0",
-    "better-auth": "^1.6.23",
+    "better-auth": "^1.7.1",
     "chalk": "^6.0.0",
     "croner": "^10.0.1",
     "date-fns": "^4.4.0",

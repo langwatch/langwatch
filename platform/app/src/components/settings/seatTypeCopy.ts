@@ -25,4 +25,22 @@ export const LITE_MEMBER_EXPLANATION =
   "reach the data, including the API and the MCP server. Give someone " +
   "permission to change something and they hold a full seat instead.";
 
+/**
+ * Shown when someone is about to invite a lite member and has named no team.
+ *
+ * A lite seat carries no organization-wide access of its own — the invite
+ * grants only what its teams grant (`applyInviteGrants` skips the
+ * organization-scoped grant for a lite member on purpose). So a lite invite
+ * with no team produces someone who can sign in, see nothing, and still hold
+ * a seat.
+ *
+ * A warning rather than a refusal: assigning the team later is a legitimate
+ * way to work, and the admin is the one who knows. It says what will happen
+ * and how to undo it, and does not explain how grants are put together.
+ */
+export const LITE_MEMBER_NEEDS_TEAM_WARNING =
+  "Add a team, or this person will not see anything. A lite member reaches " +
+  "only the projects their teams give them, so one with no team can sign in " +
+  "and do no more. You can add a team later from the members list.";
+
 export const SEAT_TYPES_DOC_PATH = "/ai-governance/roles-and-permissions#seats";

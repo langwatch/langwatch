@@ -15,13 +15,13 @@ import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../ports/scim-repository.port";
 import { ScimGrantsService } from "./scim-grants.service";
 import { ScimCostCenterService } from "./scim-cost-center.service";
+import { ScimDeprovisionService } from "./scim-deprovision.service";
 import { ScimUserPatchService } from "./scim-user-patch.service";
+import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
 
 function isUniqueViolation(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: unknown }).code === "P2002"
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
   );
 }
 
@@ -30,6 +30,8 @@ export class ScimProvisioningService {
   private readonly writer: AuthzGrantsService;
   private readonly userService: UserService;
   private readonly grants: ScimGrantsService;
+  private readonly deprovision: ScimDeprovisionService;
+  private readonly provenOffboarding: boolean;
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
 
@@ -39,19 +41,33 @@ export class ScimProvisioningService {
     grants,
     users,
     governance,
+    lifecycle,
+    provenOffboarding,
   }: {
     prisma: ScimRepositoryPort;
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: UserService;
     governance: GovernanceService;
+    lifecycle: ScimSyncLifecyclePort;
+    provenOffboarding: boolean;
   }) {
     this.prisma = prisma;
     this.writer = writer;
     this.userService = users;
     this.grants = grants;
+    this.deprovision = ScimDeprovisionService.create({
+      grants: writer,
+      lifecycle,
+    });
+    this.provenOffboarding = provenOffboarding;
     this.costCenters = ScimCostCenterService.create(governance);
-    this.patches = ScimUserPatchService.create(this.userService, this.costCenters);
+    this.patches = ScimUserPatchService.create(
+      this.userService,
+      this.costCenters,
+      this.deprovision,
+      provenOffboarding,
+    );
   }
 
   static create(options: {
@@ -60,6 +76,8 @@ export class ScimProvisioningService {
     grants: ScimGrantsService;
     users: UserService;
     governance: GovernanceService;
+    lifecycle: ScimSyncLifecyclePort;
+    provenOffboarding: boolean;
   }): ScimProvisioningService {
     return new ScimProvisioningService(options);
   }
@@ -215,13 +233,7 @@ export class ScimProvisioningService {
     return this.toScimUser(newUser);
   }
 
-  async getUser({
-    id,
-    organizationId,
-  }: {
-    id: string;
-    organizationId: string;
-  }): Promise<ScimUser> {
+  async getUser({ id, organizationId }: { id: string; organizationId: string }): Promise<ScimUser> {
     const membership = await this.prisma.tryFindMembership({
       userId: id,
       organizationId,
@@ -267,10 +279,12 @@ export class ScimProvisioningService {
     id,
     organizationId,
     request,
+    connectionId = null,
   }: {
     id: string;
     organizationId: string;
     request: ScimCreateUserRequest;
+    connectionId?: string | null;
   }): Promise<ScimUser> {
     const membership = await this.prisma.tryFindMembership({
       userId: id,
@@ -293,6 +307,14 @@ export class ScimProvisioningService {
     if (active && updatedUser.deactivatedAt) {
       await this.userService.reactivate({ id });
     } else if (!active && !updatedUser.deactivatedAt) {
+      if (this.provenOffboarding) {
+        await this.deprovision.removeAccess({
+          userId: id,
+          organizationId,
+          connectionId,
+          op: "deactivate_user",
+        });
+      }
       await this.userService.deactivate({ id });
     }
 
@@ -313,10 +335,12 @@ export class ScimProvisioningService {
     id,
     organizationId,
     patchRequest,
+    connectionId = null,
   }: {
     id: string;
     organizationId: string;
     patchRequest: ScimPatchRequest;
+    connectionId?: string | null;
   }): Promise<ScimUser> {
     const membership = await this.prisma.tryFindMembership({
       userId: id,
@@ -328,7 +352,7 @@ export class ScimProvisioningService {
     }
 
     for (const operation of patchRequest.Operations) {
-      await this.patches.apply({ id, organizationId, operation });
+      await this.patches.apply({ id, organizationId, connectionId, operation });
     }
 
     const reloadedUser = await this.userService.tryFindById({ id });
@@ -341,9 +365,11 @@ export class ScimProvisioningService {
   async deleteUser({
     id,
     organizationId,
+    connectionId = null,
   }: {
     id: string;
     organizationId: string;
+    connectionId?: string | null;
   }): Promise<void> {
     const membership = await this.prisma.tryFindMembership({
       userId: id,
@@ -354,19 +380,27 @@ export class ScimProvisioningService {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
-    // Offboarding uses the grants command; visible ids are the audit record.
-    const visibleGrants = await this.prisma.listRoleBindings({
-      kind: "member-offboarding",
-      organizationId,
-      userId: id,
-    });
-    await this.writer.offboardMember({
-      organizationId,
-      userId: id,
-      revokedGrantIds: visibleGrants.map((row) => row.id),
-      actor: ScimProvisioningService.ACTOR,
-    });
-    await this.prisma.removeMembership({ userId: id, organizationId });
+    if (this.provenOffboarding) {
+      await this.deprovision.removeAccess({
+        userId: id,
+        organizationId,
+        connectionId,
+        op: "delete_user",
+      });
+    } else {
+      const visibleGrants = await this.prisma.listRoleBindings({
+        kind: "member-offboarding",
+        organizationId,
+        userId: id,
+      });
+      await this.writer.offboardMember({
+        organizationId,
+        userId: id,
+        revokedGrantIds: visibleGrants.map((row) => row.id),
+        actor: ScimProvisioningService.ACTOR,
+      });
+      await this.prisma.removeMembership({ userId: id, organizationId });
+    }
     await this.userService.deactivate({ id });
     return;
   }

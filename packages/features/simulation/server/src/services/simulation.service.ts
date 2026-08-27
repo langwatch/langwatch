@@ -11,6 +11,7 @@ import {
   simulationQueueRunSchema,
   simulationAllSuitesRunDataSchema,
   simulationExternalSetSummarySchema,
+  simulationLastResultSummarySchema,
   simulationRunDataSchema,
   simulationSetDataSchema,
   simulationStartRunSchema,
@@ -34,6 +35,8 @@ import type {
   SimulationAllSuitesRunData,
   SimulationExportRun,
   SimulationLastUpdatedInput,
+  SimulationLastResultSummariesInput,
+  SimulationLastResultSummary,
   SimulationProjectDateRangeInput,
   SimulationProjectIdsInput,
   SimulationFinishRun,
@@ -67,12 +70,8 @@ export class SimulationService extends SimulationServiceContract {
     super();
   }
 
-  async getScenarioSetsData(
-    input: SimulationProjectDateRangeInput,
-  ): Promise<SimulationSetData[]> {
-    return simulationSetDataSchema
-      .array()
-      .parse(await this.repository.getScenarioSetsData(input));
+  async getScenarioSetsData(input: SimulationProjectDateRangeInput): Promise<SimulationSetData[]> {
+    return simulationSetDataSchema.array().parse(await this.repository.getScenarioSetsData(input));
   }
 
   async tryGetScenarioRunData(
@@ -97,12 +96,8 @@ export class SimulationService extends SimulationServiceContract {
     return summary === null ? null : simulationBatchSummarySchema.parse(summary);
   }
 
-  async getRunDataForBatchRun(
-    input: SimulationBatchRunInput,
-  ): Promise<SimulationBatchRunData> {
-    return simulationBatchRunDataSchema.parse(
-      await this.repository.getRunDataForBatchRun(input),
-    );
+  async getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData> {
+    return simulationBatchRunDataSchema.parse(await this.repository.getRunDataForBatchRun(input));
   }
 
   async getRunDataForScenarioSet(
@@ -123,9 +118,7 @@ export class SimulationService extends SimulationServiceContract {
       .parse(await this.repository.getAllRunDataForScenarioSet(input));
   }
 
-  getBatchRunCountForScenarioSet(
-    input: SimulationExternalSetCountInput,
-  ): Promise<number> {
+  getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number> {
     return this.repository.getBatchRunCountForScenarioSet(input);
   }
 
@@ -143,6 +136,14 @@ export class SimulationService extends SimulationServiceContract {
     return simulationExternalSetSummarySchema
       .array()
       .parse(await this.repository.getInternalSuiteSummaries(input));
+  }
+
+  async getLastResultSummaries(
+    input: SimulationLastResultSummariesInput,
+  ): Promise<SimulationLastResultSummary[]> {
+    return simulationLastResultSummarySchema
+      .array()
+      .parse(await this.repository.getLastResultSummaries(input));
   }
 
   async getRunDataForAllSuites(

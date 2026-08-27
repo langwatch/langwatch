@@ -11,6 +11,7 @@ import type { ScimRepositoryPort } from "../src/ports/scim-repository.port";
 import { ScimService } from "../src/services/scim.service";
 import type { UserProfile, UserService } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
@@ -35,7 +36,9 @@ function repository(overrides: Partial<ScimRepositoryPort> = {}): ScimRepository
     tryFindOrganizationBySsoDomain: vi.fn(async () => null),
     createToken: vi.fn(async () => ({ id: "token-1" })),
     listTokens: vi.fn(async () => []),
+    tryFindToken: vi.fn(async () => null),
     revokeToken: vi.fn(async () => false),
+    revokeTokensForConnection: vi.fn(async () => 0),
     tryFindTokenByHash: vi.fn(async () => null),
     recordTokenUse: vi.fn(async () => undefined),
     tryFindMembership: vi.fn(async () => null),
@@ -53,6 +56,12 @@ function repository(overrides: Partial<ScimRepositoryPort> = {}): ScimRepository
     removeGroupMembers: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
     listRoleBindings: vi.fn(async () => []),
+    scimConnectionExists: vi.fn(async () => true),
+    tryFindDirectoryUserId: vi.fn(async () => null),
+    rememberDirectoryIdentity: vi.fn(async () => undefined),
+    forgetDirectoryIdentity: vi.fn(async () => undefined),
+    forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
+    listDirectoryConnectionsForUser: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -134,6 +143,8 @@ function harness(
     users,
     governance,
     entitlements: new EnterpriseEntitlements(),
+    lifecycle: new QuietScimSyncLifecycle(),
+    provenOffboarding: false,
   });
   if (options.membership !== void 0) {
     vi.mocked(repo.tryFindMembership).mockResolvedValue(options.membership as never);

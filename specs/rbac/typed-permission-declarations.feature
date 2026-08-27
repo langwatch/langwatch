@@ -36,6 +36,40 @@ Feature: Typed permission declarations
     When the procedure declares permission "traces:view"
     Then the declaration is a compile error naming the missing scope id
 
+  # The types guarantee the scope FIELD exists; they cannot guarantee the
+  # caller fills it. A client that sends an empty id is making a bad request,
+  # not exposing a miswired procedure, and the two must not answer alike.
+
+  @unit
+  Scenario: A scope id the caller left blank is answered as invalid input
+    Given a procedure whose input carries a required "projectId"
+    When the caller sends an empty "projectId"
+    Then the caller is answered that their input was invalid
+    And the answer names the field that was left blank
+    And no permission decision is made for the caller
+    And the failure is not reported as an internal error
+
+  @unit
+  Scenario: A blank scope id never shadows one the caller did fill in
+    Given a procedure whose input carries both "projectId" and "organizationId"
+    And the permission is grantable at either tier
+    When the caller sends an empty "projectId" and a real "organizationId"
+    Then the check runs at the organization scope
+
+  @unit
+  Scenario: An input carrying no scope id at all is still a wiring bug
+    Given a procedure declaring a permission
+    When the check runs against an input naming no scope id, the types bypassed
+    Then the caller is answered with an internal error
+    And the miswired declaration is recorded for the engineer
+
+  @unit
+  Scenario: A blank project id on a multi-permission check is answered the same way
+    Given a procedure declaring several permissions, any one of which is enough
+    When the caller sends an empty "projectId"
+    Then the caller is answered that their input was invalid
+    And no permission decision is made for the caller
+
   @unit
   Scenario: An input id from a tier the permission cannot be granted at fails to compile
     Given a procedure whose input carries a required "projectId"

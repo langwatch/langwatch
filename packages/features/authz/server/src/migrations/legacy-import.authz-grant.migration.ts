@@ -63,10 +63,7 @@ import {
   type LedgerPrincipal,
   type RoleFact,
 } from "@langwatch/authz-contract";
-import type {
-  SystemMigration,
-  TenantMigrationOutcome,
-} from "@langwatch/system-migrations";
+import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 import type {
   AuthzMigrationRepository,
   ExternalMemberFact,
@@ -166,13 +163,12 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
   // Finalizing changes who answers permission checks for the organization,
   // so an operator action on it takes the typed destructive confirmation.
   readonly requiresOperatorConfirmation = true;
+  readonly enrolledAutomatically = true;
   // Cloud soaks first (per-organization enrollment); a later release flips
   // this once it has. Flipping it IS the self-hosted release act.
-  readonly runsAutomaticallyOnSelfHosted = false;
+  readonly runsAutomaticallyOnSelfHosted = true;
 
-  static create(
-    options: LegacyImportAuthzGrantMigrationOptions,
-  ): LegacyImportAuthzGrantMigration {
+  static create(options: LegacyImportAuthzGrantMigrationOptions): LegacyImportAuthzGrantMigration {
     return new LegacyImportAuthzGrantMigration(options);
   }
 
@@ -547,11 +543,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       heads,
     });
     return {
-      outstanding: [
-        ...grants.outstanding,
-        ...roles.outstanding,
-        ...resources.outstanding,
-      ].sort(),
+      outstanding: [...grants.outstanding, ...roles.outstanding, ...resources.outstanding].sort(),
       diffs: [...grants.diffs, ...roles.diffs, ...resources.diffs],
     };
   }
@@ -584,19 +576,8 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
  * always dedupes and a changed one always appends.
  */
 class AuthzMigrationCommandMapper {
-  static contentId({
-    kind,
-    id,
-    content,
-  }: {
-    kind: string;
-    id: string;
-    content: unknown;
-  }): string {
-    const digest = createHash("sha256")
-      .update(JSON.stringify(content))
-      .digest("hex")
-      .slice(0, 16);
+  static contentId({ kind, id, content }: { kind: string; id: string; content: unknown }): string {
+    const digest = createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 16);
     return `authz-engine:${kind}:${id}:${digest}`;
   }
 }
@@ -622,10 +603,7 @@ export class AuthzMigrationOwnershipMapper {
 
 /** Whether one binding row covers one user — named directly, or held
  *  through a group the user belongs to. */
-export type BindingCoverage = (args: {
-  row: LegacyBindingRow;
-  userId: string;
-}) => boolean;
+export type BindingCoverage = (args: { row: LegacyBindingRow; userId: string }) => boolean;
 
 /**
  * The coverage predicate, built once per organization from its group
@@ -649,9 +627,7 @@ class AuthzBindingCoverageMapper {
     }
     return ({ row, userId }) => {
       if (row.userId === userId) return true;
-      return (
-        row.groupId !== null && (groupsByUser.get(userId)?.has(row.groupId) ?? false)
-      );
+      return row.groupId !== null && (groupsByUser.get(userId)?.has(row.groupId) ?? false);
     };
   }
 }
@@ -781,9 +757,7 @@ export class AuthzExpectedFactsMapper {
 
   static permissionStrings(stored: unknown): string[] {
     return Array.isArray(stored)
-      ? stored.filter(
-          (entry): entry is string => typeof entry === "string" && entry !== "",
-        )
+      ? stored.filter((entry): entry is string => typeof entry === "string" && entry !== "")
       : [];
   }
 
@@ -804,9 +778,7 @@ export class AuthzExpectedFactsMapper {
       grantId: row.id,
       principal,
       roleKey:
-        row.customRoleId === null
-          ? roleKeyForTeamRole(row.role)
-          : `custom:${row.customRoleId}`,
+        row.customRoleId === null ? roleKeyForTeamRole(row.role) : `custom:${row.customRoleId}`,
       scope: { type: row.scopeType, id: row.scopeId },
       source: "migration",
       occurredAtMs: row.createdAtMs,
@@ -858,9 +830,7 @@ export class AuthzExpectedFactsMapper {
       });
     return teamRows
       .slice()
-      .sort(
-        (a, b) => a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId),
-      )
+      .sort((a, b) => a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId))
       .flatMap((row) => {
         if (row.role === "CUSTOM") return [];
         if (suppressed(row)) return [];
@@ -935,9 +905,7 @@ export class AuthzExpectedFactsMapper {
       });
     }
 
-    for (const member of members
-      .slice()
-      .sort((a, b) => a.userId.localeCompare(b.userId))) {
+    for (const member of members.slice().sort((a, b) => a.userId.localeCompare(b.userId))) {
       if (member.role !== "ADMIN") continue;
       // "No binding anywhere" reads group-held bindings too — the same
       // predicate the team-membership suppression uses.
@@ -958,9 +926,7 @@ export class AuthzExpectedFactsMapper {
       });
     }
 
-    for (const member of externalMembers
-      .slice()
-      .sort((a, b) => a.userId.localeCompare(b.userId))) {
+    for (const member of externalMembers.slice().sort((a, b) => a.userId.localeCompare(b.userId))) {
       const principal = { type: "user" as const, id: member.userId };
       facts.push({
         grantId: deriveGrantId({
@@ -1156,10 +1122,7 @@ export class AuthzMigrationProofMapper {
       // Only rows the migration owns: a live-write row (a ledger-first share
       // whose compat write was stepped over) is not this migration's to hold
       // an organization on, and never its to revoke.
-      if (
-        AuthzMigrationOwnershipMapper.includes(row.source) &&
-        !expectedLinkIds.has(row.grantId)
-      ) {
+      if (AuthzMigrationOwnershipMapper.includes(row.source) && !expectedLinkIds.has(row.grantId)) {
         outstanding.push(row.grantId);
       }
     }
@@ -1280,11 +1243,7 @@ export class AuthzMigrationProofMapper {
       ["projectId", row.projectId, head.projectId],
       ["principalType", PRINCIPAL_TO_DB[principal.type], head.principalType],
       ["principalId", principal.id, head.principalId],
-      [
-        "expiresAt",
-        this.numberField(row.expiresAtMs),
-        this.numberField(head.expiresAtMs),
-      ],
+      ["expiresAt", this.numberField(row.expiresAtMs), this.numberField(head.expiresAtMs)],
       ["maxViews", this.numberField(row.maxViews), this.numberField(head.maxViews)],
     ];
     if (head.viewCount > row.viewCount) {

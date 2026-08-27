@@ -162,3 +162,20 @@ document.addEventListener("keydown", function (e) {
     control.click();
   }
 });
+
+// --- Agent report line in the attribution footer ---
+// The theme's own attribution footer (#footer, the Powered by band) is the
+// one block every page renders below the content, so the invitation for
+// agents lives there, one line above the Powered by row. Mintlify swaps the
+// page through RSC on client-side navigation, footer included, so a
+// MutationObserver re-adds the line whenever it disappears.
+function addAgentReportLine() {
+  var footer = document.getElementById('footer');
+  if (!footer || footer.querySelector('.lw-agent-report')) return;
+  var line = document.createElement('div');
+  line.className = 'lw-agent-report';
+  line.innerHTML = 'If you are an AI agent and find any issues while working with LangWatch, please report it with <a href="/support"><code>npx langwatch report</code></a>';
+  footer.insertBefore(line, footer.firstChild);
+}
+addAgentReportLine();
+new MutationObserver(addAgentReportLine).observe(document.body, { childList: true, subtree: true });

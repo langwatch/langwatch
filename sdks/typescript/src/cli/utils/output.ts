@@ -27,8 +27,13 @@
  *   --json <fields>         comma-separated field selection; implies json.
  *   --jq <expr>             a TINY built-in subset — dot paths (`.a.b`), array
  *                           iteration (`.items[]`), an optional field after it
- *                           (`.items[].name`), and a terminal `| length`. No
+ *                           (`.items[].name`), indexing (`.items[0]`, `.items[-1]`)
+ *                           and `length`, with or without a pipe in front. No
  *                           jq dependency.
+ *   --limit <n>             keep at most n rows of the result. A projection,
+ *                           like `--jq`, so it applies to the machine formats
+ *                           only; a command with its own paging `--limit` keeps
+ *                           that one instead.
  *   --agent                 agent mode (also auto-detected from env, see
  *                           AGENT_MODE_ENV_VARS): agents format by default,
  *                           colour off, spinners off.
@@ -41,6 +46,7 @@
 import type * as yaml from "js-yaml";
 import { Option, type Command } from "commander";
 import { setOutputFormat } from "./outputScope";
+import { parsePositiveIntOrNull } from "./positiveInt";
 
 /**
  * js-yaml is only needed for `-o yaml`, so it is loaded lazily and memoized:
@@ -85,6 +91,8 @@ export interface RawOutputFlags {
   json?: string | boolean;
   /** New contract: `--jq <expr>`. */
   jq?: string;
+  /** New contract: `--limit <n>` (the shared cap; a command's own wins). */
+  limit?: string;
   /** New contract: `--agent`. */
   agent?: boolean;
 }
@@ -96,6 +104,8 @@ export interface ResolvedOutput {
   fields?: string[];
   /** The `--jq` expression, if any. */
   jq?: string;
+  /** The `--limit <n>` cap, when it is a positive number. */
+  limit?: number;
   /** Agent mode is active (flag or env): colour and spinners are off. */
   agent: boolean;
 }
@@ -162,10 +172,16 @@ export const resolveOutputOptions = (
     format = "table";
   }
 
+  // A cap that is not a positive whole number is ignored rather than obeyed: a
+  // typo must not turn a list into one row and read as the whole answer.
+  const limit =
+    raw.limit === undefined ? undefined : (parsePositiveIntOrNull(raw.limit) ?? undefined);
+
   return {
     format,
     ...(fields?.length ? { fields } : {}),
     ...(raw.jq !== undefined ? { jq: raw.jq } : {}),
+    ...(limit !== undefined ? { limit } : {}),
     agent,
   };
 };
@@ -194,8 +210,7 @@ export const resolveOutputOptions = (
  * lives here once rather than being hand-rolled at each site with its own
  * subtly different meaning.
  */
-const ownsOwnJsonFlag = (command: Command): boolean =>
-  ownsOwnOptionFlag(command, "--json");
+const ownsOwnJsonFlag = (command: Command): boolean => ownsOwnOptionFlag(command, "--json");
 
 /**
  * Does the command define this long flag ITSELF, for its own purposes?
@@ -240,44 +255,115 @@ const descend = (value: unknown, key: string): unknown => {
 };
 
 /**
- * What a path segment may look like. An ALLOWLIST, deliberately.
+ * What a path segment may look like: a key, then any number of accessors.
  *
- * Anything not matching is REJECTED rather than walked as a literal key:
- * `descend` answers `null` for any key it cannot resolve, so `.traces[0]`
- * would otherwise look up a property literally named `traces[0]`, miss, and
- * print `null` at exit 0 — a fabricated answer an agent then builds on. Array
- * indexing is the first thing anyone tries after reading this flag's own
- * `.traces[].traceId` example, so it has to fail loudly.
+ * An ALLOWLIST, deliberately. Anything not matching is REJECTED rather than
+ * walked as a literal key, because `descend` answers `null` for any key it
+ * cannot resolve: `.traces(x)` would otherwise look up a property literally
+ * named `traces(x)`, miss, and print `null` at exit 0, a fabricated answer an
+ * agent then builds on.
  *
  * A denylist was tried first and leaked: it caught brackets and quotes but not
  * operators, so `.n - 1` and `.n,.s` still answered `null` silently. Since the
  * grammar here is tiny and closed, the safe default is to name what IS legal
- * and reject the rest — being too strict costs a clear error message, being
- * too loose costs a wrong answer nobody can detect.
+ * and reject the rest.
  *
- * A trailing `[]` is stripped before this test (that IS supported).
+ * The accessor part is `[]` (iterate) or `[n]` (index, negative counts from the
+ * end), repeatable: `.traces[0]`, `.traces[].spans[0]`, `.matrix[0][1]`. The key
+ * is optional so root accessors parse too (`.[]`, `.[0]`).
  */
-const SUPPORTED_SEGMENT_RE = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+// An accessor is `[]` or `[<n>]`, and a minus needs digits after it: `[-]`
+// would otherwise parse as an index of NaN and traverse to null instead of
+// failing the way an unsupported expression has to.
+const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[(?:-?\d+)?\])*)$/;
 
 /**
- * The tiny built-in jq subset: `.`, `.a.b`, `.items[]`, `.items[].name`, and a
- * terminal `| length` (arrays, strings, objects). Iteration collects into an
- * array, the way `jq '[ .items[].name ]'` reads. Anything else throws — a
- * wrong expression must fail loudly, not silently print `null` into a
- * pipeline.
+ * What to do instead, on every refusal.
+ *
+ * This subset reads the answer before it reaches disk, so it stays small on
+ * purpose. The shell carries the full tools, and saying so is what stops the
+ * caller trying three spellings of the same idea and losing all three.
+ */
+const USE_THE_SHELL =
+  " Redirect the answer to a file (`--format json > results.json`) and narrow it" +
+  " there: real `jq` and `python` are both in your shell.";
+
+/** One move along the path: into a key, over an array, or at one index. */
+type PathStep =
+  | { kind: "key"; key: string }
+  | { kind: "iterate" }
+  | { kind: "index"; index: number };
+
+/**
+ * The path expression as a flat list of steps.
+ *
+ * Splitting on "." alone is not enough once a segment carries accessors, so each
+ * segment is parsed into its key and its accessors, and the whole path becomes
+ * one list the walk can read without looking back at the text.
+ */
+const parsePathSteps = (expression: string): PathStep[] => {
+  const steps: PathStep[] = [];
+  const segments = expression.slice(1).split(".");
+
+  segments.forEach((segment, position) => {
+    const match = SUPPORTED_SEGMENT_RE.exec(segment);
+    if (!match) {
+      throw new Error(
+        `Invalid --jq expression "${expression}": unsupported syntax at "${segment}" ` +
+          `(supported: dot paths, .items[], .items[].field, .items[0], length; ` +
+          `no quoting, optionals or operators).` +
+          USE_THE_SHELL,
+      );
+    }
+
+    const [, key, accessors = ""] = match;
+    if (key === undefined && accessors === "") {
+      // An empty segment with nothing on it: `.a..b`, or a trailing dot. Only
+      // the FIRST segment may be empty, and only to carry a root accessor
+      // (`.[]`, `.[0]`), which the accessor branch below handles.
+      throw new Error(
+        `Invalid --jq expression "${expression}": empty segment at position ${position + 1}.` +
+          USE_THE_SHELL,
+      );
+    }
+    if (key !== undefined) steps.push({ kind: "key", key });
+
+    for (const accessor of accessors.match(/\[(?:-?\d+)?\]/g) ?? []) {
+      const inner = accessor.slice(1, -1);
+      steps.push(inner === "" ? { kind: "iterate" } : { kind: "index", index: Number(inner) });
+    }
+  });
+
+  return steps;
+};
+
+/**
+ * The built-in jq subset: `.`, `.a.b`, `.items[]`, `.items[].name`, `.items[0]`
+ * (negative indexes count from the end), and a terminal `| length` on arrays,
+ * strings and objects, and bare `length` too, which is how jq itself spells the
+ * count of the whole document. Iteration collects into an array, the way
+ * `jq '[ .items[].name ]'` reads.
+ *
+ * Everything else throws. A wrong expression must fail loudly, not silently
+ * print `null` into a pipeline, and an out-of-range index is not a wrong
+ * expression: jq answers `null` there and so does this.
  */
 export const applyJq = (expression: string, data: unknown): unknown => {
+  const trimmed = expression.trim();
+
   // A terminal pipe operator: `.commands | length`. Handled before the path
   // walk — without this the whole "a | b" string would be looked up as a KEY
   // and silently print null, which is exactly the wrong answer an agent would
-  // then build on.
-  const pipeIndex = expression.indexOf("|");
-  if (pipeIndex !== -1) {
-    const path = expression.slice(0, pipeIndex).trim();
-    const operator = expression.slice(pipeIndex + 1).trim();
+  // then build on. Bare `length` is jq's own spelling of `. | length`, and is
+  // the first thing an agent reaches for to count a list.
+  const pipeIndex = trimmed.indexOf("|");
+  if (pipeIndex !== -1 || trimmed === "length") {
+    const path = pipeIndex === -1 ? "." : trimmed.slice(0, pipeIndex).trim();
+    const operator = pipeIndex === -1 ? "length" : trimmed.slice(pipeIndex + 1).trim();
     if (operator !== "length" || path.length === 0) {
       throw new Error(
-        `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported`,
+        `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported.` +
+          USE_THE_SHELL,
       );
     }
     const value = applyJq(path, data);
@@ -290,58 +376,52 @@ export const applyJq = (expression: string, data: unknown): unknown => {
     );
   }
 
-  if (!expression.startsWith(".")) {
+  if (!trimmed.startsWith(".")) {
     throw new Error(
-      `Invalid --jq expression "${expression}": must start with "." (supported: dot paths, .items[], .items[].field, | length)`,
+      `Invalid --jq expression "${expression}": must start with "." (supported: dot paths, ` +
+        `.items[], .items[].field, .items[0], length, | length).` +
+        USE_THE_SHELL,
     );
   }
-  if (expression === ".") return data;
+  if (trimmed === ".") return data;
 
-  const segments = expression.slice(1).split(".");
-  const apply = (value: unknown, rest: string[], path: string): unknown => {
+  const walk = (value: unknown, rest: PathStep[], path: string): unknown => {
     const [head, ...tail] = rest;
     if (head === undefined) return value;
 
-    const iterate = head.endsWith("[]");
-    const key = iterate ? head.slice(0, -2) : head;
-    if (key === "" && !iterate) {
-      throw new Error(
-        `Invalid --jq expression "${expression}": empty segment at "${path}"`,
-      );
-    }
-    // `key === ""` reaching here means root-level iteration (`.[]`, `.[].name`):
-    // there is no key to validate, and the non-iterating empty segment was
-    // already rejected above. Everything else must be a plain identifier.
-    if (key !== "" && !SUPPORTED_SEGMENT_RE.test(key)) {
-      throw new Error(
-        `Invalid --jq expression "${expression}": unsupported syntax at "${path}.${head}" ` +
-          `(supported: dot paths, .items[], .items[].field, | length — no indexing, ` +
-          `quoting, optionals or operators)`,
-      );
+    if (head.kind === "key") {
+      const at = `${path}.${head.key}`;
+      return walk(descend(value, head.key), tail, at);
     }
 
-    const descended = key === "" ? value : descend(value, key);
-    const at = `${path}.${head}`;
-
-    if (!iterate) {
-      if (tail.length === 0) return descended;
-      return apply(descended, tail, at);
+    if (head.kind === "index") {
+      const at = `${path}[${head.index}]`;
+      if (!Array.isArray(value)) {
+        throw new Error(
+          `Invalid --jq expression "${expression}": "${at}" indexes a value that is not an array`,
+        );
+      }
+      // jq counts a negative index from the end, and answers null past either
+      // end rather than failing.
+      const resolved = head.index < 0 ? value.length + head.index : head.index;
+      return walk(value[resolved] ?? null, tail, at);
     }
 
-    if (!Array.isArray(descended)) {
+    const at = `${path}[]`;
+    if (!Array.isArray(value)) {
       throw new Error(
         `Invalid --jq expression "${expression}": "${at}" iterates over a non-array value`,
       );
     }
-    const mapped = descended.map((item) => apply(item, tail, at));
+    const mapped = value.map((item) => walk(item, tail, at));
     // Chained iteration COLLECTS, it does not nest: `.traces[].spans[].id` is
     // `["s1","s2","s3"]`, matching `jq '[ .traces[].spans[].id ]'`, not
     // `[["s1","s2"],["s3"]]`. Each nested level has already flattened itself,
-    // so exactly one flatten per iterating segment is correct.
-    return tail.some((segment) => segment.endsWith("[]")) ? mapped.flat() : mapped;
+    // so exactly one flatten per iterating step is correct.
+    return tail.some((step) => step.kind === "iterate") ? mapped.flat() : mapped;
   };
 
-  return apply(data, segments, "");
+  return walk(data, parsePathSteps(trimmed), "");
 };
 
 /**
@@ -378,6 +458,95 @@ const serialize = async (data: unknown, format: OutputFormat): Promise<string> =
   return (await loadYaml()).dump(data).replace(/\n$/, "");
 };
 
+/**
+ * The rows in a payload: a top-level array, or the one array a list envelope
+ * holds (`{ experiments: [...], pagination }`).
+ *
+ * Structural, not a key list, and deliberately narrow: an object with two arrays
+ * in it, or an array beside fields the caller may be reading, is NOT a list to
+ * cut. Answering "there is nothing here to cut" leaves the payload whole, which
+ * is always a safe answer; guessing wrong would drop data silently.
+ */
+const collectionKeyOf = (data: unknown): string | null => {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const record = data as Record<string, unknown>;
+  const arrayKeys = Object.keys(record).filter((key) => Array.isArray(record[key]));
+  if (arrayKeys.length !== 1) return null;
+  return "pagination" in record || Object.keys(record).length === 1 ? arrayKeys[0]! : null;
+};
+
+/**
+ * `--limit <n>`: keep at most n rows of the payload.
+ *
+ * A projection, like `--jq`: the command still fetched what it fetched; this
+ * decides how much of it is printed. It exists because "unknown option
+ * '--limit'" is where an agent's first read of an unfamiliar list command ends:
+ * about twenty commands page server-side with a `--limit` of their own, so the
+ * flag reads as universal, and the ones without it answered with an error and a
+ * usage dump. Those keep their own flag (it pages, which is better); everything
+ * else now takes the cap here.
+ */
+const applyLimit = (data: unknown, limit: number): unknown => {
+  if (Array.isArray(data)) return data.slice(0, limit);
+
+  const key = collectionKeyOf(data);
+  if (!key) return data;
+
+  const record = data as Record<string, unknown>;
+  return { ...record, [key]: (record[key] as unknown[]).slice(0, limit) };
+};
+
+/**
+ * The other names a paginated list has given "how many there are in all".
+ * `total` is the common one; the search-backed lists (traces, experiments) say
+ * `totalHits`, because each list follows the shape of the API it calls.
+ */
+const TOTAL_ALIASES = ["totalHits"] as const;
+
+/**
+ * One spelling of the total on every paginated envelope.
+ *
+ * Asked how many of something there are, a caller reads `.pagination.total`.
+ * On a search-backed list that answered null, and the count then came from
+ * guessing: `length` over a page that was already capped, or a second tool.
+ * The field the API sent is kept as well, so anything reading `totalHits` is
+ * unaffected; this only adds the name every other list already uses.
+ */
+const withNormalizedTotal = (data: unknown): unknown => {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const record = data as Record<string, unknown>;
+  const pagination = record.pagination;
+  if (!pagination || typeof pagination !== "object" || Array.isArray(pagination)) return data;
+
+  const paginationRecord = pagination as Record<string, unknown>;
+  if (typeof paginationRecord.total === "number") return data;
+
+  const named = TOTAL_ALIASES.find((field) => typeof paginationRecord[field] === "number");
+  if (!named) return data;
+
+  return {
+    ...record,
+    pagination: { ...paginationRecord, total: paginationRecord[named] },
+  };
+};
+
+/**
+ * The payload as the caller asked to see it: cut to `--limit`, narrowed to
+ * `--json <fields>`, then filtered through `--jq`.
+ *
+ * That order is the readable one: the cap says how many rows, the projections
+ * say what to read off them, so `--limit 5 --jq length` answers 5.
+ */
+const projectResult = (data: unknown, resolved: ResolvedOutput): unknown => {
+  // The total is normalized BEFORE the cap, so `--limit 5` still prints the
+  // total of the whole list rather than the size of the page.
+  let out = withNormalizedTotal(data);
+  if (resolved.limit !== undefined) out = applyLimit(out, resolved.limit);
+  if (resolved.fields) out = selectFields(out, resolved.fields);
+  if (resolved.jq) out = applyJq(resolved.jq, out);
+  return out;
+};
+
 export interface PrintResultOptions extends RawOutputFlags {
   /**
    * Renders the human form of the result (the command's existing chalk
@@ -397,10 +566,7 @@ export interface PrintResultOptions extends RawOutputFlags {
  * Async solely so the yaml format can lazy-load js-yaml (see `loadYaml`);
  * callers must await it so output ordering is preserved.
  */
-export const printResult = async (
-  data: unknown,
-  options: PrintResultOptions,
-): Promise<void> => {
+export const printResult = async (data: unknown, options: PrintResultOptions): Promise<void> => {
   const { table, ...raw } = options;
   const resolved = resolveOutputOptions(raw);
 
@@ -409,9 +575,9 @@ export const printResult = async (
     return;
   }
 
-  let out = data;
-  if (resolved.fields) out = selectFields(out, resolved.fields);
-  if (resolved.jq) out = applyJq(resolved.jq, out);
+  // No cap here: these commands render their own resolved format, and the ones
+  // that take a `--limit` mean their own paging flag by it (see CAPPED_COMMANDS).
+  const out = projectResult(data, { ...resolved, limit: undefined });
 
   console.log(await serialize(out, resolved.format));
 };
@@ -443,6 +609,17 @@ export interface CommandResult {
  * keyed on the command is both simpler and free of commander private API.
  */
 const OUTPUT_AWARE_COMMANDS = new WeakSet<Command>();
+
+/**
+ * Commands whose `--limit` is the shared cap rather than their own paging flag.
+ *
+ * About twenty commands page server-side with a `--limit` of their own, and
+ * theirs means different things: how many to fetch, how many rows to print, how
+ * big a page of a walk that covers the whole window either way. Capping the
+ * printed payload on top of those would cut results the caller asked for, so the
+ * cap runs only where this module registered the flag itself.
+ */
+const CAPPED_COMMANDS = new WeakSet<Command>();
 
 /**
  * The output PORT: register a command's action so whatever it RETURNS is
@@ -478,9 +655,10 @@ export const emitsResult = <Args extends unknown[]>(
       result.table();
       return;
     }
-    let out = result.data;
-    if (resolved.fields) out = selectFields(out, resolved.fields);
-    if (resolved.jq) out = applyJq(resolved.jq, out);
+    const out = projectResult(
+      result.data,
+      CAPPED_COMMANDS.has(actionCommand) ? resolved : { ...resolved, limit: undefined },
+    );
     console.log(await serialize(out, resolved.format));
   });
 };
@@ -515,8 +693,7 @@ export const rendersOwnResult = (command: Command): Command => {
 };
 
 /** Whether this command's action speaks the output contract. */
-export const isOutputAware = (command: Command): boolean =>
-  OUTPUT_AWARE_COMMANDS.has(command);
+export const isOutputAware = (command: Command): boolean => OUTPUT_AWARE_COMMANDS.has(command);
 
 /**
  * Refuse to answer a machine format we cannot actually produce.
@@ -592,8 +769,7 @@ export const assertFormatIsSupported = async (
     raw.json !== undefined;
 
   if (requestedNewContractFlag) {
-    const { commandValidationError, reportCommandError } =
-      await import("./errorOutput.js");
+    const { commandValidationError, reportCommandError } = await import("./errorOutput.js");
     // Reported here rather than thrown: `preAction` runs OUTSIDE each
     // registration's try/catch, so a throw escapes to the dependency-free net
     // in index.ts and renders as `Error: [object Object]` — prose at a parser,
@@ -643,11 +819,7 @@ export const applyOutputContext = async (resolved: ResolvedOutput): Promise<void
   // Machine formats fail as structured documents; agent mode's document is the
   // compact single-line form (see renderErrorAsJson), everything else pretty.
   setOutputFormat(
-    resolved.format === "table"
-      ? undefined
-      : resolved.format === "agents"
-        ? "agents"
-        : "json",
+    resolved.format === "table" ? undefined : resolved.format === "agents" ? "agents" : "json",
   );
   if (resolved.agent) {
     const { disableOutputColor } = await import("./errorOutput.js");
@@ -674,6 +846,8 @@ export const registerOutputOptions = (program: Command): void => {
     long: string;
     short?: string;
     choices?: readonly string[];
+    /** Register only on commands that answer through the output port. */
+    outputAwareOnly?: boolean;
   }[] = [
     {
       flags: "-o, --output <format>",
@@ -694,8 +868,19 @@ export const registerOutputOptions = (program: Command): void => {
     },
     {
       flags: "--jq <expr>",
-      description: "Filter output with a path expression (e.g. .traces[].traceId)",
+      description:
+        "Filter output with a path expression (e.g. .traces[].traceId, .traces[0], length)",
       long: "--jq",
+    },
+    {
+      flags: "--limit <n>",
+      description: "Keep at most n rows of the result (json, agents and yaml output)",
+      long: "--limit",
+      // Only where the command has no paging `--limit` of its own, and only on
+      // commands that return their payload through the port: the cap is applied
+      // by `emitsResult`, so a command that renders itself would accept the flag
+      // and quietly ignore it.
+      outputAwareOnly: true,
     },
     {
       flags: "--agent",
@@ -709,8 +894,7 @@ export const registerOutputOptions = (program: Command): void => {
     // Commander private API: there is no public accessor for
     // allowUnknownOption — re-check on commander upgrades.
     const allowsUnknown =
-      (command as unknown as { _allowUnknownOption?: boolean })._allowUnknownOption ===
-      true;
+      (command as unknown as { _allowUnknownOption?: boolean })._allowUnknownOption === true;
 
     if (!allowsUnknown) {
       for (const option of globals) {
@@ -720,6 +904,8 @@ export const registerOutputOptions = (program: Command): void => {
             (option.short !== undefined && existing.short === option.short),
         );
         if (conflicts) continue;
+        if (option.outputAwareOnly && !OUTPUT_AWARE_COMMANDS.has(command)) continue;
+        if (option.outputAwareOnly) CAPPED_COMMANDS.add(command);
 
         const created = new Option(option.flags, option.description);
         if (option.choices) created.choices([...option.choices]);

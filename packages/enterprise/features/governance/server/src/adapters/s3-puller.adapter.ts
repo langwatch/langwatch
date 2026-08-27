@@ -17,7 +17,7 @@
  *   - "json-array" — top-level array of JSON objects
  *   - "csv"        — RFC4180-style CSV with headers
  *
- * Bad lines are logged + captureException'd but do NOT abort the run
+ * Bad lines are reported through the diagnostics port but do not abort the run
  * — the adapter advances past the file so we don't re-pull broken
  * files indefinitely. errorCount reflects the count of malformed
  * records.
@@ -119,8 +119,10 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
           key,
           signal: options.signal,
         });
-        const parsed = this.parseBody({ body, config });
-        for (const raw of parsed) {
+        const { records, unreadable } = this.parseBody({ body, config });
+        errorCount += unreadable;
+        await this.reportUnreadableLines({ key, unreadable });
+        for (const raw of records) {
           try {
             events.push(this.mapEvent(raw, config));
           } catch (error) {
@@ -130,10 +132,10 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
               key,
               error: error instanceof Error ? error.message : String(error),
             });
-            this.diagnostics.capture(
-              error instanceof Error ? error : new Error(String(error)),
-              { adapter: this.id, key },
-            );
+            this.diagnostics.capture(error instanceof Error ? error : new Error(String(error)), {
+              adapter: this.id,
+              key,
+            });
           }
         }
         lastSuccessfulKey = key;
@@ -150,10 +152,11 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
           key,
           error: error instanceof Error ? error.message : String(error),
         });
-        this.diagnostics.capture(
-          error instanceof Error ? error : new Error(String(error)),
-          { adapter: this.id, bucket: config.bucket, key },
-        );
+        this.diagnostics.capture(error instanceof Error ? error : new Error(String(error)), {
+          adapter: this.id,
+          bucket: config.bucket,
+          key,
+        });
         lastSuccessfulKey = key;
       }
     }
@@ -213,46 +216,81 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
     });
   }
 
-  private parseBody({
-    body,
-    config,
+  /**
+   * Say that a file carried lines nothing could parse.
+   *
+   * Reported once per file with the count rather than once per line: a
+   * truncated upload makes every remaining line unreadable, and that is one
+   * incident, not a thousand. A file with nothing wrong reports nothing.
+   */
+  private async reportUnreadableLines({
+    key,
+    unreadable,
   }: {
-    body: string;
-    config: S3PollingConfig;
-  }): unknown[] {
+    key: string;
+    unreadable: number;
+  }): Promise<void> {
+    if (unreadable === 0) return;
+    const context = { adapter: this.id, key, unreadable };
+    this.diagnostics.warn("skipping unparseable lines", context);
+    this.diagnostics.capture(
+      new Error(`s3_polling: ${unreadable} unparseable line(s) in ${key}`),
+      context,
+    );
+  }
+
+  /**
+   * The records a file yielded, and the count it could not read.
+   *
+   * `unreadable` exists because a line that never parses never reaches
+   * `mapEvent`, so the caller's `catch` around `mapEvent` cannot see it. It was
+   * therefore dropped in silence: `errorCount` stayed 0 and diagnostics saw
+   * fired, and the cursor advanced past the file anyway. That is worse than
+   * the stall it replaced, because corrupt input leaves no signal at all.
+   */
+  private parseBody({ body, config }: { body: string; config: S3PollingConfig }): {
+    records: unknown[];
+    unreadable: number;
+  } {
     switch (config.parser) {
       case "ndjson":
         return this.parseNdjson(body);
       case "json-array":
-        return this.parseJsonArray(body);
+        return { records: this.parseJsonArray(body), unreadable: 0 };
       case "csv":
-        return this.parseCsv(body);
+        // A CSV row cannot fail to parse: short rows are padded, so there is
+        // no such thing as a line this drops.
+        return { records: this.parseCsv(body), unreadable: 0 };
     }
   }
 
-  private parseNdjson(body: string): unknown[] {
-    const out: unknown[] = [];
+  private parseNdjson(body: string): {
+    records: unknown[];
+    unreadable: number;
+  } {
+    const records: unknown[] = [];
+    let unreadable = 0;
     for (const line of body.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
-        out.push(JSON.parse(trimmed));
+        records.push(JSON.parse(trimmed));
       } catch {
-        // Skip malformed line — caller increments errorCount + the
-        // captureException happens in the runOnce loop where we have
-        // bucket/key context.
-        continue;
+        // Counted rather than dropped. The caller cannot see this line any
+        // other way: it never becomes a record, so it never reaches the
+        // `mapEvent` catch that increments `errorCount` for a record it could
+        // not map. The captureException happens in the runOnce loop, which has
+        // the bucket and key.
+        unreadable += 1;
       }
     }
-    return out;
+    return { records, unreadable };
   }
 
   private parseJsonArray(body: string): unknown[] {
     const parsed = JSON.parse(body) as unknown;
     if (!Array.isArray(parsed)) {
-      throw new Error(
-        "json-array parser expected a top-level JSON array, got " + typeof parsed,
-      );
+      throw new Error("json-array parser expected a top-level JSON array, got " + typeof parsed);
     }
     return parsed;
   }
@@ -314,8 +352,7 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
             wrap: false,
           }) as unknown);
 
-    const asString = (v: unknown): string =>
-      v === undefined || v === null ? "" : String(v);
+    const asString = (v: unknown): string => (v === undefined || v === null ? "" : String(v));
     const asNumber = (v: unknown): number => {
       const n = typeof v === "number" ? v : Number(v);
       return Number.isFinite(n) ? n : 0;

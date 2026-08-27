@@ -910,7 +910,14 @@ export class OrganizationService extends OrganizationServiceContract {
       }
     }
 
-    return this.repo.setMemberDisabled({ organizationId, userId, disabled });
+    await this.repo.setMemberDisabled({ organizationId, userId, disabled });
+
+    // Disabling is a plain column write, not a grant write, so nothing else
+    // retires the authorization snapshots cached for this organization. An
+    // admin who has just revoked someone's access must not have to wait for a
+    // cache to age out before it is true, and re-enabling must not leave the
+    // person locked out for the same window.
+    await grantsService().invalidateOrganization({ organizationId });
   }
 
   /**

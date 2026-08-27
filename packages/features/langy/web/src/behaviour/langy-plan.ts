@@ -37,14 +37,10 @@ export interface LangyPlan {
   completedCount: number;
   /** Steps that count toward the total — everything except cancelled. */
   totalCount: number;
-  /**
-   * The other (non-`todowrite`) tool parts attributed to each item, parallel to
-   * `items`: a call belongs to whichever item was uniquely in-progress when the
-   * call appeared in the stream. Rendered nested under the current step.
-   */
-  itemParts: unknown[][];
-  /** Tool parts that ran BEFORE any step was current (no plan yet). */
+  /** Tool calls made before any plan item became active. */
   preamble: unknown[];
+  /** Tool calls attributed to each plan item by its active snapshot. */
+  itemParts: unknown[][];
 }
 
 const planStatusSchema = z.enum(["pending", "in_progress", "completed", "cancelled"]);
@@ -81,10 +77,7 @@ const PLAN_TOOL_NAMES = new Set(["todowrite", "todoread"]);
 export function cleanPlanContent(content: string): string {
   return content
     .trim()
-    .replace(
-      /\s*\((?:pending|in[_ -]?progress|completed|cancelled)(?::[^)]*)?\)\s*$/i,
-      "",
-    )
+    .replace(/\s*\((?:pending|in[_ -]?progress|completed|cancelled)(?::[^)]*)?\)\s*$/i, "")
     .trim();
 }
 
@@ -163,11 +156,12 @@ function normaliseItem(item: { content: string; status: string }): LangyPlanItem
  * agent never maintained a todo list (⇒ no checklist, today's rendering).
  *
  * The LATEST full list wins: `todowrite` rewrites the whole list every call, so
- * the last valid snapshot is the plan. Attribution is TEMPORAL and derived from
- * the snapshot history — we walk the parts in order, tracking which item was
- * in-progress at each point (mapped onto the latest list by content), and file
- * every non-plan tool call under the step that owned it. A call before any step
- * was current lands in the preamble.
+ * the last valid snapshot is the plan.
+ *
+ * The plan is the checklist and nothing else. The calls a step made are not
+ * filed under it: the transcript already carries every call where it happened
+ * (logic/langyTranscript.ts), and a card cannot be in the transcript and inside
+ * the checklist at the same time without being read twice.
  */
 export function langyPlan(
   message: { parts: readonly unknown[] },
@@ -217,9 +211,7 @@ export function langyPlan(
         // "completed". An item whose text has since changed falls to preamble.
         const currentItem = snapshot[ip];
         if (currentItem) {
-          currentItemIndex = items.findIndex(
-            (item) => item.content === currentItem.content,
-          );
+          currentItemIndex = items.findIndex((item) => item.content === currentItem.content);
         }
       }
       continue;
@@ -242,7 +234,7 @@ export function langyPlan(
     currentIndex: inProgressIndex(items),
     completedCount,
     totalCount,
-    itemParts,
     preamble,
+    itemParts,
   };
 }

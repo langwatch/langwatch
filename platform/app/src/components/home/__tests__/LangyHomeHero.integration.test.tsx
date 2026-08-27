@@ -12,7 +12,7 @@
  * and store, the ambient dev state, and the project's reach.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -40,6 +40,26 @@ vi.mock("../WelcomeHeader", () => ({
 const reachMock = vi.fn();
 vi.mock("../useProjectReach", () => ({
   useProjectReach: () => reachMock(),
+}));
+
+// The pill's menu is `AgentActionsMenu`, which reads the project for its
+// key and fetches the skill the copy hands over.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project_1", apiKey: "sk-lw-home" },
+    organization: { id: "org_1" },
+  }),
+}));
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({ data: { BASE_HOST: "https://app.langwatch.ai" } }),
+}));
+const SKILL_BODY = "# Add LangWatch Tracing to Your Code";
+vi.mock("~/utils/api", () => ({
+  api: {
+    setupSkills: {
+      getPrompt: { useQuery: () => ({ data: { body: SKILL_BODY } }) },
+    },
+  },
 }));
 
 import { LangyHomeHero } from "../LangyHomeHero";
@@ -97,7 +117,7 @@ describe("LangyHomeHero onboarding control", () => {
     });
 
     describe("when the pill's menu is opened with ask access", () => {
-      it("offers the walkthrough, the coding-agent prompt, and the docs", async () => {
+      it("offers the coding-agent prompt first, then the walkthrough, then the docs", async () => {
         reachMock.mockReturnValue(NEW_PROJECT_REACH);
         renderHero();
 
@@ -122,6 +142,23 @@ describe("LangyHomeHero onboarding control", () => {
         ).toBeDefined();
         expect(screen.queryByText("Walk me through it")).toBeNull();
         expect(screen.getByText("Read the integration guide")).toBeDefined();
+      });
+
+      it("drops the Langy glyph so the tiles still count the routes", () => {
+        canAskMock.mockReturnValue(false);
+        reachMock.mockReturnValue(NEW_PROJECT_REACH);
+        renderHero();
+
+        const withoutLangy =
+          onboardingTriggers()[0]!.querySelectorAll("svg").length;
+        cleanup();
+
+        canAskMock.mockReturnValue(true);
+        renderHero();
+        const withLangy =
+          onboardingTriggers()[0]!.querySelectorAll("svg").length;
+
+        expect(withoutLangy).toBe(withLangy - 1);
       });
     });
   });

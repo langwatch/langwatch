@@ -9,7 +9,6 @@ import {
   Building2,
   Coins,
   CreditCard,
-  Database,
   DatabaseZap,
   EyeOff,
   Fingerprint,
@@ -17,7 +16,6 @@ import {
   FolderKanban,
   FolderOpen,
   Gauge,
-  History,
   KeyRound,
   Link2,
   Lock,
@@ -25,7 +23,6 @@ import {
   MailX,
   Network,
   RefreshCw,
-  Repeat,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -305,19 +302,27 @@ export function opsGroup(): SettingsMenuGroup {
       {
         label: "Event Sourcing",
         href: "/ops/event-sourcing",
-        // The scheduler address redirects onto the schedules section of
-        // the event-sourcing workspace.
-        alsoActiveAt: ["/ops/scheduler"],
+        // Addresses this workspace owns that do not sit under its prefix.
+        // The scheduler one redirects onto the schedules section; the other
+        // three are sections of the workspace reached from its own rail —
+        // the payload store and Deja View as pages, projection replay as the
+        // drawer that address redirects to. Naming them here is what keeps
+        // this entry lit while the reader is inside the workspace, and what
+        // tells the reachability test the addresses have an owner.
+        alsoActiveAt: [
+          "/ops/scheduler",
+          "/ops/projections",
+          "/ops/blobs",
+          "/ops/dejaview",
+        ],
         icon: Workflow,
       },
-      {
-        label: "Projection Replay",
-        href: "/ops/projections",
-        icon: Repeat,
-      },
+      // Projection replay, the payload store and Deja View are not here:
+      // all three are event-sourcing tools, and they now live in that
+      // workspace's own rail rather than as top-level Ops entries. Replay was
+      // already only a drawer opened from the projections section, so its
+      // entry here pointed at a redirect.
       { label: "The Foundry", href: "/ops/foundry", icon: Anvil },
-      { label: "Payload store", href: "/ops/blobs", icon: Database },
-      { label: "Deja View", href: "/ops/dejaview", icon: History },
       { label: "Feature Flags", href: "/ops/feature-flags", icon: Flag },
       { label: "Migrations", href: "/ops/migrations", icon: DatabaseZap },
     ],
@@ -346,6 +351,11 @@ export function backofficeGroup(): SettingsMenuGroup {
         label: "Subscriptions",
         href: "/ops/backoffice/subscriptions",
         icon: CreditCard,
+      },
+      {
+        label: "Single Sign-On",
+        href: "/ops/backoffice/sso-connections",
+        icon: ShieldCheck,
       },
       {
         label: "Bug Reports",

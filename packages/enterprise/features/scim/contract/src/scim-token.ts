@@ -1,11 +1,12 @@
 export type ScimTokenEntitlement =
   | { status: "invalid_token" }
   | { status: "plan_not_entitled"; organizationId: string }
-  | { status: "ok"; organizationId: string };
+  | { status: "ok"; organizationId: string; connectionId: string | null };
 
 export interface ScimTokenRecord {
   id: string;
   organizationId: string;
+  connectionId: string | null;
   description: string | null;
   createdAt: Date;
   lastUsedAt: Date | null;
@@ -13,5 +14,5 @@ export interface ScimTokenRecord {
 
 export type ScimTokenSummary = Pick<
   ScimTokenRecord,
-  "id" | "description" | "createdAt" | "lastUsedAt"
+  "id" | "connectionId" | "description" | "createdAt" | "lastUsedAt"
 >;

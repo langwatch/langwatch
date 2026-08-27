@@ -178,6 +178,10 @@ export const AUTHZ_RESOURCES = {
     actions: ["view", "create", "update", "delete", "manage"],
     scopes: ["project", "team", "organization"],
   },
+  agentCache: {
+    actions: ["view", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
   // Owners set an experiment's policy for a whole project or organization.
   // Distinct from `experiments:*`, which is the evaluation product; this is
   // control over feature-flag experiment enrolment. Appended last, per the

@@ -31,11 +31,18 @@ vi.mock("~/server/evaluations/runEvaluation", () => ({
 }));
 
 // Bypass the RBAC resolver — we're testing the handler logic, not auth.
-vi.mock("../../rbac", () => ({
-  resolveProjectPermission: vi
-    .fn()
-    .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-}));
+// Spread the real module rather than hand-listing exports: the Langy graph
+// this import chain reaches runs pure helpers at module-load time, and a
+// hand-listed factory turns any new export into a load-time crash.
+vi.mock("../../rbac", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../rbac")>();
+  return {
+    ...actual,
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+  };
+});
 
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { evaluationsRouter } from "../evaluations";

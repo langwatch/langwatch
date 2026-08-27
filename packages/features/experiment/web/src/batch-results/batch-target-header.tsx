@@ -11,6 +11,7 @@ import {
   LuClock,
   LuCode,
   LuFileText,
+  LuTriangleAlert,
   LuTriangleRight,
 } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -23,6 +24,7 @@ import {
   PassRateCircle,
   useInteractiveTooltip,
 } from "./presentation";
+import { CostStatsTooltip, LatencyStatsTooltip } from "./metric-stats-tooltip";
 import type { BatchTargetColumn } from "../batch-evaluation-results.types";
 import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates";
 
@@ -39,6 +41,25 @@ type BatchTargetHeaderProps = {
 const formatPassRate = (passRate: number | null): string => {
   if (passRate === null) return "-";
   return `${Math.round(passRate)}%`;
+};
+
+const PassRateCoverageChip = ({
+  completedRows,
+  totalRows,
+}: {
+  completedRows: number;
+  totalRows: number;
+}) => {
+  if (totalRows === 0 || completedRows >= totalRows) return null;
+
+  return (
+    <HStack gap={1}>
+      <Icon as={LuTriangleAlert} boxSize={3} color="orange.fg" />
+      <Text color="orange.fg" fontWeight="medium">
+        {completedRows}/{totalRows}
+      </Text>
+    </HStack>
+  );
 };
 
 /**
@@ -66,10 +87,7 @@ const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregat
           <Text color="fg.muted">Pass Rate</Text>
           <HStack gap={1.5}>
             <PassRateCircle passRate={aggregates.overallPassRate} />
-            <Text
-              fontWeight="medium"
-              color={getPassRateGradientColor(aggregates.overallPassRate)}
-            >
+            <Text fontWeight="medium" color={getPassRateGradientColor(aggregates.overallPassRate)}>
               {formatPassRate(aggregates.overallPassRate)}
             </Text>
           </HStack>
@@ -88,10 +106,7 @@ const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregat
       {aggregates.latencyStats && (
         <Tooltip
           content={
-            <MetricStatsTooltip
-              stats={aggregates.latencyStats}
-              formatValue={formatLatency}
-            />
+            <MetricStatsTooltip stats={aggregates.latencyStats} formatValue={formatLatency} />
           }
           positioning={{ placement: "right" }}
           openDelay={100}
@@ -119,9 +134,7 @@ const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregat
       {/* Total Cost - with stats breakdown */}
       {aggregates.costStats && (
         <Tooltip
-          content={
-            <MetricStatsTooltip stats={aggregates.costStats} formatValue={formatCost} />
-          }
+          content={<MetricStatsTooltip stats={aggregates.costStats} formatValue={formatCost} />}
           positioning={{ placement: "right" }}
           openDelay={100}
           interactive
@@ -170,10 +183,7 @@ const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregat
                 {evaluator.passRate !== null && (
                   <HStack gap={1}>
                     <PassRateCircle passRate={evaluator.passRate} size="8px" />
-                    <Text
-                      fontSize="11px"
-                      color={getPassRateGradientColor(evaluator.passRate)}
-                    >
+                    <Text fontSize="11px" color={getPassRateGradientColor(evaluator.passRate)}>
                       {formatPassRate(evaluator.passRate)}
                     </Text>
                   </HStack>
@@ -211,9 +221,7 @@ const SummaryBadge = memo(function SummaryBadge({
   aggregates: BatchTargetAggregate;
 }) {
   const hasResults =
-    aggregates.completedRows > 0 ||
-    aggregates.errorRows > 0 ||
-    aggregates.totalCost !== null;
+    aggregates.completedRows > 0 || aggregates.errorRows > 0 || aggregates.totalCost !== null;
 
   const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
 
@@ -246,17 +254,25 @@ const SummaryBadge = memo(function SummaryBadge({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {(aggregates.overallPassRate !== null ||
-          aggregates.overallAverageScore !== null) && <Text fontWeight="600">Score</Text>}
+        {/*
+          A run that is over reports a rate for the rows that answered. Without
+          the count beside it, a column at 30 of 40 rows reads as finished and
+          invites a comparison against a column that did answer every row.
+        */}
+        <PassRateCoverageChip
+          completedRows={aggregates.completedRows}
+          totalRows={aggregates.totalRows}
+        />
+
+        {(aggregates.overallPassRate !== null || aggregates.overallAverageScore !== null) && (
+          <Text fontWeight="600">Score</Text>
+        )}
 
         {/* Pass rate */}
         {aggregates.overallPassRate !== null && (
           <HStack gap={1}>
             <PassRateCircle passRate={aggregates.overallPassRate} />
-            <Text
-              color={getPassRateGradientColor(aggregates.overallPassRate)}
-              fontWeight="medium"
-            >
+            <Text color={getPassRateGradientColor(aggregates.overallPassRate)} fontWeight="medium">
               {formatPassRate(aggregates.overallPassRate)}
             </Text>
           </HStack>
@@ -333,13 +349,7 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
       <HStack gap={2} flex={1} minWidth={0}>
         {/* Color indicator for chart correlation */}
         {colorIndicator && (
-          <Box
-            width="10px"
-            height="10px"
-            borderRadius="sm"
-            bg={colorIndicator}
-            flexShrink={0}
-          />
+          <Box width="10px" height="10px" borderRadius="sm" bg={colorIndicator} flexShrink={0} />
         )}
         <Box
           backgroundColor={getTargetColor()}
@@ -360,7 +370,7 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
           {getTargetIcon()}
         </Box>
         <Text fontSize="13px" fontWeight="medium" truncate>
-          {target.name}
+          {target.displayName ?? target.name}
         </Text>
       </HStack>
 

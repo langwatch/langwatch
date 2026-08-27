@@ -29,6 +29,7 @@
  *   through, including the 5xx redaction one case below turns on
  *
  * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/analytics/lwql-langy-authoring.feature — the placement routes
  * @see ~/server/analytics/saved-workbench-charts — the service under test
  */
 
@@ -37,6 +38,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { projectFactory } from "~/factories/project.factory";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
 import {
+  type Dashboard,
   type Organization,
   type Project,
   RoleBindingScopeType,
@@ -266,6 +268,7 @@ describe("given the saved workbench chart REST endpoints", () => {
     // failure must not be buried under teardown TypeErrors.
     for (const project of [openProject, gatedProject, otherProject].filter(Boolean)) {
       await prisma.customGraph.deleteMany({ where: { projectId: project.id } });
+      await prisma.dashboard.deleteMany({ where: { projectId: project.id } });
     }
   });
 
@@ -284,6 +287,9 @@ describe("given the saved workbench chart REST endpoints", () => {
       .map((project) => project.id);
     if (projectIds.length > 0) {
       await prisma.customGraph.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+      await prisma.dashboard.deleteMany({
         where: { projectId: { in: projectIds } },
       });
     }
@@ -809,10 +815,357 @@ describe("given the saved workbench chart REST endpoints", () => {
     });
   });
 
+  describe("when an integration places a chart on a dashboard in its project", () => {
+    /** @scenario "An integration places a saved chart on a dashboard over the API" */
+    it("answers with the placed chart, and the placement reads back by id", async () => {
+      const chart = await createChart(openProject, { name: "Placed" });
+      const dashboard = await createDashboard(openProject);
+
+      const placed = await succeeds({
+        path: placementPath(openProject, chart.id),
+        method: "PUT",
+        auth: asProject(openProject),
+        body: {
+          dashboardId: dashboard.id,
+          gridColumn: 0,
+          gridRow: 3,
+          colSpan: 2,
+          rowSpan: 2,
+        },
+      });
+      expect(placed.id).toBe(chart.id);
+      expect(placed.dashboardId).toBe(dashboard.id);
+      expect(placed.gridColumn).toBe(0);
+      expect(placed.gridRow).toBe(3);
+      expect(placed.colSpan).toBe(2);
+      expect(placed.rowSpan).toBe(2);
+
+      expect(await placementOf(openProject, chart.id)).toEqual({
+        dashboardId: dashboard.id,
+        gridColumn: 0,
+        gridRow: 3,
+        colSpan: 2,
+        rowSpan: 2,
+      });
+    });
+
+    /** @scenario "An integration unplaces a saved chart over the API" */
+    it("unplaces with a 204, after which the chart reads back with no placement", async () => {
+      const chart = await createChart(openProject, { name: "Unplaced" });
+      const dashboard = await createDashboard(openProject);
+      await succeeds({
+        path: placementPath(openProject, chart.id),
+        method: "PUT",
+        auth: asProject(openProject),
+        body: { dashboardId: dashboard.id, gridRow: 2 },
+      });
+
+      const response = await call({
+        path: placementPath(openProject, chart.id),
+        method: "DELETE",
+        auth: asProject(openProject),
+      });
+      expect(response.status).toBe(204);
+      expect(await response.text()).toBe("");
+
+      expect(await placementOf(openProject, chart.id)).toEqual({
+        dashboardId: null,
+        gridColumn: 0,
+        gridRow: 0,
+        colSpan: 1,
+        rowSpan: 1,
+      });
+    });
+  });
+
+  describe("when the placement names a dashboard of another project", () => {
+    /** @scenario "Placement onto a foreign dashboard is refused over the API the same way it is inside the application" */
+    it("refuses with the dashboard-not-found code and writes no placement", async () => {
+      const chart = await createChart(openProject, { name: "Stays put" });
+      const foreignDashboard = await createDashboard(otherProject);
+      const before = await placementOf(openProject, chart.id);
+
+      const refusal = await refused({
+        path: placementPath(openProject, chart.id),
+        method: "PUT",
+        auth: asProject(openProject),
+        body: { dashboardId: foreignDashboard.id },
+      });
+      expect(refusal.error.code).toBe(
+        "saved_workbench_chart_dashboard_not_found",
+      );
+
+      expect(await placementOf(openProject, chart.id)).toEqual(before);
+    });
+  });
+
+  describe("when the placement names a chart id absent from this project", () => {
+    /** @scenario "Placing an unknown chart id is refused as not found, indistinguishable from a foreign one" */
+    it("answers the one not-found for a foreign id and a nonexistent one alike", async () => {
+      const theirs = await createChart(otherProject, { name: "Theirs" });
+      const dashboard = await createDashboard(openProject);
+
+      const refusals = [
+        // Another project's real chart, and an id no project has ever held.
+        await refused({
+          path: placementPath(openProject, theirs.id),
+          method: "PUT",
+          auth: asProject(openProject),
+          body: { dashboardId: dashboard.id },
+        }),
+        await refused({
+          path: placementPath(openProject, `never-${nanoid()}`),
+          method: "PUT",
+          auth: asProject(openProject),
+          body: { dashboardId: dashboard.id },
+        }),
+      ];
+      expect(refusals.map((body) => body.error.code)).toEqual(
+        Array(2).fill("saved_workbench_chart_not_found"),
+      );
+
+      // The foreign chart gained nothing from the attempt.
+      expect(await placementOf(otherProject, theirs.id)).toMatchObject({
+        dashboardId: null,
+      });
+    });
+  });
+
+  describe("when the switch is off for the project placing a chart", () => {
+    /** @scenario "Placement routes stay dark while the workbench switch is off" */
+    it("refuses both placement verbs with the named refusal, mutating nothing", async () => {
+      const chart = await createChart(openProject, { name: "Dark" });
+      const dashboard = await createDashboard(openProject);
+      const before = await placementOf(openProject, chart.id);
+
+      const refusals = await withFlagOff(async () => [
+        await refused({
+          path: placementPath(openProject, chart.id),
+          method: "PUT",
+          auth: asProject(openProject),
+          body: { dashboardId: dashboard.id },
+        }),
+        await refused({
+          path: placementPath(openProject, chart.id),
+          method: "DELETE",
+          auth: asProject(openProject),
+        }),
+      ]);
+      expect(refusals.map((body) => body.error.code)).toEqual(
+        Array(2).fill("lwql_not_enabled"),
+      );
+
+      expect(await placementOf(openProject, chart.id)).toEqual(before);
+    });
+  });
+
+  describe("when the key may view analytics and tries to place a chart", () => {
+    /** @scenario "A key that may read charts may not place or unplace them" */
+    it("is refused on both placement verbs before the service is reached", async () => {
+      const chart = await createChart(openProject, { name: "Read-only" });
+      const dashboard = await createDashboard(openProject);
+      const before = await placementOf(openProject, chart.id);
+
+      for (const [method, body] of [
+        ["PUT", { dashboardId: dashboard.id }],
+        ["DELETE", undefined],
+      ] as const) {
+        const refusal = await refused({
+          path: placementPath(openProject, chart.id),
+          method,
+          auth: asViewOnly(openProject),
+          ...(body === undefined ? {} : { body }),
+        });
+        expect(refusal.error.code, method).toBe("api_key_permission_denied");
+      }
+
+      expect(await placementOf(openProject, chart.id)).toEqual(before);
+    });
+  });
+
   describe("when the caller presents no credential", () => {
     it("refuses before any chart is considered", async () => {
       const response = await app.request(chartsPath(openProject));
       expect(response.status).toBe(401);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Langy's CLI, at the wire. The `langwatch chart` family is a thin typed
+  // client over exactly these endpoints — its flag-to-request mapping is
+  // pinned by the SDK's own unit suite (chart-commands.unit.test.ts), so what
+  // these cases prove is the half the CLI cannot: that the requests the CLI
+  // emits, sent through the shipped HTTP app, land in the same rows, refusals
+  // and governors as every other path.
+  // ---------------------------------------------------------------------------
+
+  describe("given Langy drives the chart CLI against the API", () => {
+    /** The exact body `langwatch chart create --name … --sql-file … --param … --spec-file …` sends. */
+    const cliCreateBody = (name: string) => ({
+      name,
+      definition: {
+        version: 1,
+        sql: SQL,
+        parameters: { since: "2026-02-01 00:00:00" },
+        vegaLiteSpec: SPEC,
+      },
+    });
+
+    describe("when it creates a chart and reads it back by id", () => {
+      /** @scenario "Langy creates a chart with the CLI and reads it back with the same query, parameters and specification" */
+      it("returns the submitted SQL, parameter values and specification unchanged", async () => {
+        const created = await succeeds({
+          path: chartsPath(openProject),
+          method: "POST",
+          auth: asProject(openProject),
+          status: 201,
+          body: cliCreateBody("Langy's chart"),
+        });
+
+        const read = await succeeds({
+          path: chartPath(openProject, created.id),
+          auth: asProject(openProject),
+        });
+        expect(read.definition.sql).toBe(SQL);
+        expect(read.definition.parameters).toEqual({
+          since: "2026-02-01 00:00:00",
+        });
+        expect(read.definition.vegaLiteSpec).toEqual(SPEC);
+      });
+    });
+
+    describe("when its chart is compared against one saved through the application", () => {
+      /** @scenario "A chart Langy creates is indistinguishable from one a member saves by hand" */
+      it("stores a row equal on kind, definition shape and project scoping", async () => {
+        const viaCli = await succeeds({
+          path: chartsPath(openProject),
+          method: "POST",
+          auth: asProject(openProject),
+          status: 201,
+          body: cliCreateBody("Langy's twin"),
+        });
+
+        // The application's own save path: the service the tRPC router calls,
+        // with the member's protections resolved the same way.
+        const viaApplication = await SavedWorkbenchChartService.create(
+          prisma,
+        ).createChart({
+          projectId: openProject.id,
+          protections: await getProtectionsForProject(prisma, {
+            projectId: openProject.id,
+          }),
+          input: {
+            name: "Member's twin",
+            definition: cliCreateBody("unused").definition,
+          },
+        });
+
+        const rows = await prisma.customGraph.findMany({
+          where: {
+            projectId: openProject.id,
+            id: { in: [viaCli.id, viaApplication.id] },
+          },
+        });
+        expect(rows).toHaveLength(2);
+        const [first, second] = rows as unknown as [Body, Body];
+        expect(first.kind).toBe(WORKBENCH_SQL_CHART_KIND);
+        expect(second.kind).toBe(WORKBENCH_SQL_CHART_KIND);
+        expect(first.graph).toEqual(second.graph);
+        expect(first.projectId).toBe(second.projectId);
+      });
+    });
+
+    describe("when its credentials cannot read a column the SQL names", () => {
+      /** @scenario "SQL naming a column Langy's credentials cannot read is refused identically everywhere" */
+      it("is refused with the same validator code via the CLI's wire, REST directly, and the application's save path", async () => {
+        // The CLI's wire: the chart-create request `langwatch chart create` emits.
+        const viaCli = await refused({
+          path: chartsPath(gatedProject),
+          method: "POST",
+          auth: asProject(gatedProject),
+          body: {
+            name: "Withheld, via CLI",
+            definition: { ...DEFINITION, sql: GATED_SQL },
+          },
+        });
+
+        // REST directly: the governed query door with the same statement.
+        const viaRest = await refused({
+          path: `/api/v1/projects/${gatedProject.id}/analytics/query/clickhouse`,
+          method: "POST",
+          auth: asProject(gatedProject),
+          body: { sql: GATED_SQL },
+        });
+
+        // The application's own save path.
+        let viaApplication: string | undefined;
+        try {
+          await SavedWorkbenchChartService.create(prisma).createChart({
+            projectId: gatedProject.id,
+            protections: await getProtectionsForProject(prisma, {
+              projectId: gatedProject.id,
+            }),
+            input: {
+              name: "Withheld, via application",
+              definition: { ...DEFINITION, sql: GATED_SQL },
+            },
+          });
+        } catch (error) {
+          viaApplication = (error as { code?: string }).code;
+        }
+
+        expect(viaCli.error.code).toBe("lwql_not_permitted");
+        expect(viaRest.error.code).toBe(viaCli.error.code);
+        expect(viaApplication).toBe(viaCli.error.code);
+      });
+    });
+
+    describe("when it submits a specification the chart policy refuses", () => {
+      /** @scenario "A specification the chart policy refuses cannot be written through the CLI" */
+      it("answers the specification-refused code, and no chart is created", async () => {
+        const before = await listedIds(openProject);
+
+        const refusal = await refused({
+          path: chartsPath(openProject),
+          method: "POST",
+          auth: asProject(openProject),
+          body: {
+            name: "Network-loading spec via CLI",
+            definition: { ...DEFINITION, vegaLiteSpec: NETWORK_SPEC },
+          },
+        });
+        expect(refusal.error.code).toBe(
+          "saved_workbench_chart_specification_refused",
+        );
+
+        expect(await listedIds(openProject)).toEqual(before);
+      });
+    });
+
+    describe("when it places a saved chart on a dashboard", () => {
+      /** @scenario "Langy places a saved chart on a dashboard with the CLI" */
+      it("sets the dashboard id and grid position, and the chart lists among the dashboard's charts", async () => {
+        const chart = await createChart(openProject, {
+          name: "Langy placed this",
+        });
+        const dashboard = await createDashboard(openProject);
+
+        // The exact request `langwatch chart place <id> --dashboard-id <d>` emits.
+        const placed = await succeeds({
+          path: placementPath(openProject, chart.id),
+          method: "PUT",
+          auth: asProject(openProject),
+          body: { dashboardId: dashboard.id },
+        });
+        expect(placed.dashboardId).toBe(dashboard.id);
+        expect(typeof placed.gridRow).toBe("number");
+
+        const dashboardCharts = await prisma.customGraph.findMany({
+          where: { projectId: openProject.id, dashboardId: dashboard.id },
+          select: { id: true },
+        });
+        expect(dashboardCharts.map((row) => row.id)).toContain(chart.id);
+      });
     });
   });
 });

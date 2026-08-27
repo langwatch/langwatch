@@ -131,39 +131,43 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
 
   // Target columns with their outputs, cost, duration, and evaluator results
   for (const target of data.targetColumns) {
+    // The name the reader sees, so two targets stored under one name keep
+    // their own header block rather than repeating it.
+    const targetName = target.displayName ?? target.name;
+
     // Target metadata columns (model, prompt info, custom metadata)
     if (target.model) {
-      headers.push(`${target.name}_model`);
+      headers.push(`${targetName}_model`);
     }
     if (target.promptId) {
-      headers.push(`${target.name}_prompt_id`);
-      headers.push(`${target.name}_prompt_version`);
+      headers.push(`${targetName}_prompt_id`);
+      headers.push(`${targetName}_prompt_version`);
     }
     // Custom metadata keys
     if (target.metadata) {
       for (const key of Object.keys(target.metadata)) {
-        headers.push(`${target.name}_${key}`);
+        headers.push(`${targetName}_${key}`);
       }
     }
 
     // Target output (may have multiple fields)
     for (const field of target.outputFields) {
-      headers.push(`${target.name}_${field}`);
+      headers.push(`${targetName}_${field}`);
     }
     // If no output fields detected, add a generic output column
     if (target.outputFields.length === 0) {
-      headers.push(`${target.name}_output`);
+      headers.push(`${targetName}_output`);
     }
 
     // Cost and duration for this target
-    headers.push(`${target.name}_cost`);
-    headers.push(`${target.name}_duration_ms`);
+    headers.push(`${targetName}_cost`);
+    headers.push(`${targetName}_duration_ms`);
 
     // Error column
-    headers.push(`${target.name}_error`);
+    headers.push(`${targetName}_error`);
 
     // Trace ID
-    headers.push(`${target.name}_trace_id`);
+    headers.push(`${targetName}_trace_id`);
 
     // Evaluator results for this target
     // Get unique evaluator IDs used by this target
@@ -179,12 +183,12 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
 
     for (const evalId of evaluatorIds) {
       const evalName = data.evaluatorNames[evalId] ?? evalId;
-      headers.push(`${target.name}_${evalName}_score`);
-      headers.push(`${target.name}_${evalName}_passed`);
-      headers.push(`${target.name}_${evalName}_label`);
-      headers.push(`${target.name}_${evalName}_details`);
-      headers.push(`${target.name}_${evalName}_cost`);
-      headers.push(`${target.name}_${evalName}_duration_ms`);
+      headers.push(`${targetName}_${evalName}_score`);
+      headers.push(`${targetName}_${evalName}_passed`);
+      headers.push(`${targetName}_${evalName}_label`);
+      headers.push(`${targetName}_${evalName}_details`);
+      headers.push(`${targetName}_${evalName}_cost`);
+      headers.push(`${targetName}_${evalName}_duration_ms`);
     }
   }
 

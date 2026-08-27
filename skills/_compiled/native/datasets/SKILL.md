@@ -13,18 +13,18 @@ You are a senior evaluation engineer helping the user create a realistic, high-q
 
 ## NON-NEGOTIABLE: every row must look like THIS bot's actual users
 
-Before you write a single row, ask yourself: _"Would a real user of THIS specific bot, given its system prompt, persona, and domain, ever send this message?"_ If the answer is "no" or "not really", do not include the row.
+Before you write a single row, ask yourself: *"Would a real user of THIS specific bot, given its system prompt, persona, and domain, ever send this message?"* If the answer is "no" or "not really", do not include the row.
 
 This is the most failed criterion of this skill. Examples of what is **automatically wrong**:
 
 - A tweet-style emoji bot getting `"What is the capital of France?"` or `"Explain photosynthesis"`. Real users of a fun emoji bot send "lol roast my Monday outfit 🫠", "hot take on cilantro??", "describe my mood in 3 emojis", not high-school trivia.
 - A customer support bot getting `"Tell me about quantum computing"`. Real users send "WHERE IS MY ORDER #4521 ITS BEEN 2 WEEKS", "refund pls, package arrived smashed".
 - A SQL assistant getting `"Hi how are you?"`. Real users paste schemas and ask "join orders to users where signup_date > 2024".
-- A RAG knowledge-base bot getting questions whose answers are obviously _not_ in its corpus, with no negative-case framing. Real users mostly ask things the docs cover, with a sprinkle of off-topic.
+- A RAG knowledge-base bot getting questions whose answers are obviously *not* in its corpus, with no negative-case framing. Real users mostly ask things the docs cover, with a sprinkle of off-topic.
 
-The "what if it's a _general-purpose_ chatbot?" excuse is invalid: read its system prompt. Even general bots have a tone, a length budget, an emoji policy, a refusal policy. Match THAT.
+The "what if it's a *general-purpose* chatbot?" excuse is invalid: read its system prompt. Even general bots have a tone, a length budget, an emoji policy, a refusal policy. Match THAT.
 
-If you find yourself reaching for `"What is the capital of [country]?"`, `"Explain [scientific concept]"`, `"What is [historical event]?"`, or `"Tell me about [generic topic]"`, stop, re-read the system prompt, and pick something a real user of _this_ bot would say.
+If you find yourself reaching for `"What is the capital of [country]?"`, `"Explain [scientific concept]"`, `"What is [historical event]?"`, or `"Tell me about [generic topic]"`, stop, re-read the system prompt, and pick something a real user of *this* bot would say.
 
 ## Conversation Flow
 
@@ -344,7 +344,7 @@ Choose columns based on what the user is evaluating:
 
 | Use Case          | Recommended Columns                                  |
 | ----------------- | ---------------------------------------------------- |
-| Basic Q\&A        | `input`, `expected_output`                           |
+| Basic Q\&A         | `input`, `expected_output`                           |
 | RAG evaluation    | `input`, `expected_output`, `expected_contexts`      |
 | Classification    | `input`, `expected_label`                            |
 | Multi-turn        | `conversation_history`, `input`, `expected_output`   |

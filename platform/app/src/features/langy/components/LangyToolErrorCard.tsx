@@ -15,7 +15,9 @@ import { LangyFailureReference } from "./LangyFailureReference";
  * clear actions.
  *
  * The platform's own CODE is always on the card (LangyFailureReference), in mono
- * under the message.
+ * under the message, together with the disclosure that holds the engine's own
+ * words. A failure that carried no code but did carry text still gets that row:
+ * the text is the only handle the reader has, and it is never card copy.
  *
  * A failure that turns out to be a PLAN limit is not drawn here at all — it
  * belongs to LangyPlanLimitCard, which says what ran out and offers the way to
@@ -33,6 +35,7 @@ export function LangyToolErrorCard({
     !!presentation.detail ||
     !!presentation.tips?.length ||
     !!presentation.code ||
+    !!presentation.raw ||
     !!presentation.traceId;
 
   return (

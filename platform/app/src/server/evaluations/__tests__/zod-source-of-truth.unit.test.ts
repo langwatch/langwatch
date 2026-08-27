@@ -146,13 +146,30 @@ describe("given Zod schemas are the single source of truth", () => {
       expect(answerMatch.requiredFields).toEqual([]);
       expect(answerMatch.optionalFields).toEqual(["input", "output", "expected_output"]);
 
-      // The fix only relaxes fields the service marks optional — it does not
-      // blanket-empty every catalog entry; evaluators with genuinely required
-      // entry fields still list them.
+      // The classification only relaxes fields the service marks optional — it
+      // does not blanket-empty every catalog entry; evaluators with genuinely
+      // required entry fields still list them.
       const someStillRequired = Object.values(AVAILABLE_EVALUATORS).some(
         (definition) => definition.requiredFields.length > 0,
       );
       expect(someStillRequired).toBe(true);
+    });
+  });
+
+  describe("when an evaluator compares an output against an expected output", () => {
+    /** @scenario "An evaluator that compares two fields lists both as required" */
+    it("lists both comparison fields as required", () => {
+      // Neither judge can say anything without both sides. With them optional,
+      // an unmapped run compared empty to empty and reported a pass, which the
+      // run summary then counted as a correct answer.
+      const exactMatch = AVAILABLE_EVALUATORS["langevals/exact_match"];
+      expect(exactMatch.requiredFields).toEqual(["output", "expected_output"]);
+      expect(exactMatch.optionalFields).toEqual([]);
+
+      const answerMatch = AVAILABLE_EVALUATORS["langevals/llm_answer_match"];
+      expect(answerMatch.requiredFields).toEqual(["output", "expected_output"]);
+      // The question is context the judge can work without.
+      expect(answerMatch.optionalFields).toEqual(["input"]);
     });
   });
 });

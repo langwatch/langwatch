@@ -261,6 +261,7 @@ async function main() {
       userId: "sso_smoke_existing2",
       type: "oauth",
       provider: "okta",
+      issuer: "local:oauth:okta",
       providerAccountId: "okta-dave-456-original",
     },
   });
@@ -365,6 +366,9 @@ async function main() {
       userId: "sso_smoke_existing4",
       type: "oauth",
       provider: "google",
+      // Google declares a real issuer of its own, so this is NOT the
+      // synthetic `local:oauth:google` the other providers get.
+      issuer: "https://accounts.google.com",
       providerAccountId: "google-oauth2|frank-OLD-id",
     },
   });

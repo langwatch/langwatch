@@ -98,7 +98,7 @@ describe("given organizations of every eligibility kind", () => {
   });
 
   describe("when the cohort's eligible pool is read", () => {
-    /** @scenario "A cohort never includes an enterprise organization" */
+    /** @scenario "A cohort leaves out an enterprise organization by default" */
     /** @scenario "A cohort samples only organizations not already enrolled" */
     it("holds the plain and cancelled-enterprise organizations and nothing excluded", async () => {
       const pool = await repository.findCohortEligibleOrganizations({
@@ -111,6 +111,23 @@ describe("given organizations of every eligibility kind", () => {
       expect(poolIds.has(cancelledEnterpriseOrgId)).toBe(true);
       expect(poolIds.has(enterpriseOrgId)).toBe(false);
       expect(poolIds.has(pendingEnterpriseOrgId)).toBe(false);
+      expect(poolIds.has(enrolledOrgId)).toBe(false);
+      expect(poolIds.has(excludedOrgId)).toBe(false);
+    });
+
+    /** @scenario "An operator can draw enterprise organizations into a cohort" */
+    it("holds the enterprise organizations when the exclusion is lifted", async () => {
+      const pool = await repository.findCohortEligibleOrganizations({
+        migrationName: MIGRATION,
+        excludeOrganizationIds: [excludedOrgId],
+        includeEnterprise: true,
+      });
+      const poolIds = new Set(pool.map((organization) => organization.id));
+
+      expect(poolIds.has(enterpriseOrgId)).toBe(true);
+      expect(poolIds.has(pendingEnterpriseOrgId)).toBe(true);
+      // Lifting ONE exclusion lifts only that one: an already-enrolled
+      // organization and a caller-excluded id stay out regardless.
       expect(poolIds.has(enrolledOrgId)).toBe(false);
       expect(poolIds.has(excludedOrgId)).toBe(false);
     });

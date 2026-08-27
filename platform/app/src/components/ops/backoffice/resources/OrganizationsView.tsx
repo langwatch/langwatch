@@ -159,8 +159,6 @@ interface FormState {
   name: string;
   slug: string;
   phoneNumber: string;
-  ssoDomain: string;
-  ssoProvider: string;
   usageSpendingMaxLimit: string;
   signedDPA: boolean;
   promoCode: string;
@@ -241,10 +239,10 @@ function OrganizationEditDrawer({
     if (form.slug !== organization.slug) data.slug = form.slug;
     if (form.phoneNumber !== (organization.phoneNumber ?? ""))
       data.phoneNumber = nullIfEmpty(form.phoneNumber);
-    if (form.ssoDomain !== (organization.ssoDomain ?? ""))
-      data.ssoDomain = nullIfEmpty(form.ssoDomain);
-    if (form.ssoProvider !== (organization.ssoProvider ?? ""))
-      data.ssoProvider = nullIfEmpty(form.ssoProvider);
+    // No `ssoDomain` / `ssoProvider` diff: this drawer no longer edits them,
+    // so it can no longer send them. The server refuses such a write once
+    // connection routing is enforced; not sending one is how this surface
+    // stops asking for a refusal.
     const nextLimit = numOrNull(form.usageSpendingMaxLimit);
     if (nextLimit !== organization.usageSpendingMaxLimit) {
       data.usageSpendingMaxLimit = nextLimit;

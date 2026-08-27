@@ -58,6 +58,11 @@ export const TargetSummary = memo(function TargetSummary({
     aggregates.errorRows > 0 ||
     aggregates.totalCost !== null;
 
+  const coverage = passRateCoverage({
+    completedRows: aggregates.completedRows,
+    totalRows: aggregates.totalRows,
+  });
+
   // Build tooltip content
   const tooltipContent = (
     <VStack align="stretch" gap={0} fontSize="12px" minWidth="230px" color="fg">
@@ -245,13 +250,26 @@ export const TargetSummary = memo(function TargetSummary({
         overflow="hidden"
       >
         {/* Running progress */}
-        {isRunning && aggregates.completedRows < aggregates.totalRows && (
+        {isRunning && !coverage.isComplete && (
           <HStack gap={1}>
             <Icon as={LuZap} boxSize={3} color="blue.fg" />
             <Text color="blue.fg" fontWeight="medium">
               {aggregates.completedRows}/{aggregates.totalRows}
             </Text>
           </HStack>
+        )}
+
+        {/*
+          A rate that covers part of the dataset never stands on its own.
+          The score beside it is worked out over the rows that answered, so
+          without the count a column at 30 of 40 rows reads as finished and
+          invites a comparison against a column that did answer every row.
+        */}
+        {!isRunning && hasResults && (
+          <PassRateCoverageChip
+            completedRows={aggregates.completedRows}
+            totalRows={aggregates.totalRows}
+          />
         )}
 
         {(aggregates.overallPassRate !== null ||

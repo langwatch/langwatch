@@ -69,8 +69,11 @@ export const MINUTE_INTERVALS = [5, 10, 15, 30] as const;
  * it is rendered by.
  */
 export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<GovernanceSourceType, string>> = {
+  // Retired sources still need their stored cadence rendered.
   copilot_studio: "copilot_studio",
+  copilot_studio_dataverse: "copilot_studio_dataverse",
   openai_compliance: "openai_compliance",
+  openai_admin: "openai_admin",
   claude_compliance: "claude_compliance",
   anthropic_admin: "anthropic_admin",
   databricks_genie: "databricks_genie",
@@ -85,7 +88,9 @@ export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<GovernanceSourceType, strin
  */
 export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
+  copilot_studio_dataverse: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
+  openai_admin: "0 * * * *",
   claude_compliance: "*/15 * * * *",
   anthropic_admin: "0 * * * *",
   databricks_genie: "*/15 * * * *",
@@ -141,11 +146,7 @@ interface CronShapeFields {
 }
 
 /** The `*\/N * * * *` shape, N from MINUTE_INTERVALS. */
-function minutesShape({
-  minField,
-  hourField,
-  dowField,
-}: CronShapeFields): PullCadenceParts | null {
+function minutesShape({ minField, hourField, dowField }: CronShapeFields): PullCadenceParts | null {
   const stepMatch = /^\*\/(\d+)$/.exec(minField);
   if (!stepMatch) return null;
   const everyMinutes = Number(stepMatch[1]);

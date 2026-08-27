@@ -27,6 +27,7 @@ import {
   AuthzReadRepository,
   type AuthzDatabase,
   type CustomRolePermissionsRow,
+  type OrganizationMembership,
   type OrganizationRole,
   type ShareLinkRow,
 } from "../authz-read.repository";
@@ -41,11 +42,7 @@ const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 /** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
  *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that
  *  no PR-3 decision reads, so neither belongs in a binding list. */
-const BINDING_SCOPE_TYPES: readonly RoleBindingScopeType[] = [
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-];
+const BINDING_SCOPE_TYPES: readonly RoleBindingScopeType[] = ["ORGANIZATION", "TEAM", "PROJECT"];
 
 type BindingGrantRow = {
   roleKey: string | null;
@@ -67,18 +64,19 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Membership is not a grant: the same query the legacy repository runs. */
-  async tryFindOrganizationRole({
+  async tryFindOrganizationMembership({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null> {
+  }): Promise<OrganizationMembership | null> {
     const row = (await this.database.organizationUser.findFirst({
       where: { userId, organizationId },
-      select: { role: true },
-    })) as { role: OrganizationRole } | null;
-    return row?.role ?? null;
+      select: { role: true, disabledAt: true },
+    })) as { role: OrganizationRole; disabledAt: Date | null } | null;
+    if (!row) return null;
+    return { role: row.role, disabled: row.disabledAt !== null };
   }
 
   async findUserBindings({
@@ -196,7 +194,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         userId,
         team: {
           organizationId,
-          organization: { members: { some: { userId } } },
+          organization: { members: { some: { userId, disabledAt: null } } },
         },
       },
       select: {
@@ -425,7 +423,11 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     organizationId: string;
   }): Promise<boolean> {
     const membership = await this.database.organizationUser.findFirst({
-      where: { userId, organizationId },
+      // `disabledAt: null` is part of the predicate, not a refinement of it: a
+      // seat-disabled membership confers no grants, exactly as a removed one
+      // does. This is the ledger-head twin of the relation fence the legacy
+      // repository puts on each binding query.
+      where: { userId, organizationId, disabledAt: null },
       select: { userId: true },
     });
     return membership !== null;

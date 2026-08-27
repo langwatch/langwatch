@@ -130,6 +130,11 @@ function LangyShiftedRoot({
 }
 
 function LangySidecarConnected() {
-  const { proposalHandlersRef } = useLangy();
-  return <LangySidecar proposalHandlersRef={proposalHandlersRef} />;
+  const { proposalHandlersRef, actionHandlersRef } = useLangy();
+  return (
+    <LangySidecar
+      proposalHandlersRef={proposalHandlersRef}
+      actionHandlersRef={actionHandlersRef}
+    />
+  );
 }

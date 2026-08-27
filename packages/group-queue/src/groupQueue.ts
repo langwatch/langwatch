@@ -41,11 +41,7 @@ import type {
   QueueAuditAdapter,
   QueueSendOptions,
 } from "./contracts";
-import {
-  defaultFailureDecision,
-  GroupQueueConfigurationError,
-  GroupQueueError,
-} from "./errors";
+import { defaultFailureDecision, GroupQueueConfigurationError, GroupQueueError } from "./errors";
 import { getBackoffMs, JOB_RETRY_CONFIG } from "./retry";
 import {
   type ProjectStorageDestination,
@@ -87,11 +83,7 @@ import {
   gqRetryEncodeFailuresTotal,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
-import {
-  fallbackReadyScore,
-  isPlausibleReadyScore,
-  resolveReadyScore,
-} from "./readyScore";
+import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore";
 import {
   DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
   DEFAULT_CONFIRMED_DEATH_THRESHOLD,
@@ -136,9 +128,7 @@ async function withActiveSpan<T>(
  * delivery, and the fold would re-apply the batch it had already folded.
  * Pinned by retryChainInvariants.unit.test.ts.
  */
-export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
-  (JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3,
-);
+export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
 
 /**
  * A field off an untrusted payload, when it is actually a usable string.
@@ -268,10 +258,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private readonly queueName: string;
   private readonly jobName: string;
   private readonly process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
-  private readonly processBatch?: (
-    payloads: Payload[],
-    delivery?: JobDelivery,
-  ) => Promise<void>;
+  private readonly processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
   private readonly coalesceMaxBatch?: (payload: Payload) => number | undefined;
   private readonly coalesceMaxBytes?: (payload: Payload) => number | undefined;
   private readonly spanAttributes?: (payload: Payload) => Attributes;
@@ -313,6 +300,27 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private readonly deathThreshold: number;
 
   private shutdownRequested = false;
+  /**
+   * Whether `send`/`sendBatch` may still stage work.
+   *
+   * NOT the same thing as `shutdownRequested`, and the difference is the whole
+   * point. Shutdown is requested at the START of close(), while the drain that
+   * follows is still running jobs — and those jobs store events and dispatch
+   * them onward, into this same queue, because the projection, subscriber, map
+   * and fold queues are all facades over it. Gating sends on
+   * `shutdownRequested` meant the queue refused the work its own drain was
+   * producing, and nothing above retried it: every rollout quietly dropped a
+   * burst of projection dispatches (prod, 2026-08-24).
+   *
+   * Accepting them is safe. `send` stages into Redis over `redisConnection`,
+   * which the drain leaves alone — only the blocking connection is closed here,
+   * and the shared connections go afterwards, in App.close. Staged work is
+   * durable and shared, so anything staged during a drain is picked up by
+   * another pod rather than lost with this one.
+   *
+   * So the gate closes when the drain is over, however it ended.
+   */
+  private stagingClosed = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
 
@@ -353,9 +361,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     options?: {
       consumerEnabled?: boolean;
       objectStoreFor?: (projectId: string) => ObjectStore;
-      resolveStorageDestination?: (
-        projectId: string,
-      ) => Promise<ProjectStorageDestination>;
+      resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
       activity?: GroupQueueActivityPort<Payload>;
       context?: GroupQueueContextPort;
       failures?: GroupQueueFailureClassifier;
@@ -425,8 +431,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     this.activity = options?.activity;
     this.contextPort = options?.context;
     this.failureClassifier = options?.failures;
-    this.shutdownTimeoutMs =
-      options?.drainTimeoutMs ?? GROUP_QUEUE_CONFIG.shutdownTimeoutMs;
+    this.shutdownTimeoutMs = options?.drainTimeoutMs ?? GROUP_QUEUE_CONFIG.shutdownTimeoutMs;
     this.quarantineFailStreakThreshold =
       options?.policy?.quarantineFailureThreshold ?? DEFAULT_GROUP_QUARANTINE_THRESHOLD;
     this.bisectionSplitBudget =
@@ -455,10 +460,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     // it via SMEMBERS instead of an O(keyspace) `SCAN MATCH *:gq:ready`.
     // Best-effort: a miss only degrades discovery to the scan fallback.
     void this.scripts.registerQueue().catch((err) => {
-      this.logger.debug(
-        { err, queueName: this.queueName },
-        "queue registry registration failed",
-      );
+      this.logger.debug({ err, queueName: this.queueName }, "queue registry registration failed");
     });
 
     // fastq promise-based queue: bounds concurrency on this node
@@ -472,9 +474,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
     // Publish the liveness beacon before anything can claim. A consumer that
     // never claims still needs no beacon, so producers skip it entirely.
-    this.livenessReady = this.consumerEnabled
-      ? this.startLivenessBeacon()
-      : Promise.resolve();
+    this.livenessReady = this.consumerEnabled ? this.startLivenessBeacon() : Promise.resolve();
 
     // Start dispatcher and metrics collection in consumer mode
     if (this.consumerEnabled) {
@@ -514,9 +514,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     metadata: GroupQueueContextMetadata | undefined,
     operation: () => Promise<T>,
   ): Promise<T> {
-    return this.contextPort
-      ? await this.contextPort.run(metadata, operation)
-      : await operation();
+    return this.contextPort ? await this.contextPort.run(metadata, operation) : await operation();
   }
 
   private failureDecision(error: unknown): {
@@ -584,11 +582,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    * Stages a job into the group queue's Redis staging layer.
    */
   async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
-    if (this.shutdownRequested) {
+    if (this.stagingClosed) {
       throw new GroupQueueError(
         this.queueName,
         "send",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
     assertNoReservedKeys(payload as Record<string, unknown>, this.queueName, "send");
@@ -691,15 +689,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     );
   }
 
-  async sendBatch(
-    payloads: Payload[],
-    options?: QueueSendOptions<Payload>,
-  ): Promise<void> {
-    if (this.shutdownRequested) {
+  async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
+    if (this.stagingClosed) {
       throw new GroupQueueError(
         this.queueName,
         "sendBatch",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
 
@@ -707,11 +702,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       return;
     }
     for (const payload of payloads) {
-      assertNoReservedKeys(
-        payload as Record<string, unknown>,
-        this.queueName,
-        "sendBatch",
-      );
+      assertNoReservedKeys(payload as Record<string, unknown>, this.queueName, "sendBatch");
     }
 
     const delay = options?.delay ?? this.delay;
@@ -856,9 +847,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    * logs each failure individually. Avoids paying one serial PG round trip
    * per payload/sibling inside the worker slot on large coalesced batches.
    */
-  private async runAuditAll(
-    ops: Array<() => Promise<unknown> | undefined>,
-  ): Promise<void> {
+  private async runAuditAll(ops: Array<() => Promise<unknown> | undefined>): Promise<void> {
     if (!this.auditAdapter || ops.length === 0) return;
     const results = await Promise.allSettled(ops.map((op) => Promise.resolve(op())));
     for (const result of results) {
@@ -866,10 +855,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         this.logger.warn(
           {
             queueName: this.queueName,
-            error:
-              result.reason instanceof Error
-                ? result.reason.message
-                : String(result.reason),
+            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
           },
           "Audit adapter hook failed; queue continues, projection lags",
         );
@@ -1100,23 +1086,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       if (drainedSiblings.length > 0) {
         try {
           const parsedSiblings = await Promise.all(
-            drainedSiblings.map((sibling) =>
-              this.parseDrainedPayload({ sibling, groupId }),
-            ),
+            drainedSiblings.map((sibling) => this.parseDrainedPayload({ sibling, groupId })),
           );
-          const liveSiblings = drainedSiblings.filter(
-            (_, index) => parsedSiblings[index] !== null,
-          );
-          const siblingPayloads = parsedSiblings.filter(
-            (parsed) => parsed !== null,
-          ) as Payload[];
+          const liveSiblings = drainedSiblings.filter((_, index) => parsedSiblings[index] !== null);
+          const siblingPayloads = parsedSiblings.filter((parsed) => parsed !== null) as Payload[];
           drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
-            batchJobIds = [
-              stagedJobId,
-              ...liveSiblings.map((sibling) => sibling.stagedJobId),
-            ];
+            batchJobIds = [stagedJobId, ...liveSiblings.map((sibling) => sibling.stagedJobId)];
           }
         } catch (err) {
           if (err instanceof TransientBlobStoreError) {
@@ -1167,10 +1144,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     const heartbeat = this.startActiveKeyHeartbeat({
       groupId,
       stagedJobId,
-      jobDataValues: [
-        jobDataJson,
-        ...drainedSiblings.map((sibling) => sibling.jobDataJson),
-      ],
+      jobDataValues: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
       isCancelled: () => heartbeatStopped,
     });
     const stopHeartbeat = (): void => {
@@ -1191,8 +1165,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         "queue.attempt": attempt,
         // Which source won `Math.max(jobAttempt, groupAttempt)`. Distinguishes
         // a genuine first delivery from a chain whose counter was lost.
-        "queue.attempt_source":
-          attempt === 1 ? "fresh" : jobAttempt >= attempt ? "job" : "group",
+        "queue.attempt_source": attempt === 1 ? "fresh" : jobAttempt >= attempt ? "job" : "group",
       };
 
       // Add custom span attributes from the definition
@@ -1202,9 +1175,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
           for (const [key, value] of Object.entries(custom)) {
             if (
               value !== undefined &&
-              (typeof value === "string" ||
-                typeof value === "number" ||
-                typeof value === "boolean")
+              (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
             ) {
               spanAttributes[key] = value;
             }
@@ -1342,10 +1313,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                 await this.clearGroupAttempt(groupId);
 
                 await this.blobLifecycle.releaseLease({
-                  values: [
-                    jobDataJson,
-                    ...drainedSiblings.map((sibling) => sibling.jobDataJson),
-                  ],
+                  values: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
                   groupId,
                 });
               } catch (cleanupErr) {
@@ -1436,10 +1404,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                 // Honor the failure classifier's retry delay as a FLOOR over
                 // exponential backoff. A caller can lengthen but never shorten
                 // the wait, so its policy cannot cause a retry storm.
-                const backoffMs = Math.max(
-                  getBackoffMs(attempt),
-                  decision.retryAfterMs ?? 0,
-                );
+                const backoffMs = Math.max(getBackoffMs(attempt), decision.retryAfterMs ?? 0);
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 // The job keeps the id it was dispatched under (ADR-080). Its
@@ -1469,8 +1434,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                     jobDataJson,
                     err: encodeErr,
                     reason: "retry_encode_failed",
-                    message:
-                      "Retry re-encode failed; releasing old lease and discarding job",
+                    message: "Retry re-encode failed; releasing old lease and discarding job",
                     // Released below, deliberately: the body was already read, so
                     // keeping it buys a later worker nothing.
                     bodyPreserved: false,
@@ -1677,10 +1641,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       const hourKey = latencyHourBucketKey(this.queueName, completedAtMs);
       this.redisConnection
         .multi()
-        .lpush(
-          `${this.queueName}:gq:stats:latencies-ms`,
-          String(Math.round(jobDurationMs)),
-        )
+        .lpush(`${this.queueName}:gq:stats:latencies-ms`, String(Math.round(jobDurationMs)))
         .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, LATENCY_SAMPLE_SIZE - 1)
         .hincrby(minuteKey, bucketField, 1)
         .expire(minuteKey, LATENCY_MINUTE_BUCKET_TTL_SECONDS)
@@ -1755,9 +1716,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         reason: dropReasonOf(err),
         message: "Failed to parse drained sibling job data — dropping",
         // Lease release is non-destructive; bytes remain until lazy reclaim.
-        bodyPreserved: !(err instanceof DecodeFailureError
-          ? err.reason === "missing_blob"
-          : false),
+        bodyPreserved: !(err instanceof DecodeFailureError ? err.reason === "missing_blob" : false),
       });
       await this.blobLifecycle.releaseLease({
         values: [sibling.jobDataJson],
@@ -2067,10 +2026,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
   }
 
-  private async restageDrainedSiblings(
-    groupId: string,
-    siblings: DrainedJob[],
-  ): Promise<void> {
+  private async restageDrainedSiblings(groupId: string, siblings: DrainedJob[]): Promise<void> {
     for (const sibling of siblings) {
       try {
         await this.scripts.stage({
@@ -2407,9 +2363,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         // through the same redaction.
         err: redactStorageUrisInText(err instanceof Error ? err.message : String(err)),
         errStack:
-          err instanceof Error && err.stack
-            ? redactStorageUrisInText(err.stack)
-            : undefined,
+          err instanceof Error && err.stack ? redactStorageUrisInText(err.stack) : undefined,
       },
       message,
     );
@@ -2514,8 +2468,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     err: TransientBlobStoreError;
   }): Promise<void> {
     const attempt =
-      Math.max(readJobAttempt(jobDataJson) ?? 0, await this.readGroupAttempt(groupId)) +
-      1;
+      Math.max(readJobAttempt(jobDataJson) ?? 0, await this.readGroupAttempt(groupId)) + 1;
     if (attempt >= JOB_RETRY_CONFIG.maxAttempts) {
       // The retry ladder is out of rungs. This is a discard like any other, and
       // it used to claim replay would recover it — it does not (#5538).
@@ -2711,10 +2664,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         }),
       ]);
 
-      this.logger.debug(
-        { queueName: this.queueName },
-        "Group queue processor closed successfully",
-      );
+      this.logger.debug({ queueName: this.queueName }, "Group queue processor closed successfully");
     } catch (error) {
       this.logger.warn(
         {
@@ -2728,6 +2678,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       throw error;
     } finally {
       clearTimeout(shutdownTimer);
+      // Here, not at the top of close(): until this point the drain was still
+      // running jobs whose fan-out has to be allowed to stage. Past it the
+      // shared transports are about to go, so staging more is pointless. The
+      // timeout path lands here too — a drain that overran was abandoned, not
+      // finished, and either way nothing further should be staged.
+      this.stagingClosed = true;
     }
   }
 

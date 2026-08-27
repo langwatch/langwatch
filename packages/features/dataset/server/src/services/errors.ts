@@ -120,11 +120,10 @@ export class DatasetStaleColumnsError extends HandledError {
   declare readonly code: "dataset_stale_columns";
 
   constructor() {
-    super(
-      "dataset_stale_columns",
-      "This dataset's columns changed since the editor was opened",
-      { httpStatus: 409, fault: "customer" },
-    );
+    super("dataset_stale_columns", "This dataset's columns changed since the editor was opened", {
+      httpStatus: 409,
+      fault: "customer",
+    });
     this.name = "DatasetStaleColumnsError";
   }
 }
@@ -246,13 +245,7 @@ export class DatasetNotReadyError extends HandledError {
   readonly status: string;
   readonly statusError: string | null;
 
-  constructor({
-    status,
-    statusError = null,
-  }: {
-    status: string;
-    statusError?: string | null;
-  }) {
+  constructor({ status, statusError = null }: { status: string; statusError?: string | null }) {
     super("dataset_not_ready", `Dataset is not ready (status: ${status})`, {
       meta: { status },
       httpStatus: 425,
@@ -377,9 +370,7 @@ export class DatasetChunkCountMissingError extends Error {
   readonly datasetId: string;
 
   constructor(datasetId: string) {
-    super(
-      `Dataset ${datasetId} has s3_jsonl layout but a null chunkCount (I-COUNT drift)`,
-    );
+    super(`Dataset ${datasetId} has s3_jsonl layout but a null chunkCount (I-COUNT drift)`);
     this.name = "DatasetChunkCountMissingError";
     this.datasetId = datasetId;
   }
@@ -388,14 +379,25 @@ export class DatasetChunkCountMissingError extends Error {
 /**
  * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
  * storage made a writable backend mandatory, so this is a deployment-config
- * error, not a transient failure. Typed (vs a bare `Error`) so the upload route
- * can surface its actionable message to the client (configure S3 / set
- * `LANGWATCH_LOCAL_STORAGE_PATH`) instead of letting it collapse into a generic
- * 500 that the browser then mistakes for "no object storage".
+ * error, not a transient failure. We can name the cause and we can name the
+ * fix, so per ADR-045 it crosses the boundary as a handled error under
+ * `storage_not_writable` rather than as an unattributed 500.
+ *
+ * `fault: "platform"`, because provisioning object storage is ours: nothing
+ * the caller changes about the request makes the write land.
+ *
+ * The message is customer-safe by construction. The storage root and the
+ * environment variables that set it are operator detail: they ride the log
+ * line at the throw site and the remediation tips, never the response body.
  */
-export class StorageNotWritableError extends Error {
-  constructor(message: string) {
-    super(message);
+export class StorageNotWritableError extends HandledError {
+  declare readonly code: "storage_not_writable";
+
+  constructor() {
+    super("storage_not_writable", "Dataset storage is not writable, so nothing was saved", {
+      httpStatus: 500,
+      fault: "platform",
+    });
     this.name = "StorageNotWritableError";
   }
 }

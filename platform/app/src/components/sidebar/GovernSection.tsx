@@ -3,6 +3,7 @@ import React from "react";
 
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { useRouter } from "~/utils/compat/next-router";
 import { featureIcons } from "~/utils/featureIcons";
 import { SidebarSection } from "./SidebarSection";
@@ -20,13 +21,14 @@ export const GovernSection = React.memo(function GovernSection({
   showExpanded: boolean;
 }) {
   const router = useRouter();
-  const { organization, hasPermission } = useOrganizationTeamProject({
+  const { project, organization, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const { enabled: gatewayMenuEnabled } = useFeatureFlag(
     "release_ui_ai_gateway_menu_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
@@ -34,6 +36,7 @@ export const GovernSection = React.memo(function GovernSection({
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
+      projectId: project?.id ?? NOT_TARGETED,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },

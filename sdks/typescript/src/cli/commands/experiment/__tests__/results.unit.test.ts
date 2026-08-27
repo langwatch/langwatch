@@ -227,15 +227,56 @@ describe("experimentResultsCommand()", () => {
           evaluations: unknown[];
           meta: Record<string, unknown>;
         };
-        expect(payload.dataset).toHaveLength(1);
+        // `--limit 1` shortens the printed table. Both failing rows are still
+        // in the answer, and `meta` says so, so a caller doing arithmetic on
+        // the payload divides by the real number of rows.
+        expect(payload.dataset).toHaveLength(2);
         expect(payload.dataset[0]!.entry.input).toBe("broken row");
-        expect(payload.evaluations).toHaveLength(0);
         expect(payload.meta).toMatchObject({
           totalMatching: 2,
-          truncated: true,
-          limit: 1,
+          returned: 2,
+          tableLimit: 1,
+          tableTruncated: true,
           filter: "failed",
         });
+      });
+    });
+
+    describe("when the row limit is smaller than the run", () => {
+      /** @scenario "The row limit shortens the table and never the answer" */
+      it("keeps every row in the answer while the table shows the limit", async () => {
+        const big = {
+          ...sampleResults,
+          dataset: Array.from({ length: 50 }, (_, i) => ({
+            index: i,
+            entry: { input: `row ${i}` },
+          })),
+          evaluations: [],
+        };
+        mockGetRunResults.mockResolvedValue(big);
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { limit: "5" },
+        });
+        const payload = result?.data as {
+          dataset: unknown[];
+          meta: Record<string, unknown>;
+        };
+
+        expect(payload.dataset).toHaveLength(50);
+        expect(payload.meta).toMatchObject({
+          totalMatching: 50,
+          returned: 50,
+          tableLimit: 5,
+          tableTruncated: true,
+        });
+
+        result?.table();
+        const printed = logSpy.mock.calls
+          .map((c: unknown[]) => String(c[0]))
+          .join("\n");
+        expect(printed).toContain("Showing 5 of 50");
       });
     });
 
@@ -404,9 +445,42 @@ describe("experimentResultsCommand()", () => {
       });
     });
 
-    describe("when --limit drops some rows", () => {
+    describe("when --filter failed drops some rows", () => {
       /** @scenario "Comparison verdicts follow the rows that survive filtering" */
-      it("reports verdicts only for the rows still shown", async () => {
+      it("reports verdicts only for the rows that failed", async () => {
+        // Row 1 fails, row 0 passes, so only row 1 survives the filter and
+        // only its verdict should be described.
+        mockGetRunResults.mockResolvedValue({
+          ...comparisonResults,
+          evaluations: [
+            ...comparisonResults.evaluations,
+            {
+              evaluator: "quality",
+              targetId: "target_a",
+              index: 1,
+              status: "processed",
+              score: 0.1,
+              passed: false,
+            },
+          ],
+        });
+
+        const result = await experimentResultsCommand({
+          experimentSlug: "doc-qa",
+          options: { filter: "failed" },
+        });
+
+        const evaluations = (result as any).data.evaluations;
+        const verdicts = evaluations.filter(
+          (e: any) => e.evaluator === "target_comparison",
+        );
+        expect(verdicts.map((v: any) => v.index)).toEqual([1]);
+      });
+    });
+
+    describe("when the row limit is smaller than the run", () => {
+      /** @scenario "The row limit shortens the table and never the answer" */
+      it("keeps every verdict, because the limit only shortens the table", async () => {
         mockGetRunResults.mockResolvedValue(comparisonResults);
 
         const result = await experimentResultsCommand({
@@ -414,13 +488,13 @@ describe("experimentResultsCommand()", () => {
           options: { limit: "2" },
         });
 
-        // limit=2 keeps the two row-0 entries, so only row 0's verdict.
         const evaluations = (result as any).data.evaluations;
         const verdicts = evaluations.filter(
           (e: any) => e.evaluator === "target_comparison",
         );
-        expect(verdicts).toHaveLength(1);
-        expect(verdicts[0].index).toBe(0);
+        // Both judged rows are in the answer, not only the two rows the table
+        // would have printed.
+        expect(verdicts.map((v: any) => v.index).sort()).toEqual([0, 1]);
       });
     });
 

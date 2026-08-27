@@ -71,8 +71,9 @@ describe("given the Add source menu", () => {
         "Claude Code (Anthropic OAuth)",
         "Anthropic Claude (Cowork)",
         "Workato",
-        "Microsoft Copilot Studio (Purview)",
+        "Microsoft Copilot Studio",
         "OpenAI Enterprise Compliance",
+        "OpenAI Admin",
         "Anthropic Claude Enterprise Compliance",
         "Anthropic Admin API (usage & cost)",
         "Databricks AI/BI Genie",
@@ -81,12 +82,21 @@ describe("given the Add source menu", () => {
       ]) {
         expect(screen.getByText(label)).toBeTruthy();
       }
+
+      // The retired directory-audit source is filtered out of the picker, so
+      // the offer carries one Copilot entry, not two near-identical ones.
+      expect(screen.queryByText("Microsoft Copilot Studio (Purview)")).toBeNull();
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */
     it("carries no technical mode suffix on any item", async () => {
       renderMenu({ isEnterprise: true });
       await openMenu();
+
+      // An empty menu carries no suffix either, and the group headings that
+      // openMenu waits on render with or without items under them. Prove the
+      // items are there before reading anything into their absence.
+      expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
 
       expect(screen.queryByText(/·\s*(push|pull|s3)/i)).toBeNull();
     });
@@ -178,6 +188,16 @@ describe("given the Add source menu", () => {
         disabledReason: "Source limit reached.",
       });
       const user = userEvent.setup();
+
+      // The trigger is the caller's own button: it renders whether or not this
+      // component does anything at all, so on its own it proves nothing and
+      // the assertions below would report green off a broken render. The
+      // reason on hover is the control, because only this component puts it
+      // there — it goes quiet the moment the disabled path stops wiring up.
+      await user.hover(screen.getByText("Add source"));
+      await waitFor(() => {
+        expect(screen.getByText("Source limit reached.")).toBeTruthy();
+      });
 
       await user.click(screen.getByText("Add source"));
 

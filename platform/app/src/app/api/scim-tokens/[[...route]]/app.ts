@@ -29,6 +29,9 @@ type ScimTokensContext = ServiceContext<EndpointVariables>;
 const tokenSummarySchema = z.object({
   id: z.string(),
   description: z.string().nullable(),
+  /** D08: which single sign-on connection this token reaches. An id, never a
+   *  secret — and the most important thing about a token, so it is listed. */
+  connectionId: z.string().nullable(),
   createdAt: z.date(),
   lastUsedAt: z.date().nullable(),
 });
@@ -37,6 +40,11 @@ const idParamsSchema = z.object({ id: z.string().min(1) });
 
 const createTokenSchema = z.object({
   description: z.string().trim().min(1).max(255).optional(),
+  /** D08: the connection this token is for, and the whole of its write
+   *  authority. Optional on the wire and required by the service, so a
+   *  provisioning tool that has not been updated gets the named
+   *  `scim_connection_required` refusal rather than a schema error. */
+  connectionId: z.string().trim().min(1).optional(),
 });
 
 const organizationOf = (c: Context): Organization =>
@@ -64,11 +72,12 @@ const createTokenHandler = async (
     c,
     organizationId: organization.id,
     action: "management.scimToken.create",
-    args: { tokenId: created.tokenId },
+    args: { tokenId: created.tokenId, connectionId: created.connectionId },
   });
   return {
     id: created.tokenId,
     token: created.token,
+    connectionId: created.connectionId,
     description: input.description ?? null,
   };
 };

@@ -28,6 +28,34 @@ export class LiteMemberRestrictedError extends HandledError {
  * `permission` goes in `meta` because a client renders it: it is the difference
  * between "you can't do that" and "ask an admin for `datasets:manage`".
  */
+/**
+ * The caller still holds a membership in this organization, but an admin
+ * disabled it to stay within the licensed seat count, so it grants nothing.
+ *
+ * Handled, and deliberately NOT folded into the generic denial: we know
+ * exactly why the check failed, and the person can act on it — an admin can
+ * return a seat to them. Reported as "you do not have permission" it would
+ * read as a role problem they could fix by asking for a role; reported as "no
+ * membership" it would tell someone who IS a member that they are not.
+ *
+ * Nothing here names who disabled them or how many seats the license covers:
+ * that is the organization's business, and the person asking has an admin to
+ * ask. No `meta` either: nothing renders one, and the scope a check was made
+ * on is a project or team as often as an organization.
+ */
+export class MembershipDisabledError extends HandledError {
+  declare readonly code: "membership_disabled";
+
+  constructor() {
+    super(
+      "membership_disabled",
+      "Your access to this organization has been disabled",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "MembershipDisabledError";
+  }
+}
+
 export class ProjectPermissionDeniedError extends HandledError {
   declare readonly code: "project_permission_denied";
 

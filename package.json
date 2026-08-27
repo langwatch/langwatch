@@ -36,6 +36,7 @@
     "format": "oxfmt --write --disable-nested-config .",
     "format:check": "oxfmt --check --disable-nested-config .",
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
+    "start:prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",
     "prisma:seed": "pnpm --filter @langwatch/web prisma:seed",
     "pack:npm": "bash dev/scripts/pack-npm.sh",

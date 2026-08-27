@@ -111,10 +111,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
 Your evaluation metrics are now tracked and visualized in LangWatch.
 
 <Frame>
-  <img
-    src="/images/offline-evaluation/evaluation-sample.png"
-    alt="Evaluation Results Sample"
-  />
+  <img src="/images/offline-evaluation/evaluation-sample.png" alt="Evaluation Results Sample" />
 </Frame>
 
 ## Core Concepts
@@ -233,9 +230,9 @@ for index, row in evaluation.loop(df.iterrows()):
 ```
 
 <Info>
-  `evaluation.target()` automatically captures latency, creates isolated traces per
-  target, and enables context inference so `log()` calls don't need explicit `target`
-  parameters. Use `log_response()` to store the model's output.
+  `evaluation.target()` automatically captures latency, creates isolated traces per target, and
+  enables context inference so `log()` calls don't need explicit `target` parameters. Use
+  `log_response()` to store the model's output.
 </Info>
 
 Alternatively, use the `target` parameter directly with `evaluation.log()`:
@@ -267,15 +264,11 @@ await evaluation.run(dataset, async ({ item, index }) => {
       return response;
     }),
 
-    evaluation.withTarget(
-      "claude-experiment",
-      { model: "anthropic/claude-4-opus" },
-      async () => {
-        const response = await callAnthropic("claude-4-opus", item.question);
-        evaluation.log("accuracy", { score: calculateAccuracy(response, item.expected) });
-        return response;
-      },
-    ),
+    evaluation.withTarget("claude-experiment", { model: "anthropic/claude-4-opus" }, async () => {
+      const response = await callAnthropic("claude-4-opus", item.question);
+      evaluation.log("accuracy", { score: calculateAccuracy(response, item.expected) });
+      return response;
+    }),
   ]);
 
   // Latency is automatically captured from each withTarget() span
@@ -330,8 +323,8 @@ evaluation.log("accuracy", { index: 0, target: "gpt5", score: 0.95 }); // metada
 </Tabs>
 
 <Warning>
-  If you provide different metadata for the same target name, an error will be raised. Use
-  a different target name if you want different configurations.
+  If you provide different metadata for the same target name, an error will be raised. Use a
+  different target name if you want different configurations.
 </Warning>
 
 ### Metadata for Comparison
@@ -393,9 +386,7 @@ for index, row in evaluation.loop(df.iterrows(), threads=4):
     evaluation.submit(task, index, row)
 ```
 
-<Note>
-  By default, `threads=4`. Adjust based on your API rate limits and system resources.
-</Note>
+<Note>By default, `threads=4`. Adjust based on your API rate limits and system resources.</Note>
 
 ### Async-native mode
 
@@ -504,8 +495,8 @@ await evaluation.run(dataset, async ({ item, index }) => {
 </Tabs>
 
 <Info>
-  Browse our complete list of [available evaluators](/evaluations/evaluators/list)
-  including metrics for RAG quality, hallucination detection, safety, and more.
+  Browse our complete list of [available evaluators](/evaluations/evaluators/list) including metrics
+  for RAG quality, hallucination detection, safety, and more.
 </Info>
 
 ## Comparison
@@ -566,9 +557,9 @@ The candidates are whatever each `withTarget()` callback returned.
 The winner comes back named with the target name you registered. `compare()` judges however many candidates the row has, and a target that produced nothing for the row, or only an empty output, is not a candidate.
 
 <Info>
-  Compare a row once its targets have finished. In Python that is after the row's last
-  `target()` block has closed, and in TypeScript after its `withTarget()` calls have
-  settled, which under the usual `Promise.all` is right after the `await`.
+  Compare a row once its targets have finished. In Python that is after the row's last `target()`
+  block has closed, and in TypeScript after its `withTarget()` calls have settled, which under the
+  usual `Promise.all` is right after the `await`.
 </Info>
 
 <Note>
@@ -603,9 +594,9 @@ const verdict = await evaluation.compare({
 </Tabs>
 
 <Tip>
-  Use a reference answer when correctness is the question. Leave it out for open-ended
-  work, where tone, completeness, structure or policy adherence decide the winner and no
-  single answer is the right one.
+  Use a reference answer when correctness is the question. Leave it out for open-ended work, where
+  tone, completeness, structure or policy adherence decide the winner and no single answer is the
+  right one.
 </Tip>
 
 ### Customizing the judge prompt
@@ -669,9 +660,9 @@ const verdict = await evaluation.compare({
 </Tabs>
 
 <Note>
-  Only those three placeholders are substituted, and they are substituted literally. Any
-  other braces in your prompt reach the judge as written, so a rubric that says `score out
-  of {10}` is passed through unchanged.
+  Only those three placeholders are substituted, and they are substituted literally. Any other
+  braces in your prompt reach the judge as written, so a rubric that says `score out of {10}` is
+  passed through unchanged.
 </Note>
 
 ### Options
@@ -705,14 +696,14 @@ A verdict carries four things: the `status`, the `winner`, the judge's `reasonin
 | `error`        | The judge failed or could not be reached, so nothing was measured about the candidates at all                                                                                                                                                                                                                                                                                                                                                          |
 
 <Note>
-  A comparison never raises when a judge fails, and never raises on a row too thin to
-  judge. One unreachable judge in a thousand-row run costs you that row, not the run.
+  A comparison never raises when a judge fails, and never raises on a row too thin to judge. One
+  unreachable judge in a thousand-row run costs you that row, not the run.
 </Note>
 
 <Warning>
-  Naming a target in `targets` that recorded no output for the row does raise. Comparing
-  whatever remains would hand you a two-way verdict where you asked for a three-way one,
-  which is worse than a failure.
+  Naming a target in `targets` that recorded no output for the row does raise. Comparing whatever
+  remains would hand you a two-way verdict where you asked for a three-way one, which is worse than
+  a failure.
 </Warning>
 
 ### Seeing the results
@@ -848,10 +839,10 @@ await evaluation.run(
 </Tabs>
 
 <Note>
-  The older `langevals/pairwise_compare` evaluator is deprecated. Existing calls keep
-  working, because they are routed to the same judge described here, but new code should
-  use `compare()`: it takes any number of candidates, names the winner with your own
-  target name, and needs no candidate columns to assemble.
+  The older `langevals/pairwise_compare` evaluator is deprecated. Existing calls keep working,
+  because they are routed to the same judge described here, but new code should use `compare()`: it
+  takes any number of candidates, names the winner with your own target name, and needs no candidate
+  columns to assemble.
 </Note>
 
 ## Complete Example
@@ -1030,30 +1021,30 @@ All columns from your input dataset are included with their original names.
 
 For each target in your evaluation, the following columns are exported:
 
-| Column Pattern            | Description                                  | Example                                 |
-| ------------------------- | -------------------------------------------- | --------------------------------------- |
-| `{target}_model`          | Model used for this target                   | `gpt-4_model` → `openai/gpt-4`          |
-| `{target}_prompt_id`      | Prompt configuration ID (for prompt targets) | `gpt-4_prompt_id` → `prompt-abc123`     |
-| `{target}_prompt_version` | Prompt version number                        | `gpt-4_prompt_version` → `2`            |
-| `{target}_{metadata_key}` | Custom metadata values                       | `gpt-4_temperature` → `0.7`             |
-| `{target}_output`         | Model output (or individual output fields)   | `gpt-4_output` → `"The answer is 42"`   |
-| `{target}_cost`           | Execution cost in USD                        | `gpt-4_cost` → `0.0012`                 |
-| `{target}_duration_ms`    | Execution time in milliseconds               | `gpt-4_duration_ms` → `1250`            |
-| `{target}_error`          | Error message if execution failed            | `gpt-4_error` → `"Rate limit exceeded"` |
-| `{target}_trace_id`       | Trace ID for viewing execution details       | `gpt-4_trace_id` → `trace_abc123`       |
+| Column Pattern            | Description                                  | Example                                      |
+| ------------------------- | -------------------------------------------- | -------------------------------------------- |
+| `{target}_model`          | Model used for this target                   | `gpt-5-mini_model` → `openai/gpt-5-mini`     |
+| `{target}_prompt_id`      | Prompt configuration ID (for prompt targets) | `gpt-5-mini_prompt_id` → `prompt-abc123`     |
+| `{target}_prompt_version` | Prompt version number                        | `gpt-5-mini_prompt_version` → `2`            |
+| `{target}_{metadata_key}` | Custom metadata values                       | `gpt-5-mini_seed` → `42`                     |
+| `{target}_output`         | Model output (or individual output fields)   | `gpt-5-mini_output` → `"The answer is 42"`   |
+| `{target}_cost`           | Execution cost in USD                        | `gpt-5-mini_cost` → `0.0012`                 |
+| `{target}_duration_ms`    | Execution time in milliseconds               | `gpt-5-mini_duration_ms` → `1250`            |
+| `{target}_error`          | Error message if execution failed            | `gpt-5-mini_error` → `"Rate limit exceeded"` |
+| `{target}_trace_id`       | Trace ID for viewing execution details       | `gpt-5-mini_trace_id` → `trace_abc123`       |
 
 #### Evaluator Columns (per target, per evaluator)
 
 For each evaluator applied to a target:
 
-| Column Pattern                     | Description                       | Example                                                 |
-| ---------------------------------- | --------------------------------- | ------------------------------------------------------- |
-| `{target}_{evaluator}_score`       | Numeric score (0-1)               | `gpt-4_faithfulness_score` → `0.95`                     |
-| `{target}_{evaluator}_passed`      | Boolean pass/fail                 | `gpt-4_faithfulness_passed` → `true`                    |
-| `{target}_{evaluator}_label`       | Classification label              | `gpt-4_sentiment_label` → `positive`                    |
-| `{target}_{evaluator}_details`     | Additional details or explanation | `gpt-4_faithfulness_details` → `"All claims supported"` |
-| `{target}_{evaluator}_cost`        | Cost of running the evaluator     | `gpt-4_faithfulness_cost` → `0.0005`                    |
-| `{target}_{evaluator}_duration_ms` | Evaluator execution time          | `gpt-4_faithfulness_duration_ms` → `850`                |
+| Column Pattern                     | Description                       | Example                                                      |
+| ---------------------------------- | --------------------------------- | ------------------------------------------------------------ |
+| `{target}_{evaluator}_score`       | Numeric score (0-1)               | `gpt-5-mini_faithfulness_score` → `0.95`                     |
+| `{target}_{evaluator}_passed`      | Boolean pass/fail                 | `gpt-5-mini_faithfulness_passed` → `true`                    |
+| `{target}_{evaluator}_label`       | Classification label              | `gpt-5-mini_sentiment_label` → `positive`                    |
+| `{target}_{evaluator}_details`     | Additional details or explanation | `gpt-5-mini_faithfulness_details` → `"All claims supported"` |
+| `{target}_{evaluator}_cost`        | Cost of running the evaluator     | `gpt-5-mini_faithfulness_cost` → `0.0005`                    |
+| `{target}_{evaluator}_duration_ms` | Evaluator execution time          | `gpt-5-mini_faithfulness_duration_ms` → `850`                |
 
 #### Comparison Columns (per comparison)
 
@@ -1083,12 +1074,12 @@ A row's candidates can be fewer than the comparison's full set of targets, becau
 
 ### Example CSV Output
 
-For an evaluation comparing GPT-4 and Claude with a faithfulness evaluator:
+For an evaluation comparing two targets, `gpt-5-mini` and `claude`, with a faithfulness evaluator:
 
 ```csv
-index,question,expected,gpt-4_model,gpt-4_output,gpt-4_cost,gpt-4_duration_ms,gpt-4_faithfulness_score,gpt-4_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
-0,What is 2+2?,4,openai/gpt-4,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-3,2+2 equals 4,0.0008,980,0.92,true
-1,Capital of France?,Paris,openai/gpt-4,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-3,The capital of France is Paris,0.0010,890,0.97,true
+index,question,expected,gpt-5-mini_model,gpt-5-mini_output,gpt-5-mini_cost,gpt-5-mini_duration_ms,gpt-5-mini_faithfulness_score,gpt-5-mini_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
+0,What is 2+2?,4,openai/gpt-5-mini,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-sonnet-5,2+2 equals 4,0.0008,980,0.92,true
+1,Capital of France?,Paris,openai/gpt-5-mini,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-sonnet-5,The capital of France is Paris,0.0010,890,0.97,true
 ```
 
 ### Using the Data
@@ -1104,15 +1095,14 @@ Use spreadsheet filters to compare specific models or configurations:
 </Accordion>
 
 <Accordion title="Analyze costs and latency">
-  Calculate aggregate metrics across your evaluation: - Sum `{target}_cost` columns for
-  total evaluation cost per model - Average `{target}_duration_ms` to compare response
-  times - Identify outliers with high latency or cost
+  Calculate aggregate metrics across your evaluation: - Sum `{target}_cost` columns for total
+  evaluation cost per model - Average `{target}_duration_ms` to compare response times - Identify
+  outliers with high latency or cost
 </Accordion>
 
 <Accordion title="Group by metadata">
-  Analyze performance across different configurations: - Pivot tables by temperature,
-  max_tokens, or custom metadata - Compare prompt versions side-by-side - Track
-  improvements across iterations
+  Analyze performance across different configurations: - Pivot tables by temperature, max_tokens, or
+  custom metadata - Compare prompt versions side-by-side - Track improvements across iterations
 </Accordion>
 
 <Accordion title="Debug failures">
@@ -1124,8 +1114,8 @@ Investigate problematic samples:
 </AccordionGroup>
 
 <Info>
-  All column headers are normalized to lowercase with spaces replaced by underscores for
-  consistency and compatibility with data analysis tools.
+  All column headers are normalized to lowercase with spaces replaced by underscores for consistency
+  and compatibility with data analysis tools.
 </Info>
 
 ## Running in CI/CD
@@ -1150,11 +1140,7 @@ See [CI/CD Integration](/evaluations/experiments/ci-cd) for complete examples wi
 ## What's Next?
 
 <CardGroup cols={2}>
-  <Card
-    title="CI/CD Integration"
-    icon="code-branch"
-    href="/evaluations/experiments/ci-cd"
-  >
+  <Card title="CI/CD Integration" icon="code-branch" href="/evaluations/experiments/ci-cd">
     Run experiments in your CI/CD pipeline
   </Card>
   <Card title="View Evaluators" icon="list" href="/evaluations/evaluators/list">

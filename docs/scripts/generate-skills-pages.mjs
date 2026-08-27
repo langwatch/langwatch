@@ -78,7 +78,7 @@ function cmdBox({ copyValue, code, track, trackProps }) {
   ].join("\n");
 }
 
-function renderAccordion(entry) {
+function renderAccordion(entry, open = false) {
   const { title, boldPrefix, skill, slashCommand, promptFile, static: isStatic } = entry;
   const prompt = fs.readFileSync(path.join(compiledDir, promptFile), "utf8");
   const installCmd = skill ? `npx skills add ${skill}` : null;
@@ -94,6 +94,17 @@ function renderAccordion(entry) {
     lines.push(`<div className="lw-accordion lw-accordion-static" data-open="true">`);
     lines.push(`  <div className="lw-accordion-header">`);
     lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
+    lines.push(`  </div>`);
+  } else if (open) {
+    // A section with a single accordion opens it by default: the skill is
+    // the page's whole point, and a collapsed header hides it behind a
+    // click for no reason. posthog.js toggles data-open either way.
+    lines.push(`<div className="lw-accordion" data-open="true">`);
+    lines.push(
+      `  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="true">`,
+    );
+    lines.push(`    <span className="lw-accordion-title">${titleHtml}</span>`);
+    lines.push(`    ${ICONS.chevron}`);
     lines.push(`  </div>`);
   } else {
     lines.push(`<div className="lw-accordion">`);
@@ -143,10 +154,7 @@ function renderAccordion(entry) {
 
   // The fence must be longer than any backtick run inside the prompt so the
   // prompt text survives verbatim as server-rendered (hidden) content.
-  const longestBacktickRun = Math.max(
-    3,
-    ...[...prompt.matchAll(/`+/g)].map((m) => m[0].length),
-  );
+  const longestBacktickRun = Math.max(3, ...[...prompt.matchAll(/`+/g)].map((m) => m[0].length));
   const fence = "`".repeat(longestBacktickRun + 1);
   lines.push(
     `    <div className="lw-accordion-actions${!skill ? " lw-accordion-actions-single" : ""}">`,
@@ -161,9 +169,7 @@ function renderAccordion(entry) {
     `        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}>${ICONS.checkLarge}</span>`,
   );
   lines.push(`        <span className="lw-accordion-action-text">`);
-  lines.push(
-    `          <span className="lw-accordion-action-title">Copy Full Prompt</span>`,
-  );
+  lines.push(`          <span className="lw-accordion-action-title">Copy Full Prompt</span>`);
   lines.push(
     `          <span className="lw-accordion-action-subtitle">${skill ? "Run skill without installing" : "Paste into any AI assistant"}</span>`,
   );
@@ -181,13 +187,9 @@ function renderAccordion(entry) {
     lines.push(
       `      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="${downloadUrl}" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title=${attr(title)} data-track-skill=${attr(skill)}>`,
     );
-    lines.push(
-      `        <span className="lw-accordion-action-icon">${ICONS.download}</span>`,
-    );
+    lines.push(`        <span className="lw-accordion-action-icon">${ICONS.download}</span>`);
     lines.push(`        <span className="lw-accordion-action-text">`);
-    lines.push(
-      `          <span className="lw-accordion-action-title">Download SKILL.md</span>`,
-    );
+    lines.push(`          <span className="lw-accordion-action-title">Download SKILL.md</span>`);
     lines.push(
       `          <span className="lw-accordion-action-subtitle">Manual installation</span>`,
     );
@@ -214,7 +216,9 @@ for (const [pageFile, sections] of Object.entries(manifest)) {
       failed = true;
       continue;
     }
-    const generated = entries.map(renderAccordion).join("\n\n");
+    const generated = entries
+      .map((entry) => renderAccordion(entry, entries.length === 1))
+      .join("\n\n");
     content =
       content.slice(0, startIdx + start.length) +
       "\n\n" +

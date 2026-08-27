@@ -29,7 +29,7 @@ export function PublishedPromptContent({
         overflow="hidden"
         textOverflow="ellipsis"
         whiteSpace="nowrap"
-        fontSize="sm"
+        fontSize="12.5px"
         fontWeight="normal"
         flex={1}
       >

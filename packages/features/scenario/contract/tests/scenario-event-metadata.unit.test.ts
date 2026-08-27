@@ -11,6 +11,7 @@
  * at ingestion.
  *
  * @see specs/features/scenarios/extensible-scenario-metadata.feature
+ * @see specs/suites/run-note-metadata-convention.feature
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -44,6 +45,56 @@ describe("extensible scenario metadata", () => {
         expect(parsed.metadata.description).toBe("Tests login");
         expect((parsed.metadata as Record<string, unknown>).environment).toBe("staging");
         expect((parsed.metadata as Record<string, unknown>).commit_sha).toBe("abc123");
+      });
+    });
+
+    describe("when the caller sets a note of only spaces", () => {
+      /** @scenario "A blank note on an SDK run is dropped" */
+      it("records no note", () => {
+        const parsed = scenarioRunStartedSchema.parse({
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: "batch_1",
+          scenarioId: "scenario_1",
+          scenarioRunId: "run_1",
+          metadata: { note: "   " },
+        });
+
+        expect(parsed.metadata.note).toBeUndefined();
+      });
+    });
+
+    describe("when the caller sets a note longer than the input limit", () => {
+      /** @scenario "A long note on an SDK run is kept rather than refused" */
+      it("accepts the event and keeps the note in full", () => {
+        const note = "a".repeat(201);
+
+        const parsed = scenarioRunStartedSchema.parse({
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: "batch_1",
+          scenarioId: "scenario_1",
+          scenarioRunId: "run_1",
+          metadata: { note },
+        });
+
+        expect(parsed.metadata.note).toBe(note);
+      });
+    });
+
+    describe("when the caller sets a note with spaces around it", () => {
+      /** @scenario "Spaces around a note on an SDK run are removed" */
+      it("removes the spaces around the note", () => {
+        const parsed = scenarioRunStartedSchema.parse({
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: "batch_1",
+          scenarioId: "scenario_1",
+          scenarioRunId: "run_1",
+          metadata: { note: "  retry after the timeout fix  " },
+        });
+
+        expect(parsed.metadata.note).toBe("retry after the timeout fix");
       });
     });
 

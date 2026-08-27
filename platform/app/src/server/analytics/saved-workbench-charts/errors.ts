@@ -63,6 +63,31 @@ export class SavedWorkbenchChartAlreadyExistsError extends HandledError {
 }
 
 /**
+ * The dashboard a chart was asked to be placed on does not exist in this
+ * project.
+ *
+ * Covers both a foreign dashboard's id and one that never existed, and
+ * deliberately does not distinguish them — the same reasoning as
+ * {@link SavedWorkbenchChartNotFoundError}, applied to the id on the other
+ * side of a placement. Derived from
+ * {@link import("~/server/analytics/dashboardBelongsToProject").dashboardBelongsToProject},
+ * the identical tenancy check `graphs.create` already runs before it places a
+ * newly created chart.
+ */
+export class SavedWorkbenchChartDashboardNotFoundError extends HandledError {
+  declare readonly code: "saved_workbench_chart_dashboard_not_found";
+
+  constructor() {
+    super("saved_workbench_chart_dashboard_not_found", "Dashboard not found.", {
+      httpStatus: 404,
+      fault: "customer",
+      ...remediation("saved_workbench_chart_dashboard_not_found"),
+    });
+    this.name = "SavedWorkbenchChartDashboardNotFoundError";
+  }
+}
+
+/**
  * The chart policy refused the specification on the way in.
  *
  * Refusing at write is what stops the database becoming a way around the

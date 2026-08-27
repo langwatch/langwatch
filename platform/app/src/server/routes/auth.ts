@@ -15,6 +15,7 @@ import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import { auth } from "~/server/better-auth";
+import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 
@@ -124,9 +125,7 @@ const logoutHandler = async (c: Context) => {
   const clearCookies: string[] = [];
   for (const name of cookieNames) {
     clearCookies.push(`${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
-    clearCookies.push(
-      `__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`,
-    );
+    clearCookies.push(`__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`);
   }
 
   // Hono supports multiple Set-Cookie headers via append
@@ -138,11 +137,7 @@ const logoutHandler = async (c: Context) => {
     // Resolved provider, not raw env: on a denied (unlicensed) deployment
     // the platform gate coerces the deployment to email mode (ADR-027), so
     // logout must not bounce the user through the IdP.
-    if (
-      (await resolveAuthProvider()) === "auth0" &&
-      env.AUTH0_ISSUER &&
-      env.AUTH0_CLIENT_ID
-    ) {
+    if ((await resolveAuthProvider()) === "auth0" && env.AUTH0_ISSUER && env.AUTH0_CLIENT_ID) {
       const returnTo = encodeURIComponent(`${env.NEXTAUTH_URL}/auth/signin`);
       const federatedLogoutUrl = `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
       return c.redirect(federatedLogoutUrl, 302);
@@ -183,6 +178,15 @@ const betterAuthCatchAll = async (c: Context) => {
       "rejected auth request: origin does not match NEXTAUTH_URL",
     );
     return c.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
+  }
+
+  // ADR-116 §3: the born-finalized entrance's request-scoped marker, set
+  // HERE and only here, and only once the backend allowlist check has
+  // passed. Nothing below re-decides it, and outside a marked request the
+  // entrance is never reached — which is what makes deploying it a no-op
+  // until an operator targets an organization.
+  if (await isBornFinalizedSignUp({ featureFlags: c.app.featureFlags, request: c.req.raw })) {
+    return runWithIdentityBirth(() => auth.handler(c.req.raw));
   }
 
   // BetterAuth's auth.handler is fetch-compatible (Request => Response)

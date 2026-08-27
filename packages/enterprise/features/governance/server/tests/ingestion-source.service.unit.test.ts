@@ -22,9 +22,7 @@ import { TestProjectService } from "./support/test-project-service";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
 
-function source(
-  overrides: Partial<GovernanceIngestionSource> = {},
-): GovernanceIngestionSource {
+function source(overrides: Partial<GovernanceIngestionSource> = {}): GovernanceIngestionSource {
   return {
     id: "source-1",
     organizationId: "org-1",
@@ -66,23 +64,31 @@ class FakeSourceRepository extends IngestionSourceRepository {
     this.row = source({ ...this.row, ...input });
     return this.row;
   });
+  tryUpdateIfCursorUnchanged = vi.fn(
+    async (input: {
+      update: UpdateIngestionSourceRecord;
+    }): Promise<GovernanceIngestionSource | null> => {
+      this.updateInput = input.update;
+      this.row = source({ ...this.row, ...input.update });
+      return this.row;
+    },
+  );
 }
 
 class FakeProjects extends TestProjectService {
   tryFindInternal = vi.fn(
     async (_input: InternalProjectQuery): Promise<InternalProject | null> => null,
   );
-  ensureInternal = vi.fn(
-    async (_input: InternalProjectQuery): Promise<InternalProject> => ({
-      id: "gov-project",
-      name: "Governance (internal)",
-      slug: "governance-org",
-      teamId: "team",
-      kind: "internal_governance",
-      archivedAtMs: null,
-      traceSharingEnabled: false,
-    }),
-  );
+  ensureInternal = vi.fn(async (_input: InternalProjectQuery): Promise<InternalProject> => ({
+    id: "gov-project",
+    name: "Governance (internal)",
+    slug: "governance-org",
+    teamId: "team",
+    kind: "internal_governance",
+    archivedAtMs: null,
+    traceSharingEnabled: false,
+  }));
+  tryGetWithTeam = vi.fn(async () => null);
 }
 class FakeEntitlements extends IngestionSourceEntitlementsPort {
   enterprise = true;
@@ -109,9 +115,10 @@ function harness() {
   const repository = new FakeSourceRepository();
   const entitlements = new FakeEntitlements();
   const lifecycle = new FakeLifecycle();
+  const projects = new FakeProjects();
   const service = IngestionSourceService.create({
     repository,
-    projects: new FakeProjects(),
+    projects,
     entitlements,
     lifecycle,
     credentials: IngestionCredentialsService.create(new FakeEncryption()),
@@ -123,7 +130,7 @@ function harness() {
     diagnostics: new FakeDiagnostics(),
     now: () => NOW,
   });
-  return { service, repository, entitlements, lifecycle };
+  return { service, repository, projects, entitlements, lifecycle };
 }
 
 describe("IngestionSourceService", () => {
@@ -189,5 +196,112 @@ describe("IngestionSourceService", () => {
       }),
     ).rejects.toThrow("Credentials cannot be submitted in their stored form");
     expect(repository.updateInput).toBeNull();
+  });
+
+  it("keeps the stored adapter and refuses attempts to replace it", async () => {
+    const { service, repository } = harness();
+    repository.row = source({
+      parserConfig: {
+        adapter: "databricks_genie",
+        workspaceUrl: "https://safe.cloud.databricks.com",
+      },
+    });
+
+    await expect(
+      service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: {
+          adapter: "http_polling",
+          url: "https://attacker.example.test",
+        },
+      }),
+    ).rejects.toThrow(/fixed when the source is created/);
+    expect(repository.updateInput).toBeNull();
+  });
+
+  it("refuses a report change after the source has pulled", async () => {
+    const { service, repository } = harness();
+    repository.row = source({
+      parserConfig: { adapter: "anthropic_admin", report: "usage" },
+      pollerCursor: "page-2",
+    });
+
+    await expect(
+      service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: { report: "cost" },
+      }),
+    ).rejects.toThrow(/already pulled its usage report/);
+    expect(repository.updateInput).toBeNull();
+  });
+
+  it("atomically pins a report change before the first pull", async () => {
+    const { service, repository } = harness();
+    repository.row = source({
+      parserConfig: { adapter: "anthropic_admin", report: "usage" },
+      pollerCursor: null,
+    });
+
+    await service.updateSource({
+      id: "source-1",
+      organizationId: "org-1",
+      parserConfig: { report: "cost" },
+    });
+
+    expect(repository.tryUpdateIfCursorUnchanged).toHaveBeenCalledWith({
+      id: "source-1",
+      cursor: null,
+      update: expect.objectContaining({
+        parserConfig: expect.objectContaining({ report: "cost" }),
+      }),
+    });
+  });
+
+  it("refuses a report update when a pull wins the race", async () => {
+    const { service, repository } = harness();
+    repository.row = source({
+      parserConfig: { adapter: "anthropic_admin", report: "usage" },
+      pollerCursor: null,
+    });
+    repository.tryUpdateIfCursorUnchanged.mockResolvedValueOnce(null);
+
+    await expect(
+      service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: { report: "cost" },
+      }),
+    ).rejects.toThrow(/started pulling while the change was being saved/);
+  });
+
+  it("refuses a foreign or archived trace destination before creating the source", async () => {
+    const { service, repository, projects } = harness();
+
+    await expect(
+      service.createSource({
+        organizationId: "org-1",
+        sourceType: "otel_generic",
+        name: "OTel",
+        actorUserId: "user-1",
+        traceProjectId: "project-outside-org",
+      }),
+    ).rejects.toThrow(/destination must be an active project/i);
+    expect(projects.tryGetWithTeam).toHaveBeenCalledWith("project-outside-org");
+    expect(repository.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a foreign or archived trace destination before updating the source", async () => {
+    const { service, repository } = harness();
+
+    await expect(
+      service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        traceProjectId: "project-outside-org",
+      }),
+    ).rejects.toThrow(/destination must be an active project/i);
+    expect(repository.update).not.toHaveBeenCalled();
   });
 });

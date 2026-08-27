@@ -166,4 +166,59 @@ describe("experimentStatusCommand()", () => {
       ).rejects.toMatchObject({ code: 1 });
     });
   });
+
+  /**
+   * Waiting used to be the caller's job, written as `sleep 30; langwatch
+   * experiment status`. That is one command that prints nothing for half a
+   * minute, so an agent driving a page showed the sleep as the work in
+   * progress, and a turn that ended while it was open lost the run it was
+   * waiting for. The command waits for itself now.
+   */
+  describe("given the caller asks to wait for the run", () => {
+    /** @scenario "Waiting for a run returns as soon as the run reaches a terminal state" */
+    it("answers as soon as the run finishes", async () => {
+      mockGetRunStatus
+        .mockResolvedValueOnce({
+          runId: "latest_run",
+          status: "running",
+          progress: 1,
+          total: 3,
+        })
+        .mockResolvedValueOnce({
+          runId: "latest_run",
+          status: "completed",
+          progress: 3,
+          total: 3,
+        });
+
+      const result = await experimentStatusCommand("doc-qa", {
+        wait: true,
+        timeout: "30",
+        pollMs: 0,
+      });
+
+      expect(result?.data).toMatchObject({ status: "completed" });
+      expect(mockGetRunStatus).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "Waiting for a run answers with the progress when the limit is reached" */
+    it("answers with the progress it has when the limit is reached", async () => {
+      mockGetRunStatus.mockResolvedValue({
+        runId: "latest_run",
+        status: "running",
+        progress: 2,
+        total: 20,
+      });
+
+      const result = await experimentStatusCommand("doc-qa", {
+        wait: true,
+        // Zero seconds: one read, then the limit is already past. The test
+        // asserts the answer, not the clock.
+        timeout: "0",
+        pollMs: 0,
+      });
+
+      expect(result?.data).toMatchObject({ status: "running", progress: 2 });
+    });
+  });
 });

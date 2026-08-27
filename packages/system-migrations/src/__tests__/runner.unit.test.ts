@@ -13,6 +13,18 @@ class FakeStateRepository implements SystemMigrationStateRepository {
     return `${migrationName}::${tenantId}`;
   }
 
+  async hasFinalizedTenant({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): Promise<boolean> {
+    return [...this.records.values()].some(
+      (record) =>
+        record.migrationName === migrationName &&
+        record.status === "finalized",
+    );
+  }
+
   async findRecord({
     migrationName,
     tenantId,
@@ -93,6 +105,7 @@ function migrationOf(
     description: name,
     requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted: true,
+    enrolledAutomatically: false,
     migrateTenant,
   };
 }
@@ -304,7 +317,11 @@ describe("SystemMigrationRunnerService", () => {
       const summary = await runner.runPass();
 
       expect(migrate).not.toHaveBeenCalled();
-      expect(summary?.skipped).toBe(1);
+      // Already done before this pass - counted apart from cohort skips, so
+      // a run over only-finalized tenants still reads as done.
+      expect(summary?.alreadyFinalized).toBe(1);
+      expect(summary?.alreadyRolledBack).toBe(0);
+      expect(summary?.skipped).toBe(0);
     });
   });
 
@@ -332,7 +349,7 @@ describe("SystemMigrationRunnerService", () => {
       // The point of the status: without it the next pass would re-run a
       // migration whose proof still passes and undo the rollback.
       expect(migrate).not.toHaveBeenCalled();
-      expect(summary?.skipped).toBe(1);
+      expect(summary?.alreadyRolledBack).toBe(1);
       expect(
         (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
       ).toBe("rolled_back");
@@ -369,7 +386,7 @@ describe("SystemMigrationRunnerService", () => {
       // pins it exactly like a rolled-back finalized tenant, whatever state
       // it came from.
       expect(migrate).not.toHaveBeenCalled();
-      expect(summary?.skipped).toBe(1);
+      expect(summary?.alreadyRolledBack).toBe(1);
       expect(
         (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
       ).toBe("rolled_back");
@@ -611,6 +628,100 @@ describe("SystemMigrationRunnerService", () => {
 
       expect(summary?.finalized).toBe(250);
       expect(migrate).toHaveBeenCalledTimes(250);
+    });
+  });
+
+  describe("when a caller needs to know whether the pass moved anything", () => {
+    /** @scenario "The runner drives passes until nothing advances" */
+    it("counts a first record and a status change as advances", async () => {
+      const outcomes: TenantMigrationOutcome[] = [
+        { status: "migrated", report: { outstanding: 1 } },
+        { status: "finalized" },
+      ];
+      const migration = migrationOf("m1", async () => {
+        return outcomes.shift() ?? { status: "finalized" };
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      // Pending -> migrated: a tenant that had no record now has one.
+      expect((await runner.runPass()).advanced).toBe(1);
+      // migrated -> finalized: the transition a second pass exists to make.
+      expect((await runner.runPass()).advanced).toBe(1);
+    });
+
+    /** @scenario "A held tenant that never advances does not loop forever" */
+    it("counts nothing for a held tenant re-proved into the same status", async () => {
+      const migration = migrationOf("m1", async () => ({
+        status: "migrated" as const,
+        report: { outstanding: ["still disagreeing"] },
+      }));
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      const first = await runner.runPass();
+      const second = await runner.runPass();
+
+      // The tenant is visited and written on BOTH passes - `held` cannot
+      // tell them apart, which is exactly why `advanced` exists.
+      expect(first.held).toBe(1);
+      expect(second.held).toBe(1);
+      expect(first.advanced).toBe(1);
+      expect(second.advanced).toBe(0);
+    });
+
+    /** @scenario "A held tenant that never advances does not loop forever" */
+    it("counts nothing for a tenant that parks the same way twice", async () => {
+      const migration = migrationOf("m1", async () => {
+        throw new Error("still broken");
+      });
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+      });
+
+      expect((await runner.runPass()).advanced).toBe(1);
+      // A permanently broken tenant must not keep a convergence loop alive.
+      expect((await runner.runPass()).advanced).toBe(0);
+    });
+
+    /** @scenario "A pass in flight cannot overwrite an operator's rollback" */
+    it("counts nothing for a tenant an operator has pinned rolled back", async () => {
+      await state.upsertRecord({
+        migrationName: "m1",
+        tenantId: "acme",
+        status: "rolled_back",
+        report: null,
+      });
+      const migrate = vi.fn(async () => finalized);
+      const runner = new SystemMigrationRunnerService({
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migrationOf("m1", migrate)],
+      });
+
+      const summary = await runner.runPass();
+
+      // The pin is terminal, so no later pass in a loop re-claims the
+      // tenant, and it never keeps the loop running either.
+      expect(migrate).not.toHaveBeenCalled();
+      expect(summary.alreadyRolledBack).toBe(1);
+      expect(summary.advanced).toBe(0);
     });
   });
 });

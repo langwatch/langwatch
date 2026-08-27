@@ -1154,6 +1154,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     readMetrics: AppCodingAgentReadMetricsPort.create(),
   });
 
+  // The address lock is shared: the guards claim through it and the fold
+  // releases through it, so the two must be the same instance (ADR-116 §6).
+  const identityReservations = new PrismaIdentityReservationRepository(prisma);
+
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     simulationRunState: clickhouseEnabled
@@ -1371,6 +1375,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     projects,
     events: governanceOcsfEventsRepository,
   }).build();
+
+  // The /governance activity-monitor read side (spend rollups, per-source
+  // events and health). Org-scoped aggregates, but the queries key on the
+  // hidden governance Project, so it takes the standard per-tenant resolver —
+  // getClickHouseClientForTenant maps a project id to its org's route.
+  const activityMonitorRepository = clickhouseEnabled
+    ? new ActivityMonitorClickHouseRepository(resolveClickHouseClient)
+    : undefined;
 
   // Billing-month usage rollups (billable_events + trace_summaries),
   // read by the billing pipeline and the usage-limit services.

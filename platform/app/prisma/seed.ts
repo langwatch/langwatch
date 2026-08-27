@@ -240,11 +240,17 @@ async function main() {
     create: {
       userId: user.id,
       provider: "credential",
+      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
+      // credential provider's issuer is `local:credential`, not
+      // `local:oauth:credential`. Without it sign-in cannot find this row.
+      issuer: "local:credential",
       providerAccountId: user.id,
       type: "credentials",
       password: hashedPassword,
     },
-    update: { password: hashedPassword },
+    // Repeated on the update leg so a re-run also repairs a row seeded before
+    // the column existed.
+    update: { issuer: "local:credential", password: hashedPassword },
   });
 
   await prisma.organizationUser.upsert({

@@ -59,12 +59,64 @@ describe("better-auth config", () => {
       const options = (auth as any).options;
       const pluginIds = (options?.plugins ?? []).map((p: { id?: string }) => p?.id);
       expect(pluginIds).not.toContain("admin");
-      // Only genericOAuth (or empty) is acceptable — impersonation is handled
-      // via the legacy Session.impersonating JSON column, not via the
-      // admin() plugin.
+      // The allow-list is the point: a plugin appearing here that nobody
+      // deliberately registered is the failure this catches, and `admin` in
+      // particular would take impersonation over from the legacy
+      // Session.impersonating JSON column.
+      //
+      // `two-factor` (D06) and `passkey` (D07) are registered only when
+      // their env flag is on, which is why they are permitted rather than
+      // required — with both flags off the array is genericOAuth or empty,
+      // exactly as before.
+      const deliberate = ["generic-oauth", "two-factor", "passkey"];
       for (const id of pluginIds) {
-        expect(id).toBe("generic-oauth");
+        expect(deliberate).toContain(id);
       }
+    });
+
+    /** @scenario "With the flag off nothing about two-step verification exists" */
+    /** @scenario "With the flag off, passkeys do not exist" */
+    it("registers a factor plugin only when its flag is on", async () => {
+      // Both flags default off, so re-importing the module under each
+      // setting is what makes this a real check rather than one that
+      // happens to pass because nothing was ever turned on.
+      const pluginIdsUnder = async (flags: {
+        MFA_ENROLLMENT_OPEN: string;
+        PASSKEYS_ENABLED: string;
+      }): Promise<string[]> => {
+        vi.resetModules();
+        const { env } = await import("~/env.mjs");
+        vi.spyOn(env, "MFA_ENROLLMENT_OPEN", "get").mockReturnValue(
+          flags.MFA_ENROLLMENT_OPEN as never,
+        );
+        vi.spyOn(env, "PASSKEYS_ENABLED", "get").mockReturnValue(
+          flags.PASSKEYS_ENABLED as never,
+        );
+        const { auth } = await import("../index");
+        return ((auth as any).options?.plugins ?? []).map(
+          (p: { id?: string }) => p?.id,
+        );
+      };
+
+      // Not registered means the routes are not mounted, so nothing about
+      // the feature is reachable — the flag governs the surface, not just
+      // whether a screen renders.
+      const off = await pluginIdsUnder({
+        MFA_ENROLLMENT_OPEN: "off",
+        PASSKEYS_ENABLED: "off",
+      });
+      expect(off).not.toContain("two-factor");
+      expect(off).not.toContain("passkey");
+
+      const on = await pluginIdsUnder({
+        MFA_ENROLLMENT_OPEN: "on",
+        PASSKEYS_ENABLED: "on",
+      });
+      expect(on).toContain("two-factor");
+      expect(on).toContain("passkey");
+
+      vi.restoreAllMocks();
+      vi.resetModules();
     });
 
     it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email or self-hosted (ADR-027)", async () => {

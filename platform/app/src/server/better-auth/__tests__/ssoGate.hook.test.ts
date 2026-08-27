@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // file exercises only the `before`-hook's routing logic, no DB.
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
-// The gate itself is unit-tested in `ee/sso/__tests__/sso-gate.test.ts`.
+// The gate itself is unit-tested in `@langwatch/enterprise-sso-server`.
 // This file tests ONLY the hook's orchestration: which paths get refused in
 // which gate state, per ADR-027 Decision 4 / Constants table.
 vi.mock("~/runtime/app/features/sso", () => ({
@@ -128,9 +128,7 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
         runBeforeHook(ctxFor("https://host/api/auth/callback/okta?code=abc&state=xyz")),
       ).rejects.toMatchObject({ statusCode: 403 });
       await expect(
-        runBeforeHook(
-          ctxFor("https://host/api/auth/oauth2/callback/some-provider?code=abc"),
-        ),
+        runBeforeHook(ctxFor("https://host/api/auth/oauth2/callback/some-provider?code=abc")),
       ).rejects.toMatchObject({ statusCode: 403 });
     });
 

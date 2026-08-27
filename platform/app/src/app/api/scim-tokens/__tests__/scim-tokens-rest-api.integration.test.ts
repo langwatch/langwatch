@@ -27,6 +27,7 @@ import {
   type ManagementTestOrg,
   seedManagementOrg,
 } from "~/test-utils/managementApiOrg";
+import { seedSsoConnection } from "~/test-utils/ssoConnection";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: SCIM tokens REST API", () => {
@@ -61,6 +62,10 @@ describe("Feature: SCIM tokens REST API", () => {
     });
 
     seeded = await seedManagementOrg({ prisma, ns });
+    ({ connectionId } = await seedSsoConnection({
+      prisma,
+      organizationId: seeded.organization.id,
+    }));
   });
 
   afterAll(async () => {
@@ -80,7 +85,10 @@ describe("Feature: SCIM tokens REST API", () => {
       const create = await request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ description: `List Secrets ${ns}` }),
+        body: JSON.stringify({
+          connectionId,
+          description: `List Secrets ${ns}`,
+        }),
       });
       expect(create.status).toBe(201);
       const created = await create.json();
@@ -107,7 +115,7 @@ describe("Feature: SCIM tokens REST API", () => {
       const response = await request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ description: "Okta production" }),
+        body: JSON.stringify({ connectionId, description: "Okta production" }),
       });
 
       expect(response.status).toBe(201);
@@ -130,7 +138,7 @@ describe("Feature: SCIM tokens REST API", () => {
         await request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
           method: "POST",
           headers: authHeaders(),
-          body: JSON.stringify({ description: `Revoke ${ns}` }),
+          body: JSON.stringify({ connectionId, description: `Revoke ${ns}` }),
         })
       ).json();
 

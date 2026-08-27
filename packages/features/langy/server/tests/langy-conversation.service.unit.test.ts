@@ -42,9 +42,7 @@ function makeRepo(
   return Object.assign(defaults, overrides);
 }
 
-function makeCommands(
-  overrides?: Partial<LangyConversationCommands>,
-): LangyConversationCommands {
+function makeCommands(overrides?: Partial<LangyConversationCommands>): LangyConversationCommands {
   return {
     createConversation: vi.fn(async () => {}),
     forkConversation: vi.fn(async () => {}),
@@ -97,9 +95,7 @@ describe("LangyConversationService", () => {
           .mockResolvedValue(row());
         const repo = makeRepo({
           tryFindVisibleById,
-          tryFindPendingHandoff: vi
-            .fn()
-            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+          tryFindPendingHandoff: vi.fn().mockResolvedValue({ token: "t", turnId: "turn-1" }),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -181,9 +177,7 @@ describe("LangyConversationService", () => {
       try {
         const repo = makeRepo({
           tryFindVisibleById: vi.fn().mockResolvedValue(null),
-          tryFindPendingHandoff: vi
-            .fn()
-            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+          tryFindPendingHandoff: vi.fn().mockResolvedValue({ token: "t", turnId: "turn-1" }),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -210,9 +204,9 @@ describe("LangyConversationService", () => {
           tryFindVisibleById: vi.fn().mockResolvedValue(null),
         });
         const svc = new LangyConversationService(repo, makeCommands());
-        await expect(
-          svc.getById({ id: "c1", projectId: "p1", userId: "alice" }),
-        ).rejects.toThrow(LangyConversationNotFoundError);
+        await expect(svc.getById({ id: "c1", projectId: "p1", userId: "alice" })).rejects.toThrow(
+          LangyConversationNotFoundError,
+        );
       });
 
       it("tryFindByIdVisible returns null for the same case", async () => {
@@ -239,18 +233,16 @@ describe("LangyConversationService", () => {
           tryFindVisibleById: vi.fn().mockResolvedValue(null),
         });
         const svc = new LangyConversationService(repo, makeCommands());
-        await expect(
-          svc.getById({ id: "c1", projectId: "p1", userId: "alice" }),
-        ).rejects.toThrow(LangyConversationNotFoundError);
+        await expect(svc.getById({ id: "c1", projectId: "p1", userId: "alice" })).rejects.toThrow(
+          LangyConversationNotFoundError,
+        );
       });
     });
 
     describe("when the conversation is shared", () => {
       it("returns the conversation to non-owners in the same project", async () => {
         const repo = makeRepo({
-          tryFindVisibleById: vi
-            .fn()
-            .mockResolvedValue(row({ userId: "bob", isShared: true })),
+          tryFindVisibleById: vi.fn().mockResolvedValue(row({ userId: "bob", isShared: true })),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const result = await svc.getById({
@@ -271,14 +263,9 @@ describe("LangyConversationService", () => {
     it("does not archive and returns false", async () => {
       const archiveConversation = vi.fn(async () => {});
       const repo = makeRepo({
-        tryFindVisibleById: vi
-          .fn()
-          .mockResolvedValue(row({ userId: "bob", isShared: true })),
+        tryFindVisibleById: vi.fn().mockResolvedValue(row({ userId: "bob", isShared: true })),
       });
-      const svc = new LangyConversationService(
-        repo,
-        makeCommands({ archiveConversation }),
-      );
+      const svc = new LangyConversationService(repo, makeCommands({ archiveConversation }));
       const result = await svc.deleteById({
         id: "c1",
         projectId: "p1",
@@ -295,10 +282,7 @@ describe("LangyConversationService", () => {
       const repo = makeRepo({
         tryFindVisibleById: vi.fn().mockResolvedValue(row({ userId: "alice" })),
       });
-      const svc = new LangyConversationService(
-        repo,
-        makeCommands({ archiveConversation }),
-      );
+      const svc = new LangyConversationService(repo, makeCommands({ archiveConversation }));
       const result = await svc.deleteById({
         id: "c1",
         projectId: "p1",
@@ -488,9 +472,7 @@ describe("LangyConversationService", () => {
     it("falls back to createdAt when lastActivityAt is unset", async () => {
       const createdAtMs = Date.parse("2026-04-01T00:00:00.000Z");
       const repo = makeRepo({
-        findAllForUser: vi
-          .fn()
-          .mockResolvedValue([row({ lastActivityAtMs: 0, createdAtMs })]),
+        findAllForUser: vi.fn().mockResolvedValue([row({ lastActivityAtMs: 0, createdAtMs })]),
       });
       const svc = new LangyConversationService(repo, makeCommands());
       const result = await svc.getAll({ projectId: "p1", userId: "alice" });
@@ -508,10 +490,7 @@ describe("LangyConversationService", () => {
           row({ id: "c2", lastActivityAtMs: 180 }),
           row({ id: "c1", lastActivityAtMs: 170 }),
         ]);
-      const svc = new LangyConversationService(
-        makeRepo({ findAllForUser }),
-        makeCommands(),
-      );
+      const svc = new LangyConversationService(makeRepo({ findAllForUser }), makeCommands());
 
       const result = await svc.getPage({
         projectId: "p1",
@@ -573,10 +552,7 @@ describe("LangyConversationService", () => {
       const repo = makeRepo({
         findActiveOwnedIds: vi.fn().mockResolvedValue(["c1", "c2", "c3"]),
       });
-      const svc = new LangyConversationService(
-        repo,
-        makeCommands({ archiveConversation }),
-      );
+      const svc = new LangyConversationService(repo, makeCommands({ archiveConversation }));
       const result = await svc.clearAllForUser({
         projectId: "p1",
         userId: "alice",
@@ -589,10 +565,7 @@ describe("LangyConversationService", () => {
   describe("when recordUserMessage is called", () => {
     it("dispatches one RecordMessage command carrying the owner and parts", async () => {
       const recordMessage = vi.fn(async () => {});
-      const svc = new LangyConversationService(
-        makeRepo(),
-        makeCommands({ recordMessage }),
-      );
+      const svc = new LangyConversationService(makeRepo(), makeCommands({ recordMessage }));
       await svc.recordUserMessage({
         projectId: "p1",
         conversationId: "c1",
@@ -617,10 +590,7 @@ describe("LangyConversationService", () => {
     describe("when the handoff token is recorded", () => {
       it("dispatches recordTurnHandoff with the opaque token", async () => {
         const recordTurnHandoff = vi.fn(async () => {});
-        const svc = new LangyConversationService(
-          makeRepo(),
-          makeCommands({ recordTurnHandoff }),
-        );
+        const svc = new LangyConversationService(makeRepo(), makeCommands({ recordTurnHandoff }));
 
         await svc.recordTurnHandoff({
           projectId: "p1",
@@ -690,13 +660,10 @@ describe("LangyConversationService", () => {
   describe("ingestAgentTurnResult (the durable HTTP-final path)", () => {
     describe("when the agent posts a completed turn", () => {
       it("dispatches recordAgentResponse carrying the turnId and assembled parts", async () => {
-        const recordAgentResponse = vi.fn<
-          LangyConversationCommands["recordAgentResponse"]
-        >(async () => {});
-        const svc = new LangyConversationService(
-          makeRepo(),
-          makeCommands({ recordAgentResponse }),
+        const recordAgentResponse = vi.fn<LangyConversationCommands["recordAgentResponse"]>(
+          async () => {},
         );
+        const svc = new LangyConversationService(makeRepo(), makeCommands({ recordAgentResponse }));
 
         await svc.ingestAgentTurnResult({
           projectId: "p1",
@@ -732,13 +699,10 @@ describe("LangyConversationService", () => {
 
     describe("when the completed turn's reply carries a langy-card fence", () => {
       it("records the stamped typed part in place of the fence (ADR-060)", async () => {
-        const recordAgentResponse = vi.fn<
-          LangyConversationCommands["recordAgentResponse"]
-        >(async () => {});
-        const svc = new LangyConversationService(
-          makeRepo(),
-          makeCommands({ recordAgentResponse }),
+        const recordAgentResponse = vi.fn<LangyConversationCommands["recordAgentResponse"]>(
+          async () => {},
         );
+        const svc = new LangyConversationService(makeRepo(), makeCommands({ recordAgentResponse }));
 
         await svc.ingestAgentTurnResult({
           projectId: "p1",
@@ -778,10 +742,7 @@ describe("LangyConversationService", () => {
         const failAgentResponse = vi.fn<LangyConversationCommands["failAgentResponse"]>(
           async () => {},
         );
-        const svc = new LangyConversationService(
-          makeRepo(),
-          makeCommands({ failAgentResponse }),
-        );
+        const svc = new LangyConversationService(makeRepo(), makeCommands({ failAgentResponse }));
 
         await svc.ingestAgentTurnResult({
           projectId: "p1",
@@ -838,12 +799,7 @@ describe("LangyConversationService", () => {
     describe("when the conversation is not visible to the caller", () => {
       it("throws not-found and never touches the event log", async () => {
         const events = makeEvents([]);
-        const svc = new LangyConversationService(
-          makeRepo(),
-          makeCommands(),
-          undefined,
-          events,
-        );
+        const svc = new LangyConversationService(makeRepo(), makeCommands(), undefined, events);
         await expect(
           svc.getEventsAfter({
             projectId: "p1",
@@ -899,12 +855,7 @@ describe("LangyConversationService", () => {
         // so it must sit a full safety window below the cursor — pruning old
         // partitions without ever excluding a delayed event's occurred-at.
         const events = makeEvents([]);
-        const svc = new LangyConversationService(
-          visibleRepo(),
-          makeCommands(),
-          undefined,
-          events,
-        );
+        const svc = new LangyConversationService(visibleRepo(), makeCommands(), undefined, events);
         const acceptedAt = REHYDRATION_WINDOW_MS + 5_000;
         await svc.getEventsAfter({
           projectId: "p1",
@@ -1036,6 +987,92 @@ describe("LangyConversationService", () => {
           eventId: last.id,
         });
       });
+    });
+  });
+
+  // Two paths finish a turn and race each other: the relay's terminal frame and
+  // the agent's own HTTP post. Both land here, so the turn's ordered account is
+  // read HERE rather than by either caller — otherwise the record's shape would
+  // depend on which of them won.
+  describe("given a turn that wrote between its calls", () => {
+    const account = [
+      { kind: "text" as const, text: "Reading the failures first." },
+      { kind: "tool" as const, id: "call-1" },
+      { kind: "text" as const, text: "Now trying a tighter prompt." },
+      { kind: "tool" as const, id: "call-2" },
+      { kind: "text" as const, text: "Done." },
+    ];
+    const toolCalls = [
+      { id: "call-1", name: "read", output: "{}" },
+      { id: "call-2", name: "write", output: "{}" },
+    ];
+
+    const partKinds = (recordAgentResponse: ReturnType<typeof vi.fn>): string[] => {
+      const [call] = recordAgentResponse.mock.calls;
+      const { parts } = (call?.[0] ?? { parts: [] }) as {
+        parts: Array<{ type: string; text?: string }>;
+      };
+      return parts.map((part) => (part.type === "text" ? `text:${part.text}` : part.type));
+    };
+
+    /** @scenario "The order does not depend on which path finished the turn" */
+    it("records the paragraphs and the calls in the order they happened", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = LangyConversationService.create(
+        makeCommands({ recordAgentResponse }),
+        makeRepo(),
+        undefined,
+        null,
+        undefined,
+        undefined,
+        { readTurnOrder: vi.fn(async () => account) },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual([
+        "text:Reading the failures first.",
+        "tool-read",
+        "text:Now trying a tighter prompt.",
+        "tool-write",
+        "text:Done.",
+      ]);
+    });
+
+    /** @scenario "A turn whose order cannot be read is still recorded" */
+    it("records the calls before the reply when the account cannot be read", async () => {
+      const recordAgentResponse = vi.fn(async () => {});
+      const svc = LangyConversationService.create(
+        makeCommands({ recordAgentResponse }),
+        makeRepo(),
+        undefined,
+        null,
+        undefined,
+        undefined,
+        {
+          readTurnOrder: vi.fn(async () => {
+            throw new Error("redis is down");
+          }),
+        },
+      );
+
+      await svc.ingestAgentTurnResult({
+        projectId: "p1",
+        conversationId: "c1",
+        turnId: "t1",
+        status: "completed",
+        text: "Done.",
+        toolCalls,
+      });
+
+      expect(partKinds(recordAgentResponse)).toEqual(["tool-read", "tool-write", "text:Done."]);
     });
   });
 });

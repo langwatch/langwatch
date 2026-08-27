@@ -4,6 +4,7 @@ import { SuitesApiService, type SuiteTarget } from "@/client-sdk/services/suites
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { buildScope, describeScope, type ScopeOptions } from "./scopeFlags";
 
 function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
@@ -34,7 +35,7 @@ function parseTargets(targetStrings: string[]): SuiteTarget[] {
  */
 export const updateSuiteCommand = async (
   id: string,
-  options: {
+  options: ScopeOptions & {
     name?: string;
     scenarios?: string;
     targets?: string[];
@@ -46,11 +47,13 @@ export const updateSuiteCommand = async (
   await resolveCredentials();
 
   const service = new SuitesApiService();
+  const scope = await buildScope(options, service);
   const spinner = createSpinner(`Updating suite "${id}"...`).start();
 
   try {
     const updateData: Record<string, unknown> = {};
     if (options.name) updateData.name = options.name;
+    if (scope) updateData.scope = scope;
     if (options.description !== undefined) updateData.description = options.description;
     if (options.scenarios)
       updateData.scenarioIds = options.scenarios.split(",").map((s) => s.trim());
@@ -71,6 +74,7 @@ export const updateSuiteCommand = async (
         console.log(`  ${chalk.gray("ID:")}        ${chalk.green(suite.id)}`);
         console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(suite.name)}`);
         console.log(`  ${chalk.gray("Slug:")}      ${chalk.yellow(suite.slug)}`);
+        console.log(`  ${chalk.gray("Covers:")}    ${describeScope(suite.scope)}`);
         console.log(`  ${chalk.gray("Scenarios:")} ${suite.scenarioIds.length}`);
         console.log(`  ${chalk.gray("Targets:")}   ${suite.targets.length}`);
         console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);

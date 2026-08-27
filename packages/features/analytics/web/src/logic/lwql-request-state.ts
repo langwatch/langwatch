@@ -17,6 +17,8 @@
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
+export type LangWatchQLGranularityStep = 1 | 60 | 3600;
+
 /**
  * A bound parameter's value. Scalars only, matching what the API accepts — a
  * parameter is a value, not a structure.
@@ -51,6 +53,16 @@ export interface LangWatchQLSnapshot {
    * that only ever writes unbounded statements.
    */
   readonly timeWindow?: LangWatchQLTimeWindowValues;
+  /**
+   * The step the surface supplies for the reserved `period_granularity_seconds`
+   * parameter, when it offers one.
+   *
+   * Part of the snapshot for the same reason the window is: it is part of the
+   * request. A result bucketed by the hour is not the answer to the same
+   * question asked by the second, and only a snapshot that carries the step can
+   * say the one on screen has gone stale.
+   */
+  readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
 /**
@@ -119,6 +131,10 @@ export type LangWatchQLRequestAction =
       readonly type: "timeWindowChanged";
       readonly timeWindow: LangWatchQLTimeWindowValues | undefined;
     }
+  | {
+      readonly type: "granularityChanged";
+      readonly granularitySeconds: LangWatchQLGranularityStep | undefined;
+    }
   | { readonly type: "submitted"; readonly snapshot: LangWatchQLSnapshot }
   | {
       readonly type: "settled";
@@ -170,7 +186,8 @@ export function lwqlSnapshotsMatch(
   return (
     a.sql === b.sql &&
     parametersMatch(a.parameters, b.parameters) &&
-    timeWindowsMatch(a.timeWindow, b.timeWindow)
+    timeWindowsMatch(a.timeWindow, b.timeWindow) &&
+    a.granularitySeconds === b.granularitySeconds
   );
 }
 
@@ -196,6 +213,11 @@ export function lwqlRequestReducer(
       return withParameters(state, action.parameters);
     case "timeWindowChanged":
       return withTimeWindow(state, action.timeWindow);
+    case "granularityChanged":
+      return withGranularity({
+        state,
+        granularitySeconds: action.granularitySeconds,
+      });
     case "submitted":
       return withSubmission(state, action.snapshot);
     case "settled":
@@ -227,6 +249,27 @@ function withTimeWindow(
   return {
     ...state,
     draft: { ...rest, ...(timeWindow ? { timeWindow } : {}) },
+  };
+}
+
+function withGranularity({
+  state,
+  granularitySeconds,
+}: {
+  state: LangWatchQLRequestState;
+  granularitySeconds: LangWatchQLGranularityStep | undefined;
+}): LangWatchQLRequestState {
+  if (granularitySeconds === state.draft.granularitySeconds) return state;
+  // Dropped rather than set to `undefined`, matching the window above: the
+  // request builder spreads the draft, and a present-but-undefined key is a
+  // different request shape from an absent one.
+  const { granularitySeconds: _dropped, ...rest } = state.draft;
+  return {
+    ...state,
+    draft: {
+      ...rest,
+      ...(granularitySeconds !== undefined ? { granularitySeconds } : {}),
+    },
   };
 }
 

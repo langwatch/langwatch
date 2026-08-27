@@ -53,8 +53,7 @@ function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
 }
 
 const ids = { conversationId: "conv_1", turnId: "turn_1" };
-const deltas = (entries: RecordedEntry[]) =>
-  entries.filter((entry) => entry.type === "delta");
+const deltas = (entries: RecordedEntry[]) => entries.filter((entry) => entry.type === "delta");
 const reasoning = (entries: RecordedEntry[]) =>
   entries.filter((entry) => entry.type === "reasoning");
 
@@ -129,10 +128,9 @@ describe("LangyTokenBuffer hybrid flush", () => {
         const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "go" }); // immediate first flush
-        const words = Array.from(
-          { length: LANGY_STREAMING.CHUNK_TOKENS },
-          (_, i) => `w${i}`,
-        ).join(" ");
+        const words = Array.from({ length: LANGY_STREAMING.CHUNK_TOKENS }, (_, i) => `w${i}`).join(
+          " ",
+        );
         await buffer.appendChunk({ ...ids, text: words });
 
         // Size arm flushed synchronously.
@@ -170,9 +168,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
       expect(reasoning(entries)).toEqual([]);
       await buffer.markEnd(ids);
 
-      expect(reasoning(entries)).toEqual([
-        { type: "reasoning", text: "I will inspect this." },
-      ]);
+      expect(reasoning(entries)).toEqual([{ type: "reasoning", text: "I will inspect this." }]);
       expect(entries.at(-1)?.type).toBe("end");
     });
   });
@@ -194,9 +190,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
         });
         await buffer.markEnd({ ...ids, backstopSilentTurn: true });
 
-        expect(deltas(entries)).toEqual([
-          { type: "delta", text: LANGY_EMPTY_TURN_FALLBACK },
-        ]);
+        expect(deltas(entries)).toEqual([{ type: "delta", text: LANGY_EMPTY_TURN_FALLBACK }]);
         expect(entries.at(-1)?.type).toBe("end");
       });
 
@@ -255,9 +249,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
         });
 
         expect(backstopped).toBe(false);
-        expect(deltas(entries)).toEqual([
-          { type: "delta", text: "Found 3 failing traces." },
-        ]);
+        expect(deltas(entries)).toEqual([{ type: "delta", text: "Found 3 failing traces." }]);
       });
     });
   });
@@ -271,9 +263,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
         await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
         await buffer.markEnd(ids);
 
-        expect(deltas(entries)).toEqual([
-          { type: "delta", text: "Found 3 failing traces." },
-        ]);
+        expect(deltas(entries)).toEqual([{ type: "delta", text: "Found 3 failing traces." }]);
       });
 
       it("keeps the whitespace that separates two words", async () => {
@@ -310,6 +300,27 @@ describe("LangyTokenBuffer hybrid flush", () => {
           type: "delta",
           text: LANGY_EMPTY_TURN_FALLBACK,
         });
+      });
+    });
+  });
+
+  describe("given the agent dispatches a UI action", () => {
+    it("lands the typed entry on the live stream exactly as given", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = LangyTokenBuffer.create({ redis });
+
+      await buffer.appendUiAction({
+        ...ids,
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      });
+
+      expect(entries.at(-1)).toEqual({
+        type: "ui",
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
       });
     });
   });

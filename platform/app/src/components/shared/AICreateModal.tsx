@@ -511,7 +511,7 @@ function GeneratingState({ text, assistant }: GeneratingStateProps) {
           <Text fontWeight="semibold">{text}</Text>
           <Text color="fg.muted" fontSize="sm">
             {assistant.reviewHint ??
-              "Nothing is saved yet — you will review and edit the draft first."}
+              "Nothing is saved yet. You will review and edit the draft first."}
           </Text>
         </VStack>
       </VStack>

@@ -1,3 +1,4 @@
+import { SYSTEM_ACTORS, type Actor, type SystemActorName } from "@langwatch/actor";
 import { z } from "zod";
 import {
   grantableAuthzScopeRefSchema,
@@ -18,8 +19,7 @@ export const ATTACH_GRANT_COMMAND_TYPE = "lw.authz_grant.attach" as const;
 export const CHANGE_GRANT_ROLE_COMMAND_TYPE = "lw.authz_grant.change_role" as const;
 export const REVOKE_GRANT_COMMAND_TYPE = "lw.authz_grant.revoke" as const;
 export const DEFINE_ROLE_COMMAND_TYPE = "lw.authz_role.define" as const;
-export const CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE =
-  "lw.authz_role.change_permissions" as const;
+export const CHANGE_ROLE_PERMISSIONS_COMMAND_TYPE = "lw.authz_role.change_permissions" as const;
 export const DELETE_ROLE_COMMAND_TYPE = "lw.authz_role.delete" as const;
 
 export const authzRoleKindSchema = z.enum(["custom", "system_api_key"]);
@@ -153,9 +153,7 @@ export const authzLedgerBindingPrincipalSchema = z.union([
   z.object({ groupId: z.string().min(1) }).strict(),
   z.object({ apiKeyId: z.string().min(1) }).strict(),
 ]);
-export type AuthzLedgerBindingPrincipal = z.infer<
-  typeof authzLedgerBindingPrincipalSchema
->;
+export type AuthzLedgerBindingPrincipal = z.infer<typeof authzLedgerBindingPrincipalSchema>;
 
 export const authzLedgerBindingAttachSchema = z
   .object({
@@ -189,8 +187,7 @@ export function authzBindingIdentityKey({
       : "groupId" in principal
         ? principal.groupId
         : principal.apiKeyId;
-  const roleIdentity =
-    customRoleId === null ? `builtin:${role}` : `custom:${customRoleId}`;
+  const roleIdentity = customRoleId === null ? `builtin:${role}` : `custom:${customRoleId}`;
   return [principalId, scopeType, scopeId, roleIdentity].join("\u001f");
 }
 
@@ -223,9 +220,7 @@ export const authzLedgerResourcePrincipalSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("organization"), id: z.string().min(1) }).strict(),
   z.object({ type: z.literal("project"), id: z.string().min(1) }).strict(),
 ]);
-export type AuthzLedgerResourcePrincipal = z.infer<
-  typeof authzLedgerResourcePrincipalSchema
->;
+export type AuthzLedgerResourcePrincipal = z.infer<typeof authzLedgerResourcePrincipalSchema>;
 
 export const AUTHZ_SHARE_PERMISSION = "traces:view" as const;
 
@@ -272,13 +267,9 @@ export const authzAttachResourceGrantInputSchema = z
     commandId: z.string().min(1).optional(),
   })
   .strict();
-export type AuthzAttachResourceGrantInput = z.infer<
-  typeof authzAttachResourceGrantInputSchema
->;
+export type AuthzAttachResourceGrantInput = z.infer<typeof authzAttachResourceGrantInputSchema>;
 export const authzAttachResourceGrantOutputSchema = z.void();
-export type AuthzAttachResourceGrantOutput = z.infer<
-  typeof authzAttachResourceGrantOutputSchema
->;
+export type AuthzAttachResourceGrantOutput = z.infer<typeof authzAttachResourceGrantOutputSchema>;
 
 export const authzRevokeResourceGrantsInputSchema = z
   .object({
@@ -288,13 +279,9 @@ export const authzRevokeResourceGrantsInputSchema = z
     reason: z.string().min(1).optional(),
   })
   .strict();
-export type AuthzRevokeResourceGrantsInput = z.infer<
-  typeof authzRevokeResourceGrantsInputSchema
->;
+export type AuthzRevokeResourceGrantsInput = z.infer<typeof authzRevokeResourceGrantsInputSchema>;
 export const authzRevokeResourceGrantsOutputSchema = z.void();
-export type AuthzRevokeResourceGrantsOutput = z.infer<
-  typeof authzRevokeResourceGrantsOutputSchema
->;
+export type AuthzRevokeResourceGrantsOutput = z.infer<typeof authzRevokeResourceGrantsOutputSchema>;
 
 export const authzChangeBindingRoleInputSchema = z
   .object({
@@ -305,13 +292,9 @@ export const authzChangeBindingRoleInputSchema = z
     actor: grantsLedgerActorSchema,
   })
   .strict();
-export type AuthzChangeBindingRoleInput = z.infer<
-  typeof authzChangeBindingRoleInputSchema
->;
+export type AuthzChangeBindingRoleInput = z.infer<typeof authzChangeBindingRoleInputSchema>;
 export const authzChangeBindingRoleOutputSchema = z.void();
-export type AuthzChangeBindingRoleOutput = z.infer<
-  typeof authzChangeBindingRoleOutputSchema
->;
+export type AuthzChangeBindingRoleOutput = z.infer<typeof authzChangeBindingRoleOutputSchema>;
 
 export const authzRevokeBindingsInputSchema = z
   .object({
@@ -357,13 +340,9 @@ export const authzRevokeBindingsWhereInputSchema = z
     reason: z.string().min(1).optional(),
   })
   .strict();
-export type AuthzRevokeBindingsWhereInput = z.infer<
-  typeof authzRevokeBindingsWhereInputSchema
->;
+export type AuthzRevokeBindingsWhereInput = z.infer<typeof authzRevokeBindingsWhereInputSchema>;
 export const authzRevokeBindingsWhereOutputSchema = z.number().int().nonnegative();
-export type AuthzRevokeBindingsWhereOutput = z.infer<
-  typeof authzRevokeBindingsWhereOutputSchema
->;
+export type AuthzRevokeBindingsWhereOutput = z.infer<typeof authzRevokeBindingsWhereOutputSchema>;
 
 export const authzOffboardMemberInputSchema = z
   .object({
@@ -407,6 +386,28 @@ export type AuthzDeleteRoleOutput = z.infer<typeof authzDeleteRoleOutputSchema>;
 export const authzGrantActorSchema = z.object({ userId: z.string().min(1) }).strict();
 export type AuthzGrantActor = z.infer<typeof authzGrantActorSchema>;
 
+const systemActorNameSchema = z.custom<SystemActorName>(
+  (value) => typeof value === "string" && Object.hasOwn(SYSTEM_ACTORS, value),
+);
+const actorSchema: z.ZodType<Actor> = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("user"),
+      id: z.string().min(1),
+      impersonatorId: z.string().min(1).optional(),
+    })
+    .strict(),
+  z.object({ type: z.literal("api_key"), id: z.string().min(1) }).strict(),
+  z.object({ type: z.literal("system"), name: systemActorNameSchema }).strict(),
+  z
+    .object({
+      type: z.literal("internal"),
+      codePath: z.string().min(1),
+      revision: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
+
 export const grantPrincipalSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("user"), id: z.string().min(1) }).strict(),
   z.object({ type: z.literal("group"), id: z.string().min(1) }).strict(),
@@ -430,9 +431,7 @@ export const authzAttachGrantInputSchema = z
   .strict();
 export type AuthzAttachGrantInput = z.infer<typeof authzAttachGrantInputSchema>;
 
-export const authzBindingOutputSchema = z
-  .object({ bindingId: z.string().min(1) })
-  .strict();
+export const authzBindingOutputSchema = z.object({ bindingId: z.string().min(1) }).strict();
 export type AuthzBindingOutput = z.infer<typeof authzBindingOutputSchema>;
 
 export const authzUpdateGrantInputSchema = z
@@ -467,7 +466,7 @@ export type AuthzReplaceGrantInput = z.infer<typeof authzReplaceGrantInputSchema
 
 export const authzOffboardInputSchema = z
   .object({
-    actor: authzGrantActorSchema,
+    actor: z.union([authzGrantActorSchema, actorSchema]),
     userId: z.string().min(1),
     organizationId: z.string().min(1),
   })

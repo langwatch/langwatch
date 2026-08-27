@@ -160,8 +160,8 @@ WORKDIR /src/sdks/typescript
 COPY platform/app/src/server/tracer/types.ts             /src/platform/app/src/server/tracer/types.ts
 COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/server/filters/types.ts
 COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
-COPY platform/app/src/server/evaluations/evaluators.native.ts /src/platform/app/src/server/evaluations/evaluators.native.ts
-COPY platform/app/src/server/modelProviders/llmModels.json /src/platform/app/src/server/modelProviders/llmModels.json
+COPY packages/features/evaluator/contract/src/evaluators.native.ts /src/packages/features/evaluator/contract/src/evaluators.native.ts
+COPY packages/features/model-provider/contract/src/catalog/model-catalog.json /src/packages/features/model-provider/contract/src/catalog/model-catalog.json
 COPY packages/redaction/src                           /src/packages/redaction/src
 COPY platform/app/src/app/api/openapiLangWatch.json      /src/platform/app/src/app/api/openapiLangWatch.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
@@ -219,8 +219,14 @@ FROM debian:bookworm-slim
 # grammar, so a bump means re-checking the command table in
 # services/langyagent/internal/assets/AGENTS.md.
 ARG LANGWATCH_CLI_VERSION=0.31.0
+# `jq` and `python-is-python3` are here because the agent reaches for them by
+# name. The CLI's own `--jq` is a small subset (dot paths and a terminal
+# `| length`) that reads an answer before it is written to disk; anything past
+# that belongs in the shell. Without these three names present, one session
+# lost `--jq`, then `jq`, then `python` in a row while `python3` sat installed
+# under a name it did not try.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates python3 util-linux \
+    curl git ca-certificates python3 python-is-python3 jq util-linux \
     && rm -rf /var/lib/apt/lists/*
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
 # rule (services/langyagent/iptables.go) that closed the sibling-worker
@@ -336,6 +342,21 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
     chmod 0755 /workspace
 
 ENV HOME=/root
+# The `langwatch` CLI here is a Bun-compiled binary (the cli-builder stage
+# above), and Bun can auto-upload a crash report to a third party. A Bun crash
+# report reprints the process argv, and argv for `langwatch ui call` carries
+# the customer's own payload: prompt text, dataset field names, evaluator ids.
+# That data must never leave this worker, so the upload is turned off here
+# rather than left to the default of whichever platform the image runs on.
+# DO_NOT_TRACK is Bun's documented switch for it and is equivalent to
+# `telemetry = false` in bunfig.toml. It stops the upload only: Bun still
+# prints its crash banner to stderr, which no Bun setting suppresses.
+#
+# The manager passes an allowlisted environment to its workers, and the CLI
+# runs in a worker, so this ENV only reaches it because DO_NOT_TRACK is listed
+# in services/langyagent/internal/workerenv/workerenv.go. Both halves are
+# needed; a test asserts them together.
+ENV DO_NOT_TRACK=1
 WORKDIR /workspace
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/langyagent"]

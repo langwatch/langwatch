@@ -22,6 +22,7 @@ import {
   requireEnterprisePlan,
 } from "~/server/api/enterprise";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 
 const enterpriseGate = requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR);
 

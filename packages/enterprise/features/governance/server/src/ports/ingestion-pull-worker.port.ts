@@ -2,6 +2,18 @@ import type {
   GovernanceIngestionSource,
   PulledUsageObservedEventData,
 } from "@langwatch/enterprise-governance-contract";
+import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
+import type { z } from "zod";
+
+export type GovernanceTraceRequest = z.input<typeof exportTraceServiceRequestSchema>;
+
+export abstract class GovernanceTraceIngestionPort {
+  abstract ingest(input: { projectId: string; request: GovernanceTraceRequest }): Promise<{
+    rejectedSpans: number;
+    ingestionFailures: number;
+    ingestionFailureMessage?: string;
+  }>;
+}
 
 export type GovernanceOcsfEventInput = {
   tenantId: string;

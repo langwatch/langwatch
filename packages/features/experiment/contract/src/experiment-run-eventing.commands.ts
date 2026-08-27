@@ -12,9 +12,7 @@ export const startExperimentRunCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 
-export type StartExperimentRunCommandData = z.infer<
-  typeof startExperimentRunCommandDataSchema
->;
+export type StartExperimentRunCommandData = z.infer<typeof startExperimentRunCommandDataSchema>;
 
 export const recordTargetResultCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -34,19 +32,20 @@ export const recordTargetResultCommandDataSchema = z.object({
    * `targetResultEventDataSchema`, which this envelope mirrors.
    */
   domainError: z
-    .custom<SerializedHandledError>(
-      (value) => typeof value === "object" && value !== null,
-    )
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
     .nullable()
     .optional(),
   traceId: z.string().nullable().optional(),
   targets: z.array(experimentRunEventingTargetSchema).optional(),
+  /**
+   * True when the cell was copied into the run from the board rather than
+   * produced by it. See `targetResultEventDataSchema`, which this mirrors.
+   */
+  carriedOver: z.boolean().optional(),
   occurredAt: z.number(),
 });
 
-export type RecordTargetResultCommandData = z.infer<
-  typeof recordTargetResultCommandDataSchema
->;
+export type RecordTargetResultCommandData = z.infer<typeof recordTargetResultCommandDataSchema>;
 
 export const recordEvaluatorResultCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -64,6 +63,11 @@ export const recordEvaluatorResultCommandDataSchema = z.object({
   cost: z.number().nullable().optional(),
   inputs: z.record(z.string(), z.unknown()).nullable().optional(),
   duration: z.number().nullable().optional(),
+  /**
+   * True when the verdict was copied into the run from the board rather than
+   * produced by it. See `evaluatorResultEventDataSchema`, which this mirrors.
+   */
+  carriedOver: z.boolean().optional(),
   occurredAt: z.number(),
 });
 

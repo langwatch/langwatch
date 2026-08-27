@@ -154,6 +154,7 @@ function evaluationResult(): LangWatchQLQueryResult {
     truncated: false,
     diagnostics: [],
     followsTimeWindow: false,
+    followsGranularity: false,
   };
 }
 

@@ -8,6 +8,15 @@ Feature: Groups REST API
     Given I am authenticated with an organization API key
     And I have organization:manage permission
 
+  # The scim_managed_group refusals below are anchors, not implementation
+  # detail: a group the directory owns is edited by the directory or not at
+  # all, whichever way its access is stored underneath. D08 moves the writes
+  # a directory push makes onto the grants ledger and scopes its tokens per
+  # connection (specs/identity/scim-connection-sync.feature) - none of which
+  # changes any answer here. If one of these guards ever stops refusing, the
+  # next sync silently reverts a customer's edit, which is the failure they
+  # exist to prevent.
+
   # ── List groups ─────────────────────────────────────────────────────────────
 
   @unit

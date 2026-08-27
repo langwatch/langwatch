@@ -1,7 +1,7 @@
 import { docsUrl } from "~/utils/docsUrl";
 
 /**
- * Central remediation registry for handled errors — every `tips` / docs link
+ * Central remediation registry for handled errors; every `tips` / docs link
  * an error class emits lives here, keyed by the error's `code`. Error classes
  * spread `remediation(code)` into their constructor options instead of
  * inlining copy.
@@ -10,7 +10,7 @@ import { docsUrl } from "~/utils/docsUrl";
  * repo-relative docs path (not a URL) so CI can verify every linked page
  * actually exists under `docs/` (see __tests__/error-remediation.unit.test.ts).
  *
- * Dynamic content (ids, counts, hints) does NOT belong here — classes compose
+ * Dynamic content (ids, counts, hints) does NOT belong here; classes compose
  * it: `[dynamicTip, ...remediation(code).tips]`.
  */
 
@@ -24,27 +24,36 @@ const registry = {
   // ---- request boundary ----
   validation_error: {
     tips: [
-      "Read `reasons` — each entry names the offending field in meta.field and what was expected in meta.expected",
+      "Read `reasons`; each entry names the offending field in meta.field and what was expected in meta.expected",
       "Fix those fields and send the request again; retrying it unchanged will fail identically",
     ],
   },
   malformed_request: {
     tips: [
-      "The body could not be parsed at all — check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
+      "The body could not be parsed at all; check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
+    ],
+  },
+
+  // ---- dataset storage ----
+  storage_not_writable: {
+    tips: [
+      "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",
+      "Or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory and restart the service",
+      "The server log line next to this failure names the directory that was refused",
     ],
   },
 
   // ---- traces ----
   trace_not_found: {
     tips: [
-      "Check the trace id — traces are deleted after the retention window",
-      "If you just sent this trace, retry in a few seconds — ingestion is asynchronous",
+      "Check the trace id; traces are deleted after the retention window",
+      "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
     ],
     docsPath: "/platform/data-retention",
   },
   span_not_found: {
     tips: [
-      "Check the span id — spans are deleted with their trace after the retention window",
+      "Check the span id; spans are deleted with their trace after the retention window",
     ],
     docsPath: "/platform/data-retention",
   },
@@ -67,7 +76,7 @@ const registry = {
   },
   filter_parse_error: {
     tips: [
-      "Check the filter syntax near the indicated position — filters are field:value pairs combined with AND/OR",
+      "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
     ],
   },
   filter_field_unknown: {
@@ -81,39 +90,59 @@ const registry = {
   },
   lwql_unparseable: {
     tips: [
-      "Read `meta.violations` — each entry carries the line and column the parser stopped at",
+      "Read `meta.violations`; each entry carries the line and column the parser stopped at",
       "The endpoint accepts native ClickHouse SQL; check for an unclosed quote, bracket, or parenthesis first",
     ],
   },
   lwql_not_permitted: {
     tips: [
-      "Read `meta.violations` — each entry names the rule (`code`) and the clause (`clause`) that was refused",
+      "Read `meta.violations`; each entry names the rule (`code`) and the clause (`clause`) that was refused",
       "Submit one read-only SELECT; writes, DDL, SETTINGS, FORMAT, INTO OUTFILE and table functions are all refused",
       "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
     ],
   },
   lwql_parameter_missing: {
     tips: [
-      "Read `meta.parameters` — it lists every parameter the SQL declares that the request left unset",
+      "Read `meta.parameters`; it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
-      "`period_start` and `period_end` are the exception — send them as `timeWindow: { start, end }`, never under `parameters`",
+      "`period_start` and `period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
+      "`period_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
     ],
   },
   lwql_reserved_parameter_supplied: {
     tips: [
-      "Read `meta.parameters` — it lists the reserved names the request set for itself",
+      "Read `meta.parameters`; it lists the reserved names the request set for itself",
       "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
-      "Read `meta.parameters` — it lists the reserved names declared with the wrong type",
+      "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
       "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
+    ],
+  },
+  lwql_granularity_parameter_type: {
+    tips: [
+      "Read `meta.parameters`; it lists the parameter whose declaration was refused",
+      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}",
+      "When the surface supplies the step itself, it must be one of the offered steps: 1 second, 1 minute, or 1 hour",
+    ],
+  },
+  lwql_granularity_too_fine: {
+    tips: [
+      "The requested bucket size would produce more datapoints than one query may return for this period",
+      "Use a bucket size that fits the range from the offered steps -- 1 second, 1 minute or 1 hour -- or narrow the date range",
+    ],
+  },
+  lwql_granularity_requires_window: {
+    tips: [
+      "A chart declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}",
+      "The bucket budget is computed against the period those two bounds describe",
     ],
   },
   lwql_not_enabled: {
     tips: [
-      "The LangWatchQL feature is not enabled for this project — retrying will not help",
+      "The LangWatchQL feature is not enabled for this project; retrying will not help",
       "Ask an administrator to enable the SQL workbench for this project",
     ],
   },
@@ -125,26 +154,32 @@ const registry = {
   },
   saved_workbench_chart_not_found: {
     tips: [
-      "Check the chart id — a chart saved in another project is not readable from this one",
+      "Check the chart id; a chart saved in another project is not readable from this one",
       "List the project's saved charts to see which ids exist",
+    ],
+  },
+  saved_workbench_chart_dashboard_not_found: {
+    tips: [
+      "Check the dashboard id; a dashboard from another project cannot be used for placement in this project",
+      "List the project's dashboards to see which ids exist",
     ],
   },
   saved_workbench_chart_specification_refused: {
     tips: [
-      "Read `meta.errors` — each entry names the rule (`rule`) and the JSON path (`path`) that was refused",
+      "Read `meta.errors`; each entry names the rule (`rule`) and the JSON path (`path`) that was refused",
       "A specification may only read the datasets the workbench registers, and may not load anything over the network",
       "The same specification is refused when rendering, so saving it unchanged will not help",
     ],
   },
   saved_workbench_chart_definition_invalid: {
     tips: [
-      "This is a defect on our side — the stored chart cannot be read back and retrying will not help",
+      "This is a defect on our side; the stored chart cannot be read back and retrying will not help",
       "Save the chart again from the workbench to replace the unreadable definition",
     ],
   },
   lwql_unavailable: {
     tips: [
-      "The LangWatchQL analytics SQL API is not provisioned on this deployment — retrying will not help",
+      "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",
       "Contact support to have it enabled for this workspace",
     ],
   },
@@ -156,13 +191,13 @@ const registry = {
   },
   clickhouse_unavailable: {
     tips: [
-      "This is a temporary platform issue — retry in a few seconds",
+      "This is a temporary platform issue; retry in a few seconds",
       "If it persists, check the LangWatch status page or contact support",
     ],
   },
   clickhouse_overloaded: {
     tips: [
-      "Too many queries were running at once — retry in a few seconds",
+      "Too many queries were running at once; retry in a few seconds",
       "Narrow the time range or add filters so the query costs less to run",
     ],
   },
@@ -170,7 +205,7 @@ const registry = {
   // ---- api keys ----
   api_key_not_found: {
     tips: [
-      "Check the API key id — the key may have been deleted or never created",
+      "Check the API key id; the key may have been deleted or never created",
       "List the keys on the organization to find the right id",
     ],
     docsPath: "/api-reference/api-keys/overview",
@@ -191,13 +226,13 @@ const registry = {
   },
   api_key_permission_not_delegable: {
     tips: [
-      "A wider key or a higher role does not change this — make the change in LangWatch instead",
+      "A wider key or a higher role does not change this; make the change in LangWatch instead",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_scope_violation: {
     tips: [
-      "A key cannot be granted a scope you do not hold yourself — lower the requested scope or ask an admin to create the key",
+      "A key cannot be granted a scope you do not hold yourself; lower the requested scope or ask an admin to create the key",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
@@ -209,7 +244,7 @@ const registry = {
   },
   api_key_reserved_name: {
     tips: [
-      "This name is reserved for keys LangWatch manages on your behalf — pick a different name",
+      "This name is reserved for keys LangWatch manages on your behalf; pick a different name",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
@@ -282,6 +317,18 @@ const registry = {
     ],
   },
 
+  // ---- agent cache ----
+  // Read by agent code inside a run, so the tips name the next call rather
+  // than a page to open.
+  cache_entry_not_found: {
+    tips: [
+      "Store the entry before you read it; a read never creates one",
+      "Check the name, which is case sensitive",
+      "An entry is gone once its lifetime passes; store it again with a longer one if the run needs it for longer",
+    ],
+    docsPath: "/agent-simulations/authenticated-agents",
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [
@@ -293,33 +340,33 @@ const registry = {
   // ---- evaluations ----
   evaluation_not_found: {
     tips: [
-      "Check the evaluation id — it may belong to a different project",
-      "If the evaluation was just started, retry in a few seconds — evaluations run asynchronously",
+      "Check the evaluation id; it may belong to a different project",
+      "If the evaluation was just started, retry in a few seconds; evaluations run asynchronously",
     ],
     docsPath: "/evaluations/overview",
   },
   trace_not_evaluatable: {
     tips: [
       "Check that the trace contains the inputs/outputs the evaluator expects",
-      "If the trace was just ingested, retry in a few seconds — ingestion is asynchronous",
+      "If the trace was just ingested, retry in a few seconds; ingestion is asynchronous",
     ],
     docsPath: "/evaluations/overview",
   },
   evaluator_config_error: {
     tips: [
-      "Fix the evaluator config named in the message — check the evaluator's expected settings schema",
+      "Fix the evaluator config named in the message; check the evaluator's expected settings schema",
     ],
     docsPath: "/evaluations/evaluators/list",
   },
   evaluator_execution_error: {
     tips: [
-      "Retry in a few seconds — the evaluator backend failed to execute this run",
+      "Retry in a few seconds; the evaluator backend failed to execute this run",
       "If it persists, check the LangWatch status page or contact support",
     ],
   },
   evaluator_input_too_large: {
     tips: [
-      "Shorten the input sent to this evaluator — the payload exceeded the evaluator's size limit",
+      "Shorten the input sent to this evaluator; the payload exceeded the evaluator's size limit",
       "Map the evaluator to a specific field rather than the whole trace, so only what it scores is sent",
     ],
     docsPath: "/evaluations/evaluators/list",
@@ -343,16 +390,30 @@ const registry = {
     docsPath: "/evaluations/evaluators/list",
   },
 
+  // ---- default models ----
+  model_not_configured: {
+    // The write is almost always organization scoped: providers are org rows,
+    // and the onboarding seed lands the default config at ORGANIZATION so the
+    // whole organization inherits. Naming the page AND the scope is what makes
+    // this recoverable without a support round trip.
+    tips: [
+      "Open Settings, then Default Models, and set a model for the role in meta.role",
+      "Set it at the organization scope so every team and project inherits it; a project scope covers that project only",
+      "Enabling a provider is not enough on its own: the role still needs a model chosen for it",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
   // ---- langy ----
   langy_conversation_not_found: {
     tips: [
-      "Check the conversation id — it may be archived or belong to another project",
+      "Check the conversation id; it may be archived or belong to another project",
       "Start a new conversation to keep going",
     ],
   },
   langy_conversation_not_owned: {
     tips: [
-      "Shared conversations can be viewed but only the owner can continue them — start a new conversation instead",
+      "Shared conversations can be viewed but only the owner can continue them; start a new conversation instead",
     ],
   },
   langy_conversation_id_unadoptable: {
@@ -368,7 +429,7 @@ const registry = {
   },
   langy_egress_misconfigured: {
     tips: [
-      "Ask a workspace admin to review the project's outbound network policy — Langy refuses to run rather than leak",
+      "Ask a workspace admin to review the project's outbound network policy; Langy refuses to run rather than leak",
     ],
   },
   langy_insufficient_scope: {
@@ -377,18 +438,64 @@ const registry = {
   langy_turn_in_progress: {
     tips: ["Wait for the current response to finish before sending another message"],
   },
+  langy_ui_turn_inactive: {
+    tips: [
+      "UI actions only work while your own turn is running; this command must be run by the agent during a conversation, not standalone",
+    ],
+  },
+  langy_ui_action_unknown: {
+    tips: [
+      "Run `langwatch ui actions` to list the actions the current page accepts",
+    ],
+  },
+  langy_ui_payload_invalid: {
+    tips: [
+      "Read meta.issues; each entry names the offending payload field and what was expected",
+      "Run `langwatch ui actions` to see the action's payload schema",
+    ],
+  },
+  langy_ui_no_browser: {
+    tips: [
+      "The user has no page open that can run this action; tell them what you wanted to do, or use the equivalent API command instead",
+    ],
+  },
+  langy_ui_experiment_required: {
+    tips: [
+      "Pass --experiment <slug> so the backend knows which experiment to apply the action to; the slug is on the experiment context chip and in `langwatch experiment list`",
+    ],
+  },
+  langy_ui_page_out_of_date: {
+    tips: [
+      "The open page holds an older version and cannot save. Pass --experiment <slug> so the change is applied to the saved evaluation instead, and tell the user their page needs a reload",
+    ],
+  },
+  langy_ui_save_failed: {
+    tips: [
+      "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
+    ],
+  },
+  langy_ui_timeout: {
+    tips: [
+      "The page may have applied part of the action; read the current state (for example `langwatch workbench get-state`) before retrying",
+    ],
+  },
+  langy_ui_handler_failed: {
+    tips: [
+      "Read meta.errorCode for the page's own failure reason, re-read the current state, and adjust the payload before retrying",
+    ],
+  },
   langy_rate_limited: {
     tips: ["Wait a few seconds before sending another message"],
   },
   langy_turn_not_stoppable: {
     tips: [
       "Read the conversation to find the turn it currently has in flight, and stop that one",
-      "A turn that already finished needs no stopping — its answer is on the conversation",
+      "A turn that already finished needs no stopping; its answer is on the conversation",
     ],
   },
   langy_idempotency_mismatch: {
     tips: [
-      "The same idempotency key was reused with different content — mint a fresh key for every new send",
+      "The same idempotency key was reused with different content; mint a fresh key for every new send",
     ],
   },
   langy_empty_message: {
@@ -396,7 +503,7 @@ const registry = {
   },
   langy_dispatch_rejected: {
     tips: [
-      "The agent rejected this turn's request as invalid — it will not be retried; send a new message",
+      "The agent rejected this turn's request as invalid, it will not be retried; send a new message",
     ],
   },
   langy_agent_unavailable: {
@@ -407,7 +514,7 @@ const registry = {
   },
   langy_agent_session_lost: {
     tips: [
-      "The agent dropped this conversation before finishing — resend the message to pick it back up",
+      "The agent dropped this conversation before finishing; resend the message to pick it back up",
     ],
   },
   langy_github_not_connected: {
@@ -423,24 +530,24 @@ const registry = {
   },
   langy_api_credential_invalid: {
     tips: [
-      "The token did not resolve to a project — check it was copied whole and has not been revoked",
+      "The token did not resolve to a project; check it was copied whole and has not been revoked",
     ],
     docsPath: "/api-reference/api-keys/overview",
   },
   langy_api_key_unowned: {
     tips: [
-      "This key has no owning user, so there is no one for the turn to act as — mint a personal API key and use that instead",
+      "This key has no owning user, so there is no one for the turn to act as; mint a personal API key and use that instead",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   langy_api_key_no_langy_access: {
     tips: [
-      "The user who owns this key cannot use Langy in this project — ask a workspace admin to grant Langy access, then retry",
+      "The user who owns this key cannot use Langy in this project; ask a workspace admin to grant Langy access, then retry",
     ],
   },
   langy_api_actor_missing: {
     tips: [
-      "The user who owns this key no longer exists — mint a new key under a current user",
+      "The user who owns this key no longer exists; mint a new key under a current user",
     ],
   },
   langy_api_request_invalid: {
@@ -453,36 +560,36 @@ const registry = {
   },
   langy_worker_spawn_failed: {
     tips: [
-      "The agent failed to start for this turn — nothing was lost, retry in a moment",
+      "The agent failed to start for this turn; nothing was lost, retry in a moment",
     ],
   },
   langy_worker_stopped: {
     tips: [
-      "The worker died mid-reply and the server already exhausted its recovery — the message is on record, retry manually",
+      "The worker died mid-reply and the server already exhausted its recovery; the message is on record, retry manually",
     ],
   },
   langy_agent_errored: {
     tips: [
-      "The model call was rejected upstream — check meta/reasons for the provider's typed failure, then retry",
+      "The model call was rejected upstream; check meta/reasons for the provider's typed failure, then retry",
     ],
   },
   langy_turn_timeout: {
     tips: ["Retry — or ask for a narrower slice: a shorter time range or a single trace"],
   },
   langy_worker_restarting: {
-    tips: ["An update interrupted this reply — resend the message"],
+    tips: ["An update interrupted this reply; resend the message"],
   },
 
   // ---- licensing ----
   license_signing_key_not_pem: {
     tips: [
       "Provide the whole private key, including its BEGIN and END lines (PRIVATE KEY, RSA PRIVATE KEY and EC PRIVATE KEY are all accepted)",
-      "A public key cannot sign — check that this is the private half of the license signing pair",
+      "A public key cannot sign; check that this is the private half of the license signing pair",
     ],
   },
   license_signing_key_encrypted: {
     tips: [
-      "Provide an unencrypted private key — a passphrase-protected key cannot be used for signing",
+      "Provide an unencrypted private key; a passphrase-protected key cannot be used for signing",
     ],
   },
   license_signing_failed: {
@@ -492,10 +599,10 @@ const registry = {
 
 export type RemediationCode = keyof typeof registry;
 
-/** All registered codes — used by the registry test to catch typos. */
+/** All registered codes; used by the registry test to catch typos. */
 export const REMEDIATION_CODES = Object.keys(registry) as RemediationCode[];
 
-/** Every docsPath in the registry — consumed by the docs-existence CI test. */
+/** Every docsPath in the registry; consumed by the docs-existence CI test. */
 export const REMEDIATION_DOC_PATHS: readonly string[] = Object.values(
   registry as Record<string, RemediationEntry>,
 )
@@ -516,4 +623,21 @@ export function remediation(code: RemediationCode): {
     ...(entry.tips ? { tips: entry.tips } : {}),
     ...(entry.docsPath ? { docsUrl: docsUrl(entry.docsPath) } : {}),
   };
+}
+
+/**
+ * The tips for a code that is only known at runtime.
+ *
+ * One error can carry another's code: the UI-action channel wraps whatever the
+ * page reported, and its own advice is "read meta.errorCode for the page's own
+ * reason". Following that advice should then reach the inner code's tips rather
+ * than end at its name, so the wrapper looks the inner code up here. Unknown
+ * codes answer with nothing, because a code from a page is data.
+ */
+export function remediationFor(code: string | undefined): {
+  tips?: readonly string[];
+  docsUrl?: string;
+} {
+  if (!code || !(code in registry)) return {};
+  return remediation(code as RemediationCode);
 }

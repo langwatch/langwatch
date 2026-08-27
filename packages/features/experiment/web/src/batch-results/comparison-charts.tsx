@@ -226,8 +226,7 @@ export const computeTargetMetrics = (
     evaluatorNames[evalId] = metrics.name;
 
     if (metrics.scores.length > 0) {
-      avgScores[evalId] =
-        metrics.scores.reduce((a, b) => a + b, 0) / metrics.scores.length;
+      avgScores[evalId] = metrics.scores.reduce((a, b) => a + b, 0) / metrics.scores.length;
     }
 
     if (metrics.passed + metrics.failed > 0) {
@@ -297,8 +296,7 @@ export const computeRunMetrics = (data: BatchEvaluationData): RunMetricsResult =
     evaluatorNames[evalId] = metrics.name;
 
     if (metrics.scores.length > 0) {
-      avgScores[evalId] =
-        metrics.scores.reduce((a, b) => a + b, 0) / metrics.scores.length;
+      avgScores[evalId] = metrics.scores.reduce((a, b) => a + b, 0) / metrics.scores.length;
     }
 
     // Only compute pass rate if there are pass/fail results
@@ -464,15 +462,12 @@ export const ComparisonCharts = ({
   const defaultXAxis = useMemo((): XAxisOption => {
     if (comparisonData.length >= 2) return "runs";
     const targets = comparisonData[0]?.data?.targetColumns ?? [];
-    const hasRealTarget = targets.some(
-      (t) => t.type !== "evaluator" && !t.id.startsWith("_eval_"),
-    );
+    const hasRealTarget = targets.some((t) => t.type !== "evaluator" && !t.id.startsWith("_eval_"));
     if (targets.length >= 2 && hasRealTarget) return "target";
     return "runs";
   }, [comparisonData]);
 
-  const [internalXAxisOption, setInternalXAxisOption] =
-    useState<XAxisOption>(defaultXAxis);
+  const [internalXAxisOption, setInternalXAxisOption] = useState<XAxisOption>(defaultXAxis);
   const xAxisOption = controlledXAxisOption ?? internalXAxisOption;
   const setXAxisOption = (option: XAxisOption) => {
     if (onXAxisOptionChange) {
@@ -620,7 +615,7 @@ export const ComparisonCharts = ({
       const targetGroups = new Map<
         string,
         {
-          name: string;
+          displayName: string;
           costs: number[];
           latencies: number[];
           scores: Record<string, number[]>;
@@ -636,7 +631,7 @@ export const ComparisonCharts = ({
 
           // Use ID as key for uniqueness
           const existing = targetGroups.get(targetCol.id) ?? {
-            name: targetCol.name,
+            displayName: targetCol.displayName ?? targetCol.name,
             costs: [],
             latencies: [],
             scores: {},
@@ -663,9 +658,9 @@ export const ComparisonCharts = ({
         }
       }
 
-      // Use the stored name for display, include color from targetColors
+      // Use the display name, include color from targetColors
       return Array.from(targetGroups.entries()).map(([id, data], index) => ({
-        name: data.name,
+        name: data.displayName,
         color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
         cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
         latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
@@ -743,11 +738,8 @@ export const ComparisonCharts = ({
       if (xAxisOption === "prompt") {
         // Key is in format "promptId::vN" or just "promptId"
         const [promptId, versionPart] = key.split("::");
-        const resolvedPromptName =
-          promptNames[promptId ?? ""] ?? targetCol.name ?? promptId ?? key;
-        return versionPart
-          ? `${resolvedPromptName} (${versionPart})`
-          : resolvedPromptName;
+        const resolvedPromptName = promptNames[promptId ?? ""] ?? targetCol.name ?? promptId ?? key;
+        return versionPart ? `${resolvedPromptName} (${versionPart})` : resolvedPromptName;
       }
       return key;
     };
@@ -828,25 +820,26 @@ export const ComparisonCharts = ({
   // other three bars share a prefix with this one — which is how these charts
   // ended up rendering four bars all labelled "support-assista…" while their
   // siblings rendered "(1) (2) (3) (4)". Same names, same trim, everywhere.
-  const axisLabelByName = useMemo(() => {
-    const names = chartData.map((d) => String(d.name));
-    const labels = buildAxisLabels(names, axis.maxLabelLength);
-    return new Map(names.map((name, i) => [name, labels[i] ?? name]));
-  }, [chartData, axis.maxLabelLength]);
-  const formatAxisTick = (value: unknown): string => {
-    const name = String(value);
-    return axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength);
-  };
+  //
+  // Held by bar position, not by name: two targets on one board can carry the
+  // identical name, and a name-keyed lookup gives both bars the last label.
+  const axisLabels = useMemo(
+    () =>
+      buildAxisLabels(
+        chartData.map((d) => String(d.name)),
+        axis.maxLabelLength,
+      ),
+    [chartData, axis.maxLabelLength],
+  );
+  const formatAxisTick = (value: unknown, index: number): string =>
+    axisLabels[index] ?? truncateLabel(String(value), axis.maxLabelLength);
 
   // Height is shared by every chart in the row, including the WinRateCharts
   // rendered alongside — and a win-rate chart's bar count (its variants, plus
   // Tie) is independent of `chartData`, which excludes comparison columns
   // entirely. Size from the busiest chart so the tallest axis still fits.
   const chartHeight = chartHeightFor(
-    Math.max(
-      chartData.length,
-      ...(comparisonColumns ?? []).map((c) => c.variants.length + 1),
-    ),
+    Math.max(chartData.length, ...(comparisonColumns ?? []).map((c) => c.variants.length + 1)),
   );
 
   // Get all evaluators with scores (for score chart)
@@ -951,9 +944,7 @@ export const ComparisonCharts = ({
 
   // Get available X-axis options from target properties and metadata
   const xAxisOptions = useMemo(() => {
-    const options: { value: XAxisOption; label: string }[] = [
-      { value: "runs", label: "Runs" },
-    ];
+    const options: { value: XAxisOption; label: string }[] = [{ value: "runs", label: "Runs" }];
 
     // Add "Target" option if there are 2+ targets
     const targetCount = runMetrics[0]?.targetColumns?.length ?? 0;
@@ -1012,16 +1003,13 @@ export const ComparisonCharts = ({
                   size="xs"
                   variant="outline"
                   onClick={() =>
-                    groupByDropdownOpen
-                      ? setGroupByDropdownOpen(false)
-                      : openGroupByDropdown()
+                    groupByDropdownOpen ? setGroupByDropdownOpen(false) : openGroupByDropdown()
                   }
                   data-testid="group-by-button"
                   aria-haspopup="menu"
                   aria-expanded={groupByDropdownOpen}
                 >
-                  Group by:{" "}
-                  {xAxisOptions.find((o) => o.value === xAxisOption)?.label ?? "Runs"}
+                  Group by: {xAxisOptions.find((o) => o.value === xAxisOption)?.label ?? "Runs"}
                 </Button>
                 {groupByDropdownOpen && groupByBtnRect && (
                   <Portal>
@@ -1107,9 +1095,7 @@ export const ComparisonCharts = ({
                 size="xs"
                 variant="outline"
                 onClick={() =>
-                  metricsDropdownOpen
-                    ? setMetricsDropdownOpen(false)
-                    : openMetricsDropdown()
+                  metricsDropdownOpen ? setMetricsDropdownOpen(false) : openMetricsDropdown()
                 }
                 data-testid="metrics-selector-button"
                 aria-haspopup="menu"
@@ -1183,9 +1169,7 @@ export const ComparisonCharts = ({
                             border="1px solid"
                             borderColor="border.emphasized"
                             borderRadius="sm"
-                            bg={
-                              visibleMetrics.has(metric.id) ? "blue.500" : "transparent"
-                            }
+                            bg={visibleMetrics.has(metric.id) ? "blue.500" : "transparent"}
                             display="flex"
                             alignItems="center"
                             justifyContent="center"
@@ -1445,9 +1429,7 @@ export const ComparisonCharts = ({
             {showComparisonLeaderboard &&
               comparisonColumns?.map(
                 (column) =>
-                  visibleMetrics.has(
-                    `leaderboard_${column.evaluatorId}` as MetricType,
-                  ) && (
+                  visibleMetrics.has(`leaderboard_${column.evaluatorId}` as MetricType) && (
                     <ComparisonLeaderboardChart
                       key={`leaderboard-${column.evaluatorId}`}
                       column={column}
@@ -1455,9 +1437,7 @@ export const ComparisonCharts = ({
                       chartHeight={chartHeight}
                       targetColors={targetColors}
                       modelByTargetId={modelsFromRun.modelByTargetId}
-                      judgeModel={
-                        modelsFromRun.judgeModelByEvaluatorId[column.evaluatorId] ?? null
-                      }
+                      judgeModel={modelsFromRun.judgeModelByEvaluatorId[column.evaluatorId] ?? null}
                       onExpand={onOpenLeaderboard}
                     />
                   ),
@@ -1511,9 +1491,7 @@ export const ComparisonCharts = ({
                           style={{ fontSize: "11px" }}
                           width={40}
                           domain={[0, 1]}
-                          tickFormatter={(value) =>
-                            `${Math.round((value as number) * 100)}%`
-                          }
+                          tickFormatter={(value) => `${Math.round((value as number) * 100)}%`}
                           axisLine={false}
                           tickLine={false}
                         />

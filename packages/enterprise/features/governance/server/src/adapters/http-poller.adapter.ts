@@ -18,10 +18,7 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type {
-  GovernanceHttpPort,
-  GovernanceHttpResponse,
-} from "../ports/governance-http.port";
+import type { GovernanceHttpPort, GovernanceHttpResponse } from "../ports/governance-http.port";
 import {
   NullIngestionPullDiagnosticsPort,
   type IngestionPullDiagnosticsPort,
@@ -121,10 +118,11 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
     while (pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
-        this.diagnostics.info(
-          "Deadline reached mid-pagination, returning cursor for next run",
-          { adapter: this.id, pageCount, cursor },
-        );
+        this.diagnostics.info("Deadline reached mid-pagination, returning cursor for next run", {
+          adapter: this.id,
+          pageCount,
+          cursor,
+        });
         return { events: allEvents, cursor, errorCount: 0 };
       }
 
@@ -132,15 +130,12 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
       try {
         response = await this.fetchPage({ config, cursor, options });
       } catch (error) {
-        this.diagnostics.error(
-          "HttpPollingPullerAdapter: fetch failed (all retries exhausted)",
-          {
-            adapter: this.id,
-            url: config.url,
-            cursor,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        );
+        this.diagnostics.error("HttpPollingPullerAdapter: fetch failed (all retries exhausted)", {
+          adapter: this.id,
+          url: config.url,
+          cursor,
+          error: error instanceof Error ? error.message : String(error),
+        });
         // Cursor unchanged — caller leaves IngestionSource.pollerCursor
         // at its prior value so the next run resumes from the last
         // known-good page.
@@ -203,6 +198,9 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
           headers,
           body,
           signal,
+          // Source headers carry the decrypted upstream secret. Refuse a
+          // redirect rather than forwarding those headers to another host.
+          followRedirects: false,
         });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
@@ -215,6 +213,9 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        if (error instanceof Error && error.name === "RedirectRefusedError") {
+          throw error;
+        }
         // 4xx errors land here too (re-thrown above); only retry on
         // network/transport errors and 5xx
         if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
@@ -324,14 +325,11 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
       wrap: false,
     }) as unknown;
     if (!Array.isArray(eventsValue)) {
-      this.diagnostics.warn(
-        "eventsJsonPath did not resolve to an array; treating as zero events",
-        {
-          adapter: this.id,
-          eventsJsonPath: config.eventsJsonPath,
-          actualType: typeof eventsValue,
-        },
-      );
+      this.diagnostics.warn("eventsJsonPath did not resolve to an array; treating as zero events", {
+        adapter: this.id,
+        eventsJsonPath: config.eventsJsonPath,
+        actualType: typeof eventsValue,
+      });
       return [];
     }
     return eventsValue.map((evt) => this.mapEvent(evt, config));
@@ -347,8 +345,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
             wrap: false,
           }) as unknown);
 
-    const asString = (v: unknown): string =>
-      v === undefined || v === null ? "" : String(v);
+    const asString = (v: unknown): string => (v === undefined || v === null ? "" : String(v));
     const asNumber = (v: unknown): number => {
       const n = typeof v === "number" ? v : Number(v);
       return Number.isFinite(n) ? n : 0;

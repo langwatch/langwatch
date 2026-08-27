@@ -8,7 +8,7 @@ import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
 The CLI is designed to be driven by a coding assistant, and it reaches everything in the LangWatch app except cache rules, which you manage over [REST](/ai-gateway/api/management#cache-rules) or in the dashboard.
 
-Every subcommand supports `--help`, and every command accepts the output-contract flags (`-o json`, `--json <fields>`, `--jq <expr>`; see [Agent usage](#agent-usage)). Run `langwatch --help` to see the full command tree.
+Every subcommand supports `--help`, and every command accepts the output-contract flags (`-o json`, `--json <fields>`, `--jq <expr>`, `--limit <n>`; see [Agent usage](#agent-usage)). Run `langwatch --help` to see the full command tree.
 
 ## Install
 
@@ -46,8 +46,8 @@ gh attestation verify langwatch-<version>-<platform> --repo langwatch/langwatch
 #### macOS: clearing Gatekeeper
 
 <Warning>
-  The macOS binaries are **not yet codesigned or notarized**. Gatekeeper will refuse to
-  run them with *"langwatch cannot be opened because the developer cannot be verified"*.
+  The macOS binaries are **not yet codesigned or notarized**. Gatekeeper will refuse to run them
+  with *"langwatch cannot be opened because the developer cannot be verified"*.
 </Warning>
 
 macOS attaches a `com.apple.quarantine` attribute to anything downloaded from the internet. After verifying the checksum above, remove it:
@@ -60,8 +60,8 @@ Then run the binary as normal. (If `xattr` reports _"No such xattr"_, the attrib
 
 <Note>
   Only clear quarantine on a binary whose checksum you have verified against the release's
-  `SHA256SUMS`. Signing and notarization are tracked as follow-up work; until then, `npm
-  install -g langwatch` avoids Gatekeeper entirely and is the smoother path on macOS.
+  `SHA256SUMS`. Signing and notarization are tracked as follow-up work; until then, `npm install -g
+  langwatch` avoids Gatekeeper entirely and is the smoother path on macOS.
 </Note>
 
 ## Authenticate
@@ -187,11 +187,10 @@ langwatch scenario-docs advanced/red-teaming
 Both commands accept full URLs too, and any missing `.md` extension is appended automatically.
 
 <Tip>
-  If you're inside an assistant with no shell (for example, a chat-only environment), the
-  same content is available over plain HTTP, append `.md` to any documentation path, e.g.
+  If you're inside an assistant with no shell (for example, a chat-only environment), the same
+  content is available over plain HTTP, append `.md` to any documentation path, e.g.
   `https://langwatch.ai/docs/integration/python/guide.md`. Indexes:
-  [docs](https://langwatch.ai/docs/llms.txt),
-  [scenarios](https://langwatch.ai/scenario/llms.txt).
+  [docs](https://langwatch.ai/docs/llms.txt), [scenarios](https://langwatch.ai/scenario/llms.txt).
 </Tip>
 
 ## Version prompts
@@ -729,8 +728,8 @@ Date flags take ISO-8601 or epoch milliseconds.
 
 <Note>
   Provider credentials and cache rules have no CLI group. Manage providers with `langwatch
-  model-provider`, and cache rules over [REST](/ai-gateway/api/management#cache-rules) or
-  the dashboard.
+  model-provider`, and cache rules over [REST](/ai-gateway/api/management#cache-rules) or the
+  dashboard.
 </Note>
 
 Required token permissions map onto the [RBAC](/ai-gateway/rbac) grants:
@@ -776,14 +775,17 @@ Every command accepts the same output flags (with a few documented exceptions:
 through to the wrapped tool, and `dataset records add/update --json` takes a
 record _payload_):
 
-| Flag                    | Meaning                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------- |
-| `-o, --output <format>` | `table` (human default), `json`, `agents` (compact single-line JSON), `yaml`             |
-| `--json <fields>`       | JSON with only the given comma-separated fields                                          |
-| `--jq <expr>`           | Project the result before printing: dot paths, `.items[]`, `.items[].field`, `\| length` |
+| Flag                    | Meaning                                                                                                                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-o, --output <format>` | `table` (human default), `json`, `agents` (compact single-line JSON), `yaml`                                                                                                 |
+| `--json <fields>`       | JSON with only the given comma-separated fields                                                                                                                              |
+| `--jq <expr>`           | Project the result before printing: dot paths, `.items[]`, `.items[].field`, `.items[0]` (negative indexes count from the end), and `length` with or without a `\|` in front |
+| `--limit <n>`           | Keep at most n rows of the result, in the machine formats. A command that pages with a `--limit` of its own keeps that one                                                   |
 
 ```bash
 langwatch trace search --jq '.traces[].traceId'
+langwatch prompt list --jq length          # how many, in one call
+langwatch prompt list --limit 5 -o json    # the first five rows only
 langwatch evaluator list --json id,name,slug
 langwatch monitor list -o yaml
 ```

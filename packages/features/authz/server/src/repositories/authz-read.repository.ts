@@ -15,6 +15,21 @@ import type {
 /** OrganizationUser.role, or null when no membership row exists. */
 export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
 
+/**
+ * The membership row as stored: its role, and whether an admin has disabled
+ * it to stay within the licensed seat count.
+ *
+ * Both halves are FACTS, not policy - a disabled row keeps its role, and it
+ * is the collector that decides a disabled membership is not a membership
+ * (so `isOrgMember` goes false and the engine's gate denies). The role is
+ * still reported because the denial wants to say WHICH gate closed, and
+ * because re-enabling has to restore exactly what was there.
+ */
+export type OrganizationMembership = {
+  role: OrganizationRole;
+  disabled: boolean;
+};
+
 /** A CustomRole row's permission payload, unparsed - the collector applies
  *  the documented lenient parse (malformed JSON degrades to no grants). */
 export type CustomRolePermissionsRow = {
@@ -92,11 +107,19 @@ export abstract class ScopeLineageRepository {
 }
 
 export abstract class AuthzReadRepository extends ScopeLineageRepository {
-  abstract tryFindOrganizationRole(args: {
+  /**
+   * The membership row, disabled or not, or null when there is none.
+   *
+   * Named for what it returns: the previous `findOrganizationRole` reported
+   * only the role, which gave the collector no way to tell a seat-disabled
+   * membership from an absent one - so a disabled member passed the engine's
+   * membership gate and kept every permission.
+   */
+  abstract tryFindOrganizationMembership(args: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null>;
-  /** Direct user bindings - viaGroupId null. */
+  }): Promise<OrganizationMembership | null>;
+  /** Direct user bindings - viaGroupId null. Fenced on an ACTIVE membership. */
   abstract findUserBindings(args: {
     userId: string;
     organizationId: string;
@@ -115,9 +138,7 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
    * `{ userId: null }` is a SERVICE key - it exists and has no owner, so it
    * carries no ceiling. `null` means the key itself is unknown.
    */
-  abstract tryFindApiKeyOwner(
-    apiKeyId: string,
-  ): Promise<{ userId: string | null } | null>;
+  abstract tryFindApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null>;
   abstract findLegacyTeamMemberships(args: {
     userId: string;
     organizationId: string;

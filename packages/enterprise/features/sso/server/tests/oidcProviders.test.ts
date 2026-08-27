@@ -24,8 +24,7 @@ const BASE_URL = "https://langwatch.acme.test";
  */
 const PLAIN_OIDC_PROVIDER_IDS = PLAIN_OIDC_PROVIDERS.map((p) => p.providerId);
 
-const cognitoIssuer =
-  "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123";
+const cognitoIssuer = "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123";
 const oneLoginIssuer = "https://acme.onelogin.com/oidc/2";
 
 /**
@@ -49,10 +48,7 @@ const envWith = (overrides: Record<string, string | undefined>) => ({
 const providerIds = (configs: ReturnType<typeof buildGenericOAuthConfigs>) =>
   configs.map((c) => (c as { providerId?: string }).providerId);
 
-const configFor = (
-  configs: ReturnType<typeof buildGenericOAuthConfigs>,
-  providerId: string,
-) =>
+const configFor = (configs: ReturnType<typeof buildGenericOAuthConfigs>, providerId: string) =>
   configs.find((c) => (c as { providerId?: string }).providerId === providerId) as
     | {
         clientId?: string;
@@ -75,9 +71,7 @@ describe("buildGenericOAuthConfigs", () => {
       const cognito = configFor(configs, "cognito");
       expect(cognito?.clientId).toBe("cognito-client-id");
       expect(cognito?.clientSecret).toBe("cognito-client-secret");
-      expect(cognito?.discoveryUrl).toBe(
-        `${cognitoIssuer}/.well-known/openid-configuration`,
-      );
+      expect(cognito?.discoveryUrl).toBe(`${cognitoIssuer}/.well-known/openid-configuration`);
     });
 
     /** @scenario Only the named provider is mounted */
@@ -90,11 +84,7 @@ describe("buildGenericOAuthConfigs", () => {
     it("asks for the scopes needed to identify the user", () => {
       const configs = buildGenericOAuthConfigs(envWith({ provider: "cognito" }));
 
-      expect(configFor(configs, "cognito")?.scopes).toEqual([
-        "openid",
-        "email",
-        "profile",
-      ]);
+      expect(configFor(configs, "cognito")?.scopes).toEqual(["openid", "email", "profile"]);
     });
 
     it("uses PKCE", () => {
@@ -113,9 +103,7 @@ describe("buildGenericOAuthConfigs", () => {
       const onelogin = configFor(configs, "onelogin");
       expect(onelogin?.clientId).toBe("onelogin-client-id");
       expect(onelogin?.clientSecret).toBe("onelogin-client-secret");
-      expect(onelogin?.discoveryUrl).toBe(
-        `${oneLoginIssuer}/.well-known/openid-configuration`,
-      );
+      expect(onelogin?.discoveryUrl).toBe(`${oneLoginIssuer}/.well-known/openid-configuration`);
     });
 
     /** @scenario Only the named provider is mounted */
@@ -142,9 +130,7 @@ describe("buildGenericOAuthConfigs", () => {
       expect(configFor(configs, "oidc")?.discoveryUrl).toBe(
         "https://idp.acme.test/.well-known/openid-configuration",
       );
-      expect(configFor(configs, "oidc")?.redirectURI).toBe(
-        `${BASE_URL}/api/auth/callback/oidc`,
-      );
+      expect(configFor(configs, "oidc")?.redirectURI).toBe(`${BASE_URL}/api/auth/callback/oidc`);
     });
   });
 
@@ -257,9 +243,7 @@ describe("discoveryUrlFor", () => {
       const expected = `${oneLoginIssuer}/.well-known/openid-configuration`;
 
       expect(discoveryUrlFor(oneLoginIssuer, "oneLoginIssuer")).toBe(expected);
-      expect(discoveryUrlFor("acme.onelogin.com/oidc/2/", "oneLoginIssuer")).toBe(
-        expected,
-      );
+      expect(discoveryUrlFor("acme.onelogin.com/oidc/2/", "oneLoginIssuer")).toBe(expected);
     });
   });
 
@@ -273,12 +257,55 @@ describe("discoveryUrlFor", () => {
   });
 });
 
+/**
+ * The namespacing the identity branch's provider-subject lookup depends on
+ * (ADR-116). `Identifier` is uniquely indexed on
+ * `(providerId, providerAccountId)`, and every lookup keys on it, because an
+ * OIDC subject is unique only WITHIN an issuer. `providerId` can only carry
+ * that if each configured connection has its own — the moment two
+ * connections share one, their subject spaces merge and one customer can be
+ * signed in as another.
+ *
+ * Today that holds by construction: one connection per configured provider.
+ * The Auth0 exit is what puts it under pressure — every enterprise customer
+ * connecting directly, rather than behind Auth0's own namespacing — so this
+ * is here to fail loudly if a change ever routes several connections through
+ * one provider id before connections become data (D04) and the index gains a
+ * `connectionId`.
+ */
+describe("provider ids namespace their subjects", () => {
+  describe("given every provider the environment can configure", () => {
+    /** @scenario "Two enterprise IdPs sharing a subject resolve to different users" */
+    it("gives each configured provider its own id, so no two share a subject space", () => {
+      const ids = ["cognito", "onelogin", "okta", "auth0", "oidc"].flatMap((provider) =>
+        providerIds(
+          buildGenericOAuthConfigs(
+            envWith({
+              provider,
+              auth0ClientId: "auth0-client-id",
+              auth0ClientSecret: "auth0-client-secret",
+              auth0Issuer: "https://tenant.eu.auth0.com",
+              oktaClientId: "okta-client-id",
+              oktaClientSecret: "okta-client-secret",
+              oktaIssuer: "https://acme.okta.com",
+              oidcClientId: "oidc-client-id",
+              oidcClientSecret: "oidc-client-secret",
+              oidcIssuer: "https://idp.acme.com",
+            }),
+          ),
+        ),
+      );
+
+      expect(ids.length).toBeGreaterThan(0);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
+});
+
 describe("fallbackName", () => {
   describe("given a Cognito profile", () => {
     it("prefers the name Cognito sends over the derived ones", () => {
-      expect(fallbackName({ name: "SSO Dogfood", email: "sso@example.com" })).toBe(
-        "SSO Dogfood",
-      );
+      expect(fallbackName({ name: "SSO Dogfood", email: "sso@example.com" })).toBe("SSO Dogfood");
     });
   });
 });

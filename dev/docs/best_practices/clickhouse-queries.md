@@ -204,6 +204,22 @@ It is allowed to lead with `OrganizationId` **only** because all of these hold:
 
 A new table wanting this carve-out needs all six, plus a line here. Anything that merely _finds it convenient_ to skip `TenantId` does not qualify.
 
+## Validate Rows at the Boundary with Zod
+
+Parse every `result.json()` through a Zod schema before the rows leave the
+repository, and derive the returned type with `z.infer<>` — one source of truth
+for shape and validation. ClickHouse is a trust boundary: JSONEachRow renders
+aggregated numerics (`sum`, `count`, `uniqExact`) as strings once they exceed
+JS-safe range, LEFT-JOIN gaps surface as nulls where the interface said
+`string`, and a migration can rename a column under you. `.parse()` at the read
+boundary catches all three; `.catch()` on individual fields provides safe
+defaults for expected variations, while fields without one fail fast on drift.
+
+Reference implementation: `platform/app/ee/governance/services/activity-monitor/activityMonitor.clickhouse.schemas.ts`
+and its three repositories (PR #7146). New `*.clickhouse.repository.ts` files
+should follow it; existing ones migrate opportunistically when their queries
+change anyway.
+
 ## JOINs — Prefer Not To, Then Prefer `IN`
 
 ClickHouse is not Postgres here. The planner streams the **right-hand** side into

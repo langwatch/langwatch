@@ -8,8 +8,17 @@
  * splits on, so it is the import graph that is pinned here.
  *
  * The claim is containment: within this feature, every module that reaches a
- * Vega package is reachable only through `LangWatchQLChartMode`, which is what
- * `LazyLangWatchQLChartMode` loads on demand and nothing imports directly.
+ * Vega package is reachable only *behind a lazy boundary* — a module some
+ * `Lazy…` wrapper loads with a dynamic `import()` and nothing imports directly.
+ *
+ * There are two such boundaries, and they are two because the surfaces mount
+ * different components, not because the chunk differs: the workbench mounts
+ * `LangWatchQLChartMode`, the dashboard widget mounts
+ * `LangWatchQLWidgetChart`. Both reach `LangWatchQLVegaLiteChart` and so both
+ * reach Vega; what matters is that neither is reachable statically. Pinning
+ * only the workbench's boundary would have let the dashboard's chart be
+ * imported directly from the grid — several megabytes back in the entry chunk,
+ * with nothing visibly wrong.
  *
  * Node environment on purpose — this reads source, and evaluates none of it.
  */
@@ -151,11 +160,15 @@ describe("where the Vega runtime can be reached from", () => {
   describe("given the workbench's own modules", () => {
     describe("when their static import graphs are walked", () => {
       /** @scenario "Vega loads lazily from Chart mode only" */
-      it("reaches Vega from chart mode, and from nothing that is not behind it", () => {
-        const chartMode = walkStaticGraph(CHART_MODE);
-        // Without this the containment claim below would hold vacuously — a
-        // graph walk that finds nothing anywhere proves nothing.
-        expect(reachesVega(chartMode)).toBe(true);
+      it("reaches Vega from each deferred module, and from nothing that is not behind one", () => {
+        const behindABoundary = new Set<string>();
+        for (const { deferred } of LAZY_BOUNDARIES) {
+          const walk = walkStaticGraph(deferred);
+          // Without this the containment claim below would hold vacuously — a
+          // graph walk that finds nothing anywhere proves nothing.
+          expect(reachesVega(walk)).toBe(true);
+          for (const file of walk.files) behindABoundary.add(file);
+        }
 
         const chartEntry = walkStaticGraph(CHART_ENTRY);
         const behindTheBoundary = new Set([...chartMode.files, ...chartEntry.files]);
@@ -166,16 +179,20 @@ describe("where the Vega runtime can be reached from", () => {
         expect(leaks.map((file) => file.replace(PACKAGE_SRC_DIR, ""))).toEqual([]);
       });
 
-      /** @scenario "Vega loads lazily from Chart mode only" */
-      it("keeps the lazy boundary itself free of everything it defers", () => {
-        const boundary = walkStaticGraph(LAZY_BOUNDARY);
+      /** @scenario "Each lazy Vega wrapper defers its own module, in Chart mode and on the dashboard widget" */
+      it.each(
+        LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]),
+      )("keeps %s free of everything it defers", (_name, {
+        wrapper,
+        deferred,
+        specifier,
+      }) => {
+        const walk = walkStaticGraph(wrapper);
 
-        expect(reachesVega(boundary)).toBe(false);
-        expect(boundary.files).not.toContain(CHART_MODE);
+        expect(reachesVega(walk)).toBe(false);
+        expect(walk.files).not.toContain(deferred);
         // It is a lazy import, and nothing else would defer anything.
-        expect(readFileSync(LAZY_BOUNDARY, "utf8")).toContain(
-          'import("./LangWatchQLChartMode")',
-        );
+        expect(readFileSync(wrapper, "utf8")).toContain(specifier);
       });
     });
   });

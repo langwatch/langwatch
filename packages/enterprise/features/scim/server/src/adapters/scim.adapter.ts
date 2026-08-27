@@ -4,6 +4,7 @@ import type { GovernanceService } from "@langwatch/enterprise-governance-contrac
 import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementService } from "@langwatch/entitlement-contract";
 import type { UserService } from "@langwatch/user-contract";
+import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port";
 import { PrismaScimRepository } from "../repositories/prisma/scim.repository";
 import { ScimService } from "../services/scim.service";
 
@@ -13,6 +14,8 @@ export interface PostgresScimAdapterOptions {
   users: UserService;
   governance: GovernanceService;
   entitlements: EntitlementService;
+  lifecycle: ScimSyncLifecyclePort;
+  provenOffboarding: boolean;
 }
 
 /** Composition-only adapter: one build creates the process-owned SCIM service. */
@@ -30,6 +33,8 @@ export class PostgresScimAdapter {
       users: this.options.users,
       governance: this.options.governance,
       entitlements: this.options.entitlements,
+      lifecycle: this.options.lifecycle,
+      provenOffboarding: this.options.provenOffboarding,
     });
   }
 }

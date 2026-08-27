@@ -21,6 +21,7 @@ import {
   initialLangWatchQLRequestState,
   type LangWatchQLAnswer,
   type LangWatchQLParameterValue,
+  type LangWatchQLGranularityStep,
   type LangWatchQLRequestAction,
   type LangWatchQLRequestState,
   type LangWatchQLSnapshot,
@@ -39,6 +40,13 @@ export interface LangWatchQLExecuteRequest {
    * was supposed to own.
    */
   readonly timeWindow?: LangWatchQLTimeWindowValues;
+  /**
+   * The bucketing step this submission asks for. Travels in its own field for
+   * the same reason the window does — the backend refuses it as a named
+   * parameter, because a chart pinning its own step would ignore the one the
+   * surface showing it chose.
+   */
+  readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
 /** How a submission reaches the server. */
@@ -61,6 +69,14 @@ export interface LangWatchQLRequestController {
    * caller that tries to send it as one.
    */
   setTimeWindow(timeWindow: LangWatchQLTimeWindowValues | undefined): void;
+  /**
+   * Sets the step the next submission buckets at, or clears it.
+   *
+   * Separate from {@link LangWatchQLRequestController.setParameters} for the
+   * same reason the window is: the surface supplies it, and the backend refuses
+   * a caller that sends it as a parameter of its own.
+   */
+  setGranularity(granularitySeconds: LangWatchQLGranularityStep | undefined): void;
   /** Submits the current draft. No-op while a request is in flight. */
   runQuery(): void;
   /**
@@ -98,6 +114,9 @@ function requestFor(snapshot: LangWatchQLSnapshot): LangWatchQLExecuteRequest {
     sql: snapshot.sql,
     ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
     ...(snapshot.timeWindow ? { timeWindow: snapshot.timeWindow } : {}),
+    ...(snapshot.granularitySeconds !== undefined
+      ? { granularitySeconds: snapshot.granularitySeconds }
+      : {}),
   };
 }
 
@@ -164,6 +183,10 @@ export function createLangWatchQLRequestController({
 
     setTimeWindow(timeWindow) {
       apply({ type: "timeWindowChanged", timeWindow });
+    },
+
+    setGranularity(granularitySeconds) {
+      apply({ type: "granularityChanged", granularitySeconds });
     },
 
     runQuery() {

@@ -20,8 +20,11 @@ import {
   LANGY_CARD_PART_TYPE,
   type LangyCardFailedPart,
   type LangyCardPart,
+  mightContainLangyCardFence,
   parseLangyCardFailedPart,
   parseLangyCardPart,
+  salvageLangyDerivedCard,
+  splitLangyCardFences,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -105,6 +108,65 @@ export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegme
   }
   flushText();
   return segments;
+}
+
+/**
+ * The same ordered segments for a message the relay never stamped FOR THIS
+ * CLIENT: the copy the panel streamed for itself.
+ *
+ * A turn the reader watched leaves two copies of its reply. The durable record
+ * carries the parts the relay stamped out of the fences; the streamed copy in
+ * the chat engine carries the fences as text and is never replaced by the
+ * durable one (replacing it would drop the mid-turn narration, which the saved
+ * reply does not keep). So the reader who watched the turn was the only reader
+ * who saw the reply's closing cards as JSON in a code block, and a page reload
+ * drew them properly.
+ *
+ * Reading those fences here is not the browser second-guessing the relay. It
+ * is the SAME scanner and the SAME salvage the stamp uses, so it can only
+ * reach the verdict the stamp reached: a fence quoted inside another code block
+ * stays opaque text on both sides. Returns null when the text holds no fence,
+ * so an ordinary reply keeps the plain markdown path.
+ */
+export function langyAnswerSegmentsFromText(text: string): LangyAnswerSegment[] | null {
+  if (!mightContainLangyCardFence(text)) return null;
+  const fenced = splitLangyCardFences(text);
+  if (!fenced.some((segment) => segment.type === "fence")) return null;
+
+  let ordinal = 0;
+  return fenced.flatMap((segment): LangyAnswerSegment[] => {
+    if (segment.type === "text") {
+      return segment.text.trim().length > 0 ? [{ type: "text", text: segment.text }] : [];
+    }
+    ordinal += 1;
+    return [fenceSegment({ raw: segment.raw, ordinal })];
+  });
+}
+
+/** One fence's verdict, by the same salvage the relay stamps with. */
+function fenceSegment({ raw, ordinal }: { raw: string; ordinal: number }): LangyAnswerSegment {
+  const parsed = salvageLangyDerivedCard(raw);
+  if (!parsed.ok) {
+    return {
+      type: "failed",
+      part: {
+        type: LANGY_CARD_FAILED_PART_TYPE,
+        blockId: `failed-block-${ordinal}`,
+        raw,
+      },
+    };
+  }
+  return {
+    type: "card",
+    part: {
+      type: LANGY_CARD_PART_TYPE,
+      blockId: parsed.card.blockId,
+      kind: parsed.card.kind,
+      provenance: "derived",
+      card: parsed.card,
+      ...(parsed.card.hints !== undefined ? { hints: parsed.card.hints } : {}),
+    },
+  };
 }
 
 function safeStringify(value: unknown): string {

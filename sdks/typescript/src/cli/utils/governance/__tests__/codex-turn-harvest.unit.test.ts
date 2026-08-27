@@ -19,6 +19,7 @@ import {
   harvestAndEmitCodexIO,
   harvestCodexThread,
 } from "../codex-rollout-otlp";
+import { readSpooledDeclarations, writeSpooledDeclaration } from "../session-context-spool";
 import { assertCodexTurnHarvest } from "../shell-rc";
 
 const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
@@ -40,13 +41,7 @@ afterEach(() => {
 });
 
 function writeRollout(threadId: string, lines: unknown[]): string {
-  const file = join(
-    root,
-    "2026",
-    "08",
-    "02",
-    `rollout-2026-08-02T09-15-46-${threadId}.jsonl`,
-  );
+  const file = join(root, "2026", "08", "02", `rollout-2026-08-02T09-15-46-${threadId}.jsonl`);
   writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n"));
   return file;
 }
@@ -109,15 +104,7 @@ const attrOf = (span: any, key: string) =>
   span.attributes.find((a: any) => a.key === key)?.value?.stringValue;
 
 /** One attribute of the session-context record, from the logs POST. */
-const contextAttr = ({
-  bodies,
-  urls,
-  key,
-}: {
-  bodies: any[];
-  urls: string[];
-  key: string;
-}) => {
+const contextAttr = ({ bodies, urls, key }: { bodies: any[]; urls: string[]; key: string }) => {
   const at = urls.indexOf("https://e/v1/logs");
   // Without this the missing POST reads as `bodies[-1]` and the chain
   // throws a TypeError, which hides which expectation actually failed.
@@ -167,11 +154,7 @@ describe("harvestCodexThread", () => {
 
       /** @scenario "The recovered conversation lands on the trace codex already reported tokens on" */
       it("puts it on the trace id the transcript recorded, not a fresh one", async () => {
-        writeRollout(THREAD, [
-          taskStarted(TRACE),
-          userMessage("hi"),
-          agentFinal("hello"),
-        ]);
+        writeRollout(THREAD, [taskStarted(TRACE), userMessage("hi"), agentFinal("hello")]);
         const { bodies, impl } = recordingFetch();
 
         await harvestCodexThread({
@@ -266,11 +249,7 @@ describe("harvestCodexThread", () => {
       // this is the normal case, not an edge one.
       /** @scenario "Harvesting the same turn twice does not duplicate the conversation" */
       it("re-emits the same span id, which the receiver drops as a duplicate", async () => {
-        writeRollout(THREAD, [
-          taskStarted(TRACE),
-          userMessage("hi"),
-          agentFinal("hello"),
-        ]);
+        writeRollout(THREAD, [taskStarted(TRACE), userMessage("hi"), agentFinal("hello")]);
         const { bodies, impl } = recordingFetch();
         const args = {
           threadId: THREAD,
@@ -298,11 +277,7 @@ describe("harvestCodexThread", () => {
       /** @scenario "The finished turn identifies its own session" */
       it("reads only the named session's transcript", async () => {
         const other = "019fc999-dead-beef-0000-000000000000";
-        writeRollout(THREAD, [
-          taskStarted(TRACE),
-          userMessage("mine"),
-          agentFinal("mine reply"),
-        ]);
+        writeRollout(THREAD, [taskStarted(TRACE), userMessage("mine"), agentFinal("mine reply")]);
         writeRollout(other, [
           taskStarted("ffffffffffffffffffffffffffffffff"),
           userMessage("theirs"),
@@ -335,12 +310,23 @@ describe("harvestCodexThread", () => {
     };
     let stateDir: string;
 
+    let tmpRoot: string;
+    let previousTmpdir: string | undefined;
+
     beforeEach(() => {
       stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+      // The fallback queue lives in the temp directory: give this suite its
+      // own rather than the one shared with the rest of the machine.
+      tmpRoot = mkdtempSync(join(tmpdir(), "lw-codex-tmp-"));
+      previousTmpdir = process.env.TMPDIR;
+      process.env.TMPDIR = tmpRoot;
     });
 
     afterEach(() => {
+      if (previousTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = previousTmpdir;
       rmSync(stateDir, { recursive: true, force: true });
+      rmSync(tmpRoot, { recursive: true, force: true });
     });
 
     describe("when the session is harvested", () => {
@@ -366,8 +352,7 @@ describe("harvestCodexThread", () => {
         });
 
         const log =
-          bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0]
-            .logRecords[0];
+          bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0].logRecords[0];
         const attr = (key: string) =>
           log.attributes.find((a: any) => a.key === key)?.value?.stringValue;
         expect(attr("event.name")).toBe("langwatch.session_context");
@@ -378,6 +363,68 @@ describe("harvestCodexThread", () => {
         expect(attr("vcs.repository.name")).toBe("acme-app");
         expect(attr("vcs.ref.head.name")).toBe("feat/pricing");
         expect(urls).toContain("https://e/v1/traces");
+      });
+
+      describe("when a declaration is queued from a sandboxed shell", () => {
+        /** @scenario "The next session report sends the queued declaration" */
+        it("sends it after its own context, so it is the latest branch", async () => {
+          writeRollout(THREAD, [
+            sessionMeta(GIT),
+            taskStarted(TRACE),
+            userMessage("hi"),
+            agentFinal("hello"),
+          ]);
+          writeSpooledDeclaration({
+            stateDir,
+            agent: "codex",
+            sessionId: THREAD,
+            fingerprint: "declared-fingerprint",
+            payload: {
+              resourceLogs: [
+                {
+                  scopeLogs: [
+                    {
+                      logRecords: [
+                        {
+                          attributes: [
+                            {
+                              key: "vcs.ref.head.name",
+                              value: { stringValue: "feat/declared" },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            now: () => 1785654950000,
+          });
+          const { bodies, urls, impl } = recordingFetch();
+
+          await harvestCodexThread({
+            threadId: THREAD,
+            nowMs: 1785654950000,
+            endpoint: "https://e/v1/traces",
+            logsEndpoint: "https://e/v1/logs",
+            token: "sk-lw-test",
+            sessionsRoot: root,
+            stateDir,
+            fetchImpl: impl,
+          });
+
+          const branchOf = (body: any) =>
+            body.resourceLogs?.[0].scopeLogs[0].logRecords[0].attributes.find(
+              (a: any) => a.key === "vcs.ref.head.name",
+            )?.value?.stringValue;
+          const logBranches = bodies
+            .filter((_, index) => urls[index] === "https://e/v1/logs")
+            .map(branchOf);
+          expect(logBranches[0]).toBe("feat/pricing");
+          expect(logBranches[logBranches.length - 1]).toBe("feat/declared");
+          expect(readSpooledDeclarations({ stateDir, now: () => 1785654950000 })).toEqual([]);
+        });
       });
 
       /** @scenario "The reported branch follows the checkout, not the session's first minute" */
@@ -402,12 +449,8 @@ describe("harvestCodexThread", () => {
           runGit: checkoutOn("review/pr-7412"),
         });
 
-        expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
-          "review/pr-7412",
-        );
-        expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe(
-          "acme-app",
-        );
+        expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe("review/pr-7412");
+        expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe("acme-app");
       });
 
       /** @scenario "A session whose transcript records no repository still reports one" */
@@ -433,9 +476,7 @@ describe("harvestCodexThread", () => {
         });
 
         expect(contextAttr({ bodies, urls, key: "vcs.repository.owner" })).toBe("acme");
-        expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
-          "review/pr-7412",
-        );
+        expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe("review/pr-7412");
       });
 
       /** @scenario "A transcript harvested away from its checkout keeps what codex recorded" */
@@ -460,12 +501,8 @@ describe("harvestCodexThread", () => {
           runGit: () => null,
         });
 
-        expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
-          "feat/pricing",
-        );
-        expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe(
-          "acme-app",
-        );
+        expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe("feat/pricing");
+        expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe("acme-app");
       });
 
       /** @scenario "A notify that fires after every turn posts the repository once" */
@@ -539,12 +576,23 @@ describe("harvestCodexThread", () => {
     });
     let stateDir: string;
 
+    let tmpRoot: string;
+    let previousTmpdir: string | undefined;
+
     beforeEach(() => {
       stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+      // The fallback queue lives in the temp directory: give this suite its
+      // own rather than the one shared with the rest of the machine.
+      tmpRoot = mkdtempSync(join(tmpdir(), "lw-codex-tmp-"));
+      previousTmpdir = process.env.TMPDIR;
+      process.env.TMPDIR = tmpRoot;
     });
 
     afterEach(() => {
+      if (previousTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = previousTmpdir;
       rmSync(stateDir, { recursive: true, force: true });
+      rmSync(tmpRoot, { recursive: true, force: true });
     });
 
     const harvest = async (impl: typeof fetch) =>
@@ -579,7 +627,7 @@ describe("harvestCodexThread", () => {
       });
 
       /** @scenario "A machine-injected first prompt does not name the session" */
-      it("posts no title when the first prompt is an injected tag", async () => {
+      it("names it by the typed prompt, not the injected tag", async () => {
         writeRollout(THREAD, [
           sessionMeta(GIT),
           typedPrompt("<environment_context>...</environment_context>"),
@@ -592,9 +640,10 @@ describe("harvestCodexThread", () => {
         await harvest(impl);
 
         expect(urls).toContain("https://e/v1/logs");
-        expect(
-          contextAttr({ bodies, urls, key: "langwatch.session.title" }),
-        ).toBeUndefined();
+        // The injected block is skipped wherever it appears, so the prompt
+        // the person actually typed names the session rather than the
+        // session going unnamed with a usable prompt sitting right there.
+        expect(contextAttr({ bodies, urls, key: "langwatch.session.title" })).toBe("hi");
       });
     });
   });
@@ -606,11 +655,8 @@ describe("harvestCodexThread", () => {
     });
     const contextAttrsOf = (bodies: any[], urls: string[]) => {
       const log =
-        bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0]
-          .logRecords[0];
-      return Object.fromEntries(
-        log.attributes.map((a: any) => [a.key, a.value?.stringValue]),
-      );
+        bodies[urls.indexOf("https://e/v1/logs")].resourceLogs[0].scopeLogs[0].logRecords[0];
+      return Object.fromEntries(log.attributes.map((a: any) => [a.key, a.value?.stringValue]));
     };
 
     describe("when the session is harvested with nothing to name it", () => {
@@ -619,7 +665,10 @@ describe("harvestCodexThread", () => {
         writeRollout(THREAD, [
           sessionMeta(),
           taskStarted(TRACE),
-          userMessage("hi"),
+          // Injected context, not a typed prompt: it leaves the session with
+          // nothing to name it while still giving the turn a conversation to
+          // post.
+          userMessage("<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>"),
           agentFinal("hello"),
         ]);
         const { urls, impl } = recordingFetch();

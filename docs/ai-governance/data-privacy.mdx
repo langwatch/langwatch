@@ -22,10 +22,10 @@ settings. A rule is written once at the scope it should govern, and
 every project underneath resolves it automatically.
 
 <Info>
-  **Pairs with:** [No-spy mode](/ai-governance/no-spy-mode), the organization-wide posture
-  built from this policy for enterprises that must not store employee conversational
-  content, and [Compliance architecture](/ai-governance/compliance-architecture) for how
-  privacy fits the broader audit story.
+  **Pairs with:** [No-spy mode](/ai-governance/no-spy-mode), the organization-wide posture built
+  from this policy for enterprises that must not store employee conversational content, and
+  [Compliance architecture](/ai-governance/compliance-architecture) for how privacy fits the broader
+  audit story.
 </Info>
 
 ## Content categories
@@ -143,7 +143,7 @@ How three projects resolve:
 | Project                                      | Input    | Output                       | Why                                                                                                                                         |
 | -------------------------------------------- | -------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `billing-api`, a team project                | Captured | Captured                     | The organization rule is narrowed to personal projects, so neither rule applies; platform defaults.                                         |
-| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; nothing sets input.                                                                                        |
+| `hr-helpdesk`, assigned to the HR department | Captured | Restricted to the `HR` group | The department rule sets output; no rule sets input.                                                                                        |
 | Dana's personal workspace (Dana is in HR)    | Dropped  | Restricted to the `HR` group | The organization rule drops personal-project input, and a personal project follows its owner's department, so HR's output rule applies too. |
 
 All three projects also resolve **Essential** PII redaction and
@@ -175,7 +175,9 @@ Secrets redaction is **on by default for every project**.
 Coding-agent traces are full of live credentials, so the safe default
 is to scrub them. It runs natively in the ingestion pipeline and
 replaces each detected secret with a redaction placeholder, leaving
-the surrounding text intact.
+the surrounding text intact. How detection decides what is a
+credential is covered on
+[Secrets redaction](/coding-agents/secrets-redaction).
 
 The built-in catalog covers:
 
@@ -201,24 +203,24 @@ cascade, so a team's patterns apply on top of the organization's.
 A rule can disable secrets redaction for its scope.
 
 <Warning>
-  With secrets redaction off, any credential pasted into a prompt or returned by a tool is
-  stored in the clear. Turn it off only when you are certain no real credentials transit
-  the projects in scope.
+  With secrets redaction off, any credential pasted into a prompt or returned by a tool is stored in
+  the clear. Turn it off only when you are certain no real credentials transit the projects in
+  scope.
 </Warning>
 
 ## PII redaction
 
 | Level                   | What it redacts                                                        | How it runs                                                |
 | ----------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------- |
-| **Disabled**            | Nothing                                                                | No scanning at all                                         |
+| **Disabled**            | None                                                                   | No scanning at all                                         |
 | **Essential** (default) | Emails, phone numbers, credit cards, IP addresses, IBANs, national IDs | Natively in the ingestion pipeline, fast, no external call |
 | **Strict**              | Everything in Essential, plus person names and locations               | Uses the deeper analysis service                           |
 
 Like secrets, detected PII is replaced with a redaction placeholder.
 
 <Note>
-  Credit card numbers are validated before redaction, so a random 16-digit order id in
-  your traces is left intact.
+  Credit card numbers are validated before redaction, so a random 16-digit order id in your traces
+  is left intact.
 </Note>
 
 ## Custom drop keys

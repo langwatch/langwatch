@@ -97,7 +97,7 @@ describe("given experiment creation permissions and mutation boundaries", () => 
 
   afterEach(() => cleanup());
 
-  describe("when workflows:create is granted", () => {
+  describe("when experiments:update is granted", () => {
     it("renders the create button", () => {
       renderButton();
 
@@ -106,7 +106,7 @@ describe("given experiment creation permissions and mutation boundaries", () => 
     });
   });
 
-  describe("when workflows:create is denied", () => {
+  describe("when experiments:update is denied", () => {
     it("keeps the create button hidden", () => {
       permissionResult.current = false;
       renderButton();

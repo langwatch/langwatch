@@ -1238,6 +1238,875 @@
         }
       }
     },
+    "/api/agent-cache/{name}": {
+      "get": {
+        "operationId": "getApiAgentCacheByName",
+        "description": "Read a cache entry by name. An entry that was never stored, or whose lifetime has passed, answers 404. Requires the agentCache:manage grain, because a caller that can overwrite an entry can already choose what the next read answers. A legacy project API key reaches this route, the same as it reaches the rest of the project surface.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["name", "value"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The project holds no live entry under that name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiAgentCacheByName",
+        "description": "Store a value under a name, whether or not the name is held yet. The value is encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds. The last write wins.",
+        "responses": {
+          "200": {
+            "description": "Entry stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "ttl_seconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["name", "ttl_seconds"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ttl_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 86400
+                  }
+                },
+                "required": ["value"]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiAgentCacheByName",
+        "description": "Remove a cache entry. A name the project does not hold answers the same as one it does, so a caller can clear an entry without reading it first.",
+        "responses": {
+          "200": {
+            "description": "Entry removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["name", "deleted"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/agent-cache/{name}/claim": {
+      "post": {
+        "operationId": "postApiAgentCacheByNameClaim",
+        "description": "Store a value under a name only if the project does not hold that name yet. The answer says whether this caller is the one that took it: `claimed` is true when the value was written, and false when the name was already held, which leaves the held value alone. Losing is an ordinary answer and not a refusal, so a caller branches on `claimed` rather than on an error. This is what one row of a run uses to do work the rows beside it then reuse, instead of every row doing it at once. The value is encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds.",
+        "responses": {
+          "200": {
+            "description": "Claim resolved, taken or not",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "claimed": {
+                      "type": "boolean"
+                    },
+                    "ttl_seconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": ["name", "claimed", "ttl_seconds"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]*$",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "ttl_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 86400
+                  }
+                },
+                "required": ["value"]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/agents": {
       "get": {
         "operationId": "getApiAgents",
@@ -4049,6 +4918,15 @@
                     "followsTimeWindow": {
                       "type": "boolean"
                     },
+                    "followsGranularity": {
+                      "type": "boolean"
+                    },
+                    "granularitySeconds": {
+                      "type": "number"
+                    },
+                    "coarsenedFromSeconds": {
+                      "type": "number"
+                    },
                     "diagnostics": {
                       "type": "array",
                       "items": {
@@ -4082,6 +4960,7 @@
                     "statistics",
                     "truncated",
                     "followsTimeWindow",
+                    "followsGranularity",
                     "diagnostics"
                   ]
                 }
@@ -4341,6 +5220,22 @@
                       }
                     },
                     "required": ["start", "end"]
+                  },
+                  "granularitySeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 1
+                      },
+                      {
+                        "type": "number",
+                        "const": 60
+                      },
+                      {
+                        "type": "number",
+                        "const": 3600
+                      }
+                    ]
                   }
                 },
                 "required": ["sql"]
@@ -4692,6 +5587,21 @@
                           },
                           "platformUrl": {
                             "type": "string"
+                          },
+                          "dashboardId": {
+                            "type": ["string", "null"]
+                          },
+                          "gridColumn": {
+                            "type": "integer"
+                          },
+                          "gridRow": {
+                            "type": "integer"
+                          },
+                          "colSpan": {
+                            "type": "integer"
+                          },
+                          "rowSpan": {
+                            "type": "integer"
                           }
                         },
                         "required": [
@@ -4700,7 +5610,12 @@
                           "definition",
                           "createdAt",
                           "updatedAt",
-                          "platformUrl"
+                          "platformUrl",
+                          "dashboardId",
+                          "gridColumn",
+                          "gridRow",
+                          "colSpan",
+                          "rowSpan"
                         ]
                       }
                     }
@@ -4926,6 +5841,21 @@
                     },
                     "platformUrl": {
                       "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": ["string", "null"]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -4934,7 +5864,12 @@
                     "definition",
                     "createdAt",
                     "updatedAt",
-                    "platformUrl"
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
                   ]
                 }
               }
@@ -5177,6 +6112,21 @@
                     },
                     "platformUrl": {
                       "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": ["string", "null"]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -5185,7 +6135,12 @@
                     "definition",
                     "createdAt",
                     "updatedAt",
-                    "platformUrl"
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
                   ]
                 }
               }
@@ -5453,6 +6408,21 @@
                     },
                     "platformUrl": {
                       "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": ["string", "null"]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -5461,7 +6431,12 @@
                     "definition",
                     "createdAt",
                     "updatedAt",
-                    "platformUrl"
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
                   ]
                 }
               }
@@ -5709,6 +6684,557 @@
         "responses": {
           "204": {
             "description": "The chart was deleted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No chart with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "chartId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement": {
+      "put": {
+        "operationId": "putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
+        "summary": "Place a saved workbench chart on a dashboard",
+        "description": "Places one saved LangWatchQL chart on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting charts of every kind. A dashboard that is not in this project is reported as not found, exactly like a chart that is not, and nothing is written.",
+        "tags": ["Analytics / LangWatchQL"],
+        "responses": {
+          "200": {
+            "description": "The chart, now placed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "definition": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number"
+                        },
+                        "sql": {
+                          "type": "string"
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "vegaLiteSpec": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["version", "sql", "parameters"]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": ["string", "null"]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No chart with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["type", "code", "message"]
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dashboardId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "gridColumn": {
+                    "type": "integer"
+                  },
+                  "gridRow": {
+                    "type": "integer"
+                  },
+                  "colSpan": {
+                    "type": "integer"
+                  },
+                  "rowSpan": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["dashboardId"]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "chartId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
+        "summary": "Remove a saved workbench chart from its dashboard",
+        "description": "Removes one saved LangWatchQL chart from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a chart that is not placed answers 204 all the same. The chart itself — its statement, parameter values and specification — is untouched.",
+        "tags": ["Analytics / LangWatchQL"],
+        "responses": {
+          "204": {
+            "description": "The chart is no longer on any dashboard"
           },
           "400": {
             "description": "Bad Request",
@@ -8618,6 +10144,7 @@
         "operationId": "getApiExperiments",
         "summary": "List experiments for the project",
         "description": "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+        "tags": ["Experiments"],
         "parameters": [
           {
             "in": "query",
@@ -8753,6 +10280,343 @@
                     }
                   },
                   "required": ["error"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "postApiExperiments",
+        "summary": "Create an experiment and its setup",
+        "description": "Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.",
+        "tags": ["Experiments"],
+        "responses": {
+          "200": {
+            "description": "Experiment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Identifier of the created experiment"
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "Slug to address the experiment by"
+                    },
+                    "version": {
+                      "type": "number",
+                      "description": "Version of the saved setup, starting at 1"
+                    }
+                  },
+                  "required": ["id", "slug", "version"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Name for the experiment. A draft name is picked when omitted."
+                  },
+                  "state": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Setup to start from. Omit for a blank workbench with one inline dataset."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/experiments/{slug}": {
+      "get": {
+        "operationId": "getApiExperimentsBySlug",
+        "summary": "Read one experiment",
+        "description": "Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id as well, so either identifier the list hands back can be used.",
+        "tags": ["Experiments"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The experiment's slug, or its id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": ["string", "null"]
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "workflowId": {
+                      "type": ["string", "null"]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "runsCount": {
+                      "type": "number"
+                    },
+                    "lastRunAt": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "type",
+                    "workflowId",
+                    "createdAt",
+                    "updatedAt",
+                    "runsCount",
+                    "lastRunAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No experiment with that slug or id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
                 }
               }
             }
@@ -10996,13 +12860,7 @@
                                 "type": "number"
                               }
                             },
-                            "required": [
-                              "evaluatorId",
-                              "name",
-                              "passed",
-                              "failed",
-                              "passRate"
-                            ]
+                            "required": ["evaluatorId", "name", "passed", "failed", "passRate"]
                           }
                         },
                         "totalPassed": {
@@ -11494,6 +13352,816 @@
                     }
                   },
                   "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/experiments/{slug}/workbench-state": {
+      "get": {
+        "operationId": "getApiExperimentsBySlugWorkbenchState",
+        "summary": "Read an experiment's setup",
+        "description": "The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask for `fields=version` to check for changes without transferring the setup.",
+        "tags": ["Experiments"],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fields",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["version"]
+            },
+            "description": "Set to `version` to answer with the version and timestamp only"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The experiment's setup, or its version alone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": ["string", "null"]
+                        },
+                        "state": {
+                          "type": ["object", "null"],
+                          "additionalProperties": {},
+                          "description": "The experiment setup: datasets, targets and evaluators. Read it, change it, send it back whole."
+                        },
+                        "version": {
+                          "type": "integer",
+                          "description": "Send this back as expectedVersion to save safely"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "description": "ISO 8601 timestamp of the last save"
+                        }
+                      },
+                      "required": ["id", "slug", "name", "state", "version", "updatedAt"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "slug": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "description": "ISO 8601 timestamp of the last save"
+                        }
+                      },
+                      "required": ["id", "slug", "version", "updatedAt"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiExperimentsBySlugWorkbenchState",
+        "summary": "Save an experiment's setup",
+        "description": "Replace the experiment's setup. Send `expectedVersion` with the version you read and the save is refused with a 409 when someone else wrote first, instead of overwriting their work.",
+        "tags": ["Experiments"],
+        "responses": {
+          "200": {
+            "description": "Setup saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer",
+                      "description": "The version the save produced"
+                    }
+                  },
+                  "required": ["version"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    },
+                    "currentVersion": {
+                      "type": "integer",
+                      "description": "The stored version now. Read the setup again at this one."
+                    }
+                  },
+                  "required": ["error", "currentVersion"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "The full setup to save"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "description": "The version you read. Sending it refuses the save when someone else already wrote on top of it."
+                  },
+                  "commitMessage": {
+                    "type": "string",
+                    "description": "Names this version in the history list"
+                  }
+                },
+                "required": ["state"]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/experiments/{slug}/versions": {
+      "get": {
+        "operationId": "getApiExperimentsBySlugVersions",
+        "summary": "List an experiment's versions",
+        "description": "Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.",
+        "tags": ["Experiments"],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Versions per page, capped at 100"
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The `nextCursor` of the previous page"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Versions of the experiment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "description": "Restore this version by this number. Named versions run 1, 2, 3 with no gaps. The autosave row also has a number, but it changes with every save, so read it as a handle and not as a place in the history."
+                          },
+                          "counterVersion": {
+                            "type": "integer",
+                            "description": "The setup version this row was written at. It says how recent the row is, and it equals the experiment's current version on the row holding the live setup."
+                          },
+                          "autoSaved": {
+                            "type": "boolean",
+                            "description": "True for the single autosave row, which every ordinary save rewrites in place"
+                          },
+                          "commitMessage": {
+                            "type": ["string", "null"]
+                          },
+                          "authorLabel": {
+                            "type": "string",
+                            "description": "Who wrote it: user, langy or api",
+                            "example": "user"
+                          },
+                          "authorId": {
+                            "type": ["string", "null"],
+                            "description": "User id, when a person wrote it"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp of the first write"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "description": "ISO 8601 timestamp of the last write. The autosave row is rewritten in place, so this is what says how old its content is."
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "counterVersion",
+                          "autoSaved",
+                          "commitMessage",
+                          "authorLabel",
+                          "authorId",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      },
+                      "description": "Newest first, by `counterVersion`"
+                    },
+                    "nextCursor": {
+                      "type": ["integer", "null"],
+                      "description": "Pass as `cursor` to read the next page, null on the last one"
+                    }
+                  },
+                  "required": ["versions", "nextCursor"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/experiments/{slug}/versions/{version}/restore": {
+      "post": {
+        "operationId": "postApiExperimentsBySlugVersionsByVersionRestore",
+        "summary": "Restore an experiment version",
+        "description": "Bring an old setup back by writing it forward as a new save. History is never rewritten: the version you restored from stays in the list, and the restore is one more entry after it.",
+        "tags": ["Experiments"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "The version to restore, as listed by `GET /api/experiments/{slug}/versions`"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Version restored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "number",
+                      "description": "The new version the restore wrote. History is never rewritten, so the restored version is still in the list."
+                    }
+                  },
+                  "required": ["version"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    },
+                    "currentVersion": {
+                      "type": "integer",
+                      "description": "The stored version now. Read the setup again at this one."
+                    }
+                  },
+                  "required": ["error", "currentVersion"],
                   "additionalProperties": true
                 }
               }
@@ -13658,14 +16326,7 @@
                           }
                         }
                       },
-                      "required": [
-                        "run_id",
-                        "index",
-                        "score",
-                        "label",
-                        "optimizer",
-                        "predictors"
-                      ]
+                      "required": ["run_id", "index", "score", "label", "optimizer", "predictors"]
                     },
                     {
                       "type": "object",
@@ -14145,14 +16806,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "idle",
-                        "waiting",
-                        "running",
-                        "success",
-                        "error",
-                        "skipped"
-                      ],
+                      "enum": ["idle", "waiting", "running", "success", "error", "skipped"],
                       "description": "Execution state the run finished in"
                     },
                     "result": {
@@ -15512,14 +18166,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "idle",
-                        "waiting",
-                        "running",
-                        "success",
-                        "error",
-                        "skipped"
-                      ],
+                      "enum": ["idle", "waiting", "running", "success", "error", "skipped"],
                       "description": "Execution state the run finished in"
                     },
                     "result": {
@@ -15679,14 +18326,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "idle",
-                        "waiting",
-                        "running",
-                        "success",
-                        "error",
-                        "skipped"
-                      ],
+                      "enum": ["idle", "waiting", "running", "success", "error", "skipped"],
                       "description": "Execution state the run finished in"
                     },
                     "result": {
@@ -19651,15 +22291,7 @@
                           },
                           "window": {
                             "type": "string",
-                            "enum": [
-                              "minute",
-                              "hour",
-                              "day",
-                              "week",
-                              "month",
-                              "total",
-                              "manual"
-                            ]
+                            "enum": ["minute", "hour", "day", "week", "month", "total", "manual"]
                           },
                           "on_breach": {
                             "type": "string",
@@ -20034,15 +22666,7 @@
                         },
                         "window": {
                           "type": "string",
-                          "enum": [
-                            "minute",
-                            "hour",
-                            "day",
-                            "week",
-                            "month",
-                            "total",
-                            "manual"
-                          ]
+                          "enum": ["minute", "hour", "day", "week", "month", "total", "manual"]
                         },
                         "on_breach": {
                           "type": "string",
@@ -20561,15 +23185,7 @@
                         },
                         "window": {
                           "type": "string",
-                          "enum": [
-                            "minute",
-                            "hour",
-                            "day",
-                            "week",
-                            "month",
-                            "total",
-                            "manual"
-                          ]
+                          "enum": ["minute", "hour", "day", "week", "month", "total", "manual"]
                         },
                         "on_breach": {
                           "type": "string",
@@ -20928,15 +23544,7 @@
                         },
                         "window": {
                           "type": "string",
-                          "enum": [
-                            "minute",
-                            "hour",
-                            "day",
-                            "week",
-                            "month",
-                            "total",
-                            "manual"
-                          ]
+                          "enum": ["minute", "hour", "day", "week", "month", "total", "manual"]
                         },
                         "on_breach": {
                           "type": "string",
@@ -21310,15 +23918,7 @@
                         },
                         "window": {
                           "type": "string",
-                          "enum": [
-                            "minute",
-                            "hour",
-                            "day",
-                            "week",
-                            "month",
-                            "total",
-                            "manual"
-                          ]
+                          "enum": ["minute", "hour", "day", "week", "month", "total", "manual"]
                         },
                         "on_breach": {
                           "type": "string",
@@ -21655,15 +24255,7 @@
                         },
                         "window": {
                           "type": "string",
-                          "enum": [
-                            "minute",
-                            "hour",
-                            "day",
-                            "week",
-                            "month",
-                            "total",
-                            "manual"
-                          ]
+                          "enum": ["minute", "hour", "day", "week", "month", "total", "manual"]
                         },
                         "on_breach": {
                           "type": "string",
@@ -31729,12 +34321,7 @@
                           "type": ["string", "null"]
                         }
                       },
-                      "required": [
-                        "projectId",
-                        "teamId",
-                        "organizationId",
-                        "organizationName"
-                      ]
+                      "required": ["projectId", "teamId", "organizationId", "organizationName"]
                     },
                     "effective": {
                       "type": "object",
@@ -34677,13 +37264,7 @@
                             "type": ["string", "null"]
                           }
                         },
-                        "required": [
-                          "teamId",
-                          "teamName",
-                          "role",
-                          "customRoleId",
-                          "customRoleName"
-                        ]
+                        "required": ["teamId", "teamName", "role", "customRoleId", "customRoleName"]
                       }
                     }
                   },
@@ -36185,14 +38766,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "id",
-                    "name",
-                    "description",
-                    "permissions",
-                    "createdAt",
-                    "updatedAt"
-                  ]
+                  "required": ["id", "name", "description", "permissions", "createdAt", "updatedAt"]
                 }
               }
             }
@@ -36271,12 +38845,7 @@
                             }
                           }
                         },
-                        "required": [
-                          "resource",
-                          "organizationExclusive",
-                          "actions",
-                          "permissions"
-                        ]
+                        "required": ["resource", "organizationExclusive", "actions", "permissions"]
                       }
                     },
                     "actions": {
@@ -36334,14 +38903,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "id",
-                    "name",
-                    "description",
-                    "permissions",
-                    "createdAt",
-                    "updatedAt"
-                  ]
+                  "required": ["id", "name", "description", "permissions", "createdAt", "updatedAt"]
                 }
               }
             }
@@ -36398,14 +38960,7 @@
                       "type": "string"
                     }
                   },
-                  "required": [
-                    "id",
-                    "name",
-                    "description",
-                    "permissions",
-                    "createdAt",
-                    "updatedAt"
-                  ]
+                  "required": ["id", "name", "description", "permissions", "createdAt", "updatedAt"]
                 }
               }
             }
@@ -36521,6 +39076,9 @@
                           "description": {
                             "type": ["string", "null"]
                           },
+                          "connectionId": {
+                            "type": ["string", "null"]
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -36528,7 +39086,7 @@
                             "type": ["string", "null"]
                           }
                         },
-                        "required": ["id", "description", "createdAt", "lastUsedAt"]
+                        "required": ["id", "description", "connectionId", "createdAt", "lastUsedAt"]
                       }
                     }
                   },
@@ -36538,7 +39096,7 @@
             }
           }
         },
-        "description": "List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
+        "description": "List the organization's SCIM bearer tokens: id, description, the connection each one manages, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
         "tags": ["SCIM Tokens"],
         "security": [
           {
@@ -36562,17 +39120,20 @@
                     "token": {
                       "type": "string"
                     },
+                    "connectionId": {
+                      "type": "string"
+                    },
                     "description": {
                       "type": ["string", "null"]
                     }
                   },
-                  "required": ["id", "token", "description"]
+                  "required": ["id", "token", "connectionId", "description"]
                 }
               }
             }
           }
         },
-        "description": "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
+        "description": "Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against /api/scim/v2. The token only manages the people that connection provisioned. The token value is returned once, here, and never again; store it in the identity provider immediately.",
         "tags": ["SCIM Tokens"],
         "requestBody": {
           "required": true,
@@ -36585,6 +39146,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }
@@ -39146,6 +41711,9 @@
                           "description": {
                             "type": "string"
                           },
+                          "note": {
+                            "type": "string"
+                          },
                           "langwatch": {
                             "type": "object",
                             "properties": {
@@ -39158,6 +41726,9 @@
                               },
                               "simulationSuiteId": {
                                 "type": "string"
+                              },
+                              "scenarioVersion": {
+                                "type": "integer"
                               }
                             },
                             "required": ["targetReferenceId", "targetType"]
@@ -39685,12 +42256,7 @@
                                           "additionalProperties": {}
                                         }
                                       },
-                                      "required": [
-                                        "id",
-                                        "role",
-                                        "activityType",
-                                        "content"
-                                      ]
+                                      "required": ["id", "role", "activityType", "content"]
                                     },
                                     {
                                       "type": "object",
@@ -41005,16 +43571,18 @@
                                 {
                                   "type": "boolean"
                                 }
-                              ],
-                              "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                              ]
                             },
                             "secret": {
-                              "type": "boolean",
-                              "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                              "type": "boolean"
                             }
                           },
                           "required": ["name"]
                         }
+                      },
+                      "folderId": {
+                        "type": ["string", "null"],
+                        "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
                       },
                       "platformUrl": {
                         "type": "string",
@@ -41028,6 +43596,7 @@
                       "criteria",
                       "labels",
                       "parameters",
+                      "folderId",
                       "platformUrl"
                     ]
                   }
@@ -41177,16 +43746,18 @@
                               {
                                 "type": "boolean"
                               }
-                            ],
-                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                            ]
                           },
                           "secret": {
-                            "type": "boolean",
-                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                            "type": "boolean"
                           }
                         },
                         "required": ["name"]
                       }
+                    },
+                    "folderId": {
+                      "type": ["string", "null"],
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -41200,6 +43771,7 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -41338,18 +43910,20 @@
                             {
                               "type": "boolean"
                             }
-                          ],
-                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                          ]
                         },
                         "secret": {
-                          "type": "boolean",
-                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                          "type": "boolean"
                         }
                       },
                       "required": ["name"]
                     },
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
+                  },
+                  "folderId": {
+                    "type": ["string", "null"],
+                    "description": "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario."
                   }
                 },
                 "required": ["name", "situation"]
@@ -41424,16 +43998,18 @@
                               {
                                 "type": "boolean"
                               }
-                            ],
-                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                            ]
                           },
                           "secret": {
-                            "type": "boolean",
-                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                            "type": "boolean"
                           }
                         },
                         "required": ["name"]
                       }
+                    },
+                    "folderId": {
+                      "type": ["string", "null"],
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -41447,6 +44023,7 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -41624,16 +44201,18 @@
                               {
                                 "type": "boolean"
                               }
-                            ],
-                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                            ]
                           },
                           "secret": {
-                            "type": "boolean",
-                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                            "type": "boolean"
                           }
                         },
                         "required": ["name"]
                       }
+                    },
+                    "folderId": {
+                      "type": ["string", "null"],
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
                     },
                     "platformUrl": {
                       "type": "string",
@@ -41647,6 +44226,7 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -41802,18 +44382,20 @@
                             {
                               "type": "boolean"
                             }
-                          ],
-                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                          ]
                         },
                         "secret": {
-                          "type": "boolean",
-                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                          "type": "boolean"
                         }
                       },
                       "required": ["name"]
                     },
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
+                  },
+                  "folderId": {
+                    "type": ["string", "null"],
+                    "description": "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario."
                   }
                 }
               }
@@ -41956,6 +44538,473 @@
           }
         },
         "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/scenarios/{id}/versions": {
+      "get": {
+        "operationId": "getApiScenariosByIdVersions",
+        "description": "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "description": "The version number, counting from 1."
+                          },
+                          "authorLabel": {
+                            "type": ["string", "null"],
+                            "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded."
+                          },
+                          "authorId": {
+                            "type": ["string", "null"],
+                            "description": "The user who saved the version. Null when the save came from an API key."
+                          },
+                          "changeDescription": {
+                            "type": ["string", "null"]
+                          },
+                          "changedFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The fields whose value this save changed."
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "description": "When the version was written, in ISO 8601."
+                          },
+                          "isSynthesized": {
+                            "type": "boolean",
+                            "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "authorLabel",
+                          "authorId",
+                          "changeDescription",
+                          "changedFields",
+                          "createdAt",
+                          "isSynthesized"
+                        ]
+                      }
+                    },
+                    "nextCursor": {
+                      "type": ["integer", "null"],
+                      "description": "Pass as cursor to read the page below this one. Null on the last page."
+                    }
+                  },
+                  "required": ["versions", "nextCursor"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scenario not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Read the page below this version number."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/scenarios/{id}/versions/{version}": {
+      "get": {
+        "operationId": "getApiScenariosByIdVersionsByVersion",
+        "description": "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer",
+                      "description": "The version number, counting from 1."
+                    },
+                    "authorLabel": {
+                      "type": ["string", "null"],
+                      "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded."
+                    },
+                    "authorId": {
+                      "type": ["string", "null"],
+                      "description": "The user who saved the version. Null when the save came from an API key."
+                    },
+                    "changeDescription": {
+                      "type": ["string", "null"]
+                    },
+                    "changedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The fields whose value this save changed."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the version was written, in ISO 8601."
+                    },
+                    "isSynthesized": {
+                      "type": "boolean",
+                      "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
+                    },
+                    "schemaVersion": {
+                      "type": "integer",
+                      "description": "The shape the snapshot was written in."
+                    },
+                    "snapshot": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "situation": {
+                          "type": "string"
+                        },
+                        "criteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "parameters": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "description": {
+                                "type": "string",
+                                "maxLength": 500
+                              },
+                              "defaultValue": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ]
+                              },
+                              "secret": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["name"]
+                          }
+                        },
+                        "simulatorModel": {
+                          "type": ["string", "null"]
+                        },
+                        "judgeModel": {
+                          "type": ["string", "null"]
+                        },
+                        "maxTurns": {
+                          "type": ["number", "null"]
+                        },
+                        "minTurns": {
+                          "type": ["number", "null"]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "situation",
+                        "criteria",
+                        "labels",
+                        "parameters",
+                        "simulatorModel",
+                        "judgeModel",
+                        "maxTurns",
+                        "minTurns"
+                      ],
+                      "description": "The editable content of the case as this version saved it."
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "authorLabel",
+                    "authorId",
+                    "changeDescription",
+                    "changedFields",
+                    "createdAt",
+                    "isSynthesized",
+                    "schemaVersion",
+                    "snapshot"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scenario or version not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true
+          },
           {
             "schema": {
               "type": "string"
@@ -43206,6 +46255,14 @@
                           "totalCost": {
                             "type": "number"
                           },
+                          "note": {
+                            "type": ["string", "null"],
+                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                          },
+                          "scenarioVersion": {
+                            "type": ["integer", "null"],
+                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                          },
                           "platformUrl": {
                             "type": "string",
                             "format": "uri"
@@ -43223,6 +46280,8 @@
                           "timestamp",
                           "updatedAt",
                           "durationInMs",
+                          "note",
+                          "scenarioVersion",
                           "platformUrl"
                         ]
                       }
@@ -43439,6 +46498,14 @@
                     "totalCost": {
                       "type": "number"
                     },
+                    "note": {
+                      "type": ["string", "null"],
+                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                    },
+                    "scenarioVersion": {
+                      "type": ["integer", "null"],
+                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -43456,6 +46523,8 @@
                     "timestamp",
                     "updatedAt",
                     "durationInMs",
+                    "note",
+                    "scenarioVersion",
                     "platformUrl"
                   ]
                 }
@@ -43630,6 +46699,10 @@
                           "isComplete": {
                             "type": "boolean",
                             "description": "True when every run of the batch reached a terminal status."
+                          },
+                          "note": {
+                            "type": ["string", "null"],
+                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
                           }
                         },
                         "required": [
@@ -43644,7 +46717,8 @@
                           "lastUpdatedAt",
                           "firstCompletedAt",
                           "allCompletedAt",
-                          "isComplete"
+                          "isComplete",
+                          "note"
                         ]
                       }
                     },
@@ -43821,6 +46895,10 @@
                     "isComplete": {
                       "type": "boolean",
                       "description": "True when every run of the batch reached a terminal status."
+                    },
+                    "note": {
+                      "type": ["string", "null"],
+                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
                     }
                   },
                   "required": [
@@ -43835,7 +46913,8 @@
                     "lastUpdatedAt",
                     "firstCompletedAt",
                     "allCompletedAt",
-                    "isComplete"
+                    "isComplete",
+                    "note"
                   ]
                 }
               }
@@ -43957,7 +47036,7 @@
     "/api/suites": {
       "get": {
         "operationId": "getApiSuites",
-        "description": "List all non-archived suites (run plans) for the project",
+        "description": "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
         "responses": {
           "200": {
             "description": "Success",
@@ -43977,6 +47056,11 @@
                       "slug": {
                         "type": "string"
                       },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["custom", "folder"],
+                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      },
                       "description": {
                         "type": ["string", "null"]
                       },
@@ -43985,6 +47069,66 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "scope": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "all"
+                              }
+                            },
+                            "required": ["mode"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "folders"
+                              },
+                              "folderIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["mode", "folderIds"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "labels"
+                              },
+                              "labels": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["mode", "labels"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "cases"
+                              }
+                            },
+                            "required": ["mode"]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
                       },
                       "targets": {
                         "type": "array",
@@ -44026,8 +47170,10 @@
                       "id",
                       "name",
                       "slug",
+                      "kind",
                       "description",
                       "scenarioIds",
+                      "scope",
                       "targets",
                       "repeatCount",
                       "labels",
@@ -44117,6 +47263,18 @@
             }
           }
         },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "type": "string",
+              "enum": ["custom", "folder"],
+              "default": "custom"
+            },
+            "description": "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did."
+          }
+        ],
         "security": [
           {
             "project_api_key": []
@@ -44143,6 +47301,11 @@
                     "slug": {
                       "type": "string"
                     },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["custom", "folder"],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                    },
                     "description": {
                       "type": ["string", "null"]
                     },
@@ -44151,6 +47314,66 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "folderIds"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "labels"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -44192,8 +47415,10 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -44293,6 +47518,12 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["custom", "folder"],
+                    "default": "custom",
+                    "description": "custom (the default) is a run plan and needs scenarioIds and targets; folder is a test suite that starts empty and gets scenarios by filing them into it."
+                  },
                   "description": {
                     "type": "string"
                   },
@@ -44301,7 +47532,64 @@
                     "items": {
                       "type": "string"
                     },
-                    "minItems": 1
+                    "default": []
+                  },
+                  "scope": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "all"
+                          }
+                        },
+                        "required": ["mode"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "folders"
+                          },
+                          "folderIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["mode", "folderIds"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "labels"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["mode", "labels"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "cases"
+                          }
+                        },
+                        "required": ["mode"]
+                      }
+                    ],
+                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
                   },
                   "targets": {
                     "type": "array",
@@ -44318,7 +47606,7 @@
                       },
                       "required": ["type", "referenceId"]
                     },
-                    "minItems": 1
+                    "default": []
                   },
                   "repeatCount": {
                     "type": "integer",
@@ -44334,7 +47622,7 @@
                     "default": []
                   }
                 },
-                "required": ["name", "scenarioIds", "targets"]
+                "required": ["name"]
               }
             }
           }
@@ -44367,6 +47655,11 @@
                     "slug": {
                       "type": "string"
                     },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["custom", "folder"],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                    },
                     "description": {
                       "type": ["string", "null"]
                     },
@@ -44375,6 +47668,66 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "folderIds"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "labels"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -44416,8 +47769,10 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -44561,6 +47916,11 @@
                     "slug": {
                       "type": "string"
                     },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["custom", "folder"],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                    },
                     "description": {
                       "type": ["string", "null"]
                     },
@@ -44569,6 +47929,66 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "folderIds"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "labels"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -44610,8 +48030,10 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -44733,6 +48155,63 @@
                   "description": {
                     "type": ["string", "null"]
                   },
+                  "scope": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "all"
+                          }
+                        },
+                        "required": ["mode"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "folders"
+                          },
+                          "folderIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["mode", "folderIds"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "labels"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["mode", "labels"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "cases"
+                          }
+                        },
+                        "required": ["mode"]
+                      }
+                    ],
+                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                  },
                   "scenarioIds": {
                     "type": "array",
                     "items": {
@@ -44791,7 +48270,7 @@
       },
       "delete": {
         "operationId": "deleteApiSuitesById",
-        "description": "Archive (soft-delete) a suite (run plan)",
+        "description": "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
         "responses": {
           "200": {
             "description": "Suite archived",
@@ -44946,6 +48425,11 @@
                     "slug": {
                       "type": "string"
                     },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["custom", "folder"],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                    },
                     "description": {
                       "type": ["string", "null"]
                     },
@@ -44954,6 +48438,66 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "folderIds"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": ["mode", "labels"]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": ["mode"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
                     },
                     "targets": {
                       "type": "array",
@@ -44995,8 +48539,10 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -45330,6 +48876,11 @@
                       ]
                     },
                     "description": "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters."
                   }
                 }
               }

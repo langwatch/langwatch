@@ -68,7 +68,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if the CLI is pointed at a self-hosted endpoint. Read the endpoint the CLI actually uses, which can come from `.env`, from the process environment, or from the saved CLI configuration.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ---
@@ -200,7 +200,7 @@ For Python, scenario tracing is configured via `scenario.configure(...)` combine
 
 For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill. Do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
-**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment (plus `LANGWATCH_ENDPOINT` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
+**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment, plus `LANGWATCH_ENDPOINT` for self-hosted. If setup runs but no traces appear in the LangWatch UI, check each link in turn: the key is set and belongs to the project you are looking at, the endpoint points at the instance you are looking at, the instrumentation step above actually ran, and the run finished without a send failure in its output. A missing key is the most common cause, not the only one.
 
 **VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
@@ -344,7 +344,7 @@ Detect the user's transport from their codebase and pick the matching adapter. *
 | Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
 | Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                 |
 | OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                    |
-| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a _voice wrapper_ around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
+| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed, and they will (rightly) call it useless.
 
@@ -708,8 +708,8 @@ Then drive everything via `langwatch scenario --help` and `langwatch suite --hel
 
 | Noun                     | What it is                                                                                              | Commands                     |
 | ------------------------ | ------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| **scenario**             | One test case: a _situation_ plus natural-language _criteria_. It needs a target to run against.        | `langwatch scenario …`       |
-| **suite** (a _run plan_) | A reusable plan pairing scenarios × targets × repeats. Use it when the same set should run again later. | `langwatch suite …`          |
+| **scenario**             | One test case: a *situation* plus natural-language *criteria*. It needs a target to run against.        | `langwatch scenario …`       |
+| **suite** (a *run plan*) | A reusable plan pairing scenarios × targets × repeats. Use it when the same set should run again later. | `langwatch suite …`          |
 | **simulation run**       | One scenario executed once against one target. Runs triggered together share a `batchRunId`.            | `langwatch simulation-run …` |
 
 "Simulations" is what the product calls the results surface, the same work seen from the other end. There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
@@ -830,7 +830,7 @@ Review the results, sharpen the scenario with `langwatch scenario update <id> --
 
 One short question beats a confident wrong run.
 
-- Never choose _which_ agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
+- Never choose *which* agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
 - Never invent a target: `http:demo-agent-support` is not an agent id.
 - Never widen a vague request into a bigger investigation, or a bigger plan, than was asked for. If the instruction is two words and ambiguous, ask one question and stop.
 
@@ -889,7 +889,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios. Each should test one specific behavior
 - Do NOT build a suite for a one-off check. `langwatch scenario run <id> --target <type>:<refId>` runs a single scenario in one command. Suites are for sets you will run again, or for hitting several targets at once
-- Do NOT use `suite update --scenarios` to _add_ a scenario. It REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
+- Do NOT use `suite update --scenarios` to *add* a scenario. It REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
 - Do NOT invent a target reference. `http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
 - Do NOT comma-separate `--targets` on `suite create`. It is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between a one-off run and a run plan. Ask one short question and wait

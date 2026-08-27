@@ -20,7 +20,7 @@ const otherOrgScope = { type: "organization", id: OTHER_ORG } as const;
  *  are read through a getter so a test can revoke mid-run. */
 function makeMemberReader(bindings: () => CollectedBinding[] = () => []) {
   const reader = makeReader({
-    tryFindOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
+    tryFindOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
     findUserBindings: vi.fn(() => Promise.resolve(bindings())),
   });
   return {
@@ -268,7 +268,7 @@ describe("AuthzService epoch cache", () => {
       });
 
       expect(epoch).not.toHaveBeenCalled();
-      expect(reader.tryFindOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.tryFindOrganizationMembership).not.toHaveBeenCalled();
     });
   });
 });

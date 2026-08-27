@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
+import { WORKBENCH_SQL_CHART_KIND } from "~/server/analytics/chartKinds";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -12,6 +13,13 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
+
+/**
+ * Distinctive enough that a substring search over the whole serialised body
+ * cannot miss it, and cannot match by coincidence.
+ */
+const SECRET_SQL =
+  "SELECT CapturedInput AS leaked_marker_7f3a FROM analytics.traces";
 
 describe("Feature: Dashboard REST API", () => {
   let testApiKey: string;
@@ -150,6 +158,30 @@ describe("Feature: Dashboard REST API", () => {
         graph: {},
         gridRow: overrides?.gridRow ?? 0,
         gridColumn: overrides?.gridColumn ?? 0,
+      },
+    });
+  }
+
+  /**
+   * A saved LangWatchQL workbench chart placed on a dashboard. Its `graph`
+   * column holds the member's statement, which is exactly what must not appear
+   * in a REST response.
+   */
+  async function createWorkbenchChart(dashboardId: string) {
+    return await prisma.customGraph.create({
+      data: {
+        id: nanoid(),
+        projectId: testProjectId,
+        dashboardId,
+        name: `Workbench ${nanoid(6)}`,
+        kind: WORKBENCH_SQL_CHART_KIND,
+        graph: {
+          version: 1,
+          sql: SECRET_SQL,
+          parameters: {},
+        },
+        gridRow: 0,
+        gridColumn: 0,
       },
     });
   }
@@ -383,6 +415,69 @@ describe("Feature: Dashboard REST API", () => {
         dashboardIds: [],
       });
       expect(res.status).toBe(422);
+    });
+  });
+
+  // ── Chart-kind isolation ─────────────────────────────────────
+
+  // The `kind` discriminator promises that neither chart shape sees the
+  // other's rows. This is that promise on the way *out*: the REST reader
+  // serialises each graph row wholesale, so a workbench row reaching it would
+  // publish a member's stored SQL to any project API key.
+  describe("when a workbench chart is placed on the dashboard being read", () => {
+    /** @scenario "A saved workbench chart is not exposed through the dashboard REST API" */
+    it("omits the workbench chart from the graphs it returns", async () => {
+      const dashboard = await createDashboard({ name: "Mixed" });
+      const builderGraph = await createGraph(dashboard.id);
+      await createWorkbenchChart(dashboard.id);
+
+      const res = await helpers.api.get(`/api/dashboards/${dashboard.id}`);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.graphs.map((graph: { id: string }) => graph.id)).toEqual([
+        builderGraph.id,
+      ]);
+    });
+
+    it("does not carry the stored statement anywhere in the response", async () => {
+      const dashboard = await createDashboard({ name: "Mixed" });
+      await createGraph(dashboard.id);
+      await createWorkbenchChart(dashboard.id);
+
+      const res = await helpers.api.get(`/api/dashboards/${dashboard.id}`);
+      expect(res.status).toBe(200);
+
+      const raw = await res.text();
+
+      // Asserted over the whole body rather than over `graphs`: the claim is
+      // that the SQL is not in the response *at all*, which a shape-scoped
+      // assertion would not catch if a later field carried it.
+      expect(raw).not.toContain("leaked_marker_7f3a");
+    });
+
+    /** @scenario "The list's graphCount matches what the detail response actually returns" */
+    it("does not count the workbench chart the detail response omits", async () => {
+      const dashboard = await createDashboard({ name: "Mixed" });
+      await createGraph(dashboard.id);
+      await createWorkbenchChart(dashboard.id);
+
+      const detailRes = await helpers.api.get(
+        `/api/dashboards/${dashboard.id}`,
+      );
+      const detailBody = await detailRes.json();
+
+      const listRes = await helpers.api.get("/api/dashboards");
+      const listBody = await listRes.json();
+      const listed = listBody.data.find(
+        (d: { id: string }) => d.id === dashboard.id,
+      );
+
+      // The list's count and the detail's array are two views of one
+      // resource — a caller that reads graphCount and then fetches the
+      // detail must see the same number of cards in both.
+      expect(listed.graphCount).toBe(detailBody.graphs.length);
+      expect(listed.graphCount).toBe(1);
     });
   });
 });

@@ -46,7 +46,6 @@ export function InviteMemberDrawer({
 
   const { onSubmit, isSubmitting } = useInviteActions({
     organizationId: organization?.id ?? "",
-    isAdmin,
     hasEmailProvider,
     // Created invite links stay reachable via the invites table's row actions;
     // the drawer's job is to create and close, not to host the link list.

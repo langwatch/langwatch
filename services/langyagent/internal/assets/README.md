@@ -44,8 +44,8 @@ A locally built manager therefore has ONLY the github skill unless you copy
    the shared workspace on disk (`assets.MaterializeSkills`) — root-owned,
    world-readable (0755/0644), so every per-conversation UID can read but not
    modify it.
-2. Per spawn, `opencode.Provision` writes the worker's `$HOME/AGENTS.md` with
-   `${LANGWATCH_ENDPOINT}` substituted, and symlinks
+2. Per spawn, `opencode.Provision` writes the template to the worker's
+   `$HOME/AGENTS.md` byte for byte, and symlinks
    `$HOME/.config/opencode/skills` → the shared skills dir. That config path
    is where opencode discovers global skills — each `<name>/SKILL.md` becomes
    an invokable skill.
@@ -54,12 +54,18 @@ A locally built manager therefore has ONLY the github skill unless you copy
 
 ## Editing AGENTS.md — the traps
 
-- **`${LANGWATCH_ENDPOINT}` is substituted with `strings.ReplaceAll`** — every
-  occurrence, including any that appear in explanatory prose. Never write a
-  sentence that talks ABOUT the literal placeholder (it would render as
-  gibberish once the real URL is substituted in); only use the token where the
-  resolved URL itself should appear. `assets_test.go` pins that the template
-  keeps at least one occurrence.
+- **Nothing is substituted into the template.** A spawn writes these bytes to
+  the worker home unchanged. The prompt reaches the user through the reply, so
+  a host or an environment variable that only the worker can resolve must never
+  appear in it, not even as an example of what not to say. `assets_test.go`
+  pins that.
+- **The byte budget has almost no room left.** `assets_test.go` caps the
+  template at 16,384 bytes and it currently sits at 16,364, so about 20 bytes
+  are free. Any new sentence has to pay for itself out of an old one. The
+  budget test logs the live figure on every run, so read that rather than this
+  line if the two disagree. A
+  fix that needs the ceiling raised is a fix at the wrong layer: state the class
+  in one principle, or move the constraint into the harness config.
 - **Rule numbers are load-bearing.** `skills/github/SKILL.md` says "see global
   rule 14" and `platform/app/src/features/langy/logic/langyPlan.ts` documents
   itself against "AGENTS.md rule 14". Do not renumber the absolute rules;

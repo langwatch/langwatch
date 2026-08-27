@@ -6,6 +6,8 @@ export const SCIM_FEATURE_ID = "scim" as const;
 export interface ScimUser {
   schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"];
   id: string;
+  /** The identity provider's identifier, scoped to its SSO connection. */
+  externalId?: string;
   userName: string;
   name: {
     givenName: string;
@@ -86,6 +88,7 @@ const scimEnterpriseUserSchema = z
 export const scimCreateUserRequestSchema = z
   .object({
     schemas: z.array(z.string()),
+    externalId: z.string().min(1).optional(),
     userName: z.string().email(),
     name: z
       .object({
@@ -114,6 +117,8 @@ export type ScimCreateUserRequest = z.infer<typeof scimCreateUserRequestSchema>;
 export interface ScimGroup {
   schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"];
   id: string;
+  /** The identity provider's identifier, scoped to its SSO connection. */
+  externalId?: string;
   displayName: string;
   members?: Array<{
     value: string;
@@ -133,6 +138,7 @@ export const scimGroupMemberSchema = z.object({
 
 export const scimCreateGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
+  externalId: z.string().min(1).optional(),
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });
@@ -141,6 +147,7 @@ export type ScimCreateGroupRequest = z.infer<typeof scimCreateGroupRequestSchema
 
 export const scimReplaceGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
+  externalId: z.string().min(1).optional(),
   displayName: z.string(),
   members: z.array(scimGroupMemberSchema).optional(),
 });

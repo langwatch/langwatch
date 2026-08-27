@@ -110,3 +110,47 @@ describe("GET /api/experiments (public REST list)", () => {
     });
   });
 });
+
+// `GET /api/experiments/:slug` is a parameter segment at the root of a
+// namespace whose siblings are literal (`/runs`, `/runs/:runId`). A parameter
+// that swallows a literal sibling is the classic way this breaks, and it breaks
+// in production rather than in a unit test, so both directions are pinned here
+// against the real composition.
+describe("GET /api/experiments/:slug (public REST read)", () => {
+  describe("when the request has no project API key", () => {
+    /** @scenario Reading one experiment needs the project key */
+    it("is answered by the project API-key guard, not by a framework 404", async () => {
+      const res = await router.request(
+        "http://localhost/api/experiments/some-slug",
+        { method: "GET" },
+      );
+
+      // A 404 here would mean no route matched at all, which is the bug this
+      // route exists to fix: the caller could not tell a missing route from a
+      // missing experiment.
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { error?: string; message?: string };
+      expect(body.error).toBe("Unauthorized");
+      expect(body.message).toBe(API_KEY_GUARD_MESSAGE);
+    });
+  });
+
+  describe("when the path is the runs collection rather than a slug", () => {
+    /** @scenario The runs routes keep their own handlers */
+    it("does not let the slug parameter swallow /runs", async () => {
+      const res = await router.request(
+        "http://localhost/api/experiments/runs",
+        {
+          method: "GET",
+        },
+      );
+
+      // The runs route has its own API-key guard in the v3 app, which answers
+      // with a different envelope. Either way the read-one handler must not be
+      // the thing that replies.
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { error?: string; message?: string };
+      expect(body.message).not.toBe(API_KEY_GUARD_MESSAGE);
+    });
+  });
+});

@@ -62,6 +62,7 @@ describe("given a composer state with both secret and non-secret values set", ()
     },
     ottlStatements: [],
     pullSchedule: "",
+    traceProjectId: null,
   };
 
   describe("when building the persisted parserConfig", () => {

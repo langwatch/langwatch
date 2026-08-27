@@ -4,6 +4,7 @@ import { SuitesApiService, type SuiteTarget } from "@/client-sdk/services/suites
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { buildScope, describeScope, hasScopeFlag, type ScopeOptions } from "./scopeFlags";
 
 function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
@@ -36,7 +37,7 @@ function parseTargets(targetStrings: string[]): SuiteTarget[] {
  */
 export const createSuiteCommand = async (
   name: string,
-  options: {
+  options: ScopeOptions & {
     scenarios?: string;
     targets?: string[];
     repeatCount?: string;
@@ -46,26 +47,27 @@ export const createSuiteCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  if (!options.scenarios) {
+  if (!options.scenarios && !hasScopeFlag(options)) {
     console.error(
-      chalk.red("Error: --scenarios is required (comma-separated scenario IDs)"),
+      chalk.red(
+        "Error: --scenarios is required (comma-separated scenario IDs), unless the plan is given a scope with --scope-all, --scope-folder or --scope-label",
+      ),
     );
     process.exit(1);
   }
 
   if (!options.targets || options.targets.length === 0) {
-    console.error(
-      chalk.red("Error: --targets is required (format: <type>:<referenceId>)"),
-    );
+    console.error(chalk.red("Error: --targets is required (format: <type>:<referenceId>)"));
     process.exit(1);
   }
 
-  const scenarioIds = options.scenarios.split(",").map((s) => s.trim());
+  const service = new SuitesApiService();
+  const scope = await buildScope(options, service);
+  const scenarioIds = options.scenarios ? options.scenarios.split(",").map((s) => s.trim()) : [];
   const targets = parseTargets(options.targets);
   const repeatCount = options.repeatCount ? parseInt(options.repeatCount, 10) : 1;
   const labels = options.labels ? options.labels.split(",").map((l) => l.trim()) : [];
 
-  const service = new SuitesApiService();
   const spinner = createSpinner(`Creating suite "${name}"...`).start();
 
   try {
@@ -73,6 +75,7 @@ export const createSuiteCommand = async (
       name,
       description: options.description,
       scenarioIds,
+      ...(scope && { scope }),
       targets,
       repeatCount,
       labels,
@@ -86,6 +89,7 @@ export const createSuiteCommand = async (
         console.log();
         console.log(`  ${chalk.gray("ID:")}        ${chalk.green(suite.id)}`);
         console.log(`  ${chalk.gray("Slug:")}      ${chalk.yellow(suite.slug)}`);
+        console.log(`  ${chalk.gray("Covers:")}    ${describeScope(suite.scope)}`);
         console.log(`  ${chalk.gray("Scenarios:")} ${suite.scenarioIds.length}`);
         console.log(`  ${chalk.gray("Targets:")}   ${suite.targets.length}`);
         console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
@@ -93,9 +97,7 @@ export const createSuiteCommand = async (
         if (suite.platformUrl) {
           console.log(`  ${chalk.bold("View:")}  ${chalk.underline(suite.platformUrl)}`);
         }
-        console.log(
-          chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`),
-        );
+        console.log(chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`));
       },
     };
   } catch (error) {

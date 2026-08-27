@@ -49,6 +49,9 @@ export const langWatchQLQueryResultSchema = z
     truncated: z.boolean(),
     diagnostics: z.array(langWatchQLDiagnosticSchema).readonly(),
     followsTimeWindow: z.boolean(),
+    followsGranularity: z.boolean(),
+    granularitySeconds: z.number().optional(),
+    coarsenedFromSeconds: z.number().optional(),
   })
   .strict();
 export type LangWatchQLQueryResult = z.infer<typeof langWatchQLQueryResultSchema>;

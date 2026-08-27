@@ -100,7 +100,10 @@ describe("authz registry", () => {
       // webhookEndpoints / gatewaySpend append (2026-08) moved the tail
       // without moving IT — that is the append-only contract working.
       expect(permissionIndex("aiTools:manage")).toBe(116);
-      expect(permissionIndex("langy:manage")).toBe(ALL_PERMISSIONS.length - 1);
+      expect(permissionIndex("langy:manage")).toBe(125);
+      expect(permissionIndex("agentCache:manage")).toBe(
+        ALL_PERMISSIONS.length - 1,
+      );
     });
 
     it("pins the FULL serialization order (bitset indices ship inside signed passports — edit only by appending)", () => {
@@ -237,6 +240,8 @@ describe("authz registry", () => {
         "langy:update",
         "langy:delete",
         "langy:manage",
+        "agentCache:view",
+        "agentCache:manage",
       ]);
     });
 

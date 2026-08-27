@@ -27,6 +27,7 @@ describe("hasLangyAccess", () => {
         kind: "project",
         userId: "customer-1",
         projectId: "project-1",
+        organizationId: NOT_TARGETED,
       });
     });
   });
@@ -75,7 +76,7 @@ describe("hasLangyAccess", () => {
       const { service, isEnabled } = featureFlags(false);
 
       // The GitHub install route has neither a projectId nor an organizationId
-      // in hand, so the gate evaluates at user scope only.
+      // in hand, so the gate states both scopes as not targeted.
       await expect(
         hasLangyAccess({
           user: { id: "customer-3" },

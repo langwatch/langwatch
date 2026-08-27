@@ -16,6 +16,7 @@ import type {
 } from "@langwatch/authz-contract";
 import type {
   CustomRolePermissionsRow,
+  OrganizationMembership,
   OrganizationRole,
   ShareLinkRow,
 } from "../authz-read.repository";
@@ -36,18 +37,27 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     return this;
   }
 
-  async tryFindOrganizationRole({
+  async tryFindOrganizationMembership({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null> {
+  }): Promise<OrganizationMembership | null> {
     const row = (await this.database.organizationUser.findFirst({
       where: { userId, organizationId },
-      select: { role: true },
-    })) as { role: OrganizationRole } | null;
-    return row?.role ?? null;
+      select: { role: true, disabledAt: true },
+    })) as { role: OrganizationRole; disabledAt: Date | null } | null;
+    // `disabledAt` is SELECTED, not filtered: the row is a stored fact and the
+    // collector applies the policy. Filtering here would report a disabled
+    // membership as absent, and the denial could then only say "not a member"
+    // of someone who is one.
+    if (!row) return null;
+    // `!== null`, not `!= null`: a row that arrives without the column at all
+    // reads as DISABLED. That can only happen if someone drops `disabledAt`
+    // from the select above, and between a loud lockout and a silent return
+    // of everyone's access, the lockout is the one that gets noticed.
+    return { role: row.role, disabled: row.disabledAt !== null };
   }
 
   async findUserBindings({
@@ -60,13 +70,16 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     const rows = (await this.database.roleBinding.findMany({
       // Current organization membership - not the binding row - is the
       // tenancy boundary: a binding naming a user who has left the
-      // organization confers nothing. Same predicate the legacy resolvers
-      // carry (rbac.ts checkPermissionFromBindings, role-binding-resolver.ts
+      // organization, or whose seat an admin disabled, confers nothing. Same
+      // predicate the legacy resolvers carry (rbac.ts
+      // checkPermissionFromBindings, role-binding-resolver.ts
       // collectBindingsForUser).
       where: {
         organizationId,
         userId,
-        user: { orgMemberships: { some: { organizationId } } },
+        user: {
+          orgMemberships: { some: { organizationId, disabledAt: null } },
+        },
       },
       select: {
         role: true,
@@ -101,7 +114,9 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
           members: {
             some: {
               userId,
-              user: { orgMemberships: { some: { organizationId } } },
+              user: {
+                orgMemberships: { some: { organizationId, disabledAt: null } },
+              },
             },
           },
         },
@@ -169,7 +184,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         userId,
         team: {
           organizationId,
-          organization: { members: { some: { userId } } },
+          organization: { members: { some: { userId, disabledAt: null } } },
         },
       },
       select: {

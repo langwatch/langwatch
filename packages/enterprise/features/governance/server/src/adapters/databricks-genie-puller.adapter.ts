@@ -263,6 +263,9 @@ async function resolveWorkspaceToken(params: {
     },
     body: "grant_type=client_credentials&scope=all-apis",
     signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    // This request carries the client secret itself. Never hand it to a
+    // redirect target.
+    followRedirects: false,
   });
 
   if (!response.ok) {
@@ -751,9 +754,7 @@ function warehouseCostObserved({
     warehouseId,
     askedFrom: new Date(startOfHourMs(chunk.fromMs)).toISOString(),
     askedTo: new Date(endOfHourMs(chunk.toMs)).toISOString(),
-    askedHours: Math.round(
-      (endOfHourMs(chunk.toMs) - startOfHourMs(chunk.fromMs)) / ONE_HOUR_MS,
-    ),
+    askedHours: Math.round((endOfHourMs(chunk.toMs) - startOfHourMs(chunk.fromMs)) / ONE_HOUR_MS),
   };
 }
 
@@ -976,7 +977,7 @@ function endOfHourMs(ms: number): number {
  * A message with no status at all is left alone: some responses omit it, and
  * treating absent as in-flight would hold the watermark on every sweep forever.
  */
-const TERMINAL_MESSAGE_STATUSES = new Set([
+export const TERMINAL_MESSAGE_STATUSES: ReadonlySet<string> = new Set([
   "COMPLETED",
   "FAILED",
   "CANCELLED",
@@ -1185,9 +1186,7 @@ function nextWatermark({
   // sweep starts thirty days behind and that is not a stall, whereas the same
   // instant refused for a week running is.
   const capped =
-    pricedThroughMs === null || holdExpired
-      ? pending
-      : Math.min(pending, pricedThroughMs);
+    pricedThroughMs === null || holdExpired ? pending : Math.min(pending, pricedThroughMs);
   // Never backwards. An unsettled message always sits above the previous
   // watermark (it passed that filter to be read at all), so this only guards
   // the arithmetic, but a watermark that could move back would re-read forever.
@@ -1233,10 +1232,7 @@ function withoutOrphanedResume(cursor: GenieCursor): GenieCursor {
   };
 }
 
-function parseCursor(
-  cursor: string | null,
-  config: DatabricksGeniePullConfig,
-): GenieCursor {
+function parseCursor(cursor: string | null, config: DatabricksGeniePullConfig): GenieCursor {
   if (cursor) {
     try {
       return withoutOrphanedResume(cursorSchema.parse(JSON.parse(cursor)));
@@ -1555,11 +1551,7 @@ function conversationWalkPlan({
   resumable: boolean;
 } {
   const ordered = [...conversations.items].sort((a, b) =>
-    a.conversation_id < b.conversation_id
-      ? -1
-      : a.conversation_id > b.conversation_id
-        ? 1
-        : 0,
+    a.conversation_id < b.conversation_id ? -1 : a.conversation_id > b.conversation_id ? 1 : 0,
   );
   const resumable = conversations.complete;
   // An id no longer in the list means the conversation was deleted since the
@@ -1630,9 +1622,7 @@ function stoppedAt({
   return {
     items,
     complete: false,
-    resumeConversationId: conversationPlan.resumable
-      ? conversation.conversation_id
-      : null,
+    resumeConversationId: conversationPlan.resumable ? conversation.conversation_id : null,
     hadGap,
     oldestPendingMs,
   };
@@ -1669,15 +1659,7 @@ interface SpaceRead {
 class GenieHttpError extends Error {
   readonly status: number;
 
-  constructor({
-    status,
-    statusText,
-    path,
-  }: {
-    status: number;
-    statusText: string;
-    path: string;
-  }) {
+  constructor({ status, statusText, path }: { status: number; statusText: string; path: string }) {
     super(`HTTP ${status} ${statusText} (databricks genie ${path})`);
     this.name = "GenieHttpError";
     this.status = status;
@@ -1719,10 +1701,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
     return databricksGeniePullConfigSchema.parse(config);
   }
 
-  async runOnce(
-    options: PullRunOptions,
-    config: DatabricksGeniePullConfig,
-  ): Promise<PullResult> {
+  async runOnce(options: PullRunOptions, config: DatabricksGeniePullConfig): Promise<PullResult> {
     const token = await resolveWorkspaceToken({
       credentials: options.credentials,
       workspaceUrl: config.workspaceUrl,
@@ -1857,8 +1836,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
       const space = spacePlan.ordered[i]!;
       // Only the space the cursor actually stopped in inherits the conversation
       // resume point. Every space after it is taken from the top.
-      const resumeConversationId =
-        space.space_id === cursor.spaceId ? cursor.conversationId : null;
+      const resumeConversationId = space.space_id === cursor.spaceId ? cursor.conversationId : null;
 
       if (budget.exhausted()) {
         // Everything read so far is kept and the watermark is held. The
@@ -3230,8 +3208,7 @@ function nextCursor({
   // that keep owing one; any run that prices its window whole clears it, so a
   // billing table that recovers costs nothing and the clock does not carry over
   // to the next thing that goes wrong.
-  const costHeldSinceMs =
-    pricedThroughMs === null ? null : (previous.costHeldSinceMs ?? nowMs);
+  const costHeldSinceMs = pricedThroughMs === null ? null : (previous.costHeldSinceMs ?? nowMs);
   const holdExpired =
     costHeldSinceMs !== null && nowMs - costHeldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
 

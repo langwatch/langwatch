@@ -15,6 +15,10 @@ interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "h
   prefetch?: boolean;
   locale?: string | false;
   legacyBehavior?: boolean;
+  /** Opt this navigation into the browser's view transition, so elements
+   *  sharing a `view-transition-name` morph between the two pages. Ignored
+   *  for external links and by browsers without the API. */
+  viewTransition?: boolean;
   children?: ReactNode;
 }
 
@@ -48,6 +52,7 @@ const Link = forwardRef<HTMLAnchorElement, NextLinkProps>(function Link(
     prefetch: _prefetch,
     locale: _locale,
     legacyBehavior: _legacyBehavior,
+    viewTransition,
     children,
     ...rest
   },
@@ -65,7 +70,13 @@ const Link = forwardRef<HTMLAnchorElement, NextLinkProps>(function Link(
   }
 
   return (
-    <RouterLink ref={ref} to={to} replace={replace} {...rest}>
+    <RouterLink
+      ref={ref}
+      to={to}
+      replace={replace}
+      viewTransition={viewTransition}
+      {...rest}
+    >
       {children}
     </RouterLink>
   );

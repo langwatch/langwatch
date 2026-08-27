@@ -29,10 +29,7 @@ function scenario(overrides: Partial<ScenarioRunConfig> = {}): ScenarioRunConfig
   };
 }
 
-function resolve(params: {
-  scenarios: ScenarioRunConfig[];
-  values?: RunParameterValues;
-}) {
+function resolve(params: { scenarios: ScenarioRunConfig[]; values?: RunParameterValues }) {
   return resolveRunParameters(params);
 }
 

@@ -85,9 +85,11 @@ export interface CodexRolloutMeta {
   gitBranch: string | null;
   gitRepositoryUrl: string | null;
   /**
-   * The first thing the user typed, from the `user_message` event — the typed
-   * prompt itself, apart from the context codex injects as user-role messages.
-   * What names the session, since codex generates no title of its own.
+   * The first thing the user typed, apart from the context codex injects as
+   * user-role messages. What names the session, since codex generates no title
+   * of its own. Read from the `user_message` event, and from the conversation
+   * itself when there is none. Codex 0.149 emits no such event in any mode,
+   * interactive or exec, so the conversation is the only source there.
    */
   firstUserMessage: string | null;
 }
@@ -96,6 +98,39 @@ export interface CodexRolloutMeta {
 export interface ParsedCodexRollout {
   turns: CodexTurnIO[];
   meta: CodexRolloutMeta | null;
+}
+
+/**
+ * A block codex wrote to itself rather than one a person typed. Codex opens
+ * each injected block with a tag naming it, and the typed prompt never opens
+ * with one.
+ */
+const INJECTED_CONTEXT_BLOCK = /^<[A-Za-z_][\w-]*>/;
+
+/**
+ * Whether a user-role message is context codex injected.
+ *
+ * Codex bundles a whole injection into ONE message carrying several content
+ * parts, and only some of them open with a tag. A real session on the agents
+ * box opens part one with the markdown heading `# AGENTS.md instructions` and
+ * part two with `<environment_context>`. Flattening the parts first would put
+ * that heading at the front, hide the tag behind it, and let the heading name
+ * the session, so each part is tested on its own and any tagged part condemns
+ * the message.
+ *
+ * Which part carries the tag is not a signal: the parts of a bundle share a
+ * turn id and land hundredths of a second apart, so there is no order to lean
+ * on and nothing is reordered here.
+ */
+function isInjectedContent(content: unknown): boolean {
+  if (!Array.isArray(content)) return false;
+  return content.some((part) => {
+    if (!part || typeof part !== "object") return false;
+    const t = (part as { text?: unknown }).text;
+    const ot = (part as { output_text?: unknown }).output_text;
+    const text = typeof t === "string" ? t : typeof ot === "string" ? ot : "";
+    return INJECTED_CONTEXT_BLOCK.test(text.trim());
+  });
 }
 
 function truncate(text: string, max: number): string {
@@ -244,7 +279,7 @@ class CodexTurnAccumulator {
   } | null = null;
   /** Latest assistant text not yet committed to history (the final-answer candidate). */
   private pendingAssistant: string | null = null;
-  /** The first typed prompt of the thread, from its user_message event. */
+  /** The first typed prompt of the thread. */
   private firstUserMessage: string | null = null;
   /** Authoritative final answer from the agent_message(final_answer) event. */
   private agentFinal: string | null = null;
@@ -276,9 +311,7 @@ class CodexTurnAccumulator {
     this.closeTurn();
     // The first prompt arrives after session_meta, so it joins here.
     const meta =
-      this.meta === null
-        ? null
-        : { ...this.meta, firstUserMessage: this.firstUserMessage };
+      this.meta === null ? null : { ...this.meta, firstUserMessage: this.firstUserMessage };
     return { turns: this.turns, meta };
   }
 
@@ -320,11 +353,35 @@ class CodexTurnAccumulator {
   }
 
   private onUserMessage(payload: Record<string, unknown>): void {
-    if (this.firstUserMessage !== null) return;
     const msg = payload.message;
-    if (typeof msg === "string" && msg.trim()) {
-      this.firstUserMessage = msg.trim();
-    }
+    if (typeof msg === "string") this.rememberTypedPrompt(msg);
+  }
+
+  /**
+   * The first thing the person typed, from whichever place records it.
+   *
+   * Both places reach this. The `user_message` event carries it in a TUI
+   * session; the conversation carries it in a `codex exec` session, which
+   * emits no such event at all and so reached the sessions screen unnamed.
+   * The event still wins whenever there is one, because it is read before a
+   * turn opens while a conversation message is only read inside one, and a
+   * turn opens at `task_started`, after the submission that emits the event.
+   *
+   * Codex also speaks to itself in both places, injecting its context as
+   * user-role text wrapped in a tag of its own (`<environment_context>`,
+   * `<recommended_plugins>`, ...). Only what the person typed arrives
+   * untagged, and a 10k-character plugin catalogue makes a poor session
+   * title. The test below covers the event, which only ever carries a plain
+   * string; a conversation message is screened by `isInjectedContent` at the
+   * call site instead, because it can carry several content parts and the tag
+   * may sit in any of them. Screening both is what keeps an injected block
+   * from claiming the name and locking out the real prompt beside it.
+   */
+  private rememberTypedPrompt(text: string): void {
+    if (this.firstUserMessage !== null) return;
+    const trimmed = text.trim();
+    if (!trimmed || INJECTED_CONTEXT_BLOCK.test(trimmed)) return;
+    this.firstUserMessage = trimmed;
   }
 
   private onTaskStarted(payload: Record<string, unknown>): void {
@@ -335,8 +392,7 @@ class CodexTurnAccumulator {
       traceId,
       turnId: typeof payload.turn_id === "string" ? payload.turn_id : null,
       model: this.sessionModel,
-      startedAtMs:
-        typeof payload.started_at === "number" ? payload.started_at * 1000 : null,
+      startedAtMs: typeof payload.started_at === "number" ? payload.started_at * 1000 : null,
     };
   }
 
@@ -380,6 +436,10 @@ class CodexTurnAccumulator {
     } else if (role === "user") {
       this.flushPendingAssistant();
       this.history.push({ role: "user", content: text });
+      // Tested on the parts rather than the flattened text, because a
+      // bundle can open with an untagged heading and carry its tag in a
+      // later part.
+      if (!isInjectedContent(payload.content)) this.rememberTypedPrompt(text);
     } else if (role === "assistant") {
       // Hold: this may be a mid-turn preamble (committed to history when the
       // next item arrives) or the turn's final answer (consumed by closeTurn).
@@ -401,11 +461,7 @@ class CodexTurnAccumulator {
     // and `local_shell_call` name it `input` / `action`.
     const rawArgs = payload.arguments ?? payload.input ?? payload.action;
     const args =
-      typeof rawArgs === "string"
-        ? rawArgs
-        : rawArgs != null
-          ? JSON.stringify(rawArgs)
-          : "";
+      typeof rawArgs === "string" ? rawArgs : rawArgs != null ? JSON.stringify(rawArgs) : "";
     this.history.push({
       role: "assistant",
       tool_calls: [

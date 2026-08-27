@@ -4,5 +4,8 @@ export type {
   CreateScenarioBody,
   UpdateScenarioBody,
   DeleteScenarioResponse,
+  ScenarioVersionListResponse,
+  ScenarioVersionSummary,
+  ScenarioVersionDetail,
 } from "./types";
 export { ScenariosApiError } from "./errors";

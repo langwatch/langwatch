@@ -5,18 +5,17 @@ sidebarTitle: Compliance architecture
 ---
 
 <Info>
-  **Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans;
-  governance processing folds them into OCSF-mapped events for SIEM export.
+  **Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance
+  processing folds them into OCSF-mapped events for SIEM export.
 </Info>
 
 <Note>
   **Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and
-  tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license.
-  The Apache 2.0 floor still gives you a single trace store at the platform default
-  retention window and an append-only event_log; the compliance underwriting documented
-  below is the Enterprise extension. See [Open-core
-  licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0,
-  Enterprise split.
+  tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache
+  2.0 floor still gives you a single trace store at the platform default retention window and an
+  append-only event_log; the compliance underwriting documented below is the Enterprise extension.
+  See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise
+  split.
 </Note>
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
@@ -94,7 +93,7 @@ See [Governance data retention](/ai-gateway/governance/retention) for the full c
 
 ### 3. RBAC: permission-driven, not role-driven
 
-LangWatch's RBAC layer (`platform/app/src/server/api/rbac.ts`) is the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
+LangWatch's authorization contract and service (`packages/features/authz/`) are the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
 
 **Governance permissions catalog** (added in this PR):
 

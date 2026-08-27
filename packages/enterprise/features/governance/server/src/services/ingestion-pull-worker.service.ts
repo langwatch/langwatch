@@ -7,11 +7,25 @@ import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
 import type {
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSinkPort,
+  GovernanceTraceIngestionPort,
+  GovernanceTraceRequest,
   IngestionPullDiagnosticsPort,
   IngestionPullSourcePort,
   PulledUsageDispatcherPort,
   PulledUsageEntitlementPort,
 } from "../ports/ingestion-pull-worker.port";
+import {
+  COPILOT_ROUTING_PROFILE,
+  mapCopilotEventsToTraceRequest,
+} from "../adapters/copilot-studio-trace-mapper.adapter";
+import {
+  GENIE_ROUTING_PROFILE,
+  mapGenieEventsToTraceRequest,
+} from "../adapters/genie-trace-mapper.adapter";
+import type {
+  ConversationRoutingProfile,
+  RoutingOrigin,
+} from "../adapters/conversation-trace-assembly.adapter";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service";
 import type { PullerRegistryService } from "./puller-registry.service";
@@ -20,6 +34,28 @@ const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 const OCSF_ACTIVITY_INVOKE = 6;
 const OCSF_SEVERITY_INFO = 1;
+
+type ConversationRouting = {
+  profile: ConversationRoutingProfile;
+  map(input: {
+    events: NormalizedPullEvent[];
+    origin: RoutingOrigin;
+  }): GovernanceTraceRequest | null;
+};
+
+const CONVERSATION_ROUTING = new Map<string, ConversationRouting>([
+  ["databricks_genie", { profile: GENIE_ROUTING_PROFILE, map: mapGenieEventsToTraceRequest }],
+  [
+    "copilot_studio_dataverse",
+    { profile: COPILOT_ROUTING_PROFILE, map: mapCopilotEventsToTraceRequest },
+  ],
+]);
+
+export function conversationRoutingProfileFor(
+  sourceType: string,
+): ConversationRoutingProfile | undefined {
+  return CONVERSATION_ROUTING.get(sourceType)?.profile;
+}
 
 export class IngestionPullDeadlineExceededError extends Error {
   constructor(deadlineMs: number) {
@@ -50,6 +86,7 @@ export class IngestionPullWorkerService {
     private readonly usageEntitlement: PulledUsageEntitlementPort,
     private readonly usageRecords: PulledUsageRecordService,
     private readonly diagnostics: IngestionPullDiagnosticsPort,
+    private readonly traceIngestion: GovernanceTraceIngestionPort | undefined,
     private readonly configuration: IngestionPullWorkerConfiguration,
     private readonly now: () => number,
   ) {}
@@ -63,6 +100,7 @@ export class IngestionPullWorkerService {
     usageEntitlement: PulledUsageEntitlementPort;
     usageRecords: PulledUsageRecordService;
     diagnostics: IngestionPullDiagnosticsPort;
+    traceIngestion?: GovernanceTraceIngestionPort;
     configuration?: IngestionPullWorkerConfiguration;
     now?: () => number;
   }): IngestionPullWorkerService {
@@ -75,6 +113,7 @@ export class IngestionPullWorkerService {
       options.usageEntitlement,
       options.usageRecords,
       options.diagnostics,
+      options.traceIngestion,
       options.configuration ?? IngestionPullWorkerConfiguration.create(),
       options.now ?? Date.now,
     );
@@ -127,10 +166,11 @@ export class IngestionPullWorkerService {
       );
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error));
-      this.diagnostics.error(
-        "adapter.runOnce threw — leaving the durable cursor unchanged",
-        { ingestionSourceId: source.id, adapterId, error: normalized.message },
-      );
+      this.diagnostics.error("adapter.runOnce threw — leaving the durable cursor unchanged", {
+        ingestionSourceId: source.id,
+        adapterId,
+        error: normalized.message,
+      });
       this.diagnostics.capture(normalized, {
         worker: "ingestionPuller",
         ingestionSourceId: source.id,
@@ -138,7 +178,8 @@ export class IngestionPullWorkerService {
       throw error;
     }
 
-    if (result.errorCount > 0) {
+    const madeProgress = result.cursor !== input.cursor;
+    if (result.errorCount > 0 && !madeProgress) {
       throw new Error(`Ingestion pull adapter reported ${result.errorCount} error(s)`);
     }
 
@@ -148,8 +189,58 @@ export class IngestionPullWorkerService {
         source,
         pulledUsage: input.pulledUsage,
       });
+      await this.routeConversations({ events: result.events, source });
     }
     return { nextCursor: result.cursor, eventCount: result.events.length };
+  }
+
+  private async routeConversations(input: {
+    events: NormalizedPullEvent[];
+    source: GovernanceIngestionSource;
+  }): Promise<void> {
+    const { source } = input;
+    if (!source.traceProjectId) return;
+
+    const routing = CONVERSATION_ROUTING.get(source.sourceType);
+    if (!routing) return;
+    if (!this.traceIngestion) {
+      throw new Error("Conversation trace ingestion is not composed");
+    }
+
+    const request = routing.map({
+      events: input.events,
+      origin: {
+        ingestionSourceId: source.id,
+        organizationId: source.organizationId,
+        sourceType: source.sourceType,
+        profile: routing.profile,
+      },
+    });
+    if (!request) return;
+
+    const project = await this.projects.tryGetWithTeam(source.traceProjectId);
+    const destinationIsLive =
+      project !== null &&
+      project.archivedAt === null &&
+      project.team.organizationId === source.organizationId;
+    if (!destinationIsLive) {
+      this.diagnostics.warn(
+        "trace destination is archived, deleted, or belongs to another organization",
+        { ingestionSourceId: source.id, traceProjectId: source.traceProjectId },
+      );
+      return;
+    }
+
+    const result = await this.traceIngestion.ingest({
+      projectId: project.id,
+      request,
+    });
+    if (result.ingestionFailures === 0) return;
+
+    const detail = result.ingestionFailureMessage ? `: ${result.ingestionFailureMessage}` : "";
+    throw new Error(
+      `Trace door failed to dispatch ${result.ingestionFailures} span(s) for ingestion source ${source.id}${detail}`,
+    );
   }
 
   private async withDeadline<T>(
@@ -240,9 +331,7 @@ export class IngestionPullWorkerService {
     sourceType: string;
   }): GovernanceOcsfEventInput {
     const parsedTime = new Date(input.event.event_timestamp);
-    const eventTime = Number.isFinite(parsedTime.getTime())
-      ? parsedTime
-      : new Date(this.now());
+    const eventTime = Number.isFinite(parsedTime.getTime()) ? parsedTime : new Date(this.now());
     const eventId = `${input.sourceType}:${input.ingestionSourceId}:${input.event.source_event_id}`;
     const rawOcsfJson = JSON.stringify({
       class_uid: OCSF_CLASS_API_ACTIVITY,

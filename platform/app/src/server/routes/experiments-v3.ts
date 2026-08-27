@@ -38,16 +38,19 @@ import {
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
-import {
-  requestAbort,
-  runOrchestrator,
-} from "~/server/experiments-v3/execution/orchestrator";
+import { requestAbort, runOrchestrator } from "~/server/experiments-v3/execution/orchestrator";
 import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
+import { createRunStateMirror } from "~/server/experiments-v3/execution/runStateMirror";
+import {
+  planSavedRunCarryOver,
+  prepareSavedStateExecution,
+} from "~/server/experiments-v3/execution/savedStateExecution";
 import {
   type ExecutionScope,
   executionRequestSchema,
   runInputsBodySchema,
+  runsSavedDataset,
 } from "~/server/experiments-v3/execution/types";
 import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
@@ -56,9 +59,16 @@ import { fireExperimentRanNurturing } from "../app-layer/billing/nurturing/featu
 import {
   handledErrorEnvelopeSchema,
   listRunsResponseSchema,
+  listWorkbenchVersionsResponseSchema,
+  restoreWorkbenchVersionResponseSchema,
   runResultsResponseSchema,
   runStatusResponseSchema,
+  saveWorkbenchStateBodySchema,
+  saveWorkbenchStateResponseSchema,
+  staleWorkbenchStateErrorSchema,
   startRunResponseSchema,
+  workbenchStateResponseSchema,
+  workbenchVersionProbeResponseSchema,
 } from "./experiments-v3.schemas";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -92,6 +102,54 @@ const experimentErrorResponses = {
   },
 };
 
+/**
+ * The answer every workbench route has for a slug that names another kind of
+ * experiment, such as a DSPy run or a legacy batch evaluation.
+ *
+ * Only the workbench routes reach it. The run routes look the experiment up by
+ * type, so for them the same slug is a 404 instead.
+ */
+const workbenchTypeErrorResponse = {
+  400: {
+    description: "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+    content: {
+      "application/json": {
+        schema: resolver(handledErrorEnvelopeSchema),
+      },
+    },
+  },
+};
+
+/**
+ * The two extra answers a workbench WRITE has.
+ *
+ * A 409 means someone else saved on top of the state this caller read; its
+ * `currentVersion` is what to read again. A 400 means the request was refused
+ * before anything was written: the setup does not match the schema, it points
+ * at a prompt, dataset or evaluator this project no longer has, or the slug
+ * names another kind of experiment.
+ */
+const workbenchWriteErrorResponses = {
+  400: {
+    description:
+      "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)",
+    content: {
+      "application/json": {
+        schema: resolver(handledErrorEnvelopeSchema),
+      },
+    },
+  },
+  409: {
+    description:
+      "Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again.",
+    content: {
+      "application/json": {
+        schema: resolver(staleWorkbenchStateErrorSchema),
+      },
+    },
+  },
+};
+
 const secured = createServiceApp({ basePath: "/api/experiments" });
 const sessionAuth = handlerManagedAuth({
   reason: "user session validated in-handler via getServerAuthSession",
@@ -102,15 +160,26 @@ const sessionAuth = handlerManagedAuth({
 // on different grains, so they declare separately: a single shared policy
 // would report the coarser of the two for routes that only read.
 const apiKeyAuthRead = handlerManagedAuth({
-  reason:
-    "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling",
+  reason: "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling",
   permissions: ["evaluations:view"],
   credential: "apiKey",
 });
 const apiKeyAuthRun = handlerManagedAuth({
-  reason:
-    "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling",
+  reason: "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
+  credential: "apiKey",
+});
+// The workbench endpoints gate on the experiments grains rather than the
+// evaluations ones: they read and write the experiment's own setup, which is
+// what `experiments:view` and `experiments:update` name.
+const apiKeyAuthExperimentsView = handlerManagedAuth({
+  reason: "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["experiments:view"],
+  credential: "apiKey",
+});
+const apiKeyAuthExperimentsUpdate = handlerManagedAuth({
+  reason: "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["experiments:update"],
   credential: "apiKey",
 });
 
@@ -173,26 +242,20 @@ const authenticateRequest = async (c: Context, permission: Permission) => {
   return { project: resolved.project, resolved, markUsed };
 };
 
-const buildState = (
-  workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,
-): EvaluationsV3State => {
-  const dataset = workbenchState.datasets[0]!;
-  return {
-    name: workbenchState.name,
-    datasets: workbenchState.datasets as EvaluationsV3State["datasets"],
-    activeDatasetId: dataset.id ?? "dataset-1",
-    targets: workbenchState.targets as EvaluationsV3State["targets"],
-    evaluators: workbenchState.evaluators as EvaluationsV3State["evaluators"],
-    results: {
-      status: "running",
-      targetOutputs: {},
-      targetMetadata: {},
-      evaluatorResults: {},
-      errors: {},
-    },
-    pendingSavedChanges: {},
-    ui: createInitialUIState(),
-  };
+/**
+ * Query parameters and path segments that are optional positive integers, or
+ * nothing.
+ *
+ * The whole value has to be digits. `parseInt` reads the leading number and
+ * discards the rest, so it turns `3abc` into 3 and `1.5` into 1: a mistyped
+ * `/versions/3abc/restore` would then restore version 3 instead of answering
+ * 404, which is a write the caller never asked for.
+ */
+const parseOptionalPositiveInt = (value: string | undefined) => {
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
 // ── POST /execute ────────────────────────────────────────────────────
@@ -216,10 +279,7 @@ secured.access(sessionAuth).post(
 
     const session = await getServerAuthSession({ req: c.req.raw as any });
     if (!session) {
-      return c.json(
-        { error: "You must be logged in to access this endpoint." },
-        { status: 401 },
-      );
+      return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
     }
 
     const hasPermission = await probeProjectPermission(
@@ -248,10 +308,7 @@ secured.access(sessionAuth).post(
     );
 
     if ("error" in dataResult) {
-      return c.json(
-        { error: dataResult.error },
-        { status: dataResult.status as 400 | 404 },
-      );
+      return c.json({ error: dataResult.error }, { status: dataResult.status as 400 | 404 });
     }
 
     const {
@@ -280,6 +337,12 @@ secured.access(sessionAuth).post(
       ui: createInitialUIState(),
     };
 
+    const mirror = createRunStateMirror({
+      projectId,
+      experimentId: request.experimentId,
+      experimentSlug: request.experimentSlug ?? "",
+    });
+
     return streamSSE(c, async (stream) => {
       try {
         const isFullRun = request.scope.type === "full";
@@ -300,9 +363,22 @@ secured.access(sessionAuth).post(
           loadedWorkflows,
           concurrency: request.concurrency,
           seedTargetOutputs: request.seedTargetOutputs,
+          // The board as the page had it, minus what this run produces. The
+          // page sends it rather than the server reading the saved state,
+          // because the page can be ahead of its own autosave and the run has
+          // to hold what the person is looking at.
+          carriedOverCells: request.carriedOverCells,
         });
 
         for await (const event of orchestrator) {
+          // The store first, the customer second. The `execution_started`
+          // frame names the run, and the page hands that id to a poller as
+          // soon as it reads it, so a frame released before the store knows
+          // the run makes the first poll read 404 on a healthy run. Ordering
+          // it this way keeps the store a superset of what the page has seen.
+          // The mirror swallows its own failures, so a store outage still
+          // cannot stop the run.
+          await mirror.record(event);
           await stream.writeSSE({
             data: JSON.stringify(event),
           });
@@ -338,8 +414,20 @@ secured.access(sessionAuth).post(
         //
         // No `rowIndex`: the orchestrator itself threw, so the whole run is
         // gone and the mapper says so, rather than blaming one row.
+        const failure = mapThrownErrorEvent({ error });
+        if (failure.type === "error") {
+          // The code, never the thrown message: a poller reads this straight
+          // out of the run API. Written before the frame, for the same reason
+          // the loop above records first: a poller must never read the run as
+          // still going after the page has been told it died.
+          await mirror.fail({
+            code: failure.message,
+            domainError: failure.domainError,
+            traceId: failure.traceId,
+          });
+        }
         await stream.writeSSE({
-          data: JSON.stringify(mapThrownErrorEvent({ error })),
+          data: JSON.stringify(failure),
         });
       }
     });
@@ -369,17 +457,10 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
-    return c.json(
-      { error: "You must be logged in to access this endpoint." },
-      { status: 401 },
-    );
+    return c.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
   }
 
-  const hasPermission = await probeProjectPermission(
-    { session },
-    projectId,
-    "evaluations:manage",
-  );
+  const hasPermission = await probeProjectPermission({ session }, projectId, "evaluations:manage");
   if (!hasPermission) {
     return c.json(
       { error: "You do not have permission to access this endpoint." },
@@ -393,11 +474,9 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   // project before signaling an abort. Without this, a user could abort another
   // tenant's experiment run by guessing its runId.
   //
-  // In-flight runs register their owner via abortManager.setRunning, which
-  // covers the interactive workbench SSE path — that path streams results
-  // directly and never creates a polling run-state record, so consulting only
-  // runStateManager would 404 every workbench abort. runStateManager remains
-  // the fallback for the CI/CD polling path.
+  // In-flight runs register their owner via abortManager.setRunning, which is
+  // set before the first frame of either path. runStateManager is the fallback:
+  // it also holds the owner, for as long as the run state lives.
   const ownerProjectId =
     (await abortManager.getRunningProjectId(runId)) ??
     (await runStateManager.getRunState(runId))?.projectId;
@@ -487,8 +566,7 @@ secured.access(apiKeyAuthRun).post(
           "text/event-stream": {
             schema: {
               type: "string",
-              description:
-                "Progress events, ending with a done event carrying the summary",
+              description: "Progress events, ending with a done event carrying the summary",
             },
           },
         },
@@ -526,9 +604,7 @@ secured.access(apiKeyAuthRun).post(
       throw new ExperimentNotFoundError(slug);
     }
 
-    const parseResult = persistedEvaluationsV3StateSchema.safeParse(
-      experiment.workbenchState,
-    );
+    const parseResult = persistedEvaluationsV3StateSchema.safeParse(experiment.workbenchState);
     if (!parseResult.success) {
       logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
       // The stored workbench state no longer matches its schema. The customer
@@ -565,40 +641,41 @@ secured.access(apiKeyAuthRun).post(
     }
     const runInputs = inputsParse.data;
 
-    const dataResult = await loadExecutionData(
-      project.id,
-      dataset,
-      workbenchState.targets,
-      workbenchState.evaluators,
-      {
+    const prepared = await prepareSavedStateExecution({
+      experiments: c.app.experiments,
+      evaluators: c.app.evaluators,
+      projectId: project.id,
+      slug,
+      runInputs: {
         data: runInputs.data,
         datasetId: runInputs.dataset_id,
         parameters: runInputs.parameters,
       },
-      { evaluators: c.app.evaluators },
-    );
+    });
 
-    if ("error" in dataResult) {
-      return c.json(
-        { error: dataResult.error },
-        { status: dataResult.status as 400 | 404 },
-      );
+    if ("error" in prepared) {
+      return c.json({ error: prepared.error }, { status: prepared.status as 400 | 404 });
     }
 
     const {
+      experiment,
+      state,
       datasetRows,
       datasetColumns,
       loadedPrompts,
       loadedAgents,
       loadedEvaluators,
       loadedWorkflows,
-    } = dataResult;
-
-    const state = buildState(workbenchState);
+    } = prepared;
 
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
+
+    // The board the run carries in. Its board is the saved workbench state,
+    // which is the only board there is when no tab is open. A full run carries
+    // nothing, because it covers every cell itself.
+    const carriedOverCells = planSavedRunCarryOver({ prepared, scope });
 
     const acceptHeader = c.req.header("Accept") ?? "";
     const isSSE = acceptHeader.includes("text/event-stream");
@@ -627,6 +704,7 @@ secured.access(apiKeyAuthRun).post(
             workflows: c.app.workflows,
             loadedEvaluators,
             loadedWorkflows,
+            ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
           });
 
           for await (const event of orchestrator) {
@@ -676,6 +754,18 @@ secured.access(apiKeyAuthRun).post(
       workflows: c.app.workflows,
       loadedEvaluators,
       loadedWorkflows,
+      ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
+      // A run of the saved dataset fills the cells the workbench shows. The
+      // app-layer service is the one that tells the tenant the experiment
+      // moved, which is what makes an open page pick the cells up.
+      ...(runsSavedDataset(runInputs)
+        ? {
+            persistResults: {
+              experiments: getApp().experiments,
+              actor: workbenchActorFrom({ resolved }),
+            },
+          }
+        : {}),
     });
 
     return c.json({ runId, status: "running", total, runUrl });
@@ -926,8 +1016,7 @@ secured.access(apiKeyAuthRead).get(
         name: "experimentSlug",
         required: false,
         schema: { type: "string" },
-        description:
-          "Owning experiment. Required once the run has aged out of the status cache.",
+        description: "Owning experiment. Required once the run has aged out of the status cache.",
       },
     ],
     responses: {
@@ -1026,6 +1115,298 @@ secured.access(apiKeyAuthRead).get(
       logger.error({ error, runId }, "Failed to fetch run results");
       throw error;
     }
+  },
+);
+
+// ── GET /:slug/workbench-state ───────────────────────────────────────
+
+secured.access(apiKeyAuthExperimentsView).get(
+  "/:slug/workbench-state",
+  describeRoute({
+    summary: "Read an experiment's setup",
+    description:
+      "The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask for `fields=version` to check for changes without transferring the setup.",
+    tags: ["Experiments"],
+    parameters: [
+      {
+        in: "query",
+        name: "fields",
+        required: false,
+        schema: { type: "string", enum: ["version"] },
+        description: "Set to `version` to answer with the version and timestamp only",
+      },
+    ],
+    responses: {
+      ...experimentErrorResponses,
+      ...workbenchTypeErrorResponse,
+      200: {
+        description: "The experiment's setup, or its version alone",
+        content: {
+          "application/json": {
+            schema: resolver(workbenchStateResponseSchema.or(workbenchVersionProbeResponseSchema)),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { slug } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:view");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, markUsed } = authResult;
+
+    const workbench = await ExperimentService.create({
+      prisma,
+    }).getWorkbenchState({
+      projectId: project.id,
+      slug,
+    });
+
+    markUsed();
+
+    const identity = {
+      id: workbench.experimentId,
+      slug: workbench.slug,
+      version: workbench.version,
+      updatedAt: workbench.updatedAt.toISOString(),
+    };
+
+    // The probe exists so a poller can ask "did this change?" without pulling
+    // a setup it already holds. It reads the same row; what it saves is the
+    // payload, which is the part that grows with the experiment.
+    if (c.req.query("fields") === "version") {
+      return c.json(identity);
+    }
+
+    return c.json({
+      ...identity,
+      name: workbench.name,
+      state: workbench.state,
+    });
+  },
+);
+
+// ── PUT /:slug/workbench-state ───────────────────────────────────────
+
+secured.access(apiKeyAuthExperimentsUpdate).put(
+  "/:slug/workbench-state",
+  describeRoute({
+    summary: "Save an experiment's setup",
+    description:
+      "Replace the experiment's setup. Send `expectedVersion` with the version you read and the save is refused with a 409 when someone else wrote first, instead of overwriting their work.",
+    tags: ["Experiments"],
+    responses: {
+      ...experimentErrorResponses,
+      ...workbenchWriteErrorResponses,
+      200: {
+        description: "Setup saved",
+        content: {
+          "application/json": {
+            schema: resolver(saveWorkbenchStateResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", saveWorkbenchStateBodySchema),
+  async (c) => {
+    const { slug } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:update");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, resolved, markUsed } = authResult;
+
+    const body = c.req.valid("json");
+
+    const saved = await getApp().experiments.saveWorkbenchState({
+      projectId: project.id,
+      slug,
+      state: body.state,
+      ...(body.expectedVersion !== undefined ? { expectedVersion: body.expectedVersion } : {}),
+      ...(body.commitMessage ? { commitMessage: body.commitMessage } : {}),
+      actor: workbenchActorFrom({ resolved }),
+    });
+
+    markUsed();
+    return c.json({ version: saved.version });
+  },
+);
+
+// ── GET /:slug/versions ──────────────────────────────────────────────
+
+secured.access(apiKeyAuthExperimentsView).get(
+  "/:slug/versions",
+  describeRoute({
+    summary: "List an experiment's versions",
+    description:
+      "Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.",
+    tags: ["Experiments"],
+    parameters: [
+      {
+        in: "query",
+        name: "limit",
+        required: false,
+        schema: { type: "integer", default: 50, minimum: 1, maximum: 100 },
+        description: "Versions per page, capped at 100",
+      },
+      {
+        in: "query",
+        name: "cursor",
+        required: false,
+        schema: { type: "integer", minimum: 1 },
+        description: "The `nextCursor` of the previous page",
+      },
+    ],
+    responses: {
+      ...experimentErrorResponses,
+      ...workbenchTypeErrorResponse,
+      200: {
+        description: "Versions of the experiment",
+        content: {
+          "application/json": {
+            schema: resolver(listWorkbenchVersionsResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { slug } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:view");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, markUsed } = authResult;
+
+    const experiments = ExperimentService.create({ prisma });
+    // The service lists by id; the REST surface addresses experiments by slug
+    // everywhere else, so the read that resolves one to the other also answers
+    // the 404 for a slug this project does not have.
+    const workbench = await experiments.getWorkbenchState({
+      projectId: project.id,
+      slug,
+    });
+
+    const { versions, nextCursor } = await experiments.listWorkbenchVersions({
+      projectId: project.id,
+      id: workbench.experimentId,
+      ...(() => {
+        const limit = parseOptionalPositiveInt(c.req.query("limit"));
+        return limit !== undefined ? { limit } : {};
+      })(),
+      ...(() => {
+        const cursor = parseOptionalPositiveInt(c.req.query("cursor"));
+        return cursor !== undefined ? { cursor } : {};
+      })(),
+    });
+
+    markUsed();
+
+    return c.json({
+      versions: versions.map((version) => ({
+        version: version.version,
+        counterVersion: version.counterVersion,
+        autoSaved: version.autoSaved,
+        commitMessage: version.commitMessage,
+        authorLabel: version.authorLabel,
+        authorId: version.authorId,
+        createdAt: version.createdAt.toISOString(),
+        updatedAt: version.updatedAt.toISOString(),
+      })),
+      nextCursor,
+    });
+  },
+);
+
+// ── POST /:slug/versions/:version/restore ────────────────────────────
+
+secured.access(apiKeyAuthExperimentsUpdate).post(
+  "/:slug/versions/:version/restore",
+  describeRoute({
+    summary: "Restore an experiment version",
+    description:
+      "Bring an old setup back by writing it forward as a new save. History is never rewritten: the version you restored from stays in the list, and the restore is one more entry after it.",
+    tags: ["Experiments"],
+    parameters: [
+      {
+        in: "path",
+        name: "version",
+        required: true,
+        schema: { type: "integer", minimum: 1 },
+        description: "The version to restore, as listed by `GET /api/experiments/{slug}/versions`",
+      },
+    ],
+    responses: {
+      ...experimentErrorResponses,
+      ...workbenchWriteErrorResponses,
+      200: {
+        description: "Version restored",
+        content: {
+          "application/json": {
+            schema: resolver(restoreWorkbenchVersionResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { slug, version } = c.req.param();
+
+    const authResult = await authenticateRequest(c, "experiments:update");
+    if ("error" in authResult) {
+      return c.json(authResult.body ?? { error: authResult.error }, {
+        status: authResult.status,
+      });
+    }
+    const { project, resolved, markUsed } = authResult;
+
+    const experiments = getApp().experiments;
+    const workbench = await experiments.getWorkbenchState({
+      projectId: project.id,
+      slug,
+    });
+
+    // A path segment that is not a version number names a version this
+    // experiment never had, which is the same answer as a number it never
+    // had. One code, so a caller branches once.
+    //
+    // The reported version is 0, a number no experiment version ever has.
+    // `Number("abc")` is `NaN`, which JSON writes as `null`, so a caller that
+    // reads `version` as a number could not parse its own 404.
+    const parsedVersion = parseOptionalPositiveInt(version);
+    if (parsedVersion === undefined) {
+      throw new ExperimentVersionNotFoundError({
+        experimentId: workbench.experimentId,
+        version: 0,
+      });
+    }
+
+    const restored = await experiments.restoreWorkbenchVersion({
+      projectId: project.id,
+      id: workbench.experimentId,
+      version: parsedVersion,
+      actor: workbenchActorFrom({ resolved }),
+    });
+
+    logger.info(
+      { projectId: project.id, slug, version: parsedVersion },
+      "Experiment version restored over REST",
+    );
+    markUsed();
+
+    return c.json({ version: restored.version });
   },
 );
 

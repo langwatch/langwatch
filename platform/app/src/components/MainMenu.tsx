@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import type { Project } from "~/generated/prisma/client";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -125,6 +126,7 @@ function useCodingAgentLinks(): CodingAgentLinks {
   const { enabled: codingAgentPagesEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     {
+      projectId: project?.id,
       organizationId: organization?.id,
       enabled: !!organization?.id,
     },
@@ -212,12 +214,70 @@ function ObserveSection({
   );
 }
 
+function SimulationsMenuGroup({
+  project,
+  pathname,
+  showExpanded,
+}: {
+  project: Project | undefined;
+  pathname: string;
+  showExpanded: boolean;
+}) {
+  return (
+    <CollapsibleMenuGroup
+      icon={featureIcons.simulations.icon}
+      label={projectRoutes.simulations.title}
+      project={project}
+      showLabel={showExpanded}
+      children={[
+        {
+          icon: featureIcons.scenarios.icon,
+          label: projectRoutes.scenarios.title,
+          ...projectScopedDestination({
+            path: projectRoutes.scenarios.path,
+            label: projectRoutes.scenarios.title,
+            project,
+          }),
+          isActive: pathname.includes("/simulations/scenarios"),
+        },
+        {
+          icon: featureIcons.simulation_runs.icon,
+          label: projectRoutes.simulation_runs.title,
+          ...projectScopedDestination({
+            path: projectRoutes.simulation_runs.path,
+            label: projectRoutes.simulation_runs.title,
+            project,
+          }),
+          isActive:
+            pathname.includes("/simulations") &&
+            !pathname.includes("/simulations/scenarios"),
+        },
+      ]}
+    />
+  );
+}
+
 function TestSection({
   showExpanded,
   project,
   pathname,
   pendingAnnotationCount,
 }: ProjectSectionProps & { pendingAnnotationCount: number | undefined }) {
+  // One destination replaces the Simulations group, and the two cannot both
+  // be offered: they address the same runs through different routes, so a menu
+  // holding both would give a person two links to the same work.
+  const { organization } = useOrganizationTeamProject();
+  const { enabled: agentTestingEnabled } = useFeatureFlag(
+    "release_ui_agent_testing_v2_enabled",
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      // Both ids come from the same workspace query, and a rule may name
+      // either one, so the read waits until both are known.
+      enabled: !!project?.id && !!organization?.id,
+    },
+  );
+
   return (
     <SidebarSection
       id="test"
@@ -225,36 +285,22 @@ function TestSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      <CollapsibleMenuGroup
-        icon={featureIcons.simulations.icon}
-        label={projectRoutes.simulations.title}
-        project={project}
-        showLabel={showExpanded}
-        children={[
-          {
-            icon: featureIcons.scenarios.icon,
-            label: projectRoutes.scenarios.title,
-            ...projectScopedDestination({
-              path: projectRoutes.scenarios.path,
-              label: projectRoutes.scenarios.title,
-              project,
-            }),
-            isActive: pathname.includes("/simulations/scenarios"),
-          },
-          {
-            icon: featureIcons.simulation_runs.icon,
-            label: projectRoutes.simulation_runs.title,
-            ...projectScopedDestination({
-              path: projectRoutes.simulation_runs.path,
-              label: projectRoutes.simulation_runs.title,
-              project,
-            }),
-            isActive:
-              pathname.includes("/simulations") &&
-              !pathname.includes("/simulations/scenarios"),
-          },
-        ]}
-      />
+      {agentTestingEnabled ? (
+        <PageMenuLink
+          path={projectRoutes.agent_testing.path}
+          icon={featureIcons.agent_testing.icon}
+          label={projectRoutes.agent_testing.title}
+          project={project}
+          isActive={pathname.includes("/agent-testing")}
+          showLabel={showExpanded}
+        />
+      ) : (
+        <SimulationsMenuGroup
+          project={project}
+          pathname={pathname}
+          showExpanded={showExpanded}
+        />
+      )}
 
       <PageMenuLink
         path={projectRoutes.experiments.path}

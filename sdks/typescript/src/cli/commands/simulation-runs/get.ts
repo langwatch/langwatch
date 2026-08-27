@@ -71,13 +71,10 @@ export const getSimulationRunCommand = async (
   const spinner = createSpinner(`Fetching simulation run "${runId}"...`).start();
 
   try {
-    const response = await fetch(
-      `${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`,
-      {
-        method: "GET",
-        headers: buildAuthHeaders({ apiKey }),
-      },
-    );
+    const response = await fetch(`${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`, {
+      method: "GET",
+      headers: buildAuthHeaders({ apiKey }),
+    });
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -104,6 +101,8 @@ export const getSimulationRunCommand = async (
       updatedAt: number;
       durationInMs: number;
       totalCost?: number;
+      note?: string | null;
+      scenarioVersion?: number | null;
     };
 
     spinner.succeed(`Found simulation run "${run.name ?? run.scenarioRunId}"`);
@@ -122,9 +121,7 @@ export const getSimulationRunCommand = async (
 
         console.log();
         console.log(chalk.bold("  Simulation Run Details:"));
-        console.log(
-          `    ${chalk.gray("Run ID:")}      ${chalk.green(run.scenarioRunId)}`,
-        );
+        console.log(`    ${chalk.gray("Run ID:")}      ${chalk.green(run.scenarioRunId)}`);
         console.log(`    ${chalk.gray("Scenario ID:")} ${run.scenarioId}`);
         console.log(`    ${chalk.gray("Batch ID:")}    ${run.batchRunId}`);
         console.log(`    ${chalk.gray("Name:")}        ${run.name ?? chalk.gray("—")}`);
@@ -138,16 +135,22 @@ export const getSimulationRunCommand = async (
         console.log(
           `    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`,
         );
+        // Both lines are left out when the run carries nothing: a run stored
+        // before versions were recorded has no version to name, and a batch
+        // started without a note has no note.
+        if (run.scenarioVersion) {
+          console.log(`    ${chalk.gray("Version:")}     v${run.scenarioVersion}`);
+        }
+        if (run.note) {
+          console.log(`    ${chalk.gray("Note:")}        ${run.note}`);
+        }
 
         if (run.results) {
           console.log();
           console.log(chalk.bold("  Results:"));
           if (run.results.verdict) {
-            const verdictColor =
-              run.results.verdict === "passed" ? chalk.green : chalk.red;
-            console.log(
-              `    ${chalk.gray("Verdict:")}    ${verdictColor(run.results.verdict)}`,
-            );
+            const verdictColor = run.results.verdict === "passed" ? chalk.green : chalk.red;
+            console.log(`    ${chalk.gray("Verdict:")}    ${verdictColor(run.results.verdict)}`);
           }
           if (run.results.reasoning) {
             console.log(`    ${chalk.gray("Reasoning:")}  ${run.results.reasoning}`);
@@ -163,9 +166,7 @@ export const getSimulationRunCommand = async (
             );
           }
           if (run.results.error) {
-            console.log(
-              `    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`,
-            );
+            console.log(`    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`);
           }
         }
 

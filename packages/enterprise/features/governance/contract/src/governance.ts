@@ -8,6 +8,8 @@ export const GOVERNANCE_SOURCE_TYPES = [
   "claude_cowork",
   "workato",
   "copilot_studio",
+  "copilot_studio_dataverse",
+  "openai_admin",
   "openai_compliance",
   "claude_compliance",
   "anthropic_admin",

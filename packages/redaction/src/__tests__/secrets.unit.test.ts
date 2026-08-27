@@ -7,6 +7,7 @@ import {
   isSensitiveAttributeKey,
   overBroadSecretPatternProbe,
   redactSecretsInText,
+  SHAPE_ONLY_SECRET_RULE_IDS,
 } from "../secrets.js";
 
 const redact = (text: string, customPatterns?: readonly RegExp[]) =>
@@ -889,6 +890,51 @@ describe("redactSecretsInText, given a whitespace separator", () => {
       expect(redact(terraform).text).toBe(terraform);
     });
   });
+
+  describe("given a skip list", () => {
+    const RUN_ID = "unlisted_0005FFcHZ7IBvPE1OSWymml0ikKqB";
+
+    it("leaves the named rules out of the scan", () => {
+      expect(redact(RUN_ID).text).toBe("[SECRET]");
+      expect(
+        redactSecretsInText({
+          text: RUN_ID,
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }).text,
+      ).toBe(RUN_ID);
+    });
+
+    it("keeps every other rule running", () => {
+      const key = `sk-ant-api03-${BODY}`;
+      expect(
+        redactSecretsInText({
+          text: key,
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }).text,
+      ).toBe("[SECRET]");
+    });
+
+    // A custom pattern is the customer's own decision about their own data, so
+    // a skip list the platform passes must not reach it.
+    it("keeps the custom patterns running", () => {
+      expect(
+        redactSecretsInText({
+          text: RUN_ID,
+          customPatterns: compileSecretPatterns(["unlisted_[A-Za-z0-9]+"]),
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }).text,
+      ).toBe("[SECRET]");
+    });
+
+    it("scans a payload over the budget with the same skip list", () => {
+      const filler = "x".repeat(SCAN_BUDGET);
+      const { text } = redactSecretsInText({
+        text: `${filler} ${RUN_ID}`,
+        skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+      });
+      expect(text).toContain(RUN_ID);
+    });
+  });
 });
 
 describe("compileSecretPatterns", () => {
@@ -935,6 +981,17 @@ describe("BUILTIN_SECRET_RULES", () => {
     expect(ids).toContain("vendor_api_key");
     expect(ids).toContain("shaped_api_key");
     expect(ids).toContain("sensitive_assignment");
+  });
+});
+
+describe("SHAPE_ONLY_SECRET_RULE_IDS", () => {
+  // A skip list is silent when it misses: a renamed rule leaves the caller
+  // asking for a rule that no longer exists, the scan runs every rule, and
+  // nothing says so until an id is eaten in production again.
+  it("names rules that exist", () => {
+    const ids = new Set(BUILTIN_SECRET_RULES.map((rule) => rule.id));
+    const unknown = SHAPE_ONLY_SECRET_RULE_IDS.filter((id) => !ids.has(id));
+    expect(unknown).toEqual([]);
   });
 });
 
@@ -999,6 +1056,21 @@ describe("detectSecretsInText", () => {
   describe("given ordinary text", () => {
     it("returns no matches", () => {
       expect(detectSecretsInText({ text: "the user said thanks" })).toEqual([]);
+    });
+  });
+
+  describe("given a skip list", () => {
+    // The evaluator reports what redaction scrubs, so the two read the same
+    // skip list or they disagree about the same string.
+    it("leaves the named rules out of the report", () => {
+      const runId = "unlisted_0005FFcHZ7IBvPE1OSWymml0ikKqB";
+      expect(detectSecretsInText({ text: runId })).toHaveLength(1);
+      expect(
+        detectSecretsInText({
+          text: runId,
+          skipRuleIds: SHAPE_ONLY_SECRET_RULE_IDS,
+        }),
+      ).toEqual([]);
     });
   });
 

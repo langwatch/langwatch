@@ -24,10 +24,8 @@ import { appSettingsTargetFor, installAppEnv } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
-import {
-  installSessionContextHooks,
-  removeSessionContextHooks,
-} from "./session-context-hooks";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
   assertCodexTurnHarvest,
   buildScopedToolFunction,
@@ -112,11 +110,10 @@ export function installTelemetryWiring({
       );
       labels.push(displayCodexConfigPath());
     } catch (err) {
-      warnings.push(
-        `could not write ${displayCodexConfigPath()}: ${(err as Error).message}`,
-      );
+      warnings.push(`could not write ${displayCodexConfigPath()}: ${(err as Error).message}`);
     }
     assertCodexTurnHarvest();
+    assertCodexAgentGuidance();
     return { labels, warnings, requiredFailures };
   }
 
@@ -130,11 +127,7 @@ export function installTelemetryWiring({
     return { labels, warnings, requiredFailures };
   }
   try {
-    persistBlockToRc(
-      shell,
-      buildScopedToolFunction(tool, vars, shell),
-      toolMarkers(tool),
-    );
+    persistBlockToRc(shell, buildScopedToolFunction(tool, vars, shell), toolMarkers(tool));
     labels.push(tildify(rcPath(shell)));
   } catch (err) {
     warnings.push(`could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`);

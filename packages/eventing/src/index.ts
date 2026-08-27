@@ -27,6 +27,7 @@ export type { CommandSchema } from "./commands/commandSchema";
 export { defineCommandSchema } from "./commands/commandSchema";
 export type { DefinedCommandClass } from "./commands/defineCommand";
 export { defineCommand } from "./commands/defineCommand";
+export { eventIdempotencyKey } from "./commands/idempotency-key";
 // Domain types
 export { AggregateTypeSchema, type AggregateType } from "./domain/aggregateType";
 export {
@@ -42,11 +43,7 @@ export type { TenantId } from "./domain/tenantId";
 export { createTenantId, TenantIdSchema } from "./domain/tenantId";
 export type { Event, Projection } from "./domain/types";
 export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain/types";
-export type {
-  ExecutionTarget,
-  RetentionPolicy,
-  RetentionPolicyResolver,
-} from "./runtime.types";
+export type { ExecutionTarget, RetentionPolicy, RetentionPolicyResolver } from "./runtime.types";
 export type { EventSourcingOptions } from "./eventSourcing";
 // Runtime
 export { EventSourcing } from "./eventSourcing";

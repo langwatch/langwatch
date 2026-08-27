@@ -12,6 +12,7 @@ import type React from "react";
 import { useMemo } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { Link } from "~/components/ui/link";
+import { LEGAL_LINKS } from "~/utils/legalLinks";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
 import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
@@ -69,12 +70,24 @@ const OrganizationScreen: React.FC = () => {
           <Checkbox.Label fontWeight="normal" fontSize="13px" color="fg.muted">
             {"I agree to the LangWatch "}
             <Link
-              href="https://langwatch.ai/legal/terms-conditions"
+              href={LEGAL_LINKS.terms.href}
               isExternal
               fontWeight="medium"
               variant="underline"
             >
-              {"Terms of Service"}
+              {LEGAL_LINKS.terms.label}
+              <Icon size="xs">
+                <ExternalLink />
+              </Icon>
+            </Link>
+            {" and "}
+            <Link
+              href={LEGAL_LINKS.privacy.href}
+              isExternal
+              fontWeight="medium"
+              variant="underline"
+            >
+              {LEGAL_LINKS.privacy.label}
               <Icon size="xs">
                 <ExternalLink />
               </Icon>

@@ -43,7 +43,9 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
       makeReader({
         tryFindApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
         findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
-        tryFindOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
+        tryFindOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(projectBinding("VIEWER")),
       });
 
@@ -130,7 +132,9 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
   describe("given a user principal", () => {
     it("never looks for an owner", async () => {
       const reader = makeReader({
-        tryFindOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
+        tryFindOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
       });
 

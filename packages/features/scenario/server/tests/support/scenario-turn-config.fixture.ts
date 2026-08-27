@@ -46,7 +46,10 @@ export function createMockDepsForTurnConfig(overrides: {
       getLatestDsl: vi.fn().mockResolvedValue(null),
     },
     projectFetcher: {
-      findUnique: vi.fn().mockResolvedValue({ apiKey: "test-api-key" }),
+      findUnique: vi.fn().mockResolvedValue({
+        apiKey: "test-api-key",
+        team: { organizationId: "organization_1" },
+      }),
     },
     modelParamsProvider: {
       prepare: vi.fn().mockResolvedValue({ success: true, params: defaultModelParams }),

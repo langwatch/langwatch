@@ -16,17 +16,9 @@ import {
 } from "@/cli/commands/ingestion/git-context";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { GovernanceCliError } from "./cli-api";
-import {
-  type CodexRolloutMeta,
-  type CodexTurnIO,
-  parseCodexRollout,
-} from "./codex-rollout";
-import {
-  defaultStateDir,
-  readFingerprint,
-  stateFilePath,
-  writeFingerprint,
-} from "./hook-state";
+import { type CodexRolloutMeta, type CodexTurnIO, parseCodexRollout } from "./codex-rollout";
+import { defaultStateDir, readFingerprint, stateFilePath, writeFingerprint } from "./hook-state";
+import { drainSessionContextSpool } from "./session-context-spool";
 import { codexSessionIndexPath, readCodexThreadNames } from "./codex-session-index";
 import {
   buildSessionContextLogPayload,
@@ -39,10 +31,7 @@ import {
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
 function ioSpanId(traceId: string): string {
-  return createHash("sha256")
-    .update(`${traceId}:langwatch.io`)
-    .digest("hex")
-    .slice(0, 16);
+  return createHash("sha256").update(`${traceId}:langwatch.io`).digest("hex").slice(0, 16);
 }
 
 function attr(key: string, value: string) {
@@ -66,19 +55,13 @@ interface OtlpExportRequest {
  * it to `gen_ai.input.messages` + `gen_ai.system_instructions`, so the drawer
  * renders the same full conversation a claude trace does.
  */
-export function buildCodexIOExportRequest(
-  turns: CodexTurnIO[],
-  nowMs: number,
-): OtlpExportRequest {
+export function buildCodexIOExportRequest(turns: CodexTurnIO[], nowMs: number): OtlpExportRequest {
   const spans = turns.map((turn) => {
     const startMs = turn.startedAtMs ?? nowMs;
     const endMs = Math.max(startMs, nowMs);
     const attributes = [
       attr("langwatch.span.type", "llm"),
-      attr(
-        "langwatch.input",
-        JSON.stringify({ type: "chat_messages", value: turn.inputMessages }),
-      ),
+      attr("langwatch.input", JSON.stringify({ type: "chat_messages", value: turn.inputMessages })),
       attr("langwatch.output", turn.output),
     ];
     if (turn.model) {
@@ -210,6 +193,51 @@ export async function findRolloutForThread(
  * already final. Worth knowing before making the emitted content depend on
  * anything that keeps changing after the turn ends.
  */
+/**
+ * Send the declarations a sandboxed `langwatch ingest context` could not.
+ *
+ * The notify program codex runs is spawned from codex's own process, outside
+ * the sandbox it puts its shell in, so this is the seam that can reach the
+ * collector when the agent's own shell cannot. It runs after the session
+ * context posts above, so a declared checkout is the last one written and
+ * becomes the session's current branch.
+ */
+async function drainCodexSpool(args: {
+  nowMs: number;
+  logsEndpoint: string | null;
+  token: string;
+  stateDir?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<void> {
+  const { logsEndpoint, token } = args;
+  if (!logsEndpoint) return;
+  const doFetch = args.fetchImpl ?? fetch;
+  await drainSessionContextSpool({
+    stateDir: args.stateDir ?? defaultStateDir(),
+    now: () => args.nowMs,
+    post: async (payload) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5_000);
+      try {
+        const response = await doFetch(logsEndpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        return response.ok;
+      } catch {
+        return false;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  });
+}
+
 export async function harvestCodexThread(args: {
   threadId: string;
   nowMs: number;
@@ -242,6 +270,7 @@ export async function harvestCodexThread(args: {
     fetchImpl: args.fetchImpl,
     runGit: args.runGit,
   });
+  await drainCodexSpool(args);
   const recent = turns.slice(-RECENT_TURN_WINDOW);
   if (recent.length === 0) return 0;
   await postCodexTurns({
@@ -402,9 +431,7 @@ function codexSessionContext({
 }): SessionContext | null {
   const live = meta.cwd ? readSessionContext({ directory: meta.cwd, runGit }) : null;
   if (live) return live;
-  const repository = meta.gitRepositoryUrl
-    ? parseGitRemoteUrl(meta.gitRepositoryUrl)
-    : null;
+  const repository = meta.gitRepositoryUrl ? parseGitRemoteUrl(meta.gitRepositoryUrl) : null;
   if (!repository) return null;
   return {
     repository,
@@ -423,13 +450,10 @@ export async function postCodexSessionContext(args: {
   fetchImpl?: typeof fetch;
   runGit?: GitRunner;
 }): Promise<boolean> {
-  const { meta, nowMs, logsEndpoint, token, threadName, stateDir, fetchImpl, runGit } =
-    args;
+  const { meta, nowMs, logsEndpoint, token, threadName, stateDir, fetchImpl, runGit } = args;
   if (!logsEndpoint) return false;
   if (!meta?.sessionId) return false;
-  const title = meta.firstUserMessage
-    ? sessionTitleFromPrompt(meta.firstUserMessage)
-    : null;
+  const title = meta.firstUserMessage ? sessionTitleFromPrompt(meta.firstUserMessage) : null;
   const name = normalizeSessionName(threadName);
   const context = codexSessionContext({
     meta,
@@ -537,23 +561,20 @@ async function postCodexSessionContexts(args: {
   budget.unref?.();
   try {
     await Promise.all(
-      Array.from(
-        { length: Math.min(CONTEXT_POST_CONCURRENCY, metas.length) },
-        async () => {
-          while (!outOfBudget && next < metas.length) {
-            // Read and advance in one synchronous step, so two workers never
-            // take the same session.
-            const meta = metas[next++] ?? null;
-            // `postCodexSessionContext` reports failure rather than throwing,
-            // and this guard keeps that true for the caller if it ever stops.
-            await postCodexSessionContext({
-              meta,
-              threadName: meta?.sessionId ? threadNames?.get(meta.sessionId) : null,
-              ...post,
-            }).catch(() => false);
-          }
-        },
-      ),
+      Array.from({ length: Math.min(CONTEXT_POST_CONCURRENCY, metas.length) }, async () => {
+        while (!outOfBudget && next < metas.length) {
+          // Read and advance in one synchronous step, so two workers never
+          // take the same session.
+          const meta = metas[next++] ?? null;
+          // `postCodexSessionContext` reports failure rather than throwing,
+          // and this guard keeps that true for the caller if it ever stops.
+          await postCodexSessionContext({
+            meta,
+            threadName: meta?.sessionId ? threadNames?.get(meta.sessionId) : null,
+            ...post,
+          }).catch(() => false);
+        }
+      }),
     );
   } finally {
     clearTimeout(budget);
@@ -603,6 +624,7 @@ export async function harvestAndEmitCodexIO(args: {
     fetchImpl,
     runGit,
   });
+  await drainCodexSpool(args);
   if (turns.length === 0) return 0;
   await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
   return turns.length;

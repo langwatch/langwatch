@@ -1,14 +1,17 @@
 import {
   Alert,
+  Box,
   Button,
   Card,
   Container,
   Heading,
   HStack,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useEffect } from "react";
+import { AuthCard } from "~/components/auth/AuthCard";
 import { isSameOrigin, useSession } from "~/utils/auth-client";
 import { hardNavigate } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
@@ -73,7 +76,11 @@ export const isStableAuthError = (error: string | null | undefined): boolean =>
  */
 export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
 
-/** Friendly heading for known error codes; falls back to the raw code. */
+/**
+ * Friendly heading for known error codes. An unknown code gets generic copy,
+ * never itself: `?error=` is caller-controlled, and echoing it made this
+ * heading a place to put attacker-chosen words under LangWatch branding.
+ */
 const errorTitle = (error: string): string => {
   switch (error) {
     case "OAuthAccountNotLinked":
@@ -83,7 +90,7 @@ const errorTitle = (error: string): string => {
     case "SSO_PROVIDER_NOT_ALLOWED":
       return "Use your organization's sign-in";
     default:
-      return error;
+      return "Something went wrong signing you in";
   }
 };
 
@@ -128,6 +135,10 @@ export default function Error() {
     return <SignInError error={error} />;
   }
 
+  // Reached with no error code to render: the effect above is already taking
+  // them back to the front door. It is a wait rather than a failure, so it is
+  // a card that says so — this branch used to be an unstyled line of text in
+  // the corner of a blank page, sitting there for the full five seconds.
   return (
     <div style={{ padding: "12px" }}>
       Auth Error: Redirecting back to Sign in... Click <a href="/">here</a> if you are not

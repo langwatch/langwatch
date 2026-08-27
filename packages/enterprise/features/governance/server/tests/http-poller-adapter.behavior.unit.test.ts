@@ -19,10 +19,7 @@ import {
   HttpPollingPullerAdapter,
   type HttpPollingConfig,
 } from "../src/adapters/http-poller.adapter";
-import {
-  GovernanceHttpPort,
-  type GovernanceHttpResponse,
-} from "../src/ports/governance-http.port";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../src/ports/governance-http.port";
 
 const VALID_CONFIG = {
   adapter: "http_polling" as const,
@@ -99,9 +96,7 @@ describe("HttpPollingPullerAdapter", () => {
 
     it("rejects a non-URL `url` field at validate time, not runtime", () => {
       const adapter = makeAdapter();
-      expect(() =>
-        adapter.validateConfig({ ...VALID_CONFIG, url: "not-a-url" }),
-      ).toThrow();
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, url: "not-a-url" })).toThrow();
     });
 
     it("rejects missing required eventMapping fields", () => {
@@ -115,9 +110,7 @@ describe("HttpPollingPullerAdapter", () => {
 
     it("rejects an unknown adapter discriminator", () => {
       const adapter = makeAdapter();
-      expect(() =>
-        adapter.validateConfig({ ...VALID_CONFIG, adapter: "wrong" }),
-      ).toThrow();
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, adapter: "wrong" })).toThrow();
     });
 
     it("defaults method to GET when omitted", () => {

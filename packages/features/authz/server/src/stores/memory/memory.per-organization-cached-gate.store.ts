@@ -10,6 +10,7 @@ export const MAX_CACHE_ENTRIES = 5_000;
 export type PerOrganizationCachedGateStoreOptions = {
   name: string;
   ttlMs: number;
+  maxEntries?: number;
   now?: () => number;
 };
 
@@ -21,9 +22,7 @@ export class PerOrganizationCachedGateStore {
   private readonly cached = new Map<string, CacheEntry>();
   private readonly inFlight = new Map<string, InFlightEntry>();
 
-  static create(
-    options: PerOrganizationCachedGateStoreOptions,
-  ): PerOrganizationCachedGateStore {
+  static create(options: PerOrganizationCachedGateStoreOptions): PerOrganizationCachedGateStore {
     return new PerOrganizationCachedGateStore(options);
   }
 
@@ -93,7 +92,7 @@ export class PerOrganizationCachedGateStore {
       );
     }
     if (flight.isStale) return isOn;
-    if (this.cached.size >= MAX_CACHE_ENTRIES) this.evictUntilUnderCap();
+    if (this.cached.size >= this.maxEntries()) this.evictUntilUnderCap();
     this.cached.set(organizationId, {
       isOn,
       expiresAt: this.now() + this.options.ttlMs,
@@ -106,7 +105,7 @@ export class PerOrganizationCachedGateStore {
     for (const [key, entry] of this.cached) {
       if (entry.expiresAt <= now) this.cached.delete(key);
     }
-    while (this.cached.size >= MAX_CACHE_ENTRIES) {
+    while (this.cached.size >= this.maxEntries()) {
       const oldestKey: string | undefined = this.cached.keys().next().value;
       if (oldestKey === undefined) break;
       this.cached.delete(oldestKey);
@@ -115,5 +114,9 @@ export class PerOrganizationCachedGateStore {
 
   private now(): number {
     return this.options.now?.() ?? Date.now();
+  }
+
+  private maxEntries(): number {
+    return this.options.maxEntries ?? MAX_CACHE_ENTRIES;
   }
 }

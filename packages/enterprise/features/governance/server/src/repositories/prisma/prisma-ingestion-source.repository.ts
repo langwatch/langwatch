@@ -17,10 +17,13 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function toIngestionSource(row: IngestionSource): GovernanceIngestionSource {
+  const traceProjectId =
+    "traceProjectId" in row && typeof row.traceProjectId === "string" ? row.traceProjectId : null;
   return {
     id: row.id,
     organizationId: row.organizationId,
     teamId: row.teamId,
+    traceProjectId,
     sourceType: row.sourceType,
     name: row.name,
     description: row.description,
@@ -62,9 +65,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return row ? toIngestionSource(row) : null;
   }
 
-  async tryFindByCurrentSecretHash(
-    hash: string,
-  ): Promise<GovernanceIngestionSource | null> {
+  async tryFindByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null> {
     const row = await this.database.ingestionSource.findFirst({
       where: { ingestSecretHash: hash, archivedAt: null },
     });
@@ -100,10 +101,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return toIngestionSource(row);
   }
 
-  async update(
-    id: string,
-    input: UpdateIngestionSourceRecord,
-  ): Promise<GovernanceIngestionSource> {
+  async update(id: string, input: UpdateIngestionSourceRecord): Promise<GovernanceIngestionSource> {
     const { parserConfig, ...rest } = input;
     const data: Prisma.IngestionSourceUncheckedUpdateInput = rest;
     if (parserConfig !== undefined) {
@@ -114,5 +112,34 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
       data,
     });
     return toIngestionSource(row);
+  }
+
+  async tryUpdateIfCursorUnchanged(input: {
+    id: string;
+    cursor: unknown;
+    update: UpdateIngestionSourceRecord;
+  }): Promise<GovernanceIngestionSource | null> {
+    return this.database.$transaction(async (database) => {
+      const cursor =
+        input.cursor === null
+          ? { equals: Prisma.AnyNull }
+          : { equals: input.cursor as Prisma.InputJsonValue };
+      const matched = await database.ingestionSource.updateMany({
+        where: { id: input.id, pollerCursor: cursor },
+        data: { updatedAt: new Date() },
+      });
+      if (matched.count === 0) return null;
+
+      const { parserConfig, ...rest } = input.update;
+      const data: Prisma.IngestionSourceUncheckedUpdateInput = rest;
+      if (parserConfig !== undefined) {
+        data.parserConfig = parserConfig as Prisma.InputJsonValue;
+      }
+      const row = await database.ingestionSource.update({
+        where: { id: input.id },
+        data,
+      });
+      return toIngestionSource(row);
+    });
   }
 }

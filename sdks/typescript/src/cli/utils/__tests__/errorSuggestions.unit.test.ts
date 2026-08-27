@@ -37,6 +37,16 @@ describe("fallbackSuggestionsFor", () => {
     }
   });
 
+  /** @scenario The command line offers the same next steps */
+  it("points a missing default model at the Default Models settings page", () => {
+    const explanation = fallbackSuggestionsFor("model_not_configured");
+
+    expect(
+      explanation?.suggestions.some((s) => s.includes("Default Models")),
+    ).toBe(true);
+    expect(explanation?.docUrl).toContain("/platform/model-providers");
+  });
+
   it("answers undefined for a code it does not know — no invented advice", () => {
     expect(fallbackSuggestionsFor("langy_turn_in_progress")).toBeUndefined();
     expect(fallbackSuggestionsFor("")).toBeUndefined();

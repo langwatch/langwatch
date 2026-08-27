@@ -125,6 +125,10 @@ function startRun({
     // assertion would flake red. The pressure tests below force their own
     // levels the same way.
     CHECK_PRESSURE: "green",
+    // The suite itself often runs inside an agent shell, where a gate-off
+    // CHECK_SLOTS is ignored by design. Dropped so every test means what it
+    // says; the agent-shell tests below set it back on purpose.
+    CLAUDECODE: undefined,
     ...envOverrides,
   })) {
     if (value !== undefined) env[key] = value;
@@ -219,15 +223,22 @@ describe("check queue", () => {
     it("tells everything below it that the slot is already held", async () => {
       // The bin shims mean a queued `pnpm typecheck` spawns another gated
       // entry point. Without this, it queues behind the slot it is holding and
-      // waits out the entire maximum wait before starting.
+      // waits out the entire maximum wait before starting. The marker carries
+      // the wrapper's own pid, which is what an agent shell verifies.
       const run = startRun({
         tag: "nested",
-        argv: ["node", "-e", "process.stdout.write(process.env.CHECK_SLOTS)"],
+        argv: [
+          "node",
+          "-e",
+          'process.stdout.write([process.env.CHECK_SLOTS, process.env.CHECK_QUEUE_HELD, String(process.ppid)].join(" "))',
+        ],
         env: { CHECK_SLOTS: "3" },
       });
       const result = await run.done;
 
-      expect(result.stdout).toBe("0");
+      const [slots, held, wrapper] = result.stdout.split(" ");
+      expect(slots).toBe("0");
+      expect(held).toBe(wrapper);
     });
 
     /** @scenario "The wrapper is transparent to the command it runs" */
@@ -485,6 +496,105 @@ describe("check queue", () => {
       expect(maxOverlap(readEvents())).toBe(3);
       for (const result of results) expect(result.stderr).toBe("");
       expect(queueEntries()).toHaveLength(0);
+    });
+  });
+
+  describe("given an agent shell", () => {
+    /** @scenario "An agent shell cannot turn the queue off" */
+    it("ignores a gate-off, says so, and queues like everyone else", async () => {
+      const holder = startRun({ tag: "holder", holdMs: 700 });
+      await waitForHolder();
+      // Red narrows the derived limit to one, so the refusal is observable as
+      // real queueing rather than a message alone.
+      const agent = startRun({
+        tag: "agent",
+        env: {
+          CLAUDECODE: "1",
+          CHECK_SLOTS: "0",
+          CI: undefined,
+          CHECK_PRESSURE: "red",
+        },
+      });
+      const [, second] = await Promise.all([holder.done, agent.done]);
+
+      expect(second.stderr).toContain(
+        "CHECK_SLOTS=0 is ignored in an agent shell",
+      );
+      expect(second.stderr).toContain("Only a person may turn the queue off");
+      expect(second.stderr).toContain("1 check is already active");
+      expect(maxOverlap(readEvents())).toBe(1);
+    });
+
+    /** @scenario "A run the queue spawned itself stays unqueued in an agent shell" */
+    it("keeps the queue's own nested runs unqueued", async () => {
+      // A queued `pnpm typecheck` reaches a bin shim, which is another gated
+      // entry point running under the wrapper's CHECK_SLOTS=0 and marker. In
+      // an agent shell the marker is what carries the gate-off through.
+      const run = startRun({
+        tag: "outer",
+        argv: [
+          "node",
+          QUEUE_SCRIPT,
+          "node",
+          fakeCommand,
+          logFile,
+          "inner",
+          "0",
+        ],
+        // Bounds the failure mode: a regression here queues the inner run
+        // behind the outer's held slot, and "starting anyway" breaks the
+        // silence assertion instead of hanging the suite for the default wait.
+        env: { CLAUDECODE: "1", CHECK_QUEUE_MAX_WAIT_MS: "3000" },
+      });
+      const result = await run.done;
+
+      expect(result.code).toBe(0);
+      // Silent end to end: the outer run found a free slot, and the inner one
+      // was neither refused nor queued.
+      expect(result.stderr).toBe("");
+      expect(startOrder(readEvents())).toEqual(["inner"]);
+    });
+
+    /** @scenario "An agent's own shell is not a queue wrapper" */
+    it("rejects a held-marker naming an ancestor that is not a queue wrapper", async () => {
+      // The test runner is a real live ancestor of the run below, and it is
+      // not the queue. `CHECK_QUEUE_HELD=$$` from an agent shell has exactly
+      // this shape, and it is the cheapest bypass there is, so it must fail.
+      const explained = await startRun({
+        tag: "not-the-queue",
+        argv: ["--explain"],
+        env: {
+          CLAUDECODE: "1",
+          CHECK_SLOTS: "0",
+          CHECK_QUEUE_HELD: String(process.pid),
+          CI: undefined,
+        },
+      }).done;
+
+      expect(explained.stderr).toContain("ignored in an agent shell");
+      expect(explained.stderr).not.toContain("source=held");
+    });
+
+    /** @scenario "A borrowed held-marker does not turn the queue off" */
+    it("rejects a held-marker naming a live process that is not an ancestor", async () => {
+      const bystander = spawn("sleep", ["30"]);
+      try {
+        const explained = await startRun({
+          tag: "borrowed",
+          argv: ["--explain"],
+          env: {
+            CLAUDECODE: "1",
+            CHECK_SLOTS: "0",
+            CHECK_QUEUE_HELD: String(bystander.pid),
+            CI: undefined,
+          },
+        }).done;
+
+        expect(explained.stderr).toContain("ignored in an agent shell");
+        expect(explained.stderr).not.toContain("source=held");
+      } finally {
+        bystander.kill("SIGKILL");
+      }
     });
   });
 

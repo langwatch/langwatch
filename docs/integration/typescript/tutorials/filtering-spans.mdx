@@ -8,8 +8,6 @@ keywords: langwatch, typescript, javascript, filtering, spans, traces, observabi
 
 A trace filter decides which spans the LangWatch exporter sends. Use filters to keep AI and business spans while dropping framework chatter.
 
-<Info>Introduced in `langwatch@0.8.0`.</Info>
-
 ## Defaults
 
 By default we exclude HTTP request spans.
@@ -156,9 +154,7 @@ setupObservability({
   // integration to prevent double exporting
   langwatch: "disabled",
   spanProcessors: [
-    new BatchSpanProcessor(
-      new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] }),
-    ),
+    new BatchSpanProcessor(new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] })),
   ],
 });
 ```
@@ -177,6 +173,6 @@ import type { TraceFilter, Criteria, Match } from "langwatch";
 ```
 
 <Tip>
-  Use simple matchers (`equals`, `startsWith`) where possible; regex matches more patterns
-  but is slower and harder to read.
+  Use simple matchers (`equals`, `startsWith`) where possible; regex matches more patterns but is
+  slower and harder to read.
 </Tip>

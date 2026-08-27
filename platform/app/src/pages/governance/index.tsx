@@ -6,7 +6,6 @@ import {
   HStack,
   Input,
   SimpleGrid,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -229,7 +228,7 @@ function GovernanceOverviewPage() {
                 missingPermission={canReadCatalog ? undefined : "aiTools:manage"}
                 title="Add tools to the catalog"
                 description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
-                href="/governance/tool-catalog"
+                href="/governance/inventory?tab=catalog"
                 ctaLabel={
                   hasCatalogTiles
                     ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`
@@ -253,7 +252,7 @@ function GovernanceOverviewPage() {
                 missingPermission={canReadSources ? undefined : "ingestionSources:view"}
                 title="Connect an ingestion source"
                 description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
-                href="/governance/ingestion-sources"
+                href="/governance/inventory?tab=sources"
                 ctaLabel={
                   hasSources
                     ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
@@ -479,7 +478,10 @@ function GovernanceOverviewPage() {
                   </Text>
                   {/* An invitation to write, so only for whoever can. */}
                   {canManageSources && (
-                    <Link href="/governance/ingestion-sources" color="blue.600">
+                    <Link
+                      href="/governance/inventory?tab=sources"
+                      color="blue.600"
+                    >
                       + Add a source
                     </Link>
                   )}

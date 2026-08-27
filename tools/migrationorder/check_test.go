@@ -28,6 +28,37 @@ func TestCheck(t *testing.T) {
 		want []migrationorder.Finding
 	}{
 		{
+			name: "a Prisma migration in the old app root is rejected",
+			in: migrationorder.Input{
+				Set:       prisma,
+				BaseRef:   "origin/main",
+				Head:      []string{"20260827120001_mine"},
+				Misplaced: []string{"platform/app/prisma/migrations/20260827120000_old_root"},
+			},
+			want: []migrationorder.Finding{{
+				Set:     "Prisma",
+				Entry:   "platform/app/prisma/migrations/20260827120000_old_root",
+				Problem: "is outside the canonical migration root packages/prisma-client/prisma/migrations",
+				Fix: "git mv platform/app/prisma/migrations/20260827120000_old_root " +
+					"packages/prisma-client/prisma/migrations/20260827120000_old_root",
+			}},
+		},
+		{
+			name: "the old root cannot duplicate a canonical Prisma migration directory",
+			in: migrationorder.Input{
+				Set:       prisma,
+				BaseRef:   "origin/main",
+				Head:      []string{"20260827120000_same"},
+				Misplaced: []string{"platform/app/prisma/migrations/20260827120000_same"},
+			},
+			want: []migrationorder.Finding{{
+				Set:     "Prisma",
+				Entry:   "platform/app/prisma/migrations/20260827120000_same",
+				Problem: "duplicates 20260827120000_same under the canonical migration root",
+				Fix:     "git rm -r platform/app/prisma/migrations/20260827120000_same",
+			}},
+		},
+		{
 			name: "a migration numbered above everything on main is in order",
 			in: migrationorder.Input{
 				Set:       clickhouse,

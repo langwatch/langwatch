@@ -33,6 +33,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "jsonpath-plus": "^10.4.0",
     "zod": "^4.4.3"
   },

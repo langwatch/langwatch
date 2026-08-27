@@ -137,6 +137,28 @@ func TestRepoInputsRelocatedSet(t *testing.T) {
 	}
 }
 
+func TestRepoInputsFindsPrismaMigrationsInTheOldRoot(t *testing.T) {
+	root := initRepo(t)
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260827120000_old_root/migration.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+
+	inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+		return in.Set.Name == "Prisma"
+	})
+	if index < 0 {
+		t.Fatalf("no Prisma input in %+v", inputs)
+	}
+
+	want := []string{"platform/app/prisma/migrations/20260827120000_old_root"}
+	if !slices.Equal(inputs[index].Misplaced, want) {
+		t.Fatalf("Misplaced = %v, want %v", inputs[index].Misplaced, want)
+	}
+}
+
 func TestTopLevelEntries(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -160,7 +160,10 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         targetName: "gpt-5-mini",
       });
       expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
-      expect(outcome).toEqual({ nextCursor: null, eventCount: 2 });
+      expect(outcome).toEqual({
+        nextCursor: null,
+        eventCount: 2,
+      });
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
@@ -168,9 +171,9 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
   describe("source lookup fails: bail without adapter dispatch", () => {
     it("logs + returns when IngestionSource is missing", async () => {
       sourceFindUnique.mockResolvedValueOnce(null);
-      await expect(
-        runIngestionPull({ sourceId: "missing-src", cursor: null }),
-      ).rejects.toThrow("not found");
+      await expect(runIngestionPull({ sourceId: "missing-src", cursor: null })).rejects.toThrow(
+        "not found",
+      );
       expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
@@ -200,9 +203,29 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         parserConfig: { adapter: "definitely_not_registered" },
         pollerCursor: null,
       });
-      await expect(
-        runIngestionPull({ sourceId: "src-unknown", cursor: null }),
-      ).rejects.toThrow("Unknown ingestion pull adapter");
+      await expect(runIngestionPull({ sourceId: "src-unknown", cursor: null })).rejects.toThrow(
+        "Unknown ingestion pull adapter",
+      );
+      expect(sourceUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the adapter refuses the config", () => {
+    it("fails before dispatching, so no request is made against a half-read config", async () => {
+      const { url: _dropped, ...withoutUrl } = HTTP_POLLING_CONFIG;
+      sourceFindUnique.mockResolvedValueOnce({
+        id: "src-bad-config",
+        organizationId: "org-1",
+        sourceType: "http_polling",
+        status: "active",
+        parserConfig: withoutUrl,
+        pollerCursor: null,
+      });
+      await expect(runIngestionPull({ sourceId: "src-bad-config", cursor: null })).rejects.toThrow(
+        /url/i,
+      );
+      expect(fetchStub).not.toHaveBeenCalled();
+      expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });

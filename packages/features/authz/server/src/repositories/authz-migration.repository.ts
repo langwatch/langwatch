@@ -41,6 +41,7 @@ export type RoleHeadRow = {
   description: string | null;
   permissions: unknown;
   kind: string;
+  deleted: boolean;
 };
 
 export type ShareLinkFactRow = {
@@ -101,13 +102,9 @@ export type ResourceGrantUsageSeed = {
 
 /** Storage contract for the one ADR-110 AuthZ import. */
 export abstract class AuthzMigrationRepository {
-  abstract tryFindOrganizationCreatedAtMs(args: {
-    organizationId: string;
-  }): Promise<number | null>;
+  abstract tryFindOrganizationCreatedAtMs(args: { organizationId: string }): Promise<number | null>;
 
-  abstract findLegacyBindingRows(args: {
-    organizationId: string;
-  }): Promise<LegacyBindingRow[]>;
+  abstract findLegacyBindingRows(args: { organizationId: string }): Promise<LegacyBindingRow[]>;
 
   abstract findLegacyRoleRows(args: { organizationId: string }): Promise<LegacyRoleRow[]>;
 
@@ -117,13 +114,9 @@ export abstract class AuthzMigrationRepository {
 
   abstract findLegacyTeamRows(args: { organizationId: string }): Promise<LegacyTeamRow[]>;
 
-  abstract findShareLinkRows(args: {
-    organizationId: string;
-  }): Promise<ShareLinkFactRow[]>;
+  abstract findShareLinkRows(args: { organizationId: string }): Promise<ShareLinkFactRow[]>;
 
-  abstract findExternalMemberFacts(args: {
-    organizationId: string;
-  }): Promise<ExternalMemberFact[]>;
+  abstract findExternalMemberFacts(args: { organizationId: string }): Promise<ExternalMemberFact[]>;
 
   abstract findProjectCredentialFacts(args: {
     organizationId: string;
@@ -137,9 +130,7 @@ export abstract class AuthzMigrationRepository {
 
   abstract findRoleHeads(args: { organizationId: string }): Promise<RoleHeadRow[]>;
 
-  abstract findResourceGrantRows(args: {
-    organizationId: string;
-  }): Promise<ResourceGrantRow[]>;
+  abstract findResourceGrantRows(args: { organizationId: string }): Promise<ResourceGrantRow[]>;
 
   abstract seedResourceGrantUsage(args: {
     organizationId: string;

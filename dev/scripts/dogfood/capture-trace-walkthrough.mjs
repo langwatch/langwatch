@@ -166,7 +166,7 @@ async function login(page) {
     }
 
     if (wants("admin-tool-catalog-templates")) {
-      await page.goto(`${BASE}/settings/governance/tool-catalog`, {
+      await page.goto(`${BASE}/governance/inventory?tab=catalog`, {
         waitUntil: "domcontentloaded",
         timeout: 45_000,
       });
@@ -186,9 +186,9 @@ async function login(page) {
     if (wants("admin-governance")) {
       for (const [slug, file] of [
         ["settings/governance", "10-admin-governance-overview"],
-        ["settings/governance/ingestion-sources", "11-admin-ingestion-sources"],
-        ["settings/governance/tool-catalog", "12-admin-tool-catalog"],
-        ["settings/governance/departments", "13-admin-departments"],
+        ["governance/inventory?tab=sources", "11-admin-ingestion-sources"],
+        ["governance/inventory?tab=catalog", "12-admin-tool-catalog"],
+        ["governance/people", "13-admin-departments"],
         ["settings/governance/users", "14-admin-users"],
         ["settings/governance/teams", "15-admin-teams"],
         ["settings/governance/anomaly-rules", "16-admin-anomaly-rules"],

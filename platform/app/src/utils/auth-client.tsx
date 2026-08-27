@@ -1,5 +1,6 @@
 "use client";
 
+import { passkeyClient } from "@better-auth/passkey/client";
 import { createAuthClient } from "better-auth/react";
 import {
   type ReactElement,
@@ -17,7 +18,15 @@ import {
  * The adapter normalizes BetterAuth's `{ session, user }` response shape into
  * the flat Session type that the rest of the app expects.
  */
-const client = createAuthClient();
+/**
+ * The passkey plugin is declared unconditionally, and the METHOD SET decides
+ * whether anyone is offered one: the server registers its half only when
+ * `PASSKEYS_ENABLED` is on, and the sign-in router never names a passkey
+ * unless the same env says so. Gating the client half too would mean a second
+ * place for the two to disagree, and the failure would be a button that
+ * exists calling an endpoint that does not.
+ */
+const client = createAuthClient({ plugins: [passkeyClient()] });
 
 export const authClient = client;
 
@@ -185,7 +194,19 @@ export const signIn = async (
     redirect?: boolean;
   },
 ): Promise<
-  { error?: string; code?: string; status?: number; ok?: boolean } | undefined
+  | {
+      error?: string;
+      code?: string;
+      status?: number;
+      ok?: boolean;
+      /**
+       * Seconds to wait, when the refusal was a rate limit that said so. The
+       * header carries the real remaining window, and a screen that has it can
+       * say how long instead of guessing "a minute".
+       */
+      retryAfterSeconds?: number;
+    }
+  | undefined
 > => {
   // Same-origin guard on the post-login redirect target.
   const callbackURL = options?.callbackUrl
@@ -194,10 +215,24 @@ export const signIn = async (
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
+    // The rate limiter's remaining window rides a response header, which the
+    // result object does not carry. Read on the way past rather than inferred
+    // from the status, so a screen either knows the real wait or knows it does
+    // not know.
+    let retryAfterSeconds: number | undefined;
     const result = await client.signIn.email({
       email: options?.email ?? "",
       password: options?.password ?? "",
       callbackURL,
+      fetchOptions: {
+        onError: (context: { response?: { headers?: Headers } }) => {
+          const header = context.response?.headers?.get("X-Retry-After");
+          const seconds = header === null ? Number.NaN : Number(header);
+          if (Number.isFinite(seconds) && seconds > 0) {
+            retryAfterSeconds = seconds;
+          }
+        },
+      },
     });
     if (result.error) {
       // `code` is what the screens map to wording; `error` stays the message
@@ -206,6 +241,7 @@ export const signIn = async (
         error: result.error.message ?? "CredentialsSignin",
         code: result.error.code,
         status: result.error.status,
+        retryAfterSeconds,
         ok: false,
       };
     }
@@ -343,13 +379,16 @@ const SOCIAL_PROVIDERS = new Set(["google", "github", "gitlab", "microsoft", "az
 /**
  * Link an OAuth account to the currently signed-in user. This is distinct
  * from `signIn(provider)` — which creates/switches sessions. Linking routes
- * through BetterAuth's `/link-social` (for social providers) or
- * `/oauth2/link` (for generic-oauth providers, which is everything not in
- * `SOCIAL_PROVIDERS` below), both of
- * which enforce same-email matching via
- * `accountLinking.allowDifferentEmails !== true`, blocking the
- * "sign in while logged in and silently switch sessions" regression that a
- * naive `signIn(provider)` call exhibited.
+ * through BetterAuth's `/link-social`, which enforces same-email matching via
+ * `accountLinking.allowDifferentEmails !== true`, blocking the "sign in while
+ * logged in and silently switch sessions" regression that a naive
+ * `signIn(provider)` call exhibited.
+ *
+ * ONE endpoint, since better-auth 1.7. Generic-oauth providers used to link
+ * through the plugin's own `/oauth2/link` and everything else through
+ * `/link-social`; the plugin no longer mounts endpoints at all, because it
+ * registers each configured provider as a first-class social provider. So the
+ * fork is gone and an Okta account links exactly the way a GitHub one does.
  *
  * The caller passes the same provider id used in `NEXTAUTH_PROVIDER` and we
  * map `azure-ad` → `microsoft` internally so the UI doesn't need to know the
@@ -360,33 +399,13 @@ export const linkAccount = async (
   options?: { callbackUrl?: string },
 ): Promise<{ error?: string; ok?: boolean }> => {
   const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
+  const mapped = provider === "azure-ad" ? "microsoft" : provider;
 
-  if (SOCIAL_PROVIDERS.has(provider)) {
-    const mapped = provider === "azure-ad" ? "microsoft" : provider;
-    const res = await fetch("/api/auth/link-social", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ provider: mapped, callbackURL }),
-    });
-    if (!res.ok) {
-      return { error: await res.text(), ok: false };
-    }
-    const data = (await res.json()) as { url?: string; redirect?: boolean };
-    if (data.url && data.redirect !== false) {
-      navigate(data.url);
-    }
-    return { ok: true };
-  }
-
-  // Generic-oauth providers: the plugin's own endpoint. This is the
-  // fall-through on purpose, so a newly supported OIDC provider links
-  // correctly without being listed anywhere here.
-  const res = await fetch("/api/auth/oauth2/link", {
+  const res = await fetch("/api/auth/link-social", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ providerId: provider, callbackURL }),
+    body: JSON.stringify({ provider: mapped, callbackURL }),
   });
   if (!res.ok) {
     return { error: await res.text(), ok: false };

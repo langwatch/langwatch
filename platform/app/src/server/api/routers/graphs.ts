@@ -96,6 +96,18 @@ export const graphsRouter = createTRPCRouter({
         ),
       );
 
+      // A workbench row's `graph` column is its definition — `{ sql,
+      // parameters, vegaLiteSpec }`. The grid does not draw from it: the
+      // widget reads its own chart through the saved-chart service, which
+      // parses the versioned schema and refuses a row this build cannot read.
+      // Sending it here too would put a member's stored SQL in the dashboard
+      // payload for no one to use.
+      const withoutWorkbenchDefinitions = graphs.map((graph) =>
+        graph.kind === WORKBENCH_SQL_CHART_KIND
+          ? { ...graph, graph: null }
+          : graph,
+      );
+
       // The included trigger row carries provider secrets in actionParams
       // (the encrypted Slack bot token per ADR-041, webhook header values
       // per ADR-040 §3) — strip them per the trigger's own action before the

@@ -183,7 +183,7 @@ experiment = langwatch.experiment.init("custom-image-evaluation")
 for index, row in experiment.loop(df.iterrows()):
     # Call a vision model directly
     response = litellm.completion(
-        model="gpt-4o",
+        model="gpt-5-mini",
         messages=[{
             "role": "user",
             "content": [
@@ -216,7 +216,7 @@ from unstructured.partition.pdf import partition_pdf
 from unstructured.staging.base import elements_to_text
 import dspy
 
-dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+dspy.configure(lm=dspy.LM("openai/gpt-5-mini"))
 
 # Dataset of PDFs with ground truth metadata
 df = pd.DataFrame([

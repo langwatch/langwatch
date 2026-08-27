@@ -1,0 +1,203 @@
+---
+title: OpenCode Monitoring with OpenTelemetry
+sidebarTitle: OpenCode
+description: Monitor opencode with OpenTelemetry. Send sessions, cost and traces to LangWatch with the LangWatch command-line tool.
+keywords:
+  - opencode monitoring
+  - opencode usage tracking
+  - opencode telemetry
+  - opencode opentelemetry
+  - opencode cost
+---
+
+[OpenCode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
+
+There are two ways to set it up:
+
+- `langwatch opencode` starts OpenCode and sets up the connection on the first run. Use it on a machine you work on.
+- `langwatch instrument opencode` writes the same setup and exits. Use it on a server, or when the telemetry must go to a team project.
+
+## Before you start
+
+- Install opencode.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
+- Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
+
+## Run opencode through the wrapper
+
+```bash
+langwatch login --device
+langwatch opencode
+```
+
+The first run asks one question:
+
+| Answer                           | What it does                                                                                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Using your own opencode plan** | opencode keeps its own providers and its own keys. LangWatch receives telemetry only.                                                           |
+| **Using an API key**             | opencode calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
+
+LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch opencode` accepts the same flags as `opencode` and returns the same exit code.
+
+<Note>
+  A virtual key is created the first time you choose the gateway, not at login. If you always keep
+  your own providers, LangWatch never creates one for you.
+</Note>
+
+To route the model calls themselves through the gateway with a service key, and to read the provider and model options, see [opencode on the AI Gateway](/ai-gateway/cli/opencode).
+
+## Set up a machine without starting opencode
+
+`langwatch instrument opencode` writes the connection and exits. A plain `opencode` run on that machine then sends its telemetry to LangWatch. This is the setup for a server that holds many agents, for a machine image, or for a configuration management run.
+
+```bash
+langwatch instrument opencode
+```
+
+The command writes two things:
+
+- An `opencode` function in your shell start file, which applies the LangWatch settings to `opencode` runs and to no other command. The file is `~/.zshrc`, `~/.bashrc`, or `~/.config/fish/config.fish`.
+- The `experimental.openTelemetry` flag in `~/.config/opencode/opencode.jsonc`. opencode sends no telemetry without it.
+
+Open a new terminal after the command, or read the start file again, so the function is in place.
+
+<Note>
+  The shell function needs zsh, bash or fish. On Windows, start OpenCode with `langwatch opencode`
+  each time instead.
+</Note>
+
+### Choose where the telemetry goes
+
+Pass one scope flag, and one only:
+
+| Command                                                | Destination                                                                                                   |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `langwatch instrument opencode`                        | Your personal workspace                                                                                       |
+| `langwatch instrument opencode --project <id-or-slug>` | A team project. See [Team projects](/coding-agents/team-projects).                                            |
+| `langwatch instrument opencode --key <ingest-key>`     | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
+| `langwatch instrument opencode --personal`             | Back to your personal workspace                                                                               |
+
+The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts OpenCode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before OpenCode reads it.
+
+### Remove the setup
+
+```bash
+langwatch logout
+```
+
+This deletes every connection the command-line tool wrote, for every tool.
+
+## What you get in LangWatch
+
+Open your personal page at `/me`, or open the project you pinned opencode to.
+
+- **[Sessions](/coding-agents/sessions)**: one row per OpenCode session, with the context it carried and how long it worked.
+- **Traces**: one trace per turn, with each model call and each tool call in order.
+- **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn.
+- **Content**: the arguments of each tool call and the result it returned.
+
+LangWatch keeps the model calls and the tool calls, and drops the internal work OpenCode also reports, such as database, file system and configuration steps. Without that filter one session would break into hundreds of traces.
+
+Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+
+## Content and privacy
+
+OpenCode's telemetry carries the arguments of each tool call and the result it returned, which is what makes a trace readable. To keep content out of storage, set the content categories to **Drop** in the [data privacy policy](/ai-governance/data-privacy): the strip happens at ingestion, before storage, and tokens, cost, model and timing survive. Who can open a stored session's content is covered on [Privacy](/coding-agents/privacy).
+
+## Route through the LangWatch AI Gateway
+
+Everything above is telemetry: opencode keeps your own provider logins. The wrapper can instead route the model calls through the LangWatch AI Gateway with a virtual key, which adds budgets and model policies on top of the same telemetry. [opencode through the gateway](/ai-gateway/cli/opencode) covers that setup.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+
+  </Accordion>
+
+  <Accordion title="No telemetry arrives in LangWatch">
+    Open a new terminal. The `opencode` function is read from the shell start file when a shell begins, so a terminal that was already open does not have it.
+
+    Then check that `experimental.openTelemetry` is `true` in `~/.config/opencode/opencode.jsonc`. opencode accepts the LangWatch settings and sends no telemetry while that flag is off.
+
+  </Accordion>
+
+<Accordion title="The command reports that it could not write the shell start file">
+  The shell is not zsh, bash or fish. Start OpenCode with `langwatch opencode` each time, which
+  needs no start file.
+</Accordion>
+
+<Accordion title="The OpenTelemetry flag stays off">
+  You set `experimental.openTelemetry` to `false` yourself at some point. LangWatch never overrides
+  that choice. Set it to `true` in `~/.config/opencode/opencode.jsonc`, or remove the line and run
+  `langwatch instrument opencode` again.
+</Accordion>
+
+  <Accordion title="The telemetry goes to the wrong workspace">
+    Run `langwatch instrument opencode --project <id-or-slug>` to move it to a team project, or `langwatch instrument opencode --personal` to move it back to your own.
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    Check that the key is live and that the header reads `Authorization=Bearer <key>`. An ingest key can write traces and no other requests, so a key that works for ingestion still fails on other endpoints.
+
+    On a machine with a login, run `langwatch login --device` again to refresh the session.
+
+  </Accordion>
+</AccordionGroup>
+
+For more failure modes see [CLI debug](/ai-governance/cli-debug).
+
+## Manual OpenTelemetry setup
+
+Use this when you cannot install the LangWatch command-line tool.
+
+First turn the reporting on in `~/.config/opencode/opencode.jsonc`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "experimental": {
+    "openTelemetry": true
+  }
+}
+```
+
+Then set the variables below before you start opencode. They are the ones `langwatch instrument opencode` writes for you.
+
+```bash
+export OTEL_TRACES_EXPORTER=otlp
+export OTEL_LOGS_EXPORTER=otlp
+export OTEL_METRICS_EXPORTER=otlp
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ik-lw-your-ingest-key"
+export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"
+opencode
+```
+
+The header takes an ingest key (`ik-lw-…`), which can create traces and no other requests. Keep a full project API key (`sk-lw-…`) out of the configuration of a coding agent: it can read and change your project data, and a coding agent has no use for that.
+
+For a self-hosted instance, replace the endpoint with the address of your instance followed by `/api/otel`. opencode appends `/v1/traces`, `/v1/logs` and `/v1/metrics` on its own. Never write the per-signal path yourself.
+
+<Warning>
+  A plain `export` applies the key to every program the shell starts, not to OpenCode alone. To keep it to OpenCode, put the variables in a shell function. This is the function `langwatch instrument opencode` writes to your shell rc file:
+
+```bash
+opencode() {
+    OTEL_TRACES_EXPORTER=otlp \
+    OTEL_LOGS_EXPORTER=otlp \
+    OTEL_METRICS_EXPORTER=otlp \
+    OTEL_EXPORTER_OTLP_PROTOCOL=http/json \
+    OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel \
+    OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer ik-lw-your-ingest-key' \
+    OTEL_RESOURCE_ATTRIBUTES=service.name=opencode \
+    command opencode "$@"
+}
+```
+
+On fish, the same block is a function with `set -lx` for each variable.
+
+</Warning>

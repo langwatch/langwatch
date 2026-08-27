@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { z } from "zod";
 import type { DrawerType } from "~/components/drawerRegistry";
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
 export type CommandCategory = "navigation" | "actions" | "search" | "projects";
 
@@ -18,6 +19,13 @@ export interface Command {
   externalUrl?: string;
   /** Action function for action commands */
   action?: () => void;
+  /**
+   * Release flag that decides whether the command is offered, and the value
+   * the command needs. A destination that replaces another one is offered on
+   * `enabled: true`, and the one it replaces on `enabled: false`, so Quick
+   * Search never lists two routes to the same work.
+   */
+  featureFlag?: { flag: FrontendFeatureFlag; enabled: boolean };
 }
 
 export const RecentItemTypeSchema = z.enum([

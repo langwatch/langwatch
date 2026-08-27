@@ -7,6 +7,7 @@ import type {
   SimulationDeleteRun,
   SimulationExportRun,
   SimulationExternalSetSummary,
+  SimulationLastResultSummary,
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationQueueRun,
@@ -60,6 +61,9 @@ export class TestSimulationService extends SimulationService {
     return unused();
   }
   getInternalSuiteSummaries(): Promise<SimulationExternalSetSummary[]> {
+    return unused();
+  }
+  getLastResultSummaries(): Promise<SimulationLastResultSummary[]> {
     return unused();
   }
   getRunDataForAllSuites(): Promise<SimulationAllSuitesRunData> {

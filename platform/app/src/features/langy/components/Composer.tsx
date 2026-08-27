@@ -605,7 +605,16 @@ const ComposerInputRow = memo(function ComposerInputRow({
           if (hero) setMultiline(e.target.scrollHeight > 30);
         }}
         onKeyDown={onTextareaKeyDown}
-        placeholder={turnActive ? "Write your next message…" : placeholder}
+        // There is no queue (see composerKeyHandler), so the mid-turn
+        // placeholder must not read as a promise to send. It said "Write your
+        // next message…", the user wrote one, pressed Enter, and nothing
+        // happened: the text sat in the field with no sign it had been
+        // refused.
+        placeholder={
+          turnActive
+            ? "Langy is working. You can send when it stops."
+            : placeholder
+        }
         disabled={disabled}
         rows={1}
         autoresize

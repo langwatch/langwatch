@@ -45,7 +45,14 @@ const session = { user: { id: USER_ID } } as unknown as Session;
  * An organization whose only record of this user's access is a Grant head:
  * PROJECT-scoped `admin`, no compat binding row behind it.
  */
-function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
+function buildPrisma({
+  onEngine,
+  membershipDisabled = false,
+}: {
+  onEngine: boolean | undefined;
+  /** The row stays, with its role; an admin has switched the seat off. */
+  membershipDisabled?: boolean;
+}) {
   const grantFindMany = vi.fn(async (args: any) => {
     if (args?.where?.principalType !== "USER") return [];
     return [
@@ -70,7 +77,12 @@ function buildPrisma({ onEngine }: { onEngine: boolean | undefined }) {
         .mockResolvedValue({ id: TEAM_ID, organizationId: ORGANIZATION_ID }),
     },
     organizationUser: {
-      findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+      findFirst: vi.fn().mockResolvedValue({
+        role: "MEMBER",
+        disabledAt: membershipDisabled
+          ? new Date("2026-08-01T00:00:00Z")
+          : null,
+      }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: { findMany: roleBindingFindMany },
@@ -236,6 +248,94 @@ describe("the fork at the permission seams", () => {
         expect([...result.projects]).toEqual([[PROJECT_ID, false]]);
       });
     });
+  });
+
+  describe("given a member whose seat an admin disabled", () => {
+    /**
+     * The membership gate runs before either head reads a binding, so the
+     * answer is the same on both — and it is named: the boundary raises
+     * "your access was disabled", not "you are not a member" or "no
+     * permission", for someone who is a member and holds the role they
+     * always did.
+     */
+    for (const onEngine of [true, false]) {
+      const head = onEngine ? "the engine" : "legacy";
+
+      describe(`when a project permission is resolved on ${head}`, () => {
+        /** @scenario A disabled member cannot act through any permission path */
+        it("refuses by name, before any binding is read", async () => {
+          const { ctx, grantFindMany, roleBindingFindMany } = buildPrisma({
+            onEngine,
+            membershipDisabled: true,
+          });
+
+          const result = await resolveProjectPermission(
+            ctx,
+            PROJECT_ID,
+            "traces:view",
+          );
+
+          expect(result).toEqual({
+            permitted: false,
+            organizationRole: null,
+            denialReason: "membership-disabled",
+          });
+          expect(grantFindMany).not.toHaveBeenCalled();
+          expect(roleBindingFindMany).not.toHaveBeenCalled();
+        });
+      });
+
+      describe(`when a team permission is resolved on ${head}`, () => {
+        /** @scenario A disabled member cannot act through any permission path */
+        it("refuses by name, before any binding is read", async () => {
+          const { ctx, grantFindMany, roleBindingFindMany } = buildPrisma({
+            onEngine,
+            membershipDisabled: true,
+          });
+
+          const result = await resolveTeamPermission(
+            ctx,
+            TEAM_ID,
+            "traces:view",
+          );
+
+          expect(result).toEqual({
+            permitted: false,
+            organizationRole: null,
+            denialReason: "membership-disabled",
+          });
+          expect(grantFindMany).not.toHaveBeenCalled();
+          expect(roleBindingFindMany).not.toHaveBeenCalled();
+        });
+      });
+
+      describe(`when any of several permissions would do, on ${head}`, () => {
+        /** @scenario A disabled member cannot act through any permission path */
+        it("raises the disabled-membership error at the boundary", async () => {
+          const { ctx } = buildPrisma({ onEngine, membershipDisabled: true });
+          const next = vi.fn();
+
+          await expect(
+            checkDeclaredPermissionAny(["annotations:update", "traces:view"])({
+              ctx: {
+                ...(ctx as Record<string, unknown>),
+                permissionChecked: false,
+                app: {
+                  permissions: permissionsServiceFor(
+                    (ctx as { prisma: never }).prisma,
+                  ),
+                },
+              },
+              input: { projectId: PROJECT_ID },
+              next,
+            } as never),
+          ).rejects.toMatchObject({
+            cause: { code: "membership_disabled" },
+          });
+          expect(next).not.toHaveBeenCalled();
+        });
+      });
+    }
   });
 
   describe("given the demo project", () => {

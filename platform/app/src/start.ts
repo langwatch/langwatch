@@ -89,6 +89,7 @@ import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
+import { createHttpServerClosePhase } from "./server/shutdown/httpServerClosePhase";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
@@ -436,7 +437,9 @@ export const startApp = async (options: StartAppOptions) => {
   // rather than a literal here: this handler used to force-exit after 5s,
   // which is inside the GroupQueue's own drain budget, so under the `all`
   // role (this process hosting the worker stack) a drain could never finish
-  // however long the queue was told it had.
+  // however long the queue was told it had. The http drain grace comes from
+  // the same place for the same reason — see createHttpServerClosePhase.
+
   installShutdownHandlers((signal) => ({
     signal,
     logger,

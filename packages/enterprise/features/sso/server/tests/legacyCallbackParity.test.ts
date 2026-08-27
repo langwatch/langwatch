@@ -81,27 +81,15 @@ describe("legacy callback rewrites", () => {
       }
     });
 
-    /**
-     * Reads the router source rather than booting it: `createApiRouter` pulls
-     * in the whole API surface (prisma, redis, every route module), which a
-     * unit test must not pay for. The registration is a loop over the exported
-     * list, so what matters is that it is still driven by that list and has not
-     * been unrolled back into hand-written per-provider lines.
-     */
-    it("registers the rewrites from that same list, not by hand", async () => {
+    it("leaves legacy provider callbacks to better-auth's core route", async () => {
       const source = await readFile(
-        new URL(
-          "../../../../../../platform/app/src/server/api-router.ts",
-          import.meta.url,
-        ),
+        new URL("../../../../../../platform/app/src/server/api-router.ts", import.meta.url),
         "utf8",
       );
 
       expect(source).toContain("LEGACY_CALLBACK_PROVIDER_IDS");
-      expect(source).toContain("rewriteCallback(provider)");
+      expect(source).not.toContain("rewriteCallback(provider)");
 
-      // A hand-written registration for a single provider is what drifted
-      // before, so it must not come back.
       for (const providerId of LEGACY_CALLBACK_PROVIDER_IDS) {
         expect(source).not.toContain(`.all("/${providerId}", rewriteCallback(`);
       }

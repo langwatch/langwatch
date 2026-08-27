@@ -51,6 +51,10 @@ export interface SourceTypeOption {
   label: string;
   mode: SourceMode;
   blurb: string;
+  /** The source emits conversations which may be routed into traces. */
+  routesConversations?: boolean;
+  /** Existing rows remain readable, but new sources cannot select this type. */
+  deprecated?: boolean;
 }
 
 // `satisfies` (not a type annotation) so each entry's `value` keeps its
@@ -89,7 +93,23 @@ export const SOURCE_TYPE_OPTIONS = [
     label: "Microsoft Copilot Studio (Purview)",
     mode: "pull",
     blurb:
-      "Polls Microsoft Purview Audit API for Copilot Studio activity. Needs an Azure AD app registration with `AuditLog.Read.All` permission.",
+      "Retired. This source polled Microsoft's directory audit, which never contained Copilot Studio conversations.",
+    deprecated: true,
+  },
+  {
+    value: "copilot_studio_dataverse",
+    label: "Microsoft Copilot Studio",
+    mode: "pull",
+    blurb:
+      "Reads Copilot Studio conversations from a Power Platform environment using an application secret and Dataverse role.",
+    routesConversations: true,
+  },
+  {
+    value: "openai_admin",
+    label: "OpenAI Admin",
+    mode: "pull",
+    blurb:
+      "Reads organization spend with an OpenAI Admin API key, attributed by project, line item, person, and API key. Only ever create one per organization: a second source would count the same spend twice.",
   },
   {
     value: "openai_compliance",
@@ -117,6 +137,7 @@ export const SOURCE_TYPE_OPTIONS = [
     mode: "pull",
     blurb:
       "Records who asked what in Genie and the SQL it ran against your warehouse. Sign in with a Databricks service principal holding Can Manage on every Genie space you want covered — anything less returns only its own conversations.",
+    routesConversations: true,
   },
   {
     value: "s3_custom",
@@ -137,16 +158,18 @@ export const SOURCE_TYPE_OPTIONS = [
 // Compile-time completeness guard: if the server grows a source type the
 // catalog doesn't offer, this line stops building. The runtime cast in
 // SOURCE_TYPE_LABEL below is only sound because of it.
-type UncataloguedSourceType = Exclude<
-  SourceType,
-  (typeof SOURCE_TYPE_OPTIONS)[number]["value"]
->;
+type UncataloguedSourceType = Exclude<SourceType, (typeof SOURCE_TYPE_OPTIONS)[number]["value"]>;
 const _catalogIsComplete: UncataloguedSourceType extends never ? true : never = true;
 void _catalogIsComplete;
 
 export const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
   SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<SourceType, string>;
+
+export function routesConversations(sourceType: SourceType): boolean {
+  const option = SOURCE_TYPE_OPTIONS.find((candidate) => candidate.value === sourceType);
+  return option?.routesConversations === true;
+}
 
 export interface GatedSourceTypeOption extends SourceTypeOption {
   /** Locked types render in the menu but cannot be picked. */
@@ -166,7 +189,7 @@ export function gatedSourceTypeOptions({
 }: {
   isEnterprise: boolean;
 }): GatedSourceTypeOption[] {
-  return SOURCE_TYPE_OPTIONS.map((option) => ({
+  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated).map((option) => ({
     ...option,
     locked: !isEnterprise && option.value !== "otel_generic",
   }));

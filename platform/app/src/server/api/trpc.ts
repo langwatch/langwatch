@@ -922,6 +922,10 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
     403: "FORBIDDEN",
     404: "NOT_FOUND",
     409: "CONFLICT",
+    // tRPC has no GONE. NOT_FOUND is the closest reading of an expired
+    // invitation link (`invite_expired`): the thing the URL named no longer
+    // opens anything, and the client keys its copy off `code` anyway.
+    410: "NOT_FOUND",
     412: "PRECONDITION_FAILED",
     413: "PAYLOAD_TOO_LARGE",
     422: "UNPROCESSABLE_CONTENT",

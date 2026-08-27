@@ -39,11 +39,9 @@ import {
 } from "../codex-config-toml";
 import { appEnvHasAllVars, appSettingsTargetFor, installAppEnv } from "./app-settings";
 import { ensureLangwatchClaudePlugin, readClaudePluginState } from "./claude-plugin";
-import {
-  installSessionContextHooks,
-  removeSessionContextHooks,
-} from "./session-context-hooks";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 
 /**
  * Tools whose Path B telemetry persists as a scoped shell function (no
@@ -324,13 +322,7 @@ export async function askPersistChoice({
  * the plugin's hooks record, or the user is agreeing to something they were
  * never told about.
  */
-function persistQuestion({
-  tool,
-  targetHint,
-}: {
-  tool: string;
-  targetHint: string;
-}): string {
+function persistQuestion({ tool, targetHint }: { tool: string; targetHint: string }): string {
   if (tool === "claude") {
     return (
       `Set up LangWatch capture for ${tool}? This saves the telemetry env vars to ` +
@@ -401,16 +393,12 @@ export async function maybeOfferIngestionShellRcPersist({
     try {
       installAppEnv(appTarget, vars);
       console.log(
-        chalk.green(
-          `  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
-        ),
+        chalk.green(`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`),
       );
       installClaudeSessionContext(tool);
     } catch (err) {
       console.log(
-        chalk.yellow(
-          `  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`,
-        ),
+        chalk.yellow(`  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`),
       );
     }
     return;
@@ -425,6 +413,7 @@ export async function maybeOfferIngestionShellRcPersist({
   // the same grant.
   if (tool === "codex") {
     assertCodexTurnHarvest();
+    assertCodexAgentGuidance();
     return;
   }
 
@@ -459,18 +448,10 @@ export async function maybeOfferIngestionShellRcPersist({
     return;
   }
   try {
-    const wrote = persistBlockToRc(
-      shell,
-      buildScopedToolFunction(tool, vars, shell),
-      markers,
-    );
-    console.log(
-      chalk.green(`  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`),
-    );
+    const wrote = persistBlockToRc(shell, buildScopedToolFunction(tool, vars, shell), markers);
+    console.log(chalk.green(`  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`));
   } catch (err) {
-    console.log(
-      chalk.yellow(`  ! Couldn't write to ${target}: ${(err as Error).message}`),
-    );
+    console.log(chalk.yellow(`  ! Couldn't write to ${target}: ${(err as Error).message}`));
   }
 }
 
@@ -568,18 +549,12 @@ export function assertCodexTurnHarvest(): void {
     return;
   }
   if (outcome.status !== "installed") return;
+  console.log(chalk.green("  ✓ Codex will record each turn's conversation as it completes"));
   console.log(
-    chalk.green("  ✓ Codex will record each turn's conversation as it completes"),
-  );
-  console.log(
-    chalk.dim(
-      "    Sessions from before this install: `langwatch ingest codex` recovers them.",
-    ),
+    chalk.dim("    Sessions from before this install: `langwatch ingest codex` recovers them."),
   );
   if (outcome.chained) {
-    console.log(
-      chalk.dim(`    Your existing notify program still runs: ${outcome.chained[0]}`),
-    );
+    console.log(chalk.dim(`    Your existing notify program still runs: ${outcome.chained[0]}`));
   }
   if (outcome.ephemeral) {
     console.log(
@@ -655,9 +630,7 @@ function installRawSessionContextHooks(): void {
     const hooks = installSessionContextHooks({ tool: "claude_code" });
     if (hooks.action === "unchanged") return;
     console.log(
-      chalk.green(
-        `  ✓ Installed the hooks that report each session's repository and branch`,
-      ),
+      chalk.green(`  ✓ Installed the hooks that report each session's repository and branch`),
     );
   } catch {
     // Best-effort, the same way the telemetry refresh treats them.

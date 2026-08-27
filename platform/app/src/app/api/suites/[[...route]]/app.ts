@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import {
   type Suite,
@@ -23,8 +24,14 @@ const suiteResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
+  kind: z
+    .enum(["custom", "folder"])
+    .describe(
+      "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.",
+    ),
   description: z.string().nullable(),
   scenarioIds: z.array(z.string()),
+  scope: scopeSchema.nullable(),
   targets: z.array(suiteTargetSchema),
   repeatCount: z.number(),
   labels: z.array(z.string()),
@@ -36,18 +43,110 @@ const suiteResponseWithPlatformUrlSchema = suiteResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
-const createSuiteInputSchema = z.object({
-  name: z.string().min(1, "name is required"),
-  description: z.string().optional(),
-  scenarioIds: z.array(z.string()).min(1, "At least one scenario is required"),
-  targets: z.array(suiteTargetSchema).min(1, "At least one target is required"),
-  repeatCount: z.number().int().min(1).max(100).default(1),
-  labels: z.array(z.string()).default([]),
+/** What a create body carries, before either kind's guards are applied. */
+type CreateSuiteBody = {
+  kind: "custom" | "folder";
+  scope?: { mode: string };
+  scenarioIds: string[];
+  targets: unknown[];
+};
+
+/**
+ * A folder is created empty by definition, so a scope, a member list and a
+ * target list are refused rather than silently dropped.
+ */
+function refuseFolderExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
+  if (body.scope) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scope"],
+      message:
+        "A test suite runs the test cases filed in it, so it takes no scope",
+    });
+  }
+  if (body.scenarioIds.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scenarioIds"],
+      message:
+        "A folder is created empty; file scenarios into it after creating it",
+    });
+  }
+  if (body.targets.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["targets"],
+      message: "A folder gets its targets when a run is started",
+    });
+  }
+}
+
+/**
+ * A run plan states what it runs and what it runs against.
+ *
+ * A plan that covers a rule resolves its own list at run time, so only a plan
+ * that runs a hand-picked list has to name one here.
+ */
+function refusePlanGaps(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
+  const picksCases = !body.scope || body.scope.mode === "cases";
+  if (picksCases && body.scenarioIds.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scenarioIds"],
+      message: "At least one scenario is required",
+    });
+  }
+  if (body.targets.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["targets"],
+      message: "At least one target is required",
+    });
+  }
+}
+
+/**
+ * One create schema for both kinds, with the guards conditional on kind: a
+ * body naming no kind is a custom run plan and keeps the historical
+ * at-least-one guards.
+ */
+const createSuiteInputSchema = z
+  .object({
+    name: z.string().min(1, "name is required"),
+    kind: z
+      .enum(["custom", "folder"])
+      .default("custom")
+      .describe(
+        "custom (the default) is a run plan and needs scenarioIds and targets; folder is a test suite that starts empty and gets scenarios by filing them into it.",
+      ),
+    description: z.string().optional(),
+    scenarioIds: z.array(z.string()).default([]),
+    scope: scopeSchema.optional(),
+    targets: z.array(suiteTargetSchema).default([]),
+    repeatCount: z.number().int().min(1).max(100).default(1),
+    labels: z.array(z.string()).default([]),
+  })
+  .superRefine((body, ctx) => {
+    if (body.kind === "folder") {
+      refuseFolderExtras(body, ctx);
+      return;
+    }
+    refusePlanGaps(body, ctx);
+  });
+
+const listSuitesQuerySchema = z.object({
+  kind: z
+    .enum(["custom", "folder"])
+    .default("custom")
+    .describe(
+      "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did.",
+    ),
 });
 
 const updateSuiteInputSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
+  scope: scopeSchema.optional(),
   scenarioIds: z.array(z.string()).min(1).optional(),
   targets: z.array(suiteTargetSchema).min(1).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
@@ -61,6 +160,9 @@ const runSuiteInputSchema = z.object({
     .describe(
       "Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name.",
     ),
+  note: runNoteSchema.describe(
+    "One short line describing why this batch was run, e.g. a commit hash or what you changed. It is stored on every run of the batch and shown beside the run in the platform. Up to 200 characters.",
+  ),
 });
 
 const suiteRunResultSchema = z.object({
@@ -87,6 +189,7 @@ function toSuiteResponse(suite: Suite) {
     id: suite.id,
     name: suite.name,
     slug: suite.slug,
+    kind: isSuiteKind(suite.kind) ? suite.kind : "custom",
     description: suite.description,
     scenarioIds: suite.scenarioIds,
     targets: suite.targets,
@@ -103,7 +206,8 @@ const secured = createProjectApp({ basePath: "/api/suites" });
 secured.access(requires("scenarios:view")).get(
   "/",
   describeRoute({
-    description: "List all non-archived suites (run plans) for the project",
+    description:
+      "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
     responses: {
       ...baseResponses,
       200: {
@@ -116,9 +220,11 @@ secured.access(requires("scenarios:view")).get(
       },
     },
   }),
+  zValidator("query", listSuitesQuerySchema),
   async (c) => {
     const project = c.get("project");
-    logger.info({ projectId: project.id }, "Listing suites");
+    const { kind } = c.req.valid("query");
+    logger.info({ projectId: project.id, kind }, "Listing suites");
 
     const suites = await c.app.suites.list({ projectId: project.id });
 
@@ -207,7 +313,7 @@ secured.access(requires("scenarios:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = c.req.valid("json");
-    logger.info({ projectId: project.id }, "Creating suite");
+    logger.info({ projectId: project.id, kind: body.kind }, "Creating suite");
 
     const suite = await c.app.suites.create({
       ...body,
@@ -382,6 +488,7 @@ secured.access(requires("scenarios:create")).post(
         organizationId: projectWithTeam.team.organizationId,
         idempotencyKey,
         parameters: body.parameters,
+        note: body.note,
       });
 
       return c.json({
@@ -406,7 +513,8 @@ secured.access(requires("scenarios:create")).post(
 secured.access(requires("scenarios:manage")).delete(
   "/:id",
   describeRoute({
-    description: "Archive (soft-delete) a suite (run plan)",
+    description:
+      "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
     responses: {
       ...baseResponses,
       200: {

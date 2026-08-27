@@ -6,6 +6,7 @@ import { findEasterEgg } from "../easterEggs";
 import type { ListItem } from "../getIconInfo";
 import type { Command, RecentItem, SearchResult } from "../types";
 import type { GroupedRecentItems } from "../useRecentItems";
+import { useTopLevelNavigationCommands } from "./useCommandFeatureFlags";
 import type { FilteredCommands } from "./useFilteredCommands";
 import type { FilteredProject } from "./useFilteredProjects";
 
@@ -29,7 +30,7 @@ export function useCommandBarItems(
   easterEggItem: ListItem | null;
   askLangyItem: ListItem | null;
 } {
-  const availableTopLevelNav = topLevelNavigationCommands;
+  const availableTopLevelNav = useTopLevelNavigationCommands();
 
   // The "Ask Langy" activation — the command bar's door into Langy. Synthesized
   // (not a static registry command) so it can carry the live query and only

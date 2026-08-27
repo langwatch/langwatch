@@ -459,12 +459,16 @@ async function ensureActiveOrgMemberOr403(
       where: { id: tokenRecord.user_id },
       select: { deactivatedAt: true },
     }),
-    prisma.organizationUser.findUnique({
+    // `disabledAt` is part of the predicate: a seat an admin disabled to
+    // reclaim it is not an active membership, and the keys minted here are
+    // the ones the owner ceiling never reaches — a project key has no owner,
+    // and the gateway honours a personal virtual key on its own status. A
+    // disabled row reads as no membership, and the session is severed below.
+    prisma.organizationUser.findFirst({
       where: {
-        userId_organizationId: {
-          userId: tokenRecord.user_id,
-          organizationId: tokenRecord.organization_id,
-        },
+        userId: tokenRecord.user_id,
+        organizationId: tokenRecord.organization_id,
+        disabledAt: null,
       },
       select: { userId: true },
     }),
@@ -740,6 +744,36 @@ secured.access(CLI_POLICY).post("/exchange", async (c: CliContext) => {
           error_description: "User or organization no longer exists",
         },
         500,
+      );
+    }
+
+    // Membership is re-derived HERE, not trusted from approval time: an admin
+    // can disable the seat between approve and exchange, and both branches
+    // below hand out credentials the owner ceiling never reaches (a project
+    // key has no owner; a device session mints keys of its own). Refused,
+    // the device code is consumed and the answer is the same fatal
+    // access_denied/410 the mint below already gives a removed member, so the
+    // CLI stops polling for a session it will never get.
+    const activeMembership = await prisma.organizationUser.findFirst({
+      where: {
+        userId: user.id,
+        organizationId: organization.id,
+        disabledAt: null,
+      },
+      select: { userId: true },
+    });
+    if (!activeMembership) {
+      await redis.del(deviceCodeKey(device_code));
+      await redis.del(userCodeKey(record.user_code));
+      // The poll-rate key too: consumed means the next poll learns the code
+      // is gone (408), not that it polled too soon (429).
+      await redis.del(pollRateKey(device_code));
+      return c.json(
+        {
+          error: "access_denied",
+          error_description: "Not an active member of the organization",
+        },
+        410,
       );
     }
 
@@ -1073,6 +1107,36 @@ secured.access(CLI_POLICY).post("/refresh", async (c: CliContext) => {
         401,
       );
     }
+  }
+
+  // Rotation mints a new credential pair, so it re-derives membership the way
+  // the other minting endpoints do: a member whose seat an admin disabled
+  // (or who was removed) after the session started must not be able to
+  // renew it. Bearer-only routes still honour the access token already in
+  // hand until it expires (one hour), the same window a removed member has;
+  // this is what stops that window from rolling forward for ninety days.
+  const activeMembership = await prisma.organizationUser.findFirst({
+    where: {
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      disabledAt: null,
+    },
+    select: { userId: true },
+  });
+  if (!activeMembership) {
+    await redis.del(refreshTokenKey(refresh_token));
+    logger.info(
+      { userId: record.user_id, organizationId: record.organization_id },
+      "rejecting refresh: caller is not an active member of the organization",
+    );
+    return c.json(
+      {
+        error: "invalid_grant",
+        error_description:
+          "Your access to this organization is no longer active. Please run `langwatch login` to start a new session.",
+      },
+      401,
+    );
   }
 
   // Rotate: mint new pair, invalidate old. (Sliding-window rotation —
@@ -2381,14 +2445,16 @@ secured.access(cliApproveAuth).post("/approve", async (c: CliContext) => {
   }
   const { user_code, organization_id, project_id } = parsed.data;
 
-  // Verify caller is a member of the org they're issuing a key for.
-  const membership = await prisma.organizationUser.findUnique({
+  // Verify the caller is an ACTIVE member of the org they're issuing a key
+  // for: a membership an admin disabled to reclaim its seat must not approve
+  // a device and hand out a key it could not use itself.
+  const membership = await prisma.organizationUser.findFirst({
     where: {
-      userId_organizationId: {
-        userId: session.user.id,
-        organizationId: organization_id,
-      },
+      userId: session.user.id,
+      organizationId: organization_id,
+      disabledAt: null,
     },
+    select: { userId: true },
   });
   if (!membership) {
     return c.json(

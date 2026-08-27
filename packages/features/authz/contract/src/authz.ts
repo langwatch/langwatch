@@ -133,6 +133,7 @@ export const collectedGrantsSchema = z
     organizationId: z.string(),
     organizationRole: organizationRoleSchema.nullable(),
     isOrgMember: z.boolean(),
+    membershipDisabled: z.boolean().default(false),
     bindings: z.array(collectedBindingSchema),
     legacyTeamMemberships: z.array(legacyTeamMembershipSchema),
     customRolePermissions: customRolePermissionsSchema,
@@ -142,6 +143,7 @@ export type CollectedGrants = z.infer<typeof collectedGrantsSchema>;
 
 export const authzDenialReasonSchema = z.enum([
   "no-membership",
+  "membership-disabled",
   "no-binding",
   "lite-member-restricted",
   "owner-ceiling",
@@ -179,12 +181,8 @@ export type AuthzDecision = z.infer<typeof authzDecisionSchema>;
  */
 declare const AUTHORIZED_BRAND: unique symbol;
 export type Authorized<
-  Tier extends z.infer<typeof bindingScopeTierSchema> = z.infer<
-    typeof bindingScopeTierSchema
-  >,
-  Permission extends z.infer<typeof authzPermissionSchema> = z.infer<
-    typeof authzPermissionSchema
-  >,
+  Tier extends z.infer<typeof bindingScopeTierSchema> = z.infer<typeof bindingScopeTierSchema>,
+  Permission extends z.infer<typeof authzPermissionSchema> = z.infer<typeof authzPermissionSchema>,
 > = {
   readonly [AUTHORIZED_BRAND]: true;
   readonly permission: Permission;

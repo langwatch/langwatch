@@ -21,18 +21,25 @@ import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
-  ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
-  DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
+  InviteExpiredError,
   InviteNotFoundError,
+  InviteWrongAccountError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
-import { InviteService } from "../../invites/invite.service";
+import {
+  InviteService,
+  maskInvitedAddress,
+  matchInviteToAcceptor,
+  resolveInviteDisplayStatus,
+} from "../../invites/invite.service";
+import { buildInviteAcceptUrl } from "../../invites/invite-link";
+import { assertInviteSendAllowed } from "../../invites/invite-send-throttle";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import {
@@ -40,11 +47,7 @@ import {
   LICENSE_LIMIT_ERRORS,
 } from "../../license-enforcement/license-limit-guard";
 import { getRoleChangeType } from "../../license-enforcement/member-classification";
-import {
-  assertEnterprisePlan,
-  ENTERPRISE_FEATURE_ERRORS,
-  isCustomRole,
-} from "../enterprise";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS, isCustomRole } from "../enterprise";
 import {
   batchScopePermissions,
   checkOrganizationPermission,
@@ -60,10 +63,7 @@ const builtInTeamRoleInputSchema = z.enum([
   TeamUserRole.MEMBER,
   TeamUserRole.VIEWER,
 ]);
-const teamRoleInputSchema = z.union([
-  builtInTeamRoleInputSchema,
-  customTeamRoleInputSchema,
-]);
+const teamRoleInputSchema = z.union([builtInTeamRoleInputSchema, customTeamRoleInputSchema]);
 
 /**
  * The audit-log read authorizes at the ORGANIZATION tier, always.
@@ -274,9 +274,7 @@ export const organizationRouter = createTRPCRouter({
             project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
           }
           project.s3SecretAccessKey =
-            canManage && project.s3SecretAccessKey
-              ? decrypt(project.s3SecretAccessKey)
-              : null;
+            canManage && project.s3SecretAccessKey ? decrypt(project.s3SecretAccessKey) : null;
           if (project.s3Endpoint) {
             project.s3Endpoint = decrypt(project.s3Endpoint);
           }
@@ -384,21 +382,16 @@ export const organizationRouter = createTRPCRouter({
           team.members = enriched.members;
 
           if (isDemoOrg) return true;
-          return isExternal
-            ? team.members.some((member) => member.userId === userId)
-            : true;
+          return isExternal ? team.members.some((member) => member.userId === userId) : true;
         });
 
         if (isDemoOrg) {
           organization.teams = organization.teams.flatMap((team) => {
             if (team.projects.some((project) => project.id === demoProjectId)) {
-              team.projects = team.projects.filter(
-                (project) => project.id === demoProjectId,
-              );
+              team.projects = team.projects.filter((project) => project.id === demoProjectId);
 
               team.members = team.members.filter(
-                (member) =>
-                  member.userId === demoProjectUserId || member.userId === userId,
+                (member) => member.userId === demoProjectUserId || member.userId === userId,
               );
               return [team];
             } else {
@@ -580,9 +573,7 @@ export const organizationRouter = createTRPCRouter({
     .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleInvite = input.invites.some((invite) =>
-        (invite.teams ?? []).some(
-          (t) => typeof t.role === "string" && isCustomRole(t.role),
-        ),
+        (invite.teams ?? []).some((t) => typeof t.role === "string" && isCustomRole(t.role)),
       );
       if (hasCustomRoleInvite) {
         await assertEnterprisePlan({
@@ -632,6 +623,36 @@ export const organizationRouter = createTRPCRouter({
       }
 
       if (created.invites.length > 0) {
+        // D11 x D12, invitation -> request: a formal invitation sent to
+        // somebody with an open request ANSWERS it. The invitation carries
+        // the role and the teams, which is the flow that owns them, so the
+        // request resolves as approved-by-invitation rather than staying
+        // open beside it. Silent when nothing is open, and never fatal — the
+        // invitation is the durable outcome here.
+        await Promise.all(
+          created.invites.map(async (record) => {
+            const invited = await ctx.prisma.user.findFirst({
+              where: { email: record.invite.email },
+              select: { id: true },
+            });
+            if (!invited) return;
+            try {
+              await joinRequestsService({
+                authzGrants: ctx.app.authzGrants,
+                featureFlags: ctx.app.featureFlags,
+              }).resolveByInvitation({
+                userId: invited.id,
+                organizationId: record.invite.organizationId,
+                inviteId: record.invite.id,
+              });
+            } catch (error) {
+              captureException(toError(error), {
+                tags: { organizationId: record.invite.organizationId },
+              });
+            }
+          }),
+        );
+
         trackServerEvent({
           userId: ctx.session.user.id,
           event: "team_member_invited",
@@ -659,6 +680,29 @@ export const organizationRouter = createTRPCRouter({
         organizationId: input.organizationId,
         inviteId: input.inviteId,
       });
+    }),
+  resendInvite: protectedProcedure
+    .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
+    .permission("organization:manage")
+    .mutation(async ({ input, ctx }) => {
+      // Throttled per INVITATION, because the thing being protected is the
+      // recipient's inbox rather than this server: an admin with three
+      // invitations out may resend all three, and none of the three gets
+      // mailed repeatedly. Checked before the resend so a refused attempt
+      // leaves the live code alone — rotation is the old link's revocation,
+      // and a throttled click must not quietly break the link already sent.
+      await assertInviteSendAllowed({ inviteId: input.inviteId });
+
+      const inviteService = InviteService.create(ctx.prisma);
+      const { invite, emailNotSent } = await inviteService.resendInvite({
+        organizationId: input.organizationId,
+        inviteId: input.inviteId,
+      });
+      return {
+        invite,
+        emailNotSent,
+        inviteUrl: buildInviteAcceptUrl(invite.inviteCode),
+      };
     }),
   getOrganizationPendingInvites: protectedProcedure
     .input(
@@ -710,9 +754,7 @@ export const organizationRouter = createTRPCRouter({
     .permission("organization:view")
     .mutation(async ({ input, ctx }) => {
       const hasCustomRoleInvite = input.invites.some((invite) =>
-        (invite.teams ?? []).some(
-          (t) => typeof t.role === "string" && isCustomRole(t.role),
-        ),
+        (invite.teams ?? []).some((t) => typeof t.role === "string" && isCustomRole(t.role)),
       );
       if (hasCustomRoleInvite) {
         await assertEnterprisePlan({
@@ -784,11 +826,8 @@ export const organizationRouter = createTRPCRouter({
                   const hasCustom = typeof t.role === "string" && isCustomRole(t.role);
                   return {
                     teamId: t.teamId,
-                    role: hasCustom
-                      ? ("CUSTOM" as TeamUserRole)
-                      : (t.role as TeamUserRole),
-                    customRoleId:
-                      hasCustom && t.customRoleId ? t.customRoleId : undefined,
+                    role: hasCustom ? ("CUSTOM" as TeamUserRole) : (t.role as TeamUserRole),
+                    customRoleId: hasCustom && t.customRoleId ? t.customRoleId : undefined,
                   };
                 });
 
@@ -806,9 +845,7 @@ export const organizationRouter = createTRPCRouter({
                   select: { id: true },
                 });
                 const validCustomRoleIds = new Set(validCustomRoles.map((r) => r.id));
-                const invalidRoleIds = customRoleIds.filter(
-                  (id) => !validCustomRoleIds.has(id),
-                );
+                const invalidRoleIds = customRoleIds.filter((id) => !validCustomRoleIds.has(id));
                 if (invalidRoleIds.length > 0) {
                   throw new TRPCError({
                     code: "BAD_REQUEST",
@@ -921,8 +958,7 @@ export const organizationRouter = createTRPCRouter({
           throw new InviteNotFoundError();
         }
 
-        const teamAssignments =
-          (invite.teamAssignments as Array<{ customRoleId?: string }>) ?? [];
+        const teamAssignments = (invite.teamAssignments as Array<{ customRoleId?: string }>) ?? [];
         await inviteService.checkLicenseLimits({
           organizationId: input.organizationId,
           newInvites: [{ role: invite.role, teams: teamAssignments }],
@@ -934,10 +970,7 @@ export const organizationRouter = createTRPCRouter({
           organizationId: input.organizationId,
         });
       } catch (error) {
-        if (
-          error instanceof InviteNotFoundError ||
-          error instanceof OrganizationNotFoundError
-        ) {
+        if (error instanceof InviteNotFoundError || error instanceof OrganizationNotFoundError) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: error.message,
@@ -1000,6 +1033,10 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
+      if (resolveInviteDisplayStatus(invite) === "EXPIRED") {
+        throw new InviteExpiredError();
+      }
+
       if (invite.status !== "PENDING") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1013,13 +1050,13 @@ export const organizationRouter = createTRPCRouter({
       // `session.user.email` is always lowercase, but `invite.email`
       // preserves the admin's original casing. A strict `!==` would
       // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
-      // The old NextAuth flow worked accidentally because it didn't
-      // lowercase emails either — this is now a real mismatch post-migration.
-      if (session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,
-        });
+      // Signed in as somebody else is a wrong turn, not a refusal: the screen
+      // names which account is wanted and offers the way back. The hint is
+      // masked because an invite code is a bearer token — the landing already
+      // declines to name the invited address, and a mismatch is not a hole to
+      // read it through.
+      if (!inviteEmailMatches) {
+        throw new InviteWrongAccountError(maskInvitedAddress(invite.email));
       }
 
       // No transaction: the invite's grants are ledger commands, so the
@@ -1029,7 +1066,27 @@ export const organizationRouter = createTRPCRouter({
       await InviteService.create(prisma).applyInvite({
         userId: session.user.id,
         invite,
+        viaIdentifierId,
       });
+
+      // D11 x D12, acceptance -> request: accepting an invitation withdraws
+      // the same person's open request for this organization, so the
+      // membership lands exactly once and the admins' panel empties itself.
+      // Never fatal — the membership is the durable outcome, and a request
+      // left open is answered by the next approval or by the expiry.
+      try {
+        await joinRequestsService({
+          authzGrants: ctx.app.authzGrants,
+          featureFlags: ctx.app.featureFlags,
+        }).withdrawOnInvitationAccepted({
+          userId: session.user.id,
+          organizationId: invite.organizationId,
+        });
+      } catch (error) {
+        captureException(toError(error), {
+          tags: { organizationId: invite.organizationId },
+        });
+      }
 
       // Provision the user's Personal Workspace (Team.isPersonal +
       // Project.isPersonal) for this org. Idempotent — safe if a prior

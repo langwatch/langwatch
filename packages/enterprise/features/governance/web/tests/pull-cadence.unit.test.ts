@@ -9,6 +9,7 @@
  * parse. So the load-bearing test is: every recommended schedule round-trips.
  */
 import { describe, expect, it } from "vitest";
+import { SOURCE_TYPE_OPTIONS } from "../src/ingestion-source-catalog";
 import {
   composerCadenceError,
   cronFromPullParts,
@@ -16,6 +17,7 @@ import {
   PULL_SCHEDULE_DEFAULTS,
   partsFromPullCron,
   pullCadenceCronError,
+  recommendedPullSchedule,
   summarizePullCadence,
 } from "../src/pull-cadence";
 
@@ -49,6 +51,24 @@ describe("given the pull-cadence cron mapping", () => {
         frequency: "hourly",
         minute: 0,
       });
+    });
+
+    /**
+     * Every pull-mode type in the catalog must recommend a schedule.
+     *
+     * The mapping is a `Partial<Record<…>>`, so a pull-mode type added
+     * without an entry compiles fine and resolves to no recommendation. The
+     * composer then creates the source with no cadence and it never polls —
+     * a source that looks configured, reports no error, and returns nothing.
+     */
+    it("recommends a schedule for every pull-mode source the catalog offers", () => {
+      const missing = SOURCE_TYPE_OPTIONS.filter(
+        (option) =>
+          option.mode === "pull" &&
+          !option.deprecated &&
+          recommendedPullSchedule(option.value) === null,
+      ).map((option) => option.value);
+      expect(missing).toEqual([]);
     });
   });
 

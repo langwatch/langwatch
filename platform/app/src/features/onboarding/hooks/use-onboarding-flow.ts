@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { OrganizationIntent } from "~/generated/prisma/client";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { readAttribution } from "~/utils/attribution";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
 import {

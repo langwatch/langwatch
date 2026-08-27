@@ -23,11 +23,17 @@ export const scimTokenRouter = createTRPCRouter({
     .input(
       z.object({
         description: z.string().optional(),
+        // D08: which connection this token is for. Optional on the wire and
+        // required by the service, so a client that has not been updated
+        // gets the named `scim_connection_required` refusal rather than a
+        // schema error the customer cannot read.
+        connectionId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       return ctx.app.scim.generateToken({
         organizationId: input.organizationId,
+        connectionId: input.connectionId,
         description: input.description,
       });
     }),

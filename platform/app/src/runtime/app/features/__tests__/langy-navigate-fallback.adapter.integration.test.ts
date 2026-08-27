@@ -97,9 +97,7 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
       // BASE_HOST is deployment config; what this pins is the PATH the
       // platform addresses (same reasoning as
       // simulation-run-platform-url.integration.test.ts).
-      expect(url).toContain(
-        `/${project.slug}/prompts?drawer.open=promptEditor&drawer.promptId=${prompt.id}`,
-      );
+      expect(url).toContain(`/${project.slug}/prompts?promptId=${prompt.id}`);
     });
   });
 

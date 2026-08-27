@@ -48,6 +48,13 @@ export const runDataSchema = z.object({
     .object({
       name: z.string().optional(),
       description: z.string().optional(),
+      /**
+       * One short line describing why the run was started. Absent, rather than
+       * empty, on a run started without one.
+       *
+       * @see specs/suites/run-note-metadata-convention.feature
+       */
+      note: z.string().optional(),
       langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough()

@@ -41,6 +41,11 @@ import {
   removeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
+  defaultCodexAgentsMdPath,
+  hasCodexAgentGuidance,
+  removeCodexAgentGuidance,
+} from "./codex-agents-md";
+import {
   appEnvHasAnyVar,
   appEnvValues,
   appSettingsTargetFor,
@@ -136,8 +141,7 @@ export function scanTelemetryTargets({
     targets.push({
       label: `claude telemetry env (${claudeTarget.displayPath})`,
       present: appEnvHasAnyVar(claudeTarget, keys) && isClaudeEnvLangwatchOwned(),
-      remove: () =>
-        isClaudeEnvLangwatchOwned() ? removeAppEnvVars(claudeTarget, keys) : false,
+      remove: () => (isClaudeEnvLangwatchOwned() ? removeAppEnvVars(claudeTarget, keys) : false),
     });
 
     // claude, the session context hook entries in the same settings file.
@@ -203,9 +207,7 @@ export function scanTelemetryTargets({
     if (appPlatform === "darwin" || appPlatform === "linux" || appPlatform === "win32") {
       const home = os.homedir();
       targets.push({
-        label: `copilot app capture agent (${tildify(
-          copilotAppAgentPath(appPlatform, home),
-        )})`,
+        label: `copilot app capture agent (${tildify(copilotAppAgentPath(appPlatform, home))})`,
         present: isCopilotAppAgentInstalled(appPlatform, home),
         remove: () => removeCopilotAppAgent(appPlatform, home),
       });
@@ -241,6 +243,16 @@ export function scanTelemetryTargets({
     label: `codex langwatch profile file (${tildify(codexProfile)})`,
     present: codexProfileFileIsLangwatchOwned(codexProfile),
     remove: () => removeCodexGatewayProfileFile(codexProfile),
+  });
+
+  // codex, the declare-your-context guidance block in its global AGENTS.md.
+  // Its own target because the file is the user's: removal deletes exactly
+  // the marker-managed block and keeps their content byte for byte.
+  const codexAgentsMd = defaultCodexAgentsMdPath();
+  targets.push({
+    label: `codex agent guidance (${tildify(codexAgentsMd)})`,
+    present: hasCodexAgentGuidance(codexAgentsMd),
+    remove: () => removeCodexAgentGuidance(codexAgentsMd),
   });
 
   // codex, the session context hook entries in its own hooks file. Same
@@ -279,11 +291,7 @@ export function scanTelemetryTargets({
 
   // VS Code integrated-terminal telemetry clear (the `code` hardening).
   const vscodePlatform = process.platform;
-  if (
-    vscodePlatform === "darwin" ||
-    vscodePlatform === "linux" ||
-    vscodePlatform === "win32"
-  ) {
+  if (vscodePlatform === "darwin" || vscodePlatform === "linux" || vscodePlatform === "win32") {
     const home = os.homedir();
     const vscodeArgs = {
       platform: vscodePlatform as VscodePlatform,
@@ -292,9 +300,7 @@ export function scanTelemetryTargets({
     };
     const settingsPath = vscodeUserSettingsPath(vscodePlatform as VscodePlatform, home);
     targets.push({
-      label: `VS Code terminal telemetry clear (${tildify(
-        settingsPath ?? "settings.json",
-      )})`,
+      label: `VS Code terminal telemetry clear (${tildify(settingsPath ?? "settings.json")})`,
       present: vscodeTerminalEnvHasAnyClear(vscodeArgs),
       remove: () => removeVscodeTerminalOtelEnv(vscodeArgs),
     });

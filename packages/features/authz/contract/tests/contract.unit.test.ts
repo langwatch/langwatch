@@ -4,6 +4,7 @@ import {
   ALL_PERMISSIONS,
   type Authorized,
   authzDecisionSchema,
+  authzOffboardInputSchema,
   authzPermissionSchema,
   authzPrincipalRefSchema,
   authzScopeRefSchema,
@@ -69,6 +70,16 @@ describe("the portable AuthZ contract", () => {
         actor: { type: "system", id: null },
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts the authenticated system actor that performs SCIM offboarding", () => {
+    expect(
+      authzOffboardInputSchema.parse({
+        actor: { type: "system", name: "scim" },
+        userId: "user_1",
+        organizationId: "organization_1",
+      }).actor,
+    ).toEqual({ type: "system", name: "scim" });
   });
 
   it("exports only the opaque witness type, never a public mint function", () => {

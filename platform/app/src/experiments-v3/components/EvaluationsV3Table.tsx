@@ -8,7 +8,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { nanoid } from "nanoid";
 import {
   useCallback,
   useEffect,
@@ -38,6 +37,7 @@ import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
+import { newTargetId } from "../actions/transforms/addTarget";
 import { DRAWER_WIDTH } from "../constants";
 import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
 import { useDatasetSync } from "../hooks/useDatasetSync";
@@ -188,12 +188,24 @@ type EvaluationsV3TableProps = {
   isLoadingDatasets?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
+  /**
+   * "Optimize this prompt": hand the column to Langy. The page owns the
+   * hook (it is the Langy integration point); undefined hides the menu item.
+   */
+  onOptimizeTarget?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
 };
 
 export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
   disableVirtualization = false,
+  onOptimizeTarget,
 }: EvaluationsV3TableProps) {
   const { openDrawer, closeDrawer, currentDrawer } = useDrawer();
   // Serializable drawer URL params (evaluatorType, evaluatorId, …). Read here so
@@ -231,6 +243,7 @@ export function EvaluationsV3Table({
     setColumnWidths,
     toggleColumnVisibility,
     addTarget,
+    duplicateTarget,
     updateTarget,
     updateTargetComparison,
     removeTarget,
@@ -272,6 +285,7 @@ export function EvaluationsV3Table({
       setColumnWidths: state.setColumnWidths,
       toggleColumnVisibility: state.toggleColumnVisibility,
       addTarget: state.addTarget,
+      duplicateTarget: state.duplicateTarget,
       updateTarget: state.updateTarget,
       updateTargetComparison: state.updateTargetComparison,
       removeTarget: state.removeTarget,
@@ -448,7 +462,7 @@ export function EvaluationsV3Table({
       const derivationIsFinal = savedAgent.type === "workflow" && fieldsResolved;
 
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`, // Generate unique ID for the workbench
+        id: newTargetId(),
         type: "agent", // This is a target of type "agent" (code/workflow/http)
         agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
@@ -521,7 +535,7 @@ export function EvaluationsV3Table({
       };
 
       const targetConfig: TargetConfig = {
-        id: `target_${Date.now()}`,
+        id: newTargetId(),
         type: "evaluator",
         targetEvaluatorId: evaluator.id,
         inputs,
@@ -562,7 +576,7 @@ export function EvaluationsV3Table({
     }) => {
       // Convert prompt to TargetConfig format (prompt type)
       // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
-      const targetId = `target_${Date.now()}`;
+      const targetId = newTargetId();
       const targetConfig: TargetConfig = {
         id: targetId,
         type: "prompt",
@@ -768,17 +782,19 @@ export function EvaluationsV3Table({
   // Handler for duplicating a target
   const handleDuplicateTarget = useCallback(
     (target: TargetConfig) => {
-      const newTarget: TargetConfig = {
-        ...target,
-        id: `target-${nanoid(8)}`,
-      };
-      addTarget(newTarget);
+      const duplicatedId = duplicateTarget({ targetId: target.id });
+      if (!duplicatedId) return;
+      // Read the copy back: the store wired it up (its own mappings plus every
+      // evaluator's mappings for it), so this is not the target we passed in.
+      const duplicated = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === duplicatedId);
       // Open the prompt editor for the duplicated target if it's a prompt
-      if (newTarget.type === "prompt") {
-        void openTargetEditor(newTarget);
+      if (duplicated?.type === "prompt") {
+        void openTargetEditor(duplicated);
       }
     },
-    [addTarget, openTargetEditor],
+    [duplicateTarget, openTargetEditor],
   );
 
   // Extracted so BOTH the Add→Comparison flow and the reload re-hydration
@@ -873,7 +889,7 @@ export function EvaluationsV3Table({
         const currentActiveDatasetId = useEvaluationsV3Store.getState().activeDatasetId;
 
         // Create target with pending mappings
-        const targetId = `target_${Date.now()}`;
+        const targetId = newTargetId();
         const targetConfig: TargetConfig = {
           id: targetId,
           type: "prompt",
@@ -1425,6 +1441,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleOptimizeTarget: onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
@@ -1455,6 +1472,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,

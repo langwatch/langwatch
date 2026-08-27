@@ -1,3 +1,4 @@
+import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import {
   Box,
   Button,
@@ -211,6 +212,11 @@ const getPresetForRange = (
   );
 };
 
+/** Where the range list opens, relative to the trigger. */
+export type PeriodSelectorPlacement = NonNullable<
+  NonNullable<PopoverRootProps["positioning"]>["placement"]
+>;
+
 export function PeriodSelector({
   period: { startDate, endDate },
   mode,
@@ -218,6 +224,9 @@ export function PeriodSelector({
   setPeriod,
   setRelativePeriod,
   clearPeriod,
+  size = "sm",
+  triggerVariant = "outline",
+  placement = "bottom-end",
 }: {
   period: Period;
   mode: PeriodMode;
@@ -235,6 +244,12 @@ export function PeriodSelector({
    * appears only when they pass this.
    */
   clearPeriod?: () => void;
+  /** The size of the trigger. A rail foot wants "xs". */
+  size?: ButtonProps["size"];
+  /** The look of the trigger. A rail foot wants "ghost". */
+  triggerVariant?: ButtonProps["variant"];
+  /** Where the range list opens. A control at the foot of a rail wants "top-start". */
+  placement?: PeriodSelectorPlacement;
 }) {
   const { open, onOpen, onClose, setOpen } = useDisclosure();
 
@@ -260,7 +275,7 @@ export function PeriodSelector({
     <Popover.Root
       open={open}
       onOpenChange={({ open }) => setOpen(open)}
-      positioning={{ placement: "bottom-end" }}
+      positioning={{ placement }}
       size="sm"
     >
       <Popover.Trigger asChild>

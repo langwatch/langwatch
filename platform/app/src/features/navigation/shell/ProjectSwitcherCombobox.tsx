@@ -58,6 +58,11 @@ export function ProjectSwitcherCombobox({
       value={[currentProjectId]}
       openOnClick
       selectionBehavior="clear"
+      // Typing highlights the top result, so a reader can search and press
+      // Enter without reaching for the arrow keys or the mouse. A running
+      // search offers projects only, so Enter can never land on a create
+      // entry (see `useProjectPickItems`).
+      inputBehavior="autohighlight"
       onValueChange={(details) => {
         const next = details.value?.[0];
         if (next) pick(next);

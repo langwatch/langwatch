@@ -133,6 +133,12 @@ export async function ensureEvaluator({
   });
 }
 
+/**
+ * Deletes an evaluator by id. Already-gone (404) is the desired end state, not
+ * a failure — the callers are cleanup paths that run precisely when a run went
+ * wrong, so the resource being absent already is success. Everything else
+ * throws; swallowing the error would hide the leak this exists to prevent.
+ */
 export async function deleteEvaluator(id: string): Promise<void> {
   const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
     method: "DELETE",
@@ -202,9 +208,23 @@ export async function listMonitors(): Promise<Array<{ id: string; name?: string 
 }
 
 /**
- * Cleanup for the monitor scenario. Langy's own session key cannot delete —
- * that grain is withheld from it on purpose — but the suite runs with a full
- * project key, so the test can tidy up after itself.
+ * Seeds an evaluator for the delete scenario, so the deletion has a known,
+ * suite-owned target rather than gambling on whatever the project contains.
+ * The `evaluatorType` must be one the platform validates
+ * (`langevals/exact_match` costs nothing and needs no model config).
+ */
+export async function createEvaluator(
+  name: string,
+): Promise<{ id: string; name: string }> {
+  return lwPost({
+    path: "/api/evaluators",
+    body: { name, config: { evaluatorType: "langevals/exact_match" } },
+  });
+}
+
+/**
+ * Cleanup for the monitor scenario. The suite runs with a full project key,
+ * so it can tidy up regardless of what the scenario under test managed to do.
  *
  * A monitor that is already gone (404) is the desired end state, not a failure.
  * Everything else throws. Swallowing the error would be worse than a noisy

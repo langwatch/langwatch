@@ -13,17 +13,15 @@ declare the source shape, the framework handles polling + pagination +
 parsing + cursor-based resume.
 
 <Info>
-  **Pairs with:** [Ingestion sources](/ai-governance/ingestion-sources/index) (the broader
-  substrate that pull-mode lands events into) and [CLI
-  debugging](/ai-governance/cli-debug) (`langwatch ingest tail` shows pulled events
-  alongside pushed ones).
+  **Pairs with:** [Ingestion sources](/ai-governance/ingestion-sources/index) (the broader substrate
+  that pull-mode lands events into) and [CLI debugging](/ai-governance/cli-debug) (`langwatch ingest
+  tail` shows pulled events alongside pushed ones).
 </Info>
 
 <Warning>
   **Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise
-  multi-source governance ingestion stack. Apache 2.0 deployments use single-source
-  `otel_generic` push only. See [Open-core
-  licensing](/ai-governance/overview#open-core-licensing).
+  multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic`
+  push only. See [Open-core licensing](/ai-governance/open-core-licensing).
 </Warning>
 
 Inspired by Singer Tap, Airbyte CDK, Apache Camel, Kafka Connect (pull
@@ -160,7 +158,7 @@ If neither `http_polling` nor `s3_polling` fits your source, you can
 ship a custom adapter:
 
 ```ts
-// platform/app/ee/governance/services/pullers/myCustom.puller.ts
+// packages/enterprise/features/governance/server/src/adapters/my-custom-puller.adapter.ts
 import { PullerAdapter, PullResult } from "./PullerAdapter";
 import { z } from "zod";
 

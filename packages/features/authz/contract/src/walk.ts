@@ -84,7 +84,15 @@ export function organizationMembershipGateStep({
 }: DecideContext): AuthzDecision | undefined {
   if (scope.type === "resource") return;
   if (grants.principal.type !== "user" || grants.isOrgMember) return;
-  return { ...base, allowed: false, denialReason: "no-membership" };
+  return {
+    ...base,
+    allowed: false,
+    // A disabled membership fails the SAME gate as an absent one - the
+    // difference is only what the person is told, and it is a difference
+    // they can act on: an admin can re-enable a seat, nobody can re-enable
+    // a membership that was never there.
+    denialReason: grants.membershipDisabled ? "membership-disabled" : "no-membership",
+  };
 }
 
 /**
@@ -185,10 +193,16 @@ export function resourceGrantStep({
 
 /** No step granted: name the gate the caller can act on. */
 export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzDecision {
+  // Checked before everything else: a disabled seat is the reason NO path
+  // exists, so reporting the absence it causes ("no membership", "no
+  // binding") would name the symptom. On a resource scope this is the only
+  // step that runs, because the membership gate defers there to keep share
+  // links reachable.
+  if (grants.membershipDisabled) {
+    return { ...base, allowed: false, denialReason: "membership-disabled" };
+  }
   const hadAnyPath =
-    grants.isOrgMember ||
-    chainBindings.length > 0 ||
-    grants.legacyTeamMemberships.length > 0;
+    grants.isOrgMember || chainBindings.length > 0 || grants.legacyTeamMemberships.length > 0;
 
   return {
     ...base,

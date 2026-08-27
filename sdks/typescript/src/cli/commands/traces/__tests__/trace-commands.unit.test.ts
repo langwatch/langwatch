@@ -8,9 +8,7 @@ import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 // suite asserts the human default regardless of what launched vitest.
 let savedAgentEnv: Record<string, string | undefined> = {};
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 });
 afterEach(() => {
@@ -154,7 +152,8 @@ describe("searchTracesCommand()", () => {
   });
 
   describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+    /** @scenario "A search-backed list also carries the total under the common name" */
+    it("outputs the document it was given, with the total under the common name", async () => {
       const result = {
         traces: [{ traceId: "t1" }],
         pagination: { totalHits: 1 },
@@ -163,7 +162,19 @@ describe("searchTracesCommand()", () => {
 
       await searchTracesCommand({ format: "json" });
 
-      expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
+      // A trace search says how many it matched as `totalHits`, and every
+      // resource list says it as `total`. Both are printed, so a caller has
+      // one name to read on any list.
+      expect(console.log).toHaveBeenCalledWith(
+        JSON.stringify(
+          {
+            traces: [{ traceId: "t1" }],
+            pagination: { totalHits: 1, total: 1 },
+          },
+          null,
+          2,
+        ),
+      );
     });
   });
 
@@ -286,9 +297,10 @@ describe("exportTracesCommand()", () => {
     it("passes the origin as a traces.origin filter to the search API", async () => {
       await exportTracesCommand({ origin: "application,evaluation" });
 
-      const body = JSON.parse(
-        (fetchMock.mock.calls[0]![1] as { body: string }).body,
-      ) as Record<string, unknown>;
+      const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body) as Record<
+        string,
+        unknown
+      >;
       expect(body.filters).toEqual({
         "traces.origin": ["application", "evaluation"],
       });
@@ -299,9 +311,10 @@ describe("exportTracesCommand()", () => {
     it("sends no filters field so the export body stays unchanged", async () => {
       await exportTracesCommand({});
 
-      const body = JSON.parse(
-        (fetchMock.mock.calls[0]![1] as { body: string }).body,
-      ) as Record<string, unknown>;
+      const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body) as Record<
+        string,
+        unknown
+      >;
       expect(body).not.toHaveProperty("filters");
     });
   });
@@ -366,9 +379,7 @@ describe("exportTracesCommand()", () => {
 
     /** @scenario export stops paging when the server returns no further cursor */
     it("stops after the page that returns no scrollId", async () => {
-      fetchMock.mockResolvedValueOnce(
-        pageResponse({ count: 40, from: 0, totalHits: 40 }),
-      );
+      fetchMock.mockResolvedValueOnce(pageResponse({ count: 40, from: 0, totalHits: 40 }));
 
       await exportTracesCommand({ limit: "1000" });
 
@@ -428,9 +439,7 @@ describe("exportTracesCommand()", () => {
         pageResponse({ count: 100, from: 0, scrollId: "s", totalHits: 1000 }),
       );
 
-      await expect(exportTracesCommand({ limit: "abc" })).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(exportTracesCommand({ limit: "abc" })).rejects.toThrow(ProcessExitError);
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
@@ -460,9 +469,7 @@ describe("exportTracesCommand()", () => {
 
     /** @scenario export with --include-spans requests smaller pages */
     it("caps each page at 200 so per-trace span joining stays bounded", async () => {
-      fetchMock.mockResolvedValueOnce(
-        pageResponse({ count: 200, from: 0, totalHits: 200 }),
-      );
+      fetchMock.mockResolvedValueOnce(pageResponse({ count: 200, from: 0, totalHits: 200 }));
 
       await exportTracesCommand({ includeSpans: true });
 
@@ -550,9 +557,7 @@ describe("transcriptTraceCommand()", () => {
   it("fetches the transcript endpoint and prints the entries", async () => {
     await transcriptTraceCommand("trace_abc", {});
 
-    expect(String(fetchMock.mock.calls[0]![0])).toContain(
-      "/api/traces/trace_abc/transcript",
-    );
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/api/traces/trace_abc/transcript");
     const printed = logSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(printed).toContain("summarise the repo");
     expect(printed).toContain("Here is the summary.");

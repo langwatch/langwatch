@@ -13,16 +13,14 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/simulation-contract";
 import { ScenarioGridCard } from "./scenario-grid-card";
-import {
-  type ScenarioRunContextRenderer,
-  ScenarioTargetRow,
-} from "./scenario-target-row";
+import { type ScenarioRunContextRenderer, ScenarioTargetRow } from "./scenario-target-row";
 import type { ViewMode } from "./use-run-history-store";
 
 const VIRTUALIZE_THRESHOLD = 30;
 const GRID_CARD_HEIGHT = 200;
 const GRID_GAP = 16;
-const GRID_PADDING = 16;
+/** The inset the grid draws around itself when the caller asks for none. */
+const DEFAULT_GRID_PADDING = 16;
 const GRID_ROW_HEIGHT = GRID_CARD_HEIGHT + GRID_GAP;
 const LIST_ROW_HEIGHT = 37;
 const MIN_CARD_WIDTH = 250;
@@ -37,6 +35,12 @@ type ScenarioRunContentProps = {
   cancellingJobId?: string | null;
   onPrefetchRun?: (scenarioRunId: string) => void;
   renderScenarioContext?: ScenarioRunContextRenderer;
+  /**
+   * The inset around the grid of cards, in pixels. A page that already pads
+   * the column the grid sits in passes 0, so the cards line up with whatever
+   * reads above them.
+   */
+  gridPadding?: number;
 };
 
 /**
@@ -64,10 +68,7 @@ const StableGridCard = memo(function StableGridCard({
     () => onScenarioRunClick(scenarioRun),
     [onScenarioRunClick, scenarioRun],
   );
-  const handleCancel = useCallback(
-    () => onCancelRun?.(scenarioRun),
-    [onCancelRun, scenarioRun],
-  );
+  const handleCancel = useCallback(() => onCancelRun?.(scenarioRun), [onCancelRun, scenarioRun]);
   return (
     <ScenarioGridCard
       scenarioRun={scenarioRun}
@@ -100,13 +101,14 @@ function PlainContent({
   cancellingJobId,
   onPrefetchRun,
   renderScenarioContext,
+  gridPadding = DEFAULT_GRID_PADDING,
 }: ScenarioRunContentProps) {
   if (viewMode === "grid") {
     return (
       <Grid
         templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
         gap={4}
-        padding={4}
+        padding={`${gridPadding}px`}
         position="relative"
         zIndex={0}
         data-testid="scenario-grid"
@@ -170,6 +172,7 @@ function VirtualizedContent({
   cancellingJobId,
   onPrefetchRun,
   renderScenarioContext,
+  gridPadding = DEFAULT_GRID_PADDING,
 }: ScenarioRunContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
@@ -186,25 +189,21 @@ function VirtualizedContent({
   // Measure columns for grid mode before first paint
   useLayoutEffect(() => {
     if (!containerRef.current || !isGrid) return;
-    const available = containerRef.current.clientWidth - GRID_PADDING * 2;
-    setColumns(
-      Math.max(1, Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))),
-    );
-  }, [isGrid]);
+    const available = containerRef.current.clientWidth - gridPadding * 2;
+    setColumns(Math.max(1, Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))));
+  }, [isGrid, gridPadding]);
 
   // Keep columns updated on resize
   useEffect(() => {
     if (!containerRef.current || !isGrid) return;
     const el = containerRef.current;
     const observer = new ResizeObserver(() => {
-      const available = el.clientWidth - GRID_PADDING * 2;
-      setColumns(
-        Math.max(1, Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))),
-      );
+      const available = el.clientWidth - gridPadding * 2;
+      setColumns(Math.max(1, Math.floor((available + GRID_GAP) / (MIN_CARD_WIDTH + GRID_GAP))));
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isGrid]);
+  }, [isGrid, gridPadding]);
 
   // Compute scrollMargin: distance from scroll element content-top to our container top.
   // This is stable regardless of scroll position (the scroll offset cancels out).
@@ -212,14 +211,10 @@ function VirtualizedContent({
   if (containerRef.current && scrollElement) {
     const containerRect = containerRef.current.getBoundingClientRect();
     const scrollRect = scrollElement.getBoundingClientRect();
-    scrollMargin = Math.round(
-      containerRect.top - scrollRect.top + scrollElement.scrollTop,
-    );
+    scrollMargin = Math.round(containerRect.top - scrollRect.top + scrollElement.scrollTop);
   }
 
-  const rowCount = isGrid
-    ? Math.ceil(scenarioRuns.length / columns)
-    : scenarioRuns.length;
+  const rowCount = isGrid ? Math.ceil(scenarioRuns.length / columns) : scenarioRuns.length;
   const rowHeight = isGrid ? GRID_ROW_HEIGHT : LIST_ROW_HEIGHT;
 
   const getScrollElementCb = useCallback(() => scrollElement, [scrollElement]);
@@ -243,7 +238,7 @@ function VirtualizedContent({
       <div
         ref={containerRef}
         style={{
-          height: contentHeight + GRID_PADDING * 2,
+          height: contentHeight + gridPadding * 2,
           width: "100%",
           position: "relative",
           flexShrink: 0,
@@ -258,9 +253,9 @@ function VirtualizedContent({
               key={virtualRow.index}
               style={{
                 position: "absolute",
-                top: GRID_PADDING,
-                left: GRID_PADDING,
-                right: GRID_PADDING,
+                top: gridPadding,
+                left: gridPadding,
+                right: gridPadding,
                 height: GRID_CARD_HEIGHT,
                 transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
                 display: "grid",

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { trackServerEvent } from "~/server/posthog";
+import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { projectSchema } from "./schemas";
 
@@ -28,6 +29,8 @@ const createScenarioSchema = projectSchema.extend({
   // Turn config (ADR-015); null clears back to SDK default.
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // The folder (test suite) this case is filed in; absent or null = unfiled.
+  folderId: z.string().nullish(),
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -41,6 +44,12 @@ const updateScenarioSchema = projectSchema.extend({
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // Absent = keep the current folder; null = unfile; a folder id = move.
+  folderId: z.string().nullish(),
+  // The version the editor loaded. When sent, a save against any other
+  // version is refused with scenario_stale_version instead of overwriting
+  // the newer save. Absent = save over whatever is there.
+  expectedVersion: z.number().int().min(1).optional(),
 });
 
 /**
@@ -76,10 +85,7 @@ export const scenarioCrudRouter = createTRPCRouter({
         })
         .catch(captureException);
 
-      logger.info(
-        { projectId: input.projectId, scenarioId: result.id },
-        "Scenario created",
-      );
+      logger.info({ projectId: input.projectId, scenarioId: result.id }, "Scenario created");
       return result;
     }),
 
@@ -95,10 +101,7 @@ export const scenarioCrudRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      logger.debug(
-        { projectId: input.projectId, scenarioId: input.id },
-        "Fetching scenario by id",
-      );
+      logger.debug({ projectId: input.projectId, scenarioId: input.id }, "Fetching scenario by id");
       const scenario = await ctx.app.scenarios.tryGetById(input);
       if (!scenario) {
         throw new TRPCError({
@@ -124,38 +127,43 @@ export const scenarioCrudRouter = createTRPCRouter({
     .input(updateScenarioSchema)
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      logger.info(
-        { projectId: input.projectId, scenarioId: input.id },
-        "Updating scenario",
-      );
+      logger.info({ projectId: input.projectId, scenarioId: input.id }, "Updating scenario");
 
-      const { id, projectId, ...data } = input;
-      const result = await ctx.app.scenarios.update({
-        id,
-        projectId,
-        ...data,
-        lastUpdatedById: ctx.session.user.id,
-      });
+      const { id, projectId, expectedVersion, ...data } = input;
+      const service = ScenarioService.create(ctx.prisma);
+      try {
+        const result = await service.update({
+          id,
+          projectId,
+          data: {
+            ...data,
+            lastUpdatedById: ctx.session.user.id,
+          },
+          options: {
+            actor: { userId: ctx.session.user.id, label: "user" },
+            expectedVersion,
+          },
+        });
 
-      logger.info({ projectId, scenarioId: id }, "Scenario updated");
-      return result;
+        logger.info({ projectId, scenarioId: id }, "Scenario updated");
+        return result;
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
     }),
 
   archive: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      logger.info(
-        { projectId: input.projectId, scenarioId: input.id },
-        "Archiving scenario",
-      );
+      logger.info({ projectId: input.projectId, scenarioId: input.id }, "Archiving scenario");
 
       try {
         const result = await ctx.app.scenarios.archive(input);
-        logger.info(
-          { projectId: input.projectId, scenarioId: input.id },
-          "Scenario archived",
-        );
+        logger.info({ projectId: input.projectId, scenarioId: input.id }, "Scenario archived");
         return result;
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
@@ -163,6 +171,64 @@ export const scenarioCrudRouter = createTRPCRouter({
             code: "NOT_FOUND",
             message: error.message,
           });
+        }
+        throw error;
+      }
+    }),
+
+  moveToFolder: protectedProcedure
+    .input(
+      projectSchema.extend({
+        scenarioId: z.string(),
+        // A folder id files the case there; null unfiles it.
+        folderId: z.string().nullable(),
+      }),
+    )
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      logger.info(
+        {
+          projectId: input.projectId,
+          scenarioId: input.scenarioId,
+          folderId: input.folderId,
+        },
+        "Moving scenario to folder",
+      );
+
+      const service = ScenarioService.create(ctx.prisma);
+      try {
+        return await service.moveToFolder({
+          scenarioId: input.scenarioId,
+          projectId: input.projectId,
+          folderId: input.folderId,
+        });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
+    }),
+
+  duplicate: protectedProcedure
+    .input(projectSchema.extend({ scenarioId: z.string() }))
+    .permission("scenarios:manage")
+    .mutation(async ({ ctx, input }) => {
+      logger.info(
+        { projectId: input.projectId, scenarioId: input.scenarioId },
+        "Duplicating scenario",
+      );
+
+      const service = ScenarioService.create(ctx.prisma);
+      try {
+        return await service.duplicate({
+          scenarioId: input.scenarioId,
+          projectId: input.projectId,
+          lastUpdatedById: ctx.session.user.id,
+        });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
         }
         throw error;
       }

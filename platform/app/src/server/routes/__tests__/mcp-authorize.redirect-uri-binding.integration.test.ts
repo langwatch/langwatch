@@ -34,7 +34,9 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
     },
     mockPrisma: {
       organizationUser: {
-        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       roleBinding: {

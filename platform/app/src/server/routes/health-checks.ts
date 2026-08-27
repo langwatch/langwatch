@@ -21,6 +21,7 @@ import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { prisma } from "~/server/db";
+import { sendCanary } from "~/server/health-probes/canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
 

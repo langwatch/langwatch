@@ -59,8 +59,19 @@ Feature: Langy asks a real question with selectable options
   Scenario: Options naming real entities render as live rows
     Given a question whose options reference existing agents by id
     When the card renders
-    Then each option shows the entity's current name and vital detail
+    Then each option carries the entity's current name and vital detail
     And the rows are resolved with my own permissions
+
+  # An option's label is the answer, not a name for the thing it points at.
+  # "Publish the winning draft" grounded in the prompt it would publish read as
+  # that prompt's own name and version, so the closing question of a whole
+  # optimization run looked like a list of two unrelated resources.
+  @integration
+  Scenario: A grounded option still reads as the answer it is
+    Given an option labeled with an action and referencing the resource it acts on
+    When the card renders
+    Then the row reads as the option's own label
+    And the resource's current name reads under it as detail
 
   Scenario: A dead reference cannot be selected
     Given an option referencing an entity that no longer exists

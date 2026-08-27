@@ -10,6 +10,7 @@ import type { ScimRepositoryPort } from "../src/ports/scim-repository.port";
 import { ScimDirectoryService } from "../src/services/scim-directory.service";
 import { ScimGrantsService } from "../src/services/scim-grants.service";
 import { ScimService } from "../src/services/scim.service";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle";
 
 const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
@@ -147,6 +148,8 @@ describe("SCIM PATCH operation casing parity", () => {
       users,
       governance: governance(),
       entitlements: new EnterpriseEntitlements(),
+      lifecycle: new QuietScimSyncLifecycle(),
+      provenOffboarding: false,
     });
     await service.updateUser({
       id: "user-1",

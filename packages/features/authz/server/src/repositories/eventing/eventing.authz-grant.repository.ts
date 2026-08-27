@@ -20,6 +20,7 @@ import type { LedgerActor } from "@langwatch/actor";
 import {
   BindingMissingError,
   DuplicateBindingError,
+  type GrantEventSource,
   OffboardIncompleteError,
   type OffboardCounts,
 } from "@langwatch/authz-contract";
@@ -128,9 +129,7 @@ export type EventingAuthzGrantRepositoryOptions = {
 export class EventingAuthzGrantRepository extends AuthzGrantRepository {
   private readonly reads: PrismaAuthzGrantRepository;
 
-  static create(
-    options: EventingAuthzGrantRepositoryOptions,
-  ): EventingAuthzGrantRepository {
+  static create(options: EventingAuthzGrantRepositoryOptions): EventingAuthzGrantRepository {
     return new EventingAuthzGrantRepository(options);
   }
 
@@ -179,9 +178,11 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
   async createBinding({
     row,
     actor,
+    source,
   }: {
     row: RoleBindingWrite;
     actor: LedgerActor;
+    source?: GrantEventSource;
   }): Promise<void> {
     const { organizationId, ...binding } = row;
     await AuthzGrantPortFailureMapper.run(() =>
@@ -189,6 +190,9 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
         organizationId,
         bindings: [binding],
         actor,
+        // Omitted rather than defaulted here: the writer owns the default,
+        // and stating it twice is how the two drift apart.
+        ...(source ? { source } : {}),
         onDuplicate: "reject",
       }),
     );

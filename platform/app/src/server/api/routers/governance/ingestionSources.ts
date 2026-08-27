@@ -47,20 +47,43 @@ const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
  * knew and post it there. The UI has no use for it either way; it collects a
  * fresh secret when one is being set and sends nothing when it is not.
  */
-function toDto(row: {
-  id: string;
-  organizationId: string;
-  teamId: string | null;
-  sourceType: string;
-  name: string;
-  description: string | null;
-  parserConfig: unknown;
-  status: string;
-  lastEventAt: Date | null;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdById: string | null;
+export function toIngestionSourceDto({
+  row,
+  liveTraceProjectIds,
+}: {
+  row: {
+    id: string;
+    organizationId: string;
+    teamId: string | null;
+    sourceType: string;
+    name: string;
+    description: string | null;
+    parserConfig: unknown;
+    // Required, not optional: if a future `select` clause stops fetching this,
+    // `hasPollerCursor` would silently answer false for every source and the
+    // edit form would offer a backfill start that cannot take effect. Better a
+    // compile error than a setting that quietly does nothing.
+    pollerCursor: unknown;
+    // Required for the same reason as `pollerCursor` above: the edit form
+    // seeds its cadence field from this column, and a `select` clause that
+    // stopped fetching it would send the form back to the stale duplicate
+    // inside parserConfig — which is the bug this field was added to close.
+    pullSchedule: string | null;
+    status: string;
+    traceProjectId: string | null;
+    lastEventAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    createdById: string | null;
+  };
+  /**
+   * Of the destinations these rows point at, the ones still live in this
+   * org. Anything else is archived, deleted, or was never ours — all three
+   * mean the puller has stopped routing (`pullerWorker.ts:387-396`), which
+   * is the one thing the drawer must say and cannot work out for itself.
+   */
+  liveTraceProjectIds: ReadonlySet<string>;
 }) {
   const parser = (row.parserConfig as Record<string, unknown>) ?? {};
   const safeParser = Object.fromEntries(
@@ -74,13 +97,56 @@ function toDto(row: {
     name: row.name,
     description: row.description,
     parserConfig: safeParser,
+    /**
+     * Whether a pull has already minted a cursor — NOT the cursor itself,
+     * which is adapter-internal and of no use to a client.
+     *
+     * The edit form needs this to know whether the backfill start is still in
+     * play: the usage cursor deliberately never rewinds, so once one exists
+     * the setting is accepted and then ignored. `status` is not a usable proxy
+     * for it in either direction — a source that pulled successfully but
+     * recorded zero events is still `awaiting_first_event` while holding a
+     * cursor, and one disabled before its first run never held one.
+     */
+    hasPollerCursor: hasPollerCursor(row.pollerCursor),
+    /**
+     * The cron the lifecycle actually runs this source on.
+     *
+     * `parserConfig` carries an adapter-owned copy under `schedule`, written
+     * by the composer on create, and the two drift the moment anything writes
+     * one without the other — `update` accepts this column on its own, and
+     * seeds and migrations touch neither. The edit form used to seed from the
+     * copy because this column never reached the client; it does now, so the
+     * form shows the cadence that is running rather than the one that was
+     * last written through the composer.
+     *
+     * Not a secret: a cron expression says how often we poll, nothing about
+     * the credentials we poll with.
+     */
+    pullSchedule: row.pullSchedule,
     status: row.status,
+    traceProjectId: row.traceProjectId,
+    traceProjectArchived: row.traceProjectId
+      ? !liveTraceProjectIds.has(row.traceProjectId)
+      : false,
     lastEventAt: row.lastEventAt,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdById: row.createdById,
   };
+}
+
+async function dtoForRow(
+  service: IngestionSourceService,
+  row: Parameters<typeof toIngestionSourceDto>[0]["row"],
+  organizationId: string,
+) {
+  const liveTraceProjectIds = await service.liveTraceProjectIds(
+    [row],
+    organizationId,
+  );
+  return toIngestionSourceDto({ row, liveTraceProjectIds });
 }
 
 export const ingestionSourcesRouter = createTRPCRouter({
@@ -119,6 +185,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: z.record(z.string(), z.unknown()).optional(),
         pullConfig: z.record(z.string(), z.unknown()).nullable().optional(),
         pullSchedule: z.string().min(1).max(64).nullable().optional(),
+        traceProjectId: z.string().min(1).nullable().optional(),
       }),
     )
     .permission("ingestionSources:manage")
@@ -133,10 +200,11 @@ export const ingestionSourcesRouter = createTRPCRouter({
         parserConfig: input.parserConfig,
         pullConfig: input.pullConfig,
         pullSchedule: input.pullSchedule,
+        traceProjectId: input.traceProjectId,
         actorUserId: ctx.session.user.id,
       });
       return {
-        source: toDto(created.source),
+        source: await dtoForRow(service, created.source, input.organizationId),
         ingestSecret: created.ingestSecret,
       };
     }),
@@ -152,6 +220,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         status: statusSchema.optional(),
         teamId: z.string().nullable().optional(),
         pullSchedule: z.string().min(1).max(64).nullable().optional(),
+        traceProjectId: z.string().min(1).nullable().optional(),
       }),
     )
     .permission("ingestionSources:manage")
@@ -166,8 +235,9 @@ export const ingestionSourcesRouter = createTRPCRouter({
         status: input.status,
         teamId: input.teamId,
         pullSchedule: input.pullSchedule,
+        traceProjectId: input.traceProjectId,
       });
-      return toDto(updated);
+      return dtoForRow(service, updated, input.organizationId);
     }),
 
   /**
@@ -184,7 +254,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         input.organizationId,
       );
       return {
-        source: toDto(rotated.source),
+        source: await dtoForRow(service, rotated.source, input.organizationId),
         ingestSecret: rotated.ingestSecret,
       };
     }),
