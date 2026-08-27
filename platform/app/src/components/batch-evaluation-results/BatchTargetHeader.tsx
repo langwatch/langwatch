@@ -23,11 +23,11 @@ import {
   CostStatsTooltip,
   LatencyStatsTooltip,
 } from "~/components/shared/MetricStatsTooltip";
-import { passRateCoverage } from "~/components/shared/passRateCoverage";
 import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
+import { passRateCoverage } from "~/components/shared/passRateCoverage";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
