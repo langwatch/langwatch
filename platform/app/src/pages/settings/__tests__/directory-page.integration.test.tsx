@@ -190,7 +190,7 @@ describe("given the directory page", () => {
       expect(screen.getByTestId("people-section")).toBeInTheDocument();
     });
 
-    /** @scenario The rules by which somebody arrives are asked on Authentication */
+    /** @scenario The rules are not on the page about the people they admit */
     it("carries neither of the rules that admit people", () => {
       renderPage();
 
@@ -201,7 +201,7 @@ describe("given the directory page", () => {
       expect(screen.queryByTestId("two-step-requirement-card")).toBeNull();
     });
 
-    /** @scenario The tabs are four subjects drawn one way */
+    /** @scenario The tabs name the subjects this page owns */
     it("offers people, teams and groups as three tabs", () => {
       renderPage();
 

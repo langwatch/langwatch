@@ -411,10 +411,12 @@ Feature: The people and access settings, as one cluster
       And the page still says SCIM, for the administrator who searched for it
 
   # FOUR TABS, EACH A DIFFERENT SUBJECT. People, the containers people sit
-  # in, the groups a provider sends, and the credential it sends them with.
-  # They share one table treatment, one place for the tab's own action, and
-  # one heading rhythm, so moving between them is a change of subject rather
-  # than a change of product.
+  # in, the groups a provider sends, and the departments they are spent
+  # against. The credential the provider sends them with is NOT among them:
+  # it is about how people arrive, and it is asked on Authentication beside
+  # the connection it belongs to. They share one table treatment, one place
+  # for the tab's own action, and one heading rhythm, so moving between them
+  # is a change of subject rather than a change of product.
 
   Rule: the tabs are four subjects drawn one way
 
@@ -430,6 +432,58 @@ Feature: The people and access settings, as one cluster
       Then every tab that carries a number carries it as a badge on the tab
       And a tab with nothing in it still carries its zero
 
+    @integration
+    Scenario: The tabs name the subjects this page owns
+      When "ana" opens the directory page
+      Then the people, the teams and the groups each have a tab
+      And how the connector is set up is not among them, because that is about
+      how people arrive rather than about who arrived
+
+  # THE STRUCTURE THE DIRECTORY'S PEOPLE ARE SPENT AGAINST. Departments are
+  # managed under Governance, because that is where the spend they carry is
+  # read. The directory reports on them and links out, rather than offering a
+  # second place to assign anybody and a second answer about who holds whom.
+
+  Rule: the departments are reported on here and managed under Governance
+
+    @integration
+    Scenario: The departments tab joins only where there is anything to put on it
+      Given "acme" has departments
+      When "ana" opens the directory page
+      Then a departments tab is offered, carrying how many there are
+      And an organization with none is offered no such tab
+
+    @integration
+    Scenario: The departments tab references what Governance manages
+      When "ana" opens the directory page at the departments
+      Then the departments are what she is looking at
+
+    @integration
+    Scenario: A reader who may not view governance is offered no departments tab
+      Given "ana" may manage the organization but may not view governance
+      When she opens the directory page at an address naming the departments
+      Then no departments tab is offered
+      And she lands on the people rather than on a refusal
+
+    @integration
+    Scenario: A department says how much it holds, in its own words
+      When "ana" reads the departments
+      Then each one names the people, the teams and the projects it holds
+      And a part it holds none of is left out rather than read out as a zero
+      And a department holding nobody says so plainly
+
+    @integration
+    Scenario: The people no department holds are counted underneath
+      When "ana" reads the departments
+      Then the people no department holds are counted beneath them
+      And no department is invented to hold them
+
+    @integration
+    Scenario: Assignment stays where it is managed
+      When "ana" reads the departments
+      Then she is offered the way to Governance, where they are assigned
+      And nothing on this tab assigns anybody
+
   # A COUNT IS THE ONE ANSWER NOBODY CAN CHECK. The band says the directory
   # manages twelve people, and an administrator asking whether the sync is
   # right is asking about a PERSON: did Sam come through Okta, is Ana still
@@ -437,6 +491,13 @@ Feature: The people and access settings, as one cluster
   # can see. So the page names them.
 
   Rule: the people the directory manages are named, not only counted
+
+    @integration
+    Scenario: A member's department is readable at a glance
+      When "ana" reads the people the directory manages
+      Then a member a department holds carries its name beside their own
+      And a member no department holds carries nothing rather than an empty
+      label
 
     @integration
     Scenario: The directory's own people are listed by name
@@ -525,6 +586,23 @@ Feature: The people and access settings, as one cluster
       for two days
       When "ana" opens the authentication page
       Then "acme.com" is listed as missing its record rather than as proved
+
+    @integration
+    Scenario: A connection that is on but carrying nobody says both
+      When "ana" opens the authentication page
+      Then the sign-on card says who the connection routes as well as whether
+      it is on
+      And neither of the two ever stands in for the other
+
+    @integration
+    Scenario: Verifying a domain is answerable from here
+      When "ana" reads the domains on the authentication page
+      Then each one says whether it is proved or still waiting on her
+      And she is offered the way to prove another
+      And an organization that has claimed none is told so rather than shown
+      an empty panel
+      And a reader who may not see single sign-on is told who can tell them,
+      rather than shown a failure
 
     @integration
     Scenario: The overview offers only what the connection really has
