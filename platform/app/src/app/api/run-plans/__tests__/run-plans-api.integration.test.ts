@@ -332,7 +332,6 @@ describe("Feature: Run Plans REST API", () => {
           planName: "Nightly",
           created: true,
         });
-        expect(body.platformUrl).toMatch(/^https?:\/\//);
         expect(queueSimulationRun).toHaveBeenCalledTimes(1);
         expect(startSuiteRun).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -345,6 +344,11 @@ describe("Feature: Run Plans REST API", () => {
         });
         expect(stored?.name).toBe("Nightly");
         expect(stored?.kind).toBe("custom");
+        // Both interfaces open a run plan on a page of its own, so the link
+        // names the plan either way. Whether it carries a scheme is a
+        // property of BASE_HOST, which `shared/__tests__/platform-url.unit.test.ts`
+        // owns.
+        expect(body.platformUrl).toContain(stored?.slug);
       });
     });
 
