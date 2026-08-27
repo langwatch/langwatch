@@ -115,6 +115,51 @@ Feature: The Results tab
     Then every bar is drawn at the same reduced opacity
     And that opacity is stated in one place for the whole page
 
+  # --- The row menu of a run plan ---
+
+  @integration
+  Scenario: The row menu of a run plan offers to archive it
+    Given the Results tab is open on the list of run plans
+    When the row menu of a run plan is opened
+    Then it offers "Archive run plan"
+    And that action reads last, under "Edit run plan"
+    And it reads in the colour of a destructive action
+
+  @integration
+  Scenario: Archiving a run plan asks first and then takes the row away
+    Given the row menu of a run plan is open
+    When "Archive run plan" is chosen
+    Then a dialog names the plan and says its runs are kept
+    And confirming archives that plan
+    And the row leaves the list
+
+  @integration
+  Scenario: Archiving a run plan that is a test suite says the scenarios go with it
+    Given a run plan that is a test suite
+    When "Archive run plan" is chosen in its row menu
+    Then the dialog says the scenarios filed in it are archived as well
+
+  @integration
+  Scenario: Leaving the archive dialog keeps the run plan
+    Given the archive dialog of a run plan is open
+    When the dialog is left without confirming
+    Then nothing is archived
+    And the row stays in the list
+
+  @integration
+  Scenario: A set that runs from code carries no archive action in its row menu
+    Given a run plan that a code run writes into
+    When its row menu is opened
+    Then no archive action is offered
+    And no "Edit run plan" action is offered
+
+  @integration
+  Scenario: Open last run is not offered for a plan with no run in the period
+    Given a run plan with no run inside the selected period
+    When its row menu is opened
+    Then no "Open last run" action is offered
+    And the plan can still be edited and archived
+
   @integration
   Scenario: Choosing a run plan opens its runs
     Given a run plan with three finished runs

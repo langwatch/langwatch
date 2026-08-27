@@ -301,7 +301,7 @@ describe("findAtoms", () => {
       });
 
       expect(atoms).toHaveLength(1);
-      expect(atoms[0]?.scenarioId).not.toBe("");
+      expect(atoms[0]?.ScenarioId).not.toBe("");
     });
   });
 

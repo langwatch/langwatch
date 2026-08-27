@@ -12,7 +12,13 @@ import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ResultGroup } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
-import { type PlanRowModel, PlanRowsTable } from "../results/PlanRowsTable";
+import {
+  FOLDER_PLAN_ARCHIVE_DESCRIPTION,
+  PLAN_ARCHIVE_DESCRIPTION,
+  PLAN_ARCHIVE_TITLE,
+  type PlanRowModel,
+  PlanRowsTable,
+} from "../results/PlanRowsTable";
 import {
   buildRunPlans,
   CLI_EPHEMERAL_LABEL,
@@ -96,15 +102,43 @@ function renderRows(
     resolveTargetName: (key) => TARGET_NAMES[key] ?? key,
     onSelectPlan: vi.fn(),
     onEditPlan: vi.fn(),
+    onArchivePlan: vi.fn(),
     ...overrides,
   };
-  render(<PlanRowsTable {...props} />, { wrapper: Wrapper });
-  return props;
+  const view = render(<PlanRowsTable {...props} />, { wrapper: Wrapper });
+  return { props, view };
 }
 
 /** The plans of a project, with no run history attached. */
 function planRowsOf(plans: RunPlan[]): PlanRowModel[] {
   return plans.map((plan) => ({ plan, group: null }));
+}
+
+/** One plan, built from one suite, with the runs the caller wants on it. */
+function oneSuiteRow(
+  suite: Partial<RunPlanSuite> = {},
+  group: ResultGroup | null = makeGroup(),
+): PlanRowModel {
+  const plans = buildRunPlans({
+    suites: [makeSuite(suite)],
+    suiteSummaries: {},
+    externalSets: [],
+  });
+  return { plan: plans[0]!, group };
+}
+
+async function openPlanMenu(planName: string) {
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: `Actions for ${planName}` }),
+  );
+  return user;
+}
+
+async function menuItemTexts(): Promise<(string | null)[]> {
+  return (await screen.findAllByRole("menuitem")).map(
+    (item) => item.textContent,
+  );
 }
 
 describe("the Test Runs list", () => {
@@ -402,7 +436,7 @@ describe("the Test Runs list", () => {
       externalSets: [],
     });
 
-    const props = renderRows(planRowsOf(plans));
+    const { props } = renderRows(planRowsOf(plans));
 
     const row = screen.getByTestId("run-plan-row-checkout");
     const menu = within(row).getByRole("button", {
@@ -414,6 +448,110 @@ describe("the Test Runs list", () => {
 
     await user.click(row);
     expect(props.onSelectPlan).toHaveBeenCalledWith("checkout");
+  });
+
+  // --- The row menu ---
+
+  /** @scenario "The row menu of a run plan offers to archive it" */
+  it("offers archive last in the row menu, in the destructive colour", async () => {
+    renderRows([oneSuiteRow()]);
+    await openPlanMenu("Checkout");
+
+    expect(await menuItemTexts()).toEqual([
+      "Open last run",
+      "Edit run plan",
+      "Archive run plan",
+    ]);
+
+    // Archiving is the one action of the menu that takes something away, so
+    // it reads apart from the two that do not.
+    const archive = screen.getByRole("menuitem", { name: "Archive run plan" });
+    const edit = screen.getByRole("menuitem", { name: "Edit run plan" });
+    expect(archive).toHaveStyle({ color: "var(--chakra-colors-red-600)" });
+    expect(edit.style.color).toBe("");
+  });
+
+  /** @scenario "Archiving a run plan asks first and then takes the row away" */
+  it("names the plan in the archive dialog and takes the row away", async () => {
+    const row = oneSuiteRow();
+    const { props, view } = renderRows([row]);
+    const user = await openPlanMenu("Checkout");
+
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Archive run plan" }),
+    );
+
+    expect(await screen.findByText(PLAN_ARCHIVE_TITLE)).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Checkout")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(PLAN_ARCHIVE_DESCRIPTION),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Archive" }));
+    expect(props.onArchivePlan).toHaveBeenCalledWith(row.plan);
+
+    view.rerender(<PlanRowsTable {...props} rows={[]} />);
+    expect(
+      screen.queryByTestId("run-plan-row-checkout"),
+    ).not.toBeInTheDocument();
+  });
+
+  /** @scenario "Archiving a run plan that is a test suite says the scenarios go with it" */
+  it("says the scenarios go with a plan that is a test suite", async () => {
+    renderRows([oneSuiteRow({ kind: "folder", scope: null })]);
+    const user = await openPlanMenu("Checkout");
+
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Archive run plan" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByText(FOLDER_PLAN_ARCHIVE_DESCRIPTION),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "Leaving the archive dialog keeps the run plan" */
+  it("archives nothing when the archive dialog is left without confirming", async () => {
+    const { props } = renderRows([oneSuiteRow()]);
+    const user = await openPlanMenu("Checkout");
+
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Archive run plan" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(props.onArchivePlan).not.toHaveBeenCalled();
+    expect(screen.getByTestId("run-plan-row-checkout")).toBeInTheDocument();
+  });
+
+  /** @scenario "A set that runs from code carries no archive action in its row menu" */
+  it("offers neither archive nor edit on a set that runs from code", async () => {
+    const plans = buildRunPlans({
+      suites: [],
+      suiteSummaries: {},
+      externalSets: [makeExternalSet()],
+    });
+
+    renderRows([{ plan: plans[0]!, group: makeGroup({ key: "nightly-ci" }) }]);
+    await openPlanMenu("nightly-ci");
+
+    // There is no stored plan behind the row, so there is nothing to edit and
+    // nothing to archive.
+    expect(await menuItemTexts()).toEqual(["Open last run"]);
+  });
+
+  /** @scenario "Open last run is not offered for a plan with no run in the period" */
+  it("does not offer Open last run on a plan with no run in the period", async () => {
+    renderRows([oneSuiteRow({}, null)]);
+    await openPlanMenu("Checkout");
+
+    expect(await menuItemTexts()).toEqual([
+      "Edit run plan",
+      "Archive run plan",
+    ]);
   });
 
   it("lists a set written by code as a run plan of its own", () => {

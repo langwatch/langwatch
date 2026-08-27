@@ -202,6 +202,7 @@ const suitePlan: RunPlan = {
   scopeLabel: "3 scenarios",
   scenarioSetId: SUITE_SET_ID,
   suiteId: "suite_1",
+  suiteKind: "custom",
   caseCount: 3,
   lastRun: null,
 };
@@ -592,6 +593,7 @@ describe("<RunPlanDetail/>", () => {
         scopeLabel: "from code",
         scenarioSetId: "nightly-ci",
         suiteId: null,
+        suiteKind: null,
         caseCount: null,
         lastRun: null,
       },

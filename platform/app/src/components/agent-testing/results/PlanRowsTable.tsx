@@ -10,8 +10,10 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
-import { MoreVertical } from "lucide-react";
+import { Badge, Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
+import { Archive, MoreVertical } from "lucide-react";
+import { useState } from "react";
+import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
 import type { ResultGroup } from "~/server/app-layer/simulations/result-atoms/atom.types";
@@ -109,15 +111,39 @@ function LastRunCell({
   );
 }
 
+/** What the archive dialog of a run plan asks, and what it promises. */
+export const PLAN_ARCHIVE_TITLE = "Archive run plan?";
+export const PLAN_ARCHIVE_DESCRIPTION =
+  "The plan leaves the list. Its runs are kept.";
+/** A folder plan takes the scenarios filed in it, so the dialog says so. */
+export const FOLDER_PLAN_ARCHIVE_DESCRIPTION =
+  "The scenarios filed in it are archived as well. Its runs are kept.";
+
+/** True while the plan has a run inside the window the table reads. */
+function hasRunInPeriod(group: ResultGroup | null): boolean {
+  return !!group && group.lastRunAt !== null;
+}
+
 function PlanRowMenu({
   plan,
+  group,
   onSelectPlan,
   onEditPlan,
+  onRequestArchive,
 }: {
   plan: RunPlan;
+  group: ResultGroup | null;
   onSelectPlan: (planSlug: string) => void;
   onEditPlan: (suiteId: string) => void;
+  onRequestArchive: (plan: RunPlan) => void;
 }) {
+  const suiteId = plan.kind === "suite" ? plan.suiteId : null;
+  // A plan with no run in the window has nothing to open, so the item that
+  // would land on an empty run is not offered at all.
+  const canOpenLastRun = hasRunInPeriod(group);
+
+  if (!canOpenLastRun && !suiteId) return null;
+
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
@@ -134,24 +160,41 @@ function PlanRowMenu({
         </Button>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item
-          value="open-last-run"
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelectPlan(plan.slug);
-          }}
-        >
-          Open last run
-        </Menu.Item>
-        {plan.kind === "suite" && plan.suiteId ? (
+        {canOpenLastRun ? (
+          <Menu.Item
+            value="open-last-run"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectPlan(plan.slug);
+            }}
+          >
+            Open last run
+          </Menu.Item>
+        ) : null}
+        {suiteId ? (
           <Menu.Item
             value="edit"
             onClick={(event) => {
               event.stopPropagation();
-              onEditPlan(plan.suiteId!);
+              onEditPlan(suiteId);
             }}
           >
             Edit run plan
+          </Menu.Item>
+        ) : null}
+        {suiteId ? (
+          <Menu.Item
+            value="archive"
+            color="red.600"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRequestArchive(plan);
+            }}
+          >
+            <HStack gap={2}>
+              <Icon as={Archive} boxSize={3.5} />
+              Archive run plan
+            </HStack>
           </Menu.Item>
         ) : null}
       </Menu.Content>
@@ -166,6 +209,9 @@ export type PlanRowsTableProps = {
   resolveTargetName: (targetKey: string) => string;
   onSelectPlan: (planSlug: string) => void;
   onEditPlan: (suiteId: string) => void;
+  onArchivePlan: (plan: RunPlan) => void;
+  /** True while the archive call is out, so the dialog holds its buttons. */
+  isArchiving?: boolean;
 };
 
 export function PlanRowsTable({
@@ -174,8 +220,17 @@ export function PlanRowsTable({
   resolveTargetName,
   onSelectPlan,
   onEditPlan,
+  onArchivePlan,
+  isArchiving = false,
 }: PlanRowsTableProps) {
   const now = useNow();
+  const [planToArchive, setPlanToArchive] = useState<RunPlan | null>(null);
+
+  const confirmArchive = () => {
+    if (!planToArchive) return;
+    onArchivePlan(planToArchive);
+    setPlanToArchive(null);
+  };
 
   return (
     <ResultsTableCard testId="agent-testing-run-plans-table">
@@ -224,8 +279,10 @@ export function PlanRowsTable({
             >
               <PlanRowMenu
                 plan={plan}
+                group={group}
                 onSelectPlan={onSelectPlan}
                 onEditPlan={onEditPlan}
+                onRequestArchive={setPlanToArchive}
               />
             </HStack>
           </ResultsTableRow>
@@ -235,6 +292,20 @@ export function PlanRowsTable({
           <ResultsTableEmptyLine text="No run plans match these filters." />
         ) : null}
       </ResultsTableBody>
+
+      <SuiteArchiveDialog
+        open={!!planToArchive}
+        onClose={() => setPlanToArchive(null)}
+        onConfirm={confirmArchive}
+        suiteName={planToArchive?.name ?? ""}
+        isLoading={isArchiving}
+        title={PLAN_ARCHIVE_TITLE}
+        description={
+          planToArchive?.suiteKind === "folder"
+            ? FOLDER_PLAN_ARCHIVE_DESCRIPTION
+            : PLAN_ARCHIVE_DESCRIPTION
+        }
+      />
     </ResultsTableCard>
   );
 }

@@ -41,6 +41,7 @@ import type { ResultGrouping, ResultRow } from "./result-atoms";
 import type { RunPlan } from "./run-plans";
 import { type UseResultGroupsResult, useResultGroups } from "./useResultGroups";
 import { useResultsView } from "./useResultsView";
+import { useRunPlanArchive } from "./useRunPlanArchive";
 
 /** The title line: what the window holds, and the way to add a run plan. */
 function ResultsHeader({
@@ -104,6 +105,8 @@ function ResultsTable({
   onToggleOpen,
   onSelectPlan,
   onEditPlan,
+  onArchivePlan,
+  isArchivingPlan,
   onOpenRun,
 }: {
   grouping: ResultGrouping;
@@ -113,6 +116,8 @@ function ResultsTable({
   onToggleOpen: (key: string) => void;
   onSelectPlan: (planSlug: string) => void;
   onEditPlan: (suiteId: string) => void;
+  onArchivePlan: (plan: RunPlan) => void;
+  isArchivingPlan: boolean;
   onOpenRun: (row: ResultRow) => void;
 }) {
   if (grouping === "plan") {
@@ -123,6 +128,8 @@ function ResultsTable({
         resolveTargetName={results.resolveTargetName}
         onSelectPlan={onSelectPlan}
         onEditPlan={onEditPlan}
+        onArchivePlan={onArchivePlan}
+        isArchiving={isArchivingPlan}
       />
     );
   }
@@ -160,6 +167,8 @@ function ResultsBody({
   days,
   onSelectPlan,
   onEditPlan,
+  onArchivePlan,
+  isArchivingPlan,
   onOpenRun,
 }: {
   view: ReturnType<typeof useResultsView>;
@@ -169,6 +178,8 @@ function ResultsBody({
   days: number;
   onSelectPlan: (planSlug: string) => void;
   onEditPlan: (suiteId: string) => void;
+  onArchivePlan: (plan: RunPlan) => void;
+  isArchivingPlan: boolean;
   onOpenRun: (row: ResultRow) => void;
 }) {
   return (
@@ -199,6 +210,8 @@ function ResultsBody({
         onToggleOpen={view.onToggleOpen}
         onSelectPlan={onSelectPlan}
         onEditPlan={onEditPlan}
+        onArchivePlan={onArchivePlan}
+        isArchivingPlan={isArchivingPlan}
         onOpenRun={onOpenRun}
       />
     </>
@@ -239,6 +252,7 @@ export function ResultsList({
   isSseConnected,
 }: ResultsListProps) {
   const view = useResultsView(routingState);
+  const archive = useRunPlanArchive();
 
   const results = useResultGroups({
     plans,
@@ -277,6 +291,8 @@ export function ResultsList({
           days={periodDays(period)}
           onSelectPlan={onSelectPlan}
           onEditPlan={onEditPlan}
+          onArchivePlan={archive.archivePlan}
+          isArchivingPlan={archive.isArchiving}
           onOpenRun={openRun}
         />
       )}

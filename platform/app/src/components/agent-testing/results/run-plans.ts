@@ -53,6 +53,14 @@ export type RunPlan = {
   scenarioSetId: string;
   /** The suite the plan was made from, when it is one. */
   suiteId: string | null;
+  /**
+   * Which kind of suite the plan is stored as, and null for a set that runs
+   * from code.
+   *
+   * A folder holds the scenarios filed in it, so archiving one takes them
+   * with it. A custom plan holds only its own configuration.
+   */
+  suiteKind: "custom" | "folder" | null;
   /** How many scenarios the plan holds, or null when only the code that ran knows. */
   caseCount: number | null;
   lastRun: RunPlanLastRun | null;
@@ -211,6 +219,8 @@ export function buildRunPlans({
         kind: "suite" as const,
         scenarioSetId: getSuiteSetId(suite.id),
         suiteId: suite.id,
+        suiteKind:
+          suite.kind === "folder" ? ("folder" as const) : ("custom" as const),
         caseCount: suite.scenarioIds.length,
         lastRun: summary ? toLastRun(summary) : null,
         scopeLabel: suiteScopeLabel({ suite, suiteNames }),
@@ -223,6 +233,7 @@ export function buildRunPlans({
     kind: "external" as const,
     scenarioSetId: set.scenarioSetId,
     suiteId: null,
+    suiteKind: null,
     caseCount: null,
     lastRun: toLastRun(set),
     scopeLabel: "Whatever the code ran",
@@ -253,6 +264,7 @@ export function resolveRunPlan({
       kind: "external",
       scenarioSetId,
       suiteId: null,
+      suiteKind: null,
       caseCount: null,
       lastRun: null,
       scopeLabel: "Whatever the code ran",
