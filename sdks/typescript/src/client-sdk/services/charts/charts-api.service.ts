@@ -12,6 +12,7 @@ import {
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import {
   QueryApiService,
+  type QueryRunParams,
   type QueryRunResult,
   type QuerySchemaResult,
 } from "@/client-sdk/services/query/query-api.service";
@@ -242,7 +243,12 @@ export class ChartsApiService {
     sql: string;
     parameters?: Record<string, ChartParameterValue>;
     timeWindow?: { start: string; end: string };
-    granularitySeconds?: number;
+    /**
+     * Narrowed to the steps the door actually offers, straight from the
+     * generated request body — an off-list number is a compile error here
+     * rather than a `validation_error` from the platform at run time.
+     */
+    granularitySeconds?: QueryRunParams["granularitySeconds"];
   }): Promise<ChartRunResult> {
     return this.queryApi.query(params);
   }
