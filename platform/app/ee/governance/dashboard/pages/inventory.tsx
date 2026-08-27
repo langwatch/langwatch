@@ -469,7 +469,6 @@ function useGroupedSources(sources: Source[] | undefined) {
       scheduled: [],
     };
     for (const s of sources ?? []) {
-      const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === s.sourceType);
       out[
         groupForMode(
           modeForSourceType({
