@@ -11,6 +11,7 @@ import {
   LuClock,
   LuCode,
   LuFileText,
+  LuTriangleAlert,
   LuTriangleRight,
 } from "react-icons/lu";
 import {
@@ -22,6 +23,7 @@ import {
   CostStatsTooltip,
   LatencyStatsTooltip,
 } from "~/components/shared/MetricStatsTooltip";
+import { passRateCoverage } from "~/components/shared/passRateCoverage";
 import {
   getPassRateGradientColor,
   PassRateCircle,
@@ -231,6 +233,11 @@ const SummaryBadge = memo(function SummaryBadge({
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
 
+  const coverage = passRateCoverage({
+    completedRows: aggregates.completedRows,
+    totalRows: aggregates.totalRows,
+  });
+
   if (!hasResults) return null;
 
   return (
@@ -260,6 +267,20 @@ const SummaryBadge = memo(function SummaryBadge({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
+        {/*
+          A run that is over reports a rate for the rows that answered. Without
+          the count beside it, a column at 30 of 40 rows reads as finished and
+          invites a comparison against a column that did answer every row.
+        */}
+        {!coverage.isComplete && (
+          <HStack gap={1}>
+            <Icon as={LuTriangleAlert} boxSize={3} color="orange.fg" />
+            <Text color="orange.fg" fontWeight="medium">
+              {aggregates.completedRows}/{aggregates.totalRows}
+            </Text>
+          </HStack>
+        )}
+
         {(aggregates.overallPassRate !== null ||
           aggregates.overallAverageScore !== null) && (
           <Text fontWeight="600">Score</Text>
