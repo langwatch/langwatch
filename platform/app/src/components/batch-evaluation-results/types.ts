@@ -284,8 +284,31 @@ export const transformBatchEvaluationData = (
   );
 
   if (targets && targets.length > 0) {
-    // V3 style with explicit targets
-    targetColumns = targets.map((target) => ({
+    // V3 style with explicit targets.
+    //
+    // The run's Targets snapshot lists the whole board, so a run scoped to one
+    // column still declares its siblings. Render only the targets this run
+    // holds data for; a target with no rows shows an empty column with no
+    // output, no latency and no score. When the run holds data for none of
+    // them (it has just started, or its rows carry no target id), keep the
+    // declared list so the table is not empty.
+    const targetIdsWithData = new Set<string>();
+    for (const entry of dataset) {
+      if (entry.targetId) targetIdsWithData.add(entry.targetId);
+    }
+    for (const evaluation of evaluations) {
+      if (evaluation.targetId) targetIdsWithData.add(evaluation.targetId);
+      // A comparison wired as its own column-target hosts a verdict rather
+      // than an output, so it owns no dataset row. Its target id is the
+      // evaluator id.
+      targetIdsWithData.add(evaluation.evaluator);
+    }
+    const withData = targets.filter((target) =>
+      targetIdsWithData.has(target.id),
+    );
+    const runTargets = withData.length > 0 ? withData : targets;
+
+    targetColumns = runTargets.map((target) => ({
       id: target.id,
       name: target.name,
       type:
