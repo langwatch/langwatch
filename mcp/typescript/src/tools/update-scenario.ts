@@ -12,6 +12,7 @@ export async function handleUpdateScenario(params: {
   situation?: string;
   criteria?: string[];
   labels?: string[];
+  folderId?: string | null;
 }): Promise<string> {
   const { scenarioId, ...data } = params;
   const result = await apiUpdateScenario({ id: scenarioId, ...data });
@@ -26,6 +27,9 @@ export async function handleUpdateScenario(params: {
   }
   if (Array.isArray(result.labels) && result.labels.length > 0) {
     lines.push(`**Labels**: ${result.labels.join(", ")}`);
+  }
+  if (result.folderId) {
+    lines.push(`**Test suite**: ${result.folderId}`);
   }
 
   return lines.join("\n");

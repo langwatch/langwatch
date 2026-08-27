@@ -438,12 +438,17 @@
             "platform": {
               "ui": "/simulations/run-plans",
               "mcp": [
-                "platform_list_suites",
-                "platform_get_suite",
-                "platform_create_suite",
-                "platform_update_suite",
-                "platform_run_suite",
-                "platform_archive_suite"
+                "platform_run_plan",
+                "platform_list_run_plans",
+                "platform_get_run_plan",
+                "platform_rerun_run_plan",
+                "platform_archive_run_plan",
+                "platform_list_test_suites",
+                "platform_create_test_suite",
+                "platform_get_test_suite",
+                "platform_rename_test_suite",
+                "platform_archive_test_suite",
+                "platform_run_test_suite"
               ],
               "skill": null,
               "docs": null
