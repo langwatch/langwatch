@@ -7,7 +7,7 @@ import {
   type ElevenLabsConversationReader,
   type GatewayRealtimeSessionReconciliationInfrastructure,
   type RealtimeSessionReconciliationRepository,
-} from "../src/workers/realtime-session-reconciliation";
+} from "../src/adapters/realtime-session-reconciliation.adapter";
 
 const session = {
   id: "session-1",

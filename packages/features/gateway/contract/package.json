@@ -21,6 +21,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

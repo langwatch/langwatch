@@ -15,8 +15,20 @@
       "default": "./src/index.ts"
     },
     "./realtime-session-reconciliation": {
-      "types": "./src/workers/realtime-session-reconciliation.ts",
-      "default": "./src/workers/realtime-session-reconciliation.ts"
+      "types": "./src/adapters/realtime-session-reconciliation.adapter.ts",
+      "default": "./src/adapters/realtime-session-reconciliation.adapter.ts"
+    },
+    "./composition/gateway-change-events": {
+      "types": "./src/repositories/prisma/prisma.gateway-change-event.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-change-event.repository.ts"
+    },
+    "./composition/gateway-audit": {
+      "types": "./src/repositories/prisma/prisma.gateway-audit.repository.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-audit.repository.ts"
+    },
+    "./composition/gateway-virtual-keys": {
+      "types": "./src/repositories/prisma/prisma.virtual-key.repository.ts",
+      "default": "./src/repositories/prisma/prisma.virtual-key.repository.ts"
     }
   },
   "scripts": {
@@ -25,10 +37,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "zod": "^4.4.3"
   },

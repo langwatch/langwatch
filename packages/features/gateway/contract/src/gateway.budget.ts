@@ -77,6 +77,18 @@ export type GatewayBudgetWindow =
   | "TOTAL"
   | "MANUAL";
 
+export type GatewayBudgetLedgerStatus =
+  | "SUCCESS"
+  | "PROVIDER_ERROR"
+  | "BLOCKED_BY_GUARDRAIL"
+  | "CANCELLED";
+
+/** Decimal values stay portable without leaking a database client type. */
+export type GatewayMoney = {
+  toString(): string;
+  toFixed(fractionDigits?: number): string;
+};
+
 /** Persistence-shaped resource type, kept DB-library-free for transports. */
 export type GatewayBudgetResource = {
   id: string;
@@ -87,12 +99,12 @@ export type GatewayBudgetResource = {
   name: string;
   description: string | null;
   window: GatewayBudgetWindow;
-  limitUsd: { toString(): string };
+  limitUsd: GatewayMoney;
   onBreach: "BLOCK" | "WARN";
   timezone: string | null;
   externalId: string | null;
   metadata: unknown;
-  spentUsd: { toString(): string };
+  spentUsd: GatewayMoney;
   currentPeriodStartedAt: Date;
   resetsAt: Date;
   lastResetAt: Date | null;
@@ -110,6 +122,48 @@ export type GatewayBudgetWithSeats = GatewayBudgetResource & {
   endUsersOver?: number;
 };
 
+/** The target dimensions used by every request, bundle, and draft-key lookup. */
+export type GatewayBudgetResolutionTarget = {
+  organizationId: string;
+  teamId?: string | null;
+  scopedTeamIds?: string[] | null;
+  projectId?: string | null;
+  virtualKeyId?: string | null;
+  principalUserId?: string | null;
+  endUserId?: string | null;
+};
+
+export type GatewayResolvedBudget = {
+  budget: GatewayBudgetResource;
+  bucketScopeId: string;
+  principalUserId: string | null;
+  groupId: string | null;
+  endUserId: string | null;
+};
+
+export type GatewayBudgetScopeTarget = {
+  kind: string;
+  id: string;
+  name: string;
+  secondary: string | null;
+  projectSlug?: string | null;
+  memberCount?: number;
+};
+
+export type GatewayBudgetScopeReachInput = {
+  organizationId: string;
+  scope: {
+    scopeType: GatewayBudgetScopeType;
+    scopeId: string;
+  };
+};
+
+export type GatewayBudgetScopeReachResult = {
+  reachable: boolean;
+  reachableProjectIds: string[];
+  activeKeyCount: number;
+};
+
 export type GatewayBudgetListWithHealth = {
   budgets: GatewayBudgetWithSeats[];
   spendAvailable: boolean;
@@ -122,6 +176,22 @@ export type GatewayBudgetListWithHealth = {
       reachableProjectIds: string[];
     }
   >;
+};
+
+export type GatewayBudgetDetail = {
+  budget: GatewayBudgetWithSeats;
+  scopeTarget: GatewayBudgetScopeTarget;
+  recentLedger: Array<{
+    id: string;
+    virtualKeyId: string;
+    amountUsd: GatewayMoney;
+    model: string;
+    status: GatewayBudgetLedgerStatus;
+    occurredAt: Date;
+    virtualKey: { name: string; displayPrefix: string } | null;
+  }>;
+  spendAvailable: boolean;
+  unreachableByAnyKey: boolean;
 };
 
 export type GatewayBudgetScope =
@@ -271,37 +341,3 @@ export type GatewayBudgetHealth = {
   readAt: Date;
   unreachableByAnyKey: boolean;
 };
-
-/**
- * Gateway's first extracted capability is the budget preflight. Keeping this
- * as the service boundary means tRPC, REST, RPC, the CLI route, and the Go
- * gateway all use the same decision and response shape while the remaining
- * key, routing, usage, and guardrail surfaces migrate behind this service.
- */
-export abstract class GatewayService {
-  abstract checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult>;
-
-  abstract list(organizationId: string): Promise<GatewayBudgetWithSeats[]>;
-  abstract listForProject(projectId: string): Promise<GatewayBudgetWithSeats[]>;
-  abstract listWithHealth(organizationId: string): Promise<GatewayBudgetListWithHealth>;
-  abstract listForProjectWithHealth(
-    projectId: string,
-  ): Promise<GatewayBudgetListWithHealth>;
-  abstract listPageWithHealth(
-    input: GatewayBudgetPageInput,
-  ): Promise<GatewayBudgetListWithHealth>;
-  abstract get(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudgetWithSeats | null>;
-  abstract getWithHealth(
-    id: string,
-    organizationId: string,
-  ): Promise<GatewayBudgetHealth | null>;
-  abstract getDetail(id: string, organizationId: string): Promise<unknown>;
-  abstract scopeReach(input: unknown): Promise<unknown>;
-  abstract create(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource>;
-  abstract update(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
-  abstract archive(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource>;
-  abstract reset(input: ResetGatewayBudgetInput): Promise<GatewayBudgetResource>;
-}

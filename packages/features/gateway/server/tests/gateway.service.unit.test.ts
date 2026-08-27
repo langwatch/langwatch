@@ -1,17 +1,19 @@
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { GatewayService } from "../src";
-import { PrismaGatewayBudgetRepository } from "../src/repositories/prisma.gateway-budget.repository";
+import { PrismaGatewayBudgetRepository } from "../src/repositories/prisma/prisma.gateway-budget.repository";
+import { TestProjectService } from "./support/test-project-service";
 
 function serviceFor(rows: Array<Record<string, unknown>>): GatewayService {
   const database = {
     virtualKeyScope: { findMany: vi.fn().mockResolvedValue([]) },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     gatewayBudget: { findMany: vi.fn().mockResolvedValue(rows) },
-  } as unknown as Parameters<typeof PrismaGatewayBudgetRepository.create>[0];
-  return GatewayService.create({
-    repository: PrismaGatewayBudgetRepository.create(database),
-  });
+  };
+  return GatewayService.create(
+    PrismaGatewayBudgetRepository.create(database),
+    new TestProjectService(),
+  );
 }
 
 function budget(overrides: Record<string, unknown> = {}) {
