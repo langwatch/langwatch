@@ -8,7 +8,7 @@
 
 import { readFileSync } from "fs";
 import { prisma } from "../src/server/db";
-import { ModelProviderRepository } from "../src/server/modelProviders/modelProvider.repository";
+import { initializeDefaultApp } from "../src/server/app-layer/presets";
 
 const UPDATES: {
   provider: string;
@@ -64,7 +64,7 @@ async function main() {
   const project = await prisma.project.findFirst({ where: { apiKey } });
   if (!project) throw new Error(`project not found for apiKey=${apiKey}`);
 
-  const repo = new ModelProviderRepository(prisma);
+  const app = initializeDefaultApp({ processRole: "web" });
 
   for (const { provider, env } of UPDATES) {
     const filtered = Object.fromEntries(
@@ -75,15 +75,19 @@ async function main() {
       continue;
     }
 
-    const existing = await prisma.modelProvider.findFirst({
-      where: { projectId: project.id, provider },
+    const existing = await app.modelProviders.tryGetProviderForProject({
+      projectId: project.id,
+      provider,
     });
     if (!existing) {
       console.log(`⊘ ${provider}: no existing row — run seed first`);
       continue;
     }
 
-    await repo.update(existing.id, {
+    await app.modelProviders.upsert({
+      id: existing.id,
+      projectId: project.id,
+      provider,
       enabled: true,
       customKeys: filtered,
     });

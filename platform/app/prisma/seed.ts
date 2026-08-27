@@ -75,8 +75,8 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
 import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
+import { modelProviders } from "@langwatch/model-provider-contract";
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { modelProviders } from "../src/server/modelProviders/registry";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { encrypt } from "../src/utils/encryption";
 import { seedDemoPlatform } from "./seed-demo-platform";
@@ -450,7 +450,7 @@ async function main() {
 // For every provider in the registry whose primary API-key variable is set —
 // in the process env, .env, or the repo-root .env — upsert an
 // enabled, ORGANIZATION-scoped ModelProvider carrying those keys (encrypted
-// exactly as modelProvider.repository does), so a fresh local stack can talk
+// exactly as the former model-provider persistence adapter did), so a fresh local stack can talk
 // to the providers the developer already has credentials for without pasting
 // them into the settings UI. Fixed per-provider row IDs keep re-runs
 // idempotent. HAVEN_SEED_MODEL_PROVIDERS=0 disables the whole block
@@ -502,7 +502,8 @@ async function seedModelProvidersFromEnv(organizationId: string) {
     if (!envMap[def.apiKey]) continue;
 
     const keyNames = schemaKeyNames(def.keysSchema);
-    const names = keyNames.length > 0 ? keyNames : [def.apiKey, def.endpointKey];
+    const endpointKey = "endpointKey" in def ? def.endpointKey : void 0;
+    const names = keyNames.length > 0 ? keyNames : [def.apiKey, endpointKey];
     const keys: Record<string, string> = {};
     for (const name of names) {
       if (name && envMap[name]) keys[name] = envMap[name];
