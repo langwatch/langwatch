@@ -126,38 +126,6 @@ export const ssoConnectionsRouter = createTRPCRouter({
       return service().getById(input);
     }),
 
-  register: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string().min(1),
-        // The union the aggregate speaks, so a SAML request reaches the
-        // service and is refused BY NAME. Narrowing it to `"oidc"` here would
-        // answer a validation error instead, which tells the operator the
-        // field is wrong rather than that the protocol is not self-serve yet.
-        type: z.enum(["oidc", "saml"]),
-        providerId: z.string().min(1).max(100),
-        issuer: z.string().max(2048).nullable().default(null),
-        allowsJit: z.boolean().default(false),
-      }),
-    )
-    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
-    .mutation(async ({ ctx, input }) => {
-      const operator = await audited({ ctx, action: "register", args: input });
-      return service().registerConnection({ ...input, operator });
-    }),
-
-  claimDomain: protectedProcedure
-    .input(domainTarget)
-    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
-    .mutation(async ({ ctx, input }) => {
-      const operator = await audited({
-        ctx,
-        action: "claimDomain",
-        args: input,
-      });
-      await service().claimDomain({ ...input, operator });
-    }),
-
   approveDomainClaim: protectedProcedure
     .input(domainTarget)
     .noPermission(NO_PERMISSION_FOR_ORGANIZATION)

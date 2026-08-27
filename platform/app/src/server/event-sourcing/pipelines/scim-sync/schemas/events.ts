@@ -1,6 +1,7 @@
 import {
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
   SCIM_GROUP_MAPPED_EVENT_TYPE,
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
@@ -8,6 +9,7 @@ import {
   SCIM_USER_PUSHED_EVENT_TYPE,
   scimApplyFailedPayloadSchema,
   scimApplyRecoveredPayloadSchema,
+  scimApplyRedrivenPayloadSchema,
   scimApplyRetiredPayloadSchema,
   scimGroupMappedPayloadSchema,
   scimTokenIssuedPayloadSchema,
@@ -62,6 +64,14 @@ export const scimApplyRetiredEventSchema = EventSchema.extend({
 });
 export type ScimApplyRetiredEvent = z.infer<typeof scimApplyRetiredEventSchema>;
 
+export const scimApplyRedrivenEventSchema = EventSchema.extend({
+  type: z.literal(SCIM_APPLY_REDRIVEN_EVENT_TYPE),
+  data: scimApplyRedrivenPayloadSchema,
+});
+export type ScimApplyRedrivenEvent = z.infer<
+  typeof scimApplyRedrivenEventSchema
+>;
+
 export const scimTokenRevokedEventSchema = EventSchema.extend({
   type: z.literal(SCIM_TOKEN_REVOKED_EVENT_TYPE),
   data: scimTokenRevokedPayloadSchema,
@@ -75,6 +85,7 @@ export const scimSyncEventSchema = z.discriminatedUnion("type", [
   scimApplyFailedEventSchema,
   scimApplyRecoveredEventSchema,
   scimApplyRetiredEventSchema,
+  scimApplyRedrivenEventSchema,
   scimTokenRevokedEventSchema,
 ]);
 export type ScimSyncEvent = z.infer<typeof scimSyncEventSchema>;

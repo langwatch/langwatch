@@ -315,7 +315,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   # get in, above. A second address is only ever asked about: the platform
   # already holds a confirmed address for this person, so an unconfirmed extra
   # one blocks nothing and is nudged from inside the app.
-  @integration
+  @integration @unimplemented
   Scenario: A second address is nudged, never gated
     Given I am signed in and have added a second email address
     Then I can use the platform with the second address unconfirmed

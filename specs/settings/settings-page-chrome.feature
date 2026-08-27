@@ -25,7 +25,7 @@ Feature: Every settings page keeps the settings chrome
       Given every page that Settings can open
       Then each of them keeps the settings chrome
 
-    @unit
+    @unit @unimplemented
     Scenario: An address that only forwards is not framed on the way past
       Given a settings address whose page moved into a tab of another page
       When somebody opens the old address

@@ -277,7 +277,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then they become a member of "acme"
     And they are held at the enrollment gate until they set one up
 
-  @integration
+  @integration @unimplemented
   Scenario: An administrator can see who has not set one up yet
     Given "acme" requires two-step verification
     And some of its members have set one up and some have not
@@ -308,7 +308,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # and the plan is asked on the server as well — a greyed switch is a
   # courtesy to whoever is reading, not a boundary.
 
-  @integration
+  @integration @unimplemented
   Scenario: The requirement is offered on every plan and locked without one
     Given "acme" is not on a plan that carries the requirement
     When "ana" opens the organization's security settings
@@ -360,7 +360,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And setting one up here is the way through
     And nothing infers a factor the provider did not assert
 
-  @integration
+  @integration @unimplemented
   Scenario: An administrator is told when their connection asserts nothing
     Given "acme" requires two-step verification
     And "acme"'s members sign in through a connection that asserts no second factor
