@@ -151,7 +151,9 @@ describe("given two targets stored under the same name", () => {
     /** @scenario "Two bars with the same target name keep their own axis labels" */
     it("gives each bar its own numbered label", () => {
       expect(
-        barLabels({ targets: [{ name: "classifier" }, { name: "classifier" }] }),
+        barLabels({
+          targets: [{ name: "classifier" }, { name: "classifier" }],
+        }),
       ).toEqual(["classifier (1)", "classifier (2)"]);
     });
   });
@@ -161,7 +163,9 @@ describe("given targets with names of their own", () => {
   describe("when the cost chart renders one bar per target", () => {
     it("labels each bar with its plain name", () => {
       expect(
-        barLabels({ targets: [{ name: "classifier" }, { name: "summarizer" }] }),
+        barLabels({
+          targets: [{ name: "classifier" }, { name: "summarizer" }],
+        }),
       ).toEqual(["classifier", "summarizer"]);
     });
   });

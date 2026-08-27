@@ -79,15 +79,9 @@ describe("given two targets stored under the same name", () => {
     it("numbers each header the way the workbench does", () => {
       renderTableFor(["category_classifier", "category_classifier"]);
 
-      expect(
-        screen.getByText("category_classifier (1)"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("category_classifier (2)"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText("category_classifier"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText("category_classifier (1)")).toBeInTheDocument();
+      expect(screen.getByText("category_classifier (2)")).toBeInTheDocument();
+      expect(screen.queryByText("category_classifier")).not.toBeInTheDocument();
     });
   });
 });
