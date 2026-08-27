@@ -37,8 +37,22 @@ import { findPageAction } from "./pageManifests";
 export const UI_ACTION_CLAIM_WINDOW_MS = 3_000;
 /** Execute budget when the action's manifest declares none. */
 export const UI_ACTION_DEFAULT_BUDGET_MS = 10_000;
-/** Hard ceiling on any execute budget, under the ingress idle timeout. */
-export const UI_ACTION_MAX_BUDGET_MS = 30_000;
+/**
+ * Hard ceiling on any execute budget.
+ *
+ * The dispatch blocks a `langwatch ui call`, and that command runs inside an
+ * agent worker whose harness stops any command at 30 seconds. A ceiling at 30
+ * seconds was therefore a race the CLI always lost: the harness killed it at
+ * the same instant the server gave up, so the caller never read the CLI's
+ * "the action may still have applied" warning, which is written for exactly
+ * that case.
+ *
+ * The order that has to hold is: this ceiling (15s) < the CLI's own request
+ * deadline (20s, sdks/typescript/src/cli/commands/ui/call.ts) < the harness
+ * stop (30s). Each step gets 5 seconds, so the failure is always reported by
+ * the layer that owns it. This still clears the ingress idle timeout.
+ */
+export const UI_ACTION_MAX_BUDGET_MS = 15_000;
 /** Pending records outlive the longest possible dispatch, then self-clean. */
 const PENDING_TTL_SECONDS = 60;
 const CLAIM_TTL_SECONDS = 60;

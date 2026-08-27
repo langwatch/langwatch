@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LangyUiActionService,
+  UI_ACTION_MAX_BUDGET_MS,
   type UiActionBlockingRedis,
   type UiActionRedis,
   uiActionKeys,
@@ -280,6 +281,49 @@ describe("LangyUiActionService", () => {
       ).rejects.toMatchObject({ code: "langy_ui_timeout" });
       // Two waits: the claim window, then the remaining execute budget.
       expect(blpopCalls).toHaveLength(2);
+    });
+
+    /**
+     * The dispatch blocks a `langwatch ui call` inside an agent worker, and
+     * that worker's harness stops any command at 30 seconds. With the ceiling
+     * at 30 seconds too, the harness and the server gave up together: the CLI
+     * was killed before it could print the warning that the action may already
+     * have applied, which is the one thing an agent needs before it retries.
+     */
+    /** @scenario "The server gives up before the harness kills the command" */
+    it("gives up inside the ceiling, which is under the CLI deadline and the harness", async () => {
+      // The two numbers this ceiling has to stay under. They belong to other
+      // layers, so they are written here as the boundary this test pins:
+      // change one and this fails rather than the ordering breaking in silence.
+      const CLI_REQUEST_DEADLINE_MS = 20_000;
+      const AGENT_HARNESS_COMMAND_LIMIT_MS = 30_000;
+
+      const appended: Array<{
+        actionId: string;
+        kind: string;
+        payload: unknown;
+      }> = [];
+      const { redis, store, blpopCalls } = makeRedis([
+        () => {
+          const actionId = appended[0]!.actionId;
+          store.kv.set(uiActionKeys.claim(actionId), "user-1");
+        },
+        "wait-empty",
+      ]);
+      const service = makeService({ redis, appended });
+
+      // `workbench.run` declares 600s, far over the ceiling, so the total wait
+      // is the ceiling itself and not the manifest's number.
+      await expect(
+        service.dispatch({ ...DISPATCH, kind: "workbench.run", payload: {} }),
+      ).rejects.toMatchObject({ code: "langy_ui_timeout" });
+
+      const totalWaitMs = blpopCalls.reduce((sum, s) => sum + s, 0) * 1000;
+      expect(totalWaitMs).toBeLessThanOrEqual(UI_ACTION_MAX_BUDGET_MS);
+      expect(UI_ACTION_MAX_BUDGET_MS).toBeLessThan(CLI_REQUEST_DEADLINE_MS);
+      expect(CLI_REQUEST_DEADLINE_MS).toBeLessThan(
+        AGENT_HARNESS_COMMAND_LIMIT_MS,
+      );
     });
   });
 
