@@ -72,6 +72,13 @@ Physical movement in the shared worktree is not progress until its exact paths
 are reviewed and committed. There is no time estimate in this ledger: the next
 status changes when a named proof or commit changes.
 
+Pre-merge focused proof is green for all 15 Evaluation-wave package
+typechecks, Trace server typecheck and 633 tests, Suite's 28 tests, and 118
+focused application tests. Architecture review remains red and is not being
+called green: the full report includes 470 legacy-fragment findings, 104 stale
+baseline entries, 14 test-quality findings, 14 hard comment-block failures and
+218 soft comment reviews. These remain extraction/repair work after the merge.
+
 ## Deletion queue
 
 The next committed batches after the `origin/main` merge are:
