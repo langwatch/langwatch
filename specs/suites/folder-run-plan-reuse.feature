@@ -3,7 +3,7 @@ Feature: Running a folder reuses the run plan path
   I want Run suite on a folder to behave exactly like running a run plan
   So that the runs, the history and the results look the same wherever they came from
 
-  Background: one run path.
+  Background: one run path, and why a folder row still holds run settings.
     A folder is a suite, so running a folder starts a batch through the same
     path a custom run plan uses. The batch lands in the folder's own internal
     run set, and every existing history, summary and results view reads it
@@ -11,6 +11,28 @@ Feature: Running a folder reuses the run plan path
 
     Custom run plans still exist beside folders. A custom plan can span several
     folders, a set of labels, or a hand-picked list of cases.
+
+    In the product a test suite is only a grouping: it has a name and a set of
+    scenarios, and the run dialog holds the targets, the repeat count and the
+    models. A run started there goes through the run plan path, which writes
+    the whole configuration onto a RUN PLAN and never onto the folder.
+
+    The folder ROW still carries `targets`, `repeatCount`, `simulatorModel`
+    and `judgeModel`, and this is deliberate. A caller can address a folder by
+    its id and start a run without a dialog: `langwatch suite run <folder-id>`,
+    the MCP tool, and the SDK all reach `POST /api/suites/:id/run`. Those
+    callers send no targets, so without the row they would have nothing to run
+    against. The row is therefore the LAST USED execution settings of that
+    folder, kept for id-addressed callers. It is NOT a plan config, nothing in
+    the product reads it as one, and a run started from the UI never writes it.
+
+    Two things follow, and both are correct rather than oversights:
+
+      - a folder accepts targets and models through the suite update path, so
+        an id-addressed caller can set what its next run uses. See
+        specs/suites/suite-folders.feature. Do not "fix" this by refusing them.
+      - the product UI is what must never drift back into treating a folder as
+        a run plan, so that is pinned by its own scenarios below.
 
     The v1 Simulations pages must never show a folder. See
     specs/suites/suite-folders.feature for folder creation and archiving.
@@ -39,7 +61,10 @@ Feature: Running a folder reuses the run plan path
     When the folder is run
     Then six runs are scheduled
 
-  # --- Targets ---
+    The repeat count is read off the row because this run was addressed by
+    folder id and carried none of its own.
+
+  # --- The row as a last-used memory ---
 
   @integration
   Scenario: The target chosen for a folder run is offered again next time
@@ -62,6 +87,22 @@ Feature: Running a folder reuses the run plan path
     When the folder is run
     Then the run is refused with "suite_all_scenarios_archived"
     And no run is scheduled
+
+  # --- The product UI never treats a folder as a run plan ---
+
+  @unit
+  Scenario: The Agent Testing UI runs only through the run plan procedure
+    Given the Agent Testing feature source
+    When every run it can start is read
+    Then it reaches the run plan procedure
+    And it reaches neither the suite run procedure nor the run all procedure
+
+  @unit
+  Scenario: The Agent Testing UI writes no execution settings onto a suite row
+    Given the Agent Testing feature source
+    When every suite it writes is read
+    Then it calls neither the suite create procedure nor the suite update procedure
+    And so it cannot put targets, a repeat count or a model on a folder
 
   # --- Custom run plans still exist ---
 
