@@ -68,10 +68,6 @@ vi.mock("~/utils/api", () => ({
       getSummaries: { useQuery: mockSuiteSummaries },
       getById: { useQuery: () => ({ data: undefined }) },
     },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
-    prompts: {
-      getAllPromptsForProject: { useQuery: () => ({ data: [] }) },
-    },
     scenarios: {
       // The results list names the scenario and the labels of every run it
       // lists, so the tab reads the scenarios of the project too.

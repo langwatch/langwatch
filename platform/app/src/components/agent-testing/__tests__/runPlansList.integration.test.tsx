@@ -21,6 +21,7 @@ import {
   type RunPlan,
   type RunPlanSuite,
 } from "../results/run-plans";
+import { PASS_RATE_BAR_OPACITY } from "../shared/pass-rate-color";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
@@ -323,8 +324,10 @@ describe("the Test Runs list", () => {
     ).not.toBeInTheDocument();
   });
 
+  // The rates run from best to worst, so a list drawn newest first would put
+  // "0%" at the front and this assertion would fail rather than pass by luck.
   /** @scenario "The Trend column draws one bar per run, oldest first" */
-  it("draws one trend bar per run", () => {
+  it("draws one trend bar per run, oldest first", () => {
     const plans = buildRunPlans({
       projectId: PROJECT_ID,
       suites: [makeSuite()],
@@ -348,7 +351,73 @@ describe("the Test Runs list", () => {
     ]);
 
     const row = screen.getByTestId("run-plan-row-checkout");
-    expect(within(row).getAllByTestId("trend-sparkline-bar")).toHaveLength(3);
+    const bars = within(row).getAllByTestId("trend-sparkline-bar");
+    expect(bars).toHaveLength(3);
+    expect(bars.map((bar) => bar.getAttribute("title"))).toEqual([
+      "100%",
+      "50%",
+      "0%",
+    ]);
+  });
+
+  /** @scenario "The trend bars are softer than the text beside them" */
+  it("draws every trend bar at the one shared opacity", () => {
+    const plans = buildRunPlans({
+      projectId: PROJECT_ID,
+      suites: [makeSuite()],
+      suiteSummaries: {},
+      externalSets: [],
+      oneOffLastRun: null,
+    });
+    const checkout = plans.find((plan) => plan.slug === "checkout")!;
+
+    renderRows([
+      {
+        plan: checkout,
+        group: makeGroup({
+          trend: [
+            { key: "run_1", passRate: 100 },
+            { key: "run_2", passRate: 0 },
+          ],
+        }),
+      },
+    ]);
+
+    const row = screen.getByTestId("run-plan-row-checkout");
+    const sparkline = within(row).getByTestId("trend-sparkline");
+
+    // One opacity for the whole row of bars, so two bars cannot read as two
+    // meanings, and softer than the percentage beside them.
+    expect(sparkline).toHaveStyle({ opacity: String(PASS_RATE_BAR_OPACITY) });
+    expect(PASS_RATE_BAR_OPACITY).toBeLessThan(1);
+    for (const bar of within(row).getAllByTestId("trend-sparkline-bar")) {
+      expect(bar.style.opacity).toBe("");
+    }
+  });
+
+  /** @scenario "A run plan row shows its last result" */
+  it("carries the pass rate of the runs in the window", () => {
+    const plans = buildRunPlans({
+      projectId: PROJECT_ID,
+      suites: [makeSuite()],
+      suiteSummaries: {},
+      externalSets: [],
+      oneOffLastRun: null,
+    });
+    const checkout = plans.find((plan) => plan.slug === "checkout")!;
+
+    renderRows([
+      {
+        plan: checkout,
+        group: makeGroup({ passRate: 100, runCount: 1, scenarioCount: 3 }),
+      },
+    ]);
+
+    const row = screen.getByTestId("run-plan-row-checkout");
+    expect(within(row).getByTestId("pass-rate-text")).toHaveTextContent("100%");
+    expect(within(row).getByTestId("plan-last-run")).toHaveTextContent(
+      "3 scenarios",
+    );
   });
 
   /** @scenario "A run plan row opens on a click and carries no chevron" */

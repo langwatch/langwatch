@@ -136,6 +136,7 @@ const suitePlan: RunPlan = {
   slug: "checkout",
   name: "Checkout",
   kind: "suite",
+  scopeLabel: "3 scenarios",
   scenarioSetId: SUITE_SET_ID,
   suiteId: "suite_1",
   caseCount: 3,
@@ -504,6 +505,7 @@ describe("<RunPlanDetail/>", () => {
         slug: "external:nightly-ci",
         name: "nightly-ci",
         kind: "external",
+        scopeLabel: "from code",
         scenarioSetId: "nightly-ci",
         suiteId: null,
         caseCount: null,
@@ -559,6 +561,27 @@ describe("<RunPlanDetail/>", () => {
     expect(
       within(sidebar).getByRole("button", { name: /Results/ }),
     ).toBeInTheDocument();
+  });
+
+  // The three read left to right in one order. They are found by their own
+  // handles and compared by document position, so a header that put the note
+  // before the pass block would fail rather than pass on the order the
+  // assertions are written in.
+  /** @scenario "The run header reads the run, then the pass block, then the note" */
+  it("reads the run number, then the pass block, then the note", () => {
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    const number = within(line).getByText("Run #3");
+    const pass = within(line).getByTestId("run-metrics-summary");
+    const note = within(line).getByTestId("run-summary-note");
+
+    expect(
+      number.compareDocumentPosition(pass) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      pass.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   /** @scenario "The runs sidebar holds only the back link and the run list" */
@@ -852,6 +875,7 @@ describe("<RunPlanDetail/>", () => {
         slug: "one-off-runs",
         name: "One-off runs",
         kind: "one-off",
+        scopeLabel: "one-off runs",
         scenarioSetId: "__internal__proj_1__on-platform-scenarios",
         suiteId: null,
         caseCount: null,

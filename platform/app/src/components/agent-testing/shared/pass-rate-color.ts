@@ -63,11 +63,12 @@ export function passRateColor(passRate: number | null): string {
 }
 
 /**
- * How much softer than the text a drawn bar is.
+ * How much softer than the text a drawn sparkline is.
  *
- * Every bar the Results tab draws takes this one value, so a row of bars sits
- * behind the numbers beside it rather than competing with them. Stated once
- * here because two bars at two opacities read as two different meanings.
+ * It softens the whole row of bars at once rather than each bar on its own, so
+ * two bars can never end up at two opacities and read as two meanings. The
+ * bars are a glance at history; the percentage beside them is the headline and
+ * stays at full strength.
  */
 export const PASS_RATE_BAR_OPACITY = 0.8;
 

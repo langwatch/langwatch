@@ -52,6 +52,8 @@ function makeMockRepository(
     findAll: vi.fn().mockResolvedValue([]),
     findSlugsByPrefix: vi.fn().mockResolvedValue([]),
     findFirstByLabel: vi.fn().mockResolvedValue(null),
+    // No plan answers to a name unless a case says one does.
+    findPlanByName: vi.fn().mockResolvedValue(null),
     update: vi.fn(),
     archive: vi.fn(),
     ...overrides,

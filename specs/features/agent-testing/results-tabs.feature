@@ -232,15 +232,24 @@ Feature: The Results tab
     And the name of the plan is not repeated in the sidebar
 
   @integration
-  Scenario: The run header reads the run, the pass block, the evaluators and the note
-    Given a run of a plan that carries evaluators and a note
+  Scenario: The run header reads the run, then the pass block, then the note
+    Given a run of a plan that carries a note
     When the run header is read
-    Then it reads "Run #2" first
+    Then it reads "Run #3" first
     And the pass block reads after it
-    And the evaluator pills read after the pass block, at the size of the pass block
     And the note reads last
 
-  @integration
+  # Evaluators on the run plan are not built yet. The two scenarios below state
+  # how they must read once they are, and bind nothing until then.
+  @unimplemented
+  Scenario: The evaluator pills read after the pass block
+    Given a run of a plan that carries evaluators
+    When the run header is read
+    Then the evaluator pills read after the pass block
+    And they are drawn at the size of the pass block
+    And the note still reads last
+
+  @unimplemented
   Scenario: A score evaluator carries no threshold and no colour
     Given a run whose evaluators are one pass or fail check and one score
     When the evaluator pills are read

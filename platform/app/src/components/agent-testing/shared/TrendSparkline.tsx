@@ -16,7 +16,11 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { TrendPoint } from "~/server/app-layer/simulations/result-atoms/atom.types";
 import { FG_MUTED } from "./design";
-import { PASS_RATE_BAR_OPACITY, passRateColor } from "./pass-rate-color";
+import {
+  formatPassRate,
+  PASS_RATE_BAR_OPACITY,
+  passRateColor,
+} from "./pass-rate-color";
 
 /** How tall the tallest bar is drawn, and so how tall the row of them is. */
 const TREND_HEIGHT = 16;
@@ -25,6 +29,11 @@ const TREND_HEIGHT = 16;
 const TREND_FLOOR = 6;
 
 const TREND_BAR_WIDTH = "5px";
+
+/** What one bar says on hover, so a shape can be read as a number. */
+function barTitle(passRate: number | null): string {
+  return passRate === null ? "no verdict" : formatPassRate(passRate);
+}
 
 function barHeight(passRate: number | null): number {
   if (passRate === null) return TREND_FLOOR;
@@ -56,6 +65,7 @@ export function TrendSparkline({ bars, per }: TrendSparklineProps) {
       height={`${TREND_HEIGHT}px`}
       alignItems="flex-end"
       title={`Last ${bars.length} ${noun}, oldest first`}
+      opacity={PASS_RATE_BAR_OPACITY}
       data-testid="trend-sparkline"
     >
       {bars.map((bar) => (
@@ -64,8 +74,8 @@ export function TrendSparkline({ bars, per }: TrendSparklineProps) {
           width={TREND_BAR_WIDTH}
           height={`${barHeight(bar.passRate)}px`}
           borderRadius="1px"
+          title={barTitle(bar.passRate)}
           background={passRateColor(bar.passRate)}
-          opacity={PASS_RATE_BAR_OPACITY}
           flexShrink={0}
           data-testid="trend-sparkline-bar"
         />
