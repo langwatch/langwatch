@@ -2,8 +2,8 @@ import { Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
-import { LATEST_ALIAS_PROVIDERS } from "../../server/modelProviders/latestAliases";
+import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
+import { LATEST_ALIAS_PROVIDERS } from "@langwatch/model-provider-contract";
 import { modelSelectorOptions } from "../ModelSelector";
 import {
   INHERIT_SENTINEL,
