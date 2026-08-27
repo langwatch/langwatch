@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The 20260825120004_default_suite migration, run against real data.
+ * The Default suite migration, run against real data.
  *
  * The migration is the half of the "every scenario belongs to a suite"
  * invariant that fixes what is already stored; `default-suite.ts` is the half
@@ -16,7 +16,7 @@
  *
  * @see specs/suites/default-suite.feature
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { nanoid } from "nanoid";
@@ -25,10 +25,29 @@ import type { Prisma } from "~/generated/prisma/client";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 
-const MIGRATION_PATH = join(
+const MIGRATIONS_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../prisma/migrations/20260825120004_default_suite/migration.sql",
+  "../../../../prisma/migrations",
 );
+
+/**
+ * The migration is found by its name, not by its number.
+ *
+ * A migration keeps its number only until `main` merges a higher one, and then
+ * it is renumbered so it still runs. A path holding the number breaks on that
+ * day, in a test that has nothing to do with the change that caused it.
+ */
+function defaultSuiteMigrationPath(): string {
+  const matches = readdirSync(MIGRATIONS_DIR).filter((name) =>
+    name.endsWith("_default_suite"),
+  );
+  if (matches.length !== 1) {
+    throw new Error(
+      `Expected one Default suite migration, found ${matches.length}: ${matches.join(", ")}`,
+    );
+  }
+  return join(MIGRATIONS_DIR, matches[0]!, "migration.sql");
+}
 
 /**
  * A migration runs before the Prisma client and its multitenancy middleware
@@ -47,7 +66,7 @@ const TENANCY_OPTOUT =
  * the SQL that shipped.
  */
 function migrationStatements(): string[] {
-  const sql = readFileSync(MIGRATION_PATH, "utf8")
+  const sql = readFileSync(defaultSuiteMigrationPath(), "utf8")
     .split("\n")
     .filter((line) => !line.trimStart().startsWith("--"))
     .join("\n");
