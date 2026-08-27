@@ -46772,6 +46772,12 @@
                               },
                               "scenarioVersion": {
                                 "type": "integer"
+                              },
+                              "simulatorModel": {
+                                "type": "string"
+                              },
+                              "judgeModel": {
+                                "type": "string"
                               }
                             },
                             "required": [
