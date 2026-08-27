@@ -39,12 +39,10 @@ export function parseTimeseriesRows(input: {
 
   for (const row of rows) {
     const period = row.period === "current" ? current : previous;
-    const date =
-      input.timeScale === "full" ? "full" : typeof row.date === "string" ? row.date : "";
+    const date = input.timeScale === "full" ? "full" : typeof row.date === "string" ? row.date : "";
     const bucket = period.get(date) ?? { date };
     period.set(date, bucket);
-    const grouped =
-      input.groupBy && row.group_key !== undefined && row.group_key !== null;
+    const grouped = input.groupBy && row.group_key !== undefined && row.group_key !== null;
     const target = grouped
       ? (((bucket[input.groupBy!] ??= {}) as Record<string, Record<string, number>>)[
           String(row.group_key)
@@ -61,20 +59,14 @@ export function parseTimeseriesRows(input: {
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([, bucket]) => bucket);
   const currentPeriod = sorted(current);
-  const previousPeriod = sorted(previous).slice(
-    Math.max(0, previous.size - current.size),
-  );
+  const previousPeriod = sorted(previous).slice(Math.max(0, previous.size - current.size));
   const zeroKeys = input.series
-    .map((series, index) =>
-      zeroWhenAbsent(series) ? buildSeriesName(series, index) : null,
-    )
+    .map((series, index) => (zeroWhenAbsent(series) ? buildSeriesName(series, index) : null))
     .filter((key): key is string => key !== null);
   for (const bucket of [...previousPeriod, ...currentPeriod]) {
     for (const key of zeroKeys) {
       if (input.groupBy) {
-        const groups = bucket[input.groupBy] as
-          | Record<string, Record<string, number>>
-          | undefined;
+        const groups = bucket[input.groupBy] as Record<string, Record<string, number>> | undefined;
         for (const metrics of Object.values(groups ?? {})) {
           metrics[key] ??= 0;
         }

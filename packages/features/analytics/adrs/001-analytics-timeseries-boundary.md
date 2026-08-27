@@ -14,7 +14,8 @@ and Evaluation own their distinct lifecycles.
 ## Decision
 
 Analytics owns portable timeseries contracts, conservative table routing,
-ClickHouse reads, LangWatchQL browser behaviour, and Vega-Lite policy. The
+ClickHouse reads and the `evaluation_analytics` / `evaluation_analytics_rollup`
+persistence boundary, LangWatchQL browser behaviour, and Vega-Lite policy. The
 application owns routes, tRPC transport, saved-chart persistence, and browser
 theme/lazy-render ports.
 
@@ -35,8 +36,13 @@ features consume its contract, never its repositories or query builders.
 
 ## Persistence
 
-Analytics reads ClickHouse. Saved workbench chart records belong to Dashboard;
-the browser workbench itself persists nothing.
+Analytics reads ClickHouse and is the sole service writing and reading the
+evaluation analytics tables. Evaluation owns the pure event projections that
+derive their rows, then calls the canonical Analytics service. When ClickHouse
+is disabled, Analytics composes a no-op evaluation persistence implementation:
+projections continue without a database call and read-back returns no row.
+Saved workbench chart records belong to Dashboard; the browser workbench itself
+persists nothing.
 
 ## Runtime and registration
 
@@ -56,7 +62,8 @@ through its error render port and preserves their structured metadata.
 
 ## Contracts and validation
 
-Timeseries and LangWatchQL response shapes are shared Zod 4 contracts. The
+Timeseries, LangWatchQL, and evaluation analytics persistence values are shared
+Zod 4 contracts. The repository parses writes and decoded ClickHouse rows; the
 LangWatchQL query output is validated at the tRPC boundary; browser chart policy
 validates member-authored Vega-Lite specifications before rendering.
 

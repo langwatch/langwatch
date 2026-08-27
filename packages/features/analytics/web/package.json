@@ -33,6 +33,7 @@
     }
   },
   "scripts": {
+    "generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"

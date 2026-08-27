@@ -56,10 +56,7 @@ export class LoggingAnalyticsTripwire extends AnalyticsTripwire {
           }
           const routedMetrics = flatten(routedBucket);
           const legacyMetrics = flatten(legacyBucket);
-          for (const metric of new Set([
-            ...routedMetrics.keys(),
-            ...legacyMetrics.keys(),
-          ])) {
+          for (const metric of new Set([...routedMetrics.keys(), ...legacyMetrics.keys()])) {
             const routedValue = routedMetrics.get(metric);
             const legacyValue = legacyMetrics.get(metric);
             if (routedValue === undefined || legacyValue === undefined) {
@@ -73,10 +70,7 @@ export class LoggingAnalyticsTripwire extends AnalyticsTripwire {
               continue;
             }
             const denominator = Math.max(Math.abs(routedValue), Math.abs(legacyValue));
-            if (
-              denominator > 0 &&
-              Math.abs(routedValue - legacyValue) / denominator > tolerance
-            ) {
+            if (denominator > 0 && Math.abs(routedValue - legacyValue) / denominator > tolerance) {
               divergences.push({
                 period,
                 date,
@@ -120,10 +114,8 @@ function flatten(bucket: Record<string, unknown>): Map<string, number> {
       return;
     }
     if (value === null || typeof value !== "object" || Array.isArray(value)) return;
-    for (const [key, nested] of Object.entries(value))
-      visit(nested, path ? `${path}.${key}` : key);
+    for (const [key, nested] of Object.entries(value)) visit(nested, path ? `${path}.${key}` : key);
   };
-  for (const [key, value] of Object.entries(bucket))
-    if (key !== "date") visit(value, key);
+  for (const [key, value] of Object.entries(bucket)) if (key !== "date") visit(value, key);
   return result;
 }

@@ -27,15 +27,9 @@ export interface AnalyticsLegacyReadInput {
 
 /** The single persistence capability owned by Analytics. */
 export abstract class AnalyticsRepository {
-  abstract runTimeseries(
-    query: AnalyticsTimeseriesQuery,
-  ): Promise<AnalyticsTimeseriesResult>;
+  abstract runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult>;
 
-  abstract findFeedbackEvents(
-    input: AnalyticsLegacyReadInput,
-  ): Promise<AnalyticsFeedbacksResult>;
+  abstract findFeedbackEvents(input: AnalyticsLegacyReadInput): Promise<AnalyticsFeedbacksResult>;
 
-  abstract findTopDocuments(
-    input: AnalyticsLegacyReadInput,
-  ): Promise<AnalyticsTopDocumentsResult>;
+  abstract findTopDocuments(input: AnalyticsLegacyReadInput): Promise<AnalyticsTopDocumentsResult>;
 }

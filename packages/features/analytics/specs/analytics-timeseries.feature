@@ -37,3 +37,16 @@ Feature: Analytics timeseries service
       When those features need timeseries data
       Then they consume the Analytics service
       And Analytics owns no Dashboard or Topic repository
+
+  Rule: Persist evaluation analytics through Analytics
+
+    Scenario: Evaluation projections use the canonical Analytics persistence capability
+      Given an Evaluation projection has derived an evaluation analytics row
+      When it writes the row or its rollup
+      Then Analytics validates and persists the current table shape
+
+    Scenario: ClickHouse-disabled processes preserve evaluation projection no-ops
+      Given ClickHouse is disabled for a process
+      When an Evaluation projection writes or reads evaluation analytics
+      Then Analytics does not resolve a ClickHouse client
+      And the read returns no row

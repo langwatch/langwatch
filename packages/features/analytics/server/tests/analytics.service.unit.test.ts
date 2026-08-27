@@ -1,20 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { addDays, differenceInCalendarDays } from "date-fns";
 import type {
+  AnalyticsEvaluationRow,
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import { AnalyticsService } from "../src/services/analytics.service";
 import { AnalyticsAdapter } from "../src";
+import { NullAnalyticsEvaluationRepository } from "../src/testing";
 import {
   AnalyticsRepository,
   type AnalyticsTimeseriesQuery,
 } from "../src/repositories/analytics.repository";
 
-const input = (
-  overrides: Partial<AnalyticsTimeseriesInput> = {},
-): AnalyticsTimeseriesInput => ({
+const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({
   projectId: "project-1",
   startDate: Date.UTC(2026, 0, 1),
   endDate: Date.UTC(2026, 0, 2),
@@ -29,14 +29,40 @@ const result: AnalyticsTimeseriesResult = {
   currentPeriod: [{ date: "2026-01-01", "0/performance.total_cost/sum": 1 }],
 };
 
+const evaluationRow: AnalyticsEvaluationRow = {
+  tenantId: "project-1",
+  evaluationId: "evaluation-1",
+  version: "2026-08-27",
+  occurredAtMs: 1_756_262_400_000,
+  createdAtMs: 1_756_262_400_000,
+  updatedAtMs: 1_756_262_400_000,
+  evaluatorType: "native",
+  evaluatorName: null,
+  status: "processed",
+  isGuardrail: false,
+  passed: true,
+  score: 1,
+  label: null,
+  model: null,
+  traceId: null,
+  userId: null,
+  conversationId: null,
+  customerId: null,
+  origin: null,
+  durationMs: 1,
+  totalCost: null,
+  nonBilledCost: null,
+  attributes: {},
+  startedAtMs: null,
+  completedAtMs: null,
+};
+
 class RecordingRepository extends AnalyticsRepository {
   lastQuery: AnalyticsTimeseriesQuery | undefined;
   lastFeedbackInput: unknown;
   lastDocumentsInput: unknown;
 
-  async runTimeseries(
-    query: AnalyticsTimeseriesQuery,
-  ): Promise<AnalyticsTimeseriesResult> {
+  async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
     this.lastQuery = query;
     return result;
   }
@@ -52,10 +78,17 @@ class RecordingRepository extends AnalyticsRepository {
   }
 }
 
+function createService(repository: AnalyticsRepository): AnalyticsService {
+  return AnalyticsService.create({
+    repository,
+    evaluationRepository: NullAnalyticsEvaluationRepository.create(),
+  });
+}
+
 describe("AnalyticsService", () => {
   it("routes safe additive trace reads to the trace rollup and keeps the tenant", async () => {
     const repository = new RecordingRepository();
-    const service = AnalyticsService.create({ repository });
+    const service = createService(repository);
 
     await service.getTimeseries(input());
 
@@ -66,7 +99,7 @@ describe("AnalyticsService", () => {
 
   it("falls back to the legacy table for a trace-id scoped query", async () => {
     const repository = new RecordingRepository();
-    const service = AnalyticsService.create({ repository });
+    const service = createService(repository);
 
     await service.getTimeseries(input({ traceIds: ["trace-1"] }));
 
@@ -75,7 +108,7 @@ describe("AnalyticsService", () => {
 
   it("normalizes an oversized bucket request to the daily safety cap", async () => {
     const repository = new RecordingRepository();
-    const service = AnalyticsService.create({ repository });
+    const service = createService(repository);
 
     await service.getTimeseries(
       input({
@@ -90,7 +123,7 @@ describe("AnalyticsService", () => {
 
   it("keeps the legacy calendar-day previous-period envelope and row ceiling", async () => {
     const repository = new RecordingRepository();
-    const service = AnalyticsService.create({ repository });
+    const service = createService(repository);
     const startDate = new Date("2026-01-10T12:00:00.000Z");
     const endDate = new Date("2026-01-12T01:00:00.000Z");
 
@@ -111,7 +144,7 @@ describe("AnalyticsService", () => {
 
   it("uses the legacy local-calendar date calculation around a UTC date boundary", async () => {
     const repository = new RecordingRepository();
-    const service = AnalyticsService.create({ repository });
+    const service = createService(repository);
     const startDate = new Date("2026-01-10T23:30:00.000Z");
     const endDate = new Date("2026-01-11T00:30:00.000Z");
 
@@ -128,6 +161,7 @@ describe("AnalyticsService", () => {
   it("validates and decodes ClickHouse JSONEachRow results", async () => {
     const calls: Array<Record<string, unknown>> = [];
     const service = AnalyticsAdapter.create({
+      clickhouseEnabled: true,
       resolveClient: async () =>
         ({
           query: async (options: Record<string, unknown>) => {
@@ -157,7 +191,7 @@ describe("AnalyticsService", () => {
 
   it("keeps feedback and document reads on the canonical service boundary", async () => {
     const repository = new RecordingRepository();
-    const service = AnalyticsService.create({ repository });
+    const service = createService(repository);
     const filters = { "metadata.user_id": ["user-1"] };
 
     await expect(
@@ -193,6 +227,7 @@ describe("AnalyticsService", () => {
   it("preserves legacy feedback decoding and document ordering", async () => {
     const calls: Array<Record<string, unknown>> = [];
     const service = AnalyticsAdapter.create({
+      clickhouseEnabled: true,
       resolveClient: async () =>
         ({
           query: async (options: Record<string, unknown>) => {
@@ -260,9 +295,7 @@ describe("AnalyticsService", () => {
         filters: {},
       }),
     ).resolves.toEqual({
-      topDocuments: [
-        { documentId: "doc-1", count: 3, traceId: "trace-1", content: "hello" },
-      ],
+      topDocuments: [{ documentId: "doc-1", count: 3, traceId: "trace-1", content: "hello" }],
       totalUniqueDocuments: 7,
     });
     expect(calls).toHaveLength(3);
@@ -271,5 +304,43 @@ describe("AnalyticsService", () => {
         max_bytes_before_external_group_by: 500_000_000,
       });
     }
+  });
+
+  it("keeps evaluation analytics writes and read-backs as no-ops when ClickHouse is disabled", async () => {
+    const resolveClient = vi.fn(async () => {
+      throw new Error("ClickHouse must not be resolved when disabled");
+    });
+    const service = AnalyticsAdapter.create({
+      resolveClient,
+      clickhouseEnabled: false,
+    });
+
+    await service.upsertEvaluationAnalytics({ row: evaluationRow });
+    await service.appendEvaluationAnalyticsRollup({
+      row: {
+        tenantId: evaluationRow.tenantId,
+        bucketStart: new Date(evaluationRow.occurredAtMs),
+        evaluatorType: evaluationRow.evaluatorType,
+        status: evaluationRow.status,
+        evalCount: 1,
+        passCount: 1,
+        failCount: 0,
+        errorCount: 0,
+        skippedCount: 0,
+        scoreSum: 1,
+        scoreCount: 1,
+        durationSum: 1,
+        costSum: 0,
+        nonBilledCostSum: 0,
+      },
+    });
+
+    await expect(
+      service.tryGetEvaluationAnalytics({
+        tenantId: evaluationRow.tenantId,
+        evaluationId: evaluationRow.evaluationId,
+      }),
+    ).resolves.toBeNull();
+    expect(resolveClient).not.toHaveBeenCalled();
   });
 });

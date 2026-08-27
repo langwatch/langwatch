@@ -42,9 +42,7 @@ export const camelCaseToLowerCase = (input: string): string =>
 
 // https://stackoverflow.com/a/77731548/996404
 export const camelCaseToSnakeCase = (input: string): string => {
-  return input
-    .replace(/(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))/g, "$1_")
-    .toLowerCase();
+  return input.replace(/(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))/g, "$1_").toLowerCase();
 };
 
 export const snakeCaseToCamelCase = (input: string): string => {
@@ -61,10 +59,7 @@ export const snakeCaseToPascalCase = (input: string): string => {
 
 export const kebabCase = (input: string): string => {
   return input
-    .replace(
-      /!|@|#|\$|%|\^|&|\*|\(|\)|_|\+|`|~|:|;|,|\.|\?|\/|\\|\{|\}|\[|\]|\"|\'|\<|\>/g,
-      "",
-    )
+    .replace(/!|@|#|\$|%|\^|&|\*|\(|\)|_|\+|`|~|:|;|,|\.|\?|\/|\\|\{|\}|\[|\]|\"|\'|\<|\>/g, "")
     .replace(/([A-Z])/g, " $1")
     .trim()
     .replace(/ /g, "-")

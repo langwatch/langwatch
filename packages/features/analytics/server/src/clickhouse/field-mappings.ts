@@ -11,12 +11,7 @@
  * These are required for deduplication (TraceId, UpdatedAt),
  * tenant isolation (TenantId), and time filtering (OccurredAt).
  */
-export const TRACE_IDENTITY_COLUMNS = [
-  "TenantId",
-  "TraceId",
-  "OccurredAt",
-  "UpdatedAt",
-] as const;
+export const TRACE_IDENTITY_COLUMNS = ["TenantId", "TraceId", "OccurredAt", "UpdatedAt"] as const;
 
 /**
  * All trace_summaries columns that analytics queries may reference.
@@ -549,10 +544,7 @@ export function buildJoinClause({
  * Merge required columns with identity columns, ensuring identity columns
  * are always present.
  */
-function mergeWithIdentity(
-  required: ReadonlySet<string>,
-  identity: readonly string[],
-): string[] {
+function mergeWithIdentity(required: ReadonlySet<string>, identity: readonly string[]): string[] {
   const merged = new Set<string>(identity);
   for (const col of required) {
     merged.add(col);
@@ -689,9 +681,7 @@ export function narrowSpanAttributesColumns({
 
   const keys = [
     ...new Set(
-      keyMatches
-        .map((match) => match[1])
-        .filter((key): key is string => key !== undefined),
+      keyMatches.map((match) => match[1]).filter((key): key is string => key !== undefined),
     ),
   ];
   const narrowed = new Set(columns);
@@ -703,9 +693,7 @@ export function narrowSpanAttributesColumns({
 /**
  * Extract which evaluation_runs columns are referenced in a set of SQL expressions.
  */
-export function extractReferencedEvaluationColumns(
-  expressions: string[],
-): ReadonlySet<string> {
+export function extractReferencedEvaluationColumns(expressions: string[]): ReadonlySet<string> {
   const joined = expressions.join(" ");
   const columns = new Set<string>();
   const alias = tableAliases.evaluation_runs;
@@ -729,9 +717,7 @@ export function extractReferencedEvaluationColumns(
  * reads the columns actually used, instead of the full analytics set with its
  * wide Attributes map.
  */
-export function extractReferencedTraceColumns(
-  expressions: string[],
-): ReadonlySet<string> {
+export function extractReferencedTraceColumns(expressions: string[]): ReadonlySet<string> {
   const joined = expressions.join(" ");
   const columns = new Set<string>();
   const alias = tableAliases.trace_summaries;

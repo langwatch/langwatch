@@ -183,9 +183,7 @@ export function buildRollupTimeseriesQuery(
   );
 
   if (typeof input.timeScale === "number") {
-    selectExprs.push(
-      `${dateTrunc(`${ra}.BucketStart`, input.timeScale, timeZone)} AS date`,
-    );
+    selectExprs.push(`${dateTrunc(`${ra}.BucketStart`, input.timeScale, timeZone)} AS date`);
   }
 
   assertRollupUngrouped(input.groupBy);

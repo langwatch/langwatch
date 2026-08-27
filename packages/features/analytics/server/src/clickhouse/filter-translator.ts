@@ -79,10 +79,8 @@ const filterHandlers: Record<string, FilterHandler | null> = {
 
   // Metadata Filters
   "metadata.user_id": (values) => translateMetadataFilter("langwatch.user_id", values),
-  "metadata.thread_id": (values) =>
-    translateMetadataFilter("gen_ai.conversation.id", values),
-  "metadata.customer_id": (values) =>
-    translateMetadataFilter("langwatch.customer_id", values),
+  "metadata.thread_id": (values) => translateMetadataFilter("gen_ai.conversation.id", values),
+  "metadata.customer_id": (values) => translateMetadataFilter("langwatch.customer_id", values),
   "metadata.labels": (values) => translateLabelsFilter(values),
   "metadata.key": (values) => translateMetadataKeyFilter(values),
   "metadata.value": (values, key) => translateMetadataValueFilter(values, key),
@@ -94,15 +92,12 @@ const filterHandlers: Record<string, FilterHandler | null> = {
   "traces.name": (values) => translateTraceNameFilter(values),
 
   // Span Filters
-  "spans.type": (values, _key, _subkey, spanTime) =>
-    translateSpanTypeFilter(values, spanTime),
-  "spans.model": (values, _key, _subkey, spanTime) =>
-    translateSpanModelFilter(values, spanTime),
+  "spans.type": (values, _key, _subkey, spanTime) => translateSpanTypeFilter(values, spanTime),
+  "spans.model": (values, _key, _subkey, spanTime) => translateSpanModelFilter(values, spanTime),
 
   // Evaluation Filters
   "evaluations.evaluator_id": (values) => translateEvaluatorIdFilter(values),
-  "evaluations.evaluator_id.guardrails_only": (values) =>
-    translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.guardrails_only": (values) => translateEvaluatorIdFilter(values),
   "evaluations.evaluator_id.has_passed": (values) =>
     translateEvaluatorIdFilter(values, "AND Passed IS NOT NULL"),
   "evaluations.evaluator_id.has_score": (values) =>
@@ -194,10 +189,7 @@ function translateSubtopicFilter(values: string[]): FilterTranslation {
 /**
  * Translate metadata attribute filter
  */
-function translateMetadataFilter(
-  attributeKey: string,
-  values: string[],
-): FilterTranslation {
+function translateMetadataFilter(attributeKey: string, values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("metaValues");
   return {
@@ -366,10 +358,7 @@ function translateTraceNameFilter(values: string[]): FilterTranslation {
  * subqueries (issue #2660). IN subqueries are semantically equivalent and avoid
  * this planner bug.
  */
-function translateSpanTypeFilter(
-  values: string[],
-  spanTimePredicate = "",
-): FilterTranslation {
+function translateSpanTypeFilter(values: string[], spanTimePredicate = ""): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("spanTypes");
 
@@ -388,10 +377,7 @@ function translateSpanTypeFilter(
 /**
  * Translate span model filter (requires JOIN)
  */
-function translateSpanModelFilter(
-  values: string[],
-  spanTimePredicate = "",
-): FilterTranslation {
+function translateSpanModelFilter(values: string[], spanTimePredicate = ""): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("models");
 
@@ -414,10 +400,7 @@ function translateSpanModelFilter(
  *   subquery (e.g. "AND Passed IS NOT NULL"). Used by the has_passed / has_score /
  *   has_label variants so the subquery filters by result-type, not just EvaluatorId.
  */
-function translateEvaluatorIdFilter(
-  values: string[],
-  additionalWhere = "",
-): FilterTranslation {
+function translateEvaluatorIdFilter(values: string[], additionalWhere = ""): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evaluatorIds");
 
@@ -470,10 +453,7 @@ function translateEvaluationPassedFilter(
 /**
  * Translate evaluation score filter (numeric range)
  */
-function translateEvaluationScoreFilter(
-  values: string[],
-  evaluatorId?: string,
-): FilterTranslation {
+function translateEvaluationScoreFilter(values: string[], evaluatorId?: string): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const minParam = genParamName("scoreMin");
   const maxParam = genParamName("scoreMax");
@@ -510,10 +490,7 @@ function translateEvaluationScoreFilter(
 /**
  * Translate evaluation label filter
  */
-function translateEvaluationLabelFilter(
-  values: string[],
-  evaluatorId?: string,
-): FilterTranslation {
+function translateEvaluationLabelFilter(values: string[], evaluatorId?: string): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evalLabels");
 
@@ -541,10 +518,7 @@ function translateEvaluationLabelFilter(
 /**
  * Translate evaluation state filter
  */
-function translateEvaluationStateFilter(
-  values: string[],
-  evaluatorId?: string,
-): FilterTranslation {
+function translateEvaluationStateFilter(values: string[], evaluatorId?: string): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evalStates");
 
@@ -572,10 +546,7 @@ function translateEvaluationStateFilter(
 /**
  * Translate event type filter
  */
-function translateEventTypeFilter(
-  values: string[],
-  spanTimePredicate = "",
-): FilterTranslation {
+function translateEventTypeFilter(values: string[], spanTimePredicate = ""): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("eventTypes");
 
@@ -783,10 +754,7 @@ export function combineFilters(translations: FilterTranslation[]): FilterTransla
  */
 export function translateAllFilters(
   filters: Partial<
-    Record<
-      string,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
+    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >,
   spanTimePredicate?: string,
 ): FilterTranslation {
@@ -814,13 +782,7 @@ export function translateAllFilters(
           for (const [subkey, subSubValue] of Object.entries(subValue)) {
             if (Array.isArray(subSubValue)) {
               translations.push(
-                translateFilter(
-                  field as string,
-                  subSubValue,
-                  key,
-                  subkey,
-                  spanTimePredicate,
-                ),
+                translateFilter(field as string, subSubValue, key, subkey, spanTimePredicate),
               );
             }
           }

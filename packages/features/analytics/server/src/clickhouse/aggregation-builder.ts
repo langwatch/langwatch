@@ -7,10 +7,7 @@
 
 import { MAX_PROCESSED_SPANS } from "../query-builders/trace-signal";
 import { snakeCase } from "../string-casing";
-import {
-  isZeroWhenAbsentSeries,
-  type AnalyticsSeries,
-} from "@langwatch/analytics-contract";
+import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analytics-contract";
 import {
   buildJoinClause,
   type CHTable,
@@ -153,9 +150,7 @@ function dedupedTraceSummaries(
   columns?: readonly string[],
   dateFilter?: string,
 ): string {
-  const columnList = columns
-    ? Array.from(columns).join(", ")
-    : TRACE_ANALYTICS_COLUMNS.join(", ");
+  const columnList = columns ? Array.from(columns).join(", ") : TRACE_ANALYTICS_COLUMNS.join(", ");
   const dateClause = dateFilter ?? "";
   return `(
     SELECT ${columnList} FROM trace_summaries
@@ -450,9 +445,7 @@ function spanModelPartitionMissExpr(): string {
  *
  * @param groupByKey - Optional key to filter results (e.g., specific evaluator ID)
  */
-const groupByExpressions: Partial<
-  Record<string, (groupByKey?: string) => GroupByExpression>
-> = {
+const groupByExpressions: Partial<Record<string, (groupByKey?: string) => GroupByExpression>> = {
   "topics.topics": () => ({
     column: `${tableAliases.trace_summaries}.TopicId`,
     requiredJoins: [],
@@ -591,10 +584,7 @@ export interface TimeseriesQueryInput {
   previousPeriodStartDate: Date;
   series: AnalyticsSeries[];
   filters?: Partial<
-    Record<
-      string,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
+    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >;
   groupBy?: string;
   groupByKey?: string;
@@ -757,10 +747,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // Translate filters. Span/event facet filters resolve to stored_spans
   // subqueries; pass the StartTime envelope so they prune partitions instead of
   // cold-scanning S3 (see SPAN_TIME_FILTER_BOTH_PERIODS).
-  const filterTranslation = translateAllFilters(
-    input.filters ?? {},
-    SPAN_TIME_FILTER_BOTH_PERIODS,
-  );
+  const filterTranslation = translateAllFilters(input.filters ?? {}, SPAN_TIME_FILTER_BOTH_PERIODS);
   for (const join of filterTranslation.requiredJoins) {
     allJoins.add(join);
   }
@@ -842,8 +829,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     filterConditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
     allTranslationParams.traceIds = input.traceIds;
   }
-  const filterWhere =
-    filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : "";
+  const filterWhere = filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : "";
 
   // When using arrayJoin for grouping (like labels), span-level groupBy (like
   // span_type), or the span-partitioned model grouping, we need a CTE approach
@@ -1065,9 +1051,7 @@ function buildMixedEvalTimeseriesQuery({
   ]);
 
   const dateTrunc =
-    typeof input.timeScale === "number"
-      ? getDateTruncFunction(input.timeScale, timeZone)
-      : null;
+    typeof input.timeScale === "number" ? getDateTruncFunction(input.timeScale, timeZone) : null;
 
   const groupKeyExpr = groupByColumn
     ? groupByHandlesUnknown
@@ -1108,10 +1092,7 @@ function buildMixedEvalTimeseriesQuery({
   for (const metric of simpleMetrics) {
     const perTraceAlias = quoteIdentifier(`${metric.alias}__per_trace`);
     const quotedAlias = quoteIdentifier(metric.alias);
-    const exprWithoutAlias = stripSelectExpressionAlias(
-      metric.selectExpression,
-      metric.alias,
-    );
+    const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
 
     if (metric.requiredJoins.includes("evaluation_runs")) {
       innerSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
@@ -1137,8 +1118,7 @@ function buildMixedEvalTimeseriesQuery({
 
     // uniq/uniqExact of TraceId — same as count: 1 per trace row.
     if (
-      (/\buniq\s*\(/.test(exprWithoutAlias) ||
-        /\buniqExact\s*\(/.test(exprWithoutAlias)) &&
+      (/\buniq\s*\(/.test(exprWithoutAlias) || /\buniqExact\s*\(/.test(exprWithoutAlias)) &&
       exprWithoutAlias.includes("TraceId")
     ) {
       innerSelectExprs.push(`1 AS ${perTraceAlias}`);
@@ -1192,16 +1172,10 @@ function buildMixedEvalTimeseriesQuery({
   // period has no data). This matches the pattern used by buildSubqueryTimeseriesQuery.
   if (input.timeScale === "full" && !groupByColumn) {
     // Build inner SELECT without the period CASE — each CTE covers one period.
-    const periodInnerExprs = innerSelectExprs.filter(
-      (expr) => !expr.includes("AS period"),
-    );
+    const periodInnerExprs = innerSelectExprs.filter((expr) => !expr.includes("AS period"));
     const periodInnerGroupBy = innerGroupBy.filter((col) => col !== "period");
 
-    const buildPeriodCte = (
-      cteName: string,
-      startParam: string,
-      endParam: string,
-    ): string => `
+    const buildPeriodCte = (cteName: string, startParam: string, endParam: string): string => `
       ${cteName} AS (
         SELECT
           ${periodInnerExprs.join(",\n          ")}
@@ -1305,8 +1279,7 @@ function extractTraceAggregationColumn(expression: string): string | null {
   //    or `ts.Attributes["langwatch.user_id"]`. ClickHouse accepts both quote
   //    styles. Map keys can contain arbitrary characters except the matching
   //    quote, so we match non-greedily to the closing quote + bracket.
-  const bracketedPattern =
-    /[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\[(?:'[^']*'|"[^"]*")\]/g;
+  const bracketedPattern = /[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\[(?:'[^']*'|"[^"]*")\]/g;
   const bracketedMatches = expression.match(bracketedPattern);
   if (bracketedMatches && bracketedMatches.length > 0) {
     return bracketedMatches[bracketedMatches.length - 1] ?? null;
@@ -1334,11 +1307,7 @@ function extractTraceAggregationColumn(expression: string): string | null {
  * `ts.Attributes['langwatch.user_id']` the closing `]` is followed by `,`/`)`
  * which satisfies the lookahead.
  */
-function replaceColumnWithAlias(
-  expression: string,
-  column: string,
-  alias: string,
-): string {
+function replaceColumnWithAlias(expression: string, column: string, alias: string): string {
   // Escape regex metacharacters in the column reference before replacing.
   const escaped = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Anchor with negative lookbehind/lookahead so `ts.TotalCost` does not match
@@ -1525,18 +1494,14 @@ function buildArrayJoinTimeseriesQuery({
       ),
     )} AS trace_non_billed_cost`,
   );
-  cteSelectExprs.push(
-    `${traceColumnWrapper(`${ts}.TotalDurationMs`)} AS trace_duration_ms`,
-  );
+  cteSelectExprs.push(`${traceColumnWrapper(`${ts}.TotalDurationMs`)} AS trace_duration_ms`);
   cteSelectExprs.push(
     `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelPromptTokens`, `${ts}.TotalPromptTokenCount`))} AS trace_prompt_tokens`,
   );
   cteSelectExprs.push(
     `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCompletionTokens`, `${ts}.TotalCompletionTokenCount`))} AS trace_completion_tokens`,
   );
-  cteSelectExprs.push(
-    `${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`,
-  );
+  cteSelectExprs.push(`${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`);
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TimeToFirstTokenMs`)} AS trace_time_to_first_token_ms`,
   );
@@ -1591,10 +1556,7 @@ function buildArrayJoinTimeseriesQuery({
     for (const metric of simpleMetrics) {
       if (!metric.requiredJoins.includes("evaluation_runs")) continue;
       const perTraceAlias = quoteIdentifier(`${metric.alias}__per_trace`);
-      const exprWithoutAlias = stripSelectExpressionAlias(
-        metric.selectExpression,
-        metric.alias,
-      );
+      const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
       cteSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
       evalPerTraceAliases.set(metric.alias, perTraceAlias);
     }
@@ -1636,16 +1598,11 @@ function buildArrayJoinTimeseriesQuery({
             `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
         );
       }
-      outerSelectExprs.push(
-        `${outerAgg}(${perTraceAlias}) AS ${quoteIdentifier(metric.alias)}`,
-      );
+      outerSelectExprs.push(`${outerAgg}(${perTraceAlias}) AS ${quoteIdentifier(metric.alias)}`);
       continue;
     }
     // Transform the metric expression for the deduplicated context
-    const transformedExpr = transformMetricForDedup(
-      metric.selectExpression,
-      metric.alias,
-    );
+    const transformedExpr = transformMetricForDedup(metric.selectExpression, metric.alias);
     outerSelectExprs.push(transformedExpr);
   }
 
@@ -1667,10 +1624,7 @@ function buildArrayJoinTimeseriesQuery({
   // (which hardcodes per-trace passthroughs like ts.NonBilledCost regardless of
   // the requested metrics) and the filter reference. Derived from the assembled
   // expressions rather than the metric list so no referenced column is pruned.
-  const traceColumns = referencedTraceColumns(
-    [],
-    [...cteSelectExprs, filterWhere, joinClauses],
-  );
+  const traceColumns = referencedTraceColumns([], [...cteSelectExprs, filterWhere, joinClauses]);
 
   // The span-model partition join fans each trace out into one row per model
   // its spans used; it rides ALONGSIDE any generic filter/metric JOINs, whose
@@ -2065,13 +2019,7 @@ function buildSubqueryTimeseriesQuery(
       .map((series, index) => ({ series, index }))
       .filter(({ series }) => isZeroWhenAbsentSeries(series))
       .map(({ series, index }) =>
-        buildMetricAlias(
-          index,
-          series.metric,
-          series.aggregation,
-          series.key,
-          series.subkey,
-        ),
+        buildMetricAlias(index, series.metric, series.aggregation, series.key, series.subkey),
       ),
   );
   const scalarExpr = (subquery: string, alias: string, quotedAlias: string): string =>
@@ -2108,18 +2056,10 @@ function buildSubqueryTimeseriesQuery(
     const cteName = `cte_${metric.alias}`;
     const quotedAlias = quoteIdentifier(metric.alias);
     currentSelectExprs.push(
-      scalarExpr(
-        `(SELECT metric_value FROM ${cteName}_current)`,
-        metric.alias,
-        quotedAlias,
-      ),
+      scalarExpr(`(SELECT metric_value FROM ${cteName}_current)`, metric.alias, quotedAlias),
     );
     previousSelectExprs.push(
-      scalarExpr(
-        `(SELECT metric_value FROM ${cteName}_previous)`,
-        metric.alias,
-        quotedAlias,
-      ),
+      scalarExpr(`(SELECT metric_value FROM ${cteName}_previous)`, metric.alias, quotedAlias),
     );
   }
 
@@ -2318,16 +2258,12 @@ function buildDateBucketedPipelineQuery({
 
     // If anchor is the first pipeline CTE, add its column
     if (!hasSimple) {
-      selectCols.push(
-        `${firstPipelineCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`,
-      );
+      selectCols.push(`${firstPipelineCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`);
     }
 
     for (const metric of pipelineCTEsToJoin) {
       const cteName = `cte_${metric.alias}`;
-      const onClause = joinKeys
-        .map((k) => `${anchorCte}.${k} = ${cteName}.${k}`)
-        .join(" AND ");
+      const onClause = joinKeys.map((k) => `${anchorCte}.${k} = ${cteName}.${k}`).join(" AND ");
       joinSql += `\n    FULL OUTER JOIN ${cteName} ON ${onClause}`;
       selectCols.push(`${cteName}.${quoteIdentifier(metric.alias)}`);
     }
@@ -2372,10 +2308,7 @@ interface PipelineCTEContext {
  * Build a single pipeline metric CTE with date bucketing.
  * Handles both standard 2-level and nested 3-level aggregations.
  */
-function buildPipelineMetricCTE(
-  metric: MetricTranslation,
-  ctx: PipelineCTEContext,
-): string {
+function buildPipelineMetricCTE(metric: MetricTranslation, ctx: PipelineCTEContext): string {
   if (!metric.subquery) {
     throw new Error(`Metric "${metric.alias}" is missing subquery definition`);
   }
@@ -2748,10 +2681,7 @@ export function buildDataForFilterQuery(
   subkey?: string,
   searchQuery?: string,
   filters?: Partial<
-    Record<
-      string,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
+    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
@@ -2759,10 +2689,7 @@ export function buildDataForFilterQuery(
   const es = tableAliases.evaluation_runs;
 
   // Translate filters if provided
-  const filterTranslation = translateAllFilters(
-    filters ?? {},
-    SPAN_TIME_FILTER_START_END,
-  );
+  const filterTranslation = translateAllFilters(filters ?? {}, SPAN_TIME_FILTER_START_END);
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
   const filterExpressions = [filterTranslation.whereClause];
@@ -2870,9 +2797,7 @@ export function buildDataForFilterQuery(
     case "spans.model":
       joins = buildJoinClause({
         table: "stored_spans",
-        requiredColumns: new Set([
-          spanAttributesNarrowProjection(["gen_ai.request.model"]),
-        ]),
+        requiredColumns: new Set([spanAttributesNarrowProjection(["gen_ai.request.model"])]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
       });
       sql = `
@@ -2898,9 +2823,7 @@ export function buildDataForFilterQuery(
     case "spans.type":
       joins = buildJoinClause({
         table: "stored_spans",
-        requiredColumns: new Set([
-          spanAttributesNarrowProjection(["langwatch.span.type"]),
-        ]),
+        requiredColumns: new Set([spanAttributesNarrowProjection(["langwatch.span.type"])]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
       });
       sql = `
@@ -2991,20 +2914,14 @@ export function buildTopDocumentsQuery(
   startDate: Date,
   endDate: Date,
   filters?: Partial<
-    Record<
-      string,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
+    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
 
   // Translate filters
-  const filterTranslation = translateAllFilters(
-    filters ?? {},
-    SPAN_TIME_FILTER_START_END,
-  );
+  const filterTranslation = translateAllFilters(filters ?? {}, SPAN_TIME_FILTER_START_END);
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
 
@@ -3088,20 +3005,14 @@ export function buildFeedbacksQuery(
   startDate: Date,
   endDate: Date,
   filters?: Partial<
-    Record<
-      string,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
+    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
 
   // Translate filters
-  const filterTranslation = translateAllFilters(
-    filters ?? {},
-    SPAN_TIME_FILTER_START_END,
-  );
+  const filterTranslation = translateAllFilters(filters ?? {}, SPAN_TIME_FILTER_START_END);
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
 
@@ -3120,11 +3031,7 @@ export function buildFeedbacksQuery(
   // subquery, instead of joining the full analytics column set (#2551 / #2605).
   const spanJoin = buildJoinClause({
     table: "stored_spans",
-    requiredColumns: new Set([
-      '"Events.Timestamp"',
-      '"Events.Name"',
-      '"Events.Attributes"',
-    ]),
+    requiredColumns: new Set(['"Events.Timestamp"', '"Events.Name"', '"Events.Attributes"']),
     spanTimeFilter: SPAN_TIME_FILTER_START_END,
   });
 

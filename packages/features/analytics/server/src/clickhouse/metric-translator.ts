@@ -11,12 +11,7 @@ import type {
   PipelineAggregationTypes,
 } from "../types";
 import { randomUUID } from "node:crypto";
-import {
-  type CHTable,
-  getFieldMapping,
-  qualifiedColumn,
-  tableAliases,
-} from "./field-mappings";
+import { type CHTable, getFieldMapping, qualifiedColumn, tableAliases } from "./field-mappings";
 
 /**
  * Maximum thread session duration in milliseconds (3 hours).
@@ -126,9 +121,7 @@ function percentileFunctionName(
 /**
  * Check if aggregation type is a percentile
  */
-export function isPercentileAggregation(
-  agg: AggregationTypes,
-): agg is PercentileAggregationTypes {
+export function isPercentileAggregation(agg: AggregationTypes): agg is PercentileAggregationTypes {
   return ["median", "p99", "p95", "p90"].includes(agg);
 }
 

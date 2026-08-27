@@ -128,8 +128,7 @@ const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST = [
   "performance.total_tokens",
   "performance.total_processed_tokens",
 ] as const;
-export type TraceRollupMetricKey =
-  (typeof ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST)[number];
+export type TraceRollupMetricKey = (typeof ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST)[number];
 
 /**
  * Registry metric keys that can be served from `evaluation_analytics_rollup`
@@ -157,9 +156,7 @@ export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
   ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
 ]);
 
-export function isRollupRollableMetricKey(
-  metric: string,
-): metric is RollupRollableMetricKey {
+export function isRollupRollableMetricKey(metric: string): metric is RollupRollableMetricKey {
   return ROLLUP_ROLLABLE_METRIC_KEYS.has(metric);
 }
 
@@ -175,15 +172,11 @@ const ROLLUP_ROLLABLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
  * keys — used by the per-source SQL builders so their exhaustive switches
  * type-narrow correctly.
  */
-export function isRollupRollableTraceMetricKey(
-  metric: string,
-): metric is TraceRollupMetricKey {
+export function isRollupRollableTraceMetricKey(metric: string): metric is TraceRollupMetricKey {
   return ROLLUP_ROLLABLE_TRACE_METRIC_KEYS.has(metric);
 }
 
-export function isSlimEligibleTraceMetricKey(
-  metric: string,
-): metric is SlimTraceMetricKey {
+export function isSlimEligibleTraceMetricKey(metric: string): metric is SlimTraceMetricKey {
   return SLIM_ELIGIBLE_TRACE_METRIC_KEYS.has(metric);
 }
 
@@ -429,8 +422,11 @@ const ROLLUP_AVG_AGGREGATION: AnalyticsAggregation = "avg";
  * score. They fall through to the eval slim table, one row per evaluation,
  * where `min/max(Score)` is the real per-eval extremum (eval5014-P1).
  */
-const ROLLUP_EVAL_AGGREGATIONS: ReadonlySet<AnalyticsAggregation> =
-  new Set<AnalyticsAggregation>(["sum", "avg", "cardinality"]);
+const ROLLUP_EVAL_AGGREGATIONS: ReadonlySet<AnalyticsAggregation> = new Set<AnalyticsAggregation>([
+  "sum",
+  "avg",
+  "cardinality",
+]);
 
 /**
  * Input shape for the routing decision. Mirrors the relevant subset of
@@ -439,10 +435,7 @@ const ROLLUP_EVAL_AGGREGATIONS: ReadonlySet<AnalyticsAggregation> =
 export interface PickAnalyticsTableInput {
   series: AnalyticsSeries[];
   filters?: Partial<
-    Record<
-      string,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
+    Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>
   >;
   groupBy?: string;
   /** Narrow the scan to an explicit trace set. Legacy-builder-only. */
@@ -573,13 +566,9 @@ function rollupHandlesSeries(
   return false;
 }
 
-function rollupHandlesGroupBy(
-  groupBy: string | undefined,
-  source: AnalyticsMetricSource,
-): boolean {
+function rollupHandlesGroupBy(groupBy: string | undefined, source: AnalyticsMetricSource): boolean {
   if (!groupBy) return true;
-  const keys =
-    source === "trace" ? ROLLUP_TRACE_GROUP_BY_KEYS : ROLLUP_EVAL_GROUP_BY_KEYS;
+  const keys = source === "trace" ? ROLLUP_TRACE_GROUP_BY_KEYS : ROLLUP_EVAL_GROUP_BY_KEYS;
   return keys.has(groupBy);
 }
 
@@ -588,8 +577,7 @@ function rollupHandlesFilters(
   source: AnalyticsMetricSource,
 ): boolean {
   if (!filters) return true;
-  const allowed =
-    source === "trace" ? ROLLUP_TRACE_FILTER_FIELDS : ROLLUP_EVAL_FILTER_FIELDS;
+  const allowed = source === "trace" ? ROLLUP_TRACE_FILTER_FIELDS : ROLLUP_EVAL_FILTER_FIELDS;
   for (const [field, value] of Object.entries(filters)) {
     if (!hasAnyFilterValue(value)) continue;
     if (!allowed.has(field as string)) return false;
@@ -601,10 +589,7 @@ function rollupHandlesFilters(
 // Slim predicates
 // ---------------------------------------------------------------------------
 
-function slimHandlesAllSeries(
-  series: AnalyticsSeries[],
-  source: AnalyticsMetricSource,
-): boolean {
+function slimHandlesAllSeries(series: AnalyticsSeries[], source: AnalyticsMetricSource): boolean {
   return series.every((s) => slimHandlesSeries(s, source));
 }
 
@@ -625,10 +610,7 @@ function slimHandlesSeries(s: AnalyticsSeries, source: AnalyticsMetricSource): b
   return keys.has(s.metric);
 }
 
-function slimHandlesGroupBy(
-  groupBy: string | undefined,
-  source: AnalyticsMetricSource,
-): boolean {
+function slimHandlesGroupBy(groupBy: string | undefined, source: AnalyticsMetricSource): boolean {
   if (!groupBy) return true;
   const keys = source === "trace" ? SLIM_TRACE_GROUP_BY_KEYS : SLIM_EVAL_GROUP_BY_KEYS;
   return keys.has(groupBy);
@@ -669,11 +651,7 @@ function filtersHitBlocklist(filters: PickAnalyticsTableInput["filters"]): boole
   // metadata.value is keyed by the underlying metadata key — if the key on
   // the outer record is blocklisted we cannot read the value off slim either.
   const metadataValue = filters["metadata.value"];
-  if (
-    metadataValue &&
-    typeof metadataValue === "object" &&
-    !Array.isArray(metadataValue)
-  ) {
+  if (metadataValue && typeof metadataValue === "object" && !Array.isArray(metadataValue)) {
     for (const outerKey of Object.keys(metadataValue)) {
       if (isBlocklisted(outerKey)) return true;
     }

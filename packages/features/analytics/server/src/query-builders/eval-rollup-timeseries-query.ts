@@ -37,14 +37,9 @@ const ra = "ra";
  * Narrowing the type here makes the exhaustive switches below reject them at
  * compile time rather than silently returning merge-state noise.
  */
-export type EvalRollupAggregation = Extract<
-  AnalyticsAggregation,
-  "sum" | "avg" | "cardinality"
->;
+export type EvalRollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg" | "cardinality">;
 
-export type EvalRollupGroupByKey =
-  | "evaluations.evaluator_type"
-  | "evaluations.evaluation_status";
+export type EvalRollupGroupByKey = "evaluations.evaluator_type" | "evaluations.evaluation_status";
 
 export type EvalRollupMetricKey =
   | "evaluations.evaluation_score"
@@ -60,10 +55,7 @@ function isEvalRollupMetricKey(metric: string): metric is EvalRollupMetricKey {
 }
 
 function isEvalRollupGroupByKey(groupBy: string): groupBy is EvalRollupGroupByKey {
-  return (
-    groupBy === "evaluations.evaluator_type" ||
-    groupBy === "evaluations.evaluation_status"
-  );
+  return groupBy === "evaluations.evaluator_type" || groupBy === "evaluations.evaluation_status";
 }
 
 function evalRollupGroupByExpression(groupBy?: string): string | null {
@@ -85,9 +77,7 @@ function evalRollupGroupByExpression(groupBy?: string): string | null {
   }
 }
 
-function isEvalRollupAggregation(
-  agg: AnalyticsAggregation,
-): agg is EvalRollupAggregation {
+function isEvalRollupAggregation(agg: AnalyticsAggregation): agg is EvalRollupAggregation {
   return agg === "sum" || agg === "avg" || agg === "cardinality";
 }
 
@@ -96,10 +86,7 @@ function isEvalRollupAggregation(
  * Mirrors the metric-translator's behaviour for the trace rollup builder:
  * each (metric, agg) pair maps to a single SQL expression.
  */
-function evalRollupAggExpression(
-  metric: EvalRollupMetricKey,
-  agg: EvalRollupAggregation,
-): string {
+function evalRollupAggExpression(metric: EvalRollupMetricKey, agg: EvalRollupAggregation): string {
   // Verdict metrics (score, pass-rate) only read rows whose evaluation
   // actually ran to completion — an errored run's stray verdict must not
   // shift the chart (#6833). Matches the legacy per-evaluator path's
@@ -117,9 +104,7 @@ function evalRollupAggExpression(
           return `sumIf(${ra}.ScoreCount, ${processed})`;
         default: {
           const _exhaustive: never = agg;
-          throw new Error(
-            `Unhandled aggregation for evaluation_score: ${String(_exhaustive)}`,
-          );
+          throw new Error(`Unhandled aggregation for evaluation_score: ${String(_exhaustive)}`);
         }
       }
     case "evaluations.evaluation_pass_rate":
@@ -134,9 +119,7 @@ function evalRollupAggExpression(
           return `sumIf(${ra}.PassCount, ${processed}) + sumIf(${ra}.FailCount, ${processed})`;
         default: {
           const _exhaustive: never = agg;
-          throw new Error(
-            `Unhandled aggregation for evaluation_pass_rate: ${String(_exhaustive)}`,
-          );
+          throw new Error(`Unhandled aggregation for evaluation_pass_rate: ${String(_exhaustive)}`);
         }
       }
     case "evaluations.evaluation_runs":
@@ -153,9 +136,7 @@ function evalRollupAggExpression(
           );
         default: {
           const _exhaustive: never = agg;
-          throw new Error(
-            `Unhandled aggregation for evaluation_runs: ${String(_exhaustive)}`,
-          );
+          throw new Error(`Unhandled aggregation for evaluation_runs: ${String(_exhaustive)}`);
         }
       }
     default: {
@@ -181,9 +162,7 @@ export function buildEvalRollupTimeseriesQuery(
   );
 
   if (typeof input.timeScale === "number") {
-    selectExprs.push(
-      `${dateTrunc(`${ra}.BucketStart`, input.timeScale, timeZone)} AS date`,
-    );
+    selectExprs.push(`${dateTrunc(`${ra}.BucketStart`, input.timeScale, timeZone)} AS date`);
   }
 
   const groupByColumn = evalRollupGroupByExpression(input.groupBy);

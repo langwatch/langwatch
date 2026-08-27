@@ -25,10 +25,7 @@
 import { buildMetricAlias } from "../clickhouse/metric-translator";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "./trace-signal";
-import {
-  isSlimEligibleTraceMetricKey,
-  type SlimTraceMetricKey,
-} from "../routing/route-table";
+import { isSlimEligibleTraceMetricKey, type SlimTraceMetricKey } from "../routing/route-table";
 import type { AnalyticsTimeseriesBuilderInput, BuiltAnalyticsQuery } from "../types";
 import {
   collectStringValues,
@@ -349,9 +346,7 @@ function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filter
           params[pKey] = metaKey;
           const pVals = next("metaValueVals");
           params[pVals] = vals;
-          clauses.push(
-            `${ta}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
+          clauses.push(`${ta}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`);
         }
         break;
       }
@@ -393,9 +388,7 @@ export function buildSlimTimeseriesQuery(
     END AS period`,
   );
   if (typeof input.timeScale === "number") {
-    selectExprs.push(
-      `${dateTrunc(`${ta}.OccurredAt`, input.timeScale, timeZone)} AS date`,
-    );
+    selectExprs.push(`${dateTrunc(`${ta}.OccurredAt`, input.timeScale, timeZone)} AS date`);
   }
 
   const groupByColumn = slimGroupByExpression(input.groupBy);
@@ -421,9 +414,7 @@ export function buildSlimTimeseriesQuery(
   if (typeof input.timeScale === "number") groupByExprs.push("date");
   if (groupByColumn) groupByExprs.push("group_key");
 
-  const { whereClause: filterWhere, params: filterParams } = buildSlimFilterClauses(
-    input.filters,
-  );
+  const { whereClause: filterWhere, params: filterParams } = buildSlimFilterClauses(input.filters);
 
   // Mirror the legacy builder's `handlesUnknown` contract
   // (`aggregation-builder.ts` → `buildGroupKeyHavingClause`): a group-by whose
@@ -431,9 +422,7 @@ export function buildSlimTimeseriesQuery(
   // emitted WITHOUT a HAVING, so that bucket survives. Applying the blanket
   // `group_key != ''` to those would drop rows legacy keeps.
   const havingClause =
-    groupByColumn && !slimGroupByHandlesUnknown(input.groupBy)
-      ? `HAVING group_key != ''`
-      : "";
+    groupByColumn && !slimGroupByHandlesUnknown(input.groupBy) ? `HAVING group_key != ''` : "";
 
   const sql = `
     SELECT

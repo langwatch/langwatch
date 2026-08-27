@@ -11,19 +11,19 @@ import {
   buildFeedbacksQuery,
   buildTimeseriesQuery,
   buildTopDocumentsQuery,
-} from "../clickhouse/aggregation-builder";
-import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../clickhouse/settings";
-import { buildEvalRollupTimeseriesQuery } from "../query-builders/eval-rollup-timeseries-query";
-import { buildEvalSlimTimeseriesQuery } from "../query-builders/eval-slim-timeseries-query";
-import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
-import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
-import type { AnalyticsTimeseriesBuilderInput } from "../types";
+} from "../../clickhouse/aggregation-builder";
+import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../../clickhouse/settings";
+import { buildEvalRollupTimeseriesQuery } from "../../query-builders/eval-rollup-timeseries-query";
+import { buildEvalSlimTimeseriesQuery } from "../../query-builders/eval-slim-timeseries-query";
+import { buildRollupTimeseriesQuery } from "../../query-builders/rollup-timeseries-query";
+import { buildSlimTimeseriesQuery } from "../../query-builders/slim-timeseries-query";
+import type { AnalyticsTimeseriesBuilderInput } from "../../types";
 import {
   AnalyticsRepository,
   type AnalyticsLegacyReadInput,
   type AnalyticsTimeseriesQuery,
-} from "./analytics.repository";
-import { parseTimeseriesRows } from "./timeseries-row-parser";
+} from "../analytics.repository";
+import { parseTimeseriesRows } from "../timeseries-row-parser";
 
 export class AnalyticsClientUnavailableError extends Error {
   constructor(public readonly tenantId: string) {
@@ -68,16 +68,12 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   private readonly logger = createLogger("langwatch:analytics:timeseries-repository");
 
   private constructor(
-    private readonly resolveClient: (
-      tenantId: string,
-    ) => Promise<ClickHouseClient | null>,
+    private readonly resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>,
   ) {
     super();
   }
 
-  async runTimeseries(
-    query: AnalyticsTimeseriesQuery,
-  ): Promise<AnalyticsTimeseriesResult> {
+  async runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult> {
     if (!query.tenantId.trim()) {
       throw new Error("Analytics timeseries tenantId is required");
     }
@@ -137,9 +133,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     }
   }
 
-  async findTopDocuments(
-    input: AnalyticsLegacyReadInput,
-  ): Promise<AnalyticsTopDocumentsResult> {
+  async findTopDocuments(input: AnalyticsLegacyReadInput): Promise<AnalyticsTopDocumentsResult> {
     const client = await this.clientFor(input.projectId);
     const built = buildTopDocumentsQuery(
       input.projectId,
@@ -199,9 +193,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     }
   }
 
-  async findFeedbackEvents(
-    input: AnalyticsLegacyReadInput,
-  ): Promise<AnalyticsFeedbacksResult> {
+  async findFeedbackEvents(input: AnalyticsLegacyReadInput): Promise<AnalyticsFeedbacksResult> {
     const client = await this.clientFor(input.projectId);
     const built = buildFeedbacksQuery(
       input.projectId,

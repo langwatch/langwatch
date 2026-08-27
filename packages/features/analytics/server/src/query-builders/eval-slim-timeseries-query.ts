@@ -178,9 +178,10 @@ const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTim
  * serves into a WHERE fragment + params. Anything else MUST have been
  * rejected by `pickAnalyticsTable` already.
  */
-function buildEvalSlimFilterClauses(
-  filters: AnalyticsTimeseriesBuilderInput["filters"],
-): { whereClause: string; params: Record<string, unknown> } {
+function buildEvalSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filters"]): {
+  whereClause: string;
+  params: Record<string, unknown>;
+} {
   if (!filters) return { whereClause: "", params: {} };
 
   const clauses: string[] = [];
@@ -212,9 +213,7 @@ function buildEvalSlimFilterClauses(
           params[pKey] = metaKey;
           const pVals = next("metaValueVals");
           params[pVals] = vals;
-          clauses.push(
-            `${ea}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
+          clauses.push(`${ea}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`);
         }
         break;
       }
@@ -250,9 +249,7 @@ export function buildEvalSlimTimeseriesQuery(
     END AS period`,
   );
   if (typeof input.timeScale === "number") {
-    selectExprs.push(
-      `${dateTrunc(`${ea}.OccurredAt`, input.timeScale, timeZone)} AS date`,
-    );
+    selectExprs.push(`${dateTrunc(`${ea}.OccurredAt`, input.timeScale, timeZone)} AS date`);
   }
 
   const groupByColumn = evalSlimGroupByExpression(input.groupBy);

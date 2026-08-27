@@ -1,7 +1,4 @@
-import type {
-  AnalyticsAggregation,
-  AnalyticsSeries,
-} from "@langwatch/analytics-contract";
+import type { AnalyticsAggregation, AnalyticsSeries } from "@langwatch/analytics-contract";
 
 export interface BuiltAnalyticsQuery {
   readonly sql: string;
@@ -29,7 +26,4 @@ export type PercentileAggregationTypes = Extract<
   AnalyticsAggregation,
   "median" | "p99" | "p95" | "p90"
 >;
-export type PipelineAggregationTypes = Extract<
-  AnalyticsAggregation,
-  "sum" | "avg" | "min" | "max"
->;
+export type PipelineAggregationTypes = Extract<AnalyticsAggregation, "sum" | "avg" | "min" | "max">;

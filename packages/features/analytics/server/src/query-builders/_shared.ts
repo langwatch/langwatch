@@ -25,11 +25,7 @@ export function validateTimeZone(tz: string): string {
  * timeScale (in minutes) and timezone. Mirrors the legacy builder's logic
  * exactly so the bucket boundaries match the trace_summaries path.
  */
-export function dateTrunc(
-  column: string,
-  timeScaleMinutes: number,
-  timeZone: string,
-): string {
+export function dateTrunc(column: string, timeScaleMinutes: number, timeZone: string): string {
   const tz = validateTimeZone(timeZone);
   if (timeScaleMinutes <= 1) {
     return `toStartOfMinute(${column}, '${tz}')`;
@@ -42,19 +38,14 @@ export function dateTrunc(
   } else {
     const days = Math.floor(timeScaleMinutes / MINUTES_PER_DAY);
     if (days === 1) return `toStartOfDay(${column}, '${tz}')`;
-    if (days <= DAYS_PER_WEEK)
-      return `toStartOfInterval(${column}, INTERVAL ${days} DAY, '${tz}')`;
+    if (days <= DAYS_PER_WEEK) return `toStartOfInterval(${column}, INTERVAL ${days} DAY, '${tz}')`;
     if (days <= DAYS_PER_MONTH) return `toStartOfWeek(${column}, 1, '${tz}')`;
     return `toStartOfMonth(${column}, '${tz}')`;
   }
 }
 
 export function hasFilterValues(
-  v:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>
-    | undefined,
+  v: string[] | Record<string, string[]> | Record<string, Record<string, string[]>> | undefined,
 ): boolean {
   if (v === undefined) return false;
   if (Array.isArray(v)) return v.length > 0;
@@ -93,9 +84,7 @@ export function collectStringValues(
  * Percentile aggregations recognised by both slim + eval-slim builders.
  * ClickHouse's `quantileExact(<level>)` takes a fraction in [0, 1].
  */
-export function isPercentile(
-  agg: "median" | "p90" | "p95" | "p99" | (string & {}),
-): boolean {
+export function isPercentile(agg: "median" | "p90" | "p95" | "p99" | (string & {})): boolean {
   return agg === "median" || agg === "p90" || agg === "p95" || agg === "p99";
 }
 

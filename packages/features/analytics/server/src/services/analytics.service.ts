@@ -1,6 +1,11 @@
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import { addDays, differenceInCalendarDays } from "date-fns";
 import {
+  analyticsEvaluationReadInputSchema,
+  analyticsEvaluationRollupAppendBatchInputSchema,
+  analyticsEvaluationRollupAppendInputSchema,
+  analyticsEvaluationUpsertBatchInputSchema,
+  analyticsEvaluationUpsertInputSchema,
   analyticsTimeseriesInputSchema,
   analyticsTimeseriesResultSchema,
   analyticsReadInputSchema,
@@ -12,8 +17,14 @@ import {
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
+  type AnalyticsEvaluationReadInput,
+  type AnalyticsEvaluationRow,
+  type AnalyticsEvaluationRollupAppendBatchInput,
+  type AnalyticsEvaluationRollupAppendInput,
+  type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { AnalyticsRepository } from "../repositories/analytics.repository";
+import { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository";
 import { pickAnalyticsTable } from "../routing/route-table";
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -38,19 +49,22 @@ function currentAndPreviousDates(
   const periodInDays = period === undefined ? 1 : period / MINUTES_PER_DAY;
   const days = Math.max(periodInDays, differenceInCalendarDays(endDate, startDate) + 1);
   const previousPeriodStartDate = addDays(startDate, -days);
+
   return { startDate, endDate, previousPeriodStartDate };
 }
 
 export class AnalyticsService extends AnalyticsServiceContract {
   static create(options: {
     repository: AnalyticsRepository;
+    evaluationRepository: AnalyticsEvaluationRepository;
     tripwire?: AnalyticsTripwire;
   }): AnalyticsService {
-    return new AnalyticsService(options.repository, options.tripwire);
+    return new AnalyticsService(options.repository, options.evaluationRepository, options.tripwire);
   }
 
   private constructor(
     private readonly repository: AnalyticsRepository,
+    private readonly evaluationRepository: AnalyticsEvaluationRepository,
     private readonly tripwire?: AnalyticsTripwire,
     private readonly cache = new Map<string, CacheEntry>(),
   ) {
@@ -67,22 +81,28 @@ export class AnalyticsService extends AnalyticsServiceContract {
       attributes: { "tenant.id": input.projectId },
     });
     const activeContext = trace.setSpan(context.active(), span);
+
     return context.with(activeContext, async () => {
       try {
         const parsed = analyticsTimeseriesInputSchema.parse(input);
         const cacheKey = JSON.stringify({ input: parsed, options: options ?? null });
         const cached = this.cache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) return cached.result;
+        if (cached && cached.expiresAt > Date.now()) {
+          return cached.result;
+        }
+
         this.cache.delete(cacheKey);
         const result = await this.readTimeseries(parsed, options);
         this.cache.set(cacheKey, {
           result,
           expiresAt: Date.now() + TIMESERIES_CACHE_TTL_MS,
         });
+
         return result;
       } catch (error) {
         span.recordException(error instanceof Error ? error : String(error));
         span.setStatus({ code: SpanStatusCode.ERROR });
+
         throw error;
       } finally {
         span.end();
@@ -127,10 +147,9 @@ export class AnalyticsService extends AnalyticsServiceContract {
       table === "evaluation_runs" ||
       !(await this.tripwire?.isEnabled(parsed.projectId))
     ) {
-      return analyticsTimeseriesResultSchema.parse(
-        await this.repository.runTimeseries(query),
-      );
+      return analyticsTimeseriesResultSchema.parse(await this.repository.runTimeseries(query));
     }
+
     const legacyTable = parsed.series[0]?.metric.startsWith("evaluations.")
       ? "evaluation_runs"
       : "trace_summaries";
@@ -144,6 +163,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
       routed: result,
       legacy,
     });
+
     return analyticsTimeseriesResultSchema.parse(result);
   }
 
@@ -153,14 +173,17 @@ export class AnalyticsService extends AnalyticsServiceContract {
       attributes: { "tenant.id": parsed.projectId },
     });
     const activeContext = trace.setSpan(context.active(), span);
+
     return context.with(activeContext, async () => {
       try {
         const result = await this.repository.findFeedbackEvents(parsed);
         span.setAttribute("event.count", result.events.length);
+
         return result;
       } catch (error) {
         span.recordException(error instanceof Error ? error : String(error));
         span.setStatus({ code: SpanStatusCode.ERROR });
+
         throw error;
       } finally {
         span.end();
@@ -168,26 +191,59 @@ export class AnalyticsService extends AnalyticsServiceContract {
     });
   }
 
-  async getTopUsedDocuments(
-    input: AnalyticsReadInput,
-  ): Promise<AnalyticsTopDocumentsResult> {
+  async getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult> {
     const parsed = analyticsReadInputSchema.parse(input);
     const span = this.tracer.startSpan("AnalyticsService.getTopUsedDocuments", {
       attributes: { "tenant.id": parsed.projectId },
     });
     const activeContext = trace.setSpan(context.active(), span);
+
     return context.with(activeContext, async () => {
       try {
         const result = await this.repository.findTopDocuments(parsed);
         span.setAttribute("document.count", result.topDocuments.length);
+
         return result;
       } catch (error) {
         span.recordException(error instanceof Error ? error : String(error));
         span.setStatus({ code: SpanStatusCode.ERROR });
+
         throw error;
       } finally {
         span.end();
       }
     });
+  }
+
+  async upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void> {
+    await this.evaluationRepository.upsert(analyticsEvaluationUpsertInputSchema.parse(input));
+  }
+
+  async upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void> {
+    await this.evaluationRepository.upsertBatch(
+      analyticsEvaluationUpsertBatchInputSchema.parse(input),
+    );
+  }
+
+  tryGetEvaluationAnalytics(
+    input: AnalyticsEvaluationReadInput,
+  ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] } | null> {
+    return this.evaluationRepository.tryFind(analyticsEvaluationReadInputSchema.parse(input));
+  }
+
+  async appendEvaluationAnalyticsRollup(
+    input: AnalyticsEvaluationRollupAppendInput,
+  ): Promise<void> {
+    await this.evaluationRepository.appendRollup(
+      analyticsEvaluationRollupAppendInputSchema.parse(input),
+    );
+  }
+
+  async appendEvaluationAnalyticsRollupBatch(
+    input: AnalyticsEvaluationRollupAppendBatchInput,
+  ): Promise<void> {
+    await this.evaluationRepository.appendRollupBatch(
+      analyticsEvaluationRollupAppendBatchInputSchema.parse(input),
+    );
   }
 }
