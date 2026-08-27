@@ -5,17 +5,22 @@ import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import { parseRunNoteFlag } from "../../utils/runNote";
 import { waitForBatchRun } from "../../utils/waitForBatchRun";
-import { createCliRunPlansService } from "../run-plans/cli-run-plans-service";
-import { parseRepeat, parseTargets } from "../run-plans/scopeFlags";
+import { createCliRunPlansService } from "./cli-run-plans-service";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
 import {
-  reportScheduledRun,
-  reportSkippedArchived,
-} from "../run-plans/reportRun";
+  buildScope,
+  parseRepeat,
+  parseTargets,
+  type ScopeOptions,
+} from "./scopeFlags";
+import { reportScheduledRun, reportSkippedArchived } from "./reportRun";
 
-export interface RunScenarioOptions {
+export interface RunPlanRunOptions extends ScopeOptions {
   target?: string[];
   name?: string;
   repeat?: string;
+  simulatorModel?: string;
+  judgeModel?: string;
   param?: string[];
   note?: string;
   idempotencyKey?: string;
@@ -24,36 +29,45 @@ export interface RunScenarioOptions {
 }
 
 /**
- * Runs one scenario against one or more targets.
+ * Runs a configuration under a name.
  *
- * This is a run plan scoped to a single case: one request, no suite created
- * for it and none deleted afterwards. The platform files the run under a plan
- * named after the scenario and the target unless `--name` says otherwise.
+ * The name is the plan's identity: an existing name takes this configuration
+ * and the run joins that plan's history, a new name creates the plan, and no
+ * name lets the platform derive one from the scope and the targets.
  *
- * @see specs/features/scenario-cli.feature
+ * @see specs/features/run-plan-cli.feature
  */
-export const runScenarioCommand = async (
-  id: string,
-  options: RunScenarioOptions,
+export const runRunPlanCommand = async (
+  options: RunPlanRunOptions,
 ): Promise<void> => {
   await resolveCredentials();
 
+  // Everything the caller wrote is read before anything is scheduled, so a
+  // malformed line never leaves a half-started batch behind.
   const parameters = parseRunParameterFlags({ pairs: options.param });
   const note = parseRunNoteFlag({ note: options.note });
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
+  const { scope, scenarioIds } = await buildScope(
+    options,
+    createCliTestSuitesService(),
+  );
 
   const service = createCliRunPlansService();
-  const spinner = createSpinner(`Scheduling run for scenario "${id}"...`).start();
+  const spinner = createSpinner("Scheduling run...").start();
 
   try {
     const body: RunPlanRunBody = {
       ...(options.name ? { name: options.name } : {}),
       config: {
-        scope: { mode: "cases" },
-        scenarioIds: [id],
+        scope,
         targets,
+        ...(scenarioIds ? { scenarioIds } : {}),
         ...(repeatCount !== undefined ? { repeatCount } : {}),
+        ...(options.simulatorModel
+          ? { simulatorModel: options.simulatorModel }
+          : {}),
+        ...(options.judgeModel ? { judgeModel: options.judgeModel } : {}),
       },
       ...(options.idempotencyKey
         ? { idempotencyKey: options.idempotencyKey }
@@ -68,6 +82,8 @@ export const runScenarioCommand = async (
       `Run scheduled under "${result.planName}": ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId}${note ? `, note: "${note}"` : ""})`,
     );
 
+    // JSON first: the skipped-archived details are already inside the document,
+    // and prose printed before it would corrupt the parser's stdout.
     if (options.format === "json") {
       console.log(JSON.stringify(result, null, 2));
       return;
@@ -83,11 +99,11 @@ export const runScenarioCommand = async (
     await waitForBatchRun({
       batchRunId: result.batchRunId,
       jobCount: result.jobCount,
-      action: "run the scenario",
-      subject: "scenario run",
+      action: "run the plan",
+      subject: "run",
     });
   } catch (error) {
-    failSpinner({ spinner, error, action: "run the scenario" });
+    failSpinner({ spinner, error, action: "run the plan" });
     process.exit(1);
   }
 };

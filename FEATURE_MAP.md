@@ -14,7 +14,7 @@ Near-complete coverage landed across three PRs:
 ```
 observability/       — Tracing, Analytics, User Events, Annotations
 evaluations/         — Experiments, Online Evaluation (guardrails via as_guardrail=True)
-agent-simulations/   — Scenarios, Runs, Suites
+agent-simulations/   — Scenarios, Runs, Test Suites, Run Plans
 prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
 dashboards/          — Custom analytics dashboards
@@ -71,7 +71,8 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | **Agent Simulations** | | | | | | | | | | |
 | Scenarios | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Runs | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
-| Suites (Run Plans) | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Test Suites | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Run Plans | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — |
 | **Prompt Management** | | | | | | | | | | |
 | Prompts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
 | Prompt Playground | — | — | — | — | — | ✅ | — | — | ✅ | ✅ |
