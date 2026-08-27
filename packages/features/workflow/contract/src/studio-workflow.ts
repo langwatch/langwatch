@@ -116,21 +116,21 @@ export type ExecutionStatus =
   // dispatched, zero cost.
   | "skipped";
 
-export type ComponentType =
-  | "entry"
-  | "end"
-  | "signature"
-  | "code"
-  | "retriever"
-  | "prompting_technique"
-  | "custom"
-  | "evaluator"
-  | "http"
-  | "agent"
-  // Conditional gate: evaluates a Liquid expression over its inputs
-  // and routes execution down the true or false branch handle; the
-  // engine skips nodes hanging off the not-taken branch.
-  | "if_else";
+export const componentTypeSchema = z.enum([
+  "entry",
+  "end",
+  "signature",
+  "code",
+  "retriever",
+  "prompting_technique",
+  "custom",
+  "evaluator",
+  "http",
+  "agent",
+  "if_else",
+]);
+
+export type ComponentType = z.infer<typeof componentTypeSchema>;
 
 // Define the execution state type
 export interface ExecutionState {
@@ -158,9 +158,9 @@ export interface ExecutionState {
   error_type?: string;
   /** The upstream HTTP status, when an HTTP node got a non-2xx response. */
   upstream_status?: number;
-  parameters?: Record<string, any>;
-  inputs?: Record<string, any>;
-  outputs?: Record<string, any>;
+  parameters?: Record<string, unknown>;
+  inputs?: Record<string, unknown>;
+  outputs?: Record<string, unknown>;
   cost?: number;
   // Token usage + resolved model surfaced by the engine for LLM nodes. The
   // engine has no price table, so the cost is derived from these counts at the
@@ -213,6 +213,8 @@ export const llmConfigSchema = agentLlmConfigSchema;
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
 export type Signature = BaseComponent & {
+  /** Legacy root slot retained for persisted workflows; current graphs use parameters. */
+  llm?: LLMConfig;
   /** Local prompt config for unsaved prompt changes */
   localPromptConfig?: LocalPromptConfig;
   /** Reference to saved DB prompt */
@@ -307,7 +309,7 @@ export type Custom = BaseComponent & {
   workflow_id?: string;
   publishedId?: string;
   version_id?: string;
-  versions?: Record<string, any>;
+  versions?: Record<string, unknown>;
 };
 
 export type Retriever = BaseComponent;
@@ -319,7 +321,7 @@ export const nodeDatasetSchema = z.object({
   name: z.string().optional(),
   inline: z
     .object({
-      records: z.record(z.string(), z.array(z.any())),
+      records: z.record(z.string(), z.array(z.unknown())),
       columnTypes: z.array(
         z.object({
           id: z.string().optional(),
@@ -350,7 +352,7 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
   evaluator?: EvaluatorTypes | `custom/${string}` | `evaluators/${string}`;
   workflowId?: string;
-  data?: any;
+  data?: unknown;
   /** Local config for unsaved evaluator changes */
   localConfig?: { name?: string; settings?: Record<string, unknown> };
 };
@@ -482,7 +484,7 @@ const studioEdgeSchema = z.looseObject({
  * this schema keeps the same permissive node/edge payload while requiring the
  * fields the canvas materialises. It is not a second persisted wire format.
  */
-const studioWorkflowWireSchema = workflowDslSchema
+export const studioWorkflowWireSchema = workflowDslSchema
   .extend({
     workflow_id: z.string().optional(),
     experiment_id: z.string().optional(),
@@ -589,7 +591,7 @@ export type StudioWorkflow = Omit<
   version: string;
   nodes: StudioNode<Component>[];
   edges: StudioEdge[];
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   template_adapter?: "default" | "dspy_chat_adapter";
   enable_tracing?: boolean;
   workflow_type?: WorkflowTypes;
@@ -603,7 +605,7 @@ export type StudioWorkflow = Omit<
       error?: string;
       error_type?: string;
       upstream_status?: number;
-      result?: Record<string, any>;
+      result?: Record<string, unknown>;
       timestamps?: {
         [key: string]: unknown;
         started_at?: number;

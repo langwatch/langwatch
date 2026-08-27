@@ -9,7 +9,7 @@ import {
   WorkflowProjectEnvironmentPort,
   type WorkflowLlmParameterResolution,
 } from "../src/ports/workflow.port";
-import { StudioWorkflowEventEnricher } from "../src/services/studio-workflow-event-enricher.service";
+import { StudioWorkflowEventEnricherService } from "../src/services/studio-workflow-event-enricher.service";
 
 const projectId = "project-123";
 
@@ -89,12 +89,12 @@ const createEnricher = (
   projectEnvironment = new FakeProjectEnvironment(),
   llmParameters = new FakeLlmParameters(resolution),
 ) =>
-  StudioWorkflowEventEnricher.create({
+  StudioWorkflowEventEnricherService.create({
     projectEnvironment,
     llmParameters,
   });
 
-describe("StudioWorkflowEventEnricher", () => {
+describe("StudioWorkflowEventEnricherService", () => {
   it("returns non-workflow events unchanged without reading dependencies", async () => {
     const projectEnvironment = new FakeProjectEnvironment();
     const llmParameters = new FakeLlmParameters();

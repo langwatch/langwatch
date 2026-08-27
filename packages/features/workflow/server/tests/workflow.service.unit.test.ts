@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { DatasetService } from "@langwatch/dataset-contract";
 import type {
   Workflow,
   WorkflowVersion,
@@ -13,6 +12,7 @@ import {
 import {
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
+  WorkflowIdPort,
   type WorkflowExecutionInput,
 } from "../src/ports/workflow.port";
 import type {
@@ -26,6 +26,7 @@ import {
   type PersistWorkflowVersionInput,
   type WorkflowVersionHistoryRecord,
 } from "../src/repositories/workflow.repository";
+import { TestDatasetService } from "./dataset.service.fake";
 
 const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
   id,
@@ -216,81 +217,13 @@ class FakeWorkflowDslMigrationPort extends WorkflowDslMigrationPort {
   }
 }
 
-class FakeDatasetService extends DatasetService {
-  upsertDataset(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
+class FakeWorkflowIdPort extends WorkflowIdPort {
+  constructor(private readonly value = "id") {
+    super();
   }
-  validateDatasetName(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  findNextAvailableName(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  getBySlugOrId(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  getByIds(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  renameDataset(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  listDatasets(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  archiveDataset(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  restoreDataset(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  updateMapping(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  listRecords(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  getDatasetPage(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  getDatasetWithRecords(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  getDatasetHead(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  upsertRecord(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  batchCreateRecords(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  deleteRecords(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  copyDataset(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  uploadToExistingDataset(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  createDatasetFromUpload(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  createPendingUpload(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  writeStagedUpload(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  abortPendingUpload(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  finalizeUpload(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
-  }
-  retryNormalize(_input: never): Promise<never> {
-    throw new Error("Not used by this test.");
+
+  next(): string {
+    return this.value;
   }
 }
 
@@ -318,9 +251,11 @@ const service = (
 ) =>
   ServerWorkflowService.create({
     repository,
-    datasets: new FakeDatasetService(),
+    datasets: new TestDatasetService(),
     studioEvents: options.studioEvents ?? new FakeStudioEventPreparer(),
     dslMigration: new FakeWorkflowDslMigrationPort(),
+    execution: options.execution ?? new FakeWorkflowExecutionPort(),
+    ids: new FakeWorkflowIdPort(),
     ...options,
   });
 
@@ -340,10 +275,11 @@ describe("WorkflowService", () => {
   it("creates, versions and publishes through the repository boundary", async () => {
     const workflowService = ServerWorkflowService.create({
       repository: new FakeWorkflowRepository(),
-      datasets: new FakeDatasetService(),
+      datasets: new TestDatasetService(),
       studioEvents: new FakeStudioEventPreparer(),
       dslMigration: new FakeWorkflowDslMigrationPort(),
-      generateId: () => "id",
+      execution: new FakeWorkflowExecutionPort(),
+      ids: new FakeWorkflowIdPort(),
     });
     const result = await workflowService.create({
       projectId: "project_1",

@@ -1,12 +1,21 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
-
-import { materializeStudioDatasets } from "../src/services/studio-dataset-materializer.service";
+import { describe, expect, it } from "vitest";
+import { datasetWithRecordsSchema } from "@langwatch/dataset-contract";
+import {
+  nodeDatasetSchema,
+  studioClientEventSchema,
+  type StudioClientEvent,
+} from "@langwatch/workflow-contract";
+import { z } from "zod";
+import { StudioDatasetMaterializerService } from "../src/services/studio-dataset-materializer.service";
+import { TestDatasetService } from "./dataset.service.fake";
 
 const PROJECT_ID = "project-123";
 
-const makeEntryNode = (dataset: any) => ({
+const entryDataSchema = z.looseObject({
+  dataset: nodeDatasetSchema.optional(),
+});
+
+const makeEntryNode = (dataset: unknown) => ({
   id: "entry",
   type: "entry",
   position: { x: 0, y: 0 },
@@ -19,10 +28,10 @@ const makeEntryNode = (dataset: any) => ({
 
 const makeEvent = (
   type: StudioClientEvent["type"],
-  entryDataset: any,
-  extraPayload: Record<string, any> = {},
+  entryDataset: unknown,
+  extraPayload: Record<string, unknown> = {},
 ): StudioClientEvent =>
-  ({
+  studioClientEventSchema.parse({
     type,
     payload: {
       trace_id: "trace-1",
@@ -38,52 +47,73 @@ const makeEvent = (
         default_llm: { model: "openai/gpt-4o" },
         nodes: [makeEntryNode(entryDataset)],
         edges: [],
-        state: { execution: { status: "idle" as const } },
+        state: { execution: { status: "idle" } },
       },
       ...extraPayload,
     },
-  }) as unknown as StudioClientEvent;
-
-describe("materializeStudioDatasets", () => {
-  const getDatasetWithRecords = vi.fn();
-  const datasets = { getDatasetWithRecords } as unknown as DatasetService;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
   });
 
-  // Regression pin for the 3.2.0 prod break (a customer saw
-  // "entry node has no inline dataset (remote datasets not yet
-  // supported on Go path)" on a saved-dataset Evaluate run). Pre-fix,
-  // execute_evaluation forced entrySelection="all" then short-circuited
-  // the database-dataset branch with `if (entrySelection == "all") return
-  // node;`, so the Go engine received a dataset_id-only payload and
-  // rejected it. Now materializeStudioDatasets always fetches + inlines on the
-  // database path, regardless of evaluate_on/entry_selection mode.
-  it("inlines saved (database) datasets on execute_evaluation when entry_selection is all", async () => {
-    getDatasetWithRecords.mockResolvedValue({
-      dataset: {
-        id: "ds_xyz",
-        name: "Saved",
-        columnTypes: [{ name: "question", type: "string" }],
-      },
-      records: [
-        {
-          id: "r1",
-          entry: { question: "q1" },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        {
-          id: "r2",
-          entry: { question: "q2" },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ],
-      truncated: false,
-    });
+const entryData = (event: StudioClientEvent) => {
+  if (!("workflow" in event.payload)) {
+    throw new Error("Expected a workflow payload.");
+  }
 
+  const entry = event.payload.workflow.nodes.find((node) => node.id === "entry");
+  if (!entry) {
+    throw new Error("Expected an entry node.");
+  }
+
+  return entryDataSchema.parse(entry.data);
+};
+
+const savedDataset = () =>
+  datasetWithRecordsSchema.parse({
+    dataset: {
+      id: "ds_xyz",
+      projectId: PROJECT_ID,
+      name: "Saved",
+      slug: "saved",
+      columnTypes: [{ name: "question", type: "string" }],
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      archivedAt: null,
+      mapping: null,
+      useS3: false,
+      s3RecordCount: null,
+      contentLayout: "postgres",
+      status: "ready",
+      statusError: null,
+      stagingKey: null,
+      uploadFilename: null,
+      rowCount: 2,
+      sizeBytes: null,
+      chunkCount: null,
+      chunkOffsets: null,
+    },
+    records: [
+      {
+        id: "r1",
+        datasetId: "ds_xyz",
+        projectId: PROJECT_ID,
+        entry: { question: "q1" },
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      },
+      {
+        id: "r2",
+        datasetId: "ds_xyz",
+        projectId: PROJECT_ID,
+        entry: { question: "q2" },
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      },
+    ],
+    truncated: false,
+  });
+
+describe("StudioDatasetMaterializerService", () => {
+  it("inlines saved datasets for evaluation runs", async () => {
+    const datasets = new TestDatasetService(savedDataset());
     const event = makeEvent(
       "execute_evaluation",
       { id: "ds_xyz", name: "Saved" },
@@ -94,35 +124,32 @@ describe("materializeStudioDatasets", () => {
       },
     );
 
-    const enriched = await materializeStudioDatasets({
+    const enriched = await StudioDatasetMaterializerService.create(datasets).materialize({
       event,
       projectId: PROJECT_ID,
-      datasets,
     });
 
-    expect(getDatasetWithRecords).toHaveBeenCalledWith({
-      slugOrId: "ds_xyz",
-      projectId: PROJECT_ID,
-      entrySelection: "all",
-      limitMb: null,
+    expect(datasets.datasetReads).toEqual([
+      {
+        slugOrId: "ds_xyz",
+        projectId: PROJECT_ID,
+        entrySelection: "all",
+        limitMb: null,
+      },
+    ]);
+    expect(entryData(enriched).dataset?.inline?.records).toEqual({
+      question: ["q1", "q2"],
     });
-
-    if (!("workflow" in enriched.payload)) {
-      throw new Error("expected workflow in payload");
-    }
-    const entry = enriched.payload.workflow.nodes.find((n: any) => n.id === "entry");
-    expect(entry).toBeDefined();
-    expect((entry as any).data.dataset.inline).toBeDefined();
-    expect((entry as any).data.dataset.inline.records).toBeDefined();
-    expect((entry as any).data.dataset.inline.records.question).toEqual(["q1", "q2"]);
   });
 
   it("preserves inline datasets without fetching", async () => {
+    const datasets = new TestDatasetService();
     const event = makeEvent(
       "execute_evaluation",
       {
         inline: {
           records: { question: ["a", "b"] },
+          columnTypes: [{ name: "question", type: "string" }],
         },
       },
       {
@@ -132,38 +159,29 @@ describe("materializeStudioDatasets", () => {
       },
     );
 
-    const enriched = await materializeStudioDatasets({
+    const enriched = await StudioDatasetMaterializerService.create(datasets).materialize({
       event,
       projectId: PROJECT_ID,
-      datasets,
     });
 
-    expect(getDatasetWithRecords).not.toHaveBeenCalled();
-    if (!("workflow" in enriched.payload)) {
-      throw new Error("expected workflow in payload");
-    }
-    const entry = enriched.payload.workflow.nodes.find((n: any) => n.id === "entry");
-    expect((entry as any).data.dataset.inline.records.question).toEqual(["a", "b"]);
+    expect(datasets.datasetReads).toEqual([]);
+    expect(entryData(enriched).dataset?.inline?.records.question).toEqual(["a", "b"]);
   });
 
-  it("strips dataset on execute_component to keep the engine focused on the named node", async () => {
+  it("strips the dataset from component execution", async () => {
+    const datasets = new TestDatasetService();
     const event = makeEvent(
       "execute_component",
       { id: "ds_xyz", name: "Saved" },
       { node_id: "some_node", inputs: { foo: "bar" } },
     );
 
-    const enriched = await materializeStudioDatasets({
+    const enriched = await StudioDatasetMaterializerService.create(datasets).materialize({
       event,
       projectId: PROJECT_ID,
-      datasets,
     });
 
-    expect(getDatasetWithRecords).not.toHaveBeenCalled();
-    if (!("workflow" in enriched.payload)) {
-      throw new Error("expected workflow in payload");
-    }
-    const entry = enriched.payload.workflow.nodes.find((n: any) => n.id === "entry");
-    expect((entry as any).data.dataset).toBeUndefined();
+    expect(datasets.datasetReads).toEqual([]);
+    expect(entryData(enriched).dataset).toBeUndefined();
   });
 });

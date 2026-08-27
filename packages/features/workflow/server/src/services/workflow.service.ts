@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import {
   archiveWorkflowCommandSchema,
   copyWorkflowCommandSchema,
@@ -22,10 +21,11 @@ import {
   type WorkflowWithVersion,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
-import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import type {
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
+  WorkflowIdPort,
 } from "../ports/workflow.port";
 import type {
   PersistWorkflowVersionInput,
@@ -33,15 +33,16 @@ import type {
 } from "../repositories/workflow.repository";
 import type { StudioEventPreparationInput } from "./studio-event-preparer.service";
 import type { StudioEventPreparer } from "./studio-event-preparer.service";
+import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service";
 import { WorkflowDslService } from "./workflow-dsl.service";
 
 export type WorkflowServiceOptions = {
   repository: WorkflowRepository;
   datasets: DatasetService;
-  execution?: WorkflowExecutionPort;
+  execution: WorkflowExecutionPort;
   studioEvents: StudioEventPreparer;
   dslMigration: WorkflowDslMigrationPort;
-  generateId?: () => string;
+  ids: WorkflowIdPort;
 };
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
@@ -52,9 +53,11 @@ export class WorkflowService extends WorkflowServiceContract {
 
   private constructor(private readonly options: WorkflowServiceOptions) {
     super();
+    this.datasetCopies = WorkflowDatasetCopyService.create(options.datasets);
   }
 
   private readonly dsl = WorkflowDslService.create();
+  private readonly datasetCopies: WorkflowDatasetCopyService;
 
   enrichStudioEvent(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
     return this.options.studioEvents.enrich(input);
@@ -70,7 +73,9 @@ export class WorkflowService extends WorkflowServiceContract {
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion> {
     const workflow = await this.options.repository.tryFindById(input);
-    if (!workflow) throw new WorkflowNotFoundError(input.id, input.projectId);
+    if (!workflow) {
+      throw new WorkflowNotFoundError(input.id, input.projectId);
+    }
     return workflow;
   }
 
@@ -171,7 +176,9 @@ export class WorkflowService extends WorkflowServiceContract {
       id: input.versionId,
       projectId: input.projectId,
     });
-    if (!version) throw new WorkflowVersionNotFoundError(input.versionId);
+    if (!version) {
+      throw new WorkflowVersionNotFoundError(input.versionId);
+    }
     const workflow = await this.options.repository.tryFindById({
       id: version.workflowId,
       projectId: input.projectId,
@@ -206,8 +213,10 @@ export class WorkflowService extends WorkflowServiceContract {
     });
     const version = await this.options.repository.tryFindPublishedVersion(input);
     if (!version) {
-      if (!workflow.publishedId && !input.versionId)
+      if (!workflow.publishedId && !input.versionId) {
         throw new WorkflowNotPublishedError(input.workflowId);
+      }
+
       throw new WorkflowVersionNotFoundError(
         input.versionId ?? workflow.publishedId ?? "",
       );
@@ -319,7 +328,9 @@ export class WorkflowService extends WorkflowServiceContract {
       workflowId: command.id,
       projectId: command.projectId,
     });
-    if (!version) throw new WorkflowVersionNotFoundError(command.versionId);
+    if (!version) {
+      throw new WorkflowVersionNotFoundError(command.versionId);
+    }
     return this.options.repository.publish(command);
   }
 
@@ -356,10 +367,14 @@ export class WorkflowService extends WorkflowServiceContract {
     const sourceVersion =
       source.latestVersion ??
       (await this.latestVersion(command.sourceWorkflowId, command.sourceProjectId));
-    const dsl = this.dsl.copy(sourceVersion.dsl);
-    if (command.copyDatasets) {
-      await this.copyDatasets(dsl, command.sourceProjectId, command.targetProjectId);
-    }
+    const sourceDsl = this.dsl.copy(sourceVersion.dsl);
+    const dsl = command.copyDatasets
+      ? await this.datasetCopies.copy({
+          dsl: sourceDsl,
+          sourceProjectId: command.sourceProjectId,
+          targetProjectId: command.targetProjectId,
+        })
+      : sourceDsl;
     const workflowId = command.id ?? `workflow_${this.id()}`;
     const workflow = await this.options.repository.createWorkflow({
       id: workflowId,
@@ -432,7 +447,6 @@ export class WorkflowService extends WorkflowServiceContract {
   }
 
   async run(input: RunWorkflowCommand): Promise<unknown> {
-    if (!this.options.execution) throw new Error("Workflow execution is not configured.");
     const command = this.parse(runWorkflowCommandSchema, input);
     const version = await this.getPublishedVersion({
       workflowId: command.workflowId,
@@ -449,48 +463,14 @@ export class WorkflowService extends WorkflowServiceContract {
     const version = (
       await this.options.repository.findVersions({ workflowId, projectId })
     )[0];
-    if (!version) throw new WorkflowVersionRequiredError();
+    if (!version) {
+      throw new WorkflowVersionRequiredError();
+    }
     return version;
   }
 
-  private async copyDatasets(
-    dsl: import("@langwatch/workflow-contract").WorkflowDsl,
-    sourceProjectId: string,
-    targetProjectId: string,
-  ): Promise<void> {
-    const seen = new Map<string, Dataset>();
-    for (const node of dsl.nodes) {
-      if (!node || typeof node !== "object") continue;
-      const data = (node as { data?: Record<string, unknown> }).data;
-      const refs: Array<Record<string, unknown>> = [];
-      const dataset = data?.dataset;
-      if (dataset && typeof dataset === "object")
-        refs.push(dataset as Record<string, unknown>);
-      for (const parameter of Array.isArray(data?.parameters) ? data.parameters : []) {
-        if (!parameter || typeof parameter !== "object") continue;
-        const value = (parameter as { value?: unknown }).value;
-        if (value && typeof value === "object")
-          refs.push(value as Record<string, unknown>);
-      }
-      for (const ref of refs) {
-        const id = typeof ref.id === "string" ? ref.id : undefined;
-        if (!id) continue;
-        const copied =
-          seen.get(id) ??
-          (await this.options.datasets.copyDataset({
-            sourceDatasetId: id,
-            sourceProjectId,
-            targetProjectId,
-          }));
-        seen.set(id, copied);
-        ref.id = copied.id;
-        ref.name = copied.name;
-      }
-    }
-  }
-
   private id(): string {
-    return this.options.generateId?.() ?? nanoid();
+    return this.options.ids.next();
   }
 
   private parse<T>(
@@ -504,7 +484,9 @@ export class WorkflowService extends WorkflowServiceContract {
     value: unknown,
   ): T {
     const result = schema.safeParse(value);
-    if (!result.success) throw new WorkflowDslValidationError(result.error.issues);
+    if (!result.success) {
+      throw new WorkflowDslValidationError(result.error.issues);
+    }
     return result.data;
   }
 }

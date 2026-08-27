@@ -1,6 +1,6 @@
-import type { DatasetService } from "@langwatch/dataset-contract";
 import type {
   LLMConfig,
+  StudioClientEvent,
   WorkflowDsl,
   WorkflowRunOrigin,
   WorkflowVersion,
@@ -21,6 +21,31 @@ export type WorkflowExecutionInput = {
 /** Execution is infrastructure: the feature supplies a dispatch port. */
 export abstract class WorkflowExecutionPort {
   abstract execute(input: WorkflowExecutionInput): Promise<unknown>;
+}
+
+export type WorkflowNlpDispatchInput = {
+  projectId: string;
+  body: StudioClientEvent;
+  origin: WorkflowRunOrigin;
+  causalityDepth?: number;
+  parentTrace?: { traceId: string; parentSpanId: string };
+};
+
+export type WorkflowNlpDispatchResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  json(): Promise<unknown>;
+};
+
+export abstract class WorkflowNlpRuntimePort {
+  abstract dispatch(
+    input: WorkflowNlpDispatchInput,
+  ): Promise<WorkflowNlpDispatchResponse>;
+}
+
+export abstract class WorkflowIdPort {
+  abstract next(): string;
 }
 
 /** Upgrades a persisted graph before it becomes the workflow's current version. */
@@ -50,12 +75,3 @@ export abstract class WorkflowLlmParametersPort {
     models: readonly LLMConfig["model"][];
   }): Promise<readonly WorkflowLlmParameterResolution[]>;
 }
-
-/** The service accepts canonical feature services, never their repositories. */
-export type WorkflowDependencies = {
-  datasets: DatasetService;
-  execution?: WorkflowExecutionPort;
-  dslMigration: WorkflowDslMigrationPort;
-  projectEnvironment: WorkflowProjectEnvironmentPort;
-  llmParameters: WorkflowLlmParametersPort;
-};

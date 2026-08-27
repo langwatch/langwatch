@@ -41,6 +41,20 @@ export class WorkflowVersionRequiredError extends Error {
   }
 }
 
+/** The execution engine rejected an otherwise valid Workflow dispatch. */
+export class WorkflowExecutionFailedError extends HandledError {
+  declare readonly code: "workflow_execution_failed";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("workflow_execution_failed", "The workflow failed to run.", {
+      httpStatus: 502,
+      fault: "platform",
+      ...options,
+    });
+    this.name = "WorkflowExecutionFailedError";
+  }
+}
+
 /** A dispatched Studio LLM node must name its model. */
 export class LlmModelNotSetError extends Error {
   readonly cause = "LLM_MODEL_NOT_SET" as const;
@@ -54,3 +68,4 @@ export class LlmModelNotSetError extends Error {
     this.name = "LlmModelNotSetError";
   }
 }
+import { HandledError } from "@langwatch/handled-error";

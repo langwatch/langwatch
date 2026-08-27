@@ -4,9 +4,9 @@ import type {
   WorkflowLlmParametersPort,
   WorkflowProjectEnvironmentPort,
 } from "../ports/workflow.port";
-import { materializeStudioDatasets } from "./studio-dataset-materializer.service";
+import { StudioDatasetMaterializerService } from "./studio-dataset-materializer.service";
 import {
-  StudioWorkflowEventEnricher,
+  StudioWorkflowEventEnricherService,
   type StudioEventEnricher,
 } from "./studio-workflow-event-enricher.service";
 
@@ -32,13 +32,15 @@ export class StudioEventPreparerService implements StudioEventPreparer {
   }
 
   private constructor(private readonly options: StudioEventPreparerOptions) {
-    this.enricher = StudioWorkflowEventEnricher.create({
+    this.enricher = StudioWorkflowEventEnricherService.create({
       projectEnvironment: options.projectEnvironment,
       llmParameters: options.llmParameters,
     });
+    this.materializer = StudioDatasetMaterializerService.create(options.datasets);
   }
 
   private readonly enricher: StudioEventEnricher;
+  private readonly materializer: StudioDatasetMaterializerService;
 
   enrich(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
     return this.enricher.enrich(input);
@@ -46,10 +48,9 @@ export class StudioEventPreparerService implements StudioEventPreparer {
 
   async prepare(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
     const event = await this.enrich(input);
-    return materializeStudioDatasets({
-      ...input,
+    return this.materializer.materialize({
       event,
-      datasets: this.options.datasets,
+      projectId: input.projectId,
     });
   }
 }

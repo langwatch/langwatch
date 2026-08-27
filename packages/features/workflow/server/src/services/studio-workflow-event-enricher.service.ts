@@ -34,11 +34,11 @@ export type StudioEventEnricher = {
  * Adds runtime project credentials, secrets and LiteLLM parameters to a
  * validated Studio event. Process-specific reads stay behind named ports.
  */
-export class StudioWorkflowEventEnricher implements StudioEventEnricher {
+export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
   static create(
     options: StudioWorkflowEventEnricherOptions,
-  ): StudioWorkflowEventEnricher {
-    return new StudioWorkflowEventEnricher(options);
+  ): StudioWorkflowEventEnricherService {
+    return new StudioWorkflowEventEnricherService(options);
   }
 
   private constructor(private readonly options: StudioWorkflowEventEnricherOptions) {}

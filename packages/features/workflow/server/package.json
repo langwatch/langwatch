@@ -22,9 +22,12 @@
   },
   "dependencies": {
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
-    "nanoid": "^5.1.5"
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
