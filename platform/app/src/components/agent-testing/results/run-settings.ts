@@ -14,9 +14,9 @@
  *
  * A model reads back as the value the plan was CONFIGURED with, which is
  * absent when the plan named none. A run recorded before the models were
- * stamped is absent for the same reason and reads the same way: this
- * configuration named no model. It never reads as the project default,
- * because the default at read time is not what the run took.
+ * stamped is absent for the same reason and reads the same way. The name of
+ * the project default is never put in its place, because the default of today
+ * is not always the model the run took.
  *
  * The run NOTE is not here. It reads in the header line and does not move.
  *

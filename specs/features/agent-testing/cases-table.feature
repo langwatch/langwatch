@@ -23,7 +23,14 @@ Feature: The scenarios table
     editing one, and no "Edit suite" button is offered.
 
     Under the table sits one button, "Open recent run". It drops a short list
-    of the recent runs of that suite, and choosing one opens that run.
+    of the recent runs that covered a scenario of the open suite, and choosing
+    one opens that run. A run belongs to the run plan it was started under, so
+    a row names that plan rather than a number: a run of one scenario is a plan
+    of its own, and the same suite is also covered by the plans that run all of
+    it.
+
+    The button is offered when, and only when, that list has rows. Both ask the
+    one question: has a scenario of this suite run inside the period.
 
   # --- Which suite is open ---
 
@@ -257,23 +264,44 @@ Feature: The scenarios table
 
   @integration
   Scenario: One button under the table opens a recent run of the suite
-    Given a test suite with a finished run
+    Given a test suite whose scenarios have a finished run
     When that suite is opened
     Then a button under the table reads "Open recent run"
     And no line under the table reads "Last run on"
 
   @integration
+  Scenario: A run of one scenario of the suite is offered under the table
+    Given a scenario of the open suite that ran on its own run plan
+    And no run was started on a plan named after the suite
+    When that suite is opened
+    Then a button under the table reads "Open recent run"
+    And the list holds that run under the name of the plan it ran on
+
+  @integration
   Scenario: The list names the recent runs of that suite, newest first
-    Given a test suite with three finished runs
+    Given a test suite whose scenarios have three finished runs
     When "Open recent run" is opened
     Then the three runs are listed newest first
-    And each row reads the number of the run, how long ago it started and how it did
+    And each row reads the run plan the run belongs to, how long ago it started and how it did
+
+  @integration
+  Scenario: A run that covered no scenario of the suite is left out
+    Given a run of another suite inside the period
+    When "Open recent run" is opened
+    Then that run is not listed
+
+  @integration
+  Scenario: A run that belongs to no run plan is left out
+    Given a run of a scenario of the suite in a set the platform keeps for itself
+    When "Open recent run" is opened
+    Then that run is not listed, because there is no plan to open it under
+    And no internal name reads in the list
 
   @integration
   Scenario: A row of the list stays short
     Given the recent runs list is open on a run that passed
     When one row is read
-    Then it holds the number of the run, the time and the pass rate, and nothing else
+    Then it holds the run plan, the time and the pass rate, and nothing else
     And the list stays a way into a run and not a second results table
 
   @integration
@@ -286,12 +314,12 @@ Feature: The scenarios table
   Scenario: Choosing a run opens it on the Results tab
     Given the recent runs list is open on the suite "Refunds"
     When one of the runs is chosen
-    Then the address names the Results tab, the plan of that suite and that run
+    Then the address names the Results tab, the plan the run belongs to and that run
     And the page is not reloaded, so a live run keeps streaming
 
   @integration
-  Scenario: A suite with no run in the period offers no recent runs button
-    Given a test suite with no run in the period
+  Scenario: A suite whose scenarios have no run in the period offers no recent runs button
+    Given a test suite whose scenarios have no run in the period
     When that suite is opened
     Then no "Open recent run" button is shown
 

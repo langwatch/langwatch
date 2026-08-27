@@ -14,7 +14,8 @@
  * monospace font, because a value like `eu-central` is a literal and a
  * proportional font hides the difference between two of them. The judge reads
  * on every run, even a standard one, because the judge is what decided every
- * verdict on the page. The repeat count and the simulator model read only
+ * verdict on the page. A run that named no model of its own reads as the
+ * project default, which is what it ran on. The repeat count and the simulator model read only
  * when the run carries them, so a plain run stays a short block.
  *
  * The run note is not here. It reads in the header line and does not move.
@@ -28,8 +29,15 @@ import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { FG_MUTED } from "../shared/design";
 import type { RunSettings } from "./run-settings";
 
-/** What a model row says when the run named no model of its own. */
-export const NO_MODEL_NAMED = "No model named";
+/**
+ * What a model row says when the run named no model of its own.
+ *
+ * Such a run did not go unjudged: it took the default model of the project,
+ * resolved when the run was queued. Naming that is what the reader needs, and
+ * the row cannot print the model itself, because the default of today is not
+ * always the one the run took.
+ */
+export const PROJECT_DEFAULT_MODEL = "Project default model";
 
 const LABEL_WIDTH = "104px";
 
@@ -73,7 +81,7 @@ function ModelRow({
         <LLMModelDisplay model={model} fontSize="12px" />
       ) : (
         <Text fontSize="12px" color={FG_MUTED}>
-          {NO_MODEL_NAMED}
+          {PROJECT_DEFAULT_MODEL}
         </Text>
       )}
     </SettingRow>

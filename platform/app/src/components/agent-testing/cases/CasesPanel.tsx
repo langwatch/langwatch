@@ -39,8 +39,12 @@ export type CasesPanelProps = {
   canManage: boolean;
   /** The open test suite, or nothing while the project holds none, which is day zero. */
   suite: TestSuiteEntry | null;
-  /** True when the open suite ran at least once inside the period. */
-  suiteHasRun: boolean;
+  /**
+   * Every scenario filed under the open suite, whatever the label filter
+   * shows. The recent runs under the table are the runs that covered one of
+   * them, so they are read from the suite and not from the rows on screen.
+   */
+  suiteScenarioIds: string[];
   /** The window the runs of the suite are read in. */
   period: Period;
   /** False while the project has no agent to test, which comes before a suite. */

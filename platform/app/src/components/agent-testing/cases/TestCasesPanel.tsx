@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
+import { useMemo } from "react";
 import { toExternalPlanSlug } from "../results/run-plans";
 import { CasesPanel } from "./CasesPanel";
 import { collectLabels } from "./test-cases";
@@ -13,6 +14,15 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
   const { base, data, view, caseMutations, suiteDialog, run, open } = model;
   const isExternal = base.selection.kind === "external";
   const selectedSuite = view.selectedSuite;
+  const suiteScenarioIds = useMemo(
+    () =>
+      selectedSuite
+        ? data.cases
+            .filter((testCase) => testCase.folderId === selectedSuite.id)
+            .map((testCase) => testCase.id)
+        : [],
+    [data.cases, selectedSuite],
+  );
 
   return (
     <CasesPanel
@@ -26,9 +36,7 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       suites={data.suites}
       canManage={base.canManage}
       suite={selectedSuite}
-      suiteHasRun={
-        !!selectedSuite && data.suiteIdsWithRuns.has(selectedSuite.id)
-      }
+      suiteScenarioIds={suiteScenarioIds}
       period={base.periodPicker.period}
       hasAgent={data.hasAgent}
       projectHasNoCases={data.cases.length === 0}

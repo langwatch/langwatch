@@ -19,6 +19,8 @@ import {
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { RunPlanDetail } from "../results/RunPlanDetail";
+import { RUN_AGAIN_LABEL } from "../results/RunPlanDetailHeader";
+import { PROJECT_DEFAULT_MODEL } from "../results/RunSettingsBlock";
 import type { RunPlan } from "../results/run-plans";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
@@ -707,6 +709,46 @@ describe("<RunPlanDetail/>", () => {
     expect(positionOf(edit)).toBeLessThan(positionOf(runControl));
   });
 
+  /**
+   * The layout is read off the emitted rules, because jsdom lays nothing out.
+   * Three of them carry the whole rule: the actions never shrink, the run
+   * summary takes what is left and may shrink to nothing, and the line packs
+   * to its right end, which is where the actions stay if it ever has to break.
+   */
+  /** @scenario "A note never moves the actions of the header line" */
+  it("keeps the actions at the right end however long the note is", () => {
+    const longNote = "n".repeat(200);
+    setRuns([makeRun({ batchRunId: "batch_3", metadata: { note: longNote } })]);
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    const summary = within(line).getByTestId("run-summary-run");
+    const actions = within(line).getByTestId("run-summary-actions");
+
+    expect(line).toHaveStyle({ justifyContent: "flex-end" });
+    expect(actions).toHaveStyle({ flexShrink: "0" });
+    expect(summary).toHaveStyle({ flexGrow: "1" });
+
+    // The note is what gives the space back, and the whole of it stays
+    // readable on the note itself.
+    const note = within(line).getByTestId("run-summary-note");
+    expect(note).toHaveAttribute("title", longNote);
+    expect(note).toHaveStyle({ textOverflow: "ellipsis", minWidth: "0px" });
+  });
+
+  /** @scenario "The run control of an open run offers to run it again" */
+  it("reads Run again on the control of an open run", () => {
+    renderDetail();
+
+    const line = screen.getByTestId("run-summary-line");
+    expect(within(line).getByTestId("run-plan-button")).toHaveTextContent(
+      RUN_AGAIN_LABEL,
+    );
+    expect(
+      within(line).queryByRole("button", { name: "Run" }),
+    ).not.toBeInTheDocument();
+  });
+
   /** @scenario "The header line does not repeat when the run started" */
   it("leaves how long ago the run started off the header line", async () => {
     const user = userEvent.setup();
@@ -1049,8 +1091,8 @@ describe("<RunPlanDetail/>", () => {
     expect(judge.querySelector("svg")).not.toBeNull();
   });
 
-  /** @scenario "The judge always reads, and a run that named no model says so" */
-  it("reads the judge as naming no model on a run that stamped none", async () => {
+  /** @scenario "The judge always reads, and a run that named no model reads the project default" */
+  it("reads the judge as the project default on a run that stamped no model", async () => {
     const user = userEvent.setup();
     setRuns(
       configuredBatch({ targetReferenceId: "agent_1", targetType: "http" }),
@@ -1060,10 +1102,14 @@ describe("<RunPlanDetail/>", () => {
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
     const block = screen.getByTestId("run-settings-block");
-    expect(within(block).getByTestId("run-settings-judge")).toHaveTextContent(
-      "No model named",
-    );
-    // The project default is not what the run took, so no model reads here.
+    // Such a run judged on the default model of the project, so the row says
+    // that rather than reading as if no judge had run at all.
+    const judge = within(block).getByTestId("run-settings-judge");
+    expect(judge).toHaveTextContent("Project default model");
+    expect(judge).not.toHaveTextContent(/no model/i);
+    expect(PROJECT_DEFAULT_MODEL).toBe("Project default model");
+    // The simulator reads only when the run named one, so a run that named
+    // neither model keeps the block to the judge alone.
     expect(
       within(block).queryByTestId("run-settings-simulator"),
     ).not.toBeInTheDocument();

@@ -2,9 +2,13 @@
  * The one control under the cases table: a way into a recent run of the open
  * test suite.
  *
- * A row holds the number of the run, how long ago it started and how it did,
- * and nothing more. The whole point is to reach a run in one click, so the
- * list stays scannable and the results themselves stay on the Results tab.
+ * A row holds the run plan the run belongs to, how long ago it started and how
+ * it did, and nothing more. The whole point is to reach a run in one click, so
+ * the list stays scannable and the results themselves stay on the Results tab.
+ *
+ * The button is offered when the suite has a scenario that ran inside the
+ * period, which is the one question the list itself answers, so the control is
+ * never offered over an empty list and never hidden over a full one.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -15,12 +19,10 @@ import { useState } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
-import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { FG_MUTED } from "../shared/design";
 import { formatPassRate, passRateColor } from "../shared/pass-rate-color";
 import { SmallButton } from "../shared/SmallButton";
-import type { TestSuiteEntry } from "./test-cases";
 import { useOpenPlanRun } from "./useOpenPlanRun";
 import { type RecentRun, useSuiteRecentRuns } from "./useSuiteRecentRuns";
 
@@ -31,31 +33,35 @@ export const OPEN_RECENT_RUN_LABEL = "Open recent run";
 export const RUNNING_RUN_LABEL = "running";
 
 export type RecentRunsMenuProps = {
-  suite: TestSuiteEntry;
   period: Period;
-  /** False when the suite has no run in the period, so there is nothing to open. */
+  /** The scenarios filed under the suite, which are what its runs covered. */
+  scenarioIds: string[];
+  /**
+   * False when no scenario of the suite ran inside the period, so there is
+   * nothing to open.
+   */
   hasRun: boolean;
 };
 
-/** One run, as one row: the number, the time, the result. */
+/** One run, as one row: the run plan, the time, the result. */
 function RecentRunRow({
   run,
   onOpen,
 }: {
   run: RecentRun;
-  onOpen: (batchRunId: string) => void;
+  onOpen: (run: RecentRun) => void;
 }) {
   const now = useNow();
 
   return (
     <Menu.Item
       value={run.batchRunId}
-      onClick={() => onOpen(run.batchRunId)}
+      onClick={() => onOpen(run)}
       data-testid={`recent-run-${run.batchRunId}`}
     >
       <HStack gap={2} width="full">
-        <Text fontSize="12px" fontWeight="medium">
-          Run #{run.ordinal}
+        <Text fontSize="12px" fontWeight="medium" truncate minWidth={0}>
+          {run.planName}
         </Text>
         <Text fontSize="11px" color={FG_MUTED}>
           {formatTimeAgoCompact(run.timestamp, now)}
@@ -89,12 +95,12 @@ function RecentRunsNote({ children }: { children: string }) {
 }
 
 function RecentRunsList({
-  suite,
   period,
+  scenarioIds,
   isOpen,
 }: RecentRunsMenuProps & { isOpen: boolean }) {
   const { runs, isLoading } = useSuiteRecentRuns({
-    scenarioSetId: getSuiteSetId(suite.id),
+    scenarioIds,
     period,
     enabled: isOpen,
   });
@@ -111,8 +117,11 @@ function RecentRunsList({
         <RecentRunRow
           key={run.batchRunId}
           run={run}
-          onOpen={(batchRunId) =>
-            openPlanRun({ planSlug: suite.slug, batchRunId })
+          onOpen={(chosen) =>
+            openPlanRun({
+              planSlug: chosen.planSlug,
+              batchRunId: chosen.batchRunId,
+            })
           }
         />
       ))}

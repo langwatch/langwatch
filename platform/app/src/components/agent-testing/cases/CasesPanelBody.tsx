@@ -77,6 +77,17 @@ function useCaseSelection({
 }
 
 /**
+ * The one question the recent runs list answers, asked off the last results
+ * the table already holds: has a scenario of this suite run inside the period.
+ * The control under the table is never offered over a list with no rows.
+ */
+function hasRunInPeriod(props: CasesPanelBodyProps): boolean {
+  return props.suiteScenarioIds.some((scenarioId) =>
+    props.lastResults.has(scenarioId),
+  );
+}
+
+/**
  * Day zero, in the order a person can act on it: an agent to test comes
  * before a suite to file scenarios into, and a suite comes before a scenario.
  */
@@ -158,9 +169,9 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         onArchive={props.onArchive}
       />
       <RecentRunsMenu
-        suite={props.suite}
         period={props.period}
-        hasRun={props.suiteHasRun}
+        scenarioIds={props.suiteScenarioIds}
+        hasRun={hasRunInPeriod(props)}
       />
       <MoveToSuiteSelectionBar
         selectedCount={selectedIds.size}

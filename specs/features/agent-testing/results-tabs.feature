@@ -384,6 +384,21 @@ Feature: The Results tab
     And the back control stays in the sidebar
 
   @integration
+  Scenario: A note never moves the actions of the header line
+    Given a run that carries a note too long for the line
+    When the header line is read
+    Then the note takes the space the run summary leaves and is cut with an ellipsis
+    And the full note is still reachable on the note itself
+    And the actions keep their place at the right end of the line
+    And the actions stay at the right end if the line has to break
+
+  @integration
+  Scenario: The run control of an open run offers to run it again
+    Given a run of a plan is open
+    When the header line is read
+    Then the run control reads "Run again"
+
+  @integration
   Scenario: The header line does not repeat when the run started
     Given a run of a plan is open
     When the header line is read
@@ -470,10 +485,10 @@ Feature: The Results tab
     And no name is made up from the recorded user id
 
   @integration
-  Scenario: The judge always reads, and a run that named no model says so
+  Scenario: The judge always reads, and a run that named no model reads the project default
     Given a run whose metadata names neither simulation model
     When "Show run settings" is chosen
-    Then the judge reads as naming no model
+    Then the judge reads as the project default model, because that is what such a run judged with
     And no simulator model reads in the block
 
   @integration
