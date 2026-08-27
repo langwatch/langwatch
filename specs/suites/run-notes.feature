@@ -40,9 +40,9 @@ Feature: A note on a run
 
   @integration
   Scenario: A note on a single scenario run is stored with that run
-    Given a test case row with a last target already chosen
-    When Run is chosen, a note is typed and the run is confirmed
-    Then the one-off run carries the note
+    Given a test case and a target
+    When a run of that case is started with a note
+    Then that run carries the note
 
   # --- Reading a note back ---
 

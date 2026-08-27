@@ -144,7 +144,6 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
       <CasesTable
         cases={props.cases}
         canManage={props.canManage}
-        runningCaseId={props.runningCaseId}
         isSelectionMode={isSelectionMode}
         selectedIds={selectedIds}
         hasLastRunByCase={hasLastRunByCase}

@@ -78,6 +78,23 @@ Feature: A run plan is identified by its name
     Then a run plan of kind custom named "Refunds" is created
     And the folder is unchanged
 
+  # --- A run of one scenario is an ordinary plan ---
+
+  @integration
+  Scenario: Two runs of one scenario against one agent stack on one plan
+    Given a scenario "Angry refund request" and an agent "prod-agent"
+    When it is run twice under the name "Angry refund request prod-agent"
+    Then only one run plan of that name exists
+    And it covers that one scenario
+    And both runs belong to it as two separate runs
+
+  @integration
+  Scenario: Running one scenario against another agent creates a second plan
+    Given a scenario "Angry refund request" run under "Angry refund request prod-agent"
+    When it is run under the name "Angry refund request dev-agent"
+    Then two run plans exist
+    And each covers that one scenario against its own agent
+
   # --- The rename trap ---
 
   @integration

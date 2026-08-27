@@ -35,7 +35,6 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       allLabels={collectLabels(data.cases)}
       activeLabels={view.activeLabels}
       onToggleLabel={view.toggleLabel}
-      runningCaseId={run.runningCaseId}
       onRunSet={run.runSelectedSuite}
       onNewTestCase={() => base.onNewTestCase(selectedSuite?.id ?? null)}
       onNewSuite={suiteDialog.openNew}

@@ -14,7 +14,8 @@ import type { RunScope } from "./run-configuration";
  *
  * The first three arms fix the scope, so the dialog says nothing about what
  * runs. "plan" is the New run plan entry point, the one place the scope is
- * still being chosen.
+ * still being chosen. "case" fixes the scope to one scenario, and a run of it
+ * goes out as an ordinary run plan named after that scenario and its agent.
  */
 export type RunDialogSubject =
   | { kind: "plan"; initialTarget: TargetValue }
@@ -48,11 +49,11 @@ export type RunDialogSubject =
 /** What the caller learns the moment a run is queued. */
 export type RunStartedInfo = {
   batchRunId: string;
-  /** The run set the batch lands in, when it is known at queue time. */
-  scenarioSetId?: string;
-  /** Set on a one-off run: the case whose run to watch. */
+  /** The run set of the plan the batch landed in, known at queue time. */
+  scenarioSetId: string;
+  /** Set when the run covers one scenario: the case whose run to watch. */
   scenarioId?: string;
-  /** Set on a one-off run: the agent it went against. */
+  /** Set when the run covers one scenario: the agent it went against. */
   targetId?: string;
 };
 
@@ -60,8 +61,6 @@ export type RunDialogProps = {
   subject: RunDialogSubject | null;
   onClose: () => void;
   onRunStarted: (info: RunStartedInfo) => void;
-  /** A one-off run finished its start-up poll, well or not. */
-  onCaseRunSettled?: (scenarioId: string) => void;
 };
 
 /** Which list of targets the dialog offers: the agents, or the prompts. */

@@ -54,7 +54,6 @@ export type CasesTableProps = {
   /** The scenarios of the open suite, in order. */
   cases: TestCase[];
   canManage: boolean;
-  runningCaseId?: string | null;
   /** True when the table shows checkboxes for a bulk move-to-suite. */
   isSelectionMode: boolean;
   selectedIds: Set<string>;
@@ -122,7 +121,6 @@ function TableHeaderRow({
 export function CasesTable({
   cases,
   canManage,
-  runningCaseId,
   isSelectionMode,
   selectedIds,
   hasLastRunByCase,
@@ -162,7 +160,6 @@ export function CasesTable({
             testCase={testCase}
             templateColumns={templateColumns}
             canManage={canManage}
-            isRunning={runningCaseId === testCase.id}
             hasLastRun={hasLastRunByCase(testCase.id)}
             isSelectionMode={isSelectionMode}
             isSelected={selectedIds.has(testCase.id)}
@@ -186,7 +183,6 @@ function CaseRow({
   testCase,
   templateColumns,
   canManage,
-  isRunning,
   hasLastRun,
   isSelectionMode,
   isSelected,
@@ -203,7 +199,6 @@ function CaseRow({
   testCase: TestCase;
   templateColumns: string;
   canManage: boolean;
-  isRunning: boolean;
   hasLastRun: boolean;
   isSelectionMode: boolean;
   isSelected: boolean;
@@ -272,7 +267,6 @@ function CaseRow({
       <CaseRowActions
         testCase={testCase}
         canManage={canManage}
-        isRunning={isRunning}
         hasLastRun={hasLastRun}
         onRunCase={onRunCase}
         onEdit={onEdit}
@@ -289,7 +283,6 @@ function CaseRow({
 function CaseRowActions({
   testCase,
   canManage,
-  isRunning,
   hasLastRun,
   onRunCase,
   onEdit,
@@ -301,7 +294,6 @@ function CaseRowActions({
 }: {
   testCase: TestCase;
   canManage: boolean;
-  isRunning: boolean;
   hasLastRun: boolean;
   onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
@@ -320,7 +312,6 @@ function CaseRowActions({
       {canManage && (
         <RunCaseButton
           caseName={testCase.name}
-          isRunning={isRunning}
           onOpen={() => onRunCase(testCase)}
         />
       )}

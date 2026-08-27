@@ -1003,9 +1003,14 @@ describe("<RunDialog/>", () => {
     await user.click(screen.getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(mockRunScenario).toHaveBeenCalledWith(
-      expect.objectContaining({ scenarioId: "case_1" }),
+    // A run of one scenario is an ordinary plan run, so it goes out the same
+    // way every other entry point does.
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({ scenarioIds: ["case_1"] }),
+      }),
     );
+    expect(mockRunScenario).not.toHaveBeenCalled();
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 

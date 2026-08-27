@@ -85,7 +85,7 @@ export function RunPlanDialogHost() {
       subject={subject}
       onClose={close}
       onRunStarted={({ batchRunId, scenarioSetId }) => {
-        if (scenarioSetId) setPendingRun({ batchRunId, scenarioSetId });
+        setPendingRun({ batchRunId, scenarioSetId });
       }}
     />
   );

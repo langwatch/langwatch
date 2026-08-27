@@ -90,7 +90,6 @@ export type RunDialogSubmitInput = {
   /** The keys of the secret rows, which is all the suite may remember of them. */
   storableSecretNames: string[] | undefined;
   onRunStarted: (info: RunStartedInfo) => void;
-  onCaseRunSettled?: (scenarioId: string) => void;
   onClose: () => void;
   setInlineError: (error: unknown) => void;
   setMissingProvider: (missing: boolean) => void;
@@ -150,8 +149,7 @@ export function useRunDialogSubmit(input: RunDialogSubmitInput) {
   return {
     run: batch.run,
     hasAnyTarget,
-    isRunning: batch.isRunning,
-    isBusy: batch.isPending,
+    isBusy: batch.isBusy,
   };
 }
 

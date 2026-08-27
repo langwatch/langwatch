@@ -62,6 +62,8 @@ async function runUnderName(params: {
   scope: SuiteScope;
   targets: SuiteTarget[];
   repeatCount?: number;
+  /** The scenarios a hand-picked scope covers. */
+  scenarioIds?: string[];
 }) {
   return suiteService.runPlan({
     projectId,
@@ -72,6 +74,9 @@ async function runUnderName(params: {
       targets: params.targets,
       ...(params.repeatCount !== undefined && {
         repeatCount: params.repeatCount,
+      }),
+      ...(params.scenarioIds !== undefined && {
+        scenarioIds: params.scenarioIds,
       }),
     },
     idempotencyKey: `run-${nanoid(6)}`,
@@ -120,6 +125,99 @@ beforeEach(async () => {
       startSuiteRun,
       queueSimulationRun,
     }),
+  });
+});
+
+/** The runs the suite-run pipeline was asked to start, in order. */
+function startedRuns() {
+  return startSuiteRun.mock.calls.map(([data]) => data);
+}
+
+describe("a run of one scenario", () => {
+  /**
+   * A run of one scenario is an ordinary run plan: the name the app derives is
+   * the scenario name and the agent, so pressing Run again on the same row
+   * against the same agent joins the plan the first run created and stacks a
+   * second run on it.
+   */
+  describe("when the same scenario runs twice against the same agent", () => {
+    /** @scenario "Two runs of one scenario against one agent stack on one plan" */
+    it("keeps one plan of that name and files both runs under it", async () => {
+      const testCase = await createCase("Angry refund request");
+      const agent = await createHttpAgent();
+      const name = "Angry refund request prod-agent";
+
+      const first = await runUnderName({
+        name,
+        scope: { mode: "cases" },
+        scenarioIds: [testCase.id],
+        targets: [{ type: "http", referenceId: agent.id }],
+      });
+      const second = await runUnderName({
+        name,
+        scope: { mode: "cases" },
+        scenarioIds: [testCase.id],
+        targets: [{ type: "http", referenceId: agent.id }],
+      });
+
+      expect(first.created).toBe(true);
+      expect(second.created).toBe(false);
+      expect(second.suiteId).toBe(first.suiteId);
+
+      const plans = await plansNamed(name);
+      expect(plans).toHaveLength(1);
+      expect(plans[0]!.scenarioIds).toEqual([testCase.id]);
+
+      // Two runs, one plan: the plan's run list is what grows a trend.
+      const runs = startedRuns();
+      expect(runs).toHaveLength(2);
+      expect(runs.map((run) => run.suiteId)).toEqual([
+        first.suiteId,
+        first.suiteId,
+      ]);
+      expect(new Set(runs.map((run) => run.scenarioSetId)).size).toBe(1);
+      expect(runs[0]!.batchRunId).not.toBe(runs[1]!.batchRunId);
+      expect(runs.map((run) => run.scenarioIds)).toEqual([
+        [testCase.id],
+        [testCase.id],
+      ]);
+    });
+  });
+
+  describe("when the same scenario runs against another agent", () => {
+    /** @scenario "Running one scenario against another agent creates a second plan" */
+    it("creates a second plan under the other name", async () => {
+      const testCase = await createCase("Angry refund request");
+      const prod = await createHttpAgent();
+      const dev = await createHttpAgent();
+
+      const first = await runUnderName({
+        name: "Angry refund request prod-agent",
+        scope: { mode: "cases" },
+        scenarioIds: [testCase.id],
+        targets: [{ type: "http", referenceId: prod.id }],
+      });
+      const second = await runUnderName({
+        name: "Angry refund request dev-agent",
+        scope: { mode: "cases" },
+        scenarioIds: [testCase.id],
+        targets: [{ type: "http", referenceId: dev.id }],
+      });
+
+      expect(second.created).toBe(true);
+      expect(second.suiteId).not.toBe(first.suiteId);
+
+      const prodPlan = (
+        await plansNamed("Angry refund request prod-agent")
+      )[0]!;
+      const devPlan = (await plansNamed("Angry refund request dev-agent"))[0]!;
+      expect(prodPlan.scenarioIds).toEqual([testCase.id]);
+      expect(devPlan.scenarioIds).toEqual([testCase.id]);
+      expect(prodPlan.targets).toEqual([
+        { type: "http", referenceId: prod.id },
+      ]);
+      expect(devPlan.targets).toEqual([{ type: "http", referenceId: dev.id }]);
+    });
   });
 });
 

@@ -42,16 +42,14 @@ function dialogTitle(subject: RunDialogSubject): string {
 }
 
 /**
- * Run waits for a target when there is no server-side refusal to lean on: a
- * one-off run has none, and a project with nothing to test has nothing to
- * choose.
+ * Run waits for a target only when the project has nothing to test, since
+ * there is nothing to choose. Every other missing target is a refusal the
+ * server names, so the dialog reads the same reason whatever started the run.
  */
 function isRunBlocked({
-  subject,
   form,
   controller,
 }: {
-  subject: RunDialogSubject | null;
   form: RunDialogForm;
   controller: RunDialogController;
 }): boolean {
@@ -60,7 +58,7 @@ function isRunBlocked({
   if (form.runName.trim() === "") return true;
   if (form.caseCount === 0) return true;
   if (form.target) return false;
-  return subject?.kind === "case" || !controller.hasAnyTarget;
+  return !controller.hasAnyTarget;
 }
 
 /**
@@ -85,18 +83,13 @@ function runBlockedReason({
     }
     return "The scope holds no scenario to run.";
   }
-  if (!form.target && (subject?.kind === "case" || !controller.hasAnyTarget)) {
+  if (!form.target && !controller.hasAnyTarget) {
     return "Choose an agent to run against.";
   }
   return null;
 }
 
-export function RunDialog({
-  subject,
-  onClose,
-  onRunStarted,
-  onCaseRunSettled,
-}: RunDialogProps) {
+export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
   // Escape belongs to the run name list while that list is open. The dialog's
   // own Escape handling listens on the document in the capture phase, so it
   // runs before the field can stop the key and has to be turned off instead.
@@ -117,7 +110,6 @@ export function RunDialog({
     storableRunParameters: form.storableRunParameters,
     storableSecretNames: form.storableSecretNames,
     onRunStarted,
-    onCaseRunSettled,
     onClose,
     setInlineError: form.setInlineError,
     setMissingProvider: form.setMissingProvider,
@@ -166,7 +158,7 @@ export function RunDialog({
         </Dialog.Body>
         <RunDialogFooter
           controller={controller}
-          isRunBlocked={isRunBlocked({ subject, form, controller })}
+          isRunBlocked={isRunBlocked({ form, controller })}
           blockedReason={runBlockedReason({ subject, form, controller })}
           caseCount={form.caseCount}
           onClose={onClose}

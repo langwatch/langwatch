@@ -157,7 +157,6 @@ describe("normaliseRunScope", () => {
 });
 
 describe("describeConfigurations", () => {
-  /** @scenario "Two configurations of one plan name are told apart by what differs" */
   describe("when two entries share a plan name and differ in repeat count", () => {
     const once = entry({ planId: "plan_1" });
     const thrice = entry({
@@ -166,6 +165,7 @@ describe("describeConfigurations", () => {
     });
     const entries = [once, thrice];
 
+    /** @scenario "Two configurations of one plan name are told apart by what differs" */
     it("lists both", () => {
       const described = describeConfigurations({
         entries,
@@ -175,6 +175,7 @@ describe("describeConfigurations", () => {
       expect(described.size).toBe(2);
     });
 
+    /** @scenario "Two configurations of one plan name are told apart by what differs" */
     it("names the repeat count on the entry that carries one", () => {
       const described = describeConfigurations({
         entries,

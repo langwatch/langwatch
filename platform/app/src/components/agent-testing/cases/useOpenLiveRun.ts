@@ -7,7 +7,7 @@
  * streams the conversation in live.
  *
  * @see specs/features/agent-testing/cases-table.feature
- * @see specs/features/agent-testing/live-one-off-run.feature
+ * @see specs/features/agent-testing/live-single-scenario-run.feature
  */
 
 import { useCallback } from "react";

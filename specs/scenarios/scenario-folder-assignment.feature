@@ -6,7 +6,9 @@ Feature: Filing a test case into a test suite
   Background: what a case shows.
     A test case belongs to exactly one test suite. A case written without one
     named is filed into the project's Default suite, which is created on that
-    first write if the project has none, so no case is ever loose.
+    first write if the project has none, so no case is ever loose. The editor
+    therefore offers a choice that names no suite, and taking it files the case
+    into Default rather than leaving it loose.
 
     The column stays nullable, because an archived case keeps whatever suite it
     had and a code-pushed case has no row at all. The rule is kept by the
@@ -37,7 +39,7 @@ Feature: Filing a test case into a test suite
     Given the project has the test suites "Refunds" and "Checkout"
     When the case editor is opened
     Then both suite names are offered
-    And an option to leave the case unfiled is offered
+    And a choice that names no suite is offered
 
   # --- Moving ---
 
@@ -67,11 +69,11 @@ Feature: Filing a test case into a test suite
   # --- Running one case on its own ---
 
   @integration
-  Scenario: An unfiled case runs on its own and lands in One-off runs
-    Given an unfiled case
+  Scenario: Running one case on its own starts a run plan of that case and target
+    Given a case filed in "Refunds"
     When Run is chosen on its row and a target is confirmed
-    Then the run starts
-    And it is listed under One-off runs in the Test Runs list
+    Then the run starts under a run plan named after the case and that target
+    And nothing is filed in the project's internal run set
 
   # --- Failure paths ---
 

@@ -8,9 +8,7 @@
 import { useCallback, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { readScenarioTarget } from "~/hooks/useScenarioTarget";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import type { RunDialogSubject, RunStartedInfo } from "../run/RunDialog";
-import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 import type { TestCase, TestSuiteEntry } from "./test-cases";
 import { useOpenLiveRun } from "./useOpenLiveRun";
@@ -41,36 +39,26 @@ function runSubjectForSuite({
 /**
  * What happens the moment a run is queued. Shared by the table and the case
  * editor, so a run started from either one opens the same way.
+ *
+ * The run set is always the one of the plan the run joined, so the drawer and
+ * the runs rail read the run back under that plan.
  */
-export function useRunStartedHandler({
-  projectId,
-  setRunningCaseId,
-}: {
-  projectId: string;
-  /** Marks the row of a one-off run while it starts. */
-  setRunningCaseId?: (scenarioId: string | null) => void;
-}): (info: RunStartedInfo) => void {
+export function useRunStartedHandler(): (info: RunStartedInfo) => void {
   const { openLiveRun } = useOpenLiveRun();
   const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
 
   return useCallback(
-    (info: RunStartedInfo) => {
-      const scenarioSetId = info.scenarioSetId ?? getOnPlatformSetId(projectId);
-      setPendingRun({ batchRunId: info.batchRunId, scenarioSetId });
-      if (!info.scenarioId) {
+    ({ batchRunId, scenarioSetId, scenarioId, targetId }: RunStartedInfo) => {
+      setPendingRun({ batchRunId, scenarioSetId });
+      if (!scenarioId) {
         toaster.create({ title: "Run scheduled", type: "success" });
         return;
       }
-      // A one-off run opens in the drawer right away and streams into it.
-      setRunningCaseId?.(info.scenarioId);
-      openLiveRun({
-        batchRunId: info.batchRunId,
-        scenarioSetId,
-        scenarioId: info.scenarioId,
-        targetId: info.targetId,
-      });
+      // A run of one scenario opens in the drawer right away and streams into
+      // it, so the person watches the conversation without leaving the table.
+      openLiveRun({ batchRunId, scenarioSetId, scenarioId, targetId });
     },
-    [setPendingRun, setRunningCaseId, openLiveRun, projectId],
+    [setPendingRun, openLiveRun],
   );
 }
 
@@ -78,9 +66,6 @@ export type CaseRunActions = {
   /** The suite or case the run dialog is open on, if any. */
   runSubject: RunDialogSubject | null;
   closeRunDialog: () => void;
-  /** The case whose one-off run is starting, so its row can say so. */
-  runningCaseId: string | null;
-  clearRunningCase: () => void;
   onRunStarted: (info: RunStartedInfo) => void;
   runCase: (testCase: TestCase) => void;
   /** Runs the suite that is open. */
@@ -100,8 +85,7 @@ export function useCaseRunActions({
   selectedSuite: TestSuiteEntry | null;
 }): CaseRunActions {
   const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
-  const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
-  const onRunStarted = useRunStartedHandler({ projectId, setRunningCaseId });
+  const onRunStarted = useRunStartedHandler();
 
   const runCase = useCallback(
     (testCase: TestCase) => {
@@ -134,8 +118,6 @@ export function useCaseRunActions({
   return {
     runSubject,
     closeRunDialog: () => setRunSubject(null),
-    runningCaseId,
-    clearRunningCase: () => setRunningCaseId(null),
     onRunStarted,
     runCase,
     runSelectedSuite,

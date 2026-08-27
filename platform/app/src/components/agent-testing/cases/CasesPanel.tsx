@@ -50,7 +50,6 @@ export type CasesPanelProps = {
   allLabels: string[];
   activeLabels: string[];
   onToggleLabel: (label: string) => void;
-  runningCaseId?: string | null;
   isRunningSet?: boolean;
   onRunSet: () => void;
   onNewTestCase: () => void;

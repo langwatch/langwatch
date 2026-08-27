@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { MAX_ATOM_PAGE } from "~/server/app-layer/simulations/result-atoms/result-atoms.clickhouse.repository";
 import type { ResultsFilter } from "~/server/app-layer/simulations/result-atoms/atom.types";
+import { MAX_ATOM_PAGE } from "~/server/app-layer/simulations/result-atoms/result-atoms.clickhouse.repository";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

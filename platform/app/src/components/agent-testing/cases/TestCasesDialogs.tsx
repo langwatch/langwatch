@@ -27,7 +27,6 @@ export function TestCasesDialogs({ model }: { model: TestCasesTabModel }) {
         subject={run.runSubject}
         onClose={run.closeRunDialog}
         onRunStarted={run.onRunStarted}
-        onCaseRunSettled={run.clearRunningCase}
       />
 
       <ScenarioArchiveDialog

@@ -9,8 +9,11 @@ Feature: Running one scenario keeps the person in place
     and the conversation streams into it. When the conversation ends, the judge
     verdict appears in the same drawer.
 
-    The run is filed under One-off runs, so it can be found again later. See
-    specs/suites/one-off-runs-surface.feature.
+    The run is an ordinary run plan. Its name is the scenario name followed by
+    the agent, the same way a suite run is named, so running the same scenario
+    against the same agent again stacks run 1, run 2 and run 3 on one plan and
+    the plan grows a trend. Running it against another agent is another name,
+    so it is another plan. See specs/suites/run-plan-identity-by-name.feature.
 
   # --- Staying in place ---
 
@@ -40,14 +43,14 @@ Feature: Running one scenario keeps the person in place
 
   @integration
   Scenario: The conversation streams into the drawer while the run goes on
-    Given the run detail drawer is open on a running one-off run
+    Given the run detail drawer is open on a running single-scenario run
     When the agent and the simulated user exchange messages
     Then each message appears in the drawer as it arrives
     And the drawer does not need a reload
 
   @integration
   Scenario: The judge verdict appears after the conversation ends
-    Given a one-off run whose conversation has ended
+    Given a single-scenario run whose conversation has ended
     When the judge finishes
     Then the verdict appears in the drawer
     And each criterion reads as met or not met
@@ -55,7 +58,7 @@ Feature: Running one scenario keeps the person in place
 
   @integration
   Scenario: The drawer offers Open Scenario for that case
-    Given the run detail drawer is open on a finished one-off run
+    Given the run detail drawer is open on a finished single-scenario run
     When its header is read
     Then a single "Open Scenario" button is offered
     And it opens the editor for that scenario
@@ -71,17 +74,30 @@ Feature: Running one scenario keeps the person in place
   # --- Where the run lands ---
 
   @integration
-  Scenario: The finished one-off run is listed under One-off runs
-    Given a finished one-off run of the case "Angry refund request"
-    When the Results tab is opened and "One-off runs" is chosen
-    Then a run named "Angry refund request" is listed
-    And choosing it shows the same results the drawer showed
+  Scenario: The run goes out under a plan named after the scenario and the agent
+    Given the case "Angry refund request" and the agent "prod-agent"
+    When Run is confirmed on that case row
+    Then the run goes out under the name "Angry refund request prod-agent"
+    And that run plan covers only that one case
+
+  @integration
+  Scenario: Running the same case against the same agent again joins the same plan
+    Given the case "Angry refund request" was already run against "prod-agent"
+    When it is run against "prod-agent" again
+    Then both runs go out under the same name
+    And the second run joins the plan the first one created
+
+  @integration
+  Scenario: Running the same case against another agent is another plan
+    Given the case "Angry refund request" and the agents "prod-agent" and "dev-agent"
+    When the case is run against "dev-agent"
+    Then the run goes out under the name "Angry refund request dev-agent"
 
   # --- Stopping ---
 
   @integration
-  Scenario: A one-off run can be stopped from the drawer
-    Given the drawer is open on a running one-off run
+  Scenario: A single-scenario run can be stopped from the drawer
+    Given the drawer is open on a running single-scenario run
     When Stop is chosen
     Then the run stops
     And the drawer reads that the run was stopped
@@ -91,14 +107,14 @@ Feature: Running one scenario keeps the person in place
   @integration
   Scenario: A run that cannot start says why in the drawer
     Given a target that is not reachable
-    When a one-off run against it is confirmed
+    When a single-scenario run against it is confirmed
     Then the drawer opens and reads the named failure
     And it does not read "unknown error"
 
   @integration
   Scenario: A run refused before it is queued keeps the dialog open
     Given a project with no model provider set up
-    When a one-off run is confirmed
+    When a single-scenario run is confirmed
     Then the run dialog stays open and reads what is missing
     And it offers to open the model provider settings
     And no drawer opens

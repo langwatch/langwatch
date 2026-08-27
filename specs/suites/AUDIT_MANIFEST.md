@@ -24,7 +24,7 @@ They bind as the implementation phases land.
 | folder-membership-invariant.feature | WS1 phase 2 (folders) |
 | run-notes.feature | WS1 phase 1 (notes), plus WS3/WS4 for the surfaces |
 | run-note-metadata-convention.feature | WS1 phase 1 (notes) |
-| one-off-runs-surface.feature | Existing behavior; the v2 rows bind in WS3 |
+| internal-run-set-surface.feature | Existing behavior; the v2 rows bind in WS3 |
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|

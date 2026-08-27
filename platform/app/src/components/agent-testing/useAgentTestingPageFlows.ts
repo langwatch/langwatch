@@ -6,12 +6,9 @@
  */
 
 import { useEffect } from "react";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { useOpenLiveRun } from "./cases/useOpenLiveRun";
 import { useOpenNewRunPlan } from "./run/RunPlanDialogHost";
 import type { AgentTestingSelection } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
@@ -56,26 +53,4 @@ export function useHydrateViewFromUrl(): void {
  */
 export function useNewRunPlanFlow(): () => void {
   return useOpenNewRunPlan();
-}
-
-/**
- * Save and Run inside the case editor keeps the person on this page. The run
- * opens in the drawer instead of sending them to the v1 page.
- */
-export function useScenarioEditorRunFlow(projectId: string | undefined): void {
-  const { setFlowCallbacks } = useDrawer();
-  const { openLiveRun } = useOpenLiveRun();
-  const setPendingRun = useAgentTestingStore((state) => state.setPendingRun);
-
-  useEffect(() => {
-    if (!projectId) return;
-    const scenarioSetId = getOnPlatformSetId(projectId);
-    setFlowCallbacks("scenarioEditor", {
-      onRunStarted: ({ batchRunId }: { batchRunId: string }) => {
-        setPendingRun({ batchRunId, scenarioSetId });
-        void openLiveRun({ batchRunId, scenarioSetId });
-      },
-    });
-    return () => setFlowCallbacks("scenarioEditor", {});
-  }, [projectId, setFlowCallbacks, setPendingRun, openLiveRun]);
 }

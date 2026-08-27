@@ -7,7 +7,7 @@
  * are sorted by last run date.
  *
  * @see specs/scenarios/internal-set-namespace.feature
- * @see specs/suites/one-off-runs-surface.feature
+ * @see specs/suites/internal-run-set-surface.feature
  */
 import { describe, expect, it } from "vitest";
 import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";

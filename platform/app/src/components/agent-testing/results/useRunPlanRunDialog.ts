@@ -3,11 +3,12 @@
  * result row.
  *
  * The plan is run as its test suite, so the dialog offers the same targets and
- * the same remembered choice as running it from the rail. A single row is run
- * as a one-off, which is where a single case always lands.
+ * the same remembered choice as running it from the rail. A single row runs the
+ * one case it holds, which is an ordinary run plan of that case and its agent.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/suites/run-plan-identity-by-name.feature
  */
 
 import { useCallback, useState } from "react";
@@ -41,7 +42,7 @@ export function useRunPlanRunDialog({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const [subject, setSubject] = useState<RunDialogSubject | null>(null);
-  const onRunStarted = useRunStartedHandler({ projectId });
+  const onRunStarted = useRunStartedHandler();
 
   const suiteId = plan.kind === "suite" ? plan.suiteId : null;
   const { data: suite } = api.suites.getById.useQuery(

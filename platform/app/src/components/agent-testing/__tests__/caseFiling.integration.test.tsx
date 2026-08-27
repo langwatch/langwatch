@@ -10,7 +10,13 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -94,7 +100,9 @@ vi.mock("~/utils/api", () => ({
       create: { useMutation: mutation(vi.fn()) },
       update: { useMutation: mutation(vi.fn()) },
       run: { useMutation: mutation(vi.fn()) },
-      runPlan: { useMutation: mutation(mockRunPlan) },
+      runPlan: {
+        useMutation: () => ({ mutateAsync: mockRunPlan, isPending: false }),
+      },
     },
     organization: {
       getOrganizationWithMembersAndTheirTeams: { useQuery: emptyQuery },
@@ -309,12 +317,19 @@ describe("the Scenarios tab", () => {
     });
   });
 
-  /** @scenario "An unfiled case runs on its own and lands in One-off runs" */
-  it("runs an unfiled case on its own without leaving the page", async () => {
+  /** @scenario "Running one case on its own starts a run plan of that case and target" */
+  it("runs one case as a run plan named after the case and the agent", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
       data: [scenarioRow()],
       isLoading: false,
+    });
+    mockRunPlan.mockResolvedValue({
+      batchRunId: "batch_new",
+      jobCount: 1,
+      suiteId: "plan_double",
+      planName: "Double charge prod-agent",
+      created: true,
     });
     renderTab();
 
@@ -323,15 +338,17 @@ describe("the Scenarios tab", () => {
     await user.click(within(dialog).getByTestId("run-dialog-agent-agent_1"));
     await user.click(within(dialog).getByTestId("run-dialog-run"));
 
-    // A single case run goes through scenarios.run, which writes into the
-    // project's own internal set. That set is what the Test Runs list reads as
-    // One-off runs.
-    expect(mockRunScenario).toHaveBeenCalledWith(
-      expect.objectContaining({
-        scenarioId: "case_1",
-        target: { type: "http", id: "agent_1" },
-      }),
-    );
+    await waitFor(() => expect(mockRunPlan).toHaveBeenCalled());
+    const sent = mockRunPlan.mock.calls[0]![0] as {
+      name: string;
+      config: { scope: { mode: string }; scenarioIds?: string[] };
+    };
+    expect(sent.name).toBe("Double charge prod-agent");
+    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect(sent.config.scenarioIds).toEqual(["case_1"]);
+    // Nothing goes through the scenario runner, so nothing lands in the
+    // project's internal run set.
+    expect(mockRunScenario).not.toHaveBeenCalled();
     // The page stays where it is; the v1 page is the one that navigates.
     expect(mockRouterPush).not.toHaveBeenCalled();
   });

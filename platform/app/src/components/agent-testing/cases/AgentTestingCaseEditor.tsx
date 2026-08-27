@@ -23,7 +23,7 @@ import { useRunStartedHandler } from "./useCaseRunActions";
 export function AgentTestingCaseEditor() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const onRunStarted = useRunStartedHandler({ projectId });
+  const onRunStarted = useRunStartedHandler();
   const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
 
   const handleSaved = useCallback(

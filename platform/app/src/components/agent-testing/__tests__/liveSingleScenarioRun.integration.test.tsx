@@ -1,14 +1,22 @@
 /**
  * @vitest-environment jsdom
  *
- * Running one scenario keeps the person in place: the run dialog confirms,
+ * Running one scenario keeps the person in place: the run dialog confirms, the
+ * run goes out as an ordinary run plan named after the scenario and the agent,
  * the wide drawer opens at queue time, the conversation streams into it, and
  * the verdict lands in the same drawer.
  *
- * @see specs/features/agent-testing/live-one-off-run.feature
+ * @see specs/features/agent-testing/live-single-scenario-run.feature
+ * @see specs/suites/run-plan-identity-by-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import {
@@ -37,6 +45,7 @@ const mockScenariosGetAll = vi.hoisted(() => vi.fn());
 const mockFoldersGetAll = vi.hoisted(() => vi.fn());
 const mockLastResults = vi.hoisted(() => vi.fn());
 const mockRunScenario = vi.hoisted(() => vi.fn());
+const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
 const mockCancelJob = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
@@ -113,7 +122,10 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
       runPlan: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+        useMutation: () => ({
+          mutateAsync: mockSuitesRunPlan,
+          isPending: false,
+        }),
       },
     },
     organization: {
@@ -126,6 +138,12 @@ vi.mock("~/utils/api", () => ({
             {
               id: "agent_1",
               name: "prod-agent",
+              type: "http",
+              updatedAt: new Date("2026-07-01T00:00:00.000Z"),
+            },
+            {
+              id: "agent_2",
+              name: "dev-agent",
               type: "http",
               updatedAt: new Date("2026-07-01T00:00:00.000Z"),
             },
@@ -231,6 +249,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
+/** The run set of the plan a single-scenario run resolves onto. */
+const PLAN_SET_ID = "__internal__plan_angry__suite";
+
 const REFUNDS = {
   id: "suite_refunds",
   name: "Refunds",
@@ -278,13 +299,22 @@ async function confirmRowRun(user: ReturnType<typeof userEvent.setup>) {
   );
   const dialog = await screen.findByTestId("run-case-dialog");
   await user.click(within(dialog).getByTestId("run-dialog-run"));
+  await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+}
+
+/** The one payload the run dialog sent to the run plan endpoint. */
+function queuedPlanRun(call = 0) {
+  return mockSuitesRunPlan.mock.calls[call]![0] as {
+    name: string;
+    config: { scope: { mode: string }; scenarioIds?: string[] };
+  };
 }
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 
-describe("starting a one-off run from the case table", () => {
+describe("starting a run of one scenario from the case table", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -304,6 +334,13 @@ describe("starting a one-off run from the case table", () => {
     mockGetBatchRunData.mockReturnValue({ data: undefined });
     mockGetScenario.mockReturnValue({ data: scenarioRow(), isLoading: false });
     mockRunScenario.mockReturnValue(new Promise(() => undefined));
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_q",
+      jobCount: 1,
+      suiteId: "plan_angry",
+      planName: "Angry refund request prod-agent",
+      created: true,
+    });
   });
 
   afterEach(cleanup);
@@ -352,13 +389,14 @@ describe("starting a one-off run from the case table", () => {
 
     await confirmRowRun(user);
 
-    // The drawer opens on the batch, before the run has an id.
+    // The drawer opens on the batch, before the run has an id, and on the run
+    // set of the plan the run joined.
     expect(mockOpenDrawer).toHaveBeenCalledWith("scenarioRunDetail", {
       urlParams: expect.objectContaining({
         variant: "agent-testing",
         scenarioId: "case_1",
         targetId: "agent_1",
-        scenarioSetId: "__internal__proj_1__on-platform-scenarios",
+        scenarioSetId: PLAN_SET_ID,
         batchRunId: expect.any(String),
       }),
     });
@@ -369,7 +407,7 @@ describe("starting a one-off run from the case table", () => {
     mockParams.value = {
       variant: "agent-testing",
       batchRunId: "batch_q",
-      scenarioSetId: "__internal__proj_1__on-platform-scenarios",
+      scenarioSetId: PLAN_SET_ID,
       scenarioId: "case_1",
       targetId: "agent_1",
     };
@@ -382,6 +420,83 @@ describe("starting a one-off run from the case table", () => {
     ).toBeInTheDocument();
     expect(within(queued).getByText(/prod-agent/)).toBeInTheDocument();
     expect(within(queued).getByText("Queued")).toBeInTheDocument();
+  });
+
+  /** @scenario "The run goes out under a plan named after the scenario and the agent" */
+  it("queues one run plan named after the case and the agent, covering that case alone", async () => {
+    const user = userEvent.setup();
+    render(<TestCasesTab />, { wrapper: Wrapper });
+
+    await confirmRowRun(user);
+
+    const sent = queuedPlanRun();
+    expect(sent.name).toBe("Angry refund request prod-agent");
+    expect(sent.config.scope).toEqual({ mode: "cases" });
+    expect(sent.config.scenarioIds).toEqual(["case_1"]);
+    // Nothing goes to the scenario runner any more, so nothing lands in the
+    // project's internal run set.
+    expect(mockRunScenario).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Running the same case against the same agent again joins the same plan" */
+  it("sends the same name both times, so the second run joins the first plan", async () => {
+    const user = userEvent.setup();
+    const view = render(<TestCasesTab />, { wrapper: Wrapper });
+
+    await confirmRowRun(user);
+    // The second run resolves onto the plan the first one created, which is
+    // what the server answers when the name matches.
+    mockSuitesRunPlan.mockResolvedValue({
+      batchRunId: "batch_q2",
+      jobCount: 1,
+      suiteId: "plan_angry",
+      planName: "Angry refund request prod-agent",
+      created: false,
+    });
+    view.rerender(
+      <ChakraProvider value={defaultSystem}>
+        <TestCasesTab />
+      </ChakraProvider>,
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Run Angry refund request" }),
+    );
+    const dialog = await screen.findByTestId("run-case-dialog");
+    await user.click(within(dialog).getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalledTimes(2));
+
+    expect(queuedPlanRun(0).name).toBe("Angry refund request prod-agent");
+    expect(queuedPlanRun(1).name).toBe(queuedPlanRun(0).name);
+    // Two batches, one plan: the plan's run list is what grows a trend.
+    expect(queuedPlanRun(1)).not.toBe(queuedPlanRun(0));
+    expect(mockOpenDrawer).toHaveBeenLastCalledWith(
+      "scenarioRunDetail",
+      expect.objectContaining({
+        urlParams: expect.objectContaining({
+          scenarioSetId: PLAN_SET_ID,
+          batchRunId: "batch_q2",
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "Running the same case against another agent is another plan" */
+  it("names the other agent when the run goes against it", async () => {
+    const user = userEvent.setup();
+    render(<TestCasesTab />, { wrapper: Wrapper });
+
+    await user.click(
+      screen.getByRole("button", { name: "Run Angry refund request" }),
+    );
+    const dialog = await screen.findByTestId("run-case-dialog");
+    await user.click(within(dialog).getByTestId("run-dialog-agent-agent_2"));
+    expect(within(dialog).getByTestId("run-dialog-name")).toHaveValue(
+      "Angry refund request dev-agent",
+    );
+
+    await user.click(within(dialog).getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
+    expect(queuedPlanRun().name).toBe("Angry refund request dev-agent");
   });
 
   /** @scenario "Closing the drawer leaves the table where it was" */
@@ -404,7 +519,7 @@ describe("starting a one-off run from the case table", () => {
           unmetCriteriaCount: 0,
           lastRunAt: Date.now(),
           batchRunId: "batch_q",
-          scenarioSetId: "__internal__proj_1__on-platform-scenarios",
+          scenarioSetId: PLAN_SET_ID,
           durationInMs: 6300,
           totalCost: 0.0042,
         },
@@ -422,7 +537,7 @@ describe("starting a one-off run from the case table", () => {
   });
 });
 
-describe("the live one-off run in the drawer", () => {
+describe("the live run of one scenario in the drawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStreaming.value = [];
@@ -430,7 +545,7 @@ describe("the live one-off run in the drawer", () => {
       variant: "agent-testing",
       scenarioRunId: "run_1",
       batchRunId: "batch_1",
-      scenarioSetId: "__internal__proj_1__on-platform-scenarios",
+      scenarioSetId: PLAN_SET_ID,
       scenarioId: "case_1",
     };
     mockGetRunState.mockReturnValue({ data: makeRunState(), error: null });
@@ -498,7 +613,7 @@ describe("the live one-off run in the drawer", () => {
     expect(screen.getAllByText("$0.004200").length).toBeGreaterThan(0);
   });
 
-  /** @scenario "A one-off run can be stopped from the drawer" */
+  /** @scenario "A single-scenario run can be stopped from the drawer" */
   it("stops the run from the drawer and reads that it was stopped", async () => {
     const user = userEvent.setup();
     const view = renderDrawer();
@@ -506,7 +621,7 @@ describe("the live one-off run in the drawer", () => {
     await user.click(screen.getByTestId("run-drawer-stop"));
     expect(mockCancelJob).toHaveBeenCalledWith({
       projectId: "proj_1",
-      scenarioSetId: "__internal__proj_1__on-platform-scenarios",
+      scenarioSetId: PLAN_SET_ID,
       batchRunId: "batch_1",
       scenarioRunId: "run_1",
       scenarioId: "case_1",
@@ -590,6 +705,7 @@ describe("a run refused before it is queued", () => {
       }),
     ).toBeInTheDocument();
     expect(onRunStarted).not.toHaveBeenCalled();
+    expect(mockSuitesRunPlan).not.toHaveBeenCalled();
     expect(mockRunScenario).not.toHaveBeenCalled();
     expect(mockOpenDrawer).not.toHaveBeenCalled();
   });

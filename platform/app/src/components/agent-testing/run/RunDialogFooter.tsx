@@ -45,7 +45,7 @@ export function RunDialogFooter({
       background={undefined}
       borderColor="transparent"
       disabled={isRunBlocked}
-      loading={controller.isRunning}
+      loading={controller.isBusy}
       onClick={() => void controller.run()}
       // A disabled solid button must not brighten on hover: pointer-events
       // stay off so the hover state cannot fire at all.
