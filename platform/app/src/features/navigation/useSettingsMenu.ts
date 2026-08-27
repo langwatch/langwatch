@@ -21,7 +21,6 @@ import {
   type LucideIcon,
   MailX,
   Network,
-  RefreshCw,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -404,11 +403,6 @@ export function backofficeGroup(): SettingsMenuGroup {
         label: "Identity Lookup",
         href: "/ops/backoffice/identity-lookup",
         icon: UserSearch,
-      },
-      {
-        label: "Directory Sync",
-        href: "/ops/backoffice/directory-sync",
-        icon: RefreshCw,
       },
       {
         label: "Bug Reports",
