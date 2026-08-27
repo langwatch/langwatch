@@ -164,7 +164,12 @@ describe("FACET_REGISTRY shape", () => {
         throw new Error("expected eventAttributeKeys to be dynamic_keys");
       }
       const { sql } = def.queryBuilder(baseCtx);
-      expect(sql).toContain("`Events.Attributes`.keys");
+      // Matched as one shape on purpose. Asserting the fragments separately
+      // would pass on a query that flattened the whole Map and only mentioned
+      // `.keys` in the filter, which is the exact bug being pinned out.
+      expect(sql).toMatch(
+        /arrayJoin\(\s*arrayJoin\(\s*`Events\.Attributes`\.keys\s*\)\s*\)\s+AS\s+key/,
+      );
       expect(sql).not.toContain("mapKeys");
       expect(sql).not.toContain("mapValues");
       expect(sql).toMatch(/length\(`Events\.Attributes`\.keys\)\s*>\s*0/);

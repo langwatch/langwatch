@@ -48,7 +48,11 @@ const MEMORY_CAP = "40000000"; // 40 MB
 
 type FacetRow = { facet_value: string; cnt: string; total_distinct: string };
 
-async function seedSpansWithEvents(ch: ClickHouseClient): Promise<void> {
+async function seedSpansWithEvents({
+  ch,
+}: {
+  ch: ClickHouseClient;
+}): Promise<void> {
   const now = Date.now();
   const value = "v".repeat(VALUE_SIZE);
   const eventAttributes = Object.fromEntries(
@@ -117,7 +121,7 @@ describe("event-attribute-keys facet integration", () => {
     const rawClient = getTestClickHouseClient();
     if (!rawClient) throw new Error("ClickHouse client not available");
     ch = wrapWithDefaultSettings(rawClient);
-    await seedSpansWithEvents(ch);
+    await seedSpansWithEvents({ ch });
   }, 180_000);
 
   afterAll(async () => {
@@ -132,73 +136,75 @@ describe("event-attribute-keys facet integration", () => {
     offset: 0,
   };
 
-  describe("when discovering keys under a tight memory budget", () => {
-    it("completes and returns every distinct key exactly once", async () => {
-      const query = buildEventAttributeKeysFacetQuery(ctx);
-      const result = await ch.query({
-        query: query.sql,
-        query_params: query.params,
-        format: "JSONEachRow",
-        clickhouse_settings: { max_memory_usage: MEMORY_CAP },
-      });
-      const rows = await result.json<FacetRow>();
+  describe("given seeded spans with event attributes", () => {
+    describe("when discovering keys under a tight memory budget", () => {
+      it("completes and returns every distinct key exactly once", async () => {
+        const query = buildEventAttributeKeysFacetQuery(ctx);
+        const result = await ch.query({
+          query: query.sql,
+          query_params: query.params,
+          format: "JSONEachRow",
+          clickhouse_settings: { max_memory_usage: MEMORY_CAP },
+        });
+        const rows = await result.json<FacetRow>();
 
-      const keys = rows.map((r) => r.facet_value);
-      expect(new Set(keys).size).toBe(keys.length); // GROUP BY => no dupes
-      expect(keys).toContain("event_key_0");
-      expect(keys).toContain(`event_key_${KEYS_PER_EVENT - 1}`);
-      expect(keys).not.toContain(""); // empty keys filtered out
-      expect(rows).toHaveLength(EXPECTED_DISTINCT_KEYS);
-      expect(Number(rows[0]?.total_distinct)).toBe(EXPECTED_DISTINCT_KEYS);
+        const keys = rows.map((r) => r.facet_value);
+        expect(new Set(keys).size).toBe(keys.length); // GROUP BY => no dupes
+        expect(keys).toContain("event_key_0");
+        expect(keys).toContain(`event_key_${KEYS_PER_EVENT - 1}`);
+        expect(keys).not.toContain(""); // empty keys filtered out
+        expect(rows).toHaveLength(EXPECTED_DISTINCT_KEYS);
+        expect(Number(rows[0]?.total_distinct)).toBe(EXPECTED_DISTINCT_KEYS);
+      });
+
+      it("counts every (span, event) occurrence of a key, as before the fix", async () => {
+        // The subcolumn must not change multiplicity: one row per key per event
+        // per span, which is what orders the sidebar by frequency.
+        const query = buildEventAttributeKeysFacetQuery(ctx);
+        const result = await ch.query({
+          query: query.sql,
+          query_params: query.params,
+          format: "JSONEachRow",
+          clickhouse_settings: { max_memory_usage: MEMORY_CAP },
+        });
+        const rows = await result.json<FacetRow>();
+
+        for (const row of rows) {
+          expect(Number(row.cnt)).toBe(SPAN_COUNT * EVENTS_PER_SPAN);
+        }
+      });
     });
 
-    it("counts every (span, event) occurrence of a key, as before the fix", async () => {
-      // The subcolumn must not change multiplicity: one row per key per event
-      // per span, which is what orders the sidebar by frequency.
-      const query = buildEventAttributeKeysFacetQuery(ctx);
-      const result = await ch.query({
-        query: query.sql,
-        query_params: query.params,
-        format: "JSONEachRow",
-        clickhouse_settings: { max_memory_usage: MEMORY_CAP },
+    describe("when reading the whole Map instead of the keys subcolumn", () => {
+      it("blows the same memory budget (the bug this fixes)", async () => {
+        // Identical query except both the projection and the empty
+        // short-circuit go through the Map, dragging the values column in.
+        // This is the pre-fix shape; it must exceed the budget the
+        // subcolumn query clears.
+        const query = buildEventAttributeKeysFacetQuery(ctx);
+        const preFixSql = query.sql
+          .replace(
+            "arrayJoin(arrayJoin(`Events.Attributes`.keys))",
+            "arrayJoin(mapKeys(arrayJoin(`Events.Attributes`)))",
+          )
+          .replace(
+            "length(`Events.Attributes`.keys) > 0",
+            "length(`Events.Attributes`) > 0",
+          );
+        expect(preFixSql).not.toBe(query.sql); // guard: the replaces actually hit
+        expect(preFixSql).not.toContain(".keys");
+
+        await expect(
+          ch
+            .query({
+              query: preFixSql,
+              query_params: query.params,
+              format: "JSONEachRow",
+              clickhouse_settings: { max_memory_usage: MEMORY_CAP },
+            })
+            .then((r) => r.json()),
+        ).rejects.toThrow(/memory limit exceeded/i);
       });
-      const rows = await result.json<FacetRow>();
-
-      for (const row of rows) {
-        expect(Number(row.cnt)).toBe(SPAN_COUNT * EVENTS_PER_SPAN);
-      }
-    });
-  });
-
-  describe("when reading the whole Map instead of the keys subcolumn", () => {
-    it("blows the same memory budget (the bug this fixes)", async () => {
-      // Identical query except both the projection and the empty
-      // short-circuit go through the Map, dragging the values column in.
-      // This is the pre-fix shape; it must exceed the budget the
-      // subcolumn query clears.
-      const query = buildEventAttributeKeysFacetQuery(ctx);
-      const preFixSql = query.sql
-        .replace(
-          "arrayJoin(arrayJoin(`Events.Attributes`.keys))",
-          "arrayJoin(mapKeys(arrayJoin(`Events.Attributes`)))",
-        )
-        .replace(
-          "length(`Events.Attributes`.keys) > 0",
-          "length(`Events.Attributes`) > 0",
-        );
-      expect(preFixSql).not.toBe(query.sql); // guard: the replaces actually hit
-      expect(preFixSql).not.toContain(".keys");
-
-      await expect(
-        ch
-          .query({
-            query: preFixSql,
-            query_params: query.params,
-            format: "JSONEachRow",
-            clickhouse_settings: { max_memory_usage: MEMORY_CAP },
-          })
-          .then((r) => r.json()),
-      ).rejects.toThrow(/memory limit exceeded/i);
     });
   });
 });
