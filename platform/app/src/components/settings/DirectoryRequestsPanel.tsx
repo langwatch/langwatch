@@ -125,6 +125,11 @@ function reasonInWords(reason: string | null): string | null {
   if (!reason) return null;
   const spoken: Record<string, string> = {
     plan_not_entitled: "Your plan no longer includes directory sync",
+    // A 403 that is NOT a lapsed plan. The commonest is a provider reaching
+    // for somebody a different connection provisioned, which used to be
+    // filed as an entitlement problem and sent administrators to look at
+    // their subscription instead of at their connector.
+    forbidden: "Your directory asked for something this connection may not do",
     unauthorized: "The token presented was not one we recognise",
     malformed_body: "The request body could not be read as JSON",
     invalid_resource: "The resource sent was not one we can accept",

@@ -156,7 +156,15 @@ function scimResourceOf(path: string): string {
  */
 function refusalReasonFor(status: number): ScimRefusalReason {
   if (status === 401) return "unauthorized";
-  if (status === 403) return "plan_not_entitled";
+  // A 403 is "you may not", and a lapsed plan is only ONE of the ways to
+  // earn one. `assertWritable` answers 403 when a provider touches somebody
+  // another connection provisioned, so filing every 403 as a plan lapse told
+  // an administrator on the ADR-126 activity page — the surface built to
+  // answer "why did my sync stop" — that their Enterprise plan no longer
+  // includes SCIM, when their provider was simply pointed at the wrong
+  // connection. The entitlement middleware records its own reason; anything
+  // else that answers 403 says so without naming a cause it does not know.
+  if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 400) return "invalid_resource";
@@ -889,6 +897,11 @@ secured
  */
 secured.hono.onError((error, c) => {
   if (error instanceof HandledError) {
+    // The refusal names ITSELF on the activity feed. Without this the record
+    // falls back to whatever the status alone implies, which is a guess about
+    // a cause the error already knows.
+    c.set("scimRefusalReason", refusalReasonFor(error.httpStatus));
+    c.set("scimRefusalDetail", error.message);
     return new Response(
       JSON.stringify({
         schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],

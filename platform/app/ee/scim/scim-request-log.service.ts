@@ -28,6 +28,9 @@ const SCIM_REQUEST_LOG_SWEEP_BATCH = 5_000;
 
 export type ScimRefusalReason =
   | "plan_not_entitled"
+  /** "You may not", where the cause is not a lapsed plan — a provider
+   *  touching somebody another connection provisioned is the usual one. */
+  | "forbidden"
   | "unauthorized"
   | "malformed_body"
   | "invalid_resource"

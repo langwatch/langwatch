@@ -364,11 +364,19 @@ export class ScimGroupService {
       });
       if (byIdentifier) return byIdentifier;
     }
+    // THE SAME REACH THE READS HAVE. Every other query in this service is
+    // scoped to the connection that asked (or to the pre-scoping rows, which
+    // carry no connection), and this fallback was not — so a second directory
+    // pushing a group name the first one already used was told the name
+    // exists, while `listGroups` and `findGroup` refused to show it the row.
+    // Entra creates "Engineering", Okta cannot create it and cannot see it,
+    // and its provider retries the create forever, 409ing each time.
     return this.prisma.group.findFirst({
       where: {
         organizationId,
         name: displayName,
         scimSource: { not: null },
+        OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
       },
     });
   }

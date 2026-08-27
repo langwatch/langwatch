@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -13,6 +14,8 @@ import {
   ScimTokenTooShortError,
   ScimTokenUnavailableError,
 } from "./errors";
+
+const logger = createLogger("langwatch:scim:tokens");
 
 /** How a stored digest was derived. */
 type ScimTokenHashScheme = "sha256" | "hmac-sha256";
@@ -191,24 +194,37 @@ export class ScimTokenService {
 
     // A value somebody else already chose. Refused generically and on purpose:
     // "that token is taken" would confirm to one customer that another holds
-    // it, which is a probe rather than an error message. The database says the
-    // same thing independently — this is the sentence, not the guard.
-    const taken = await this.prisma.scimToken.findUnique({
-      where: { hashedToken },
+    // it, which is a probe rather than an error message.
+    //
+    // BOTH DIGESTS ARE ASKED FOR, and the unique index is why that matters.
+    // The index is on the COLUMN, so `hmac(T)` names at most one row and
+    // `sha256(T)` names at most one row — but those are two different values,
+    // so they can be two different rows in two different organizations.
+    // Checking only the new scheme meant an administrator could supply a
+    // value some legacy token already hashes to, the insert would not trip
+    // the constraint, and `findByToken` — which asks for both — would then
+    // match two rows and let the planner decide whose directory the caller
+    // was writing to.
+    const taken = await this.prisma.scimToken.findFirst({
+      where: {
+        hashedToken: {
+          in: [
+            hashedToken,
+            this.hashToken(token, "sha256"),
+          ],
+        },
+      },
       select: { id: true },
     });
     if (taken) {
       throw new ScimTokenUnavailableError();
     }
 
-    const scimToken = await this.prisma.scimToken.create({
-      data: {
-        organizationId,
-        connectionId,
-        hashedToken,
-        hashScheme: "hmac-sha256",
-        description: description ?? null,
-      },
+    const scimToken = await this.createTokenRow({
+      organizationId,
+      connectionId,
+      hashedToken,
+      description: description ?? null,
     });
 
     await this.syncLifecycle.tokenIssued({
@@ -379,18 +395,23 @@ export class ScimTokenService {
   }
 
   /**
-   * The one row a presented token names, or none.
+   * The one row a presented token names, or none — and NONE when more than
+   * one row names it.
    *
-   * BOTH digests are asked for, because a token minted before the pepper
+   * Both digests are asked for, because a token minted before the pepper
    * existed is still the credential its identity provider is configured with.
-   * `hashedToken` is unique, so each digest names at most one row and this
-   * cannot answer with somebody else's — which is the whole reason the
-   * constraint is there. Without it two organizations that chose the same
-   * secret would both match, and the planner would decide which customer's
-   * directory the caller was allowed to write to.
+   * The unique index is on the COLUMN, so each digest names at most one row —
+   * but `hmac(T)` and `sha256(T)` are two different values, so they can be
+   * two different rows belonging to two different organizations. `findFirst`
+   * over both then let the planner choose whose directory a caller could
+   * write to, which is the one thing this lookup must never do.
+   *
+   * Minting checks both digests now, so the pair cannot be created. This is
+   * the other half: a pair that already exists authenticates nobody rather
+   * than authenticating whoever the planner reaches first.
    */
-  private findByToken(token: string) {
-    return this.prisma.scimToken.findFirst({
+  private async findByToken(token: string) {
+    const matches = await this.prisma.scimToken.findMany({
       where: {
         hashedToken: {
           in: [
@@ -398,6 +419,41 @@ export class ScimTokenService {
             this.hashToken(token, "sha256"),
           ],
         },
+      },
+      take: 2,
+    });
+    if (matches.length !== 1) {
+      if (matches.length > 1) {
+        logger.error(
+          { rows: matches.length },
+          "a presented SCIM token names more than one row; refusing it",
+        );
+      }
+      return null;
+    }
+    return matches[0] ?? null;
+  }
+
+  /** One place the row is written, so the scheme it records and the digest it
+   *  stores cannot drift apart. */
+  private createTokenRow({
+    organizationId,
+    connectionId,
+    hashedToken,
+    description,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
+    hashedToken: string;
+    description: string | null;
+  }) {
+    return this.prisma.scimToken.create({
+      data: {
+        organizationId,
+        connectionId,
+        hashedToken,
+        hashScheme: "hmac-sha256",
+        description,
       },
     });
   }
