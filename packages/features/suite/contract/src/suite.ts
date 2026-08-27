@@ -33,6 +33,14 @@ export const suiteTargetSchema = suiteTargetBaseSchema.superRefine((target, cont
 });
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 
+/** Browser and transport callers use the same target parser as the service boundary. */
+export function parseSuiteTargets(value: unknown): SuiteTarget[] {
+  return z.array(suiteTargetSchema).parse(value);
+}
+
+/** Keeps the authoring limit aligned with the established suite-run transport. */
+export const MAX_SUITE_REPEAT_COUNT = 5;
+
 export const suiteSchema = z
   .object({
     id: z.string().min(1),

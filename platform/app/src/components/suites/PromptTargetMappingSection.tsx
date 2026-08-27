@@ -14,7 +14,7 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { FieldMapping } from "~/components/variables/VariableMappingInput";
 import type { Variable } from "~/components/variables/VariablesSection";
-import type { SuiteTarget } from "~/server/suites/types";
+import type { SuiteTarget } from "@langwatch/suite-contract";
 import { ScenarioInputMappingSection } from "./ScenarioInputMappingSection";
 
 /** A prompt as the run-plan form knows it. */
@@ -58,8 +58,8 @@ export function PromptTargetMappingSection({
   return (
     <VStack align="stretch" gap={4} width="full">
       <Text fontSize="sm" color="fg.muted">
-        Choose which part of a simulation each prompt reads. Anything left unset is
-        matched by name when the run starts.
+        Choose which part of a simulation each prompt reads. Anything left unset is matched by name
+        when the run starts.
       </Text>
       {promptTargets.map(({ target, prompt }) => (
         <Box key={`${target.type}-${target.referenceId}`} width="full">

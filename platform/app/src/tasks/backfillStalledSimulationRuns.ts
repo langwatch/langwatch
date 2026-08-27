@@ -2,11 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { getApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
-import type { StalledRunFinder } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
-  getStalledRunFindersByInstance,
-} from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
+  ClickHouseStalledRunFinder,
+  type StalledRunFinder,
+} from "@langwatch/simulation-server";
 
 const logger = createLogger("langwatch:tasks:backfillStalledSimulationRuns");
 
@@ -98,7 +98,10 @@ export default async function execute(...args: string[]) {
   const app = getApp();
 
   const dryRun = args.includes("--dry-run");
-  const finders = await getStalledRunFindersByInstance();
+  const finders = (await app.clickhouse.allInstances()).map(({ target, client }) => ({
+    target,
+    finder: new ClickHouseStalledRunFinder(client),
+  }));
 
   if (finders.length === 0) {
     logger.info("No ClickHouse instance configured; nothing to backfill");

@@ -35,7 +35,7 @@ import {
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { getFlowCallbacks, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
+import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { api } from "~/utils/api";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
@@ -125,12 +125,11 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     prompts,
   });
 
-  const { archivedScenariosWithNames, archivedTargetsWithNames } =
-    useArchivedItemsResolution({
-      archivedScenarioIds: suiteForm.archivedScenarioIds,
-      archivedTargets: suiteForm.archivedTargets,
-      projectId: project?.id,
-    });
+  const { archivedScenariosWithNames, archivedTargetsWithNames } = useArchivedItemsResolution({
+    archivedScenarioIds: suiteForm.archivedScenarioIds,
+    archivedTargets: suiteForm.archivedTargets,
+    projectId: project?.id,
+  });
 
   const { form } = suiteForm;
   const errors = form.formState.errors;
@@ -411,8 +410,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                     Models
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    Choose the models that role-play the user and judge the runs. Both
-                    default to your project&apos;s Default model.
+                    Choose the models that role-play the user and judge the runs. Both default to
+                    your project&apos;s Default model.
                   </Text>
                   <SimulationModelSelect
                     label="User simulator"
@@ -471,14 +470,14 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                             size="sm"
                             width="80px"
                             min={1}
-                            max={MAX_REPEAT_COUNT}
+                            max={MAX_SUITE_REPEAT_COUNT}
                             {...form.register("repeatCount", {
                               valueAsNumber: true,
                             })}
                             borderColor={errors.repeatCount ? "red.500" : undefined}
                           />
                           <Text fontSize="xs" color="fg.muted">
-                            times per scenario x target (max {MAX_REPEAT_COUNT})
+                            times per scenario x target (max {MAX_SUITE_REPEAT_COUNT})
                           </Text>
                         </HStack>
                         {errors.repeatCount && (
@@ -509,10 +508,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       </Drawer.Root>
 
       {/* Child drawer: Scenario Editor -- managed via local state */}
-      <ScenarioFormDrawer
-        open={scenarioEditorOpen}
-        onClose={() => setScenarioEditorOpen(false)}
-      />
+      <ScenarioFormDrawer open={scenarioEditorOpen} onClose={() => setScenarioEditorOpen(false)} />
 
       {/* Child drawer: Agent HTTP Editor -- managed via local state */}
       <AgentHttpEditorDrawer

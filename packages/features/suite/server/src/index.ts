@@ -9,3 +9,18 @@ export {
 } from "./adapters/clickhouse.suite-eventing.adapter";
 export { SuiteExecutionPort } from "./ports/suite-execution.port";
 export type { SuiteClickHouseClient } from "./ports/suite-clickhouse.port";
+export {
+  CompleteSuiteRunItemCommand,
+  RecordSuiteRunItemStartedCommand,
+  StartSuiteRunCommand,
+} from "./commands/suite-run.commands";
+export {
+  createSuiteRunProcessingPipeline,
+  type SuiteRunProcessingPipelineDeps,
+} from "./adapters/suite-run-processing.adapter";
+export {
+  SUITE_RUN_PROJECTION_VERSIONS,
+  type CompleteSuiteRunItemCommandData,
+  type RecordSuiteRunItemStartedCommandData,
+  type StartSuiteRunCommandData,
+} from "@langwatch/suite-contract";

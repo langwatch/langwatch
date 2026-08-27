@@ -39,13 +39,12 @@ vi.mock("@langwatch/observability", () => ({
 
 import fs from "fs";
 
-const PACKAGE_ROOT = path.resolve(import.meta.dirname, "../../../../../platform/app");
+const PACKAGE_ROOT = path.resolve(import.meta.dirname, "..");
 const SOURCE_PATH = path.join(
   PACKAGE_ROOT,
   "src",
-  "runtime",
-  "worker",
-  "scenario-child-process.ts",
+  "adapters",
+  "scenario-child-execution.adapter.ts",
 );
 const SOURCE_ROOTS = [path.dirname(SOURCE_PATH)];
 
@@ -145,12 +144,7 @@ describe("resolveChildProcessSpawn", () => {
   });
 
   describe("when NODE_ENV is development", () => {
-    const BUNDLE = path.join(
-      PACKAGE_ROOT,
-      "dist",
-      "server",
-      "scenario-child-process.cjs",
-    );
+    const BUNDLE = path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.cjs");
 
     /**
      * Bundle at `bundleMtimeMs`, one child source at `sourceMtimeMs`. Omitting

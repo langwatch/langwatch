@@ -27,7 +27,9 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
-    "@langwatch/suite-contract": "workspace:*"
+    "@langwatch/simulation-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

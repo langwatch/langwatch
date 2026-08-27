@@ -3,11 +3,10 @@ import {
   type SuiteRunResult,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import { SuiteExecutionPort } from "@langwatch/suite-server";
+import type { QueueRunCommandData } from "@langwatch/simulation-server";
+import { type StartSuiteRunCommandData, SuiteExecutionPort } from "@langwatch/suite-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import {
   generateBatchRunId,
   type RunSecretCiphertext,
@@ -35,9 +34,7 @@ function withSecretParameterNames(
 function withSecretParameters(
   secretParameters: RunSecretCiphertext | undefined,
 ): { secretParameters: RunSecretCiphertext } | Record<string, never> {
-  return secretParameters && Object.keys(secretParameters).length > 0
-    ? { secretParameters }
-    : {};
+  return secretParameters && Object.keys(secretParameters).length > 0 ? { secretParameters } : {};
 }
 
 /**
@@ -59,12 +56,8 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
   }
 
   private constructor(
-    private readonly startSuiteRunCommand: (
-      data: StartSuiteRunCommandData,
-    ) => Promise<void>,
-    private readonly queueSimulationRunCommand: (
-      data: QueueRunCommandData,
-    ) => Promise<void>,
+    private readonly startSuiteRunCommand: (data: StartSuiteRunCommandData) => Promise<void>,
+    private readonly queueSimulationRunCommand: (data: QueueRunCommandData) => Promise<void>,
     private readonly scenarios: ScenarioService,
   ) {
     super();
@@ -97,8 +90,7 @@ export class AppSuiteExecutionPort extends SuiteExecutionPort {
     );
     const batchRunId = input.batchRunId ?? generateBatchRunId();
     const setId = getSuiteSetId(input.suiteId);
-    const total =
-      input.activeScenarioIds.length * input.activeTargets.length * input.repeatCount;
+    const total = input.activeScenarioIds.length * input.activeTargets.length * input.repeatCount;
 
     logger.debug(
       {

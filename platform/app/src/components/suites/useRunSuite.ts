@@ -16,7 +16,7 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
-import { parseSuiteTargets } from "~/server/suites/types";
+import { parseSuiteTargets } from "@langwatch/suite-contract";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -117,9 +117,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(null);
   const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(null);
   /** Only the names typed over in the confirmation, keyed by name. */
-  const [parameterOverrides, setParameterOverrides] = useState<Record<string, string>>(
-    {},
-  );
+  const [parameterOverrides, setParameterOverrides] = useState<Record<string, string>>({});
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
@@ -169,10 +167,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         });
       }
 
-      optionsRef.current.onRunScheduled?.(
-        variables.id,
-        variables.batchRunId ?? result.batchRunId,
-      );
+      optionsRef.current.onRunScheduled?.(variables.id, variables.batchRunId ?? result.batchRunId);
     },
     onError: (err, variables) => {
       setPendingSuite(null);
@@ -212,8 +207,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     const values: Record<string, string> = {};
     for (const definition of parameterDefinitions) {
       values[definition.name] =
-        parameterOverrides[definition.name] ??
-        displayOptionalValue(definition.defaultValue);
+        parameterOverrides[definition.name] ?? displayOptionalValue(definition.defaultValue);
     }
     return values;
   }, [parameterDefinitions, parameterOverrides]);

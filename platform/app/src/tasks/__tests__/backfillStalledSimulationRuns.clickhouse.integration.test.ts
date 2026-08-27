@@ -8,7 +8,7 @@ import {
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   ClickHouseStalledRunFinder,
-} from "../../server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
+} from "@langwatch/simulation-server";
 
 const tenantId = `test-stalled-backfill-${nanoid()}`;
 const otherTenantId = `test-stalled-backfill-other-${nanoid()}`;
@@ -127,13 +127,7 @@ describe("ClickHouseStalledRunFinder.findStalledRuns (integration)", () => {
         ArchivedAt: hoursAgo(48),
       });
 
-      await insertRows(ch, [
-        abandonedStarted,
-        abandonedQueued,
-        recentlyActive,
-        finished,
-        archived,
-      ]);
+      await insertRows(ch, [abandonedStarted, abandonedQueued, recentlyActive, finished, archived]);
 
       const result = await finder.findStalledRuns({
         now: NOW,

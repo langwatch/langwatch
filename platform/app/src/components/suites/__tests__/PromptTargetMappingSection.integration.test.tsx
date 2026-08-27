@@ -12,11 +12,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SuiteTarget } from "~/server/suites/types";
-import {
-  type MappablePrompt,
-  PromptTargetMappingSection,
-} from "../PromptTargetMappingSection";
+import type { SuiteTarget } from "@langwatch/suite-contract";
+import { type MappablePrompt, PromptTargetMappingSection } from "../PromptTargetMappingSection";
 
 vi.mock("~/optimization_studio/components/code/workflow-code-editor.transport", () => ({
   CodeEditor: () => null,

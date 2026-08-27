@@ -21,10 +21,14 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.23.0",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/simulation-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "nanoid": "^5.1.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {

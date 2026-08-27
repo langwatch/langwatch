@@ -2,16 +2,7 @@
  * Suite detail panel showing header, stats bar, and run results.
  */
 
-import {
-  Box,
-  Button,
-  Center,
-  EmptyState,
-  HStack,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Center, EmptyState, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import {
   BarChart3,
   CheckCircle,
@@ -31,7 +22,7 @@ import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import { useNow } from "~/hooks/useNow";
 import { getSuiteSetId } from "@langwatch/suite-contract";
-import { parseSuiteTargets } from "~/server/suites/types";
+import { parseSuiteTargets } from "@langwatch/suite-contract";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { RunHistoryPanel, type RunHistoryStats } from "./RunHistoryPanel";
 

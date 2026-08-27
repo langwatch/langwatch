@@ -7,7 +7,7 @@ import {
   type ScenarioUnsuccessfulExecutionInput,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { StalledHistoricalRun } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/stalledSimulationRuns.clickhouse.repository";
+import type { StalledHistoricalRun } from "@langwatch/simulation-server";
 import { backfillStalledRuns } from "../backfillStalledSimulationRuns";
 
 vi.mock("~/server/app-layer/app", () => ({ getApp: vi.fn() }));
@@ -42,9 +42,7 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
     throw new Error("cancel unexpectedly called in backfill tests");
   }
 
-  prefetch(
-    _input: ScenarioExecutionPrefetchInput,
-  ): Promise<ScenarioExecutionPrefetchResult> {
+  prefetch(_input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult> {
     throw new Error("prefetch unexpectedly called in backfill tests");
   }
 
@@ -92,9 +90,7 @@ describe("backfillStalledRuns", () => {
         makeRun({ scenarioRunId: "run-3" }),
       ];
       const execution = new TestScenarioExecutionService();
-      execution.finishUnsuccessfulRun.mockRejectedValueOnce(
-        new Error("event store unavailable"),
-      );
+      execution.finishUnsuccessfulRun.mockRejectedValueOnce(new Error("event store unavailable"));
 
       const outcome = await backfillStalledRuns({
         finder: makeFinder(runs),

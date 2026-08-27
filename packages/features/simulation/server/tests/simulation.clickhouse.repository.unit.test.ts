@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
-import type { SimulationReadClient } from "../src/adapters/clickhouse-simulation.adapter";
+import type { SimulationReadClient } from "../src/adapters/simulation.clickhouse.adapter";
 import {
   RUN_ID_CAP,
   SimulationClickHouseRepository,

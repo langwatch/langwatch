@@ -11,12 +11,13 @@
 
 import type { TenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { ArchiveSetCommand } from "../commands";
+import { ArchiveSetCommand } from "../../src/adapters/simulation-processing-commands.adapter";
 import {
   type SimulationProcessingEvent,
+  SimulationSetArchivedEventSchema,
   simulationSetArchivedEventDataSchema,
-} from "../schemas/events";
-import { isSimulationSetArchivedEvent } from "../schemas/typeGuards";
+} from "../../src/adapters/simulation-run.adapter";
+import { isSimulationSetArchivedEvent } from "../../src/adapters/simulation-run.adapter";
 
 function makeArchiveSetCommand(overrides?: {
   tenantId?: string;
@@ -84,7 +85,7 @@ describe("ArchiveSetCommand (lw#3636)", () => {
       it("returns true and narrows to SimulationSetArchivedEvent", async () => {
         const handler = new ArchiveSetCommand();
         const [event] = await handler.handle(makeArchiveSetCommand());
-        const candidate = event as unknown as SimulationProcessingEvent;
+        const candidate: SimulationProcessingEvent = SimulationSetArchivedEventSchema.parse(event);
         expect(isSimulationSetArchivedEvent(candidate)).toBe(true);
         if (isSimulationSetArchivedEvent(candidate)) {
           // Type narrowing — these reads compile only when the guard works.

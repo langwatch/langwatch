@@ -18,8 +18,8 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
+import type { QueueRunCommandData } from "@langwatch/simulation-server";
+import type { StartSuiteRunCommandData } from "@langwatch/suite-server";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
@@ -90,8 +90,7 @@ describe("Feature: Suites REST API", () => {
 
     helpers = {
       api: {
-        get: (path: string) =>
-          app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
+        get: (path: string) => app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
         post: (path: string, body: unknown) =>
           app.request(path, {
             method: "POST",
@@ -425,9 +424,7 @@ describe("Feature: Suites REST API", () => {
         const body = await res.json();
         expect(body.error).toBe("scenario_parameter_unknown");
         expect(body.unknownKeys).toEqual(["regoin"]);
-        expect(body.declaredNames).toEqual(
-          expect.arrayContaining(["account_tier", "region"]),
-        );
+        expect(body.declaredNames).toEqual(expect.arrayContaining(["account_tier", "region"]));
       });
 
       /** @scenario "A run-time key no scenario in the run declares is rejected with scenario_parameter_unknown" */
