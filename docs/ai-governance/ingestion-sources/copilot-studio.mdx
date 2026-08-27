@@ -1,11 +1,11 @@
 ---
-title: "Microsoft Copilot Studio (Purview) — Retired"
+title: "Microsoft Copilot Studio (Purview), Retired"
 description: This source type polled Microsoft's directory audit log, which records directory changes and has never contained a Copilot conversation. It is retired and replaced by the Dataverse source.
-sidebarTitle: Copilot Studio (Purview) — Retired
+sidebarTitle: Copilot Studio (Purview), Retired
 ---
 
 <Warning>
-**This source type is retired.** It polled Microsoft's directory audit — the log
+**This source type is retired.** It polled Microsoft's directory audit, the log
 of who was made an administrator and which app was granted consent. That log
 records changes to the directory; it has never contained a Copilot conversation
 and no configuration would make it.
@@ -19,7 +19,7 @@ See [Microsoft Copilot Studio (Dataverse)](/ai-governance/ingestion-sources/copi
 The `copilot_studio` source type was created as a setup contract for a planned
 Purview Audit poller. The poller was never built because the underlying API
 (`graph.microsoft.com/v1.0/auditLogs/directoryAudits`) does not carry
-conversation data — only directory-level changes like admin consent grants and
+conversation data, only directory-level changes like admin consent grants and
 app registrations.
 
 The replacement, `copilot_studio_dataverse`, reads conversations directly from
