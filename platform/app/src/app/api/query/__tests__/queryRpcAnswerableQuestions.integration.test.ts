@@ -735,11 +735,12 @@ describe("given the /api/v1/query JSON-RPC door and a seed with known answers", 
       }),
     });
     const body = (await response.json()) as Record<string, any>;
-    expect(response.status, `query failed: ${JSON.stringify(body)}`).toBe(200);
-    expect(
-      body.error,
-      `query.run answered an error: ${JSON.stringify(body)}`,
-    ).toBeUndefined();
+    if (response.status !== 200) {
+      throw new Error(`query failed: ${JSON.stringify(body)}`);
+    }
+    if (body.error !== undefined) {
+      throw new Error(`query.run answered an error: ${JSON.stringify(body)}`);
+    }
     return body.result as Record<string, any>;
   };
 
@@ -872,7 +873,9 @@ describe("given the /api/v1/query JSON-RPC door and a seed with known answers", 
         promptId,
       })) {
         const result = await postgres.asAdmin(statement);
-        expect(result.exitCode, result.stderr).toBe(0);
+        if (result.exitCode !== 0) {
+          throw new Error(result.stderr);
+        }
       }
     }
 
