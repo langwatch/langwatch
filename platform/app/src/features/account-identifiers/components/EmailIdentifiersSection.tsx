@@ -20,6 +20,7 @@ import { showErrorToast } from "~/features/errors";
 import type { AccountIdentifier } from "~/server/app-layer/identity/account-identifiers.service";
 import { api } from "~/utils/api";
 import { useSearchParams } from "~/utils/compat/next-navigation";
+import { readHandledError } from "~/features/errors/logic/readHandledError";
 import { useResendBackoff } from "../hooks/useResendBackoff";
 import {
   forgetAddressVerifier,
@@ -82,6 +83,10 @@ export function EmailIdentifiersSection({
   const removeIdentifier = api.identity.removeIdentifier.useMutation();
 
   const [resentTo, setResentTo] = useState<string | null>(null);
+  // WHICH address is being resent, not whether ANY is. Two unconfirmed
+  // addresses are two separate conversations, and pressing one should not
+  // stand the other down — which is what `AddressRow` already says it does.
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const sentTo = resentTo;
 
   const rows = identifiers.data ?? [];
@@ -115,7 +120,18 @@ export function EmailIdentifiersSection({
     }
   };
 
-  const resend = async (row: (typeof rows)[number]) => {
+  /**
+   * Returns the server's own wait when it refused for rate limiting, so the
+   * row can hold its button for the real window rather than its local step.
+   *
+   * `useResendBackoff` has always had `holdFor` for exactly this, and nothing
+   * called it: after the per-address limit fired, the button re-enabled after
+   * the local three seconds and every press produced another error toast for
+   * the rest of the window.
+   */
+  const resend = async (
+    row: (typeof rows)[number],
+  ): Promise<number | null> => {
     try {
       if (row.value && row.value === ownAddress) {
         // Reuses the shell nudge's own mutation: one address, one sender.
@@ -132,8 +148,11 @@ export function EmailIdentifiersSection({
         });
       }
       setResentTo(row.value);
+      return null;
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't send that link" });
+      const retryAfter = readHandledError(error)?.meta?.retryAfterSeconds;
+      return typeof retryAfter === "number" ? retryAfter : null;
     }
   };
 
@@ -186,9 +205,16 @@ export function EmailIdentifiersSection({
               row={row}
               linkJustSent={sentTo !== null && sentTo === row.value}
               lastUsedAt={lastUsed.data?.byIdentifier[row.identifierId] ?? null}
-              isSending={resendAdded.isPending || resendOwnAddress.isPending}
+              isSending={resendingId === row.identifierId}
               isRemoving={removeIdentifier.isPending}
-              onResend={() => void resend(row)}
+              onResend={async () => {
+                setResendingId(row.identifierId);
+                try {
+                  return await resend(row);
+                } finally {
+                  setResendingId(null);
+                }
+              }}
               onRemove={() => void remove(row)}
             />
           ))
@@ -220,18 +246,21 @@ export function EmailIdentifiersSection({
             lastUsedAt={null}
             isSending={resendOwnAddress.isPending}
             isRemoving={false}
-            onResend={() => {
-              resendOwnAddress.mutate(
-                {},
-                {
-                  onSuccess: () => setResentTo(ownAddress),
-                  onError: (error) =>
-                    showErrorToast({
-                      error,
-                      fallbackTitle: "Couldn't send that link",
-                    }),
-                },
-              );
+            onResend={async () => {
+              try {
+                await resendOwnAddress.mutateAsync({});
+                setResentTo(ownAddress);
+                return null;
+              } catch (error) {
+                showErrorToast({
+                  error,
+                  fallbackTitle: "Couldn't send that link",
+                });
+                // The same rule the other rows follow: their window, not ours.
+                const retryAfter =
+                  readHandledError(error)?.meta?.retryAfterSeconds;
+                return typeof retryAfter === "number" ? retryAfter : null;
+              }
             }}
             onRemove={() => void 0}
             hideRemove
@@ -470,7 +499,9 @@ function AddressRow({
   lastUsedAt: string | null;
   isSending: boolean;
   isRemoving: boolean;
-  onResend: () => void;
+  /** The server's wait in seconds when it refused for rate limiting, or null
+   *  when there is nothing to hold for. */
+  onResend: () => Promise<number | null> | void;
   onRemove: () => void;
   /** For the row that stands in before identifiers exist: there is nothing to
    *  detach yet, so there is nothing honest to offer. */
@@ -529,7 +560,14 @@ function AddressRow({
           disabled={backoff.isWaiting}
           onClick={() => {
             backoff.recordAttempt();
-            onResend();
+            void Promise.resolve(onResend()).then((retryAfterSeconds) => {
+              // THE SERVER'S LIMIT WINS. Ours is a courtesy step; theirs is
+              // the door that is actually shut, and saying "3 seconds" about
+              // a window twenty minutes long is worse than saying nothing.
+              if (typeof retryAfterSeconds === "number") {
+                backoff.holdFor(retryAfterSeconds);
+              }
+            });
           }}
           data-testid="resend-address-link"
         >

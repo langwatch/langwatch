@@ -157,7 +157,15 @@ export function cancelPasskeyCeremony(): void {
   current?.cancel();
 }
 
-/** Try the same ceremony again from the unanswered state. */
+/**
+ * Try the same ceremony again from the unanswered state.
+ *
+ * `cancel` is deliberately NOT called here, even though it is what marks an
+ * attempt abandoned: cancelling is declining, and it hands the person to the
+ * other ways in — which is the opposite of what "Try again" means. Standing
+ * the previous attempt down is the caller's to do when it starts the next
+ * one; see `dial` in `PasskeySignInButton`.
+ */
 export function retryPasskeyCeremony(): void {
   const current = live;
   endPasskeyCeremony();

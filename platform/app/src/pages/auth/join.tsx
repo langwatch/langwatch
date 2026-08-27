@@ -102,16 +102,25 @@ export default function Join() {
   // A lookup we could not make is not a lookup that found nothing. Say so and
   // leave the explicit choice, rather than quietly carrying on to workspace
   // creation as though this person had no colleagues here.
-  if (lookup.isError) {
+  //
+  // `mine` is held to the same rule, and was not: an errored read left
+  // `pendingOrganizationId` null, so the page skipped the awaiting-approval
+  // branch and offered "Join <org>" to somebody who had already asked. The
+  // button then threw `join_request_already_pending` and toasted "Couldn't
+  // ask to join" — the same guess this comment forbids, one query over.
+  if (lookup.isError || mine.isError) {
     return (
       <AuthShell>
         <JoinStage />
         <AuthCard title="We couldn't check for your colleagues">
           <VStack width="full" align="stretch" gap="14px">
             <HandledErrorAlert
-              error={lookup.error}
+              error={lookup.error ?? mine.error}
               fallbackTitle="We couldn't check for your colleagues"
-              onRetry={() => void lookup.refetch()}
+              onRetry={() => {
+                if (lookup.isError) void lookup.refetch();
+                if (mine.isError) void mine.refetch();
+              }}
             />
             <Button
               variant="ghost"

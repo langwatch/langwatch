@@ -122,6 +122,14 @@ export function PasskeySignInButton({
   const dial = () => {
     onError(null);
     setIsBusy(true);
+    // THE ONE BEING REPLACED IS ABANDONED. "Try again" starts a second
+    // ceremony while the first prompt may still be open in the system UI —
+    // and `cancel` is the only other thing that marks an attempt abandoned,
+    // but cancelling is declining and would hand the person to the other ways
+    // in. Without this the old attempt resolved when its prompt was finally
+    // dismissed, announced its refusal onto the card, and tore down the panel
+    // belonging to the ceremony still in flight.
+    if (attempt.current) attempt.current.abandoned = true;
     const current = { abandoned: false };
     attempt.current = current;
     startPasskeyCeremony({

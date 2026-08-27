@@ -3,6 +3,27 @@ import { explainAnyError } from "~/features/errors/logic/presentation";
 import { authClient } from "~/utils/auth-client";
 
 /**
+ * The query parameter that says an `?error=` on this page belongs to a test
+ * sign-in, and to WHICH connection's.
+ *
+ * `error`/`error_description` is the shape every OAuth bounce uses, and this
+ * hook lives on ordinary app routes that other flows land on — so without a
+ * marker of our own, any error parameter on the page was reported as the
+ * identity provider bouncing this test back, quoting somebody else's code.
+ */
+const TEST_SIGN_IN_MARKER = "ssoTest";
+
+/** Where the provider returns to: this page, marked as this test's. */
+const testSignInCallbackUrl = (connectionId: string): string => {
+  const here = new URL(window.location.href);
+  // Any verdict on the URL now is about to be replaced by this attempt's.
+  here.searchParams.delete("error");
+  here.searchParams.delete("error_description");
+  here.searchParams.set(TEST_SIGN_IN_MARKER, connectionId);
+  return here.toString();
+};
+
+/**
  * Sending yourself to the identity provider and back, from anywhere that
  * offers it.
  *
@@ -55,6 +76,14 @@ export function useTestSignIn({ connectionId }: { connectionId: string }) {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("error");
       if (!code) return null;
+      // OURS, or somebody else's. `error`/`error_description` is the shape
+      // every OAuth bounce uses, and this hook is mounted on ordinary app
+      // routes that other flows land on — the auth error page and the generic
+      // callback both read the same keys. Without a marker of our own, any
+      // `?error=` on the page was reported to an administrator as "your
+      // identity provider sent you back with an error", quoting somebody
+      // else's code at them.
+      if (params.get(TEST_SIGN_IN_MARKER) !== connectionId) return null;
       const description = params.get("error_description");
       return {
         title: "Your identity provider sent you back with an error",
@@ -73,8 +102,9 @@ export function useTestSignIn({ connectionId }: { connectionId: string }) {
     try {
       const { error } = await authClient.signIn.sso({
         providerId: connectionId,
-        // Back to this page, so the result is the first thing they see.
-        callbackURL: window.location.href,
+        // Back to this page, so the result is the first thing they see —
+        // carrying the marker that says an error on it is THIS test's.
+        callbackURL: testSignInCallbackUrl(connectionId),
       });
       if (error) setStartFailure(startFailureFrom(error));
     } catch (error) {

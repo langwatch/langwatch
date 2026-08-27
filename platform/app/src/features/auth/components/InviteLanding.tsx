@@ -232,6 +232,17 @@ function SignedOutInvite({
           ? `${inviterName} invited you to ${organizationName} on LangWatch.`
           : `You have been invited to ${organizationName} on LangWatch.`}
       </Text>
+      {/* A ROUTING FAILURE IS NOT AN EMPTY METHOD SET. Rendering null on a
+          null decision left the invitee looking at "X invited you to Y" with
+          no way in at all — no methods, no create-account link (that lives
+          inside the picker), no error and no retry — until they reloaded and
+          got lucky. The endpoint is rate limited per IP, so a shared office
+          network reaches this without anything being down. */}
+      <HandledErrorAlert
+        error={routing.error}
+        fallbackTitle="Couldn't load your sign-in options"
+        className="lw-auth-alert"
+      />
       {routing.decision ? (
         <SignInMethodPicker
           methodSet={routing.decision.methodSet}
@@ -262,7 +273,29 @@ function SignedOutInvite({
             </HStack>
           )}
         />
-      ) : null}
+      ) : routing.isDeciding ? null : (
+        // Neither an answer nor an error yet, or an answer that never came:
+        // the two links the picker would have drawn are the way on, so the
+        // invitation is never a dead end.
+        <HStack gap={4}>
+          <Box asChild>
+            <Link
+              href={`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+              style={{ textDecoration: "underline" }}
+            >
+              Sign in
+            </Link>
+          </Box>
+          <Box asChild>
+            <Link
+              href={`/auth/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+              style={{ textDecoration: "underline" }}
+            >
+              Create an account
+            </Link>
+          </Box>
+        </HStack>
+      )}
     </AuthCard>
   );
 }
