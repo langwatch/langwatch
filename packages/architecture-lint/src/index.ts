@@ -1,5 +1,6 @@
 import { relative, resolve } from "node:path";
 import { lintApplicationBoundaries } from "./application-boundaries";
+import { lintApiTransportBoundaries } from "./api-transport-boundaries";
 import { lintArchitectureRecords } from "./architecture-records";
 import { lintCycles } from "./cycles";
 import { changedSourceFiles, lintCommentBlocks } from "./comment-blocks";
@@ -30,6 +31,7 @@ export type {
   PackageKind,
 } from "./types";
 export { readFeatureCatalogue } from "./feature-catalogue";
+export { lintApiTransportBoundaries } from "./api-transport-boundaries";
 export { changedSourceFiles, lintCommentBlocks } from "./comment-blocks";
 export type {
   CommentBlockLintOptions,
@@ -101,6 +103,7 @@ export function lintWorkspace(
     ...lintApplicationBoundaries(root, discovery.packages, {
       legacyMigration: options.legacyApplicationMigration !== false,
     }),
+    ...lintApiTransportBoundaries(root, discovery.packages),
     ...lintPrismaBoundaries(discovery.packages),
     ...lintServiceResultContracts(discovery.packages),
     ...lintServiceProjectionBoundaries(discovery.packages),
