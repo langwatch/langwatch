@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-27
 
-**Committed baseline:** `d191ef8c32`
+**Committed baseline:** `1f0ee01ec9`
 
 **Goal:** delete `platform/app`.
 
@@ -24,8 +24,8 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Ledger item                                          |       Count | Status                                |
 | ---------------------------------------------------- | ----------: | ------------------------------------- |
 | Original application baseline                       | 6,398 files | Reference                             |
-| Committed `platform/app` at `d191ef8c32`             | 5,991 files | Authoritative current progress        |
-| Current physical tree from `rg --files platform/app` | 5,898 files | Working-tree queue only; not progress |
+| Committed `platform/app` at `1f0ee01ec9`             | 5,894 files | Authoritative current progress        |
+| Current physical tree from `rg --files platform/app` | 5,896 files | Working tree includes new adapters    |
 | Automation cut                                       |    73 fewer | Committed                             |
 | Coding Agent/GitHub cut                              |    36 fewer | Committed                             |
 | Trace processing cut                                 |    45 fewer | Committed                             |
@@ -35,6 +35,9 @@ git ls-tree -r --name-only HEAD platform/app | wc -l
 | Workflow application cut                             |     3 fewer | Committed                             |
 | Feature-web and Ops composition cuts                 |     5 fewer | Committed                             |
 | Legacy Feature Flag cut                              |    21 fewer | Committed                             |
+| Gateway persistence and policy cut                   |    47 fewer | Committed                             |
+| Trace projection-persistence cut                      |     8 fewer | Committed                             |
+| Topic clustering application cut                     |    39 fewer | Committed                             |
 
 The Automation contract, server and web packages have 559 passing tests, and
 their displaced application roots are empty. Coding Agent/GitHub has 266
@@ -51,11 +54,12 @@ cutovers remain explicit ledger work.
 | Area          | Current fact                                                                                                                                                                                                                                                                | Exit condition                                                                                                                                                                                                                                                         |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Trace process | The 154-file cut is committed at `ef6c41f1f7`: `+2,208/-12,378`, for a net 45-file application reduction. The required Eventing preparation seam is committed at `cb5feeb6aa`. Old schema imports are zero; Coding tests pass 266/266 and Trace server typechecks. | Keep the remaining 18 files only while their named composition/effect responsibilities exist; delete each as its owning feature or worker composition moves. |
-| Trace reads   | At committed `HEAD`, `server/app-layer/traces` and `server/traces` remain large and are not one safe move. The 11-file projection-persistence cut is active.                                                                                                            | Cut dependency-closed read cohorts while preserving every response field and keeping `trace_analytics`, `trace_summaries` and timeseries rollups distinct. |
+| Trace reads   | The 11-file projection-persistence move is committed at `64e18e11a6`; Trace server typecheck and 633 tests pass. `trace_analytics`, `trace_summaries` and timeseries rollups remain separate repositories and tables.                                                        | Move the query/facet compiler, then edit/protection and usage cohorts while preserving every response field and query semantic. |
 | Evaluation    | Evaluation processing is committed at `d4f11f4da7`: 67 files, `+1,304/-8,875`, for a net 42-file application reduction. Package implementation is checkpointed separately at `48585548d6`.                                                                            | Prove the focused package/app checks, then drain remaining execution, evaluator, monitor and transport callers without collapsing the distinct Evaluation/Evaluator/Monitor/Experiment/Scenario/Simulation/Suite owners. |
 | Langy         | Langy package work is committed at `086250abca`; its 120-file application cut is committed at `b1599b2080`: `+1,001/-10,163`, for a net 37-file application reduction.                                                                                               | Prove the focused feature/app checks, then move the remaining eventing pipeline and UI composition without restoring app-layer services. |
 | Model Provider | Model Provider package work is committed at `435d8711d0`; its 130-file application cut is committed at `14fc0f4282`: `+1,315/-30,905`, for a net 45-file application reduction.                                                                                      | Prove the focused feature/app checks, then move the remaining UI and process composition without restoring the deleted repositories, catalogue or service. |
-| Gateway       | Gateway package implementation is checkpointed at `9b03f579ee`; the application cutover is active.                                                                                                                                                                   | Rewire the composed service graph, preserve money/auth/query behavior and delete the displaced Gateway, virtual-key, spend and realtime implementation. |
+| Gateway       | Package ownership starts at `9b03f579ee`; the 137-file app cut is committed at `e1ff7b9f3f`, deleting 47 net application files. Gateway package typecheck, 128 server tests and 12 contract tests pass. Twenty app service modules remain.                                  | Move the remaining virtual-key, config/materialisation, guardrail, cache and realtime collaborators behind the same canonical Gateway service; remove the final `getApp` route. |
+| Topic         | Package ownership is committed at `ee3c64f882`; the 56-file app cut is committed at `1f0ee01ec9`, deleting both old roots and 39 net application files. Topic typechecks and 157 tests pass. Docker integration was unavailable.                                              | Clear the strict-layout and relocated task/test import findings without restoring app business logic; rerun Testcontainers integration where Docker exists. |
 | API framework | The first-class REST surface is committed package-only at `755db4b875`. No caller uses it. Its package checks pass, but its RPC and REST builder types still need separating before adoption.                                                                          | During the `apps/api` cut, adopt mandatory Zod input/output schemas and `/api/v1/{service}/{optional date-or-latest}/{endpoint}`, with the date version also accepted by header. Do not churn current routes first. |
 | Feature Flag  | The canonical package is committed at `607f5e728e`; the 23-file legacy cleanup is committed at `d191ef8c32`, deleting the old server implementation and PostHog local-evaluation copy. Source imports of the old boundary are zero.                                                | Move the remaining browser/API/worker composition during the physical app split; do not restore app-owned flag rules, stores or services. |
 
@@ -67,18 +71,19 @@ status changes when a named proof or commit changes.
 
 The next committed batches are:
 
-1. **Trace projection persistence:** move the 11 repository/adapter files for
-   Trace summaries, Trace analytics and analytics rollups without merging their
-   tables or query semantics.
-2. **Gateway application cutover:** delete the displaced Gateway, spend,
-   virtual-key and realtime implementation after caller rewiring.
-3. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
+1. **Evaluator and Monitor:** finish the active application cutover while
+   keeping Evaluation, Evaluator and Monitor as separate services.
+2. **Experiment:** move run processing, its process manager/projections and
+   compatibility transports with the Experiment feature.
+3. **Scenario, Simulation and Suite:** move each singular service and its own
+   eventing/runtime slice; do not merge the three because their callers overlap.
+4. **Trace query and facet compiler:** move the 34-file filter/facet compiler as
    one dependency-closed read-side collaborator.
-4. **Trace edit overlay and protection:** move the 18-file edit/protection core
+5. **Trace edit overlay and protection:** move the 18-file edit/protection core
    and its behavioural coverage.
-5. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
+6. **Trace usage readers:** move the five usage-owned readers to Usage/Billing,
    not into the Trace service merely because they currently live under Trace.
-6. **API composition:** adopt the parked REST surface when `apps/api` is
+7. **API composition:** adopt the parked REST surface when `apps/api` is
    created; do not churn current routes before that physical cut.
 
 The remainder of Evaluation and the other feature slices remain open. They are
