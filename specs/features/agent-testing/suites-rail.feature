@@ -50,7 +50,7 @@ Feature: The test suites rail
   Scenario: The Default suite carries the actions of an ordinary suite
     Given the Default test suite in the rail
     When its row menu is opened
-    Then "New scenario", "Run suite", "Edit suite" and "Archive suite" are offered
+    Then "New scenario", "Run suite", "Rename" and "Archive suite" are offered
     And nothing marks it as unchangeable
 
   @integration
@@ -81,7 +81,7 @@ Feature: The test suites rail
   Scenario: The row menu of a test suite offers its five actions in order
     Given a test suite in the rail
     When its row menu is opened
-    Then the actions read, in order: "New scenario", "Run suite", "Edit suite", "Open last run", "Archive suite"
+    Then the actions read, in order: "New scenario", "Run suite", "Rename", "Open last run", "Archive suite"
 
   @integration
   Scenario: Open last run goes straight to the last run of that suite
@@ -110,47 +110,48 @@ Feature: The test suites rail
     Then the first remaining suite is open
     And no empty view is shown in between
 
-  # --- The suite editor ---
+  # --- Renaming a test suite ---
 
   @integration
-  Scenario: Edit suite opens a small centered dialog holding only a Name field
+  Scenario: Rename opens a small centered dialog holding only a Name field
     Given a test suite in the rail
-    When "Edit suite" is chosen from its row menu
-    Then a small centered dialog opens titled "Edit test suite"
+    When "Rename" is chosen from its row menu
+    Then a small centered dialog opens titled "Rename test suite"
+    And the name of that suite is already in the field
     And the only field it holds is "Name"
     And it is sized to what it holds
 
   @integration
-  Scenario: The suite editor carries no targets, no models, no repeat count and no evaluators
-    Given the suite editor is open on a test suite
+  Scenario: The name dialog carries no targets, no models, no repeat count and no evaluators
+    Given the name dialog is open on a test suite
     When it is read
     Then no agent, no simulation model, no judge, no repeat count and no evaluator is offered
     And no tab strip is shown, because a suite is only a grouping
 
   @integration
-  Scenario: The suite editor does not manage which scenarios are in the suite
-    Given the suite editor is open on a test suite
+  Scenario: The name dialog does not manage which scenarios are in the suite
+    Given the name dialog is open on a test suite
     When it is read
     Then it lists no scenarios and offers no way to add or remove one
     And membership stays in the scenarios table, where "Move to suite..." changes it
 
   @integration
-  Scenario: Saving the suite editor renames the suite
-    Given the suite editor is open on the suite "Refunds"
+  Scenario: Saving the name dialog renames the suite
+    Given the name dialog is open on the suite "Refunds"
     When the name is changed to "Refunds and returns" and saved
     Then the rail reads the new name
     And the dialog closes
 
   @integration
-  Scenario: The suite editor refuses an empty name
-    Given the suite editor is open on a test suite
+  Scenario: The name dialog refuses an empty name
+    Given the name dialog is open on a test suite
     When the name is cleared and saved
     Then the dialog says a test suite needs a name
     And nothing is saved
 
   @integration
-  Scenario: The suite editor offers no destructive action
-    Given the suite editor is open on a test suite
+  Scenario: The name dialog offers no destructive action
+    Given the name dialog is open on a test suite
     When its actions are read
     Then only "Cancel" and "Save" are offered
     And archiving stays in the row menu of the rail, where it already was
@@ -160,7 +161,7 @@ Feature: The test suites rail
     Given a person with read-only access to the project
     When a test suite row menu is opened
     Then "Open last run" is the only action offered
-    And "New scenario", "Run suite", "Edit suite" and "Archive suite" are not offered
+    And "New scenario", "Run suite", "Rename" and "Archive suite" are not offered
 
   # --- Selection ---
 

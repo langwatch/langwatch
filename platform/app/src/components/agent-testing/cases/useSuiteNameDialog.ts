@@ -1,6 +1,6 @@
 /**
- * The one dialog that names a test suite, opened from the rail, from the panel
- * header and from the day-zero empty state.
+ * The one dialog that names a test suite, opened from the rail, from the name
+ * above the cases table and from the day-zero empty state.
  *
  * It is one dialog and not two because creating and renaming ask the same
  * question. Which of the two it is reads off the suite it was opened on.
@@ -17,7 +17,7 @@ export type SuiteNameDialogModel = {
   /** The suite being renamed, or nothing while one is being created. */
   suite: TestSuiteEntry | null;
   openNew: () => void;
-  openEdit: (suiteId: string) => void;
+  openRename: (suiteId: string) => void;
   close: () => void;
   confirm: (name: string) => void;
 };
@@ -53,7 +53,7 @@ export function useSuiteNameDialog({
     isOpen: openOn !== undefined,
     suite,
     openNew: useCallback(() => setOpenOn(null), []),
-    openEdit: useCallback((suiteId: string) => setOpenOn(suiteId), []),
+    openRename: useCallback((suiteId: string) => setOpenOn(suiteId), []),
     close,
     confirm,
   };

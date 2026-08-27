@@ -6,31 +6,25 @@
  */
 
 import { Badge, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
-import {
-  ChevronRight,
-  Folder,
-  FolderCode,
-  Pencil,
-  Play,
-  Plus,
-} from "lucide-react";
+import { ChevronRight, Folder, FolderCode, Play, Plus } from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
 import type { CasesPanelProps } from "./CasesPanel";
+import { SuiteNameHeading } from "./SuiteNameHeading";
 
 export type CasesPanelHeaderProps = Pick<
   CasesPanelProps,
   | "title"
   | "canManage"
-  | "hasSuite"
+  | "suite"
   | "allLabels"
   | "activeLabels"
   | "onToggleLabel"
   | "isRunningSet"
   | "onRunSet"
   | "onNewTestCase"
-  | "onEditSuite"
+  | "onRenameSuite"
   | "onOpenExternalResults"
 > & {
   /** True for a set that runs from code, which the platform cannot write. */
@@ -41,7 +35,7 @@ export type CasesPanelHeaderProps = Pick<
 export function CasesPanelHeader(props: CasesPanelHeaderProps) {
   // Day zero has no suite to name, so the header stays out of the way and the
   // body asks the one question there is to ask.
-  if (!props.isExternal && !props.hasSuite) return null;
+  if (!props.isExternal && !props.suite) return null;
 
   return (
     <HStack gap={2} minHeight="32px" flexWrap="wrap">
@@ -50,9 +44,12 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
         boxSize="15px"
         color={FG_MUTED}
       />
-      <Text fontSize="14px" fontWeight="semibold" color="fg">
-        {props.title}
-      </Text>
+      <SuiteNameHeading
+        name={props.title}
+        onRename={
+          !props.isExternal && props.canManage ? props.onRenameSuite : undefined
+        }
+      />
       <Text fontSize="11.5px" color={FG_MUTED}>
         {props.caseCount} {props.caseCount === 1 ? "scenario" : "scenarios"}
       </Text>
@@ -84,7 +81,6 @@ function CasesPanelActions({
   isRunningSet,
   onRunSet,
   onNewTestCase,
-  onEditSuite,
   allLabels,
   activeLabels,
   onToggleLabel,
@@ -93,22 +89,12 @@ function CasesPanelActions({
   | "isRunningSet"
   | "onRunSet"
   | "onNewTestCase"
-  | "onEditSuite"
   | "allLabels"
   | "activeLabels"
   | "onToggleLabel"
 >) {
   return (
     <>
-      <SmallButton
-        variant="ghost"
-        background="transparent"
-        borderColor="transparent"
-        onClick={onEditSuite}
-      >
-        <Pencil size={13} />
-        Edit suite
-      </SmallButton>
       {allLabels.length > 0 && (
         <LabelFilterDropdown
           allLabels={allLabels}

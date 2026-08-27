@@ -2,8 +2,8 @@
  * Asks for the name of a test suite, and nothing else.
  *
  * A suite is only a grouping: it carries no targets, no repeat count, no
- * simulation models and no evaluators, so naming it is the whole editor. The
- * same dialog creates one and renames one.
+ * simulation models and no evaluators, so naming it is the whole of editing
+ * one. The same dialog creates one and renames one.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/suite-folders.feature
@@ -64,7 +64,7 @@ export function SuiteNameDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            {isEditing ? "Edit test suite" : "New test suite"}
+            {isEditing ? "Rename test suite" : "New test suite"}
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>

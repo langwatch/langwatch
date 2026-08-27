@@ -15,7 +15,7 @@ export type SuiteRailMenuProps = {
   hasRun: boolean;
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
-  onEditSuite: (suiteId: string) => void;
+  onRenameSuite: (suiteId: string) => void;
   onOpenLastRun: (suite: TestSuiteEntry) => void;
   onArchiveSuite: () => void;
 };
@@ -79,7 +79,7 @@ export function SuiteRailMenu({
   hasRun,
   onNewTestCase,
   onRunSuite,
-  onEditSuite,
+  onRenameSuite,
   onOpenLastRun,
   onArchiveSuite,
 }: SuiteRailMenuProps) {
@@ -107,10 +107,10 @@ export function SuiteRailMenu({
         )}
         {canManage && (
           <SuiteMenuItem
-            value="edit-suite"
-            onChoose={() => onEditSuite(suite.id)}
+            value="rename-suite"
+            onChoose={() => onRenameSuite(suite.id)}
           >
-            Edit suite
+            Rename
           </SuiteMenuItem>
         )}
         {hasRun && (

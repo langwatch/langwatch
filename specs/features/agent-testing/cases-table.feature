@@ -18,8 +18,12 @@ Feature: The scenarios table
     One test suite is always open, so the rows are always flat. There is no
     root list of suites: the rail already lists them.
 
-    A summary line under the table says when the suite last ran and how it
-    did.
+    The name of the open suite reads above the table, with the control that
+    renames it. A test suite carries only a name, so renaming is the whole of
+    editing one, and no "Edit suite" button is offered.
+
+    Under the table sits one button, "Open recent run". It drops a short list
+    of the recent runs of that suite, and choosing one opens that run.
 
   # --- Which suite is open ---
 
@@ -60,6 +64,14 @@ Feature: The scenarios table
     Given a scenario row
     When the leading edge of the row is read
     Then no file icon is drawn before the title
+
+  @integration
+  Scenario: Labels are shown as small pastel pills beside the name
+    Given a scenario with the labels "critical" and "billing"
+    When its row is read
+    Then each label is drawn as a small pill beside the name
+    And each pill carries a colour of its own, so two labels never read alike
+    And the pills stay quieter than the name of the scenario
 
   @integration
   Scenario: The cases table shows the scenario column and the row actions, and no last result
@@ -213,15 +225,82 @@ Feature: The scenarios table
     When "critical" is chosen in the label filter
     Then only the cases with that label are listed
 
-  # --- The summary line ---
+  # --- Renaming the open suite ---
 
   @integration
-  Scenario: A borderless line under the table says when the suite last ran
+  Scenario: The name of the open suite carries a rename control
+    Given the suite "Refunds" is open
+    When the line above the table is read
+    Then a rename control sits beside the name
+    And choosing it opens the name dialog on "Refunds"
+
+  @integration
+  Scenario: The rename control is reachable from the keyboard
+    Given the suite "Refunds" is open
+    When the rename control is asked for keyboard focus
+    Then it takes the focus
+    And a person who uses no pointer can still rename the suite
+
+  @integration
+  Scenario: No Edit suite button sits above the table
+    Given the suite "Refunds" is open
+    When the line above the table is read
+    Then no button reads "Edit suite"
+
+  @integration
+  Scenario: A person with read-only access is offered no rename control
+    Given a person with read-only access to the project
+    When the line above the table is read
+    Then no rename control is offered
+
+  # --- Recent runs ---
+
+  @integration
+  Scenario: One button under the table opens a recent run of the suite
     Given a test suite with a finished run
     When that suite is opened
-    Then a line under the table reads "Last run on" with the date of that run
-    And the date sits directly left of the result of the whole suite
-    And nothing else sits on the line between them
+    Then a button under the table reads "Open recent run"
+    And no line under the table reads "Last run on"
+
+  @integration
+  Scenario: The list names the recent runs of that suite, newest first
+    Given a test suite with three finished runs
+    When "Open recent run" is opened
+    Then the three runs are listed newest first
+    And each row reads the number of the run, how long ago it started and how it did
+
+  @integration
+  Scenario: A row of the list stays short
+    Given the recent runs list is open on a run that passed
+    When one row is read
+    Then it holds the number of the run, the time and the pass rate, and nothing else
+    And the list stays a way into a run and not a second results table
+
+  @integration
+  Scenario: A run that is still going reads as running
+    Given a test suite whose newest run has scenarios left to judge
+    When "Open recent run" is opened
+    Then that row reads "running" in place of a pass rate
+
+  @integration
+  Scenario: Choosing a run opens it on the Results tab
+    Given the recent runs list is open on the suite "Refunds"
+    When one of the runs is chosen
+    Then the address names the Results tab, the plan of that suite and that run
+    And the page is not reloaded, so a live run keeps streaming
+
+  @integration
+  Scenario: A suite with no run in the period offers no recent runs button
+    Given a test suite with no run in the period
+    When that suite is opened
+    Then no "Open recent run" button is shown
+
+  @integration
+  Scenario: The runs are read only when the list is opened
+    Given a test suite with a finished run
+    When that suite is opened and the list is left closed
+    Then the runs of the suite are not read
+    And opening the list reads them
 
   # --- Empty states ---
 

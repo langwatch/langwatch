@@ -67,7 +67,7 @@ function renderRail(
     onNewSuite: vi.fn(),
     onNewTestCase: vi.fn(),
     onRunSuite: vi.fn(),
-    onEditSuite: vi.fn(),
+    onRenameSuite: vi.fn(),
     onOpenLastRun: vi.fn(),
     onArchiveSuite: vi.fn(),
     period: THIRTY_DAYS,
@@ -193,7 +193,7 @@ describe("the test suites rail", () => {
     expect(items).toEqual([
       "New scenario",
       "Run suite",
-      "Edit suite",
+      "Rename",
       "Open last run",
       "Archive suite",
     ]);
@@ -256,7 +256,7 @@ describe("the test suites rail", () => {
     expect(items).toEqual([
       "New scenario",
       "Run suite",
-      "Edit suite",
+      "Rename",
       "Open last run",
       "Archive suite",
     ]);
@@ -406,7 +406,7 @@ describe("the test suites rail", () => {
       setId: "nightly-ci",
     });
     expect(
-      screen.queryByRole("menuitem", { name: "Edit suite" }),
+      screen.queryByRole("menuitem", { name: "Rename" }),
     ).not.toBeInTheDocument();
   });
 
@@ -427,18 +427,18 @@ describe("the test suites rail", () => {
       return { props };
     }
 
-    /** @scenario "Edit suite opens a small centered dialog holding only a Name field" */
+    /** @scenario "Rename opens a small centered dialog holding only a Name field" */
     it("opens a small centered dialog holding only a Name field", () => {
       renderEditor();
 
       const dialog = screen.getByTestId("agent-testing-suite-name-dialog");
-      expect(within(dialog).getByText("Edit test suite")).toBeInTheDocument();
+      expect(within(dialog).getByText("Rename test suite")).toBeInTheDocument();
       const name = within(dialog).getByLabelText("Test suite name");
       expect(name).toHaveValue("Refunds");
       expect(within(dialog).getAllByRole("textbox")).toHaveLength(1);
     });
 
-    /** @scenario "The suite editor carries no targets, no models, no repeat count and no evaluators" */
+    /** @scenario "The name dialog carries no targets, no models, no repeat count and no evaluators" */
     it("carries no targets, no models, no repeat count and no tab strip", () => {
       renderEditor();
 
@@ -458,7 +458,7 @@ describe("the test suites rail", () => {
       expect(within(dialog).queryByRole("spinbutton")).not.toBeInTheDocument();
     });
 
-    /** @scenario "The suite editor does not manage which scenarios are in the suite" */
+    /** @scenario "The name dialog does not manage which scenarios are in the suite" */
     it("lists no scenarios and offers no way to add or remove one", () => {
       renderEditor();
 
@@ -470,7 +470,7 @@ describe("the test suites rail", () => {
       expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
-    /** @scenario "Saving the suite editor renames the suite" */
+    /** @scenario "Saving the name dialog renames the suite" */
     it("renames the suite on save", async () => {
       const user = userEvent.setup();
       const { props } = renderEditor();
@@ -483,7 +483,7 @@ describe("the test suites rail", () => {
       expect(props.onConfirm).toHaveBeenCalledWith("Refunds and returns");
     });
 
-    /** @scenario "The suite editor refuses an empty name" */
+    /** @scenario "The name dialog refuses an empty name" */
     it("refuses an empty name and saves nothing", async () => {
       const user = userEvent.setup();
       const { props } = renderEditor();
@@ -497,7 +497,7 @@ describe("the test suites rail", () => {
       expect(props.onConfirm).not.toHaveBeenCalled();
     });
 
-    /** @scenario "The suite editor offers no destructive action" */
+    /** @scenario "The name dialog offers no destructive action" */
     it("offers only Cancel and Save", () => {
       renderEditor();
 

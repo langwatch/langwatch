@@ -25,7 +25,11 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       isLastResultsLoading={data.isLastResultsLoading}
       suites={data.suites}
       canManage={base.canManage}
-      hasSuite={!!selectedSuite}
+      suite={selectedSuite}
+      suiteHasRun={
+        !!selectedSuite && data.suiteIdsWithRuns.has(selectedSuite.id)
+      }
+      period={base.periodPicker.period}
       hasAgent={data.hasAgent}
       projectHasNoCases={data.cases.length === 0}
       allLabels={collectLabels(data.cases)}
@@ -50,8 +54,8 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       onOpenExternalResults={() =>
         base.selectPlan(toExternalPlanSlug(view.externalSetId))
       }
-      onEditSuite={() => {
-        if (selectedSuite) suiteDialog.openEdit(selectedSuite.id);
+      onRenameSuite={() => {
+        if (selectedSuite) suiteDialog.openRename(selectedSuite.id);
       }}
     />
   );

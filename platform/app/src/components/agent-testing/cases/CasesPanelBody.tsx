@@ -1,7 +1,8 @@
 /**
  * What sits under the cases panel header: the skeleton, an empty state, or
- * the table with the last-run line beneath it. The bulk selection action bar
- * lives here too, so the selection state does not leak into the tab model.
+ * the table with the recent runs control beneath it. The bulk selection
+ * action bar lives here too, so the selection state does not leak into the
+ * tab model.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -20,8 +21,8 @@ import {
   CasesTableSkeleton,
   ExternalCasesTable,
 } from "./CasesTable";
-import { LastRunLine } from "./LastRunLine";
 import { MoveToSuiteSelectionBar } from "./MoveToSuiteSelectionBar";
+import { RecentRunsMenu } from "./RecentRunsMenu";
 import type { TestCase } from "./test-cases";
 
 export type CasesPanelBodyProps = CasesPanelProps & {
@@ -125,7 +126,7 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
     );
   }
 
-  if (!props.hasSuite) return <DayZeroEmptyState {...props} />;
+  if (!props.suite) return <DayZeroEmptyState {...props} />;
 
   if (props.cases.length === 0) {
     return props.projectHasNoCases ? (
@@ -157,7 +158,11 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         onOpenLastRun={props.onOpenLastRun}
         onArchive={props.onArchive}
       />
-      <LastRunLine cases={props.cases} lastResults={props.lastResults} />
+      <RecentRunsMenu
+        suite={props.suite}
+        period={props.period}
+        hasRun={props.suiteHasRun}
+      />
       <MoveToSuiteSelectionBar
         selectedCount={selectedIds.size}
         suites={props.suites}

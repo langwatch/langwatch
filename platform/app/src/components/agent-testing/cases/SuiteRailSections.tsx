@@ -92,7 +92,7 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
                 hasRun={props.suiteIdsWithRuns.has(suite.id)}
                 onNewTestCase={props.onNewTestCase}
                 onRunSuite={props.onRunSuite}
-                onEditSuite={props.onEditSuite}
+                onRenameSuite={props.onRenameSuite}
                 onOpenLastRun={props.onOpenLastRun}
                 onArchiveSuite={() => props.onRequestArchive(suite)}
               />

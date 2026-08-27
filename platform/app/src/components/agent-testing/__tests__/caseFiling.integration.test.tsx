@@ -59,6 +59,10 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
+        // The run dialog reads the configurations its scope already ran with.
+        getRunConfigurations: {
+          useQuery: () => ({ data: [], isLoading: false }),
+        },
         getAll: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
@@ -72,6 +76,8 @@ vi.mock("~/utils/api", () => ({
       getExternalSetSummaries: { useQuery: emptyQuery },
       getLastResultSummaries: { useQuery: mockLastResults },
       getScenarioSetRunData: { useQuery: emptyQuery },
+      getSuiteRunData: { useQuery: emptyQuery },
+      getScenarioSetBatchRunCount: { useQuery: emptyQuery },
       archive: { useMutation: mutation(mockArchiveScenario) },
       duplicate: { useMutation: mutation(vi.fn()) },
       moveToFolder: { useMutation: mutation(vi.fn()) },

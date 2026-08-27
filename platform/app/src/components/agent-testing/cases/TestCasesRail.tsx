@@ -27,7 +27,7 @@ export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
       onNewSuite={suiteDialog.openNew}
       onNewTestCase={(suiteId) => base.onNewTestCase(suiteId)}
       onRunSuite={run.runSuiteById}
-      onEditSuite={suiteDialog.openEdit}
+      onRenameSuite={suiteDialog.openRename}
       onOpenLastRun={(suite) => base.selectPlan(suite.slug)}
       onArchiveSuite={suiteMutations.archiveSuite}
       isArchiving={suiteMutations.isArchiving}

@@ -9,25 +9,42 @@
  * @see specs/scenarios/scenario-folder-assignment.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, renderHook, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  renderHook,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { CasesPanel } from "../cases/CasesPanel";
 import type { CaseLastResult } from "../cases/CasesTable";
 import type { TestCase, TestSuiteEntry } from "../cases/test-cases";
+import { useSuiteRecentRuns } from "../cases/useSuiteRecentRuns";
 import { useTestCasesView } from "../cases/useTestCasesView";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
+
+const suiteRunDataQuery = vi.hoisted(() => vi.fn());
+const batchRunCountQuery = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getScenarioSetRunData: {
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
+      getSuiteRunData: { useQuery: suiteRunDataQuery },
+      getScenarioSetBatchRunCount: { useQuery: batchRunCountQuery },
     },
   },
 }));
@@ -39,13 +56,24 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+const routerPush = vi.hoisted(() => vi.fn());
+
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
+  useRouter: () => ({
+    query: { project: "test-project" },
+    push: routerPush,
+    isReady: true,
+  }),
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+const PERIOD = {
+  startDate: new Date("2026-07-01T00:00:00.000Z"),
+  endDate: new Date("2026-07-31T00:00:00.000Z"),
+};
 
 const DEFAULT_SUITE: TestSuiteEntry = {
   id: "suite_default",
@@ -106,7 +134,9 @@ function panelProps(
     isLastResultsLoading: false,
     suites: [REFUNDS, CHECKOUT],
     canManage: true,
-    hasSuite: true,
+    suite: REFUNDS,
+    suiteHasRun: true,
+    period: PERIOD,
     hasAgent: true,
     projectHasNoCases: false,
     allLabels: [],
@@ -126,9 +156,89 @@ function panelProps(
     onArchive: vi.fn(),
     onOpenExternalCase: vi.fn(),
     onOpenExternalResults: vi.fn(),
-    onEditSuite: vi.fn(),
+    onRenameSuite: vi.fn(),
     ...overrides,
   };
+}
+
+/**
+ * Far enough back that the reading of "now" the page took when it loaded is
+ * still two whole hours after it, however long the test itself takes.
+ */
+const TWO_HOURS_AGO = Date.now() - 2 * 60 * 60 * 1000 - 60_000;
+
+function makeSuiteRun(
+  overrides: Partial<ScenarioRunData> = {},
+): ScenarioRunData {
+  return {
+    scenarioId: "case_1",
+    batchRunId: "batch_1",
+    scenarioRunId: "run_1",
+    name: "Double charge",
+    description: null,
+    metadata: null,
+    status: ScenarioRunStatus.SUCCESS,
+    results: null,
+    messages: [],
+    timestamp: TWO_HOURS_AGO,
+    durationInMs: 6300,
+    totalCost: 0.0042,
+    ...overrides,
+  } as ScenarioRunData;
+}
+
+/**
+ * Three batches, handed over oldest first on purpose. Putting them in order
+ * is the work the list does, so a fixture already in order would prove
+ * nothing. batch_1 holds one run that passed and one that failed.
+ */
+function threeRuns(): ScenarioRunData[] {
+  const day = 24 * 60 * 60 * 1000;
+  return [
+    makeSuiteRun({
+      batchRunId: "batch_1",
+      scenarioRunId: "run_1a",
+      timestamp: TWO_HOURS_AGO - 2 * day,
+    }),
+    makeSuiteRun({
+      batchRunId: "batch_1",
+      scenarioRunId: "run_1b",
+      status: ScenarioRunStatus.FAILED,
+      timestamp: TWO_HOURS_AGO - 2 * day,
+    }),
+    makeSuiteRun({
+      batchRunId: "batch_2",
+      scenarioRunId: "run_2",
+      timestamp: TWO_HOURS_AGO - day,
+    }),
+    makeSuiteRun({
+      batchRunId: "batch_3",
+      scenarioRunId: "run_3",
+      timestamp: TWO_HOURS_AGO,
+    }),
+  ];
+}
+
+function setRecentRuns(runs: ScenarioRunData[], batchCount: number) {
+  suiteRunDataQuery.mockReturnValue({ data: { runs }, isLoading: false });
+  batchRunCountQuery.mockReturnValue({ data: { count: batchCount } });
+}
+
+async function openRecentRuns(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByTestId("recent-runs-trigger"));
+  return await screen.findByTestId("recent-runs-list");
+}
+
+/** The pieces of text one row of the recent runs list is made of. */
+function readRow(row: HTMLElement): string[] {
+  return Array.from(row.querySelectorAll("p")).map(
+    (part) => part.textContent ?? "",
+  );
+}
+
+/** True for a read that was actually asked for rather than held back. */
+function isEnabledRead(call: unknown[]): boolean {
+  return (call[1] as { enabled?: boolean } | undefined)?.enabled === true;
 }
 
 function renderPanel(
@@ -160,10 +270,7 @@ function renderView({
   return renderHook(() =>
     useTestCasesView({
       selection,
-      period: {
-        startDate: new Date("2026-07-01T00:00:00.000Z"),
-        endDate: new Date("2026-07-31T00:00:00.000Z"),
-      },
+      period: PERIOD,
       suites,
       cases,
     }),
@@ -172,6 +279,14 @@ function renderView({
 
 describe("the scenarios table", () => {
   afterEach(cleanup);
+
+  beforeEach(() => {
+    routerPush.mockClear();
+    suiteRunDataQuery.mockReset();
+    batchRunCountQuery.mockReset();
+    suiteRunDataQuery.mockReturnValue({ data: undefined, isLoading: false });
+    batchRunCountQuery.mockReturnValue({ data: undefined });
+  });
 
   // --- Which suite is open ---
 
@@ -474,7 +589,10 @@ describe("the scenarios table", () => {
   it("opens the case editor when a row with no last run is clicked", async () => {
     const user = userEvent.setup();
     const testCase = makeCase();
-    const { props } = renderPanel({ cases: [testCase], lastResults: new Map() });
+    const { props } = renderPanel({
+      cases: [testCase],
+      lastResults: new Map(),
+    });
 
     await user.click(screen.getByText("Double charge"));
 
@@ -525,26 +643,192 @@ describe("the scenarios table", () => {
     expect(screen.queryByText("Late refund")).not.toBeInTheDocument();
   });
 
-  // --- The summary line ---
+  // --- Renaming the open suite ---
 
-  /** @scenario "A borderless line under the table says when the suite last ran" */
-  it("says under the table when the suite last ran and how it did", () => {
-    renderPanel({
-      cases: [makeCase()],
-      lastResults: new Map([["case_1", makeResult()]]),
+  describe("given the suite Refunds is open", () => {
+    /** @scenario "The name of the open suite carries a rename control" */
+    it("offers a rename control beside the name that opens the name dialog", async () => {
+      const user = userEvent.setup();
+      const { props } = renderPanel({ cases: [makeCase()] });
+
+      const rename = screen.getByRole("button", { name: "Rename test suite" });
+      // It sits with the name, not among the actions at the far end of the line.
+      expect(rename.parentElement).toHaveTextContent("Refunds");
+
+      await user.click(rename);
+      expect(props.onRenameSuite).toHaveBeenCalled();
     });
 
-    const line = screen.getByTestId("cases-last-run-line");
-    expect(line).toHaveTextContent("Last run on Jul 8");
-    expect(within(line).getByText("100%")).toBeInTheDocument();
-    // The date sits directly left of the result, with nothing pushing them
-    // apart, so the pair reads at the right edge of the line.
-    expect(line.children).toHaveLength(2);
-    expect(line.children[0]).toHaveTextContent("Last run on");
-    expect(line.children[1]).toHaveAttribute(
-      "data-testid",
-      "run-metrics-summary",
-    );
+    /** @scenario "The rename control is reachable from the keyboard" */
+    it("takes keyboard focus, so it is not offered on hover alone", () => {
+      renderPanel({ cases: [makeCase()] });
+
+      const rename = screen.getByRole("button", { name: "Rename test suite" });
+      rename.focus();
+
+      expect(document.activeElement).toBe(rename);
+      expect(rename).not.toHaveAttribute("tabindex", "-1");
+      expect(rename).not.toHaveAttribute("aria-hidden");
+    });
+
+    /** @scenario "No Edit suite button sits above the table" */
+    it("offers no Edit suite button above the table", () => {
+      renderPanel({ cases: [makeCase()] });
+
+      expect(screen.queryByText("Edit suite")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Edit suite" }),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A person with read-only access is offered no rename control" */
+    it("offers no rename control to a person with read-only access", () => {
+      renderPanel({ cases: [makeCase()], canManage: false });
+
+      expect(screen.getByText("Refunds")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Rename test suite" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  // --- Recent runs ---
+
+  describe("given a test suite with runs in the period", () => {
+    /** @scenario "One button under the table opens a recent run of the suite" */
+    it("offers one Open recent run button and no last run line", () => {
+      renderPanel({ cases: [makeCase()] });
+
+      expect(
+        screen.getByRole("button", { name: /Open recent run/ }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Last run on/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("cases-last-run-line"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The list names the recent runs of that suite, newest first" */
+    it("lists the runs newest first with the number, the time and the result", async () => {
+      setRecentRuns(threeRuns(), 3);
+      const user = userEvent.setup();
+      renderPanel({ cases: [makeCase()] });
+
+      const list = await openRecentRuns(user);
+      const rows = within(list).getAllByRole("menuitem");
+
+      expect(rows.map((row) => row.getAttribute("data-testid"))).toEqual([
+        "recent-run-batch_3",
+        "recent-run-batch_2",
+        "recent-run-batch_1",
+      ]);
+      expect(rows[0]).toHaveTextContent("Run #3");
+      expect(rows[0]).toHaveTextContent("2h ago");
+      expect(rows[0]).toHaveTextContent("100%");
+      // batch_1 held one passed run and one failed one.
+      expect(rows[2]).toHaveTextContent("Run #1");
+      expect(rows[2]).toHaveTextContent("50%");
+    });
+
+    /** @scenario "A row of the list stays short" */
+    it("holds only the number of the run, the time and the pass rate in a row", async () => {
+      setRecentRuns(threeRuns(), 3);
+      const user = userEvent.setup();
+      renderPanel({ cases: [makeCase()] });
+
+      const list = await openRecentRuns(user);
+      const row = within(list).getByTestId("recent-run-batch_3");
+
+      expect(readRow(row)).toEqual(["Run #3", "2h ago", "100%"]);
+    });
+
+    /** @scenario "A run that is still going reads as running" */
+    it("reads running in place of a pass rate while a run is still judged", async () => {
+      setRecentRuns(
+        [
+          makeSuiteRun({
+            batchRunId: "batch_live",
+            scenarioRunId: "run_live",
+            status: ScenarioRunStatus.IN_PROGRESS,
+          }),
+        ],
+        1,
+      );
+      const user = userEvent.setup();
+      renderPanel({ cases: [makeCase()] });
+
+      const list = await openRecentRuns(user);
+
+      expect(
+        readRow(within(list).getByTestId("recent-run-batch_live")),
+      ).toEqual(["Run #1", "2h ago", "running"]);
+    });
+
+    /** @scenario "Choosing a run opens it on the Results tab" */
+    it("pushes the Results tab, the plan of the suite and that run", async () => {
+      setRecentRuns(threeRuns(), 3);
+      const user = userEvent.setup();
+      renderPanel({ cases: [makeCase()] });
+
+      const list = await openRecentRuns(user);
+      await user.click(within(list).getByTestId("recent-run-batch_2"));
+
+      expect(routerPush).toHaveBeenCalledWith(
+        {
+          pathname: "/[project]/agent-testing/[[...path]]",
+          query: {
+            project: "test-project",
+            path: ["results", "refunds", "batch_2"],
+          },
+        },
+        "/test-project/agent-testing/results/refunds/batch_2",
+        { shallow: true },
+      );
+    });
+
+    /** @scenario "The runs are read only when the list is opened" */
+    it("holds both reads back until the list is opened", async () => {
+      setRecentRuns(threeRuns(), 3);
+
+      // The hook itself holds the reads back, whether or not the list is
+      // mounted while it is closed.
+      const { rerender } = renderHook(
+        ({ enabled }: { enabled: boolean }) =>
+          useSuiteRecentRuns({
+            scenarioSetId: "__internal__suite_refunds__suite",
+            period: PERIOD,
+            enabled,
+          }),
+        { initialProps: { enabled: false } },
+      );
+
+      expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(false);
+      expect(batchRunCountQuery.mock.calls.some(isEnabledRead)).toBe(false);
+
+      rerender({ enabled: true });
+
+      expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(true);
+      expect(batchRunCountQuery.mock.calls.some(isEnabledRead)).toBe(true);
+
+      // And opening the list is what turns them on.
+      suiteRunDataQuery.mockClear();
+      batchRunCountQuery.mockClear();
+      setRecentRuns(threeRuns(), 3);
+      const user = userEvent.setup();
+      renderPanel({ cases: [makeCase()] });
+      await openRecentRuns(user);
+
+      expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(true);
+      expect(batchRunCountQuery.mock.calls.some(isEnabledRead)).toBe(true);
+    });
+  });
+
+  /** @scenario "A suite with no run in the period offers no recent runs button" */
+  it("offers no recent runs button for a suite that never ran in the period", () => {
+    renderPanel({ cases: [makeCase()], suiteHasRun: false });
+
+    expect(screen.queryByTestId("recent-runs-trigger")).not.toBeInTheDocument();
+    expect(screen.queryByText("Open recent run")).not.toBeInTheDocument();
   });
 
   // --- Empty states ---
@@ -579,7 +863,7 @@ describe("the scenarios table", () => {
     it("asks for the name of the first test suite and shows no suite header", async () => {
       const user = userEvent.setup();
       const { props } = renderPanel({
-        hasSuite: false,
+        suite: null,
         hasAgent: true,
         projectHasNoCases: true,
         suites: [],
@@ -612,7 +896,7 @@ describe("the scenarios table", () => {
     it("offers to connect the agent before it asks for a test suite", async () => {
       const user = userEvent.setup();
       const { props } = renderPanel({
-        hasSuite: false,
+        suite: null,
         hasAgent: false,
         projectHasNoCases: true,
         suites: [],
@@ -635,7 +919,7 @@ describe("the scenarios table", () => {
     it("holds the skeleton rather than asking anything while the reads are open", () => {
       renderPanel({
         isLoading: true,
-        hasSuite: false,
+        suite: null,
         hasAgent: false,
         suites: [],
         cases: [],

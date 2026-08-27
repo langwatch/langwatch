@@ -55,7 +55,7 @@ export type SuiteRailProps = {
   onNewSuite: () => void;
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
-  onEditSuite: (suiteId: string) => void;
+  onRenameSuite: (suiteId: string) => void;
   onOpenLastRun: (suite: TestSuiteEntry) => void;
   onArchiveSuite: (suiteId: string) => void;
   isArchiving?: boolean;

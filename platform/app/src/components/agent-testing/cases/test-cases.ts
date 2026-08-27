@@ -8,9 +8,6 @@
  * @see specs/scenarios/scenario-folder-assignment.feature
  */
 
-import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
 import type { SuiteTarget } from "~/server/suites/types";
 
 /** A scenario as the table reads it. */
@@ -87,66 +84,4 @@ export function collectLabels(cases: TestCase[]): string[] {
     for (const label of testCase.labels) labels.add(label);
   }
   return Array.from(labels).sort();
-}
-
-const PASSED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
-  ScenarioRunStatus.SUCCESS,
-]);
-
-const FAILED_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
-  ScenarioRunStatus.FAILED,
-  ScenarioRunStatus.ERROR,
-]);
-
-/**
- * How a group of cases did, from the last result of each of them.
- *
- * The shape is the one RunMetricsSummary reads. Duration and cost stay empty:
- * the last-result read carries a verdict per case, not the metrics of a run.
- */
-export function summaryFromLastResults(
-  results: ScenarioLastResultSummary[],
-): RunGroupSummary {
-  let passedCount = 0;
-  let failedCount = 0;
-  let cancelledCount = 0;
-  let inProgressCount = 0;
-
-  for (const result of results) {
-    if (PASSED_STATUSES.has(result.status)) passedCount++;
-    else if (FAILED_STATUSES.has(result.status)) failedCount++;
-    else if (result.status === ScenarioRunStatus.CANCELLED) cancelledCount++;
-    else inProgressCount++;
-  }
-
-  const completedCount = passedCount + failedCount;
-
-  return {
-    passRate: completedCount > 0 ? (passedCount / completedCount) * 100 : null,
-    passedCount,
-    failedCount,
-    stalledCount: 0,
-    cancelledCount,
-    completedCount,
-    totalCount: results.length,
-    inProgressCount,
-    queuedCount: 0,
-    totalCost: null,
-    averageAgentLatencyMs: null,
-    totalDurationMs: null,
-    agentLatencyStats: null,
-    agentCostStats: null,
-    averageAgentCost: null,
-  };
-}
-
-/** The newest run time among a set of last results, or nothing. */
-export function lastRunAtOf(
-  results: ScenarioLastResultSummary[],
-): number | null {
-  let latest: number | null = null;
-  for (const result of results) {
-    if (latest === null || result.lastRunAt > latest) latest = result.lastRunAt;
-  }
-  return latest;
 }

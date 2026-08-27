@@ -58,6 +58,10 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
+        // The run dialog reads the configurations its scope already ran with.
+        getRunConfigurations: {
+          useQuery: () => ({ data: [], isLoading: false }),
+        },
         getAll: { invalidate: vi.fn() },
         getRunState: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
@@ -76,6 +80,8 @@ vi.mock("~/utils/api", () => ({
       getExternalSetSummaries: { useQuery: emptyQuery },
       getLastResultSummaries: { useQuery: mockLastResults },
       getScenarioSetRunData: { useQuery: emptyQuery },
+      getSuiteRunData: { useQuery: emptyQuery },
+      getScenarioSetBatchRunCount: { useQuery: emptyQuery },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       moveToFolder: {
@@ -412,9 +418,6 @@ describe("starting a one-off run from the case table", () => {
     );
 
     expect(screen.getByTestId("agent-testing-cases-table")).toBeInTheDocument();
-    // The cases table no longer carries a last result cell, so the fresh
-    // verdict lands on the summary line under the table.
-    expect(screen.getByTestId("cases-last-run-line")).toHaveTextContent("100%");
     expect(mockRouterPush).not.toHaveBeenCalled();
   });
 });
